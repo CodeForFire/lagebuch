@@ -3,6 +3,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{CAFD053B-97E0-4F65-AFA6-6DEB1F160EFD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Feuerwehr.Domain", "src\Feuerwehr.Domain\Feuerwehr.Domain.csproj", "{BEAA30F9-2644-469B-8C2B-BC0BA413D457}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{122AC94A-9D21-47F9-A1E5-710687074046}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Feuerwehr.Domain.Tests", "tests\Feuerwehr.Domain.Tests\Feuerwehr.Domain.Tests.csproj", "{46BC0C00-230B-449A-BA0E-840413737647}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -10,5 +18,19 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BEAA30F9-2644-469B-8C2B-BC0BA413D457}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BEAA30F9-2644-469B-8C2B-BC0BA413D457}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BEAA30F9-2644-469B-8C2B-BC0BA413D457}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BEAA30F9-2644-469B-8C2B-BC0BA413D457}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46BC0C00-230B-449A-BA0E-840413737647}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46BC0C00-230B-449A-BA0E-840413737647}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46BC0C00-230B-449A-BA0E-840413737647}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46BC0C00-230B-449A-BA0E-840413737647}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{BEAA30F9-2644-469B-8C2B-BC0BA413D457} = {CAFD053B-97E0-4F65-AFA6-6DEB1F160EFD}
+		{46BC0C00-230B-449A-BA0E-840413737647} = {122AC94A-9D21-47F9-A1E5-710687074046}
 	EndGlobalSection
 EndGlobal
