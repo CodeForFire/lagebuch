@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+.vs/
+TestResults/
+coverage/
+*.trx
+
+# Project-specific: never commit the legacy template or planning artifacts
+*.xltm
+Einsatzdokumentation_Digital_*.xltm
+docs/superpowers/
+
+# Local SDD scratch / ledger
+.superpowers/
