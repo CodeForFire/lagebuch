@@ -17,6 +17,8 @@ public class IlsNumberTests
     [InlineData("12345")]
     [InlineData("12a4")]
     [InlineData("")]
+    [InlineData("1234\n")]
+    [InlineData("1234 ")]
     public void Parse_rejects_non_four_digit_values(string input)
     {
         Assert.Throws<FormatException>(() => IlsNumber.Parse(input));

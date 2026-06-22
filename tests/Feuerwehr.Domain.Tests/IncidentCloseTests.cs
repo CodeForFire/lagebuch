@@ -62,4 +62,20 @@ public class IncidentCloseTests
         incident.Close(clock, op);
         Assert.Throws<IncidentClosedException>(() => incident.ToggleChecklistItem(id));
     }
+
+    [Fact]
+    public void Assigning_role_after_close_throws()
+    {
+        var incident = OpenIncident(out var clock, out var op);
+        incident.Close(clock, op);
+        Assert.Throws<IncidentClosedException>(() => incident.AssignRole("EL", "Müller"));
+    }
+
+    [Fact]
+    public void Adding_force_unit_after_close_throws()
+    {
+        var incident = OpenIncident(out var clock, out var op);
+        incident.Close(clock, op);
+        Assert.Throws<IncidentClosedException>(() => incident.AddForceUnit("FFB", 12));
+    }
 }

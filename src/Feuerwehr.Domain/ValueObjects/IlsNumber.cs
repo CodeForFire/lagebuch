@@ -28,6 +28,6 @@ public sealed partial record IlsNumber
 
     public override string ToString() => Value;
 
-    [GeneratedRegex(@"^\d{4}$")]
+    [GeneratedRegex(@"\A\d{4}\z")]
     private static partial Regex FourDigits();
 }
