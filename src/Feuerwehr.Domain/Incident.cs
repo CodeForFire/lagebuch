@@ -52,6 +52,46 @@ public sealed class Incident
         return incident;
     }
 
+    public static Incident Rehydrate(
+        Guid id,
+        DateTimeOffset startedAt,
+        IncidentState state,
+        IncidentNumber? incidentNumber,
+        IlsNumber? ilsNumber,
+        string? keyword,
+        string? street,
+        string? district,
+        string? status,
+        DateTimeOffset? closedAt,
+        string? closedBy,
+        IEnumerable<ChecklistItem> checklist,
+        IEnumerable<EtbEntry> journal,
+        IEnumerable<RoleAssignment> roles,
+        IEnumerable<ForceUnit> forces,
+        IEnumerable<AuditEvent> audit)
+    {
+        var incident = new Incident
+        {
+            Id = id,
+            StartedAt = startedAt,
+            State = state,
+            IncidentNumber = incidentNumber,
+            IlsNumber = ilsNumber,
+            Keyword = keyword,
+            Street = street,
+            District = district,
+            Status = status,
+            ClosedAt = closedAt,
+            ClosedBy = closedBy
+        };
+        incident._checklist.AddRange(checklist);
+        incident._journal.AddRange(journal);
+        incident._roles.AddRange(roles);
+        incident._forces.AddRange(forces);
+        incident._audit.AddRange(audit);
+        return incident;
+    }
+
     private void EnsureOpen()
     {
         if (State == IncidentState.Closed)

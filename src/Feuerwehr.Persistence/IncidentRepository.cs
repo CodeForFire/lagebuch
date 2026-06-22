@@ -1,0 +1,202 @@
+using Feuerwehr.Domain;
+using Feuerwehr.Persistence.Sqlite;
+using Microsoft.Data.Sqlite;
+
+namespace Feuerwehr.Persistence;
+
+public sealed class IncidentRepository
+{
+    private const string Iso = "O";
+
+    public void Save(string path, Incident incident)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        using var cn = SqliteConnectionFactory.OpenReadWrite(path);
+        Migrations.Migrate(cn);
+        using var tx = cn.BeginTransaction();
+
+        foreach (var table in new[]
+                 { "incident_meta", "checklist_items", "etb_entries",
+                   "role_assignments", "force_units", "audit_events" })
+        {
+            Exec(cn, tx, $"DELETE FROM {table};");
+        }
+
+        Run(cn, tx,
+            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by) " +
+            "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy);",
+            p =>
+            {
+                p("$id", incident.Id.ToString());
+                p("$started", incident.StartedAt.ToString(Iso));
+                p("$state", (int)incident.State);
+                p("$num", (object?)incident.IncidentNumber?.Value ?? DBNull.Value);
+                p("$ils", (object?)incident.IlsNumber?.Value ?? DBNull.Value);
+                p("$kw", (object?)incident.Keyword ?? DBNull.Value);
+                p("$street", (object?)incident.Street ?? DBNull.Value);
+                p("$district", (object?)incident.District ?? DBNull.Value);
+                p("$status", (object?)incident.Status ?? DBNull.Value);
+                p("$closedAt", (object?)incident.ClosedAt?.ToString(Iso) ?? DBNull.Value);
+                p("$closedBy", (object?)incident.ClosedBy ?? DBNull.Value);
+            });
+
+        for (var i = 0; i < incident.Checklist.Count; i++)
+        {
+            var c = incident.Checklist[i];
+            Run(cn, tx,
+                "INSERT INTO checklist_items (id, ordinal, text, is_done, note) VALUES ($id,$o,$t,$d,$n);",
+                p => { p("$id", c.Id.ToString()); p("$o", i); p("$t", c.Text); p("$d", c.IsDone ? 1 : 0); p("$n", (object?)c.Note ?? DBNull.Value); });
+        }
+
+        for (var i = 0; i < incident.Journal.Count; i++)
+        {
+            var e = incident.Journal[i];
+            Run(cn, tx,
+                "INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by) VALUES ($id,$o,$ts,$dir,$from,$to,$txt,$by);",
+                p =>
+                {
+                    p("$id", e.Id.ToString()); p("$o", i); p("$ts", e.Timestamp.ToString(Iso));
+                    p("$dir", (int)e.Direction); p("$from", (object?)e.From ?? DBNull.Value);
+                    p("$to", (object?)e.To ?? DBNull.Value); p("$txt", e.Text); p("$by", e.EnteredBy);
+                });
+        }
+
+        for (var i = 0; i < incident.Roles.Count; i++)
+        {
+            var r = incident.Roles[i];
+            Run(cn, tx,
+                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time) VALUES ($id,$o,$role,$name,$cs,$from,$to);",
+                p =>
+                {
+                    p("$id", r.Id.ToString()); p("$o", i); p("$role", r.Role); p("$name", r.PersonName);
+                    p("$cs", (object?)r.CallSign ?? DBNull.Value);
+                    p("$from", (object?)r.From?.ToString(Iso) ?? DBNull.Value);
+                    p("$to", (object?)r.To?.ToString(Iso) ?? DBNull.Value);
+                });
+        }
+
+        for (var i = 0; i < incident.Forces.Count; i++)
+        {
+            var f = incident.Forces[i];
+            Run(cn, tx,
+                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, status, notes) VALUES ($id,$o,$b,$cs,$pc,$st,$n);",
+                p =>
+                {
+                    p("$id", f.Id.ToString()); p("$o", i); p("$b", f.Brigade);
+                    p("$cs", (object?)f.CallSign ?? DBNull.Value); p("$pc", f.PersonnelCount);
+                    p("$st", (object?)f.Status ?? DBNull.Value); p("$n", (object?)f.Notes ?? DBNull.Value);
+                });
+        }
+
+        for (var i = 0; i < incident.Audit.Count; i++)
+        {
+            var a = incident.Audit[i];
+            Run(cn, tx,
+                "INSERT INTO audit_events (ordinal, at, action, by_operator) VALUES ($o,$at,$act,$by);",
+                p => { p("$o", i); p("$at", a.At.ToString(Iso)); p("$act", a.Action); p("$by", a.By); });
+        }
+
+        tx.Commit();
+    }
+
+    public Incident Load(string path)
+    {
+        // Peek at state with a read-only connection to decide open mode.
+        IncidentState state;
+        using (var probe = SqliteConnectionFactory.OpenReadOnly(path))
+        using (var cmd = probe.CreateCommand())
+        {
+            cmd.CommandText = "SELECT state FROM incident_meta LIMIT 1;";
+            var raw = cmd.ExecuteScalar() ?? throw new InvalidOperationException("No incident in file.");
+            state = (IncidentState)Convert.ToInt32(raw);
+        }
+
+        using var cn = state == IncidentState.Closed
+            ? SqliteConnectionFactory.OpenReadOnly(path)
+            : SqliteConnectionFactory.OpenReadWrite(path);
+
+        var meta = ReadRow(cn,
+            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by FROM incident_meta LIMIT 1;");
+
+        var checklist = ReadAll(cn, "SELECT id, text, is_done, note FROM checklist_items ORDER BY ordinal;",
+            r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3)));
+
+        var journal = ReadAll(cn, "SELECT id, timestamp, direction, from_party, to_party, text, entered_by FROM etb_entries ORDER BY ordinal;",
+            r => Domain.Etb.EtbEntry.Rehydrate(Guid.Parse(r.GetString(0)), ParseDate(r.GetString(1)),
+                (Domain.Etb.EtbDirection)r.GetInt32(2), r.GetString(5), r.GetString(6), Str(r, 3), Str(r, 4)));
+
+        var roles = ReadAll(cn, "SELECT id, role, person_name, call_sign, from_time, to_time FROM role_assignments ORDER BY ordinal;",
+            r => new Domain.RoleAssignment(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),
+                Str(r, 3), NullableDate(r, 4), NullableDate(r, 5)));
+
+        var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, status, notes FROM force_units ORDER BY ordinal;",
+            r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3), Str(r, 4), Str(r, 5)));
+
+        var audit = ReadAll(cn, "SELECT at, action, by_operator FROM audit_events ORDER BY ordinal;",
+            r => new Domain.AuditEvent(ParseDate(r.GetString(0)), r.GetString(1), r.GetString(2)));
+
+        var incidentNumber = meta[3] is string n ? new Domain.ValueObjects.IncidentNumber(n) : null;
+        var ilsNumber = meta[4] is string ils ? Domain.ValueObjects.IlsNumber.Parse(ils) : null;
+
+        return Incident.Rehydrate(
+            Guid.Parse((string)meta[0]!),
+            ParseDate((string)meta[1]!),
+            (IncidentState)Convert.ToInt32(meta[2]),
+            incidentNumber,
+            ilsNumber,
+            meta[5] as string,
+            meta[6] as string,
+            meta[7] as string,
+            meta[8] as string,
+            meta[9] is string ca ? ParseDate(ca) : null,
+            meta[10] as string,
+            checklist, journal, roles, forces, audit);
+    }
+
+    private static DateTimeOffset ParseDate(string s) =>
+        DateTimeOffset.Parse(s, null, System.Globalization.DateTimeStyles.RoundtripKind);
+
+    private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
+
+    private static DateTimeOffset? NullableDate(SqliteDataReader r, int i) =>
+        r.IsDBNull(i) ? null : ParseDate(r.GetString(i));
+
+    private static object?[] ReadRow(SqliteConnection cn, string sql)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = sql;
+        using var r = cmd.ExecuteReader();
+        if (!r.Read()) throw new InvalidOperationException("No incident in file.");
+        var values = new object?[r.FieldCount];
+        for (var i = 0; i < r.FieldCount; i++)
+            values[i] = r.IsDBNull(i) ? null : r.GetValue(i);
+        return values;
+    }
+
+    private static List<T> ReadAll<T>(SqliteConnection cn, string sql, Func<SqliteDataReader, T> map)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = sql;
+        using var r = cmd.ExecuteReader();
+        var list = new List<T>();
+        while (r.Read()) list.Add(map(r));
+        return list;
+    }
+
+    private static void Run(SqliteConnection cn, SqliteTransaction tx, string sql, Action<Action<string, object>> bind)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = sql;
+        bind((name, value) => cmd.Parameters.AddWithValue(name, value));
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void Exec(SqliteConnection cn, SqliteTransaction tx, string sql)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+}
