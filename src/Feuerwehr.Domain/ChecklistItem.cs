@@ -10,6 +10,17 @@ public sealed class ChecklistItem
         Text = text.Trim();
     }
 
+    private ChecklistItem(Guid id, string text, bool isDone, string? note)
+    {
+        Id = id;
+        Text = text;
+        IsDone = isDone;
+        Note = note;
+    }
+
+    public static ChecklistItem Rehydrate(Guid id, string text, bool isDone, string? note)
+        => new(id, text, isDone, note);
+
     public Guid Id { get; }
     public string Text { get; }
     public bool IsDone { get; private set; }

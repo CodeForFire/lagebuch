@@ -35,4 +35,23 @@ public sealed record EtbEntry
             EnteredBy = @operator.Display
         };
     }
+
+    public static EtbEntry Rehydrate(
+        Guid id,
+        DateTimeOffset timestamp,
+        EtbDirection direction,
+        string text,
+        string enteredBy,
+        string? from,
+        string? to)
+        => new()
+        {
+            Id = id,
+            Timestamp = timestamp,
+            Direction = direction,
+            Text = text,
+            EnteredBy = enteredBy,
+            From = from,
+            To = to
+        };
 }
