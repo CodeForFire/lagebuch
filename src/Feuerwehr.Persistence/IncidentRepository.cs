@@ -99,6 +99,90 @@ public sealed class IncidentRepository
         tx.Commit();
     }
 
+    public Incident Load(string path)
+    {
+        // Peek at state with a read-only connection to decide open mode.
+        IncidentState state;
+        using (var probe = SqliteConnectionFactory.OpenReadOnly(path))
+        using (var cmd = probe.CreateCommand())
+        {
+            cmd.CommandText = "SELECT state FROM incident_meta LIMIT 1;";
+            var raw = cmd.ExecuteScalar() ?? throw new InvalidOperationException("No incident in file.");
+            state = (IncidentState)Convert.ToInt32(raw);
+        }
+
+        using var cn = state == IncidentState.Closed
+            ? SqliteConnectionFactory.OpenReadOnly(path)
+            : SqliteConnectionFactory.OpenReadWrite(path);
+
+        var meta = ReadRow(cn,
+            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by FROM incident_meta LIMIT 1;");
+
+        var checklist = ReadAll(cn, "SELECT id, text, is_done, note FROM checklist_items ORDER BY ordinal;",
+            r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3)));
+
+        var journal = ReadAll(cn, "SELECT id, timestamp, direction, from_party, to_party, text, entered_by FROM etb_entries ORDER BY ordinal;",
+            r => Domain.Etb.EtbEntry.Rehydrate(Guid.Parse(r.GetString(0)), ParseDate(r.GetString(1)),
+                (Domain.Etb.EtbDirection)r.GetInt32(2), r.GetString(5), r.GetString(6), Str(r, 3), Str(r, 4)));
+
+        var roles = ReadAll(cn, "SELECT id, role, person_name, call_sign, from_time, to_time FROM role_assignments ORDER BY ordinal;",
+            r => new Domain.RoleAssignment(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),
+                Str(r, 3), NullableDate(r, 4), NullableDate(r, 5)));
+
+        var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, status, notes FROM force_units ORDER BY ordinal;",
+            r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3), Str(r, 4), Str(r, 5)));
+
+        var audit = ReadAll(cn, "SELECT at, action, by_operator FROM audit_events ORDER BY ordinal;",
+            r => new Domain.AuditEvent(ParseDate(r.GetString(0)), r.GetString(1), r.GetString(2)));
+
+        var incidentNumber = meta[3] is string n ? new Domain.ValueObjects.IncidentNumber(n) : null;
+        var ilsNumber = meta[4] is string ils ? Domain.ValueObjects.IlsNumber.Parse(ils) : null;
+
+        return Incident.Rehydrate(
+            Guid.Parse((string)meta[0]!),
+            ParseDate((string)meta[1]!),
+            (IncidentState)Convert.ToInt32(meta[2]),
+            incidentNumber,
+            ilsNumber,
+            meta[5] as string,
+            meta[6] as string,
+            meta[7] as string,
+            meta[8] as string,
+            meta[9] is string ca ? ParseDate(ca) : null,
+            meta[10] as string,
+            checklist, journal, roles, forces, audit);
+    }
+
+    private static DateTimeOffset ParseDate(string s) =>
+        DateTimeOffset.Parse(s, null, System.Globalization.DateTimeStyles.RoundtripKind);
+
+    private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
+
+    private static DateTimeOffset? NullableDate(SqliteDataReader r, int i) =>
+        r.IsDBNull(i) ? null : ParseDate(r.GetString(i));
+
+    private static object?[] ReadRow(SqliteConnection cn, string sql)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = sql;
+        using var r = cmd.ExecuteReader();
+        if (!r.Read()) throw new InvalidOperationException("No incident in file.");
+        var values = new object?[r.FieldCount];
+        for (var i = 0; i < r.FieldCount; i++)
+            values[i] = r.IsDBNull(i) ? null : r.GetValue(i);
+        return values;
+    }
+
+    private static List<T> ReadAll<T>(SqliteConnection cn, string sql, Func<SqliteDataReader, T> map)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = sql;
+        using var r = cmd.ExecuteReader();
+        var list = new List<T>();
+        while (r.Read()) list.Add(map(r));
+        return list;
+    }
+
     private static void Run(SqliteConnection cn, SqliteTransaction tx, string sql, Action<Action<string, object>> bind)
     {
         using var cmd = cn.CreateCommand();
