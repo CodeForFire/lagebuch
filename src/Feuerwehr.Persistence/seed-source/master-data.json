@@ -1,0 +1,1336 @@
+{
+  "_note": "Extracted from Einsatzdokumentation_Digital_v9.6.6.xltm Hilfsdaten sheet. PII (personnel names + phone numbers) intentionally EXCLUDED per project decision.",
+  "roles": [
+    "EL",
+    "EAL",
+    "UEAL",
+    "VF",
+    "ZF",
+    "GF",
+    "StF",
+    "TF",
+    "Melder"
+  ],
+  "status": [
+    "aufgenommen",
+    "übermittelt",
+    "abgearbeitet",
+    "kein Eingreifen",
+    "abbestellt"
+  ],
+  "equipment": [
+    "Mobilteil 1",
+    "Mobilteil 2",
+    "Digitalkamera",
+    "GoPro",
+    "HRT",
+    "Weste EAL",
+    "Weste EL",
+    "Weste Presse",
+    "Weste Atemschutz",
+    "AED",
+    "Fernglas",
+    "Windmesser",
+    "Sonstiges (siehe Bemerkung)"
+  ],
+  "districts": [
+    "Aich",
+    "FFB",
+    "Puch"
+  ],
+  "radioCallSigns": [
+    "FFB 1/10/1",
+    "FFB 1/11/1",
+    "FFB 1/12/1",
+    "FFB 1/14/1",
+    "FFB 1/14/2",
+    "FFB 1/23/1",
+    "FFB 1/30/1",
+    "FFB 1/40/1",
+    "FFB 1/40/2",
+    "FFB 1/41/1",
+    "FFB 1/53/1",
+    "FFB 1/56/1",
+    "FFB 1/58/1",
+    "FFB 1/61/1",
+    "FFB 1/65/1",
+    "FFB 1/94/1",
+    "FFB 1/99/1",
+    "FFB 1/99/2",
+    "FFB 2/11/1",
+    "FFB 2/30/1",
+    "FFB 2/40/1",
+    "Aich 11/1",
+    "Aich 42/1",
+    "Puch 14/1",
+    "Puch 43/1"
+  ],
+  "streets": [
+    {
+      "name": "Abt-Anselm-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Abt-Führer-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Abt-Thoma-Str.",
+      "district": "Puch"
+    },
+    {
+      "name": "Adalbert-Stifter-Ring",
+      "district": "FFB"
+    },
+    {
+      "name": "Adolf-Kolping-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Aicher Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Albert-Schweitzer-Ring",
+      "district": "FFB"
+    },
+    {
+      "name": "Albrecht-Dürer-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Alemannenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Almuñécarstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Alpenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Alpspitzweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Ährenfeld",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Anger",
+      "district": "Aich"
+    },
+    {
+      "name": "Am Ausjagbogen",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Drudenbogen",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Einfang",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Engelsberg",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Fohlenhof",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Fuchsbogen",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Hardtanger",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Hart",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Kugelfang",
+      "district": "FFB"
+    },
+    {
+      "name": "Am Lindenplatz",
+      "district": "FFB"
+    },
+    {
+      "name": "Auf der Lände",
+      "district": "FFB"
+    },
+    {
+      "name": "Augsburger Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Aumillerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Bahnhofstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Bajuwarenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Balduin-Helm-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Bartlweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Beethovenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Birkenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Bismarckstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Bleichanger",
+      "district": "FFB"
+    },
+    {
+      "name": "Blumenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Boosstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Breitenbichl",
+      "district": "FFB"
+    },
+    {
+      "name": "Brucker Str.",
+      "district": "Aich"
+    },
+    {
+      "name": "Buchenauer Platz",
+      "district": "FFB"
+    },
+    {
+      "name": "Buchenauer Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Buchenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Bullachstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Bürgermeister-Braumiller-Str.",
+      "district": "Puch"
+    },
+    {
+      "name": "Bürgermeister-Miller-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Carl-von-Linde-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Cerveteristr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Dachauer Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Dallmayrstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Danziger Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Denkmalstr.",
+      "district": "Puch"
+    },
+    {
+      "name": "Dianastr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Dirnaglstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Dorfstr.",
+      "district": "Aich"
+    },
+    {
+      "name": "Dr.-Blaich-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Dr.-Lorenz-Lampl-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Drachenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Ebnerweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Edererstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Edignaweg",
+      "district": "Puch"
+    },
+    {
+      "name": "Eduard-Friederich-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Eibenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Eichendorffweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Eichenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Eisenhoferstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Emmeringer Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Enzianstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Erlenstr. (neu: Hans-Kiener-Str.)",
+      "district": "FFB"
+    },
+    {
+      "name": "Eschenauerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Eschenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ettenhoferstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Falkenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Fasanenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Feldstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ferdinand-Feldigl-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ferdinand-Miller-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Feuerhausstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Fichtenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Finkenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Fliederstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Flurstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Föhrenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Frankenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Fraunhoferstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Friedrich-Ebert-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Frühlingstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Fürstenfelder Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Fürstenfelder Weg",
+      "district": "Puch"
+    },
+    {
+      "name": "Ganghoferstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Gartenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Gegenpointstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Gehagstr.",
+      "district": "Puch"
+    },
+    {
+      "name": "Geisinger Steig",
+      "district": "FFB"
+    },
+    {
+      "name": "Gelbenholzener Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "General-Ritter-von-Mann-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Gernlindener Weg",
+      "district": "FFB"
+    },
+    {
+      "name": "Geschwister-Haeusler-Weg",
+      "district": "FFB"
+    },
+    {
+      "name": "Geschwister-Scholl-Platz",
+      "district": "FFB"
+    },
+    {
+      "name": "Glockenbecherweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Goethestr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Günther-von-Maltzahn-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Habichtstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Hans-Güntner-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Hans-Kiener-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Hans-Sachs-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Haselnußweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Hasenheide",
+      "district": "FFB"
+    },
+    {
+      "name": "Hauptstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Heideweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Heimstättenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Henrik-Moor-Weg",
+      "district": "FFB"
+    },
+    {
+      "name": "Herrenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Heuweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Hindenburgstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Hochfeldweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Hochrainerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Höhenringstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Holunderweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Holzhofstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Holzstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Hubertusstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Hugo-Junkers-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Im Eichgärtl",
+      "district": "FFB"
+    },
+    {
+      "name": "Industriestr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Jägerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Jahnstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Jakob-Groß-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Jexlau",
+      "district": "Puch"
+    },
+    {
+      "name": "Josef-Priller-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Josef-Spital-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Julie-Mayr-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Jupiterstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kaiseranger",
+      "district": "Puch"
+    },
+    {
+      "name": "Kaiser-Ludwig-Str.",
+      "district": "Puch"
+    },
+    {
+      "name": "Kapellenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kapuzinerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Karl-Robiczek-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Karl-Trautmann-Weg",
+      "district": "FFB"
+    },
+    {
+      "name": "Karwendelstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kastanienweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Kellererstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Keller-Reutlingen-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Keltenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Kiefernstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kieswerkstr.",
+      "district": "Puch"
+    },
+    {
+      "name": "Kirchstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kirschbaumstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Klosteranger",
+      "district": "Puch"
+    },
+    {
+      "name": "Klosterstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kögelstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kohlstatt",
+      "district": "FFB"
+    },
+    {
+      "name": "Konrad-Adenauer-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Korbinian-Penzl-Str.",
+      "district": "Puch"
+    },
+    {
+      "name": "Krautgartenweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Kreuzfeldstr.",
+      "district": "Puch"
+    },
+    {
+      "name": "Kronprinz-Rupprecht-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Kurt-Huber-Ring",
+      "district": "FFB"
+    },
+    {
+      "name": "Kurt-Schumacher-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Lämmerweide",
+      "district": "FFB"
+    },
+    {
+      "name": "Landsberger Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Langbehnstr.",
+      "district": "Puch"
+    },
+    {
+      "name": "Lärchenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ledererstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Leitenweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Lena-Christ-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Leonhardsplatz",
+      "district": "FFB"
+    },
+    {
+      "name": "Lessingstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Liebigstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Lilienthalstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Lindacher Weg",
+      "district": "Puch"
+    },
+    {
+      "name": "Lindenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Livry-Gargan-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ludwigshöhe",
+      "district": "FFB"
+    },
+    {
+      "name": "Ludwigstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ludwig-Thoma-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Luitpoldstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Lützowstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Maisacher Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Malchinger Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Margeritenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Marsstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Marthabräustr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Martin-Luther-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Meisenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Messerschmittstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Michael-Kohlhaas-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Miedersweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Milchstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Mondstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Mörikestr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Mozartstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Mühlanger",
+      "district": "FFB"
+    },
+    {
+      "name": "Mühlfeldstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Münchner Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Nannhofer Str.",
+      "district": "Aich"
+    },
+    {
+      "name": "Nelkenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Neufeldstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Neulindacher Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Nibelungenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Nicolaus-Otto-Str.",
+      "district": "Puch"
+    },
+    {
+      "name": "Niederbronnerweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Nikolausbergstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Nimrodstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Nordendstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Nußbaumstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Oberöggerweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Ordenslandstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Orlando-di-Lasso-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Oskar-von-Miller-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ostendstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Otl-Aicher-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Otto-Kubel-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "P+R Fürstenfeldbruck",
+      "district": "FFB"
+    },
+    {
+      "name": "P1 Festplatz",
+      "district": "FFB"
+    },
+    {
+      "name": "P3 Sportplatz",
+      "district": "FFB"
+    },
+    {
+      "name": "Pappelweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Parchwitzerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Parkplatz Auf der Lände",
+      "district": "FFB"
+    },
+    {
+      "name": "Parkplatz Fürstenfeld",
+      "district": "FFB"
+    },
+    {
+      "name": "Parkplatz P3",
+      "district": "FFB"
+    },
+    {
+      "name": "Parsevalstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Paul-Gerhardt-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Pellhammerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Peter-Rosegger-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Pfaffinger Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Philipp-Weiß-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Plonnerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Polzstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Pruggmayrstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Pucher Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Pucher Weg",
+      "district": "Aich"
+    },
+    {
+      "name": "Puchermühlstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Rebhuhnweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Ricarda-Huch-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Richard-Higgins-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ringelnatzweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Ringstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Rißfeldstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Rodelbahnstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Römerbogen",
+      "district": "FFB"
+    },
+    {
+      "name": "Röntgenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Rosenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Rotdornweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Rothschwaiger Feldweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Rothschwaiger Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Rudolf-Diesel-Ring",
+      "district": "FFB"
+    },
+    {
+      "name": "Saarstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Schillerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Schlehdornweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Schleifweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Schlesierstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Schloßbergstr.",
+      "district": "Aich"
+    },
+    {
+      "name": "Schöngeisinger Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Schubertstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Schulweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Schwabenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Schwalbenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Senserbergstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Siechfeldstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Siedlerplatz",
+      "district": "FFB"
+    },
+    {
+      "name": "Siedlerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Sinzingerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Sommerkellerweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Sonnenplatz",
+      "district": "FFB"
+    },
+    {
+      "name": "Sparkassenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Spatzenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "St.-Bernhard-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "St.-Sebastian-Str.",
+      "district": "Puch"
+    },
+    {
+      "name": "Stadelbergerstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Starenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Sternstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Stiglmayrstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Stockmeierweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Straße der Luftwaffe",
+      "district": "FFB"
+    },
+    {
+      "name": "Sudetenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Tannenweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Theodor-Heuss-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Theresianumweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Tonwerkstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Tüflweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Tulpenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Uhlandstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Ulmenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Unfaltstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Veilchenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Veit-Stoß-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Viehmarktstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Viscardistr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Vogelbeerweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Von-Gravenreuth-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Waldfriedhofstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Waldstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Weichselstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Weidenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Weiherstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Weilerweg",
+      "district": "Aich"
+    },
+    {
+      "name": "Werftstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Wernher-von-Braun-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Westendstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Wettersteinstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Wiesenstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Wilhelm-Busch-Str.",
+      "district": "FFB"
+    },
+    {
+      "name": "Willy-Buchauer-Ring",
+      "district": "FFB"
+    },
+    {
+      "name": "Wittelsbacherplatz",
+      "district": "FFB"
+    },
+    {
+      "name": "Zadarstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Zeilstr.",
+      "district": "Aich"
+    },
+    {
+      "name": "Zellhofstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Zenettistr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Zeppelinstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Zisterzienserweg",
+      "district": "FFB"
+    },
+    {
+      "name": "Zugspitzstr.",
+      "district": "FFB"
+    },
+    {
+      "name": "Zum Krebsenbach",
+      "district": "FFB"
+    },
+    {
+      "name": "Zur Kaisersäule",
+      "district": "Puch"
+    }
+  ],
+  "checklistTemplate": [
+    "Aufstellort ELW weit genug weg um nicht zu behindern?",
+    "Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?",
+    "Rote Kennleuchte ein, Blaulicht aus?",
+    "PC eingeschaltet und VPN Verbindung aktiviert?",
+    "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
+    "Bei ILS gemeldet und Ansprechpartner (FFB 12/1) sowie Standort EL durchgegeben?",
+    "Alarmfax im Mailprogramm kopiert und im Reiter Alarmfax eingefügt?",
+    "Bereitstellungsraum/-räume festgelegt und an ILS weitergegeben?",
+    "Anfahrende Kräfte informiert, dass sie sich beim FFB 12/1 anmelden sollen (solange kein EAL benannt)?",
+    "Takt. Zeichen mit den fremden Fzgen beschriftet?",
+    "Headsets aufgebaut? (am Major die Funkkanäle ganz runter drehen, Lautstärke über Headset regeln)",
+    "Weiteres Personal für ELW1 beim EL angefordert?"
+  ]
+}
