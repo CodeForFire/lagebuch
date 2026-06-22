@@ -20,6 +20,8 @@ public sealed class IncidentReportDocument : IDocument
 
     public void Compose(IDocumentContainer document)
     {
+        PdfLicense.Ensure();
+
         document.Page(page =>
         {
             page.Size(PageSizes.A4);

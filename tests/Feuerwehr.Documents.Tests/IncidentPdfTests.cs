@@ -2,6 +2,7 @@ using Feuerwehr.Domain;
 using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
+using QuestPDF.Fluent;
 
 namespace Feuerwehr.Documents.Tests;
 
@@ -56,6 +57,13 @@ public class IncidentPdfTests
         incident.Close(clock, op);
 
         var bytes = IncidentPdf.Generate(incident);
+        PdfAssert.IsPdf(bytes);
+    }
+
+    [Fact]
+    public void Direct_document_generation_ensures_license_and_produces_a_valid_pdf()
+    {
+        var bytes = new IncidentReportDocument(BuildFullIncident()).GeneratePdf();
         PdfAssert.IsPdf(bytes);
     }
 }
