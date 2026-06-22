@@ -1,0 +1,50 @@
+using Feuerwehr.Persistence.Sqlite;
+using Microsoft.Data.Sqlite;
+
+namespace Feuerwehr.Persistence.Tests;
+
+public class MigrationsTests : IDisposable
+{
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"mig-{Guid.NewGuid():N}.fwincident");
+
+    public void Dispose()
+    {
+        SqliteConnection.ClearAllPools();
+        if (File.Exists(_path)) File.Delete(_path);
+    }
+
+    [Fact]
+    public void Fresh_database_starts_at_version_zero()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Assert.Equal(0, Migrations.GetVersion(cn));
+    }
+
+    [Fact]
+    public void Migrate_brings_database_to_current_version_and_is_idempotent()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+        }
+        // re-open and migrate again: no error, same version
+        using (var cn2 = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn2);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+        }
+    }
+
+    [Fact]
+    public void Migrate_creates_the_incident_tables()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN " +
+            "('incident_meta','checklist_items','etb_entries','role_assignments','force_units','audit_events');";
+        Assert.Equal(6L, (long)cmd.ExecuteScalar()!);
+    }
+}
