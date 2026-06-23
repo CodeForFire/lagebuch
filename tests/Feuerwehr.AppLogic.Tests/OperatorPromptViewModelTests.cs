@@ -21,4 +21,15 @@ public class OperatorPromptViewModelTests
         Assert.NotNull(vm.Result);
         Assert.Equal("Müller (FFB 12/1)", vm.Result!.Display);
     }
+
+    [Fact]
+    public void Confirm_raises_property_changed_for_Result()
+    {
+        var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
+        var raised = false;
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OperatorPromptViewModel.Result)) raised = true; };
+        vm.ConfirmCommand.Execute(null);
+        Assert.True(raised);
+        Assert.NotNull(vm.Result);
+    }
 }
