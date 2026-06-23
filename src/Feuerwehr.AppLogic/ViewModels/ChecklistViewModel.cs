@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
@@ -43,13 +42,17 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     [ObservableProperty]
     private string? _note;
 
-    private bool CanToggle => !IsReadOnly;
-
-    [RelayCommand(CanExecute = nameof(CanToggle))]
-    private void Toggle()
+    // Driven by the two-way IsChecked binding on the CheckBox. The binding is the single
+    // source of truth for IsDone; here we reconcile the domain model and persist. Using a
+    // separate Command in addition to the binding would toggle the state twice per click
+    // and the visible value would revert, so the checkbox never appeared to persist.
+    partial void OnIsDoneChanged(bool value)
     {
-        _session.Incident.ToggleChecklistItem(_id);
-        IsDone = !IsDone;
+        if (IsReadOnly)
+            return;
+        var item = _session.Incident.Checklist.First(c => c.Id == _id);
+        if (item.IsDone != value)
+            _session.Incident.ToggleChecklistItem(_id);
         _onChanged();
     }
 }

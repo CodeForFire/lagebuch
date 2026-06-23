@@ -8,8 +8,7 @@
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:ChecklistItemViewModel">
           <Grid ColumnDefinitions="Auto,*" Margin="0,2">
-            <CheckBox Grid.Column="0" IsChecked="{Binding IsDone}"
-                      Command="{Binding ToggleCommand}" />
+            <CheckBox Grid.Column="0" IsChecked="{Binding IsDone}" />
             <TextBlock Grid.Column="1" Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="Wrap" />
           </Grid>
         </DataTemplate>
