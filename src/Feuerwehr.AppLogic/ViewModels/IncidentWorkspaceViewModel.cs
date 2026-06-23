@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Documents;
+using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Persistence.MasterData;
 
@@ -25,10 +26,16 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanContinueEditing))]
+    [NotifyCanExecuteChangedFor(nameof(CloseIncidentCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ContinueEditingCommand))]
     private bool _isReadOnly;
 
     [ObservableProperty]
     private DateTimeOffset? _lastSavedAt;
+
+    [ObservableProperty]
+    private OperatorPromptViewModel? _pendingPrompt;
 
     public ChecklistViewModel Checklist { get; private set; } = null!;
     public EtbViewModel Etb { get; private set; } = null!;
@@ -38,6 +45,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public string IncidentNumberDisplay => Formatting.OrDash(_session.Incident.IncidentNumber?.Value);
     public string IlsNumberDisplay => Formatting.OrDash(_session.Incident.IlsNumber?.Value);
     public string StatusDisplay => Formatting.State(_session.Incident.State);
+
+    public string ReadOnlyReason => _session.Incident.State == IncidentState.Closed
+        ? "Abgeschlossen — schreibgeschützt"
+        : "Schreibgeschützt geöffnet";
 
     private void OnChanged()
     {
@@ -63,12 +74,32 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private void CloseIncident()
     {
         _session.Close(_clock);
-        IsReadOnly = true;
+        IsReadOnly = true; // notifies CanContinueEditing + both commands
         LastSavedAt = _clock.Now;
         BuildChildren();
-        CloseIncidentCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(StatusDisplay));
     }
+
+    // Editable only when read-only AND not finished — a closed incident stays read-only.
+    public bool CanContinueEditing => IsReadOnly && _session.Incident.State == IncidentState.Open;
+
+    [RelayCommand(CanExecute = nameof(CanContinueEditing))]
+    private void ContinueEditing() => PendingPrompt = new OperatorPromptViewModel();
+
+    // Called by the view when the prompt confirms (Result set).
+    public void ConfirmContinueEditing()
+    {
+        var op = PendingPrompt?.Result;
+        PendingPrompt = null;
+        if (op is null)
+            return;
+        _session.ContinueEditing(_clock, op);
+        IsReadOnly = false; // notifies CanContinueEditing + both commands
+        LastSavedAt = _clock.Now;
+        BuildChildren();
+    }
+
+    public void CancelContinueEditing() => PendingPrompt = null;
 
     [RelayCommand]
     private async Task ExportPdfAsync()

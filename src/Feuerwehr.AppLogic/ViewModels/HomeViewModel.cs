@@ -39,30 +39,19 @@ public sealed partial class HomeViewModel : ObservableObject
         OpenWorkspace(session, path, md);
     }
 
+    // Opening is always read-only and prompt-free. The workspace offers "Weiter bearbeiten"
+    // to upgrade a still-open incident to editable (which prompts for the operator there).
     [RelayCommand]
-    private void OpenRecent(string path) => OpenExisting(path, op: null);
+    private void OpenRecent(string path) =>
+        OpenWorkspace(IncidentSession.OpenReadOnly(_store, path), path, _masterData.Get());
 
     [RelayCommand]
-    private async Task OpenFileAsync(SessionOperator? op)
+    private async Task OpenFileAsync()
     {
         var path = await _dialogs.PickOpenAsync();
         if (string.IsNullOrWhiteSpace(path))
             return;
-        OpenExisting(path, op);
-    }
-
-    private void OpenExisting(string path, SessionOperator? op)
-    {
-        // Peek state: if it's an open incident we need an operator. The App passes one in
-        // (after prompting) for the OpenFile flow; OpenRecent relies on Open() throwing if
-        // an operator is required, which the App handles by prompting then retrying.
-        var probe = _store.Load(path);
-        SessionOperator? effectiveOp = probe.State == IncidentState.Open ? op : null;
-        if (probe.State == IncidentState.Open && effectiveOp is null)
-            return; // App will prompt for operator and retry via OpenFile
-
-        var session = IncidentSession.Open(_store, path, effectiveOp);
-        OpenWorkspace(session, path, _masterData.Get());
+        OpenWorkspace(IncidentSession.OpenReadOnly(_store, path), path, _masterData.Get());
     }
 
     private void OpenWorkspace(IncidentSession session, string path, Persistence.MasterData.MasterDataSet md)

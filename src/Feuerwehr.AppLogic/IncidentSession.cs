@@ -19,8 +19,12 @@ public sealed class IncidentSession
 
     public Incident Incident { get; }
     public string Path { get; }
-    public SessionOperator? Operator { get; }
-    public bool IsReadOnly => Incident.State == IncidentState.Closed;
+    public SessionOperator? Operator { get; private set; }
+
+    // Read-only when there is no operator to attribute edits to, OR the incident is closed
+    // (closing keeps its operator for attribution, but a closed incident is irreversibly
+    // read-only — the domain rejects mutations either way).
+    public bool IsReadOnly => Operator is null || Incident.State == IncidentState.Closed;
 
     public static IncidentSession StartNew(
         IIncidentStore store,
@@ -46,6 +50,28 @@ public sealed class IncidentSession
             throw new InvalidOperationException("Ein offener Einsatz erfordert einen Bearbeiter.");
         var effectiveOperator = incident.State == IncidentState.Closed ? null : op;
         return new IncidentSession(store, incident, path, effectiveOperator);
+    }
+
+    // Opens any incident read-only, regardless of state, without requiring an operator.
+    // The workspace can later upgrade an open incident to editable via ContinueEditing.
+    public static IncidentSession OpenReadOnly(IIncidentStore store, string path)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        return new IncidentSession(store, store.Load(path), path, op: null);
+    }
+
+    // Upgrades a read-only-opened, still-open incident to editable by attaching an operator.
+    public void ContinueEditing(IClock clock, SessionOperator op)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        if (Incident.State == IncidentState.Closed)
+            throw new InvalidOperationException("Ein abgeschlossener Einsatz kann nicht weiter bearbeitet werden.");
+        if (Operator is not null)
+            return; // already editable
+        Operator = op;
+        Incident.ResumeEditing(clock, op);
+        Save();
     }
 
     public void Save() => _store.Save(Path, Incident);

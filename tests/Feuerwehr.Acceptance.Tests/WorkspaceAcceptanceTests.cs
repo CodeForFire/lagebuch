@@ -43,6 +43,19 @@ public class WorkspaceAcceptanceTests
         return new IncidentWorkspaceViewModel(session, new FixedClock(), Md(), new FakeDialogs());
     }
 
+    // A read-only-opened workspace over a still-open (or optionally closed) incident.
+    private static IncidentWorkspaceViewModel BuildReadOnlyWorkspace(bool closed = false)
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock();
+        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident", new[] { "Blaulicht aus?" });
+        if (closed)
+            seed.Close(clock);
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        return new IncidentWorkspaceViewModel(ro, clock, Md(), new FakeDialogs());
+    }
+
     [AvaloniaFact]
     public void Workspace_renders_with_four_tabs()
     {
@@ -112,5 +125,57 @@ public class WorkspaceAcceptanceTests
         Assert.True(banner.IsVisible);
         Assert.True(vm.Etb.IsReadOnly);
         Assert.False(vm.Etb.AddEntryCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public void Open_readonly_open_incident_shows_continue_editing_action()
+    {
+        var vm = BuildReadOnlyWorkspace();
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        var button = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "ContinueEditingButton");
+        Assert.True(button.IsVisible);
+        Assert.True(vm.Etb.IsReadOnly);
+    }
+
+    [AvaloniaFact]
+    public void Continue_editing_prompts_for_operator_and_enables_editing()
+    {
+        var vm = BuildReadOnlyWorkspace();
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        // Open the prompt via the UI button.
+        var button = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "ContinueEditingButton");
+        button.Command!.Execute(null);
+        Assert.NotNull(vm.PendingPrompt);
+
+        // Fill and confirm the prompt; the view's code-behind auto-applies the result.
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.False(vm.IsReadOnly);
+        Assert.False(vm.Etb.IsReadOnly);
+
+        var banner = window.GetVisualDescendants().OfType<Border>()
+            .Single(b => b.Name == "ReadOnlyBanner");
+        Assert.False(banner.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void Closed_incident_has_no_continue_editing_action()
+    {
+        var vm = BuildReadOnlyWorkspace(closed: true);
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        var button = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "ContinueEditingButton");
+        Assert.False(button.IsVisible);
+        Assert.False(vm.CanContinueEditing);
     }
 }

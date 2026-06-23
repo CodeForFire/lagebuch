@@ -6,7 +6,7 @@ namespace Feuerwehr.App.ViewModels;
 
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    private enum PendingAction { None, New, Open }
+    private enum PendingAction { None, New }
 
     private readonly HomeViewModel _home;
     private PendingAction _pending = PendingAction.None;
@@ -31,12 +31,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         PendingPrompt = new OperatorPromptViewModel();
     }
 
+    // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
     [RelayCommand]
-    private void RequestOpenFile()
-    {
-        _pending = PendingAction.Open;
-        PendingPrompt = new OperatorPromptViewModel();
-    }
+    private void RequestOpenFile() => _home.OpenFileCommand.Execute(null);
 
     [RelayCommand]
     private void ConfirmOperator()
@@ -49,8 +46,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (action == PendingAction.New)
             _home.NewIncidentCommand.Execute(op);
-        else if (action == PendingAction.Open)
-            _home.OpenFileCommand.Execute(op);
     }
 
     [RelayCommand]
