@@ -14,14 +14,16 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly IRecentFilesStore _recent;
     private readonly IFileDialogService _dialogs;
     private readonly IClock _clock;
+    private readonly ITicker _ticker;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker)
     {
         _store = store;
         _masterData = masterData;
         _recent = recent;
         _dialogs = dialogs;
         _clock = clock;
+        _ticker = ticker;
         RecentFiles = new ObservableCollection<string>(recent.GetRecent());
     }
 
@@ -59,7 +61,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _recent.Add(path);
         if (!RecentFiles.Contains(path))
             RecentFiles.Insert(0, path);
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, md, _dialogs);
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs);
         WorkspaceOpened?.Invoke(workspace);
     }
 }

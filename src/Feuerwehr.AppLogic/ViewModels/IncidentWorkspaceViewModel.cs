@@ -12,13 +12,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 {
     private readonly IncidentSession _session;
     private readonly IClock _clock;
+    private readonly ITicker _ticker;
     private readonly MasterDataSet _masterData;
     private readonly IFileDialogService _dialogs;
 
-    public IncidentWorkspaceViewModel(IncidentSession session, IClock clock, MasterDataSet masterData, IFileDialogService dialogs)
+    public IncidentWorkspaceViewModel(IncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs)
     {
         _session = session;
         _clock = clock;
+        _ticker = ticker;
         _masterData = masterData;
         _dialogs = dialogs;
         IsReadOnly = session.IsReadOnly;
@@ -41,6 +43,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public EtbViewModel Etb { get; private set; } = null!;
     public RolesViewModel Roles { get; private set; } = null!;
     public ForcesViewModel Forces { get; private set; } = null!;
+    public ReminderViewModel? Reminder { get; private set; }
 
     public string IncidentNumberDisplay => Formatting.OrDash(_session.Incident.IncidentNumber?.Value);
     public string IlsNumberDisplay => Formatting.OrDash(_session.Incident.IlsNumber?.Value);
@@ -62,10 +65,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Etb = new EtbViewModel(_session, _clock, OnChanged);
         Roles = new RolesViewModel(_session, _masterData, OnChanged);
         Forces = new ForcesViewModel(_session, _masterData, OnChanged);
+
+        Reminder?.Dispose();
+        Reminder = _session.IsReadOnly ? null : new ReminderViewModel(_session, _clock, _ticker, OnChanged);
+
         OnPropertyChanged(nameof(Checklist));
         OnPropertyChanged(nameof(Etb));
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
+        OnPropertyChanged(nameof(Reminder));
     }
 
     private bool CanClose => !IsReadOnly;

@@ -30,7 +30,7 @@ public class HomeViewModelTests
         var store = new FakeStore();
         var recent = new FakeRecent();
         var dialogs = new FakeDialogs(); // PickSaveAsync returns "/x.fwincident"
-        var vm = new HomeViewModel(store, new FakeMasterData(), recent, dialogs, new FixedClock(T0));
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, dialogs, new FixedClock(T0), new FakeTicker());
 
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
@@ -52,7 +52,7 @@ public class HomeViewModelTests
         seed.Close(clock);
 
         var recent = new FakeRecent();
-        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock);
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -70,7 +70,7 @@ public class HomeViewModelTests
         var clock = new FixedClock(T0);
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock);
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -89,7 +89,7 @@ public class HomeViewModelTests
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
         // Dialog returns the seeded path so OpenFile has something to open.
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenReturningDialogs(), clock);
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenReturningDialogs(), clock, new FakeTicker());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -107,7 +107,7 @@ public class HomeViewModelTests
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         store.ResetLoadCount();
 
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock);
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker());
         vm.OpenRecentCommand.Execute("/x.fwincident");
 
         Assert.Equal(1, store.LoadCount);
