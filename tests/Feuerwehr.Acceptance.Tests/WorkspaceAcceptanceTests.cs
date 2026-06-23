@@ -29,6 +29,11 @@ internal sealed class FixedClock : IClock
 {
     public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 }
+internal sealed class NoopTicker : ITicker
+{
+    public IDisposable Subscribe(Action onTick) => new Sub();
+    private sealed class Sub : IDisposable { public void Dispose() { } }
+}
 
 public class WorkspaceAcceptanceTests
 {
@@ -40,7 +45,7 @@ public class WorkspaceAcceptanceTests
     {
         session = IncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
-        return new IncidentWorkspaceViewModel(session, new FixedClock(), Md(), new FakeDialogs());
+        return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs());
     }
 
     // A read-only-opened workspace over a still-open (or optionally closed) incident.
@@ -53,7 +58,7 @@ public class WorkspaceAcceptanceTests
         if (closed)
             seed.Close(clock);
         var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
-        return new IncidentWorkspaceViewModel(ro, clock, Md(), new FakeDialogs());
+        return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs());
     }
 
     [AvaloniaFact]
@@ -177,5 +182,36 @@ public class WorkspaceAcceptanceTests
             .Single(b => b.Name == "ContinueEditingButton");
         Assert.False(button.IsVisible);
         Assert.False(vm.CanContinueEditing);
+    }
+
+    [AvaloniaFact]
+    public void Editable_workspace_shows_reminder_bar()
+    {
+        var vm = BuildWorkspace(out _);
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        var reminderBar = window.GetVisualDescendants().OfType<Border>()
+            .Single(b => b.Name == "ReminderBar");
+        Assert.True(reminderBar.IsVisible);
+        Assert.True(vm.HasReminder);
+
+        var startButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "ReminderStartButton");
+        Assert.True(startButton.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void Readonly_workspace_does_not_show_reminder_bar()
+    {
+        var vm = BuildReadOnlyWorkspace();
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        var reminderBar = window.GetVisualDescendants().OfType<Border>()
+            .FirstOrDefault(b => b.Name == "ReminderBar");
+        Assert.NotNull(reminderBar);
+        Assert.False(reminderBar.IsVisible);
+        Assert.False(vm.HasReminder);
     }
 }

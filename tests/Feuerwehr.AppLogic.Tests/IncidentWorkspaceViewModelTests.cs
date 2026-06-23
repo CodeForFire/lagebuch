@@ -29,7 +29,7 @@ public class IncidentWorkspaceViewModelTests
         clock = new FixedClock(T0);
         var session = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", new[] { "A?" });
-        return new IncidentWorkspaceViewModel(session, clock, Md(), dialogs ?? new FakeDialogs());
+        return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), dialogs ?? new FakeDialogs());
     }
 
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
@@ -42,7 +42,7 @@ public class IncidentWorkspaceViewModelTests
         if (closed)
             seed.Close(clock);
         var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
-        return new IncidentWorkspaceViewModel(ro, clock, Md(), new FakeDialogs());
+        return new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(), Md(), new FakeDialogs());
     }
 
     [Fact]
@@ -164,5 +164,37 @@ public class IncidentWorkspaceViewModelTests
         vm.Etb.AddEntryCommand.Execute(null);
 
         Assert.Equal("Schmidt (FFB 1)", vm.Etb.Entries[0].EnteredBy);
+    }
+
+    [Fact]
+    public void Editable_workspace_has_reminder()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.NotNull(vm.Reminder);
+    }
+
+    [Fact]
+    public void Closing_workspace_drops_reminder()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var session = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { "A?" });
+        var ticker = new FakeTicker();
+        var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(), new FakeDialogs());
+
+        vm.CloseIncidentCommand.Execute(null);
+
+        Assert.Null(vm.Reminder);
+        Assert.Equal(0, ticker.SubscriberCount); // disposed -> unsubscribed
+    }
+
+    [Fact]
+    public void ReadOnly_opened_workspace_has_no_reminder()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+
+        Assert.Null(vm.Reminder);
     }
 }
