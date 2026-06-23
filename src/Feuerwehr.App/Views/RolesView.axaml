@@ -4,20 +4,29 @@
              x:Class="Feuerwehr.App.Views.RolesView"
              x:DataType="vm:RolesViewModel">
   <DockPanel>
-    <Border DockPanel.Dock="Bottom" Padding="0,8,0,0" IsEnabled="{Binding !IsReadOnly}">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <ComboBox Width="120" ItemsSource="{Binding RoleOptions}" SelectedItem="{Binding NewRole}" />
-        <TextBox Width="200" Watermark="Name" Text="{Binding NewPersonName}" />
-        <ComboBox Width="160" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
-        <Button Content="Zuweisen" Command="{Binding AddRoleCommand}" />
+    <TextBlock DockPanel.Dock="Top" Text="FÜHRUNG &amp; FUNKTIONEN" Classes="overline" Margin="0,0,0,14" />
+
+    <!-- Input dock -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <ComboBox Width="130" ItemsSource="{Binding RoleOptions}" SelectedItem="{Binding NewRole}" />
+        <TextBox Width="210" Watermark="Name" Text="{Binding NewPersonName}" />
+        <ComboBox Width="170" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+        <Button Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}" />
       </StackPanel>
     </Border>
-    <DataGrid ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="Funktion" Binding="{Binding Role}" />
-        <DataGridTextColumn Header="Name" Binding="{Binding PersonName}" Width="*" />
-        <DataGridTextColumn Header="Funkrufname" Binding="{Binding CallSign}" />
-      </DataGrid.Columns>
-    </DataGrid>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="FUNKTION" Binding="{Binding Role}" />
+          <DataGridTextColumn Header="NAME" Binding="{Binding PersonName}" Width="*" />
+          <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
   </DockPanel>
 </UserControl>

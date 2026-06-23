@@ -4,24 +4,33 @@
              x:Class="Feuerwehr.App.Views.EtbView"
              x:DataType="vm:EtbViewModel">
   <DockPanel>
-    <Border DockPanel.Dock="Bottom" Padding="0,8,0,0" IsEnabled="{Binding !IsReadOnly}">
-      <StackPanel Orientation="Horizontal" Spacing="6">
+    <TextBlock DockPanel.Dock="Top" Text="EINSATZTAGEBUCH" Classes="overline" Margin="0,0,0,14" />
+
+    <!-- Input dock -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Horizontal" Spacing="8">
         <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}" />
-        <ComboBox Width="120" ItemsSource="{Binding DirectionOptions}" SelectedItem="{Binding NewDirection}" />
-        <TextBox Width="100" Watermark="Von" Text="{Binding NewFrom}" />
-        <TextBox Width="100" Watermark="An" Text="{Binding NewTo}" />
-        <Button x:Name="EtbAddButton" Content="Hinzufügen" Command="{Binding AddEntryCommand}" />
+        <ComboBox Width="130" ItemsSource="{Binding DirectionOptions}" SelectedItem="{Binding NewDirection}" />
+        <TextBox Width="110" Watermark="Von" Text="{Binding NewFrom}" />
+        <TextBox Width="110" Watermark="An" Text="{Binding NewTo}" />
+        <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}" />
       </StackPanel>
     </Border>
-    <DataGrid x:Name="EtbGrid" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="Zeit" Binding="{Binding Time}" />
-        <DataGridTextColumn Header="Richtung" Binding="{Binding Direction}" />
-        <DataGridTextColumn Header="Von" Binding="{Binding From}" />
-        <DataGridTextColumn Header="An" Binding="{Binding To}" />
-        <DataGridTextColumn Header="Eintrag" Binding="{Binding Text}" Width="*" />
-        <DataGridTextColumn Header="Erfasst von" Binding="{Binding EnteredBy}" />
-      </DataGrid.Columns>
-    </DataGrid>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid x:Name="EtbGrid" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="ZEIT" Binding="{Binding Time}" />
+          <DataGridTextColumn Header="RICHTUNG" Binding="{Binding Direction}" />
+          <DataGridTextColumn Header="VON" Binding="{Binding From}" />
+          <DataGridTextColumn Header="AN" Binding="{Binding To}" />
+          <DataGridTextColumn Header="EINTRAG" Binding="{Binding Text}" Width="*" />
+          <DataGridTextColumn Header="ERFASST VON" Binding="{Binding EnteredBy}" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
   </DockPanel>
 </UserControl>

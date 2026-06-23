@@ -4,26 +4,42 @@
              x:Class="Feuerwehr.App.Views.ForcesView"
              x:DataType="vm:ForcesViewModel">
   <DockPanel>
-    <Border DockPanel.Dock="Bottom" Padding="0,8,0,0" IsEnabled="{Binding !IsReadOnly}">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <TextBox Width="160" Watermark="Feuerwehr" Text="{Binding NewBrigade}" />
-        <ComboBox Width="160" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
-        <NumericUpDown Width="110" Minimum="0" Value="{Binding NewPersonnelCount}" />
-        <Button Content="Hinzufügen" Command="{Binding AddForceCommand}" />
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Center" />
+      <!-- Total strength readout -->
+      <Border Grid.Column="1" Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource RadiusMd}" Padding="18,8">
+        <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+          <TextBlock Text="GESAMTSTÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+          <TextBlock Classes="metric" FontSize="26" Foreground="{StaticResource SignalBrush}"
+                     Text="{Binding TotalPersonnel}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- Input dock -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBox Width="170" Watermark="Feuerwehr" Text="{Binding NewBrigade}" />
+        <ComboBox Width="170" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+        <NumericUpDown Width="118" Minimum="0" Value="{Binding NewPersonnelCount}" />
+        <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}" />
       </StackPanel>
     </Border>
-    <DockPanel DockPanel.Dock="Bottom">
-      <TextBlock Text="Gesamtstärke: " FontWeight="SemiBold" />
-      <TextBlock Text="{Binding TotalPersonnel}" />
-    </DockPanel>
-    <DataGrid ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
-      <DataGrid.Columns>
-        <DataGridTextColumn Header="Feuerwehr" Binding="{Binding Brigade}" />
-        <DataGridTextColumn Header="Funkrufname" Binding="{Binding CallSign}" />
-        <DataGridTextColumn Header="Stärke" Binding="{Binding PersonnelCount}" />
-        <DataGridTextColumn Header="Status" Binding="{Binding Status}" />
-        <DataGridTextColumn Header="Bemerkung" Binding="{Binding Notes}" Width="*" />
-      </DataGrid.Columns>
-    </DataGrid>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
+          <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
+          <DataGridTextColumn Header="STÄRKE" Binding="{Binding PersonnelCount}" />
+          <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" />
+          <DataGridTextColumn Header="BEMERKUNG" Binding="{Binding Notes}" Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
   </DockPanel>
 </UserControl>

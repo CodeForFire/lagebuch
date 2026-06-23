@@ -3,14 +3,48 @@
         xmlns:vm="clr-namespace:Feuerwehr.App.ViewModels"
         x:Class="Feuerwehr.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Width="1000" Height="700" Title="Lagebuch">
+        Width="1080" Height="740" MinWidth="900" MinHeight="600"
+        Title="Lagebuch"
+        TransparencyLevelHint="None"
+        Background="{StaticResource AppBackgroundBrush}">
   <Panel>
     <DockPanel>
-      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="10">
-        <Button x:Name="NewIncidentButton" Content="Neuer Einsatz" Command="{Binding RequestNewIncidentCommand}" />
-        <Button x:Name="OpenFileButton" Content="Öffnen…" Command="{Binding RequestOpenFileCommand}" />
-        <Button x:Name="HomeButton" Content="Übersicht" Command="{Binding GoHomeCommand}" />
-      </StackPanel>
+      <!-- ===== Command bar ===== -->
+      <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBarBrush}"
+              BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
+              Height="60">
+        <Grid Margin="0,0,18,0" ColumnDefinitions="Auto,*,Auto">
+          <!-- Brand mark: signal bar + wordmark -->
+          <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Stretch">
+            <Border Width="4" Background="{StaticResource SignalGradientBrush}" />
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="20,0,0,0" VerticalAlignment="Center">
+              <Border Width="34" Height="34" CornerRadius="{StaticResource RadiusSm}"
+                      Background="{StaticResource SignalGradientBrush}"
+                      BoxShadow="0 4 14 -4 #99FF3D2E">
+                <TextBlock Text="L" FontFamily="{StaticResource DisplayFont}"
+                           FontSize="22" FontWeight="SemiBold" Foreground="#FFFFFF"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="LAGEBUCH" FontFamily="{StaticResource DisplayFont}"
+                           FontSize="19" FontWeight="SemiBold" LetterSpacing="3"
+                           Foreground="{StaticResource TextPrimaryBrush}" />
+                <TextBlock Text="EINSATZDOKUMENTATION" Classes="overline"
+                           FontSize="9" LetterSpacing="3" Margin="0,-2,0,0" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Actions -->
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Button x:Name="HomeButton" Classes="ghost" Content="ÜBERSICHT" Command="{Binding GoHomeCommand}" />
+            <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}" Margin="4,0" />
+            <Button x:Name="OpenFileButton" Content="ÖFFNEN" Command="{Binding RequestOpenFileCommand}" />
+            <Button x:Name="NewIncidentButton" Classes="signal" Content="NEUER EINSATZ" Command="{Binding RequestNewIncidentCommand}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
       <ContentControl Content="{Binding CurrentView}" />
     </DockPanel>
     <ContentControl Content="{Binding PendingPrompt}"

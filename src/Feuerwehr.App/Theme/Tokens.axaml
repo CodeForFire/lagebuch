@@ -1,0 +1,90 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- LAGEBUCH · Design Tokens
+       "Dispatch console": deep charcoal surfaces, signal-red
+       emergency accent, tactical monospace for time & call-signs. -->
+
+  <!-- Typography -->
+
+  <FontFamily x:Key="DisplayFont">avares://Feuerwehr.App/Assets/Fonts#Oswald</FontFamily>
+  <FontFamily x:Key="BodyFont">avares://Feuerwehr.App/Assets/Fonts#Barlow</FontFamily>
+  <FontFamily x:Key="MonoFont">avares://Feuerwehr.App/Assets/Fonts#JetBrains Mono</FontFamily>
+
+  <!-- Raw colors -->
+
+  <Color x:Key="AppBgColor">#0B0E13</Color>
+  <Color x:Key="AppBgColor2">#10141C</Color>
+  <Color x:Key="SurfaceColor">#141A24</Color>
+  <Color x:Key="SurfaceRaisedColor">#1B2330</Color>
+  <Color x:Key="SurfaceTopColor">#222C3B</Color>
+
+  <Color x:Key="HairlineColor">#26303D</Color>
+  <Color x:Key="BorderStrongColor">#384556</Color>
+
+  <Color x:Key="TextPrimaryColor">#EEF2F8</Color>
+  <Color x:Key="TextSecondaryColor">#9AA7B8</Color>
+  <Color x:Key="TextMutedColor">#65728580</Color>
+
+  <Color x:Key="SignalColor">#FF3D2E</Color>
+  <Color x:Key="SignalHotColor">#FF5A3C</Color>
+  <Color x:Key="SignalDeepColor">#C71E12</Color>
+
+  <Color x:Key="AmberColor">#FFB23E</Color>
+  <Color x:Key="AmberDeepColor">#7A4A07</Color>
+  <Color x:Key="ActiveColor">#37D17C</Color>
+  <Color x:Key="IncomingColor">#52ABFF</Color>
+
+  <!-- Brushes -->
+
+  <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+  <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="{StaticResource SurfaceRaisedColor}" />
+  <SolidColorBrush x:Key="SurfaceTopBrush" Color="{StaticResource SurfaceTopColor}" />
+  <SolidColorBrush x:Key="HairlineBrush" Color="{StaticResource HairlineColor}" />
+  <SolidColorBrush x:Key="BorderStrongBrush" Color="{StaticResource BorderStrongColor}" />
+
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+  <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
+  <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+
+  <SolidColorBrush x:Key="SignalBrush" Color="{StaticResource SignalColor}" />
+  <SolidColorBrush x:Key="SignalHotBrush" Color="{StaticResource SignalHotColor}" />
+  <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
+  <SolidColorBrush x:Key="ActiveBrush" Color="{StaticResource ActiveColor}" />
+  <SolidColorBrush x:Key="IncomingBrush" Color="{StaticResource IncomingColor}" />
+
+  <!-- Atmospheric app background: vertical charcoal wash -->
+  <LinearGradientBrush x:Key="AppBackgroundBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+    <GradientStop Color="{StaticResource AppBgColor2}" Offset="0" />
+    <GradientStop Color="{StaticResource AppBgColor}" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- Header bar: deep panel with a faint top-light sheen -->
+  <LinearGradientBrush x:Key="HeaderBarBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+    <GradientStop Color="#1A2230" Offset="0" />
+    <GradientStop Color="#10151E" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- Signal accent gradient (brand bar, primary buttons) -->
+  <LinearGradientBrush x:Key="SignalGradientBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+    <GradientStop Color="{StaticResource SignalHotColor}" Offset="0" />
+    <GradientStop Color="{StaticResource SignalDeepColor}" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- Sidebar (tab strip) wash -->
+  <LinearGradientBrush x:Key="SidebarBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+    <GradientStop Color="#121823" Offset="0" />
+    <GradientStop Color="#0D121A" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- Metrics -->
+
+  <CornerRadius x:Key="RadiusSm">5</CornerRadius>
+  <CornerRadius x:Key="RadiusMd">8</CornerRadius>
+  <CornerRadius x:Key="RadiusLg">12</CornerRadius>
+  <x:Double x:Key="ControlHeight">36</x:Double>
+
+  <BoxShadows x:Key="PanelShadow">0 8 28 -8 #99000000</BoxShadows>
+  <BoxShadows x:Key="OverlayShadow">0 24 60 -12 #CC000000</BoxShadows>
+
+</ResourceDictionary>

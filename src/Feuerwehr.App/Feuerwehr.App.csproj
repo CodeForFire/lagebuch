@@ -18,6 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\Fonts\*.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Feuerwehr.AppLogic\Feuerwehr.AppLogic.csproj" />
   </ItemGroup>
 
