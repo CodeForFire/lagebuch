@@ -13,7 +13,13 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     [ObservableProperty]
     private string? _operatorCallSign;
 
-    public SessionOperator? Result { get; private set; }
+    private SessionOperator? _result;
+
+    public SessionOperator? Result
+    {
+        get => _result;
+        private set => SetProperty(ref _result, value);
+    }
 
     private bool CanConfirm => !string.IsNullOrWhiteSpace(OperatorName);
 

@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             x:Class="Feuerwehr.App.Views.RolesView"
+             x:DataType="vm:RolesViewModel">
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Padding="0,8,0,0" IsEnabled="{Binding !IsReadOnly}">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <ComboBox Width="120" ItemsSource="{Binding RoleOptions}" SelectedItem="{Binding NewRole}" />
+        <TextBox Width="200" Watermark="Name" Text="{Binding NewPersonName}" />
+        <ComboBox Width="160" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+        <Button Content="Zuweisen" Command="{Binding AddRoleCommand}" />
+      </StackPanel>
+    </Border>
+    <DataGrid ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Funktion" Binding="{Binding Role}" />
+        <DataGridTextColumn Header="Name" Binding="{Binding PersonName}" Width="*" />
+        <DataGridTextColumn Header="Funkrufname" Binding="{Binding CallSign}" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </DockPanel>
+</UserControl>

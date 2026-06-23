@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             x:Class="Feuerwehr.App.Views.OperatorPromptView"
+             x:DataType="vm:OperatorPromptViewModel">
+  <Border Background="#80000000" Padding="40">
+    <Border Background="White" CornerRadius="6" Padding="20" Width="360"
+            VerticalAlignment="Center" HorizontalAlignment="Center">
+      <StackPanel Spacing="10">
+        <TextBlock Text="Wer dokumentiert?" FontSize="16" FontWeight="SemiBold" />
+        <TextBox x:Name="OperatorNameBox" Watermark="Name" Text="{Binding OperatorName}" />
+        <TextBox Watermark="Funkrufname (optional)" Text="{Binding OperatorCallSign}" />
+        <Button x:Name="ConfirmButton" Content="Bestätigen" Command="{Binding ConfirmCommand}"
+                HorizontalAlignment="Right" />
+      </StackPanel>
+    </Border>
+  </Border>
+</UserControl>

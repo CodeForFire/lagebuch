@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             x:Class="Feuerwehr.App.Views.ForcesView"
+             x:DataType="vm:ForcesViewModel">
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Padding="0,8,0,0" IsEnabled="{Binding !IsReadOnly}">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBox Width="160" Watermark="Feuerwehr" Text="{Binding NewBrigade}" />
+        <ComboBox Width="160" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+        <NumericUpDown Width="110" Minimum="0" Value="{Binding NewPersonnelCount}" />
+        <Button Content="Hinzufügen" Command="{Binding AddForceCommand}" />
+      </StackPanel>
+    </Border>
+    <DockPanel DockPanel.Dock="Bottom">
+      <TextBlock Text="Gesamtstärke: " FontWeight="SemiBold" />
+      <TextBlock Text="{Binding TotalPersonnel}" />
+    </DockPanel>
+    <DataGrid ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Feuerwehr" Binding="{Binding Brigade}" />
+        <DataGridTextColumn Header="Funkrufname" Binding="{Binding CallSign}" />
+        <DataGridTextColumn Header="Stärke" Binding="{Binding PersonnelCount}" />
+        <DataGridTextColumn Header="Status" Binding="{Binding Status}" />
+        <DataGridTextColumn Header="Bemerkung" Binding="{Binding Notes}" Width="*" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </DockPanel>
+</UserControl>

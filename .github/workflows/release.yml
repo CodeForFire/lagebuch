@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            asset: lagebuch-win-x64.exe
+            artifact: Feuerwehr.App.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            asset: lagebuch-linux-x64
+            artifact: Feuerwehr.App
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish
+        run: >
+          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj
+          -c Release -r ${{ matrix.rid }} --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish
+      - name: Rename artifact
+        shell: bash
+        run: cp "publish/${{ matrix.artifact }}" "${{ matrix.asset }}"
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}
