@@ -37,12 +37,17 @@ internal sealed class FixedClock : IClock
 {
     public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 }
+internal sealed class NoopTicker : ITicker
+{
+    public IDisposable Subscribe(Action onTick) => new Sub();
+    private sealed class Sub : IDisposable { public void Dispose() { } }
+}
 
 public class MainWindowViewModelTests
 {
     private static MainWindowViewModel New()
     {
-        var home = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock());
+        var home = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(), new NoopTicker());
         return new MainWindowViewModel(home);
     }
 
@@ -91,7 +96,7 @@ public class MainWindowViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock);
+        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new NoopTicker());
         var vm = new MainWindowViewModel(home);
 
         vm.RequestOpenFileCommand.Execute(null);
@@ -107,7 +112,7 @@ public class MainWindowViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock);
+        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new NoopTicker());
         var vm = new MainWindowViewModel(home);
 
         vm.OpenRecent("/x.fwincident");

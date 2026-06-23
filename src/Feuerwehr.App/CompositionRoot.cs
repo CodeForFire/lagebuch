@@ -14,6 +14,7 @@ public static class CompositionRoot
         var masterData = new MasterDataProvider(AppPaths.MasterDataDbPath);
         var recent = new JsonRecentFilesStore(AppPaths.RecentFilesJsonPath);
         var dialogs = new StorageProviderFileDialogService(topLevel);
-        return new HomeViewModel(store, masterData, recent, dialogs, new SystemClock());
+        var ticker = new NoopTicker();
+        return new HomeViewModel(store, masterData, recent, dialogs, new SystemClock(), ticker);
     }
 }
