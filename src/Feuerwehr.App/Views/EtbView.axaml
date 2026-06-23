@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             x:Class="Feuerwehr.App.Views.EtbView"
+             x:DataType="vm:EtbViewModel">
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Padding="0,8,0,0" IsEnabled="{Binding !IsReadOnly}">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}" />
+        <TextBox Width="100" Watermark="Von" Text="{Binding NewFrom}" />
+        <TextBox Width="100" Watermark="An" Text="{Binding NewTo}" />
+        <Button x:Name="EtbAddButton" Content="Hinzufügen" Command="{Binding AddEntryCommand}" />
+      </StackPanel>
+    </Border>
+    <DataGrid x:Name="EtbGrid" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Zeit" Binding="{Binding Time}" />
+        <DataGridTextColumn Header="Richtung" Binding="{Binding Direction}" />
+        <DataGridTextColumn Header="Von" Binding="{Binding From}" />
+        <DataGridTextColumn Header="An" Binding="{Binding To}" />
+        <DataGridTextColumn Header="Eintrag" Binding="{Binding Text}" Width="*" />
+        <DataGridTextColumn Header="Erfasst von" Binding="{Binding EnteredBy}" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </DockPanel>
+</UserControl>
