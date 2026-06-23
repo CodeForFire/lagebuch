@@ -98,6 +98,14 @@ public sealed class Incident
             throw new IncidentClosedException();
     }
 
+    public void ResumeEditing(IClock clock, SessionOperator resumedBy)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(resumedBy);
+        EnsureOpen();
+        _audit.Add(new AuditEvent(clock.Now, "resumed", resumedBy.Display));
+    }
+
     public void Close(IClock clock, SessionOperator closedBy)
     {
         ArgumentNullException.ThrowIfNull(clock);

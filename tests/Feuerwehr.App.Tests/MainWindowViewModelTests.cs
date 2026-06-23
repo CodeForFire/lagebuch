@@ -1,4 +1,5 @@
 using Feuerwehr.App.ViewModels;
+using Feuerwehr.AppLogic;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;
@@ -83,4 +84,43 @@ public class MainWindowViewModelTests
         Assert.Null(vm.PendingPrompt);
         Assert.IsType<HomeViewModel>(vm.CurrentView);
     }
+
+    [Fact]
+    public void RequestOpenFile_opens_readonly_without_prompt()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock();
+        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock);
+        var vm = new MainWindowViewModel(home);
+
+        vm.RequestOpenFileCommand.Execute(null);
+
+        Assert.Null(vm.PendingPrompt); // no operator prompt for open
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        Assert.True(workspace.IsReadOnly);
+    }
+
+    [Fact]
+    public void OpenRecent_opens_readonly_without_prompt()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock();
+        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock);
+        var vm = new MainWindowViewModel(home);
+
+        vm.OpenRecent("/x.fwincident");
+
+        Assert.Null(vm.PendingPrompt);
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        Assert.True(workspace.IsReadOnly);
+    }
+}
+
+internal sealed class OpenPathDialogs : IFileDialogService
+{
+    public Task<string?> PickSaveAsync(string s) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
 }

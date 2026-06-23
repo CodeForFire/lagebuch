@@ -32,6 +32,19 @@ public class IncidentWorkspaceViewModelTests
         return new IncidentWorkspaceViewModel(session, clock, Md(), dialogs ?? new FakeDialogs());
     }
 
+    // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
+    private static IncidentWorkspaceViewModel ReadOnlyWorkspace(out FixedClock clock, bool closed = false)
+    {
+        var store = new FakeStore();
+        clock = new FixedClock(T0);
+        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { "A?" });
+        if (closed)
+            seed.Close(clock);
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        return new IncidentWorkspaceViewModel(ro, clock, Md(), new FakeDialogs());
+    }
+
     [Fact]
     public void Editing_a_child_autosaves()
     {
@@ -82,5 +95,74 @@ public class IncidentWorkspaceViewModelTests
         var dialogs = new FakeDialogs { ExportPath = null };
         var vm = NewWorkspace(out _, out _, dialogs);
         await vm.ExportPdfCommand.ExecuteAsync(null); // should not throw
+    }
+
+    [Fact]
+    public void ContinueEditing_command_disabled_for_closed_incident()
+    {
+        var vm = ReadOnlyWorkspace(out _, closed: true);
+        Assert.True(vm.IsReadOnly);
+        Assert.False(vm.CanContinueEditing);
+        Assert.False(vm.ContinueEditingCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ContinueEditing_command_enabled_for_open_readonly_incident()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+        Assert.True(vm.IsReadOnly);
+        Assert.True(vm.CanContinueEditing);
+        Assert.True(vm.ContinueEditingCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Confirming_continue_editing_makes_workspace_editable_and_rebuilds_children()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+
+        vm.ContinueEditingCommand.Execute(null);
+        Assert.NotNull(vm.PendingPrompt);
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmContinueEditing();
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.False(vm.IsReadOnly);
+        Assert.False(vm.CanContinueEditing);
+        Assert.False(vm.Etb.IsReadOnly);
+        vm.Etb.NewText = "Meldung";
+        Assert.True(vm.Etb.AddEntryCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Cancelling_continue_editing_stays_readonly()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+
+        vm.ContinueEditingCommand.Execute(null);
+        Assert.NotNull(vm.PendingPrompt);
+        vm.CancelContinueEditing();
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.True(vm.IsReadOnly);
+        Assert.True(vm.CanContinueEditing);
+    }
+
+    [Fact]
+    public void Continue_editing_then_add_etb_attributes_to_resuming_operator()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+
+        vm.ContinueEditingCommand.Execute(null);
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.OperatorCallSign = "FFB 1";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmContinueEditing();
+
+        vm.Etb.NewText = "Lagemeldung";
+        vm.Etb.NewDirection = EtbDirection.Internal;
+        vm.Etb.AddEntryCommand.Execute(null);
+
+        Assert.Equal("Schmidt (FFB 1)", vm.Etb.Entries[0].EnteredBy);
     }
 }

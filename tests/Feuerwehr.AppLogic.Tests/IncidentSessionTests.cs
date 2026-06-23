@@ -85,6 +85,99 @@ public class IncidentSessionTests
     }
 
     [Fact]
+    public void OpenReadOnly_open_incident_is_readonly_without_operator()
+    {
+        var store = new FakeStore();
+        IncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+
+        Assert.True(ro.IsReadOnly);
+        Assert.Null(ro.Operator);
+        Assert.Equal(IncidentState.Open, ro.Incident.State);
+    }
+
+    [Fact]
+    public void OpenReadOnly_closed_incident_is_readonly()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+        seed.Close(clock);
+
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        Assert.True(ro.IsReadOnly);
+    }
+
+    [Fact]
+    public void ContinueEditing_on_open_session_sets_operator_and_makes_editable()
+    {
+        var store = new FakeStore();
+        IncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+
+        ro.ContinueEditing(new FixedClock(T0), new SessionOperator("Schmidt"));
+
+        Assert.False(ro.IsReadOnly);
+        Assert.Equal("Schmidt", ro.Operator!.Display);
+    }
+
+    [Fact]
+    public void ContinueEditing_on_closed_session_throws()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+        seed.Close(clock);
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+
+        Assert.Throws<InvalidOperationException>(
+            () => ro.ContinueEditing(clock, new SessionOperator("Schmidt")));
+    }
+
+    [Fact]
+    public void ContinueEditing_is_idempotent_when_editable()
+    {
+        var store = new FakeStore();
+        var session = IncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+
+        session.ContinueEditing(new FixedClock(T0), new SessionOperator("Schmidt"));
+
+        Assert.Equal("Müller", session.Operator!.Display); // unchanged
+    }
+
+    [Fact]
+    public void ContinueEditing_appends_resumed_audit_event_with_operator_display()
+    {
+        var store = new FakeStore();
+        IncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+
+        ro.ContinueEditing(new FixedClock(T0.AddHours(2)), new SessionOperator("Schmidt", "FFB 1"));
+
+        var resumed = Assert.Single(ro.Incident.Audit, a => a.Action == "resumed");
+        Assert.Equal("Schmidt (FFB 1)", resumed.By);
+    }
+
+    [Fact]
+    public void IsReadOnly_true_exactly_when_operator_is_null()
+    {
+        var store = new FakeStore();
+        var editable = IncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+        Assert.False(editable.IsReadOnly); // has operator
+
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        Assert.True(ro.IsReadOnly); // no operator
+    }
+
+    [Fact]
     public void ExportPdf_returns_a_pdf()
     {
         var store = new FakeStore();

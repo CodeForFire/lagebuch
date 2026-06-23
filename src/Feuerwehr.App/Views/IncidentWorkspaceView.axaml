@@ -3,33 +3,43 @@
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
              x:Class="Feuerwehr.App.Views.IncidentWorkspaceView"
              x:DataType="vm:IncidentWorkspaceViewModel">
-  <DockPanel Margin="10">
-    <!-- Header -->
-    <StackPanel DockPanel.Dock="Top" Spacing="2">
-      <TextBlock Text="Einsatzdokumentation" FontSize="18" FontWeight="SemiBold" />
-      <StackPanel Orientation="Horizontal" Spacing="16">
-        <TextBlock Text="{Binding IncidentNumberDisplay, StringFormat='Einsatznr: {0}'}" />
-        <TextBlock Text="{Binding IlsNumberDisplay, StringFormat='ILS: {0}'}" />
-        <TextBlock Text="{Binding StatusDisplay, StringFormat='Status: {0}'}" />
+  <Panel>
+    <DockPanel Margin="10">
+      <!-- Header -->
+      <StackPanel DockPanel.Dock="Top" Spacing="2">
+        <TextBlock Text="Einsatzdokumentation" FontSize="18" FontWeight="SemiBold" />
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <TextBlock Text="{Binding IncidentNumberDisplay, StringFormat='Einsatznr: {0}'}" />
+          <TextBlock Text="{Binding IlsNumberDisplay, StringFormat='ILS: {0}'}" />
+          <TextBlock Text="{Binding StatusDisplay, StringFormat='Status: {0}'}" />
+        </StackPanel>
+        <Border x:Name="ReadOnlyBanner" Background="#FFE0B2" Padding="6" CornerRadius="4"
+                IsVisible="{Binding IsReadOnly}">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <TextBlock Text="{Binding ReadOnlyReason}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button x:Name="ContinueEditingButton" Content="Weiter bearbeiten"
+                    Command="{Binding ContinueEditingCommand}"
+                    IsVisible="{Binding CanContinueEditing}" />
+          </StackPanel>
+        </Border>
       </StackPanel>
-      <Border x:Name="ReadOnlyBanner" Background="#FFE0B2" Padding="6" CornerRadius="4"
-              IsVisible="{Binding IsReadOnly}">
-        <TextBlock Text="Abgeschlossen — schreibgeschützt" FontWeight="SemiBold" />
-      </Border>
-    </StackPanel>
-    <!-- Footer -->
-    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-      <Button x:Name="CloseButton" Content="Einsatz abschließen" Command="{Binding CloseIncidentCommand}" />
-      <Button x:Name="ExportButton" Content="PDF exportieren" Command="{Binding ExportPdfCommand}" />
-      <TextBlock VerticalAlignment="Center"
-                 Text="{Binding LastSavedAt, StringFormat='Gespeichert: {0:HH:mm:ss}'}" />
-    </StackPanel>
-    <!-- Tabs -->
-    <TabControl x:Name="ModuleTabs">
-      <TabItem Header="Checkliste"><ContentControl Content="{Binding Checklist}" /></TabItem>
-      <TabItem Header="ETB"><ContentControl Content="{Binding Etb}" /></TabItem>
-      <TabItem Header="Funktionen"><ContentControl Content="{Binding Roles}" /></TabItem>
-      <TabItem Header="Kräfte"><ContentControl Content="{Binding Forces}" /></TabItem>
-    </TabControl>
-  </DockPanel>
+      <!-- Footer -->
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button x:Name="CloseButton" Content="Einsatz abschließen" Command="{Binding CloseIncidentCommand}" />
+        <Button x:Name="ExportButton" Content="PDF exportieren" Command="{Binding ExportPdfCommand}" />
+        <TextBlock VerticalAlignment="Center"
+                   Text="{Binding LastSavedAt, StringFormat='Gespeichert: {0:HH:mm:ss}'}" />
+      </StackPanel>
+      <!-- Tabs -->
+      <TabControl x:Name="ModuleTabs">
+        <TabItem Header="Checkliste"><ContentControl Content="{Binding Checklist}" /></TabItem>
+        <TabItem Header="ETB"><ContentControl Content="{Binding Etb}" /></TabItem>
+        <TabItem Header="Funktionen"><ContentControl Content="{Binding Roles}" /></TabItem>
+        <TabItem Header="Kräfte"><ContentControl Content="{Binding Forces}" /></TabItem>
+      </TabControl>
+    </DockPanel>
+    <!-- Continue-editing operator prompt overlay -->
+    <ContentControl Content="{Binding PendingPrompt}"
+                    IsVisible="{Binding PendingPrompt, Converter={x:Static ObjectConverters.IsNotNull}}" />
+  </Panel>
 </UserControl>
