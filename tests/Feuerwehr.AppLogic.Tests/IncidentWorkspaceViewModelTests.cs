@@ -57,7 +57,8 @@ public class IncidentWorkspaceViewModelTests
         Assert.False(vm.CloseIncidentCommand.CanExecute(null));
         Assert.True(vm.Etb.IsReadOnly);
         Assert.False(vm.Etb.AddEntryCommand.CanExecute(null));
-        Assert.False(vm.Checklist.Items[0].ToggleCommand.CanExecute(null));
+        Assert.True(vm.Checklist.IsReadOnly);
+        Assert.True(vm.Checklist.Items[0].IsReadOnly);
     }
 
     [Fact]

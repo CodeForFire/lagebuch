@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -73,6 +74,28 @@ public class WorkspaceAcceptanceTests
 
         Assert.Single(session.Incident.Journal);
         Assert.Single(vm.Etb.Entries);
+    }
+
+    [AvaloniaFact]
+    public void Clicking_checklist_checkbox_persists_done_state()
+    {
+        var vm = BuildWorkspace(out var session);
+        var view = new ChecklistView { DataContext = vm.Checklist };
+        var window = new Window { Content = view, Width = 600, Height = 400 };
+        window.Show();
+
+        var checkBox = view.GetVisualDescendants().OfType<CheckBox>().First();
+
+        // Simulate a real user click on the checkbox (drive the actual input pipeline,
+        // not the command directly, so the IsChecked two-way binding participates too).
+        var center = checkBox.TranslatePoint(
+            new Avalonia.Point(checkBox.Bounds.Width / 2, checkBox.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(center, Avalonia.Input.MouseButton.Left);
+        window.MouseUp(center, Avalonia.Input.MouseButton.Left);
+
+        Assert.True(checkBox.IsChecked);
+        Assert.True(vm.Checklist.Items[0].IsDone);
+        Assert.True(session.Incident.Checklist[0].IsDone);
     }
 
     [AvaloniaFact]
