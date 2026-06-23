@@ -7,6 +7,7 @@
     <Border DockPanel.Dock="Bottom" Padding="0,8,0,0" IsEnabled="{Binding !IsReadOnly}">
       <StackPanel Orientation="Horizontal" Spacing="6">
         <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}" />
+        <ComboBox Width="120" ItemsSource="{Binding DirectionOptions}" SelectedItem="{Binding NewDirection}" />
         <TextBox Width="100" Watermark="Von" Text="{Binding NewFrom}" />
         <TextBox Width="100" Watermark="An" Text="{Binding NewTo}" />
         <Button x:Name="EtbAddButton" Content="Hinzufügen" Command="{Binding AddEntryCommand}" />

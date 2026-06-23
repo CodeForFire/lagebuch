@@ -5,6 +5,6 @@
              x:DataType="vm:HomeViewModel">
   <StackPanel Margin="40" Spacing="16" MaxWidth="600">
     <TextBlock Text="Zuletzt verwendet" FontSize="20" FontWeight="SemiBold" />
-    <ListBox x:Name="RecentList" ItemsSource="{Binding RecentFiles}" Height="400" />
+    <ListBox x:Name="RecentList" ItemsSource="{Binding RecentFiles}" SelectionMode="Single" Height="400" />
   </StackPanel>
 </UserControl>

@@ -54,4 +54,15 @@ public class EtbViewModelTests
         Assert.True(vm.IsReadOnly);
         Assert.False(vm.AddEntryCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void DirectionOptions_contains_all_directions()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2)));
+        var session = IncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var vm = new EtbViewModel(session, clock, () => { });
+        Assert.Contains(EtbDirection.Incoming, vm.DirectionOptions);
+        Assert.Contains(EtbDirection.Outgoing, vm.DirectionOptions);
+        Assert.Contains(EtbDirection.Internal, vm.DirectionOptions);
+    }
 }

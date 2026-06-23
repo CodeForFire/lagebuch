@@ -27,6 +27,7 @@ public sealed partial class EtbViewModel : ObservableObject
 
     public bool IsReadOnly { get; }
     public ObservableCollection<EtbEntryRow> Entries { get; }
+    public IReadOnlyList<EtbDirection> DirectionOptions { get; } = Enum.GetValues<EtbDirection>();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddEntryCommand))]

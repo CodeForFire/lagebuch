@@ -4,7 +4,7 @@
              x:Class="Feuerwehr.App.Views.ChecklistView"
              x:DataType="vm:ChecklistViewModel">
   <ScrollViewer>
-    <ItemsControl ItemsSource="{Binding Items}">
+    <ItemsControl ItemsSource="{Binding Items}" IsEnabled="{Binding !IsReadOnly}">
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:ChecklistItemViewModel">
           <Grid ColumnDefinitions="Auto,*" Margin="0,2">
