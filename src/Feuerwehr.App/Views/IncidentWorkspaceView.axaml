@@ -22,6 +22,39 @@
                     IsVisible="{Binding CanContinueEditing}" />
           </StackPanel>
         </Border>
+        <!-- ILS reminder timer (only present when editable: Reminder != null) -->
+        <Border x:Name="ReminderBar" Background="#E3F2FD" Padding="6" CornerRadius="4" Margin="0,4,0,0"
+                IsVisible="{Binding HasReminder}">
+          <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
+                      DataContext="{Binding Reminder}">
+            <TextBlock Text="Rückmeldung an ILS:" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+            <!-- Idle: choose interval + start -->
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                        IsVisible="{Binding !IsRunning}">
+              <NumericUpDown Value="{Binding IntervalMinutes}" Minimum="1" Maximum="120" Increment="1"
+                             Width="110" FormatString="0" />
+              <TextBlock Text="Min." VerticalAlignment="Center" />
+              <Button x:Name="ReminderStartButton" Content="Timer starten" Command="{Binding StartCommand}" />
+            </StackPanel>
+
+            <!-- Running, not due: countdown + stop -->
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                        IsVisible="{Binding IsRunning}">
+              <TextBlock Text="{Binding RemainingDisplay, StringFormat='in {0}'}"
+                         IsVisible="{Binding !IsDue}" VerticalAlignment="Center" />
+              <Button x:Name="ReminderStopButton" Content="Stopp" Command="{Binding StopCommand}"
+                      IsVisible="{Binding !IsDue}" />
+            </StackPanel>
+
+            <!-- Due: alert + acknowledge -->
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                        IsVisible="{Binding IsDue}">
+              <TextBlock Text="fällig!" FontWeight="Bold" Foreground="#B71C1C" VerticalAlignment="Center" />
+              <Button x:Name="ReminderAckButton" Content="Erledigt" Command="{Binding AcknowledgeCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
       </StackPanel>
       <!-- Footer -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">

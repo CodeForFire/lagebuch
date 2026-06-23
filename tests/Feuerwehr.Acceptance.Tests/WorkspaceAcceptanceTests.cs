@@ -183,4 +183,35 @@ public class WorkspaceAcceptanceTests
         Assert.False(button.IsVisible);
         Assert.False(vm.CanContinueEditing);
     }
+
+    [AvaloniaFact]
+    public void Editable_workspace_shows_reminder_bar()
+    {
+        var vm = BuildWorkspace(out _);
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        var reminderBar = window.GetVisualDescendants().OfType<Border>()
+            .Single(b => b.Name == "ReminderBar");
+        Assert.True(reminderBar.IsVisible);
+        Assert.True(vm.HasReminder);
+
+        var startButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "ReminderStartButton");
+        Assert.True(startButton.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void Readonly_workspace_does_not_show_reminder_bar()
+    {
+        var vm = BuildReadOnlyWorkspace();
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        var reminderBar = window.GetVisualDescendants().OfType<Border>()
+            .FirstOrDefault(b => b.Name == "ReminderBar");
+        Assert.NotNull(reminderBar);
+        Assert.False(reminderBar.IsVisible);
+        Assert.False(vm.HasReminder);
+    }
 }

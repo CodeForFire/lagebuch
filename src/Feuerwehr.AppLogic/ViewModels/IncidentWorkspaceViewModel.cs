@@ -53,6 +53,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         ? "Abgeschlossen — schreibgeschützt"
         : "Schreibgeschützt geöffnet";
 
+    public bool HasReminder => Reminder is not null;
+
     private void OnChanged()
     {
         _session.Save();
@@ -74,6 +76,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(Reminder));
+        OnPropertyChanged(nameof(HasReminder));
     }
 
     private bool CanClose => !IsReadOnly;
