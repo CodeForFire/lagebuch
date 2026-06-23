@@ -4,13 +4,7 @@
              x:Class="Feuerwehr.App.Views.HomeView"
              x:DataType="vm:HomeViewModel">
   <StackPanel Margin="40" Spacing="16" MaxWidth="600">
-    <TextBlock Text="Lagebuch" FontSize="28" FontWeight="Bold" />
-    <StackPanel Orientation="Horizontal" Spacing="10">
-      <!-- These buttons are wired by MainWindow to MainWindowViewModel commands (Task 5). -->
-      <Button x:Name="NewIncidentButton" Content="Neuer Einsatz" />
-      <Button x:Name="OpenFileButton" Content="Öffnen…" />
-    </StackPanel>
-    <TextBlock Text="Zuletzt verwendet:" FontWeight="SemiBold" />
-    <ListBox x:Name="RecentList" ItemsSource="{Binding RecentFiles}" Height="300" />
+    <TextBlock Text="Zuletzt verwendet" FontSize="20" FontWeight="SemiBold" />
+    <ListBox x:Name="RecentList" ItemsSource="{Binding RecentFiles}" Height="400" />
   </StackPanel>
 </UserControl>

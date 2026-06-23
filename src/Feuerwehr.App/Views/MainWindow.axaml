@@ -1,7 +1,19 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Feuerwehr.App.ViewModels"
         x:Class="Feuerwehr.App.Views.MainWindow"
-        Width="1000" Height="700"
-        Title="Lagebuch">
-  <TextBlock Text="Lagebuch" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="24" />
+        x:DataType="vm:MainWindowViewModel"
+        Width="1000" Height="700" Title="Lagebuch">
+  <Panel>
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="10">
+        <Button x:Name="NewIncidentButton" Content="Neuer Einsatz" Command="{Binding RequestNewIncidentCommand}" />
+        <Button x:Name="OpenFileButton" Content="Öffnen…" Command="{Binding RequestOpenFileCommand}" />
+        <Button x:Name="HomeButton" Content="Übersicht" Command="{Binding GoHomeCommand}" />
+      </StackPanel>
+      <ContentControl Content="{Binding CurrentView}" />
+    </DockPanel>
+    <ContentControl Content="{Binding PendingPrompt}"
+                    IsVisible="{Binding PendingPrompt, Converter={x:Static ObjectConverters.IsNotNull}}" />
+  </Panel>
 </Window>
