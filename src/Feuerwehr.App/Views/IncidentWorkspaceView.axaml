@@ -4,73 +4,161 @@
              x:Class="Feuerwehr.App.Views.IncidentWorkspaceView"
              x:DataType="vm:IncidentWorkspaceViewModel">
   <Panel>
-    <DockPanel Margin="10">
-      <!-- Header -->
-      <StackPanel DockPanel.Dock="Top" Spacing="2">
-        <TextBlock Text="Einsatzdokumentation" FontSize="18" FontWeight="SemiBold" />
-        <StackPanel Orientation="Horizontal" Spacing="16">
-          <TextBlock Text="{Binding IncidentNumberDisplay, StringFormat='Einsatznr: {0}'}" />
-          <TextBlock Text="{Binding IlsNumberDisplay, StringFormat='ILS: {0}'}" />
-          <TextBlock Text="{Binding StatusDisplay, StringFormat='Status: {0}'}" />
+    <DockPanel>
+      <!-- ===================== Status header ===================== -->
+      <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}"
+              BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
+              Padding="24,16">
+        <StackPanel Spacing="14">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <!-- Title block -->
+            <StackPanel Grid.Column="0" Spacing="2">
+              <TextBlock Text="EINSATZDOKUMENTATION" Classes="overline" />
+              <TextBlock Text="Lagebuch" Classes="display" FontSize="24" />
+            </StackPanel>
+
+            <!-- Status chips -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+              <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                      CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
+                <StackPanel>
+                  <TextBlock Text="EINSATZNR" Classes="overline" FontSize="9" />
+                  <TextBlock Classes="mono" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}"
+                             Text="{Binding IncidentNumberDisplay}" />
+                </StackPanel>
+              </Border>
+              <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                      CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
+                <StackPanel>
+                  <TextBlock Text="ILS" Classes="overline" FontSize="9" />
+                  <TextBlock Classes="mono" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}"
+                             Text="{Binding IlsNumberDisplay}" />
+                </StackPanel>
+              </Border>
+              <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                      CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
+                <StackPanel>
+                  <TextBlock Text="STATUS" Classes="overline" FontSize="9" />
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Ellipse Width="9" Height="9" VerticalAlignment="Center"
+                             Fill="{StaticResource ActiveBrush}" />
+                    <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Medium" FontSize="15"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Text="{Binding StatusDisplay}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Grid>
+
+          <!-- Read-only banner -->
+          <Border x:Name="ReadOnlyBanner" Background="#241608"
+                  BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+                  IsVisible="{Binding IsReadOnly}">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <TextBlock Text="🔒" FontSize="15" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding ReadOnlyReason}" FontWeight="SemiBold"
+                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+              <Button x:Name="ContinueEditingButton" Content="WEITER BEARBEITEN"
+                      Command="{Binding ContinueEditingCommand}"
+                      IsVisible="{Binding CanContinueEditing}" />
+            </StackPanel>
+          </Border>
+
+          <!-- ILS reminder bar -->
+          <Border x:Name="ReminderBar" Background="#0B1A2A"
+                  BorderBrush="{StaticResource IncomingBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
+                  IsVisible="{Binding HasReminder}">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
+                        DataContext="{Binding Reminder}">
+              <TextBlock Text="⏱" FontSize="15" VerticalAlignment="Center"
+                         Foreground="{StaticResource IncomingBrush}" />
+              <TextBlock Text="RÜCKMELDUNG AN ILS" Classes="overline" FontSize="10"
+                         Foreground="{StaticResource IncomingBrush}" VerticalAlignment="Center" />
+
+              <!-- Idle: interval + start -->
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                          IsVisible="{Binding !IsRunning}">
+                <NumericUpDown Value="{Binding IntervalMinutes}" Minimum="1" Maximum="120" Increment="1"
+                               Width="118" FormatString="0" />
+                <TextBlock Text="Min." Classes="secondary" VerticalAlignment="Center" />
+                <Button x:Name="ReminderStartButton" Content="TIMER STARTEN" Command="{Binding StartCommand}" />
+              </StackPanel>
+
+              <!-- Running, not due: countdown + stop -->
+              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
+                          IsVisible="{Binding IsRunning}">
+                <TextBlock Classes="mono" FontSize="17" Foreground="{StaticResource IncomingBrush}"
+                           Text="{Binding RemainingDisplay, StringFormat='in {0}'}"
+                           IsVisible="{Binding !IsDue}" VerticalAlignment="Center" />
+                <Button x:Name="ReminderStopButton" Content="STOPP" Command="{Binding StopCommand}"
+                        IsVisible="{Binding !IsDue}" />
+              </StackPanel>
+
+              <!-- Due: alert + acknowledge -->
+              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
+                          IsVisible="{Binding IsDue}">
+                <Border Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
+                        Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E">
+                  <TextBlock Text="FÄLLIG!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
+                             LetterSpacing="1.5" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                </Border>
+                <Button x:Name="ReminderAckButton" Classes="signal" Content="ERLEDIGT" Command="{Binding AcknowledgeCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
         </StackPanel>
-        <Border x:Name="ReadOnlyBanner" Background="#FFE0B2" Padding="6" CornerRadius="4"
-                IsVisible="{Binding IsReadOnly}">
-          <StackPanel Orientation="Horizontal" Spacing="12">
-            <TextBlock Text="{Binding ReadOnlyReason}" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <Button x:Name="ContinueEditingButton" Content="Weiter bearbeiten"
-                    Command="{Binding ContinueEditingCommand}"
-                    IsVisible="{Binding CanContinueEditing}" />
+      </Border>
+
+      <!-- ===================== Action footer ===================== -->
+      <Border DockPanel.Dock="Bottom" Background="{StaticResource HeaderBarBrush}"
+              BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0"
+              Padding="24,12">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+            <Button x:Name="CloseButton" Content="EINSATZ ABSCHLIESSEN" Command="{Binding CloseIncidentCommand}" />
+            <Button x:Name="ExportButton" Classes="signal" Content="PDF EXPORTIEREN" Command="{Binding ExportPdfCommand}" />
           </StackPanel>
-        </Border>
-        <!-- ILS reminder timer (only present when editable: Reminder != null) -->
-        <Border x:Name="ReminderBar" Background="#E3F2FD" Padding="6" CornerRadius="4" Margin="0,4,0,0"
-                IsVisible="{Binding HasReminder}">
-          <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
-                      DataContext="{Binding Reminder}">
-            <TextBlock Text="Rückmeldung an ILS:" FontWeight="SemiBold" VerticalAlignment="Center" />
-
-            <!-- Idle: choose interval + start -->
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                        IsVisible="{Binding !IsRunning}">
-              <NumericUpDown Value="{Binding IntervalMinutes}" Minimum="1" Maximum="120" Increment="1"
-                             Width="110" FormatString="0" />
-              <TextBlock Text="Min." VerticalAlignment="Center" />
-              <Button x:Name="ReminderStartButton" Content="Timer starten" Command="{Binding StartCommand}" />
-            </StackPanel>
-
-            <!-- Running, not due: countdown + stop -->
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                        IsVisible="{Binding IsRunning}">
-              <TextBlock Text="{Binding RemainingDisplay, StringFormat='in {0}'}"
-                         IsVisible="{Binding !IsDue}" VerticalAlignment="Center" />
-              <Button x:Name="ReminderStopButton" Content="Stopp" Command="{Binding StopCommand}"
-                      IsVisible="{Binding !IsDue}" />
-            </StackPanel>
-
-            <!-- Due: alert + acknowledge -->
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                        IsVisible="{Binding IsDue}">
-              <TextBlock Text="fällig!" FontWeight="Bold" Foreground="#B71C1C" VerticalAlignment="Center" />
-              <Button x:Name="ReminderAckButton" Content="Erledigt" Command="{Binding AcknowledgeCommand}" />
-            </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Ellipse Width="7" Height="7" Fill="{StaticResource ActiveBrush}" VerticalAlignment="Center" />
+            <TextBlock Classes="mono" FontSize="12" VerticalAlignment="Center"
+                       Text="{Binding LastSavedAt, StringFormat='gespeichert {0:HH:mm:ss}'}" />
           </StackPanel>
-        </Border>
-      </StackPanel>
-      <!-- Footer -->
-      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-        <Button x:Name="CloseButton" Content="Einsatz abschließen" Command="{Binding CloseIncidentCommand}" />
-        <Button x:Name="ExportButton" Content="PDF exportieren" Command="{Binding ExportPdfCommand}" />
-        <TextBlock VerticalAlignment="Center"
-                   Text="{Binding LastSavedAt, StringFormat='Gespeichert: {0:HH:mm:ss}'}" />
-      </StackPanel>
-      <!-- Tabs -->
-      <TabControl x:Name="ModuleTabs">
-        <TabItem Header="Checkliste"><ContentControl Content="{Binding Checklist}" /></TabItem>
-        <TabItem Header="ETB"><ContentControl Content="{Binding Etb}" /></TabItem>
-        <TabItem Header="Funktionen"><ContentControl Content="{Binding Roles}" /></TabItem>
-        <TabItem Header="Kräfte"><ContentControl Content="{Binding Forces}" /></TabItem>
-      </TabControl>
+        </Grid>
+      </Border>
+
+      <!-- ===================== Module tabs ===================== -->
+      <Border Background="{StaticResource AppBackgroundBrush}" Padding="0">
+        <TabControl x:Name="ModuleTabs">
+          <TabControl.Background>
+            <SolidColorBrush Color="Transparent" />
+          </TabControl.Background>
+          <TabItem Header="CHECKLISTE">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Checklist}" />
+            </Border>
+          </TabItem>
+          <TabItem Header="ETB">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Etb}" />
+            </Border>
+          </TabItem>
+          <TabItem Header="FUNKTIONEN">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Roles}" />
+            </Border>
+          </TabItem>
+          <TabItem Header="KRÄFTE">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Forces}" />
+            </Border>
+          </TabItem>
+        </TabControl>
+      </Border>
     </DockPanel>
+
     <!-- Continue-editing operator prompt overlay -->
     <ContentControl Content="{Binding PendingPrompt}"
                     IsVisible="{Binding PendingPrompt, Converter={x:Static ObjectConverters.IsNotNull}}" />

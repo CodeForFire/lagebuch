@@ -3,16 +3,23 @@
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
              x:Class="Feuerwehr.App.Views.ChecklistView"
              x:DataType="vm:ChecklistViewModel">
-  <ScrollViewer>
-    <ItemsControl ItemsSource="{Binding Items}" IsEnabled="{Binding !IsReadOnly}">
-      <ItemsControl.ItemTemplate>
-        <DataTemplate x:DataType="vm:ChecklistItemViewModel">
-          <Grid ColumnDefinitions="Auto,*" Margin="0,2">
-            <CheckBox Grid.Column="0" IsChecked="{Binding IsDone}" />
-            <TextBlock Grid.Column="1" Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="Wrap" />
-          </Grid>
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
-  </ScrollViewer>
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" Text="EINSATZ-CHECKLISTE" Classes="overline" Margin="0,0,0,14" />
+    <ScrollViewer>
+      <ItemsControl ItemsSource="{Binding Items}" IsEnabled="{Binding !IsReadOnly}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ChecklistItemViewModel">
+            <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusSm}" Padding="14,11" Margin="0,0,0,7">
+              <Grid ColumnDefinitions="Auto,*">
+                <CheckBox Grid.Column="0" IsChecked="{Binding IsDone}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Text}" VerticalAlignment="Center"
+                           TextWrapping="Wrap" FontSize="14.5" Margin="4,0,0,0" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
 </UserControl>
