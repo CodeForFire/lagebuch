@@ -111,6 +111,28 @@
               </StackPanel>
             </StackPanel>
           </Border>
+
+          <!-- Atemschutz pressure-control reminder (soonest-due Trupp across all tabs) -->
+          <Border x:Name="ScbaControlBar" Background="#241608"
+                  BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
+                  IsVisible="{Binding Scba.HasControlReminder}">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
+                        DataContext="{Binding Scba}">
+              <TextBlock Text="⏱" FontSize="15" VerticalAlignment="Center"
+                         Foreground="{StaticResource AmberBrush}" />
+              <TextBlock Text="ATEMSCHUTZ" Classes="overline" FontSize="10"
+                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+              <TextBlock x:Name="ScbaControlText" Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
+                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+              <Border Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
+                      Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E"
+                      IsVisible="{Binding IsAnyControlDue}">
+                <TextBlock Text="DRUCKABFRAGE!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
+                           LetterSpacing="1.5" Foreground="#FFFFFF" VerticalAlignment="Center" />
+              </Border>
+            </StackPanel>
+          </Border>
         </StackPanel>
       </Border>
 

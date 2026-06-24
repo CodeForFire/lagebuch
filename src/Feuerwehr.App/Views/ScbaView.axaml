@@ -18,19 +18,9 @@
     <TextBlock DockPanel.Dock="Top" Text="ATEMSCHUTZÜBERWACHUNG" Classes="overline"
                Margin="0,0,0,14" VerticalAlignment="Center" />
 
-    <!-- Next pressure-control reminder: nags the operator to ask the soonest-due trupp. -->
-    <Border DockPanel.Dock="Top" Margin="0,0,0,12" IsVisible="{Binding HasControlReminder}"
-            Background="#241608" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-            CornerRadius="{StaticResource RadiusSm}" Padding="14,10">
-      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-        <TextBlock Text="⏱" FontSize="15" VerticalAlignment="Center"
-                   Foreground="{StaticResource AmberBrush}" />
-        <TextBlock Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
-                   Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-      </StackPanel>
-    </Border>
-
-    <!-- Registration dock: announce a Trupp on standby. The air clock starts later, via "UNTER PA". -->
+    <!-- Registration dock: announce a Trupp on standby. The air clock starts later, via "UNTER PA".
+         The next-pressure-control reminder lives in the global incident header so it's visible
+         from every tab. -->
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
