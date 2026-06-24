@@ -38,6 +38,7 @@ public sealed class IncidentReportDocument : IDocument
                 column.Item().Element(c => EtbSection.Compose(c, _incident));
                 column.Item().Element(c => RolesSection.Compose(c, _incident));
                 column.Item().Element(c => ForcesSection.Compose(c, _incident));
+                column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
             });
 
             page.Footer().AlignCenter().Text(t =>

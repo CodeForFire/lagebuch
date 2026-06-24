@@ -11,7 +11,8 @@ public sealed record MasterDataSet(
     IReadOnlyList<string> Districts,
     IReadOnlyList<string> RadioCallSigns,
     IReadOnlyList<Street> Streets,
-    IReadOnlyList<string> ChecklistTemplate);
+    IReadOnlyList<string> ChecklistTemplate,
+    IReadOnlyList<string> TruppTypes);
 
 public static class MasterDataDefaults
 {
@@ -39,6 +40,7 @@ public static class MasterDataDefaults
             Arr(root, "districts"),
             Arr(root, "radioCallSigns"),
             streets,
-            Arr(root, "checklistTemplate"));
+            Arr(root, "checklistTemplate"),
+            Arr(root, "truppTypes"));
     }
 }

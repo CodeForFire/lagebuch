@@ -37,4 +37,40 @@ public class MigrationForwardCompatTests : IDisposable
             Assert.Equal(1L, (long)check.ExecuteScalar()!);
         }
     }
+
+    [Fact]
+    public void Loading_a_pre_v2_incident_file_upgrades_and_does_not_crash()
+    {
+        // Arrange: write a normal incident, then degrade the file to a pre-SCBA (V1) state —
+        // exactly what a file last saved by the old code looks like on disk.
+        var clock = new Clock();
+        var op = new Domain.SessionOperator("Müller", "FFB 12/1");
+        var incident = Domain.Incident.Start(clock, op, "Brand");
+        incident.AddForceUnit("FFB", 12);
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "DROP TABLE scba_pressure_readings; DROP TABLE scba_trupps; " +
+                "DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (1);";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        // Act + Assert: opening the old file must upgrade it in place, not throw.
+        var loaded = repo.Load(_path);
+
+        Assert.Equal("Brand", loaded.Keyword);
+        Assert.Equal(12, loaded.TotalPersonnel);
+        Assert.Empty(loaded.ScbaTrupps);
+    }
+
+    private sealed class Clock : Domain.Time.IClock
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+    }
 }

@@ -11,7 +11,7 @@ public class RolesViewModelTests
     private static MasterDataSet Md() => new(
         Roles: new[] { "EL", "ZF" }, Status: Array.Empty<string>(), Equipment: Array.Empty<string>(),
         Districts: Array.Empty<string>(), RadioCallSigns: new[] { "FFB 12/1" },
-        Streets: Array.Empty<Street>(), ChecklistTemplate: Array.Empty<string>());
+        Streets: Array.Empty<Street>(), ChecklistTemplate: Array.Empty<string>(), TruppTypes: Array.Empty<string>());
 
     [Fact]
     public void AddRole_appends_and_clears_and_fires_onchanged()

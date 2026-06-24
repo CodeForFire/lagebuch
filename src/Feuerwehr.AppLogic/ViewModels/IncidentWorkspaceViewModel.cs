@@ -61,6 +61,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public EtbViewModel Etb { get; private set; } = null!;
     public RolesViewModel Roles { get; private set; } = null!;
     public ForcesViewModel Forces { get; private set; } = null!;
+    public ScbaViewModel Scba { get; private set; } = null!;
     public ReminderViewModel? Reminder { get; private set; }
 
     public string IlsNumberDisplay => Formatting.OrDash(_session.Incident.IlsNumber?.Value);
@@ -85,6 +86,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Roles = new RolesViewModel(_session, _masterData, OnChanged);
         Forces = new ForcesViewModel(_session, _masterData, OnChanged);
 
+        Scba?.Dispose();
+        Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, OnChanged);
+
         Reminder?.Dispose();
         Reminder = _session.IsReadOnly ? null : new ReminderViewModel(_session, _clock, _ticker, OnChanged);
 
@@ -92,6 +96,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Etb));
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
+        OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
     }

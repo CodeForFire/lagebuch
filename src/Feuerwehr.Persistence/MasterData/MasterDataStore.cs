@@ -24,6 +24,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_call_signs (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
             """);
     }
 
@@ -42,6 +43,7 @@ public sealed class MasterDataStore
         InsertList(cn, tx, "md_equipment", set.Equipment);
         InsertList(cn, tx, "md_districts", set.Districts);
         InsertList(cn, tx, "md_call_signs", set.RadioCallSigns);
+        InsertList(cn, tx, "md_trupp_types", set.TruppTypes);
         foreach (var s in set.Streets)
             Run(cn, tx, "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
                 p => { p("$n", s.Name); p("$d", s.District); });
@@ -58,7 +60,8 @@ public sealed class MasterDataStore
         ReadColumn(cn, "SELECT value FROM md_districts;"),
         ReadColumn(cn, "SELECT value FROM md_call_signs;"),
         ReadStreets(cn),
-        ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"));
+        ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"),
+        ReadColumn(cn, "SELECT value FROM md_trupp_types;"));
 
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
     {

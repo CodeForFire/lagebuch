@@ -157,6 +157,11 @@
               <ContentControl Content="{Binding Forces}" />
             </Border>
           </TabItem>
+          <TabItem Header="ATEMSCHUTZ">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Scba}" />
+            </Border>
+          </TabItem>
         </TabControl>
       </Border>
     </DockPanel>

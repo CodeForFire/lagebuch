@@ -47,4 +47,31 @@ public class MigrationsTests : IDisposable
             "('incident_meta','checklist_items','etb_entries','role_assignments','force_units','audit_events');";
         Assert.Equal(6L, (long)cmd.ExecuteScalar()!);
     }
+
+    [Fact]
+    public void V1_database_upgrades_to_v2_and_gains_scba_tables()
+    {
+        // Build a database stamped at version 1, before the SCBA tables existed.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (1);";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Assert.Equal(1, Migrations.GetVersion(cn));
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var check = cn.CreateCommand();
+            check.CommandText =
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN " +
+                "('scba_trupps','scba_pressure_readings');";
+            Assert.Equal(2L, (long)check.ExecuteScalar()!);
+        }
+    }
 }

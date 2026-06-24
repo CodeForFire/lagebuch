@@ -17,7 +17,8 @@ public sealed class IncidentRepository
 
         foreach (var table in new[]
                  { "incident_meta", "checklist_items", "etb_entries",
-                   "role_assignments", "force_units", "audit_events" })
+                   "role_assignments", "force_units", "scba_trupps",
+                   "scba_pressure_readings", "audit_events" })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
         }
@@ -88,6 +89,34 @@ public sealed class IncidentRepository
                 });
         }
 
+        for (var i = 0; i < incident.ScbaTrupps.Count; i++)
+        {
+            var t = incident.ScbaTrupps[i];
+            Run(cn, tx,
+                "INSERT INTO scba_trupps (id, ordinal, designation, members, call_sign, task, entry_time, entry_pressure, max_duration_minutes, return_pressure_bar, exit_time) " +
+                "VALUES ($id,$o,$des,$mem,$cs,$task,$entry,$ep,$max,$ret,$exit);",
+                p =>
+                {
+                    p("$id", t.Id.ToString()); p("$o", i); p("$des", t.Designation); p("$mem", t.Members);
+                    p("$cs", (object?)t.CallSign ?? DBNull.Value); p("$task", (object?)t.Task ?? DBNull.Value);
+                    p("$entry", t.EntryTime.ToString(Iso)); p("$ep", t.EntryPressure);
+                    p("$max", t.MaxDurationMinutes); p("$ret", t.ReturnPressureBar);
+                    p("$exit", (object?)t.ExitTime?.ToString(Iso) ?? DBNull.Value);
+                });
+
+            for (var j = 0; j < t.PressureReadings.Count; j++)
+            {
+                var reading = t.PressureReadings[j];
+                Run(cn, tx,
+                    "INSERT INTO scba_pressure_readings (id, trupp_id, ordinal, reading_time, bar) VALUES ($id,$tid,$o,$time,$bar);",
+                    p =>
+                    {
+                        p("$id", Guid.NewGuid().ToString()); p("$tid", t.Id.ToString()); p("$o", j);
+                        p("$time", reading.Time.ToString(Iso)); p("$bar", reading.Bar);
+                    });
+            }
+        }
+
         for (var i = 0; i < incident.Audit.Count; i++)
         {
             var a = incident.Audit[i];
@@ -101,6 +130,15 @@ public sealed class IncidentRepository
 
     public Incident Load(string path)
     {
+        // Bring an older file up to the current schema before reading it. A file last written
+        // by an earlier version sits at its old schema_version; without this, Load would query
+        // tables that don't exist yet. Migration is version-gated/idempotent and only adds empty
+        // tables, so re-opening a closed incident read-only afterwards still reads no new content.
+        using (var migrateCn = SqliteConnectionFactory.OpenReadWrite(path))
+        {
+            Migrations.Migrate(migrateCn);
+        }
+
         // Peek at state with a read-only connection to decide open mode.
         IncidentState state;
         using (var probe = SqliteConnectionFactory.OpenReadOnly(path))
@@ -132,6 +170,25 @@ public sealed class IncidentRepository
         var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, status, notes FROM force_units ORDER BY ordinal;",
             r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3), Str(r, 4), Str(r, 5)));
 
+        var readingsByTrupp = ReadAll(cn,
+            "SELECT trupp_id, reading_time, bar FROM scba_pressure_readings ORDER BY ordinal;",
+            r => (TruppId: Guid.Parse(r.GetString(0)),
+                  Reading: new Domain.Atemschutz.PressureReading(ParseDate(r.GetString(1)), r.GetInt32(2))))
+            .GroupBy(x => x.TruppId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Reading).ToList());
+
+        var scbaTrupps = ReadAll(cn,
+            "SELECT id, designation, members, call_sign, task, entry_time, entry_pressure, max_duration_minutes, return_pressure_bar, exit_time FROM scba_trupps ORDER BY ordinal;",
+            r =>
+            {
+                var id = Guid.Parse(r.GetString(0));
+                return Domain.Atemschutz.AtemschutzTrupp.Rehydrate(
+                    id, ParseDate(r.GetString(5)), r.GetString(1), r.GetString(2),
+                    Str(r, 3), Str(r, 4), r.GetInt32(6), r.GetInt32(7), r.GetInt32(8),
+                    NullableDate(r, 9),
+                    readingsByTrupp.TryGetValue(id, out var rs) ? rs : Enumerable.Empty<Domain.Atemschutz.PressureReading>());
+            });
+
         var audit = ReadAll(cn, "SELECT at, action, by_operator FROM audit_events ORDER BY ordinal;",
             r => new Domain.AuditEvent(ParseDate(r.GetString(0)), r.GetString(1), r.GetString(2)));
 
@@ -150,7 +207,7 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            checklist, journal, roles, forces, audit);
+            checklist, journal, roles, forces, scbaTrupps, audit);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

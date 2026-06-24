@@ -39,7 +39,7 @@ public class WorkspaceAcceptanceTests
 {
     private static MasterDataSet Md() => new(
         new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<Street>(), new[] { "Blaulicht aus?" });
+        Array.Empty<string>(), Array.Empty<Street>(), new[] { "Blaulicht aus?" }, new[] { "Angriffstrupp" });
 
     private static IncidentWorkspaceViewModel BuildWorkspace(out IncidentSession session)
     {
@@ -62,14 +62,14 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_with_four_tabs()
+    public void Workspace_renders_with_five_tabs()
     {
         var vm = BuildWorkspace(out _);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(4, tabs.Items.Count);
+        Assert.Equal(5, tabs.Items.Count);
     }
 
     [AvaloniaFact]

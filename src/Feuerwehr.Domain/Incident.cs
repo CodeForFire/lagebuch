@@ -1,3 +1,4 @@
+using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
@@ -12,6 +13,7 @@ public sealed class Incident
     private readonly List<EtbEntry> _journal = new();
     private readonly List<RoleAssignment> _roles = new();
     private readonly List<ForceUnit> _forces = new();
+    private readonly List<AtemschutzTrupp> _scbaTrupps = new();
     private readonly List<AuditEvent> _audit = new();
 
     private Incident() { }
@@ -34,6 +36,7 @@ public sealed class Incident
     public IReadOnlyList<EtbEntry> Journal => _journal;
     public IReadOnlyList<RoleAssignment> Roles => _roles;
     public IReadOnlyList<ForceUnit> Forces => _forces;
+    public IReadOnlyList<AtemschutzTrupp> ScbaTrupps => _scbaTrupps;
     public IReadOnlyList<AuditEvent> Audit => _audit;
 
     public static Incident Start(IClock clock, SessionOperator openedBy, string? keyword = null)
@@ -68,6 +71,7 @@ public sealed class Incident
         IEnumerable<EtbEntry> journal,
         IEnumerable<RoleAssignment> roles,
         IEnumerable<ForceUnit> forces,
+        IEnumerable<AtemschutzTrupp> scbaTrupps,
         IEnumerable<AuditEvent> audit)
     {
         var incident = new Incident
@@ -88,6 +92,7 @@ public sealed class Incident
         incident._journal.AddRange(journal);
         incident._roles.AddRange(roles);
         incident._forces.AddRange(forces);
+        incident._scbaTrupps.AddRange(scbaTrupps);
         incident._audit.AddRange(audit);
         return incident;
     }
@@ -208,4 +213,44 @@ public sealed class Incident
         _forces.Add(unit);
         return unit;
     }
+
+    public AtemschutzTrupp AddScbaTrupp(
+        IClock clock,
+        string designation,
+        string members,
+        int entryPressure,
+        string? callSign = null,
+        string? task = null,
+        int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
+        int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        var trupp = AtemschutzTrupp.Create(
+            clock.Now, designation, members, entryPressure, callSign, task, maxDurationMinutes, returnPressureBar);
+        _scbaTrupps.Add(trupp);
+        return trupp;
+    }
+
+    public AtemschutzTrupp RecordScbaPressure(IClock clock, Guid truppId, int bar)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        var trupp = FindScbaTrupp(truppId);
+        trupp.RecordPressure(clock.Now, bar);
+        return trupp;
+    }
+
+    public AtemschutzTrupp MarkScbaReturned(IClock clock, Guid truppId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        var trupp = FindScbaTrupp(truppId);
+        trupp.MarkReturned(clock.Now);
+        return trupp;
+    }
+
+    private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>
+        _scbaTrupps.FirstOrDefault(t => t.Id == truppId)
+            ?? throw new KeyNotFoundException($"Atemschutz-Trupp {truppId} not found.");
 }

@@ -4,7 +4,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -26,6 +26,10 @@ public static class Migrations
         if (version < 1)
         {
             ApplyV1(cn, tx);
+        }
+        if (version < 2)
+        {
+            ApplyV2(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -97,6 +101,34 @@ public static class Migrations
                 at TEXT NOT NULL,
                 action TEXT NOT NULL,
                 by_operator TEXT NOT NULL
+            );
+            """);
+    }
+
+    private static void ApplyV2(SqliteConnection cn, SqliteTransaction tx)
+    {
+        Exec(cn, tx, """
+            CREATE TABLE scba_trupps (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                designation TEXT NOT NULL,
+                members TEXT NOT NULL,
+                call_sign TEXT,
+                task TEXT,
+                entry_time TEXT NOT NULL,
+                entry_pressure INTEGER NOT NULL,
+                max_duration_minutes INTEGER NOT NULL,
+                return_pressure_bar INTEGER NOT NULL,
+                exit_time TEXT
+            );
+            """);
+        Exec(cn, tx, """
+            CREATE TABLE scba_pressure_readings (
+                id TEXT PRIMARY KEY,
+                trupp_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                reading_time TEXT NOT NULL,
+                bar INTEGER NOT NULL
             );
             """);
     }
