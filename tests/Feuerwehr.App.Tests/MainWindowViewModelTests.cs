@@ -60,11 +60,12 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void RequestNewIncident_shows_operator_prompt()
+    public void RequestNewIncident_shows_operator_prompt_collecting_ils()
     {
         var vm = New();
         vm.RequestNewIncidentCommand.Execute(null);
         Assert.NotNull(vm.PendingPrompt);
+        Assert.True(vm.PendingPrompt!.CollectsIlsNumber);
     }
 
     [Fact]

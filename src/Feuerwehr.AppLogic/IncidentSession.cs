@@ -2,6 +2,7 @@ using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Documents;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
+using Feuerwehr.Domain.ValueObjects;
 
 namespace Feuerwehr.AppLogic;
 
@@ -31,12 +32,15 @@ public sealed class IncidentSession
         IClock clock,
         SessionOperator op,
         string path,
-        IEnumerable<string> checklistTemplate)
+        IEnumerable<string> checklistTemplate,
+        IlsNumber? ilsNumber = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(op);
         var incident = Incident.Start(clock, op);
         incident.SeedChecklist(checklistTemplate);
+        if (ilsNumber is not null)
+            incident.SetIlsNumber(ilsNumber);
         var session = new IncidentSession(store, incident, path, op);
         session.Save();
         return session;

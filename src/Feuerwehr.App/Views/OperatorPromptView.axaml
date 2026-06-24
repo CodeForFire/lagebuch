@@ -20,6 +20,14 @@
           <TextBox x:Name="OperatorNameBox" Watermark="z. B. Müller" Text="{Binding OperatorName}" />
           <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" Margin="0,8,0,3" />
           <TextBox Watermark="optional" Text="{Binding OperatorCallSign}" />
+          <StackPanel IsVisible="{Binding CollectsIlsNumber}" Spacing="3">
+            <TextBlock Text="ILS-NUMMER" Classes="overline" FontSize="10" Margin="0,8,0,3" />
+            <TextBox x:Name="IlsNumberBox" MaxLength="4" Watermark="4-stellig, optional"
+                     Text="{Binding IlsNumberInput}" />
+            <TextBlock Text="ILS-Nummer muss genau 4 Ziffern haben." Classes="secondary"
+                       Foreground="{StaticResource AmberBrush}" FontSize="11"
+                       IsVisible="{Binding ShowIlsError}" />
+          </StackPanel>
           <Button x:Name="ConfirmButton" Classes="signal" Content="BESTÄTIGEN" Command="{Binding ConfirmCommand}"
                   HorizontalAlignment="Right" Margin="0,16,0,0" />
         </StackPanel>

@@ -117,7 +117,7 @@ public sealed class Incident
         _audit.Add(new AuditEvent(clock.Now, "closed", closedBy.Display));
     }
 
-    public void SetIncidentNumber(IncidentNumber number)
+    public void SetIncidentNumber(IncidentNumber? number)
     {
         EnsureOpen();
         IncidentNumber = number;

@@ -4,6 +4,7 @@ using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Documents;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
+using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Persistence.MasterData;
 
 namespace Feuerwehr.AppLogic.ViewModels;
@@ -24,6 +25,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _masterData = masterData;
         _dialogs = dialogs;
         IsReadOnly = session.IsReadOnly;
+        // Seed the backing field directly so initialization doesn't trigger a write-back/save.
+        _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
         BuildChildren();
     }
 
@@ -39,13 +42,27 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
 
+    // Editable Einsatznummer; optional and changeable any time the incident is open.
+    // Blank clears the value. Writes through to the domain and autosaves.
+    [ObservableProperty]
+    private string _incidentNumberInput = string.Empty;
+
+    partial void OnIncidentNumberInputChanged(string value)
+    {
+        if (IsReadOnly)
+            return;
+        var trimmed = value?.Trim();
+        _session.Incident.SetIncidentNumber(
+            string.IsNullOrWhiteSpace(trimmed) ? null : new IncidentNumber(trimmed));
+        OnChanged();
+    }
+
     public ChecklistViewModel Checklist { get; private set; } = null!;
     public EtbViewModel Etb { get; private set; } = null!;
     public RolesViewModel Roles { get; private set; } = null!;
     public ForcesViewModel Forces { get; private set; } = null!;
     public ReminderViewModel? Reminder { get; private set; }
 
-    public string IncidentNumberDisplay => Formatting.OrDash(_session.Incident.IncidentNumber?.Value);
     public string IlsNumberDisplay => Formatting.OrDash(_session.Incident.IlsNumber?.Value);
     public string StatusDisplay => Formatting.State(_session.Incident.State);
 

@@ -1,6 +1,7 @@
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;
+using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Persistence.MasterData;
 
 namespace Feuerwehr.AppLogic.Tests;
@@ -35,12 +36,30 @@ public class HomeViewModelTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        vm.NewIncidentCommand.Execute(new SessionOperator("Müller"));
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
 
         Assert.NotNull(opened);
         Assert.False(opened!.IsReadOnly);
         Assert.Contains("/x.fwincident", recent.GetRecent());
         Assert.Equal("A?", opened.Checklist.Items[0].Text); // checklist template seeded
+    }
+
+    [Fact]
+    public void NewIncident_with_ils_sets_number_and_suggests_filename()
+    {
+        var store = new FakeStore();
+        var dialogs = new CapturingSaveDialogs();
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker());
+
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        var ils = IlsNumber.Parse("1234");
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), ils));
+
+        Assert.Equal("Einsatz-1234.fwincident", dialogs.LastSuggestedName);
+        Assert.NotNull(opened);
+        Assert.Equal("1234", opened!.IlsNumberDisplay);
     }
 
     [Fact]
@@ -119,6 +138,19 @@ internal sealed class OpenReturningDialogs : IFileDialogService
 {
     public Task<string?> PickSaveAsync(string suggestedFileName) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+}
+
+// Captures the suggested filename passed to PickSaveAsync.
+internal sealed class CapturingSaveDialogs : IFileDialogService
+{
+    public string? LastSuggestedName { get; private set; }
+    public Task<string?> PickSaveAsync(string suggestedFileName)
+    {
+        LastSuggestedName = suggestedFileName;
+        return Task.FromResult<string?>("/x.fwincident");
+    }
+    public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 }
 

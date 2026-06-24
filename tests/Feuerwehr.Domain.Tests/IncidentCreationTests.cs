@@ -45,4 +45,15 @@ public class IncidentCreationTests
         Assert.Equal("Buchenau", incident.District);
         Assert.Equal("in Bearbeitung", incident.Status);
     }
+
+    [Fact]
+    public void SetIncidentNumber_null_clears_previous_value()
+    {
+        var incident = Incident.Start(new FixedClock(T0), new SessionOperator("Müller"));
+        incident.SetIncidentNumber(new IncidentNumber("B 4242"));
+
+        incident.SetIncidentNumber(null);
+
+        Assert.Null(incident.IncidentNumber);
+    }
 }
