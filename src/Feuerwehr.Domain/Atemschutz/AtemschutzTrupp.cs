@@ -1,15 +1,20 @@
 namespace Feuerwehr.Domain.Atemschutz;
 
 /// <summary>
-/// A breathing-apparatus (SCBA) team under monitoring. Mutable: pressure readings are
-/// appended and the exit time is set when the team returns. Live countdown/alarm values are
-/// pure functions of a supplied <c>now</c>, so nothing time-derived is stored — reopening an
-/// incident resumes an active Trupp's countdown from its persisted entry time.
+/// A breathing-apparatus (SCBA) team under monitoring. Lifecycle: <b>registered</b> (announced
+/// but not yet under air) → <b>active</b> (clock running from <see cref="StartTime"/>) →
+/// <b>returned</b> (<see cref="ExitTime"/> set). Registration does not start the clock, because a
+/// standby/second Trupp may wait minutes before it actually starts consuming air.
+///
+/// Live countdown/alarm values are pure functions of a supplied <c>now</c>, anchored on
+/// <see cref="StartTime"/>, so nothing time-derived is stored — reopening an incident resumes an
+/// active Trupp's countdown from its persisted start time.
 /// </summary>
 public sealed class AtemschutzTrupp
 {
     public const int DefaultMaxDurationMinutes = 30;
     public const int DefaultReturnPressureBar = 60;
+    public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;
 
     private readonly List<PressureReading> _readings = new();
@@ -21,108 +26,160 @@ public sealed class AtemschutzTrupp
     public string Members { get; private init; } = string.Empty;
     public string? CallSign { get; private init; }
     public string? Task { get; private init; }
-    public DateTimeOffset EntryTime { get; private init; }
-    public int EntryPressure { get; private init; }
+
+    /// <summary>When the Trupp was announced/registered (not yet necessarily under air).</summary>
+    public DateTimeOffset RegisteredAt { get; private init; }
+
+    /// <summary>When the Trupp went under air. Null while still on standby.</summary>
+    public DateTimeOffset? StartTime { get; private set; }
+
+    /// <summary>Cylinder pressure recorded the moment the Trupp went under air. Null until started.</summary>
+    public int? StartPressure { get; private set; }
+
     public int MaxDurationMinutes { get; private init; }
     public int ReturnPressureBar { get; private init; }
+    public int PressureControlIntervalMinutes { get; private init; }
     public DateTimeOffset? ExitTime { get; private set; }
 
     public IReadOnlyList<PressureReading> PressureReadings => _readings;
 
-    public static AtemschutzTrupp Create(
-        DateTimeOffset entryTime,
+    public static AtemschutzTrupp Register(
+        DateTimeOffset registeredAt,
         string designation,
         string members,
-        int entryPressure,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = DefaultMaxDurationMinutes,
-        int returnPressureBar = DefaultReturnPressureBar)
+        int returnPressureBar = DefaultReturnPressureBar,
+        int pressureControlIntervalMinutes = DefaultPressureControlIntervalMinutes)
     {
         if (string.IsNullOrWhiteSpace(designation))
             throw new ArgumentException("Trupp-Bezeichnung darf nicht leer sein.", nameof(designation));
         if (string.IsNullOrWhiteSpace(members))
             throw new ArgumentException("Mannschaft darf nicht leer sein.", nameof(members));
-        ValidatePressure(entryPressure, nameof(entryPressure));
         ValidatePressure(returnPressureBar, nameof(returnPressureBar));
         if (maxDurationMinutes <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxDurationMinutes));
+        if (pressureControlIntervalMinutes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(pressureControlIntervalMinutes));
 
         return new AtemschutzTrupp
         {
             Id = Guid.NewGuid(),
-            EntryTime = entryTime,
+            RegisteredAt = registeredAt,
             Designation = designation.Trim(),
             Members = members.Trim(),
-            EntryPressure = entryPressure,
             CallSign = string.IsNullOrWhiteSpace(callSign) ? null : callSign.Trim(),
             Task = string.IsNullOrWhiteSpace(task) ? null : task.Trim(),
             MaxDurationMinutes = maxDurationMinutes,
-            ReturnPressureBar = returnPressureBar
+            ReturnPressureBar = returnPressureBar,
+            PressureControlIntervalMinutes = pressureControlIntervalMinutes
         };
     }
 
     public static AtemschutzTrupp Rehydrate(
         Guid id,
-        DateTimeOffset entryTime,
+        DateTimeOffset registeredAt,
+        DateTimeOffset? startTime,
         string designation,
         string members,
         string? callSign,
         string? task,
-        int entryPressure,
+        int? startPressure,
         int maxDurationMinutes,
         int returnPressureBar,
+        int pressureControlIntervalMinutes,
         DateTimeOffset? exitTime,
         IEnumerable<PressureReading> readings)
     {
         var trupp = new AtemschutzTrupp
         {
             Id = id,
-            EntryTime = entryTime,
+            RegisteredAt = registeredAt,
+            StartTime = startTime,
             Designation = designation,
             Members = members,
             CallSign = callSign,
             Task = task,
-            EntryPressure = entryPressure,
+            StartPressure = startPressure,
             MaxDurationMinutes = maxDurationMinutes,
             ReturnPressureBar = returnPressureBar,
+            PressureControlIntervalMinutes = pressureControlIntervalMinutes,
             ExitTime = exitTime
         };
         trupp._readings.AddRange(readings);
         return trupp;
     }
 
+    /// <summary>Sends the Trupp under air: starts the clock and records the starting pressure.</summary>
+    public void Start(DateTimeOffset time, int startPressure)
+    {
+        if (HasStarted)
+            throw new InvalidOperationException("Trupp ist bereits unter Atemschutz.");
+        ValidatePressure(startPressure, nameof(startPressure));
+        if (startPressure <= 0)
+            throw new ArgumentOutOfRangeException(nameof(startPressure), "Einstiegsdruck muss größer als 0 sein.");
+        StartTime = time;
+        StartPressure = startPressure;
+    }
+
     public void RecordPressure(DateTimeOffset time, int bar)
     {
         if (!IsActive)
-            throw new InvalidOperationException("Trupp ist bereits zurück; keine Druckkontrolle möglich.");
+            throw new InvalidOperationException("Druckkontrolle nur für einen Trupp unter Atemschutz möglich.");
         ValidatePressure(bar, nameof(bar));
         _readings.Add(new PressureReading(time, bar));
     }
 
     public void MarkReturned(DateTimeOffset time)
     {
-        if (!IsActive)
+        if (!HasStarted)
+            throw new InvalidOperationException("Trupp ist noch nicht unter Atemschutz.");
+        if (ExitTime is not null)
             throw new InvalidOperationException("Trupp ist bereits zurück.");
         ExitTime = time;
     }
 
-    public bool IsActive => ExitTime is null;
+    public bool HasStarted => StartTime is not null;
 
-    /// <summary>Most recent measured pressure, or the entry pressure if none recorded yet.</summary>
-    public int LatestPressure => _readings.Count > 0 ? _readings[^1].Bar : EntryPressure;
+    /// <summary>Registered but not yet under air.</summary>
+    public bool IsWaiting => StartTime is null && ExitTime is null;
 
-    public DateTimeOffset DueAt => EntryTime + TimeSpan.FromMinutes(MaxDurationMinutes);
+    /// <summary>Under air right now (started and not yet returned).</summary>
+    public bool IsActive => StartTime is not null && ExitTime is null;
 
-    public TimeSpan Elapsed(DateTimeOffset now) => now - EntryTime;
+    public bool IsReturned => ExitTime is not null;
 
-    public TimeSpan Remaining(DateTimeOffset now) => DueAt - now;
+    /// <summary>Most recent measured pressure, or the start pressure if none recorded yet; null before start.</summary>
+    public int? LatestPressure => _readings.Count > 0 ? _readings[^1].Bar : StartPressure;
 
-    public bool IsTimeAlarm(DateTimeOffset now) => IsActive && now >= DueAt;
+    public DateTimeOffset? DueAt =>
+        StartTime is { } start ? start + TimeSpan.FromMinutes(MaxDurationMinutes) : null;
 
-    public bool IsPressureAlarm => IsActive && LatestPressure <= ReturnPressureBar;
+    public TimeSpan Elapsed(DateTimeOffset now) =>
+        StartTime is { } start ? now - start : TimeSpan.Zero;
+
+    public TimeSpan Remaining(DateTimeOffset now) =>
+        DueAt is { } due ? due - now : TimeSpan.Zero;
+
+    public bool IsTimeAlarm(DateTimeOffset now) => IsActive && DueAt is { } due && now >= due;
+
+    public bool IsPressureAlarm => IsActive && LatestPressure is { } p && p <= ReturnPressureBar;
 
     public bool IsAlarm(DateTimeOffset now) => IsTimeAlarm(now) || IsPressureAlarm;
+
+    /// <summary>Anchor for the next pressure check: the latest reading, else the start time.</summary>
+    private DateTimeOffset? LastControlAt =>
+        _readings.Count > 0 ? _readings[^1].Time : StartTime;
+
+    public DateTimeOffset? NextControlDueAt =>
+        LastControlAt is { } anchor ? anchor + TimeSpan.FromMinutes(PressureControlIntervalMinutes) : null;
+
+    public TimeSpan ControlRemaining(DateTimeOffset now) =>
+        NextControlDueAt is { } due ? due - now : TimeSpan.Zero;
+
+    public bool IsControlDue(DateTimeOffset now) =>
+        IsActive && NextControlDueAt is { } due && now >= due;
 
     private static void ValidatePressure(int bar, string paramName)
     {

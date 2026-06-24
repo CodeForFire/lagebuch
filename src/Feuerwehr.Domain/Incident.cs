@@ -218,17 +218,27 @@ public sealed class Incident
         IClock clock,
         string designation,
         string members,
-        int entryPressure,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
-        int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar)
+        int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
-        var trupp = AtemschutzTrupp.Create(
-            clock.Now, designation, members, entryPressure, callSign, task, maxDurationMinutes, returnPressureBar);
+        var trupp = AtemschutzTrupp.Register(
+            clock.Now, designation, members, callSign, task,
+            maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes);
         _scbaTrupps.Add(trupp);
+        return trupp;
+    }
+
+    public AtemschutzTrupp StartScbaTrupp(IClock clock, Guid truppId, int startPressure)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        var trupp = FindScbaTrupp(truppId);
+        trupp.Start(clock.Now, startPressure);
         return trupp;
     }
 

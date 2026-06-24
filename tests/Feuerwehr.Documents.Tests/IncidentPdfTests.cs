@@ -29,7 +29,8 @@ public class IncidentPdfTests
         incident.AssignRole("EL", "Müller", callSign: "FFB 12/1");
         incident.AddForceUnit("FFB", 12, callSign: "FFB 1/40/1");
         incident.AddForceUnit("Emmering", 9);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", 300, callSign: "FFB 1/40/1");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", callSign: "FFB 1/40/1");
+        incident.StartScbaTrupp(clock, trupp.Id, 300);
         incident.RecordScbaPressure(clock, trupp.Id, 220);
         return incident;
     }

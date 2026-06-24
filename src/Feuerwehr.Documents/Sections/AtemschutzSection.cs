@@ -36,7 +36,7 @@ public static class AtemschutzSection
                 table.Header(header =>
                 {
                     foreach (var title in new[]
-                             { "Trupp", "Mannschaft", "Funkrufname", "Einstieg", "Ausstieg", "Druck Start", "Druck akt." })
+                             { "Trupp", "Mannschaft", "Funkrufname", "Start", "Ende", "Druck Start", "Druck akt." })
                         header.Cell().Element(Cells.Header).Text(title).SemiBold();
                 });
 
@@ -45,10 +45,10 @@ public static class AtemschutzSection
                     table.Cell().Element(Cells.Body).Text(trupp.Designation);
                     table.Cell().Element(Cells.Body).Text(trupp.Members);
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(trupp.CallSign));
-                    table.Cell().Element(Cells.Body).Text(Formatting.Timestamp(trupp.EntryTime));
+                    table.Cell().Element(Cells.Body).Text(trupp.StartTime is { } s ? Formatting.Timestamp(s) : "—");
                     table.Cell().Element(Cells.Body).Text(trupp.ExitTime is { } e ? Formatting.Timestamp(e) : "—");
-                    table.Cell().Element(Cells.Body).Text($"{trupp.EntryPressure} bar");
-                    table.Cell().Element(Cells.Body).Text($"{trupp.LatestPressure} bar");
+                    table.Cell().Element(Cells.Body).Text(trupp.StartPressure is { } sp ? $"{sp} bar" : "—");
+                    table.Cell().Element(Cells.Body).Text(trupp.LatestPressure is { } lp ? $"{lp} bar" : "—");
                 }
             });
         });
