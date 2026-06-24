@@ -9,8 +9,10 @@ public sealed class MasterDataStore
     {
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
         EnsureSchema(cn);
-        if (IsEmpty(cn))
-            Seed(cn, MasterDataDefaults.LoadEmbedded());
+        // Backfill per category, not all-or-nothing: a DB seeded before a new category existed
+        // has the populated old tables but an empty new one. Seeding only when the whole store
+        // looks empty would skip the new category forever, leaving its dropdown blank.
+        SeedMissing(cn, MasterDataDefaults.LoadEmbedded());
         return Read(cn);
     }
 
@@ -24,31 +26,41 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_call_signs (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
             """);
     }
 
-    private static bool IsEmpty(SqliteConnection cn)
+    private static bool IsTableEmpty(SqliteConnection cn, string table)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT count(*) FROM md_roles;";
+        cmd.CommandText = $"SELECT count(*) FROM {table};";
         return (long)cmd.ExecuteScalar()! == 0;
     }
 
-    private static void Seed(SqliteConnection cn, MasterDataSet set)
+    private static void SeedMissing(SqliteConnection cn, MasterDataSet set)
     {
         using var tx = cn.BeginTransaction();
-        InsertList(cn, tx, "md_roles", set.Roles);
-        InsertList(cn, tx, "md_status", set.Status);
-        InsertList(cn, tx, "md_equipment", set.Equipment);
-        InsertList(cn, tx, "md_districts", set.Districts);
-        InsertList(cn, tx, "md_call_signs", set.RadioCallSigns);
-        foreach (var s in set.Streets)
-            Run(cn, tx, "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
-                p => { p("$n", s.Name); p("$d", s.District); });
-        for (var i = 0; i < set.ChecklistTemplate.Count; i++)
-            Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text) VALUES ($o,$t);",
-                p => { p("$o", i); p("$t", set.ChecklistTemplate[i]); });
+        SeedListIfEmpty(cn, tx, "md_roles", set.Roles);
+        SeedListIfEmpty(cn, tx, "md_status", set.Status);
+        SeedListIfEmpty(cn, tx, "md_equipment", set.Equipment);
+        SeedListIfEmpty(cn, tx, "md_districts", set.Districts);
+        SeedListIfEmpty(cn, tx, "md_call_signs", set.RadioCallSigns);
+        SeedListIfEmpty(cn, tx, "md_trupp_types", set.TruppTypes);
+        if (IsTableEmpty(cn, "md_streets"))
+            foreach (var s in set.Streets)
+                Run(cn, tx, "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
+                    p => { p("$n", s.Name); p("$d", s.District); });
+        if (IsTableEmpty(cn, "md_checklist_template"))
+            for (var i = 0; i < set.ChecklistTemplate.Count; i++)
+                Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text) VALUES ($o,$t);",
+                    p => { p("$o", i); p("$t", set.ChecklistTemplate[i]); });
         tx.Commit();
+    }
+
+    private static void SeedListIfEmpty(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
+    {
+        if (IsTableEmpty(cn, table))
+            InsertList(cn, tx, table, values);
     }
 
     private static MasterDataSet Read(SqliteConnection cn) => new(
@@ -58,7 +70,8 @@ public sealed class MasterDataStore
         ReadColumn(cn, "SELECT value FROM md_districts;"),
         ReadColumn(cn, "SELECT value FROM md_call_signs;"),
         ReadStreets(cn),
-        ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"));
+        ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"),
+        ReadColumn(cn, "SELECT value FROM md_trupp_types;"));
 
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
     {

@@ -39,7 +39,7 @@ public class WorkspaceAcceptanceTests
 {
     private static MasterDataSet Md() => new(
         new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<Street>(), new[] { "Blaulicht aus?" });
+        Array.Empty<string>(), Array.Empty<Street>(), new[] { "Blaulicht aus?" }, new[] { "Angriffstrupp" });
 
     private static IncidentWorkspaceViewModel BuildWorkspace(out IncidentSession session)
     {
@@ -62,14 +62,14 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_with_four_tabs()
+    public void Workspace_renders_with_five_tabs()
     {
         var vm = BuildWorkspace(out _);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(4, tabs.Items.Count);
+        Assert.Equal(5, tabs.Items.Count);
     }
 
     [AvaloniaFact]
@@ -213,5 +213,26 @@ public class WorkspaceAcceptanceTests
         Assert.NotNull(reminderBar);
         Assert.False(reminderBar.IsVisible);
         Assert.False(vm.HasReminder);
+    }
+
+    [AvaloniaFact]
+    public void Scba_control_reminder_appears_in_global_header_when_a_trupp_is_under_air()
+    {
+        var vm = BuildWorkspace(out _);
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+
+        var bar = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ScbaControlBar");
+        Assert.False(bar.IsVisible); // nothing under air yet
+
+        vm.Scba.NewDesignation = "Angriffstrupp";
+        vm.Scba.NewMembers = "Müller / Schmidt";
+        vm.Scba.AddTruppCommand.Execute(null);
+        var row = vm.Scba.Trupps[^1];
+        row.PressureInput = 300;
+        row.StartCommand.Execute(null);
+
+        Assert.True(vm.Scba.HasControlReminder);
+        Assert.True(bar.IsVisible);
     }
 }

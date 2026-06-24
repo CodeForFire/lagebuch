@@ -1332,5 +1332,12 @@
     "Takt. Zeichen mit den fremden Fzgen beschriftet?",
     "Headsets aufgebaut? (am Major die Funkkanäle ganz runter drehen, Lautstärke über Headset regeln)",
     "Weiteres Personal für ELW1 beim EL angefordert?"
+  ],
+  "truppTypes": [
+    "Angriffstrupp",
+    "Wassertrupp",
+    "Schlauchtrupp",
+    "Sicherheitstrupp",
+    "Sonstiger Trupp"
   ]
 }

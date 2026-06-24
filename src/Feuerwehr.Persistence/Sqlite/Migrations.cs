@@ -1,10 +1,11 @@
+using Feuerwehr.Domain.Atemschutz;
 using Microsoft.Data.Sqlite;
 
 namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 3;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -26,6 +27,14 @@ public static class Migrations
         if (version < 1)
         {
             ApplyV1(cn, tx);
+        }
+        if (version < 2)
+        {
+            ApplyV2(cn, tx);
+        }
+        if (version < 3)
+        {
+            ApplyV3(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -99,6 +108,71 @@ public static class Migrations
                 by_operator TEXT NOT NULL
             );
             """);
+    }
+
+    private static void ApplyV2(SqliteConnection cn, SqliteTransaction tx)
+    {
+        Exec(cn, tx, """
+            CREATE TABLE scba_trupps (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                designation TEXT NOT NULL,
+                members TEXT NOT NULL,
+                call_sign TEXT,
+                task TEXT,
+                entry_time TEXT NOT NULL,
+                entry_pressure INTEGER NOT NULL,
+                max_duration_minutes INTEGER NOT NULL,
+                return_pressure_bar INTEGER NOT NULL,
+                exit_time TEXT
+            );
+            """);
+        Exec(cn, tx, """
+            CREATE TABLE scba_pressure_readings (
+                id TEXT PRIMARY KEY,
+                trupp_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                reading_time TEXT NOT NULL,
+                bar INTEGER NOT NULL
+            );
+            """);
+    }
+
+    private static void ApplyV3(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Reshape scba_trupps: registration is now separate from going under air. A Trupp gains a
+        // registered_at and a nullable start_time/start_pressure (null while on standby), plus a
+        // pressure-control interval. Rebuild the table (portable across SQLite versions) and map
+        // any existing V2 rows — those were already "under air", so start == entry.
+        Exec(cn, tx, """
+            CREATE TABLE scba_trupps_v3 (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                designation TEXT NOT NULL,
+                members TEXT NOT NULL,
+                call_sign TEXT,
+                task TEXT,
+                registered_at TEXT NOT NULL,
+                start_time TEXT,
+                start_pressure INTEGER,
+                max_duration_minutes INTEGER NOT NULL,
+                return_pressure_bar INTEGER NOT NULL,
+                pressure_control_interval_minutes INTEGER NOT NULL,
+                exit_time TEXT
+            );
+            """);
+        Exec(cn, tx, $"""
+            INSERT INTO scba_trupps_v3
+                (id, ordinal, designation, members, call_sign, task, registered_at, start_time,
+                 start_pressure, max_duration_minutes, return_pressure_bar,
+                 pressure_control_interval_minutes, exit_time)
+            SELECT id, ordinal, designation, members, call_sign, task, entry_time, entry_time,
+                   entry_pressure, max_duration_minutes, return_pressure_bar,
+                   {AtemschutzTrupp.DefaultPressureControlIntervalMinutes}, exit_time
+            FROM scba_trupps;
+            """);
+        Exec(cn, tx, "DROP TABLE scba_trupps;");
+        Exec(cn, tx, "ALTER TABLE scba_trupps_v3 RENAME TO scba_trupps;");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

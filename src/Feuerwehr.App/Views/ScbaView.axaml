@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             x:Class="Feuerwehr.App.Views.ScbaView"
+             x:DataType="vm:ScbaViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.scbaStatus">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.scbaStatus.alarm">
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
+    </Style>
+    <Style Selector="TextBlock.scbaStatus.control">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+  </UserControl.Styles>
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" Text="ATEMSCHUTZÜBERWACHUNG" Classes="overline"
+               Margin="0,0,0,14" VerticalAlignment="Center" />
+
+    <!-- Registration dock: announce a Trupp on standby. The air clock starts later, via "UNTER PA".
+         The next-pressure-control reminder lives in the global incident header so it's visible
+         from every tab. -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <ComboBox Width="150" PlaceholderText="Trupp" ItemsSource="{Binding TruppTypeOptions}"
+                  SelectedItem="{Binding NewDesignation}" />
+        <TextBox Width="200" Watermark="Mannschaft (z. B. Müller / Schmidt)" Text="{Binding NewMembers}" />
+        <ComboBox Width="140" PlaceholderText="Funkrufname" ItemsSource="{Binding CallSignOptions}"
+                  SelectedItem="{Binding NewCallSign}" />
+        <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"
+                       FormatString="0" />
+        <TextBlock Text="Min. max." Classes="secondary" VerticalAlignment="Center" />
+        <NumericUpDown Width="100" Minimum="1" Maximum="60" Value="{Binding NewControlIntervalMinutes}"
+                       FormatString="0" />
+        <TextBlock Text="Min. Abfrage" Classes="secondary" VerticalAlignment="Center" />
+        <Button Classes="signal" Content="BEREITSTELLEN" Command="{Binding AddTruppCommand}" />
+      </StackPanel>
+    </Border>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="TRUPP" Binding="{Binding Designation}" />
+          <DataGridTextColumn Header="MANNSCHAFT" Binding="{Binding Members}" Width="*" />
+          <DataGridTextColumn Header="FUNK" Binding="{Binding CallSign}" />
+          <DataGridTextColumn Header="START" Binding="{Binding StartTimeDisplay}" />
+          <DataGridTextColumn Header="EINGESETZT" Binding="{Binding ElapsedDisplay}" />
+          <DataGridTextColumn Header="RESTZEIT" Binding="{Binding RemainingDisplay}" />
+          <DataGridTextColumn Header="DRUCK" Binding="{Binding PressureDisplay}" />
+          <DataGridTextColumn Header="ABFRAGE IN" Binding="{Binding ControlRemainingDisplay}" />
+          <DataGridTemplateColumn Header="STATUS">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <TextBlock Text="{Binding StatusDisplay}" VerticalAlignment="Center" Margin="12,0"
+                           FontWeight="SemiBold" Classes="scbaStatus"
+                           Classes.alarm="{Binding IsAlarm}" Classes.control="{Binding IsControlDue}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="DRUCK [bar] / AKTION" Width="300">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,4" VerticalAlignment="Center">
+                  <!-- Pressure entry: used both as start pressure and for ongoing Druckkontrolle. -->
+                  <NumericUpDown Width="104" Minimum="0" Maximum="400" Value="{Binding PressureInput}"
+                                 FormatString="0" IsEnabled="{Binding !IsReturned}" />
+                  <Button Classes="signal" Content="UNTER PA" Command="{Binding StartCommand}"
+                          IsVisible="{Binding IsWaiting}" />
+                  <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                          IsVisible="{Binding IsActive}" />
+                  <Button Classes="signal" Content="ZURÜCK" Command="{Binding MarkReturnedCommand}"
+                          IsVisible="{Binding IsActive}" />
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+  </DockPanel>
+</UserControl>

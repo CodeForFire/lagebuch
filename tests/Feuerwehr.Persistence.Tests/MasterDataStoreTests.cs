@@ -1,4 +1,5 @@
 using Feuerwehr.Persistence.MasterData;
+using Feuerwehr.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
 namespace Feuerwehr.Persistence.Tests;
@@ -36,5 +37,31 @@ public class MasterDataStoreTests : IDisposable
         var second = store.GetOrSeed(_path);
         Assert.Equal(first.Streets.Count, second.Streets.Count);
         Assert.Equal(first.Roles.Count, second.Roles.Count);
+    }
+
+    [Fact]
+    public void GetOrSeed_seeds_trupp_types()
+    {
+        var set = new MasterDataStore().GetOrSeed(_path);
+        Assert.Contains("Angriffstrupp", set.TruppTypes);
+    }
+
+    [Fact]
+    public void GetOrSeed_backfills_a_new_category_into_an_already_seeded_db()
+    {
+        // Simulate a masterdata.db created before truppTypes existed: roles are present
+        // (so the legacy "is the DB empty?" check is false) but the trupp-types table is bare.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE md_roles (value TEXT NOT NULL); INSERT INTO md_roles (value) VALUES ('EL');";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        Assert.Contains("Angriffstrupp", set.TruppTypes);
     }
 }
