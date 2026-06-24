@@ -28,7 +28,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RequestNewIncident()
     {
         _pending = PendingAction.New;
-        PendingPrompt = new OperatorPromptViewModel();
+        PendingPrompt = new OperatorPromptViewModel(collectIlsNumber: true);
     }
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
@@ -38,14 +38,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ConfirmOperator()
     {
-        var op = PendingPrompt?.Result;
+        var prompt = PendingPrompt;
+        var op = prompt?.Result;
         var action = _pending;
         PendingPrompt = null;
         _pending = PendingAction.None;
         if (op is null) return;
 
         if (action == PendingAction.New)
-            _home.NewIncidentCommand.Execute(op);
+            _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.IlsNumber));
     }
 
     [RelayCommand]

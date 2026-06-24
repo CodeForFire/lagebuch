@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Feuerwehr.AppLogic.Services;
-using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
 
 namespace Feuerwehr.AppLogic.ViewModels;
@@ -31,13 +30,17 @@ public sealed partial class HomeViewModel : ObservableObject
     public Action<IncidentWorkspaceViewModel>? WorkspaceOpened { get; set; }
 
     [RelayCommand]
-    private async Task NewIncidentAsync(SessionOperator op)
+    private async Task NewIncidentAsync(NewIncidentRequest request)
     {
-        var path = await _dialogs.PickSaveAsync("Einsatz.fwincident");
+        var suggestedName = request.IlsNumber is { } ils
+            ? $"Einsatz-{ils.Value}.fwincident"
+            : "Einsatz.fwincident";
+        var path = await _dialogs.PickSaveAsync(suggestedName);
         if (string.IsNullOrWhiteSpace(path))
             return;
         var md = _masterData.Get();
-        var session = IncidentSession.StartNew(_store, _clock, op, path, md.ChecklistTemplate);
+        var session = IncidentSession.StartNew(
+            _store, _clock, request.Operator, path, md.ChecklistTemplate, request.IlsNumber);
         OpenWorkspace(session, path, md);
     }
 
