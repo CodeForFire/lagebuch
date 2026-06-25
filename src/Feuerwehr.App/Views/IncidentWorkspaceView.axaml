@@ -170,7 +170,10 @@
       </Border>
 
       <!-- ===================== Module tabs ===================== -->
-      <Border Background="{StaticResource AppBackgroundBrush}" Padding="0">
+      <!-- 24px left gutter so the nav rail shares the same left edge as the header bars
+           and footer actions. The content area keeps its own inner padding, preserving
+           the gap between rail and content. -->
+      <Border Background="{StaticResource AppBackgroundBrush}" Padding="24,0,0,0">
         <TabControl x:Name="ModuleTabs">
           <TabControl.Background>
             <SolidColorBrush Color="Transparent" />
