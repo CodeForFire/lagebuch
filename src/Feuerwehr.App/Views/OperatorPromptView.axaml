@@ -3,7 +3,7 @@
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
              x:Class="Feuerwehr.App.Views.OperatorPromptView"
              x:DataType="vm:OperatorPromptViewModel">
-  <Border Background="#B3070A10" Padding="40">
+  <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
     <Border Width="400" VerticalAlignment="Center" HorizontalAlignment="Center"
             Background="{StaticResource SurfaceRaisedBrush}"
             BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
@@ -17,13 +17,25 @@
           <TextBlock Text="DOKUMENTATION" Classes="overline" />
           <TextBlock Text="Wer dokumentiert?" Classes="display" FontSize="22" Margin="0,0,0,8" />
           <TextBlock Text="NAME" Classes="overline" FontSize="10" Margin="0,4,0,3" />
-          <TextBox x:Name="OperatorNameBox" Watermark="z. B. Müller" Text="{Binding OperatorName}" />
+          <TextBox x:Name="OperatorNameBox" Watermark="z. B. Müller" Text="{Binding OperatorName}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
           <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" Margin="0,8,0,3" />
-          <TextBox Watermark="optional" Text="{Binding OperatorCallSign}" />
+          <TextBox Watermark="optional" Text="{Binding OperatorCallSign}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
           <StackPanel IsVisible="{Binding CollectsIlsNumber}" Spacing="3">
             <TextBlock Text="ILS-NUMMER" Classes="overline" FontSize="10" Margin="0,8,0,3" />
             <TextBox x:Name="IlsNumberBox" MaxLength="4" Watermark="4-stellig, optional"
-                     Text="{Binding IlsNumberInput}" />
+                     Text="{Binding IlsNumberInput}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
             <TextBlock Text="ILS-Nummer muss genau 4 Ziffern haben." Classes="secondary"
                        Foreground="{StaticResource AmberBrush}" FontSize="11"
                        IsVisible="{Binding ShowIlsError}" />

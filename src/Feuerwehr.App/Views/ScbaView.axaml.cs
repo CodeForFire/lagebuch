@@ -4,5 +4,9 @@ namespace Feuerwehr.App.Views;
 
 public partial class ScbaView : UserControl
 {
-    public ScbaView() => InitializeComponent();
+    public ScbaView()
+    {
+        InitializeComponent();
+        AttachedToVisualTree += (_, _) => MembersBox.Focus();
+    }
 }

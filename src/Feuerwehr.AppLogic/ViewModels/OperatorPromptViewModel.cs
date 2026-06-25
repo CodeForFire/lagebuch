@@ -53,4 +53,10 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     {
         Result = new SessionOperator(OperatorName, OperatorCallSign);
     }
+
+    // Raised when the operator dismisses the prompt (e.g. Escape). Hosts clear the overlay.
+    public event EventHandler? Cancelled;
+
+    [RelayCommand]
+    private void Cancel() => Cancelled?.Invoke(this, EventArgs.Empty);
 }

@@ -42,12 +42,17 @@ internal sealed class NoopTicker : ITicker
     public IDisposable Subscribe(Action onTick) => new Sub();
     private sealed class Sub : IDisposable { public void Dispose() { } }
 }
+internal sealed class NoopAlarmService : IAlarmService
+{
+    public void Start() { }
+    public void Stop() { }
+}
 
 public class MainWindowViewModelTests
 {
     private static MainWindowViewModel New()
     {
-        var home = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(), new NoopTicker());
+        var home = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(), new NoopTicker(), new NoopAlarmService());
         return new MainWindowViewModel(home);
     }
 
@@ -97,7 +102,7 @@ public class MainWindowViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new NoopTicker());
+        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new NoopTicker(), new NoopAlarmService());
         var vm = new MainWindowViewModel(home);
 
         vm.RequestOpenFileCommand.Execute(null);
@@ -113,7 +118,7 @@ public class MainWindowViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new NoopTicker());
+        var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new NoopTicker(), new NoopAlarmService());
         var vm = new MainWindowViewModel(home);
 
         vm.OpenRecent("/x.fwincident");

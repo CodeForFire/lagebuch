@@ -29,7 +29,7 @@ public class IncidentWorkspaceViewModelTests
         clock = new FixedClock(T0);
         var session = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", new[] { "A?" });
-        return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), dialogs ?? new FakeDialogs());
+        return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), dialogs ?? new FakeDialogs(), new FakeAlarmService());
     }
 
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
@@ -42,7 +42,7 @@ public class IncidentWorkspaceViewModelTests
         if (closed)
             seed.Close(clock);
         var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
-        return new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(), Md(), new FakeDialogs());
+        return new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService());
     }
 
     [Fact]
@@ -93,25 +93,52 @@ public class IncidentWorkspaceViewModelTests
         seed.Save();
         var reopened = IncidentSession.Open(store, "/x.fwincident", new SessionOperator("Müller"));
 
-        var vm = new IncidentWorkspaceViewModel(reopened, clock, new FakeTicker(), Md(), new FakeDialogs());
+        var vm = new IncidentWorkspaceViewModel(reopened, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService());
 
         Assert.Equal("B 99", vm.IncidentNumberInput);
     }
 
     [Fact]
-    public void CloseIncident_makes_workspace_readonly_and_disables_edits()
+    public void CloseIncident_prompts_for_confirmation_before_closing()
     {
         var vm = NewWorkspace(out _, out _);
         Assert.True(vm.CloseIncidentCommand.CanExecute(null));
 
         vm.CloseIncidentCommand.Execute(null);
 
+        // Nothing closed yet — a confirmation overlay is presented.
+        Assert.NotNull(vm.PendingConfirm);
+        Assert.False(vm.IsReadOnly);
+    }
+
+    [Fact]
+    public void Confirming_close_makes_workspace_readonly_and_disables_edits()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.CloseIncidentCommand.Execute(null);
+
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.Null(vm.PendingConfirm);
         Assert.True(vm.IsReadOnly);
         Assert.False(vm.CloseIncidentCommand.CanExecute(null));
         Assert.True(vm.Etb.IsReadOnly);
         Assert.False(vm.Etb.AddEntryCommand.CanExecute(null));
         Assert.True(vm.Checklist.IsReadOnly);
         Assert.True(vm.Checklist.Items[0].IsReadOnly);
+    }
+
+    [Fact]
+    public void Cancelling_close_leaves_incident_open()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.CloseIncidentCommand.Execute(null);
+
+        vm.PendingConfirm!.CancelCommand.Execute(null);
+
+        Assert.Null(vm.PendingConfirm);
+        Assert.False(vm.IsReadOnly);
+        Assert.True(vm.CloseIncidentCommand.CanExecute(null));
     }
 
     [Fact]
@@ -222,9 +249,10 @@ public class IncidentWorkspaceViewModelTests
         var session = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", new[] { "A?" });
         var ticker = new FakeTicker();
-        var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(), new FakeDialogs());
+        var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService());
 
         vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null); // confirm the close
 
         Assert.Null(vm.Reminder);
         Assert.Equal(0, ticker.SubscriberCount); // disposed -> unsubscribed

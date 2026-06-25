@@ -16,14 +16,16 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly ITicker _ticker;
     private readonly MasterDataSet _masterData;
     private readonly IFileDialogService _dialogs;
+    private readonly IAlarmService _alarm;
 
-    public IncidentWorkspaceViewModel(IncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs)
+    public IncidentWorkspaceViewModel(IncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm)
     {
         _session = session;
         _clock = clock;
         _ticker = ticker;
         _masterData = masterData;
         _dialogs = dialogs;
+        _alarm = alarm;
         IsReadOnly = session.IsReadOnly;
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
@@ -41,6 +43,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
+
+    [ObservableProperty]
+    private ConfirmDialogViewModel? _pendingConfirm;
 
     // Editable Einsatznummer; optional and changeable any time the incident is open.
     // Blank clears the value. Writes through to the domain and autosaves.
@@ -87,7 +92,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Forces = new ForcesViewModel(_session, _masterData, OnChanged);
 
         Scba?.Dispose();
-        Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, OnChanged);
+        Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
         Reminder?.Dispose();
         Reminder = _session.IsReadOnly ? null : new ReminderViewModel(_session, _clock, _ticker, OnChanged);
@@ -103,8 +108,24 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     private bool CanClose => !IsReadOnly;
 
+    // Closing is permanent (the incident becomes read-only), so confirm first. If a Trupp is
+    // still under air, call that out — closing mid-Atemschutz is a serious mistake.
     [RelayCommand(CanExecute = nameof(CanClose))]
     private void CloseIncident()
+    {
+        var activeTrupps = _session.Incident.ScbaTrupps.Count(t => t.IsActive);
+        var message = activeTrupps > 0
+            ? $"ACHTUNG: {activeTrupps} Atemschutztrupp(s) noch unter PA. " +
+              "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?"
+            : "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?";
+        var dialog = new ConfirmDialogViewModel(
+            "Einsatz abschließen?", message, "ABSCHLIESSEN", PerformClose);
+        // Clear the overlay on either outcome; PerformClose has already run on confirm.
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
+    }
+
+    private void PerformClose()
     {
         _session.Close(_clock);
         IsReadOnly = true; // notifies CanContinueEditing + both commands

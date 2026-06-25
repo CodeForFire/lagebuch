@@ -4,5 +4,9 @@ namespace Feuerwehr.App.Views;
 
 public partial class RolesView : UserControl
 {
-    public RolesView() => InitializeComponent();
+    public RolesView()
+    {
+        InitializeComponent();
+        AttachedToVisualTree += (_, _) => PersonNameBox.Focus();
+    }
 }

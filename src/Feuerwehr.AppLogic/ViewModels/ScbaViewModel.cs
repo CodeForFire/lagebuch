@@ -128,14 +128,16 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 {
     private readonly IncidentSession _session;
     private readonly IClock _clock;
+    private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
     private readonly IDisposable? _subscription;
     private readonly HashSet<Guid> _alarmLogged = new();
 
-    public ScbaViewModel(IncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, Action onChanged)
+    public ScbaViewModel(IncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
     {
         _session = session;
         _clock = clock;
+        _alarm = alarm;
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
         TruppTypeOptions = masterData.TruppTypes;
@@ -200,6 +202,62 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         }
     }
 
+    // ----- Rückzugsalarm: a trupp has hit its time limit or return pressure (life-safety) -----
+
+    private IEnumerable<AtemschutzTrupp> AlarmingTrupps =>
+        _session.Incident.ScbaTrupps.Where(t => t.IsActive && t.IsAlarm(_clock.Now));
+
+    public bool IsAnyAlarm => AlarmingTrupps.Any();
+
+    public string AlarmDisplay
+    {
+        get
+        {
+            var trupps = AlarmingTrupps.ToList();
+            if (trupps.Count == 0)
+                return "—";
+            var first = $"RÜCKZUGSALARM {trupps[0].Designation}: {AlarmReason(trupps[0])}";
+            return trupps.Count == 1 ? first : $"{first}  (+{trupps.Count - 1})";
+        }
+    }
+
+    [ObservableProperty]
+    private bool _isAlarmAcknowledged;
+
+    private bool CanAcknowledgeAlarm => IsAnyAlarm;
+
+    [RelayCommand(CanExecute = nameof(CanAcknowledgeAlarm))]
+    private void AcknowledgeAlarm()
+    {
+        // Silence the sound; the visual banner stays until the trupp is back.
+        _alarm.Stop();
+        IsAlarmAcknowledged = true;
+    }
+
+    private string AlarmReason(AtemschutzTrupp trupp) => trupp.IsTimeAlarm(_clock.Now)
+        ? "Einsatzzeit erreicht"
+        : $"Rückzugsdruck erreicht ({trupp.LatestPressure} bar)";
+
+    /// <summary>Sounds or silences the audible alarm from current state, and keeps the banner
+    /// bindings fresh. A newly-alarming trupp re-arms the sound even after an earlier ack.</summary>
+    private void UpdateAlarm(bool newAlarmTripped)
+    {
+        if (newAlarmTripped)
+            IsAlarmAcknowledged = false;
+
+        if (IsAnyAlarm && !IsAlarmAcknowledged)
+            _alarm.Start();
+        else if (!IsAnyAlarm)
+        {
+            _alarm.Stop();
+            IsAlarmAcknowledged = false;
+        }
+
+        OnPropertyChanged(nameof(IsAnyAlarm));
+        OnPropertyChanged(nameof(AlarmDisplay));
+        AcknowledgeAlarmCommand.NotifyCanExecuteChanged();
+    }
+
     private bool CanAddTrupp =>
         !IsReadOnly && !string.IsNullOrWhiteSpace(NewDesignation) && !string.IsNullOrWhiteSpace(NewMembers);
 
@@ -251,7 +309,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             _clock, _session.Operator!, EtbDirection.Internal,
             $"Druckkontrolle Atemschutz {trupp.Designation}: {bar} bar", from: trupp.CallSign, to: null);
         RefreshRow(truppId);
-        LogNewAlarms(); // a low reading may immediately trip the Rückzugsdruck alarm
+        var tripped = LogNewAlarms(); // a low reading may immediately trip the Rückzugsdruck alarm
+        UpdateAlarm(tripped);
         RefreshHeader();
         _onChanged();
     }
@@ -263,6 +322,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             _clock, _session.Operator!, EtbDirection.Internal,
             $"Atemschutztrupp {trupp.Designation} zurück", from: trupp.CallSign, to: null);
         RefreshRow(truppId);
+        UpdateAlarm(newAlarmTripped: false); // a returned trupp may clear the last alarm
         RefreshHeader();
         _onChanged();
     }
@@ -282,7 +342,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         foreach (var row in Trupps)
             row.Refresh();
         RefreshHeader();
-        if (LogNewAlarms())
+        var tripped = LogNewAlarms();
+        UpdateAlarm(tripped);
+        if (tripped)
             _onChanged();
     }
 
@@ -297,9 +359,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         {
             if (!trupp.IsActive || !trupp.IsAlarm(_clock.Now) || !_alarmLogged.Add(trupp.Id))
                 continue;
-            var reason = trupp.IsTimeAlarm(_clock.Now)
-                ? "Einsatzzeit erreicht"
-                : $"Rückzugsdruck erreicht ({trupp.LatestPressure} bar)";
+            var reason = AlarmReason(trupp);
             _session.Incident.AddJournalEntry(
                 _clock, _session.Operator!, EtbDirection.Internal,
                 $"Rückzugsalarm Atemschutz {trupp.Designation}: {reason}", from: null, to: trupp.CallSign);
@@ -308,5 +368,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         return logged;
     }
 
-    public void Dispose() => _subscription?.Dispose();
+    public void Dispose()
+    {
+        _alarm.Stop();
+        _subscription?.Dispose();
+    }
 }

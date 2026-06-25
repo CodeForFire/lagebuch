@@ -4,5 +4,9 @@ namespace Feuerwehr.App.Views;
 
 public partial class ForcesView : UserControl
 {
-    public ForcesView() => InitializeComponent();
+    public ForcesView()
+    {
+        InitializeComponent();
+        AttachedToVisualTree += (_, _) => BrigadeBox.Focus();
+    }
 }
