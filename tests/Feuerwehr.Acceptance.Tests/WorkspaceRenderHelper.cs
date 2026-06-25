@@ -1,0 +1,67 @@
+using Feuerwehr.AppLogic;
+using Feuerwehr.AppLogic.Services;
+using Feuerwehr.AppLogic.ViewModels;
+using Feuerwehr.Domain;
+using Feuerwehr.Persistence.MasterData;
+
+namespace Feuerwehr.Acceptance.Tests;
+
+internal sealed class ManualTicker : ITicker
+{
+    private readonly List<Action> _subs = new();
+    public IDisposable Subscribe(Action onTick) { _subs.Add(onTick); return new Sub(); }
+    public void Pulse() { foreach (var s in _subs.ToArray()) s(); }
+    private sealed class Sub : IDisposable { public void Dispose() { } }
+}
+
+internal static class WorkspaceRenderHelper
+{
+    private static MasterDataSet Md() => new(
+        new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+        Array.Empty<string>(), Array.Empty<Street>(),
+        new[]
+        {
+            "Aufstellort ELW weit genug weg um nicht zu behindern?",
+            "Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?",
+            "Rote Kennleuchte ein, Blaulicht aus?",
+            "PC eingeschaltet und VPN Verbindung aktiviert?",
+            "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
+        },
+        new[] { "Angriffstrupp" });
+
+    public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars()
+    {
+        var clock = new FixedClock();
+        var checklist = new[]
+        {
+            "Aufstellort ELW weit genug weg um nicht zu behindern?",
+            "Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?",
+            "Rote Kennleuchte ein, Blaulicht aus?",
+            "PC eingeschaltet und VPN Verbindung aktiviert?",
+            "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
+        };
+        var session = IncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklist);
+        var ticker = new ManualTicker();
+        var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(),
+            new FakeDialogs(), new NoopAlarmService());
+        vm.IncidentNumberInput = "123";
+
+        // Drive the three header bars into their visible states (like the reported screenshot):
+        //   1) ILS reminder running, 2) SCBA pressure-control due, 3) Rückzugsalarm active.
+        vm.Reminder!.StartCommand.Execute(null);
+
+        vm.Scba.NewDesignation = "Angriffstrupp";
+        vm.Scba.NewMembers = "Müller / Schmidt";
+        vm.Scba.AddTruppCommand.Execute(null);
+        var row = vm.Scba.Trupps[^1];
+        row.PressureInput = 300;
+        row.StartCommand.Execute(null);
+
+        // Advance past the 30-min max duration so the trupp is in Rückzugsalarm.
+        clock.Now = clock.Now.AddMinutes(31);
+        ticker.Pulse();
+
+        return vm;
+    }
+}
