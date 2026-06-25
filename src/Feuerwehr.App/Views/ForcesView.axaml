@@ -22,7 +22,11 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBox Width="170" Watermark="Feuerwehr" Text="{Binding NewBrigade}" />
+        <TextBox x:Name="BrigadeBox" Width="170" Watermark="Feuerwehr" Text="{Binding NewBrigade}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddForceCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
         <ComboBox Width="170" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
         <NumericUpDown Width="118" Minimum="0" Value="{Binding NewPersonnelCount}" />
         <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}" />

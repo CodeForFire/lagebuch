@@ -12,7 +12,11 @@
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <ComboBox Width="130" ItemsSource="{Binding RoleOptions}" SelectedItem="{Binding NewRole}" />
-        <TextBox Width="210" Watermark="Name" Text="{Binding NewPersonName}" />
+        <TextBox x:Name="PersonNameBox" Width="210" Watermark="Name" Text="{Binding NewPersonName}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddRoleCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
         <ComboBox Width="170" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
         <Button Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}" />
       </StackPanel>

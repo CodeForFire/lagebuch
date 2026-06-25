@@ -15,11 +15,14 @@ public partial class MainWindow : Window
         viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainWindowViewModel.PendingPrompt) && viewModel.PendingPrompt is { } prompt)
+            {
                 prompt.PropertyChanged += (_, pe) =>
                 {
                     if (pe.PropertyName == nameof(OperatorPromptViewModel.Result) && prompt.Result is not null)
                         viewModel.ConfirmOperatorCommand.Execute(null);
                 };
+                prompt.Cancelled += (_, _) => viewModel.CancelOperatorCommand.Execute(null);
+            }
         };
     }
 }

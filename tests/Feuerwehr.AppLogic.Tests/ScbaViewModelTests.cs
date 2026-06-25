@@ -18,8 +18,8 @@ public class ScbaViewModelTests
         IncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
 
-    private static ScbaViewModel Vm(FixedClock clock, IncidentSession session, Action? onChanged = null, FakeTicker? ticker = null) =>
-        new(session, Md(), clock, ticker ?? new FakeTicker(), onChanged ?? (() => { }));
+    private static ScbaViewModel Vm(FixedClock clock, IncidentSession session, Action? onChanged = null, FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
+        new(session, Md(), clock, ticker ?? new FakeTicker(), alarm ?? new FakeAlarmService(), onChanged ?? (() => { }));
 
     private static ScbaTruppRow Register(ScbaViewModel vm, string designation = "Angriffstrupp", string members = "Müller / Schmidt")
     {
@@ -206,5 +206,117 @@ public class ScbaViewModelTests
         vm.Dispose();
 
         Assert.Equal(0, ticker.SubscriberCount);
+    }
+
+    [Fact]
+    public void Tick_past_max_duration_sounds_the_audible_alarm_and_sets_banner()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewMaxDurationMinutes = 30;
+        var row = Register(vm);
+        row.PressureInput = 300;
+        row.StartCommand.Execute(null);
+
+        Assert.False(vm.IsAnyAlarm);
+        Assert.False(alarm.IsSounding);
+
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+
+        Assert.True(vm.IsAnyAlarm);
+        Assert.True(alarm.IsSounding);
+        Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay);
+        Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Acknowledging_alarm_silences_sound_but_keeps_banner()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewMaxDurationMinutes = 30;
+        var row = Register(vm);
+        row.PressureInput = 300;
+        row.StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+
+        vm.AcknowledgeAlarmCommand.Execute(null);
+
+        Assert.False(alarm.IsSounding); // sound stopped
+        Assert.True(vm.IsAnyAlarm);     // but banner remains while the alarm condition persists
+
+        // A further tick with the alarm acknowledged must not re-arm the sound.
+        ticker.Fire();
+        Assert.False(alarm.IsSounding);
+    }
+
+    [Fact]
+    public void Returning_the_alarming_trupp_clears_banner_and_stops_alarm()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewMaxDurationMinutes = 30;
+        var row = Register(vm);
+        row.PressureInput = 300;
+        row.StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+        Assert.True(alarm.IsSounding);
+
+        row.MarkReturnedCommand.Execute(null);
+
+        Assert.False(vm.IsAnyAlarm);
+        Assert.False(alarm.IsSounding);
+    }
+
+    [Fact]
+    public void A_second_trupp_newly_alarming_re_arms_the_sound_after_ack()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+
+        vm.NewMaxDurationMinutes = 30;
+        var first = Register(vm, members: "Müller / Schmidt");
+        first.PressureInput = 300;
+        first.StartCommand.Execute(null);
+
+        // Second trupp goes under air 10 minutes later, so its limit falls after the first's.
+        clock.Now = T0.AddMinutes(10);
+        vm.NewMaxDurationMinutes = 30;
+        var second = Register(vm, members: "Huber / Mayer");
+        second.PressureInput = 300;
+        second.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();              // first trupp alarms (limit at T0+30)
+        vm.AcknowledgeAlarmCommand.Execute(null);
+        Assert.False(alarm.IsSounding);
+
+        clock.Now = T0.AddMinutes(41);
+        ticker.Fire();              // second trupp now past its limit (T0+40) → re-arm
+
+        Assert.True(alarm.IsSounding);
+    }
+
+    [Fact]
+    public void Dispose_stops_the_alarm()
+    {
+        var clock = new FixedClock(T0);
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), alarm: alarm);
+
+        vm.Dispose();
+
+        Assert.True(alarm.StopCount >= 1);
     }
 }

@@ -35,6 +35,7 @@ public partial class IncidentWorkspaceView : UserControl
                 if (pe.PropertyName == nameof(OperatorPromptViewModel.Result) && prompt.Result is not null)
                     _vm.ConfirmContinueEditing();
             };
+            prompt.Cancelled += (_, _) => _vm.CancelContinueEditing();
         }
     }
 }

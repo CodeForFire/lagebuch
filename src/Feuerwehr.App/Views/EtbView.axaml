@@ -11,7 +11,11 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}" />
+        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
         <ComboBox Width="130" ItemsSource="{Binding DirectionOptions}" SelectedItem="{Binding NewDirection}" />
         <TextBox Width="110" Watermark="Von" Text="{Binding NewFrom}" />
         <TextBox Width="110" Watermark="An" Text="{Binding NewTo}" />

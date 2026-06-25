@@ -34,6 +34,11 @@ internal sealed class NoopTicker : ITicker
     public IDisposable Subscribe(Action onTick) => new Sub();
     private sealed class Sub : IDisposable { public void Dispose() { } }
 }
+internal sealed class NoopAlarmService : IAlarmService
+{
+    public void Start() { }
+    public void Stop() { }
+}
 
 public class WorkspaceAcceptanceTests
 {
@@ -45,7 +50,7 @@ public class WorkspaceAcceptanceTests
     {
         session = IncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
-        return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs());
+        return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
     }
 
     // A read-only-opened workspace over a still-open (or optionally closed) incident.
@@ -58,7 +63,7 @@ public class WorkspaceAcceptanceTests
         if (closed)
             seed.Close(clock);
         var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
-        return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs());
+        return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
     }
 
     [AvaloniaFact]
@@ -124,6 +129,7 @@ public class WorkspaceAcceptanceTests
         window.Show();
 
         vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null); // confirm the close prompt
 
         var banner = window.GetVisualDescendants().OfType<Border>()
             .Single(b => b.Name == "ReadOnlyBanner");

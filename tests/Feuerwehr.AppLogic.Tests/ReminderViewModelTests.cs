@@ -5,6 +5,16 @@ using Feuerwehr.Domain.Etb;
 
 namespace Feuerwehr.AppLogic.Tests;
 
+// Records Start/Stop so tests can assert the audible alarm fired without real audio.
+internal sealed class FakeAlarmService : IAlarmService
+{
+    public int StartCount { get; private set; }
+    public int StopCount { get; private set; }
+    public bool IsSounding { get; private set; }
+    public void Start() { StartCount++; IsSounding = true; }
+    public void Stop() { StopCount++; IsSounding = false; }
+}
+
 // Synchronous fake ticker — tests call Fire() to advance a "tick".
 internal sealed class FakeTicker : ITicker
 {

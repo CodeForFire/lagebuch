@@ -133,6 +133,22 @@
               </Border>
             </StackPanel>
           </Border>
+
+          <!-- Atemschutz Rückzugsalarm: unmissable red banner + audible alarm (life-safety) -->
+          <Border x:Name="ScbaAlarmBar" Background="{StaticResource SignalGradientBrush}"
+                  BorderBrush="{StaticResource SignalHotBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="16,12"
+                  BoxShadow="0 0 22 -2 #CCFF3D2E"
+                  IsVisible="{Binding Scba.IsAnyAlarm}">
+            <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Scba}">
+              <TextBlock Grid.Column="0" Text="🚨" FontSize="20" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <TextBlock Grid.Column="1" Text="{Binding AlarmDisplay}"
+                         FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
+                         LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Content="ALARM QUITTIEREN" Command="{Binding AcknowledgeAlarmCommand}"
+                      VerticalAlignment="Center" />
+            </Grid>
+          </Border>
         </StackPanel>
       </Border>
 
@@ -191,5 +207,9 @@
     <!-- Continue-editing operator prompt overlay -->
     <ContentControl Content="{Binding PendingPrompt}"
                     IsVisible="{Binding PendingPrompt, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Confirmation overlay (e.g. closing the incident) -->
+    <ContentControl Content="{Binding PendingConfirm}"
+                    IsVisible="{Binding PendingConfirm, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>
