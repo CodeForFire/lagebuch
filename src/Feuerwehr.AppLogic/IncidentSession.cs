@@ -37,10 +37,10 @@ public sealed class IncidentSession
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(op);
-        var incident = Incident.Start(clock, op);
+        // ILS number goes through the factory rather than SetIlsNumber afterwards, so the
+        // automatic "Einsatz begonnen" entry can name it.
+        var incident = Incident.Start(clock, op, keyword: null, ilsNumber: ilsNumber);
         incident.SeedChecklist(checklistTemplate);
-        if (ilsNumber is not null)
-            incident.SetIlsNumber(ilsNumber);
         var session = new IncidentSession(store, incident, path, op);
         session.Save();
         return session;

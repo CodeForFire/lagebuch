@@ -101,9 +101,10 @@ public class ReminderViewModelTests
 
         vm.AcknowledgeCommand.Execute(null);
 
-        var entry = Assert.Single(session.Incident.Journal);
+        // Journal[0] is the automatic "Einsatz begonnen" entry; acknowledging must add
+        // exactly one more.
+        var entry = Assert.Single(session.Incident.Journal, e => e.Text == "Rückmeldung an ILS");
         Assert.Equal(EtbDirection.Outgoing, entry.Direction);
-        Assert.Equal("Rückmeldung an ILS", entry.Text);
         Assert.Equal("ILS", entry.To);
         Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
         Assert.False(vm.IsDue);                 // re-anchored to now

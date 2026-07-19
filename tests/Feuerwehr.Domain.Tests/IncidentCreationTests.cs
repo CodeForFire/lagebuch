@@ -1,3 +1,4 @@
+using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Domain.Time;
 
@@ -27,6 +28,33 @@ public class IncidentCreationTests
         Assert.Equal(IncidentState.Open, incident.State);
         Assert.Equal("Brand", incident.Keyword);
         Assert.Equal("opened", Assert.Single(incident.Audit).Action);
+    }
+
+    [Fact]
+    public void Start_logs_opening_etb_entry()
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Müller", "FFB 12/1");
+
+        var incident = Incident.Start(clock, op);
+
+        var entry = Assert.Single(incident.Journal);
+        Assert.Equal("Einsatz begonnen", entry.Text);
+        Assert.Equal(EtbDirection.Internal, entry.Direction);
+        Assert.Equal(T0, entry.Timestamp);
+        Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
+        Assert.Null(entry.From);
+        Assert.Null(entry.To);
+    }
+
+    [Fact]
+    public void Start_with_ils_number_names_it_in_the_opening_entry()
+    {
+        var incident = Incident.Start(
+            new FixedClock(T0), new SessionOperator("Müller"), ilsNumber: IlsNumber.Parse("4711"));
+
+        Assert.Equal("4711", incident.IlsNumber!.Value);
+        Assert.Equal("Einsatz begonnen (ILS 4711)", Assert.Single(incident.Journal).Text);
     }
 
     [Fact]

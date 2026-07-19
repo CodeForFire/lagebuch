@@ -128,6 +128,35 @@ public class IncidentWorkspaceViewModelTests
         Assert.True(vm.Checklist.Items[0].IsReadOnly);
     }
 
+    // The closing entry is appended after the ETB grid is already populated, so it only
+    // shows up because PerformClose rebuilds the children. Guards that rebuild.
+    [Fact]
+    public void Confirming_close_shows_the_closing_entry_in_the_etb_grid()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.CloseIncidentCommand.Execute(null);
+
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        // Newest-first grid: the closing entry sits above the opening one.
+        Assert.Equal("Einsatz abgeschlossen", vm.Etb.Entries[0].Text);
+        Assert.Equal("Einsatz begonnen", vm.Etb.Entries[1].Text);
+    }
+
+    [Fact]
+    public void Continuing_editing_shows_the_resume_entry_in_the_etb_grid()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+        vm.ContinueEditingCommand.Execute(null);
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+
+        vm.ConfirmContinueEditing();
+
+        Assert.Equal("Bearbeitung fortgesetzt", vm.Etb.Entries[0].Text);
+        Assert.Equal("Schmidt", vm.Etb.Entries[0].EnteredBy);
+    }
+
     [Fact]
     public void Cancelling_close_leaves_incident_open()
     {

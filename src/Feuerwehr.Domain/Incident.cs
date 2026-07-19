@@ -39,7 +39,11 @@ public sealed class Incident
     public IReadOnlyList<AtemschutzTrupp> ScbaTrupps => _scbaTrupps;
     public IReadOnlyList<AuditEvent> Audit => _audit;
 
-    public static Incident Start(IClock clock, SessionOperator openedBy, string? keyword = null)
+    public static Incident Start(
+        IClock clock,
+        SessionOperator openedBy,
+        string? keyword = null,
+        IlsNumber? ilsNumber = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(openedBy);
@@ -49,9 +53,13 @@ public sealed class Incident
             Id = Guid.NewGuid(),
             StartedAt = clock.Now,
             State = IncidentState.Open,
-            Keyword = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim()
+            Keyword = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim(),
+            IlsNumber = ilsNumber
         };
         incident._audit.Add(new AuditEvent(clock.Now, "opened", openedBy.Display));
+        incident.LogLifecycle(clock, openedBy, ilsNumber is null
+            ? "Einsatz begonnen"
+            : $"Einsatz begonnen (ILS {ilsNumber.Value})");
         return incident;
     }
 
@@ -103,12 +111,19 @@ public sealed class Incident
             throw new IncidentClosedException();
     }
 
+    // Appends a lifecycle entry straight to the journal, deliberately bypassing
+    // AddJournalEntry's EnsureOpen guard: Close has to log its own entry, and it is only
+    // ever called from the transition methods, which guard themselves.
+    private void LogLifecycle(IClock clock, SessionOperator op, string text) =>
+        _journal.Add(EtbEntry.Create(clock.Now, EtbDirection.Internal, text, op));
+
     public void ResumeEditing(IClock clock, SessionOperator resumedBy)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(resumedBy);
         EnsureOpen();
         _audit.Add(new AuditEvent(clock.Now, "resumed", resumedBy.Display));
+        LogLifecycle(clock, resumedBy, "Bearbeitung fortgesetzt");
     }
 
     public void Close(IClock clock, SessionOperator closedBy)
@@ -116,6 +131,8 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(closedBy);
         EnsureOpen();
+        // Must precede the state flip — a closed incident rejects journal writes.
+        LogLifecycle(clock, closedBy, "Einsatz abgeschlossen");
         State = IncidentState.Closed;
         ClosedAt = clock.Now;
         ClosedBy = closedBy.Display;

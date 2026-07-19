@@ -95,8 +95,11 @@ public class WorkspaceAcceptanceTests
 
         addButton.Command!.Execute(null);
 
-        Assert.Single(session.Incident.Journal);
-        Assert.Single(vm.Etb.Entries);
+        // The grid already holds the automatic "Einsatz begonnen" entry; it is newest-first,
+        // so the entry just typed appears above it.
+        Assert.Equal(2, session.Incident.Journal.Count);
+        Assert.Equal("Lagemeldung erhalten", vm.Etb.Entries[0].Text);
+        Assert.Equal("Einsatz begonnen", vm.Etb.Entries[1].Text);
     }
 
     [AvaloniaFact]
