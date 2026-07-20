@@ -18,7 +18,7 @@ public sealed class IncidentRepository
         foreach (var table in new[]
                  { "incident_meta", "checklist_items", "etb_entries",
                    "role_assignments", "force_units", "scba_trupps",
-                   "scba_pressure_readings", "audit_events" })
+                   "scba_trupp_members", "scba_pressure_readings", "audit_events" })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
         }
@@ -96,11 +96,11 @@ public sealed class IncidentRepository
         {
             var t = incident.ScbaTrupps[i];
             Run(cn, tx,
-                "INSERT INTO scba_trupps (id, ordinal, designation, members, call_sign, task, registered_at, start_time, start_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time) " +
-                "VALUES ($id,$o,$des,$mem,$cs,$task,$reg,$start,$sp,$max,$ret,$interval,$exit);",
+                "INSERT INTO scba_trupps (id, ordinal, designation, call_sign, task, registered_at, start_time, start_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time) " +
+                "VALUES ($id,$o,$des,$cs,$task,$reg,$start,$sp,$max,$ret,$interval,$exit);",
                 p =>
                 {
-                    p("$id", t.Id.ToString()); p("$o", i); p("$des", t.Designation); p("$mem", t.Members);
+                    p("$id", t.Id.ToString()); p("$o", i); p("$des", t.Designation);
                     p("$cs", (object?)t.CallSign ?? DBNull.Value); p("$task", (object?)t.Task ?? DBNull.Value);
                     p("$reg", t.RegisteredAt.ToString(Iso));
                     p("$start", (object?)t.StartTime?.ToString(Iso) ?? DBNull.Value);
@@ -109,6 +109,18 @@ public sealed class IncidentRepository
                     p("$interval", t.PressureControlIntervalMinutes);
                     p("$exit", (object?)t.ExitTime?.ToString(Iso) ?? DBNull.Value);
                 });
+
+            for (var j = 0; j < t.Members.Count; j++)
+            {
+                var member = t.Members[j];
+                Run(cn, tx,
+                    "INSERT INTO scba_trupp_members (trupp_id, ordinal, role, name) VALUES ($tid,$o,$role,$name);",
+                    p =>
+                    {
+                        p("$tid", t.Id.ToString()); p("$o", j);
+                        p("$role", (int)member.Role); p("$name", member.Name);
+                    });
+            }
 
             for (var j = 0; j < t.PressureReadings.Count; j++)
             {
@@ -182,6 +194,14 @@ public sealed class IncidentRepository
             r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3),
                 r.GetInt32(4), Str(r, 5), Str(r, 6)));
 
+        var membersByTrupp = ReadAll(cn,
+            "SELECT trupp_id, role, name FROM scba_trupp_members ORDER BY ordinal;",
+            r => (TruppId: Guid.Parse(r.GetString(0)),
+                  Member: new Domain.Atemschutz.TruppMember(
+                      (Domain.Atemschutz.TruppRole)r.GetInt32(1), r.GetString(2))))
+            .GroupBy(x => x.TruppId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Member).ToList());
+
         var readingsByTrupp = ReadAll(cn,
             "SELECT trupp_id, reading_time, bar FROM scba_pressure_readings ORDER BY ordinal;",
             r => (TruppId: Guid.Parse(r.GetString(0)),
@@ -190,14 +210,15 @@ public sealed class IncidentRepository
             .ToDictionary(g => g.Key, g => g.Select(x => x.Reading).ToList());
 
         var scbaTrupps = ReadAll(cn,
-            "SELECT id, designation, members, call_sign, task, registered_at, start_time, start_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time FROM scba_trupps ORDER BY ordinal;",
+            "SELECT id, designation, call_sign, task, registered_at, start_time, start_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time FROM scba_trupps ORDER BY ordinal;",
             r =>
             {
                 var id = Guid.Parse(r.GetString(0));
                 return Domain.Atemschutz.AtemschutzTrupp.Rehydrate(
-                    id, ParseDate(r.GetString(5)), NullableDate(r, 6), r.GetString(1), r.GetString(2),
-                    Str(r, 3), Str(r, 4), NullableInt(r, 7), r.GetInt32(8), r.GetInt32(9), r.GetInt32(10),
-                    NullableDate(r, 11),
+                    id, ParseDate(r.GetString(4)), NullableDate(r, 5), r.GetString(1),
+                    membersByTrupp.TryGetValue(id, out var ms) ? ms : Enumerable.Empty<Domain.Atemschutz.TruppMember>(),
+                    Str(r, 2), Str(r, 3), NullableInt(r, 6), r.GetInt32(7), r.GetInt32(8), r.GetInt32(9),
+                    NullableDate(r, 10),
                     readingsByTrupp.TryGetValue(id, out var rs) ? rs : Enumerable.Empty<Domain.Atemschutz.PressureReading>());
             });
 

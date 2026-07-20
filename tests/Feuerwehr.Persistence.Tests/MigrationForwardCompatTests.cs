@@ -248,6 +248,97 @@ public class MigrationForwardCompatTests : IDisposable
         }
     }
 
+    [Theory]
+    // The old members column was free text with " / " as a mere watermark hint, so the data in
+    // the wild is not uniform. Everything must survive; nothing may be silently dropped.
+    [InlineData("Müller / Schmidt", new[] { "Müller", "Schmidt" })]
+    [InlineData("Müller/Schmidt", new[] { "Müller", "Schmidt" })]
+    [InlineData("Müller / Schmidt / Huber", new[] { "Müller", "Schmidt", "Huber" })]
+    [InlineData("Müller und Schmidt", new[] { "Müller und Schmidt" })]
+    [InlineData("Müller", new[] { "Müller" })]
+    [InlineData("", new[] { "Unbekannt" })]
+    public void V5_trupp_members_split_into_rows_on_v6(string legacy, string[] expected)
+    {
+        WriteV5TruppWithMembers(legacy);
+
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+        using var read = cn.CreateCommand();
+        read.CommandText = "SELECT role, name FROM scba_trupp_members ORDER BY ordinal;";
+        using var r = read.ExecuteReader();
+        var names = new List<string>();
+        var roles = new List<int>();
+        while (r.Read()) { roles.Add(r.GetInt32(0)); names.Add(r.GetString(1)); }
+
+        Assert.Equal(expected, names);
+        // First name becomes the Truppführer, the rest follow in position order.
+        Assert.Equal(Enumerable.Range(0, expected.Length), roles);
+    }
+
+    [Fact]
+    public void V6_drops_the_members_column_but_keeps_every_other_trupp_field()
+    {
+        WriteV5TruppWithMembers("Müller / Schmidt");
+
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+
+        var columns = new List<string>();
+        using (var info = cn.CreateCommand())
+        {
+            info.CommandText = "SELECT name FROM pragma_table_info('scba_trupps');";
+            using var ir = info.ExecuteReader();
+            while (ir.Read()) columns.Add(ir.GetString(0));
+        }
+        Assert.DoesNotContain("members", columns);
+
+        using var read = cn.CreateCommand();
+        read.CommandText =
+            "SELECT designation, call_sign, start_pressure, max_duration_minutes, pressure_control_interval_minutes FROM scba_trupps;";
+        using var r = read.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.Equal("Angriffstrupp", r.GetString(0));
+        Assert.Equal("FFB 1/40/1", r.GetString(1));
+        Assert.Equal(300, r.GetInt32(2));
+        Assert.Equal(30, r.GetInt32(3));
+        Assert.Equal(5, r.GetInt32(4));
+    }
+
+    private void WriteV5TruppWithMembers(string members)
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (5);
+                CREATE TABLE scba_trupps (
+                    id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, designation TEXT NOT NULL,
+                    members TEXT NOT NULL, call_sign TEXT, task TEXT, registered_at TEXT NOT NULL,
+                    start_time TEXT, start_pressure INTEGER, max_duration_minutes INTEGER NOT NULL,
+                    return_pressure_bar INTEGER NOT NULL,
+                    pressure_control_interval_minutes INTEGER NOT NULL, exit_time TEXT);
+                """;
+            cmd.ExecuteNonQuery();
+
+            using var insert = cn.CreateCommand();
+            insert.CommandText = """
+                INSERT INTO scba_trupps
+                    (id, ordinal, designation, members, call_sign, task, registered_at, start_time,
+                     start_pressure, max_duration_minutes, return_pressure_bar,
+                     pressure_control_interval_minutes, exit_time)
+                VALUES ('44444444-4444-4444-4444-444444444444', 0, 'Angriffstrupp', $m, 'FFB 1/40/1',
+                        NULL, '2026-06-22T09:03:00.0000000+02:00', '2026-06-22T09:03:00.0000000+02:00',
+                        300, 30, 60, 5, NULL);
+                """;
+            insert.Parameters.AddWithValue("$m", members);
+            insert.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+    }
+
     private sealed class Clock : Domain.Time.IClock
     {
         public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));

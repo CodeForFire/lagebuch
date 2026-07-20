@@ -43,7 +43,7 @@ public static class AtemschutzSection
                 foreach (var trupp in incident.ScbaTrupps)
                 {
                     table.Cell().Element(Cells.Body).Text(trupp.Designation);
-                    table.Cell().Element(Cells.Body).Text(trupp.Members);
+                    table.Cell().Element(Cells.Body).Text(trupp.MembersDisplay);
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(trupp.CallSign));
                     table.Cell().Element(Cells.Body).Text(trupp.StartTime is { } s ? Formatting.Timestamp(s) : "—");
                     table.Cell().Element(Cells.Body).Text(trupp.ExitTime is { } e ? Formatting.Timestamp(e) : "—");

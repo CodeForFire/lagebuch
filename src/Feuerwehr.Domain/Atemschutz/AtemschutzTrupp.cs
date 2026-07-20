@@ -17,13 +17,39 @@ public sealed class AtemschutzTrupp
     public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;
 
+    /// <summary>
+    /// The Trupp type that operates in chemical protection suits and is crewed by three rather
+    /// than two. Named here rather than duplicated as a literal in the ViewModel, the seed and the
+    /// tests, because the cardinality rule keys off it.
+    /// </summary>
+    public const string ChemicalTruppDesignation = "CSA-Trupp";
+
+    /// <summary>Crew size of an ordinary Trupp: Truppführer + Truppmann.</summary>
+    public const int StandardMemberCount = 2;
+
+    /// <summary>Crew size of a <see cref="ChemicalTruppDesignation"/>.</summary>
+    public const int ChemicalMemberCount = 3;
+
     private readonly List<PressureReading> _readings = new();
+    private readonly List<TruppMember> _members = new();
 
     private AtemschutzTrupp() { }
 
     public Guid Id { get; private init; }
     public string Designation { get; private init; } = string.Empty;
-    public string Members { get; private init; } = string.Empty;
+
+    /// <summary>
+    /// The crew, in position order. Always <see cref="StandardMemberCount"/> people, or
+    /// <see cref="ChemicalMemberCount"/> for a CSA-Trupp — a Trupp is never one person.
+    /// </summary>
+    public IReadOnlyList<TruppMember> Members => _members;
+
+    /// <summary>
+    /// The crew as one line, for the grid, the PDF and ETB entries. Replaces the free-text
+    /// Members string this type used to store.
+    /// </summary>
+    public string MembersDisplay => string.Join(" / ", _members.Select(m => m.Name));
+
     public string? CallSign { get; private init; }
     public string? Task { get; private init; }
 
@@ -46,35 +72,61 @@ public sealed class AtemschutzTrupp
     public static AtemschutzTrupp Register(
         DateTimeOffset registeredAt,
         string designation,
-        string members,
+        IEnumerable<TruppMember> members,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = DefaultMaxDurationMinutes,
         int returnPressureBar = DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = DefaultPressureControlIntervalMinutes)
     {
+        ArgumentNullException.ThrowIfNull(members);
         if (string.IsNullOrWhiteSpace(designation))
             throw new ArgumentException("Trupp-Bezeichnung darf nicht leer sein.", nameof(designation));
-        if (string.IsNullOrWhiteSpace(members))
-            throw new ArgumentException("Mannschaft darf nicht leer sein.", nameof(members));
+        var crew = members.ToList();
+        ValidateCrew(designation, crew);
         ValidatePressure(returnPressureBar, nameof(returnPressureBar));
         if (maxDurationMinutes <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxDurationMinutes));
         if (pressureControlIntervalMinutes <= 0)
             throw new ArgumentOutOfRangeException(nameof(pressureControlIntervalMinutes));
 
-        return new AtemschutzTrupp
+        var trupp = new AtemschutzTrupp
         {
             Id = Guid.NewGuid(),
             RegisteredAt = registeredAt,
             Designation = designation.Trim(),
-            Members = members.Trim(),
             CallSign = string.IsNullOrWhiteSpace(callSign) ? null : callSign.Trim(),
             Task = string.IsNullOrWhiteSpace(task) ? null : task.Trim(),
             MaxDurationMinutes = maxDurationMinutes,
             ReturnPressureBar = returnPressureBar,
             PressureControlIntervalMinutes = pressureControlIntervalMinutes
         };
+        trupp._members.AddRange(crew);
+        return trupp;
+    }
+
+    /// <summary>True when this designation denotes a three-person chemical-protection Trupp.</summary>
+    public static bool IsChemicalTrupp(string designation) =>
+        string.Equals(designation?.Trim(), ChemicalTruppDesignation, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Required crew size for a designation: three for CSA, two otherwise.</summary>
+    public static int RequiredMemberCount(string designation) =>
+        IsChemicalTrupp(designation) ? ChemicalMemberCount : StandardMemberCount;
+
+    private static void ValidateCrew(string designation, IReadOnlyList<TruppMember> crew)
+    {
+        // Atemschutz is never a solo activity -- a Trupp is the unit that goes under air together,
+        // and the monitoring sheet has no concept of a single wearer. Enforcing the count here
+        // rather than in the ViewModel keeps it true for rehydrated and imported data as well.
+        var required = RequiredMemberCount(designation);
+        if (crew.Count != required)
+            throw new ArgumentException(
+                $"{designation.Trim()} muss aus genau {required} Personen bestehen (angegeben: {crew.Count}).",
+                nameof(crew));
+        if (crew.Any(m => m is null || string.IsNullOrWhiteSpace(m.Name)))
+            throw new ArgumentException("Alle Truppmitglieder müssen einen Namen haben.", nameof(crew));
+        if (crew.Select(m => m.Role).Distinct().Count() != crew.Count)
+            throw new ArgumentException("Jede Truppfunktion darf nur einmal besetzt sein.", nameof(crew));
     }
 
     public static AtemschutzTrupp Rehydrate(
@@ -82,7 +134,7 @@ public sealed class AtemschutzTrupp
         DateTimeOffset registeredAt,
         DateTimeOffset? startTime,
         string designation,
-        string members,
+        IEnumerable<TruppMember> members,
         string? callSign,
         string? task,
         int? startPressure,
@@ -98,7 +150,6 @@ public sealed class AtemschutzTrupp
             RegisteredAt = registeredAt,
             StartTime = startTime,
             Designation = designation,
-            Members = members,
             CallSign = callSign,
             Task = task,
             StartPressure = startPressure,
@@ -107,6 +158,10 @@ public sealed class AtemschutzTrupp
             PressureControlIntervalMinutes = pressureControlIntervalMinutes,
             ExitTime = exitTime
         };
+        // Rehydrate deliberately does not re-run ValidateCrew: a stored Trupp is history, and
+        // refusing to open an incident because an old record has the wrong crew size would make
+        // the file unreadable rather than merely imperfect.
+        trupp._members.AddRange(members);
         trupp._readings.AddRange(readings);
         return trupp;
     }
