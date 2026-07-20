@@ -90,4 +90,45 @@ public class LayoutAlignmentTests
         Assert.True(crew.ActualWidth >= 160,
             $"MANNSCHAFT collapsed to {crew.ActualWidth:F0}px at a window width of {width}px.");
     }
+
+    // Roster names are "Lastname, Firstname", so two of them joined by " / " overflow the crew
+    // cell and a CSA crew of three has no chance. Each member gets its own line.
+    [AvaloniaFact]
+    public void Atemschutz_crew_is_rendered_one_member_per_line()
+    {
+        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
+        vm.Scba.NewDesignation = "CSA-Trupp";
+        vm.Scba.NewTruppfuehrer = "Hintersberger, Hans";
+        vm.Scba.NewTruppmann = "Kreutzkamp, Bastian";
+        vm.Scba.NewZweiterTruppmann = "Schormaier, Florian";
+        vm.Scba.AddTruppCommand.Execute(null);
+
+        var view = new ScbaView { DataContext = vm.Scba };
+        var window = new Window { Content = view, Width = 1280, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var rendered = window.GetVisualDescendants().OfType<TextBlock>()
+            .Select(b => b.Text).Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+
+        // Each name is its own text run, not one joined string that the cell then clips.
+        foreach (var name in new[] { "Hintersberger, Hans", "Kreutzkamp, Bastian", "Schormaier, Florian" })
+            Assert.Contains(name, rendered);
+        Assert.DoesNotContain(rendered, s => s!.Contains("Hintersberger, Hans / "));
+
+        // Existing in the visual tree is not the same as being visible. DataGrid rows are styled
+        // to a fixed 40px, which laid the third name out at y=40 in a 41px row — present, and
+        // entirely clipped. DesiredSize is useless here because the fixed height clamps it, so
+        // the assertion has to be geometric: every name must actually fall inside its row.
+        var crewCell = window.GetVisualDescendants().OfType<ItemsControl>()
+            .Single(c => c.ItemsSource is IReadOnlyList<string> l && l.Contains("Schormaier, Florian"));
+        var row = crewCell.GetVisualAncestors().OfType<DataGridRow>().Single();
+
+        foreach (var line in crewCell.GetVisualDescendants().OfType<TextBlock>())
+        {
+            var top = line.TranslatePoint(new Point(0, 0), row)!.Value.Y;
+            Assert.True(top + line.Bounds.Height <= row.Bounds.Height,
+                $"'{line.Text}' extends to {top + line.Bounds.Height:F0}px in a {row.Bounds.Height:F0}px row — clipped.");
+        }
+    }
 }

@@ -68,7 +68,11 @@
 
     <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False">
+      <!-- Rows size to their content here, unlike the other grids. A Trupp is two people and a
+           CSA-Trupp three, each on its own line, so the shared 40px RowHeight from Styles.axaml
+           would clip the last crew member. -->
+      <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
+                RowHeight="NaN">
         <DataGrid.Columns>
           <DataGridTextColumn Header="TRUPP" Binding="{Binding Designation}" />
           <!-- MinWidth matters: this is the only star-sized column, so it absorbs every other
@@ -78,8 +82,14 @@
           <DataGridTemplateColumn Header="MANNSCHAFT" Width="*" MinWidth="180">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
-                <TextBlock Text="{Binding Members}" VerticalAlignment="Center" Margin="12,0"
-                           ToolTip.Tip="{Binding MembersDetail}" />
+                <ItemsControl ItemsSource="{Binding MemberLines}" VerticalAlignment="Center"
+                              Margin="12,6" ToolTip.Tip="{Binding MembersDetail}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>

@@ -42,6 +42,14 @@ public sealed partial class ScbaTruppRow : ObservableObject
     public string Designation => _trupp.Designation;
     public string Members => _trupp.MembersDisplay;
 
+    /// <summary>
+    /// The crew one name per line. Roster names are "Lastname, Firstname", so two of them joined
+    /// on a single line overflow the column and a CSA crew of three has no chance — the grid
+    /// clips rather than wraps, which silently hides who is under air.
+    /// </summary>
+    public IReadOnlyList<string> MemberLines =>
+        _trupp.Members.Select(m => m.Name).ToArray();
+
     /// <summary>The crew with their positions, for the row tooltip.</summary>
     public string MembersDetail =>
         string.Join("\n", _trupp.Members.Select(m => $"{m.RoleDisplay}: {m.Name}"));
