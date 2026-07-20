@@ -8,11 +8,11 @@ public class ScbaViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
-    private static MasterDataSet Md() => new(
-        Roles: Array.Empty<string>(), Status: Array.Empty<string>(), Equipment: Array.Empty<string>(),
-        Districts: Array.Empty<string>(), RadioCallSigns: new[] { "FFB 1/40/1" },
-        Streets: Array.Empty<Street>(), ChecklistTemplate: Array.Empty<string>(),
-        TruppTypes: new[] { "Angriffstrupp", "Wassertrupp" }, Personnel: Array.Empty<Person>());
+    private static MasterDataSet Md() => MasterDataSet.Empty with
+    {
+        RadioCallSigns = new[] { "FFB 1/40/1" },
+        TruppTypes = new[] { "Angriffstrupp", "Wassertrupp" },
+    };
 
     private static IncidentSession NewSession(FixedClock clock) =>
         IncidentSession.StartNew(new FakeStore(), clock,

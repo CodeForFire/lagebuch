@@ -5,7 +5,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -39,6 +39,10 @@ public static class Migrations
         if (version < 4)
         {
             ApplyV4(cn, tx);
+        }
+        if (version < 5)
+        {
+            ApplyV5(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -186,6 +190,14 @@ public static class Migrations
         // table in place is enough — no rebuild-and-copy as in V3.
         AddColumnIfMissing(cn, tx, "role_assignments", "section", "TEXT");
         AddColumnIfMissing(cn, tx, "role_assignments", "phone", "TEXT");
+    }
+
+    private static void ApplyV5(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Kräfteübersicht counts Atemschutzgeräteträger alongside the crew total. NOT NULL with a
+        // default of 0 is safe here: existing rows genuinely have no recorded AGT count, and 0
+        // reads the same as "none recorded" for the sum that feeds the header tile.
+        AddColumnIfMissing(cn, tx, "force_units", "scba_count", "INTEGER NOT NULL DEFAULT 0");
     }
 
     /// <summary>

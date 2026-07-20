@@ -70,6 +70,49 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Total_scba_sums_the_agt_of_every_unit()
+    {
+        var incident = NewIncident(out _, out _);
+        incident.AddForceUnit("FFB Wache 1", 12, scbaCount: 6);
+        incident.AddForceUnit("Emmering", 9, scbaCount: 4);
+        incident.AddForceUnit("Aich", 5);
+
+        Assert.Equal(26, incident.TotalPersonnel);
+        Assert.Equal(10, incident.TotalScba);
+    }
+
+    [Fact]
+    public void A_force_unit_records_status_and_notes()
+    {
+        var incident = NewIncident(out _, out _);
+        incident.AddForceUnit("FFB Wache 1", 9, status: " Im Einsatz ", notes: " über DLK ");
+
+        var unit = Assert.Single(incident.Forces);
+        Assert.Equal("Im Einsatz", unit.Status);
+        Assert.Equal("über DLK", unit.Notes);
+    }
+
+    [Fact]
+    public void Agt_cannot_outnumber_the_crew()
+    {
+        var incident = NewIncident(out _, out _);
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => incident.AddForceUnit("FFB Wache 1", 4, scbaCount: 5));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => incident.AddForceUnit("FFB Wache 1", 4, scbaCount: -1));
+        Assert.Empty(incident.Forces);
+    }
+
+    [Fact]
+    public void Every_crew_member_may_be_an_agt()
+    {
+        var incident = NewIncident(out _, out _);
+        incident.AddForceUnit("FFB Wache 1", 4, scbaCount: 4);
+        Assert.Equal(4, Assert.Single(incident.Forces).ScbaCount);
+    }
+
+    [Fact]
     public void Assign_role_appends()
     {
         var incident = NewIncident(out _, out _);

@@ -16,10 +16,10 @@ internal sealed class ManualTicker : ITicker
 
 internal static class WorkspaceRenderHelper
 {
-    private static MasterDataSet Md() => new(
-        new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<Street>(),
-        new[]
+    private static MasterDataSet Md() => MasterDataSet.Empty with
+    {
+        Roles = new[] { "EL" },
+        ChecklistTemplate = new[]
         {
             "Aufstellort ELW weit genug weg um nicht zu behindern?",
             "Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?",
@@ -27,13 +27,17 @@ internal static class WorkspaceRenderHelper
             "PC eingeschaltet und VPN Verbindung aktiviert?",
             "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
         },
-        new[] { "Angriffstrupp" },
-        // Fictional roster: the real personnel.json is gitignored, so tests must supply their own.
-        new[]
+        TruppTypes = new[] { "Angriffstrupp" },
+        Brigades = new[] { "FFB Wache 1", "FFB Wache 2", "Aich", "Puch", "Emmering" },
+        UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
+        RadioCallSigns = new[] { "FFB 1/40/1", "FFB 1/23/1", "Aich 42/1", "Land 1" },
+        // Fictional roster: the real personnel.json is gitignored, so tests supply their own.
+        Personnel = new[]
         {
             new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
             new Person("Musterfrau", "Erika", "GF", null, "01 71 / 7 65 43 21"),
-        });
+        },
+    };
 
     public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars()
     {

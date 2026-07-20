@@ -82,11 +82,12 @@ public sealed class IncidentRepository
         {
             var f = incident.Forces[i];
             Run(cn, tx,
-                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, status, notes) VALUES ($id,$o,$b,$cs,$pc,$st,$n);",
+                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n);",
                 p =>
                 {
                     p("$id", f.Id.ToString()); p("$o", i); p("$b", f.Brigade);
                     p("$cs", (object?)f.CallSign ?? DBNull.Value); p("$pc", f.PersonnelCount);
+                    p("$ac", f.ScbaCount);
                     p("$st", (object?)f.Status ?? DBNull.Value); p("$n", (object?)f.Notes ?? DBNull.Value);
                 });
         }
@@ -172,8 +173,9 @@ public sealed class IncidentRepository
             r => new Domain.RoleAssignment(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),
                 Str(r, 3), NullableDate(r, 4), NullableDate(r, 5), Str(r, 6), Str(r, 7)));
 
-        var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, status, notes FROM force_units ORDER BY ordinal;",
-            r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3), Str(r, 4), Str(r, 5)));
+        var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes FROM force_units ORDER BY ordinal;",
+            r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3),
+                r.GetInt32(4), Str(r, 5), Str(r, 6)));
 
         var readingsByTrupp = ReadAll(cn,
             "SELECT trupp_id, reading_time, bar FROM scba_pressure_readings ORDER BY ordinal;",

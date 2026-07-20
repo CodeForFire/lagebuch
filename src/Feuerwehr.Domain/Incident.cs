@@ -172,6 +172,9 @@ public sealed class Incident
 
     public int TotalPersonnel => _forces.Sum(f => f.PersonnelCount);
 
+    /// <summary>Total Atemschutzgeräteträger across all units — how many Trupps can be formed.</summary>
+    public int TotalScba => _forces.Sum(f => f.ScbaCount);
+
     public void SeedChecklist(IEnumerable<string> itemTexts)
     {
         EnsureOpen();
@@ -244,10 +247,11 @@ public sealed class Incident
         int personnelCount,
         string? callSign = null,
         string? status = null,
-        string? notes = null)
+        string? notes = null,
+        int scbaCount = 0)
     {
         EnsureOpen();
-        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes);
+        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount);
         _forces.Add(unit);
         return unit;
     }
