@@ -185,6 +185,34 @@ public class MigrationForwardCompatTests : IDisposable
         }
     }
 
+    [Fact]
+    public void A_file_from_a_newer_version_is_refused_and_its_marker_left_alone()
+    {
+        // A file written by a build that is ahead of this one. Migrate has no migration to run --
+        // every `version < N` is false -- and must not conclude from that that the file is current.
+        var newer = Migrations.CurrentVersion + 1;
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                $"CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES ({newer});";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            var ex = Assert.Throws<UnsupportedSchemaVersionException>(() => Migrations.Migrate(cn));
+            Assert.Equal(newer, ex.FileVersion);
+            Assert.Equal(Migrations.CurrentVersion, ex.SupportedVersion);
+
+            // The marker must survive untouched. Stamping it down to CurrentVersion would make the
+            // file claim a schema it does not have, and the newer build would then skip the very
+            // migration that produced it.
+            Assert.Equal(newer, Migrations.GetVersion(cn));
+        }
+    }
+
     private sealed class Clock : Domain.Time.IClock
     {
         public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
