@@ -259,7 +259,7 @@ public sealed class Incident
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,
         string designation,
-        string members,
+        IEnumerable<TruppMember> members,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,

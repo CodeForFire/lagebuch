@@ -7,6 +7,6 @@ public partial class ScbaView : UserControl
     public ScbaView()
     {
         InitializeComponent();
-        AttachedToVisualTree += (_, _) => MembersBox.Focus();
+        AttachedToVisualTree += (_, _) => TruppfuehrerBox.Focus();
     }
 }

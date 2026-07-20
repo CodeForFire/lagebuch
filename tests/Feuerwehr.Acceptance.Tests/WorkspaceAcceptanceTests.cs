@@ -243,7 +243,8 @@ public class WorkspaceAcceptanceTests
         Assert.False(bar.IsVisible); // nothing under air yet
 
         vm.Scba.NewDesignation = "Angriffstrupp";
-        vm.Scba.NewMembers = "Müller / Schmidt";
+        vm.Scba.NewTruppfuehrer = "Müller";
+        vm.Scba.NewTruppmann = "Schmidt";
         vm.Scba.AddTruppCommand.Execute(null);
         var row = vm.Scba.Trupps[^1];
         row.PressureInput = 300;

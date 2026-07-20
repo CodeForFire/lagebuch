@@ -40,7 +40,12 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     public Guid Id => _trupp.Id;
     public string Designation => _trupp.Designation;
-    public string Members => _trupp.Members;
+    public string Members => _trupp.MembersDisplay;
+
+    /// <summary>The crew with their positions, for the row tooltip.</summary>
+    public string MembersDetail =>
+        string.Join("\n", _trupp.Members.Select(m => $"{m.RoleDisplay}: {m.Name}"));
+
     public string? CallSign => _trupp.CallSign;
 
     public bool IsWaiting => _trupp.IsWaiting;
@@ -142,6 +147,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         IsReadOnly = session.IsReadOnly;
         TruppTypeOptions = masterData.TruppTypes;
         CallSignOptions = masterData.RadioCallSigns;
+        PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
         Trupps = new ObservableCollection<ScbaTruppRow>(session.Incident.ScbaTrupps.Select(CreateRow));
 
         // Suppress re-logging alarms for trupps already alarming when the incident is reopened.
@@ -156,15 +162,40 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     public bool IsReadOnly { get; }
     public IReadOnlyList<string> TruppTypeOptions { get; }
     public IReadOnlyList<string> CallSignOptions { get; }
+
+    /// <summary>
+    /// Name suggestions for the crew boxes. Empty when no personnel roster is installed, which is
+    /// the normal state on a fresh clone — the boxes stay free text either way.
+    /// </summary>
+    public IReadOnlyList<string> PersonOptions { get; }
     public ObservableCollection<ScbaTruppRow> Trupps { get; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    [NotifyPropertyChangedFor(nameof(RequiresThirdMember))]
     private string _newDesignation = string.Empty;
+
+    /// <summary>
+    /// Whether the selected Trupp type is crewed by three. Drives the visibility of the third
+    /// name box, so the form matches the rule the domain enforces.
+    /// </summary>
+    public bool RequiresThirdMember => AtemschutzTrupp.IsChemicalTrupp(NewDesignation);
+
+    /// <summary>
+    /// Truppführer. A Trupp always has one; the crew is never a single free-text field.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    private string _newTruppfuehrer = string.Empty;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
-    private string _newMembers = string.Empty;
+    private string _newTruppmann = string.Empty;
+
+    /// <summary>Only used -- and only required -- for a CSA-Trupp.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    private string _newZweiterTruppmann = string.Empty;
 
     [ObservableProperty]
     private string? _newCallSign;
@@ -259,23 +290,32 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     }
 
     private bool CanAddTrupp =>
-        !IsReadOnly && !string.IsNullOrWhiteSpace(NewDesignation) && !string.IsNullOrWhiteSpace(NewMembers);
+        !IsReadOnly && !string.IsNullOrWhiteSpace(NewDesignation)
+        && !string.IsNullOrWhiteSpace(NewTruppfuehrer) && !string.IsNullOrWhiteSpace(NewTruppmann)
+        // Mirrors the domain cardinality rule so an incomplete CSA-Trupp disables the button
+        // rather than throwing on click.
+        && (!RequiresThirdMember || !string.IsNullOrWhiteSpace(NewZweiterTruppmann));
+
+    private IReadOnlyList<TruppMember> BuildCrew() =>
+        TruppMember.Crew(NewTruppfuehrer, NewTruppmann, RequiresThirdMember ? NewZweiterTruppmann : null);
 
     [RelayCommand(CanExecute = nameof(CanAddTrupp))]
     private void AddTrupp()
     {
         var trupp = _session.Incident.AddScbaTrupp(
-            _clock, NewDesignation, NewMembers, NewCallSign,
+            _clock, NewDesignation, BuildCrew(), NewCallSign,
             task: null, maxDurationMinutes: NewMaxDurationMinutes, returnPressureBar: NewReturnPressureBar,
             pressureControlIntervalMinutes: NewControlIntervalMinutes);
         Trupps.Add(CreateRow(trupp));
         _session.Incident.AddJournalEntry(
             _clock, _session.Operator!, EtbDirection.Internal,
-            $"Atemschutztrupp {trupp.Designation} bereitgestellt: {trupp.Members}",
+            $"Atemschutztrupp {trupp.Designation} bereitgestellt: {trupp.MembersDisplay}",
             from: null, to: trupp.CallSign);
 
         NewDesignation = string.Empty;
-        NewMembers = string.Empty;
+        NewTruppfuehrer = string.Empty;
+        NewTruppmann = string.Empty;
+        NewZweiterTruppmann = string.Empty;
         NewCallSign = null;
         NewMaxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes;
         NewReturnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar;

@@ -1,4 +1,5 @@
 using Feuerwehr.AppLogic.ViewModels;
+using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain;
 using Feuerwehr.Persistence.MasterData;
 
@@ -21,10 +22,13 @@ public class ScbaViewModelTests
     private static ScbaViewModel Vm(FixedClock clock, IncidentSession session, Action? onChanged = null, FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
         new(session, Md(), clock, ticker ?? new FakeTicker(), alarm ?? new FakeAlarmService(), onChanged ?? (() => { }));
 
-    private static ScbaTruppRow Register(ScbaViewModel vm, string designation = "Angriffstrupp", string members = "Müller / Schmidt")
+    private static ScbaTruppRow Register(ScbaViewModel vm, string designation = "Angriffstrupp",
+        string truppfuehrer = "Müller", string truppmann = "Schmidt", string? zweiterTruppmann = null)
     {
         vm.NewDesignation = designation;
-        vm.NewMembers = members;
+        vm.NewTruppfuehrer = truppfuehrer;
+        vm.NewTruppmann = truppmann;
+        vm.NewZweiterTruppmann = zweiterTruppmann ?? string.Empty;
         vm.AddTruppCommand.Execute(null);
         return vm.Trupps[^1];
     }
@@ -53,7 +57,8 @@ public class ScbaViewModelTests
         var clock = new FixedClock(T0);
         var vm = Vm(clock, NewSession(clock));
         vm.NewDesignation = "Angriffstrupp";
-        vm.NewMembers = "  ";
+        vm.NewTruppfuehrer = "  ";
+        vm.NewTruppmann = "Schmidt";
         Assert.False(vm.AddTruppCommand.CanExecute(null));
     }
 
@@ -189,7 +194,8 @@ public class ScbaViewModelTests
 
         var vm = Vm(clock, ro);
         vm.NewDesignation = "Angriffstrupp";
-        vm.NewMembers = "Müller / Schmidt";
+        vm.NewTruppfuehrer = "Müller";
+        vm.NewTruppmann = "Schmidt";
         Assert.True(vm.IsReadOnly);
         Assert.False(vm.AddTruppCommand.CanExecute(null));
         Assert.False(vm.HasControlReminder);
@@ -286,14 +292,14 @@ public class ScbaViewModelTests
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
 
         vm.NewMaxDurationMinutes = 30;
-        var first = Register(vm, members: "Müller / Schmidt");
+        var first = Register(vm);
         first.PressureInput = 300;
         first.StartCommand.Execute(null);
 
         // Second trupp goes under air 10 minutes later, so its limit falls after the first's.
         clock.Now = T0.AddMinutes(10);
         vm.NewMaxDurationMinutes = 30;
-        var second = Register(vm, members: "Huber / Mayer");
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
         second.PressureInput = 300;
         second.StartCommand.Execute(null);
 
@@ -318,5 +324,91 @@ public class ScbaViewModelTests
         vm.Dispose();
 
         Assert.True(alarm.StopCount >= 1);
+    }
+
+    // --- Crew entry (issue #15) ---
+
+    [Fact]
+    public void A_trupp_needs_both_crew_names_before_it_can_be_registered()
+    {
+        var vm = Vm(new FixedClock(T0), NewSession(new FixedClock(T0)));
+        vm.NewDesignation = "Angriffstrupp";
+
+        vm.NewTruppfuehrer = "Müller";
+        Assert.False(vm.AddTruppCommand.CanExecute(null)); // a Trupp is never one person
+
+        vm.NewTruppmann = "Schmidt";
+        Assert.True(vm.AddTruppCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void A_csa_trupp_reveals_and_requires_the_third_name()
+    {
+        var vm = Vm(new FixedClock(T0), NewSession(new FixedClock(T0)));
+        vm.NewDesignation = "Angriffstrupp";
+        Assert.False(vm.RequiresThirdMember);
+
+        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        Assert.True(vm.RequiresThirdMember);
+
+        vm.NewTruppfuehrer = "Müller";
+        vm.NewTruppmann = "Schmidt";
+        Assert.False(vm.AddTruppCommand.CanExecute(null));
+
+        vm.NewZweiterTruppmann = "Huber";
+        Assert.True(vm.AddTruppCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void A_third_name_left_over_from_a_csa_selection_is_not_carried_into_an_ordinary_trupp()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        vm.NewZweiterTruppmann = "Huber";
+
+        // Switching back to a two-person type must not smuggle the third name into the crew and
+        // trip the domain's cardinality guard.
+        vm.NewDesignation = "Angriffstrupp";
+        vm.NewTruppfuehrer = "Müller";
+        vm.NewTruppmann = "Schmidt";
+        vm.AddTruppCommand.Execute(null);
+
+        Assert.Equal("Müller / Schmidt", vm.Trupps[^1].Members);
+    }
+
+    [Fact]
+    public void Registering_a_trupp_logs_the_full_crew_to_the_etb()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+
+        Register(vm, AtemschutzTrupp.ChemicalTruppDesignation, "Müller", "Schmidt", "Huber");
+
+        Assert.Contains(session.Incident.Journal,
+            e => e.Text == "Atemschutztrupp CSA-Trupp bereitgestellt: Müller / Schmidt / Huber");
+    }
+
+    [Fact]
+    public void The_row_exposes_the_crew_with_their_positions()
+    {
+        var clock = new FixedClock(T0);
+        var row = Register(Vm(clock, NewSession(clock)));
+
+        Assert.Equal("Müller / Schmidt", row.Members);
+        Assert.Equal("Truppführer: Müller\nTruppmann: Schmidt", row.MembersDetail);
+    }
+
+    [Fact]
+    public void Crew_inputs_reset_after_registering()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        Register(vm, AtemschutzTrupp.ChemicalTruppDesignation, "Müller", "Schmidt", "Huber");
+
+        Assert.Equal("", vm.NewTruppfuehrer);
+        Assert.Equal("", vm.NewTruppmann);
+        Assert.Equal("", vm.NewZweiterTruppmann);
     }
 }

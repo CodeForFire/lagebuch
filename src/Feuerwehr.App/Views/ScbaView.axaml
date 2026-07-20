@@ -27,12 +27,33 @@
       <StackPanel Orientation="Horizontal" Spacing="8">
         <ComboBox Width="150" PlaceholderText="Trupp" ItemsSource="{Binding TruppTypeOptions}"
                   SelectedItem="{Binding NewDesignation}" />
-        <TextBox x:Name="MembersBox" Width="200" Watermark="Mannschaft (z. B. Müller / Schmidt)"
-                 Text="{Binding NewMembers}">
-          <TextBox.KeyBindings>
+        <!-- One box per position rather than a single free-text field: a Trupp is two people
+             (three in CSA), and the third box only appears when the type calls for it. -->
+        <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170" Watermark="Truppführer"
+                         ItemsSource="{Binding PersonOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewTruppfuehrer}">
+          <AutoCompleteBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
+          </AutoCompleteBox.KeyBindings>
+        </AutoCompleteBox>
+        <AutoCompleteBox x:Name="TruppmannBox" Width="170" Watermark="Truppmann"
+                         ItemsSource="{Binding PersonOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewTruppmann}">
+          <AutoCompleteBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
+          </AutoCompleteBox.KeyBindings>
+        </AutoCompleteBox>
+        <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170" Watermark="2. Truppmann (CSA)"
+                         IsVisible="{Binding RequiresThirdMember}"
+                         ItemsSource="{Binding PersonOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewZweiterTruppmann}">
+          <AutoCompleteBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
+          </AutoCompleteBox.KeyBindings>
+        </AutoCompleteBox>
         <ComboBox Width="140" PlaceholderText="Funkrufname" ItemsSource="{Binding CallSignOptions}"
                   SelectedItem="{Binding NewCallSign}" />
         <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"
@@ -50,7 +71,14 @@
       <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="TRUPP" Binding="{Binding Designation}" />
-          <DataGridTextColumn Header="MANNSCHAFT" Binding="{Binding Members}" Width="*" />
+          <DataGridTemplateColumn Header="MANNSCHAFT" Width="*">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <TextBlock Text="{Binding Members}" VerticalAlignment="Center" Margin="12,0"
+                           ToolTip.Tip="{Binding MembersDetail}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="FUNK" Binding="{Binding CallSign}" />
           <DataGridTextColumn Header="START" Binding="{Binding StartTimeDisplay}" />
           <DataGridTextColumn Header="EINGESETZT" Binding="{Binding ElapsedDisplay}" />

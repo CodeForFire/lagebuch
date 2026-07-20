@@ -1,7 +1,8 @@
-using Feuerwehr.Domain;
+using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
+using Feuerwehr.Domain;
 using QuestPDF.Fluent;
 
 namespace Feuerwehr.Documents.Tests;
@@ -35,7 +36,7 @@ public class IncidentPdfTests
         incident.AddForceUnit("FFB Wache 1", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
             notes: "über Drehleiter angefordert", scbaCount: 6);
         incident.AddForceUnit("Emmering", 9, scbaCount: 4);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", callSign: "FFB 1/40/1");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), callSign: "FFB 1/40/1");
         incident.StartScbaTrupp(clock, trupp.Id, 300);
         incident.RecordScbaPressure(clock, trupp.Id, 220);
         return incident;
