@@ -71,7 +71,11 @@
       <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="TRUPP" Binding="{Binding Designation}" />
-          <DataGridTemplateColumn Header="MANNSCHAFT" Width="*">
+          <!-- MinWidth matters: this is the only star-sized column, so it absorbs every other
+               column's content growth. Without a floor it collapses to the DataGrid's 20px
+               minimum on a narrow window and the crew silently disappears. Scrolling the grid
+               is the right trade-off; hiding who is under air is not. -->
+          <DataGridTemplateColumn Header="MANNSCHAFT" Width="*" MinWidth="180">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <TextBlock Text="{Binding Members}" VerticalAlignment="Center" Margin="12,0"
