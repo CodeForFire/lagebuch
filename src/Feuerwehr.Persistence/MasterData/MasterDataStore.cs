@@ -9,10 +9,13 @@ public sealed class MasterDataStore
     {
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
         EnsureSchema(cn);
-        // Backfill per category, not all-or-nothing: a DB seeded before a new category existed
-        // has the populated old tables but an empty new one. Seeding only when the whole store
-        // looks empty would skip the new category forever, leaving its dropdown blank.
-        SeedMissing(cn, MasterDataDefaults.LoadEmbedded());
+        // Merge rather than seed-only-when-empty. Filling a table only while it was still empty
+        // meant every later addition to the seed was invisible on an existing installation --
+        // which silently cost eight radio call signs, the CSA-Trupp type and the whole personnel
+        // roster before it was noticed. Merging is additive and order-preserving: seed values
+        // first, in seed order, then anything already present that the seed does not know about,
+        // so nothing local is dropped.
+        Merge(cn, MasterDataDefaults.LoadEmbedded());
         return Read(cn);
     }
 
@@ -39,34 +42,70 @@ public sealed class MasterDataStore
             """);
     }
 
-    private static bool IsTableEmpty(SqliteConnection cn, string table)
+    private static void Merge(SqliteConnection cn, MasterDataSet set)
     {
-        using var cmd = cn.CreateCommand();
-        cmd.CommandText = $"SELECT count(*) FROM {table};";
-        return (long)cmd.ExecuteScalar()! == 0;
-    }
+        // Every read happens before the transaction opens: Microsoft.Data.Sqlite rejects a command
+        // that has no Transaction while one is pending, and computing the whole plan up front also
+        // keeps the write phase short.
+        var lists = new (string Table, IReadOnlyList<string> Seed)[]
+        {
+            ("md_roles", set.Roles),
+            ("md_status", set.Status),
+            ("md_unit_status", set.UnitStatus),
+            ("md_equipment", set.Equipment),
+            ("md_districts", set.Districts),
+            ("md_call_signs", set.RadioCallSigns),
+            ("md_brigades", set.Brigades),
+            ("md_trupp_types", set.TruppTypes),
+        };
 
-    private static void SeedMissing(SqliteConnection cn, MasterDataSet set)
-    {
+        var listPlans = lists
+            .Select(l => (l.Table, Merged: Combine(l.Seed, ReadColumn(cn, $"SELECT value FROM {l.Table};"), v => v)))
+            .Where(p => !p.Merged.InSync)
+            .ToList();
+
+        var streets = Combine(set.Streets, ReadStreets(cn), s => Key(s.Name, s.District));
+        var checklist = Combine(set.ChecklistTemplate,
+            ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"), t => t);
+        // Personnel is read back sorted by name, so the order rows happen to sit in on disk is not
+        // observable — comparing it would rewrite the table on every start for no reason.
+        var personnel = Combine(set.Personnel, ReadPersonnel(cn),
+            p => Key(p.LastName, p.FirstName), orderMatters: false);
+
+        if (listPlans.Count == 0 && streets.InSync && checklist.InSync && personnel.InSync)
+            return; // already in sync — do not rewrite on every start
+
         using var tx = cn.BeginTransaction();
-        SeedListIfEmpty(cn, tx, "md_roles", set.Roles);
-        SeedListIfEmpty(cn, tx, "md_status", set.Status);
-        SeedListIfEmpty(cn, tx, "md_equipment", set.Equipment);
-        SeedListIfEmpty(cn, tx, "md_districts", set.Districts);
-        SeedListIfEmpty(cn, tx, "md_call_signs", set.RadioCallSigns);
-        SeedListIfEmpty(cn, tx, "md_brigades", set.Brigades);
-        SeedListIfEmpty(cn, tx, "md_unit_status", set.UnitStatus);
-        SeedListIfEmpty(cn, tx, "md_trupp_types", set.TruppTypes);
-        if (IsTableEmpty(cn, "md_streets"))
-            foreach (var s in set.Streets)
+
+        foreach (var (table, merged) in listPlans)
+        {
+            Run(cn, tx, $"DELETE FROM {table};", _ => { });
+            InsertList(cn, tx, table, merged.Values);
+        }
+
+        if (!streets.InSync)
+        {
+            Run(cn, tx, "DELETE FROM md_streets;", _ => { });
+            foreach (var s in streets.Values)
                 Run(cn, tx, "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
                     p => { p("$n", s.Name); p("$d", s.District); });
-        if (IsTableEmpty(cn, "md_checklist_template"))
-            for (var i = 0; i < set.ChecklistTemplate.Count; i++)
+        }
+
+        if (!checklist.InSync)
+        {
+            Run(cn, tx, "DELETE FROM md_checklist_template;", _ => { });
+            for (var i = 0; i < checklist.Values.Count; i++)
+            {
+                var text = checklist.Values[i];
                 Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text) VALUES ($o,$t);",
-                    p => { p("$o", i); p("$t", set.ChecklistTemplate[i]); });
-        if (IsTableEmpty(cn, "md_personnel"))
-            foreach (var person in set.Personnel)
+                    p => { p("$o", i); p("$t", text); });
+            }
+        }
+
+        if (!personnel.InSync)
+        {
+            Run(cn, tx, "DELETE FROM md_personnel;", _ => { });
+            foreach (var person in personnel.Values)
                 Run(cn, tx, "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone) VALUES ($l,$f,$r,$c,$p);",
                     p =>
                     {
@@ -75,13 +114,37 @@ public sealed class MasterDataStore
                         p("$c", (object?)person.CallSign ?? DBNull.Value);
                         p("$p", (object?)person.Phone ?? DBNull.Value);
                     });
+        }
+
         tx.Commit();
     }
 
-    private static void SeedListIfEmpty(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
+    /// <summary>
+    /// Composite identity for a multi-column row. The separator is required, not cosmetic:
+    /// plain concatenation would make ("Bahnhofstr.", "FFB") collide with ("Bahnhofstr.F", "FB").
+    /// </summary>
+    private static string Key(params string?[] parts) => string.Join('\u001F', parts);
+
+    /// <summary>
+    /// Seed values first, in seed order, then any existing value the seed does not contain.
+    /// New seed entries therefore appear in their intended position rather than tacked onto the
+    /// end, and local additions survive. <c>InSync</c> is true when the table already matches the
+    /// merge result, so the common every-startup case writes nothing at all.
+    /// </summary>
+    private static (IReadOnlyList<T> Values, bool InSync) Combine<T>(
+        IReadOnlyList<T> seed, IReadOnlyList<T> existing, Func<T, string> key, bool orderMatters = true)
     {
-        if (IsTableEmpty(cn, table))
-            InsertList(cn, tx, table, values);
+        var merged = new List<T>(seed);
+        var seen = seed.Select(key).ToHashSet(StringComparer.Ordinal);
+        foreach (var e in existing)
+            if (seen.Add(key(e)))
+                merged.Add(e);
+
+        var inSync = merged.Count == existing.Count
+            && (orderMatters
+                ? merged.Zip(existing).All(pair => key(pair.First) == key(pair.Second))
+                : existing.All(e => seen.Contains(key(e))));
+        return (merged, inSync);
     }
 
     private static MasterDataSet Read(SqliteConnection cn) => new(

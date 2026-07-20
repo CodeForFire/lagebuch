@@ -98,9 +98,12 @@ public class MasterDataStoreTests : IDisposable
 
         var set = new MasterDataStore().GetOrSeed(_path);
 
-        // Ordered by last name, so Musterfrau precedes Mustermann.
-        Assert.Equal(new[] { "Musterfrau, Erika", "Mustermann, Max" },
-            set.Personnel.Select(p => p.DisplayName));
+        // Asserted by membership, not by whole-collection equality: seeding now merges, so a
+        // developer with a local personnel.json installed would otherwise see this fail purely
+        // because their roster is also present. It passed before only because the old
+        // seed-when-empty rule skipped a non-empty table.
+        Assert.Contains("Musterfrau, Erika", set.Personnel.Select(p => p.DisplayName));
+        Assert.Contains("Mustermann, Max", set.Personnel.Select(p => p.DisplayName));
         var max = set.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("01 71 / 1 23 45 67", max.Phone);
         Assert.Equal("Land 1", max.CallSign);
@@ -175,4 +178,117 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void A_person_without_a_first_name_displays_as_the_last_name_alone()
         => Assert.Equal("Mustermann", new Person("Mustermann", "", null, null, null).DisplayName);
+
+    // --- Seed merging ---
+
+    // The original behaviour only filled a table while it was still entirely empty, so every
+    // later seed addition was invisible on an existing installation. That bit three times:
+    // eight missing radio call signs, the CSA-Trupp type, and the personnel roster.
+    [Fact]
+    public void New_seed_values_reach_a_db_that_predates_them()
+    {
+        SeedLegacy("md_trupp_types",
+            "Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "Sicherheitstrupp", "Sonstiger Trupp");
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        Assert.Contains("CSA-Trupp", set.TruppTypes);
+    }
+
+    [Fact]
+    public void Merged_values_land_in_seed_order_not_appended_at_the_end()
+    {
+        SeedLegacy("md_trupp_types",
+            "Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "Sicherheitstrupp", "Sonstiger Trupp");
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        // CSA-Trupp belongs with the other real Trupp types, ahead of the catch-all.
+        Assert.Equal(MasterDataDefaults.LoadEmbedded().TruppTypes, set.TruppTypes);
+    }
+
+    [Fact]
+    public void Values_the_seed_does_not_know_about_are_kept()
+    {
+        SeedLegacy("md_trupp_types", "Angriffstrupp", "Eigener Sondertrupp");
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        // Merging is additive: a hand-added entry must survive, even though nothing in the app
+        // creates one yet. Silently dropping local data would be worse than a stale list.
+        Assert.Contains("Eigener Sondertrupp", set.TruppTypes);
+        Assert.Contains("CSA-Trupp", set.TruppTypes);
+    }
+
+    [Fact]
+    public void Merging_repeatedly_does_not_duplicate_anything()
+    {
+        var store = new MasterDataStore();
+        var first = store.GetOrSeed(_path);
+        var second = store.GetOrSeed(_path);
+        var third = store.GetOrSeed(_path);
+
+        Assert.Equal(first.TruppTypes, third.TruppTypes);
+        Assert.Equal(first.RadioCallSigns, second.RadioCallSigns);
+        Assert.Equal(third.Streets.Count, third.Streets.Distinct().Count());
+        Assert.Equal(third.RadioCallSigns.Count, third.RadioCallSigns.Distinct().Count());
+        Assert.Equal(313, third.Streets.Count);
+    }
+
+    [Fact]
+    public void Streets_merge_on_name_and_district_together()
+    {
+        ExecRaw("CREATE TABLE md_streets (name TEXT NOT NULL, district TEXT NOT NULL);"
+              + "INSERT INTO md_streets (name, district) VALUES ('Bahnhofstr.', 'FFB'), ('Eigene Str.', 'Aich');");
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        Assert.Single(set.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
+        Assert.Contains(set.Streets, s => s.Name == "Eigene Str.");
+        Assert.Equal(314, set.Streets.Count); // 313 seeded + the local one
+    }
+
+    [Fact]
+    public void Personnel_merge_on_the_whole_name()
+    {
+        ExecRaw("CREATE TABLE md_personnel (last_name TEXT NOT NULL, first_name TEXT NOT NULL,"
+              + " role TEXT, call_sign TEXT, phone TEXT);"
+              + "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone)"
+              + " VALUES ('Eigen', 'Person', NULL, NULL, '01 71 / 0 00 00 00');");
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        Assert.Contains(set.Personnel, p => p.LastName == "Eigen" && p.FirstName == "Person");
+    }
+
+    [Fact]
+    public void Checklist_template_gains_new_steps_without_losing_local_ones()
+    {
+        ExecRaw("CREATE TABLE md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);"
+              + "INSERT INTO md_checklist_template (ordinal, text) VALUES (0, 'Eigener Schritt');");
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        Assert.Equal(13, set.ChecklistTemplate.Count); // 12 seeded + the local one
+        Assert.Contains("Eigener Schritt", set.ChecklistTemplate);
+        Assert.Equal(MasterDataDefaults.LoadEmbedded().ChecklistTemplate[0], set.ChecklistTemplate[0]);
+    }
+
+    private void SeedLegacy(string table, params string[] values)
+    {
+        var sql = $"CREATE TABLE {table} (value TEXT NOT NULL);"
+                + string.Join("", values.Select(v => $"INSERT INTO {table} (value) VALUES ('{v}');"));
+        ExecRaw(sql);
+    }
+
+    private void ExecRaw(string sql)
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+    }
 }
