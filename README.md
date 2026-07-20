@@ -14,3 +14,27 @@ Under construction. See plans under `docs/` (note: design/plan artifacts are not
 dotnet build
 dotnet test
 ```
+
+## Run
+
+```bash
+dotnet run --project src/Feuerwehr.App/Feuerwehr.App.csproj
+```
+
+## Master data
+
+Dropdown contents (roles, radio call signs, streets, ...) are seeded from
+`src/Feuerwehr.Persistence/seed-source/master-data.json` into a local
+`masterdata.db` on first start.
+
+Seeding fills a category only while its table is still empty, so **changes to
+the seed file do not reach an existing installation**. To pick them up, delete
+the database and let it be recreated:
+
+| Platform | Path |
+|---|---|
+| Windows | `%AppData%\Lagebuch\masterdata.db` |
+| Linux   | `~/.config/Lagebuch/masterdata.db` |
+
+This is a deliberate pre-release simplification — there is no master-data
+versioning or in-app editor yet.
