@@ -131,4 +131,32 @@ public class LayoutAlignmentTests
                 $"'{line.Text}' extends to {top + line.Bounds.Height:F0}px in a {row.Bounds.Height:F0}px row — clipped.");
         }
     }
+
+    // The grid used to need ~1460px for ten columns, so on a normal window the action column was
+    // cut off and the whole grid scrolled sideways. Seven stacked columns fit; this pins that.
+    [AvaloniaTheory]
+    [InlineData(1280)]
+    [InlineData(1400)]
+    [InlineData(1613)]
+    public void Atemschutz_grid_fits_without_scrolling_sideways(double width)
+    {
+        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
+        vm.Scba.NewDesignation = "CSA-Trupp";
+        vm.Scba.NewTruppfuehrer = "Hintersberger, Hans";
+        vm.Scba.NewTruppmann = "Kreutzkamp, Bastian";
+        vm.Scba.NewZweiterTruppmann = "Schormaier, Florian";
+        vm.Scba.NewCallSign = "FFB 1/41/1";
+        vm.Scba.AddTruppCommand.Execute(null);
+
+        var view = new ScbaView { DataContext = vm.Scba };
+        var window = new Window { Content = view, Width = width, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var grid = view.GetVisualDescendants().OfType<DataGrid>().Single();
+        var total = grid.Columns.Sum(c => c.ActualWidth);
+
+        Assert.True(total <= grid.Bounds.Width + 1,
+            $"columns need {total:F0}px in a {grid.Bounds.Width:F0}px grid — the row overflows.");
+    }
 }
