@@ -66,13 +66,15 @@ public sealed class IncidentRepository
         {
             var r = incident.Roles[i];
             Run(cn, tx,
-                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time) VALUES ($id,$o,$role,$name,$cs,$from,$to);",
+                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph);",
                 p =>
                 {
                     p("$id", r.Id.ToString()); p("$o", i); p("$role", r.Role); p("$name", r.PersonName);
                     p("$cs", (object?)r.CallSign ?? DBNull.Value);
                     p("$from", (object?)r.From?.ToString(Iso) ?? DBNull.Value);
                     p("$to", (object?)r.To?.ToString(Iso) ?? DBNull.Value);
+                    p("$sec", (object?)r.Section ?? DBNull.Value);
+                    p("$ph", (object?)r.Phone ?? DBNull.Value);
                 });
         }
 
@@ -166,9 +168,9 @@ public sealed class IncidentRepository
             r => Domain.Etb.EtbEntry.Rehydrate(Guid.Parse(r.GetString(0)), ParseDate(r.GetString(1)),
                 (Domain.Etb.EtbDirection)r.GetInt32(2), r.GetString(5), r.GetString(6), Str(r, 3), Str(r, 4)));
 
-        var roles = ReadAll(cn, "SELECT id, role, person_name, call_sign, from_time, to_time FROM role_assignments ORDER BY ordinal;",
+        var roles = ReadAll(cn, "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone FROM role_assignments ORDER BY ordinal;",
             r => new Domain.RoleAssignment(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),
-                Str(r, 3), NullableDate(r, 4), NullableDate(r, 5)));
+                Str(r, 3), NullableDate(r, 4), NullableDate(r, 5), Str(r, 6), Str(r, 7)));
 
         var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, status, notes FROM force_units ORDER BY ordinal;",
             r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3), Str(r, 4), Str(r, 5)));

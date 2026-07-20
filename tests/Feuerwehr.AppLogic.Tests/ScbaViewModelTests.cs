@@ -12,7 +12,7 @@ public class ScbaViewModelTests
         Roles: Array.Empty<string>(), Status: Array.Empty<string>(), Equipment: Array.Empty<string>(),
         Districts: Array.Empty<string>(), RadioCallSigns: new[] { "FFB 1/40/1" },
         Streets: Array.Empty<Street>(), ChecklistTemplate: Array.Empty<string>(),
-        TruppTypes: new[] { "Angriffstrupp", "Wassertrupp" });
+        TruppTypes: new[] { "Angriffstrupp", "Wassertrupp" }, Personnel: Array.Empty<Person>());
 
     private static IncidentSession NewSession(FixedClock clock) =>
         IncidentSession.StartNew(new FakeStore(), clock,

@@ -27,7 +27,13 @@ internal static class WorkspaceRenderHelper
             "PC eingeschaltet und VPN Verbindung aktiviert?",
             "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
         },
-        new[] { "Angriffstrupp" });
+        new[] { "Angriffstrupp" },
+        // Fictional roster: the real personnel.json is gitignored, so tests must supply their own.
+        new[]
+        {
+            new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
+            new Person("Musterfrau", "Erika", "GF", null, "01 71 / 7 65 43 21"),
+        });
 
     public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars()
     {

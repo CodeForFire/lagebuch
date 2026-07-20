@@ -27,6 +27,13 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_personnel (
+                last_name TEXT NOT NULL,
+                first_name TEXT NOT NULL,
+                role TEXT,
+                call_sign TEXT,
+                phone TEXT
+            );
             """);
     }
 
@@ -54,6 +61,16 @@ public sealed class MasterDataStore
             for (var i = 0; i < set.ChecklistTemplate.Count; i++)
                 Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text) VALUES ($o,$t);",
                     p => { p("$o", i); p("$t", set.ChecklistTemplate[i]); });
+        if (IsTableEmpty(cn, "md_personnel"))
+            foreach (var person in set.Personnel)
+                Run(cn, tx, "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone) VALUES ($l,$f,$r,$c,$p);",
+                    p =>
+                    {
+                        p("$l", person.LastName); p("$f", person.FirstName);
+                        p("$r", (object?)person.Role ?? DBNull.Value);
+                        p("$c", (object?)person.CallSign ?? DBNull.Value);
+                        p("$p", (object?)person.Phone ?? DBNull.Value);
+                    });
         tx.Commit();
     }
 
@@ -71,7 +88,8 @@ public sealed class MasterDataStore
         ReadColumn(cn, "SELECT value FROM md_call_signs;"),
         ReadStreets(cn),
         ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"),
-        ReadColumn(cn, "SELECT value FROM md_trupp_types;"));
+        ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
+        ReadPersonnel(cn));
 
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
     {
@@ -97,6 +115,19 @@ public sealed class MasterDataStore
         var list = new List<Street>();
         while (r.Read()) list.Add(new Street(r.GetString(0), r.GetString(1)));
         return list;
+    }
+
+    private static List<Person> ReadPersonnel(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT last_name, first_name, role, call_sign, phone FROM md_personnel ORDER BY last_name, first_name;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<Person>();
+        while (r.Read())
+            list.Add(new Person(r.GetString(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4)));
+        return list;
+
+        static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     }
 
     private static void Run(SqliteConnection cn, SqliteTransaction tx, string sql, Action<Action<string, object>> bind)

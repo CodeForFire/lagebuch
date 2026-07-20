@@ -22,18 +22,22 @@ public static class RolesSection
 
             column.Item().Table(table =>
             {
+                // Seven columns on A4 portrait: only Name still gets meaningful slack, and the
+                // two timestamps keep fixed widths so they never wrap mid-value.
                 table.ColumnsDefinition(columns =>
                 {
                     columns.RelativeColumn(1); // Funktion
                     columns.RelativeColumn(2); // Name
-                    columns.RelativeColumn(2); // Funkrufname
+                    columns.RelativeColumn(1); // Abschnitt
+                    columns.RelativeColumn(1); // Funkrufname
+                    columns.RelativeColumn(1); // Handynummer
                     columns.ConstantColumn(95); // Von
                     columns.ConstantColumn(95); // Bis
                 });
 
                 table.Header(header =>
                 {
-                    foreach (var title in new[] { "Funktion", "Name", "Funkrufname", "Von", "Bis" })
+                    foreach (var title in new[] { "Funktion", "Name", "Abschnitt", "Funkrufname", "Handynummer", "Von", "Bis" })
                         header.Cell().Element(Cells.Header).Text(title).SemiBold();
                 });
 
@@ -41,7 +45,9 @@ public static class RolesSection
                 {
                     table.Cell().Element(Cells.Body).Text(role.Role);
                     table.Cell().Element(Cells.Body).Text(role.PersonName);
+                    table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.Section));
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.CallSign));
+                    table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.Phone));
                     table.Cell().Element(Cells.Body).Text(role.From is { } f ? Formatting.Timestamp(f) : "—");
                     table.Cell().Element(Cells.Body).Text(role.To is { } t ? Formatting.Timestamp(t) : "—");
                 }

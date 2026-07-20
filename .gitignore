@@ -14,5 +14,9 @@ coverage/
 Einsatzdokumentation_Digital_*.xltm
 docs/superpowers/
 
+# Personnel roster (names + mobile numbers) exported from CLS. Never commit.
+# personnel.example.json documents the format and is safe to track.
+src/Feuerwehr.Persistence/seed-source/personnel.json
+
 # Local SDD scratch / ledger
 .superpowers/

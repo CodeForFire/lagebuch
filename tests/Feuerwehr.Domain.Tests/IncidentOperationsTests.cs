@@ -76,4 +76,74 @@ public class IncidentOperationsTests
         incident.AssignRole("EL", "Müller", callSign: "FFB 12/1");
         Assert.Equal("EL", Assert.Single(incident.Roles).Role);
     }
+
+    [Fact]
+    public void Assign_role_records_section_and_phone()
+    {
+        var incident = NewIncident(out _, out _);
+        incident.AssignRole("EL", "Müller", section: "  Abschnitt Nord  ", phone: " 01 71 / 1 23 45 67 ");
+
+        var role = Assert.Single(incident.Roles);
+        Assert.Equal("Abschnitt Nord", role.Section);
+        Assert.Equal("01 71 / 1 23 45 67", role.Phone);
+    }
+
+    [Fact]
+    public void Blank_section_and_phone_become_null_rather_than_empty()
+    {
+        var incident = NewIncident(out _, out _);
+        incident.AssignRole("EL", "Müller", section: "   ", phone: "");
+
+        var role = Assert.Single(incident.Roles);
+        Assert.Null(role.Section);
+        Assert.Null(role.Phone);
+    }
+
+    [Fact]
+    public void Ending_a_role_assignment_stamps_bis_in_place()
+    {
+        var incident = NewIncident(out var clock, out _);
+        var assigned = incident.AssignRole("EL", "Müller", from: clock.Now);
+
+        var ended = incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(30));
+
+        Assert.Equal(clock.Now.AddMinutes(30), ended.To);
+        // Assignments are immutable records, so ending one replaces it -- the aggregate must not
+        // grow a second entry, and the surviving one must be the ended copy.
+        Assert.Equal(ended, Assert.Single(incident.Roles));
+        Assert.Equal(assigned.Id, ended.Id);
+    }
+
+    [Fact]
+    public void Ending_an_unknown_role_assignment_is_rejected()
+    {
+        var incident = NewIncident(out var clock, out _);
+        Assert.Throws<ArgumentException>(() => incident.EndRoleAssignment(Guid.NewGuid(), clock.Now));
+    }
+
+    [Fact]
+    public void Ending_an_already_ended_role_assignment_is_rejected()
+    {
+        var incident = NewIncident(out var clock, out _);
+        var assigned = incident.AssignRole("EL", "Müller", from: clock.Now);
+        incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(30));
+
+        // The Bis time records when a handover actually happened; pressing the button again must
+        // not quietly rewrite it.
+        Assert.Throws<InvalidOperationException>(
+            () => incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(45)));
+        Assert.Equal(clock.Now.AddMinutes(30), Assert.Single(incident.Roles).To);
+    }
+
+    [Fact]
+    public void A_role_assignment_cannot_end_before_it_began()
+    {
+        var incident = NewIncident(out var clock, out _);
+        var assigned = incident.AssignRole("EL", "Müller", from: clock.Now);
+
+        Assert.Throws<ArgumentException>(
+            () => incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(-1)));
+        Assert.Throws<ArgumentException>(
+            () => RoleAssignment.Create("EL", "Müller", from: clock.Now, to: clock.Now.AddMinutes(-1)));
+    }
 }

@@ -4,6 +4,17 @@ namespace Feuerwehr.Persistence.MasterData;
 
 public sealed record Street(string Name, string District);
 
+/// <summary>
+/// A person from the local roster. Sourced from the gitignored personnel.json, so this list is
+/// empty on a fresh clone and on CI — every consumer must treat that as normal rather than as a
+/// configuration error, and must still accept a freely typed name.
+/// </summary>
+public sealed record Person(string LastName, string FirstName, string? Role, string? CallSign, string? Phone)
+{
+    /// <summary>How the person is offered in pickers and stored on an assignment.</summary>
+    public string DisplayName => string.IsNullOrWhiteSpace(FirstName) ? LastName : $"{LastName}, {FirstName}";
+}
+
 public sealed record MasterDataSet(
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> Status,
@@ -12,18 +23,14 @@ public sealed record MasterDataSet(
     IReadOnlyList<string> RadioCallSigns,
     IReadOnlyList<Street> Streets,
     IReadOnlyList<string> ChecklistTemplate,
-    IReadOnlyList<string> TruppTypes);
+    IReadOnlyList<string> TruppTypes,
+    IReadOnlyList<Person> Personnel);
 
 public static class MasterDataDefaults
 {
     public static MasterDataSet LoadEmbedded()
     {
-        var asm = typeof(MasterDataDefaults).Assembly;
-        var resourceName = asm.GetManifestResourceNames()
-            .Single(n => n.EndsWith("master-data.json", StringComparison.Ordinal));
-        using var stream = asm.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException("Embedded master-data.json not found.");
-        using var doc = JsonDocument.Parse(stream);
+        using var doc = JsonDocument.Parse(OpenRequired("master-data.json"));
         var root = doc.RootElement;
 
         static IReadOnlyList<string> Arr(JsonElement e, string prop) =>
@@ -41,6 +48,43 @@ public static class MasterDataDefaults
             Arr(root, "radioCallSigns"),
             streets,
             Arr(root, "checklistTemplate"),
-            Arr(root, "truppTypes"));
+            Arr(root, "truppTypes"),
+            LoadPersonnel());
+    }
+
+    /// <summary>
+    /// Reads the optional personnel roster. It lives in a separate, gitignored file because it is
+    /// the only PII in the seed, and it is only embedded when a local export exists — so an absent
+    /// resource is the expected state on CI and on a fresh clone, not a failure.
+    /// </summary>
+    private static IReadOnlyList<Person> LoadPersonnel()
+    {
+        using var stream = Open("personnel.json");
+        if (stream is null)
+            return Array.Empty<Person>();
+
+        using var doc = JsonDocument.Parse(stream);
+        return doc.RootElement.GetProperty("personnel").EnumerateArray()
+            .Select(p => new Person(
+                p.GetProperty("lastName").GetString()!,
+                p.GetProperty("firstName").GetString() ?? string.Empty,
+                Opt(p, "role"),
+                Opt(p, "callSign"),
+                Opt(p, "phone")))
+            .ToList();
+
+        static string? Opt(JsonElement e, string prop) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind is not JsonValueKind.Null ? v.GetString() : null;
+    }
+
+    private static Stream OpenRequired(string fileName) =>
+        Open(fileName) ?? throw new InvalidOperationException($"Embedded {fileName} not found.");
+
+    private static Stream? Open(string fileName)
+    {
+        var asm = typeof(MasterDataDefaults).Assembly;
+        var resourceName = asm.GetManifestResourceNames()
+            .SingleOrDefault(n => n.EndsWith(fileName, StringComparison.Ordinal));
+        return resourceName is null ? null : asm.GetManifestResourceStream(resourceName);
     }
 }

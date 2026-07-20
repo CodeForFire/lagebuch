@@ -11,7 +11,8 @@ internal sealed class FakeMasterData : IMasterDataProvider
     public MasterDataSet Get() => new(
         Roles: new[] { "EL" }, Status: Array.Empty<string>(), Equipment: Array.Empty<string>(),
         Districts: Array.Empty<string>(), RadioCallSigns: Array.Empty<string>(),
-        Streets: Array.Empty<Street>(), ChecklistTemplate: new[] { "A?" }, TruppTypes: new[] { "Angriffstrupp" });
+        Streets: Array.Empty<Street>(), ChecklistTemplate: new[] { "A?" }, TruppTypes: new[] { "Angriffstrupp" },
+        Personnel: Array.Empty<Person>());
 }
 
 internal sealed class FakeRecent : IRecentFilesStore

@@ -1,0 +1,26 @@
+{
+  "_note": "TEMPLATE ONLY - contains no real people. Copy to personnel.json next to this file and replace the entries with the CLS export. personnel.json is gitignored and must never be committed: it holds names and mobile numbers.",
+  "_schema": {
+    "lastName": "required",
+    "firstName": "required",
+    "role": "optional - a value from the roles list, e.g. ZF",
+    "callSign": "optional - personal leadership call sign, e.g. Land 1",
+    "phone": "optional - mobile number as it should be displayed"
+  },
+  "personnel": [
+    {
+      "lastName": "Mustermann",
+      "firstName": "Max",
+      "role": "ZF",
+      "callSign": "Land 1",
+      "phone": "01 71 / 1 23 45 67"
+    },
+    {
+      "lastName": "Musterfrau",
+      "firstName": "Erika",
+      "role": "GF",
+      "callSign": null,
+      "phone": "01 71 / 7 65 43 21"
+    }
+  ]
+}

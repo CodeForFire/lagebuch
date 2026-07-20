@@ -210,12 +210,33 @@ public sealed class Incident
         string personName,
         string? callSign = null,
         DateTimeOffset? from = null,
-        DateTimeOffset? to = null)
+        DateTimeOffset? to = null,
+        string? section = null,
+        string? phone = null)
     {
         EnsureOpen();
-        var assignment = RoleAssignment.Create(role, personName, callSign, from, to);
+        var assignment = RoleAssignment.Create(role, personName, callSign, from, to, section, phone);
         _roles.Add(assignment);
         return assignment;
+    }
+
+    /// <summary>
+    /// Stamps the end of an assignment. Ending an already-ended assignment is rejected: the Bis
+    /// time is a record of when someone actually handed over, not a field to be corrected by
+    /// pressing the button twice.
+    /// </summary>
+    public RoleAssignment EndRoleAssignment(Guid assignmentId, DateTimeOffset to)
+    {
+        EnsureOpen();
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+            throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        if (_roles[index].To is not null)
+            throw new InvalidOperationException("Funktionszuweisung ist bereits beendet.");
+
+        var ended = _roles[index].EndedAt(to);
+        _roles[index] = ended;
+        return ended;
     }
 
     public ForceUnit AddForceUnit(

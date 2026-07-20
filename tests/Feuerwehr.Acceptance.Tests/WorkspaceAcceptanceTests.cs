@@ -46,7 +46,8 @@ public class WorkspaceAcceptanceTests
 {
     private static MasterDataSet Md() => new(
         new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<Street>(), new[] { "Blaulicht aus?" }, new[] { "Angriffstrupp" });
+        Array.Empty<string>(), Array.Empty<Street>(), new[] { "Blaulicht aus?" }, new[] { "Angriffstrupp" },
+        new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") });
 
     private static IncidentWorkspaceViewModel BuildWorkspace(out IncidentSession session)
     {
@@ -280,5 +281,36 @@ public class WorkspaceAcceptanceTests
             .Select(t => t.Text)
             .Where(t => !string.IsNullOrWhiteSpace(t))
             .ToArray()!;
+    }
+
+    // The Funktionen tab had no UI-level coverage at all before issue #17 widened it.
+    [AvaloniaFact]
+    public void Assigning_a_function_via_the_ui_fills_the_grid_and_stamps_von()
+    {
+        var vm = BuildWorkspace(out var session);
+        var view = new RolesView { DataContext = vm.Roles };
+        var window = new Window { Content = view, Width = 1200, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        // Typing a roster name must pull the number across without any extra keystrokes.
+        view.GetControl<AutoCompleteBox>("PersonNameBox").Text = "Mustermann, Max";
+        Assert.Equal("01 71 / 1 23 45 67", vm.Roles.NewPhone);
+
+        vm.Roles.NewRole = "EL";
+        view.GetControl<TextBox>("SectionBox").Text = "Abschnitt Nord";
+        Dispatcher.UIThread.RunJobs();
+        vm.Roles.AddRoleCommand.Execute(null);
+
+        var assignment = Assert.Single(session.Incident.Roles);
+        Assert.Equal("Abschnitt Nord", assignment.Section);
+        Assert.Equal("01 71 / 1 23 45 67", assignment.Phone);
+        Assert.NotNull(assignment.From);
+
+        var row = Assert.Single(vm.Roles.Roles);
+        Assert.True(row.IsRunning);
+        row.EndCommand.Execute(null);
+        Assert.False(row.IsRunning);
+        Assert.NotNull(Assert.Single(session.Incident.Roles).To);
     }
 }
