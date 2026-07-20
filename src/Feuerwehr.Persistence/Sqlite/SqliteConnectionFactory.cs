@@ -17,6 +17,24 @@ public static class SqliteConnectionFactory
         return cn;
     }
 
+    /// <summary>
+    /// Read-write, but never creates. For paths that are supposed to already hold an incident --
+    /// where conjuring an empty database silently replaces "this file is gone" with a valid-looking
+    /// empty Einsatz. <see cref="OpenReadWrite"/> stays creating for Save and for seeding master data.
+    /// </summary>
+    public static SqliteConnection OpenExisting(string path)
+    {
+        var cn = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Mode = SqliteOpenMode.ReadWrite
+        }.ToString());
+        cn.Open();
+        Execute(cn, "PRAGMA journal_mode=WAL;");
+        Execute(cn, "PRAGMA foreign_keys=ON;");
+        return cn;
+    }
+
     public static SqliteConnection OpenReadOnly(string path)
     {
         var cn = new SqliteConnection(new SqliteConnectionStringBuilder

@@ -135,11 +135,16 @@ public sealed class IncidentRepository
 
     public Incident Load(string path)
     {
+        // Check before opening: SQLite would otherwise report a missing file as a bare "unable to
+        // open database file", and the caller cannot tell that apart from a corrupt one.
+        if (!File.Exists(path))
+            throw new FileNotFoundException("Die Datei wurde nicht gefunden.", path);
+
         // Bring an older file up to the current schema before reading it. A file last written
         // by an earlier version sits at its old schema_version; without this, Load would query
         // tables that don't exist yet. Migration is version-gated/idempotent and only adds empty
         // tables, so re-opening a closed incident read-only afterwards still reads no new content.
-        using (var migrateCn = SqliteConnectionFactory.OpenReadWrite(path))
+        using (var migrateCn = SqliteConnectionFactory.OpenExisting(path))
         {
             Migrations.Migrate(migrateCn);
         }
@@ -156,7 +161,7 @@ public sealed class IncidentRepository
 
         using var cn = state == IncidentState.Closed
             ? SqliteConnectionFactory.OpenReadOnly(path)
-            : SqliteConnectionFactory.OpenReadWrite(path);
+            : SqliteConnectionFactory.OpenExisting(path);
 
         var meta = ReadRow(cn,
             "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by FROM incident_meta LIMIT 1;");
