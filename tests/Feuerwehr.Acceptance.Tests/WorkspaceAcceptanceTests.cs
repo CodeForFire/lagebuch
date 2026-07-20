@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Feuerwehr.App.Views;
 using Feuerwehr.AppLogic;
@@ -243,5 +245,40 @@ public class WorkspaceAcceptanceTests
 
         Assert.True(vm.Scba.HasControlReminder);
         Assert.True(bar.IsVisible);
+    }
+
+    // Binding the bare EtbDirection enum made Avalonia fall back to Enum.ToString(), so the
+    // picker read "Incoming" while the grid beside it read "Eingang". A ViewModel-level
+    // assertion cannot catch that regression — it only shows up once the control renders.
+    [AvaloniaFact]
+    public void Etb_direction_picker_renders_german_labels()
+    {
+        var vm = BuildWorkspace(out _);
+        var view = new EtbView { DataContext = vm.Etb };
+        var window = new Window { Content = view, Width = 800, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var box = view.GetControl<ComboBox>("DirectionBox");
+
+        // Closed: the selection box shows the label, not the enum identifier.
+        Assert.Equal("Eingang", Text(box).Single());
+
+        box.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        // Open: the list itself is realized into an OverlayPopupHost, which is a sibling of the
+        // ComboBox rather than a descendant — so the options have to be read through the popup.
+        var popupHost = Assert.IsAssignableFrom<Control>(
+            box.GetVisualDescendants().OfType<Popup>().Single().Host);
+        var options = Text(popupHost);
+
+        Assert.Equal(new[] { "Eingang", "Ausgang", "Intern" }, options);
+
+        static string[] Text(Control c) => c.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Select(t => t.Text)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToArray()!;
     }
 }

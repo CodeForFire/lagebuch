@@ -16,7 +16,16 @@
             <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
           </TextBox.KeyBindings>
         </TextBox>
-        <ComboBox Width="130" ItemsSource="{Binding DirectionOptions}" SelectedItem="{Binding NewDirection}" />
+        <ComboBox x:Name="DirectionBox" Width="130"
+                  ItemsSource="{Binding DirectionOptions}"
+                  SelectedValue="{Binding NewDirection}"
+                  SelectedValueBinding="{Binding Value}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:EtbDirectionOption">
+              <TextBlock Text="{Binding Label}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
         <TextBox Width="110" Watermark="Von" Text="{Binding NewFrom}" />
         <TextBox Width="110" Watermark="An" Text="{Binding NewTo}" />
         <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}" />

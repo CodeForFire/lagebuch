@@ -9,6 +9,13 @@ namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed record EtbEntryRow(string Time, string Direction, string? From, string? To, string Text, string EnteredBy);
 
+/// <summary>
+/// An <see cref="EtbDirection"/> paired with its German label, so the picker shows the same
+/// wording as the grid and the PDF. Binding the raw enum makes Avalonia fall back to
+/// <see cref="Enum.ToString()"/>, which leaks the English identifiers into the UI.
+/// </summary>
+public sealed record EtbDirectionOption(EtbDirection Value, string Label);
+
 public sealed partial class EtbViewModel : ObservableObject
 {
     private readonly IncidentSession _session;
@@ -27,7 +34,10 @@ public sealed partial class EtbViewModel : ObservableObject
 
     public bool IsReadOnly { get; }
     public ObservableCollection<EtbEntryRow> Entries { get; }
-    public IReadOnlyList<EtbDirection> DirectionOptions { get; } = Enum.GetValues<EtbDirection>();
+    public IReadOnlyList<EtbDirectionOption> DirectionOptions { get; } =
+        Enum.GetValues<EtbDirection>()
+            .Select(d => new EtbDirectionOption(d, Formatting.Direction(d)))
+            .ToArray();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddEntryCommand))]

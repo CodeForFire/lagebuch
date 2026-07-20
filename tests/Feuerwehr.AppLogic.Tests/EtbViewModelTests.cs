@@ -61,11 +61,42 @@ public class EtbViewModelTests
     [Fact]
     public void DirectionOptions_contains_all_directions()
     {
-        var clock = new FixedClock(new DateTimeOffset(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2)));
-        var session = IncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var vm = new EtbViewModel(session, clock, () => { });
-        Assert.Contains(EtbDirection.Incoming, vm.DirectionOptions);
-        Assert.Contains(EtbDirection.Outgoing, vm.DirectionOptions);
-        Assert.Contains(EtbDirection.Internal, vm.DirectionOptions);
+        var vm = NewVm();
+        Assert.Contains(EtbDirection.Incoming, vm.DirectionOptions.Select(o => o.Value));
+        Assert.Contains(EtbDirection.Outgoing, vm.DirectionOptions.Select(o => o.Value));
+        Assert.Contains(EtbDirection.Internal, vm.DirectionOptions.Select(o => o.Value));
+    }
+
+    // The picker used to bind the bare enum, so Avalonia rendered "Incoming"/"Outgoing"/
+    // "Internal" right next to a grid saying "Eingang"/"Ausgang"/"Intern". The old version of
+    // this test asserted membership only, which is exactly why that slipped through.
+    [Theory]
+    [InlineData(EtbDirection.Incoming, "Eingang")]
+    [InlineData(EtbDirection.Outgoing, "Ausgang")]
+    [InlineData(EtbDirection.Internal, "Intern")]
+    public void DirectionOptions_are_labelled_in_german(EtbDirection direction, string expected)
+    {
+        var option = Assert.Single(NewVm().DirectionOptions, o => o.Value == direction);
+        Assert.Equal(expected, option.Label);
+    }
+
+    [Fact]
+    public void DirectionOption_labels_match_the_grid_and_the_pdf()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.NewDirection = EtbDirection.Outgoing;
+        vm.AddEntryCommand.Execute(null);
+
+        var selected = Assert.Single(vm.DirectionOptions, o => o.Value == vm.NewDirection);
+        Assert.Equal(vm.Entries[0].Direction, selected.Label);
+    }
+
+    private static EtbViewModel NewVm()
+    {
+        var clock = new FixedClock(T0);
+        var session = IncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        return new EtbViewModel(session, clock, () => { });
     }
 }
