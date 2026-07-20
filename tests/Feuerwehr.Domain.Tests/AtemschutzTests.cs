@@ -256,4 +256,29 @@ public class AtemschutzTests
         var incident = NewIncident(out var clock);
         Assert.Throws<KeyNotFoundException>(() => incident.StartScbaTrupp(clock, Guid.NewGuid(), 300));
     }
+
+    [Fact]
+    public void Elapsed_stops_when_the_trupp_returns()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
+        incident.StartScbaTrupp(clock, trupp.Id, 300);
+        clock.Now = T0.AddMinutes(12);
+        incident.MarkScbaReturned(clock, trupp.Id);
+
+        // Time under air is a fact about the past. Left running, a Trupp returned months ago
+        // reads as tens of thousands of hours -- which is what the live grid was showing.
+        Assert.Equal(TimeSpan.FromMinutes(12), trupp.Elapsed(T0.AddMinutes(12)));
+        Assert.Equal(TimeSpan.FromMinutes(12), trupp.Elapsed(T0.AddDays(30)));
+    }
+
+    [Fact]
+    public void Elapsed_still_runs_while_the_trupp_is_under_air()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
+        incident.StartScbaTrupp(clock, trupp.Id, 300);
+
+        Assert.Equal(TimeSpan.FromMinutes(7), trupp.Elapsed(T0.AddMinutes(7)));
+    }
 }

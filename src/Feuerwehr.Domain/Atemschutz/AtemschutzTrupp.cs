@@ -211,8 +211,13 @@ public sealed class AtemschutzTrupp
     public DateTimeOffset? DueAt =>
         StartTime is { } start ? start + TimeSpan.FromMinutes(MaxDurationMinutes) : null;
 
+    /// <summary>
+    /// Time under air. Once the Trupp is back this is a closed fact, so it is measured to
+    /// <see cref="ExitTime"/> rather than to <paramref name="now"/> — otherwise a Trupp that
+    /// returned months ago keeps accumulating and the grid reads tens of thousands of hours.
+    /// </summary>
     public TimeSpan Elapsed(DateTimeOffset now) =>
-        StartTime is { } start ? now - start : TimeSpan.Zero;
+        StartTime is { } start ? (ExitTime ?? now) - start : TimeSpan.Zero;
 
     public TimeSpan Remaining(DateTimeOffset now) =>
         DueAt is { } due ? due - now : TimeSpan.Zero;
