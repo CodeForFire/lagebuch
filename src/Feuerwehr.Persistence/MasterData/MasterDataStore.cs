@@ -24,6 +24,8 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_equipment (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_call_signs (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_brigades (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
@@ -52,6 +54,8 @@ public sealed class MasterDataStore
         SeedListIfEmpty(cn, tx, "md_equipment", set.Equipment);
         SeedListIfEmpty(cn, tx, "md_districts", set.Districts);
         SeedListIfEmpty(cn, tx, "md_call_signs", set.RadioCallSigns);
+        SeedListIfEmpty(cn, tx, "md_brigades", set.Brigades);
+        SeedListIfEmpty(cn, tx, "md_unit_status", set.UnitStatus);
         SeedListIfEmpty(cn, tx, "md_trupp_types", set.TruppTypes);
         if (IsTableEmpty(cn, "md_streets"))
             foreach (var s in set.Streets)
@@ -86,6 +90,8 @@ public sealed class MasterDataStore
         ReadColumn(cn, "SELECT value FROM md_equipment;"),
         ReadColumn(cn, "SELECT value FROM md_districts;"),
         ReadColumn(cn, "SELECT value FROM md_call_signs;"),
+        ReadColumn(cn, "SELECT value FROM md_brigades;"),
+        ReadColumn(cn, "SELECT value FROM md_unit_status;"),
         ReadStreets(cn),
         ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"),
         ReadColumn(cn, "SELECT value FROM md_trupp_types;"),

@@ -23,13 +23,14 @@ public static class ForcesSection
                         columns.RelativeColumn(2); // Feuerwehr
                         columns.RelativeColumn(2); // Funkrufname
                         columns.ConstantColumn(55); // Stärke
+                        columns.ConstantColumn(45); // AGT
                         columns.RelativeColumn(2); // Status
                         columns.RelativeColumn(3); // Bemerkung
                     });
 
                     table.Header(header =>
                     {
-                        foreach (var title in new[] { "Feuerwehr", "Funkrufname", "Stärke", "Status", "Bemerkung" })
+                        foreach (var title in new[] { "Feuerwehr", "Funkrufname", "Stärke", "AGT", "Status", "Bemerkung" })
                             header.Cell().Element(Cells.Header).Text(title).SemiBold();
                     });
 
@@ -38,6 +39,7 @@ public static class ForcesSection
                         table.Cell().Element(Cells.Body).Text(unit.Brigade);
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.CallSign));
                         table.Cell().Element(Cells.Body).Text(unit.PersonnelCount.ToString());
+                        table.Cell().Element(Cells.Body).Text(unit.ScbaCount.ToString());
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.Status));
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.Notes));
                     }
@@ -52,6 +54,8 @@ public static class ForcesSection
             {
                 t.Span("Gesamtstärke: ").SemiBold();
                 t.Span(incident.TotalPersonnel.ToString());
+                t.Span("   davon Atemschutzgeräteträger: ").SemiBold();
+                t.Span(incident.TotalScba.ToString());
             });
         });
     }

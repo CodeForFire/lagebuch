@@ -44,10 +44,15 @@ internal sealed class NoopAlarmService : IAlarmService
 
 public class WorkspaceAcceptanceTests
 {
-    private static MasterDataSet Md() => new(
-        new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<Street>(), new[] { "Blaulicht aus?" }, new[] { "Angriffstrupp" },
-        new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") });
+    private static MasterDataSet Md() => MasterDataSet.Empty with
+    {
+        Roles = new[] { "EL" },
+        ChecklistTemplate = new[] { "Blaulicht aus?" },
+        TruppTypes = new[] { "Angriffstrupp" },
+        Brigades = new[] { "FFB Wache 1", "Aich" },
+        UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
+        Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
+    };
 
     private static IncidentWorkspaceViewModel BuildWorkspace(out IncidentSession session)
     {

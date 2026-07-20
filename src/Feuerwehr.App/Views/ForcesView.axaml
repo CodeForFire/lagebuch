@@ -6,13 +6,17 @@
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
       <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Center" />
-      <!-- Total strength readout -->
+      <!-- Total strength readout, with the Atemschutz subset beside it -->
       <Border Grid.Column="1" Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" Padding="18,8">
         <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
           <TextBlock Text="GESAMTSTÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
           <TextBlock Classes="metric" FontSize="26" Foreground="{StaticResource SignalBrush}"
                      Text="{Binding TotalPersonnel}" />
+          <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
+          <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+          <TextBlock x:Name="TotalScbaText" Classes="metric" FontSize="26"
+                     Foreground="{StaticResource SignalBrush}" Text="{Binding TotalScba}" />
         </StackPanel>
       </Border>
     </Grid>
@@ -22,24 +26,34 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBox x:Name="BrigadeBox" Width="170" Watermark="Feuerwehr" Text="{Binding NewBrigade}">
-          <TextBox.KeyBindings>
+        <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
+             must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. -->
+        <AutoCompleteBox x:Name="BrigadeBox" Width="160" Watermark="Feuerwehr"
+                         ItemsSource="{Binding BrigadeOptions}"
+                         FilterMode="ContainsOrdinal"
+                         MinimumPrefixLength="0"
+                         Text="{Binding NewBrigade}">
+          <AutoCompleteBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding AddForceCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
-        <ComboBox Width="170" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
-        <NumericUpDown Width="118" Minimum="0" Value="{Binding NewPersonnelCount}" />
+          </AutoCompleteBox.KeyBindings>
+        </AutoCompleteBox>
+        <ComboBox Width="140" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+        <NumericUpDown x:Name="PersonnelBox" Width="110" Minimum="0" Value="{Binding NewPersonnelCount}" />
+        <NumericUpDown x:Name="ScbaBox" Width="110" Minimum="0" Value="{Binding NewScbaCount}" />
+        <ComboBox x:Name="StatusBox" Width="160" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
+        <TextBox x:Name="NotesBox" Width="180" Watermark="Bemerkung" Text="{Binding NewNotes}" />
         <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}" />
       </StackPanel>
     </Border>
 
     <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid x:Name="ForcesGrid" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
           <DataGridTextColumn Header="STÄRKE" Binding="{Binding PersonnelCount}" />
+          <DataGridTextColumn Header="AGT" Binding="{Binding ScbaCount}" />
           <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" />
           <DataGridTextColumn Header="BEMERKUNG" Binding="{Binding Notes}" Width="*" />
         </DataGrid.Columns>

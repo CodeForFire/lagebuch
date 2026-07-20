@@ -186,6 +186,41 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void V4_force_units_migrate_to_v5_defaulting_agt_to_zero()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (4);
+                CREATE TABLE force_units (
+                    id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, brigade TEXT NOT NULL,
+                    call_sign TEXT, personnel_count INTEGER NOT NULL, status TEXT, notes TEXT);
+                INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, status, notes)
+                VALUES ('33333333-3333-3333-3333-333333333333', 0, 'FFB Wache 1', 'FFB 1/40/1', 9, NULL, NULL);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var read = cn.CreateCommand();
+            read.CommandText = "SELECT personnel_count, scba_count FROM force_units;";
+            using var r = read.ExecuteReader();
+            Assert.True(r.Read());
+            Assert.Equal(9, r.GetInt32(0));
+            // No AGT count was ever recorded for this unit, and 0 reads the same as "none known"
+            // for the header total -- so the NOT NULL DEFAULT 0 does not invent information.
+            Assert.Equal(0, r.GetInt32(1));
+        }
+    }
+
+    [Fact]
     public void A_file_from_a_newer_version_is_refused_and_its_marker_left_alone()
     {
         // A file written by a build that is ahead of this one. Migrate has no migration to run --

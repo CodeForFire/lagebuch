@@ -8,11 +8,12 @@ public class RolesViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
-    private static MasterDataSet Md(params Person[] personnel) => new(
-        Roles: new[] { "EL", "ZF" }, Status: Array.Empty<string>(), Equipment: Array.Empty<string>(),
-        Districts: Array.Empty<string>(), RadioCallSigns: new[] { "FFB 12/1" },
-        Streets: Array.Empty<Street>(), ChecklistTemplate: Array.Empty<string>(), TruppTypes: Array.Empty<string>(),
-        Personnel: personnel);
+    private static MasterDataSet Md(params Person[] personnel) => MasterDataSet.Empty with
+    {
+        Roles = new[] { "EL", "ZF" },
+        RadioCallSigns = new[] { "FFB 12/1" },
+        Personnel = personnel,
+    };
 
     private static readonly Person Max = new("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67");
 

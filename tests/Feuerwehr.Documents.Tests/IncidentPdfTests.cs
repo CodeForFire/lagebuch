@@ -32,8 +32,9 @@ public class IncidentPdfTests
             section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
         incident.EndRoleAssignment(assigned.Id, clock.Now.AddHours(1));
         incident.AssignRole("ZF", "Schmidt");
-        incident.AddForceUnit("FFB", 12, callSign: "FFB 1/40/1");
-        incident.AddForceUnit("Emmering", 9);
+        incident.AddForceUnit("FFB Wache 1", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
+            notes: "über Drehleiter angefordert", scbaCount: 6);
+        incident.AddForceUnit("Emmering", 9, scbaCount: 4);
         var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", callSign: "FFB 1/40/1");
         incident.StartScbaTrupp(clock, trupp.Id, 300);
         incident.RecordScbaPressure(clock, trupp.Id, 220);

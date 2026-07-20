@@ -17,9 +17,12 @@ internal sealed class FakeStore : IIncidentStore
 }
 internal sealed class FakeMasterData : IMasterDataProvider
 {
-    public MasterDataSet Get() => new(
-        new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<Street>(), new[] { "A?" }, new[] { "Angriffstrupp" }, Array.Empty<Person>());
+    public MasterDataSet Get() => MasterDataSet.Empty with
+    {
+        Roles = new[] { "EL" },
+        ChecklistTemplate = new[] { "A?" },
+        TruppTypes = new[] { "Angriffstrupp" },
+    };
 }
 internal sealed class FakeRecent : IRecentFilesStore
 {

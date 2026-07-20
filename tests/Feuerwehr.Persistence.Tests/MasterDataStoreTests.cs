@@ -107,6 +107,71 @@ public class MasterDataStoreTests : IDisposable
         Assert.Null(set.Personnel.Single(p => p.LastName == "Musterfrau").Phone);
     }
 
+    // --- Kräfte master data (issue #18) ---
+
+    [Fact]
+    public void Seed_contains_the_feuerwehren_from_the_hilfsdaten_sheet()
+    {
+        var set = MasterDataDefaults.LoadEmbedded();
+        Assert.Equal(
+            new[]
+            {
+                "FFB Wache 1", "FFB Wache 2", "Aich", "Puch", "Emmering", "Schöngeising",
+                "Biburg", "Maisach", "Germering", "Mammendorf", "Landkreis",
+            },
+            set.Brigades);
+    }
+
+    [Fact]
+    public void Seed_contains_the_per_unit_status_vocabulary()
+    {
+        var set = MasterDataDefaults.LoadEmbedded();
+        Assert.Equal(new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" }, set.UnitStatus);
+        // Must not be confused with the incident-level list, which is a different vocabulary.
+        Assert.Contains("aufgenommen", set.Status);
+        Assert.DoesNotContain("aufgenommen", set.UnitStatus);
+    }
+
+    [Theory]
+    // The units listed on the Kräfteübersicht sheet that the original import missed.
+    [InlineData("FFB 1/39/1")]
+    [InlineData("FFB 1/59/1")]
+    [InlineData("Kater 13/1")]
+    [InlineData("Land 13/1")]
+    [InlineData("Land 1")]
+    [InlineData("Land 4")]
+    public void Seed_contains_the_previously_missing_call_signs(string callSign)
+        => Assert.Contains(callSign, MasterDataDefaults.LoadEmbedded().RadioCallSigns);
+
+    [Fact]
+    public void Adding_call_signs_did_not_drop_any_existing_one()
+    {
+        var set = MasterDataDefaults.LoadEmbedded();
+        Assert.Equal(33, set.RadioCallSigns.Count);
+        Assert.Equal(set.RadioCallSigns.Count, set.RadioCallSigns.Distinct().Count());
+        foreach (var kept in new[] { "FFB 1/10/1", "FFB 1/94/1", "FFB 1/99/2", "Aich 11/1", "Puch 43/1" })
+            Assert.Contains(kept, set.RadioCallSigns);
+    }
+
+    [Fact]
+    public void Brigades_and_unit_status_backfill_into_an_already_seeded_db()
+    {
+        // The categories added by issue #18 must reach a masterdata.db created before they existed.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE md_roles (value TEXT NOT NULL); INSERT INTO md_roles (value) VALUES ('EL');";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        Assert.Contains("FFB Wache 1", set.Brigades);
+        Assert.Contains("Bereitstellungsraum", set.UnitStatus);
+    }
+
     [Fact]
     public void A_person_without_a_first_name_displays_as_the_last_name_alone()
         => Assert.Equal("Mustermann", new Person("Mustermann", "", null, null, null).DisplayName);
