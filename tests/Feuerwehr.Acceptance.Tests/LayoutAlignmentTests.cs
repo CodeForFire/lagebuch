@@ -62,4 +62,32 @@ public class LayoutAlignmentTests
         Assert.Equal(Gutter, tabStripLeft, precision: 0);
         Assert.Equal(Gutter, footerCloseLeft, precision: 0);
     }
+
+    // MANNSCHAFT is the only star-sized column in the Atemschutz grid, so it absorbs the
+    // content-driven growth of the eight auto-sized columns plus the fixed 300px action column.
+    // Once their natural widths exceed the viewport it was squeezed to Avalonia's 20px
+    // MinColumnWidth floor and the crew names disappeared entirely -- on a monitoring screen
+    // where who is under air is the most safety-critical column on the row.
+    [AvaloniaTheory]
+    [InlineData(1613)]
+    [InlineData(1400)]
+    [InlineData(1280)]
+    [InlineData(1100)]
+    [InlineData(900)]
+    public void Atemschutz_crew_column_stays_readable_at_any_window_width(double width)
+    {
+        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
+        var view = new ScbaView { DataContext = vm.Scba };
+        var window = new Window { Content = view, Width = width, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var grid = view.GetVisualDescendants().OfType<DataGrid>().Single();
+        var crew = grid.Columns.Single(c => (string?)c.Header == "MANNSCHAFT");
+
+        // Wide enough for two family names side by side; below this the grid must scroll
+        // horizontally instead of silently hiding the column.
+        Assert.True(crew.ActualWidth >= 160,
+            $"MANNSCHAFT collapsed to {crew.ActualWidth:F0}px at a window width of {width}px.");
+    }
 }
