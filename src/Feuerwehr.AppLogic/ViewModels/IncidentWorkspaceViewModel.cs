@@ -88,7 +88,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     {
         Checklist = new ChecklistViewModel(_session, OnChanged);
         Etb = new EtbViewModel(_session, _clock, OnChanged);
-        Roles = new RolesViewModel(_session, _masterData, OnChanged);
+        Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
         Forces = new ForcesViewModel(_session, _masterData, OnChanged);
 
         Scba?.Dispose();

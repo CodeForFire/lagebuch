@@ -19,7 +19,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
 {
     public MasterDataSet Get() => new(
         new[] { "EL" }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<Street>(), new[] { "A?" }, new[] { "Angriffstrupp" });
+        Array.Empty<string>(), Array.Empty<Street>(), new[] { "A?" }, new[] { "Angriffstrupp" }, Array.Empty<Person>());
 }
 internal sealed class FakeRecent : IRecentFilesStore
 {

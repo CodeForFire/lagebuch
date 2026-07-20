@@ -26,7 +26,12 @@ public class IncidentPdfTests
         incident.ToggleChecklistItem(incident.Checklist[0].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung erhalten", from: "ILS");
-        incident.AssignRole("EL", "Müller", callSign: "FFB 12/1");
+        // Exercise the widest Funktionszuweisung row: every one of the seven columns filled, so
+        // the A4 portrait layout is proven not to overflow.
+        var assigned = incident.AssignRole("EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
+            section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
+        incident.EndRoleAssignment(assigned.Id, clock.Now.AddHours(1));
+        incident.AssignRole("ZF", "Schmidt");
         incident.AddForceUnit("FFB", 12, callSign: "FFB 1/40/1");
         incident.AddForceUnit("Emmering", 9);
         var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", callSign: "FFB 1/40/1");

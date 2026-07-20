@@ -5,7 +5,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -35,6 +35,10 @@ public static class Migrations
         if (version < 3)
         {
             ApplyV3(cn, tx);
+        }
+        if (version < 4)
+        {
+            ApplyV4(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -173,6 +177,53 @@ public static class Migrations
             """);
         Exec(cn, tx, "DROP TABLE scba_trupps;");
         Exec(cn, tx, "ALTER TABLE scba_trupps_v3 RENAME TO scba_trupps;");
+    }
+
+    private static void ApplyV4(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Funktionszuweisung gains the two columns the paper form always had: Abschnitt (the
+        // "Zusatz" field) and the person's mobile number. Both are nullable, so widening the
+        // table in place is enough — no rebuild-and-copy as in V3.
+        AddColumnIfMissing(cn, tx, "role_assignments", "section", "TEXT");
+        AddColumnIfMissing(cn, tx, "role_assignments", "phone", "TEXT");
+    }
+
+    /// <summary>
+    /// ALTER TABLE ADD COLUMN, made safe to re-run. SQLite has no IF NOT EXISTS for columns, and a
+    /// duplicate ADD is a hard error that aborts the whole migration transaction.
+    ///
+    /// Both guards earn their keep against real states this repo already produces. A file can
+    /// carry a version marker older than its physical schema (a downgrade, a restored backup, or
+    /// a partially-completed upgrade), which re-runs this migration over columns that exist. And a
+    /// file can reach here without the table at all, because a version marker only promises that
+    /// the *numbered* migrations ran, not that every table survived. Skipping is the right answer
+    /// in both cases: the goal is that the column exists afterwards, not that this particular
+    /// statement executed.
+    /// </summary>
+    private static void AddColumnIfMissing(
+        SqliteConnection cn, SqliteTransaction tx, string table, string column, string type)
+    {
+        if (!TableExists(cn, tx, table) || ColumnExists(cn, tx, table, column))
+            return;
+        Exec(cn, tx, $"ALTER TABLE {table} ADD COLUMN {column} {type};");
+    }
+
+    private static bool TableExists(SqliteConnection cn, SqliteTransaction tx, string table)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=$t;";
+        cmd.Parameters.AddWithValue("$t", table);
+        return (long)cmd.ExecuteScalar()! > 0;
+    }
+
+    private static bool ColumnExists(SqliteConnection cn, SqliteTransaction tx, string table, string column)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = $"SELECT count(*) FROM pragma_table_info('{table}') WHERE name=$c;";
+        cmd.Parameters.AddWithValue("$c", column);
+        return (long)cmd.ExecuteScalar()! > 0;
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

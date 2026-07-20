@@ -31,7 +31,8 @@ public class IncidentRoundTripTests : IDisposable
         incident.ToggleChecklistItem(incident.Checklist[0].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
-        incident.AssignRole("EL", "Müller", callSign: "FFB 12/1");
+        incident.AssignRole("EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
+            section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
         incident.AddForceUnit("FFB", 12, callSign: "FFB 1/40/1");
 
         var repo = new IncidentRepository();
@@ -53,6 +54,10 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(clock.Now, loaded.Journal[1].Timestamp);
         Assert.Equal("Müller (FFB 12/1)", loaded.Journal[1].EnteredBy);
         Assert.Equal("EL", loaded.Roles[0].Role);
+        Assert.Equal("Abschnitt Nord", loaded.Roles[0].Section);
+        Assert.Equal("01 71 / 1 23 45 67", loaded.Roles[0].Phone);
+        Assert.Equal(clock.Now, loaded.Roles[0].From);
+        Assert.Null(loaded.Roles[0].To);
         Assert.Equal(12, loaded.TotalPersonnel);
         Assert.Equal(incident.Audit.Count, loaded.Audit.Count);
     }

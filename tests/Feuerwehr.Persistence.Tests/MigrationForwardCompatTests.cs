@@ -121,6 +121,70 @@ public class MigrationForwardCompatTests : IDisposable
         }
     }
 
+    [Fact]
+    public void V3_role_assignments_migrate_to_v4_keeping_existing_rows()
+    {
+        // A V3-shaped role_assignments table: no section, no phone.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (3);
+                CREATE TABLE role_assignments (
+                    id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, role TEXT NOT NULL,
+                    person_name TEXT NOT NULL, call_sign TEXT, from_time TEXT, to_time TEXT);
+                INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time)
+                VALUES ('22222222-2222-2222-2222-222222222222', 0, 'EL', 'Müller', 'FFB 12/1', NULL, NULL);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var read = cn.CreateCommand();
+            read.CommandText = "SELECT person_name, section, phone FROM role_assignments;";
+            using var r = read.ExecuteReader();
+            Assert.True(r.Read());
+            Assert.Equal("Müller", r.GetString(0));
+            // Widening must not disturb the existing row; the new columns simply read as null.
+            Assert.True(r.IsDBNull(1));
+            Assert.True(r.IsDBNull(2));
+        }
+    }
+
+    [Fact]
+    public void Re_running_v4_over_an_already_widened_table_is_a_no_op()
+    {
+        // A file whose version marker is older than its physical schema — what a restored backup
+        // or an interrupted upgrade looks like. ALTER TABLE ADD COLUMN is a hard error on a
+        // duplicate, so without a guard this would abort the whole migration transaction.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (3);
+                CREATE TABLE role_assignments (
+                    id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, role TEXT NOT NULL,
+                    person_name TEXT NOT NULL, call_sign TEXT, from_time TEXT, to_time TEXT,
+                    section TEXT, phone TEXT);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+        }
+    }
+
     private sealed class Clock : Domain.Time.IClock
     {
         public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));

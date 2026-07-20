@@ -21,7 +21,8 @@ public class IncidentWorkspaceViewModelTests
     private static MasterDataSet Md() => new(
         Roles: new[] { "EL" }, Status: Array.Empty<string>(), Equipment: Array.Empty<string>(),
         Districts: Array.Empty<string>(), RadioCallSigns: Array.Empty<string>(),
-        Streets: Array.Empty<Street>(), ChecklistTemplate: Array.Empty<string>(), TruppTypes: Array.Empty<string>());
+        Streets: Array.Empty<Street>(), ChecklistTemplate: Array.Empty<string>(), TruppTypes: Array.Empty<string>(),
+        Personnel: Array.Empty<Person>());
 
     private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
     {

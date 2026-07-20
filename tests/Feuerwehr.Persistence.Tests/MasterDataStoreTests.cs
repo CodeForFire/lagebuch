@@ -64,4 +64,50 @@ public class MasterDataStoreTests : IDisposable
 
         Assert.Contains("Angriffstrupp", set.TruppTypes);
     }
+
+    // --- Personnel roster (issue #17) ---
+
+    [Fact]
+    public void Personnel_is_empty_when_no_roster_has_been_installed()
+    {
+        // personnel.json is gitignored and only embedded when a local CLS export exists, so on CI
+        // and on a fresh clone this is the normal state -- it must not throw or seed placeholders.
+        // A developer with a local export sees their own roster instead, hence the range check.
+        var set = MasterDataDefaults.LoadEmbedded();
+        Assert.NotNull(set.Personnel);
+        Assert.DoesNotContain(set.Personnel, p => string.IsNullOrWhiteSpace(p.LastName));
+    }
+
+    [Fact]
+    public void Personnel_round_trips_through_the_store()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE md_personnel (
+                    last_name TEXT NOT NULL, first_name TEXT NOT NULL,
+                    role TEXT, call_sign TEXT, phone TEXT);
+                INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone)
+                VALUES ('Mustermann', 'Max', 'ZF', 'Land 1', '01 71 / 1 23 45 67'),
+                       ('Musterfrau', 'Erika', NULL, NULL, NULL);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var set = new MasterDataStore().GetOrSeed(_path);
+
+        // Ordered by last name, so Musterfrau precedes Mustermann.
+        Assert.Equal(new[] { "Musterfrau, Erika", "Mustermann, Max" },
+            set.Personnel.Select(p => p.DisplayName));
+        var max = set.Personnel.Single(p => p.LastName == "Mustermann");
+        Assert.Equal("01 71 / 1 23 45 67", max.Phone);
+        Assert.Equal("Land 1", max.CallSign);
+        Assert.Null(set.Personnel.Single(p => p.LastName == "Musterfrau").Phone);
+    }
+
+    [Fact]
+    public void A_person_without_a_first_name_displays_as_the_last_name_alone()
+        => Assert.Equal("Mustermann", new Person("Mustermann", "", null, null, null).DisplayName);
 }
