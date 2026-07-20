@@ -120,6 +120,69 @@ public class HomeViewModelTests
     }
 
     [Fact]
+    public void OpenRecent_of_an_unreadable_file_reports_instead_of_crashing()
+    {
+        // A recent entry that has since been moved, truncated, or written by a newer build. The
+        // Home screen has to survive it: an Einsatz is exactly the moment not to lose the app.
+        var vm = new HomeViewModel(new ThrowingStore("Datei kaputt."), new FakeMasterData(), new FakeRecent(),
+            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        vm.OpenRecentCommand.Execute("/gone.fwincident");
+
+        Assert.Null(opened);
+        Assert.NotNull(vm.OpenError);
+        Assert.Contains("gone.fwincident", vm.OpenError!);
+        Assert.Contains("Datei kaputt.", vm.OpenError!);
+    }
+
+    [Fact]
+    public void OpenFile_of_an_unreadable_file_reports_instead_of_crashing()
+    {
+        var vm = new HomeViewModel(new ThrowingStore("Datei kaputt."), new FakeMasterData(), new FakeRecent(),
+            new OpenReturningDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        vm.OpenFileCommand.Execute(null);
+
+        Assert.Null(opened);
+        Assert.NotNull(vm.OpenError);
+    }
+
+    [Fact]
+    public void A_failed_open_does_not_pollute_the_recent_list()
+    {
+        // The path never became a usable Einsatz, so promoting it to "zuletzt verwendet" would
+        // just hand the user a button that fails again.
+        var recent = new FakeRecent();
+        var vm = new HomeViewModel(new ThrowingStore("kaputt"), new FakeMasterData(), recent,
+            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+
+        vm.OpenRecentCommand.Execute("/gone.fwincident");
+
+        Assert.Empty(recent.GetRecent());
+        Assert.DoesNotContain("/gone.fwincident", vm.RecentFiles);
+    }
+
+    [Fact]
+    public void A_successful_open_clears_a_previous_error()
+    {
+        var store = new SelectivelyThrowingStore();
+        var clock = new FixedClock(T0);
+        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+        vm.OpenRecentCommand.Execute("/gone.fwincident");
+        Assert.NotNull(vm.OpenError);
+
+        vm.OpenRecentCommand.Execute("/x.fwincident");
+
+        Assert.Null(vm.OpenError);
+    }
+
+    [Fact]
     public void OpenRecent_loads_store_once()
     {
         var store = new CountingStore();
@@ -153,6 +216,24 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     }
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+}
+
+// Every Load fails, standing in for a moved, truncated, or too-new file.
+internal sealed class ThrowingStore : IIncidentStore
+{
+    private readonly string _message;
+    public ThrowingStore(string message) => _message = message;
+    public void Save(string path, Incident incident) { }
+    public Incident Load(string path) => throw new InvalidOperationException(_message);
+}
+
+// Loads what was saved; anything else throws — lets one test fail an open, then succeed.
+internal sealed class SelectivelyThrowingStore : IIncidentStore
+{
+    private readonly Dictionary<string, Incident> _saved = new();
+    public void Save(string path, Incident incident) => _saved[path] = incident;
+    public Incident Load(string path) =>
+        _saved.TryGetValue(path, out var i) ? i : throw new InvalidOperationException("Datei kaputt.");
 }
 
 // Counts Load calls to guard against the old double-load regression.
