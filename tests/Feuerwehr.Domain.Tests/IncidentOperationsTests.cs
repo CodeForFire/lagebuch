@@ -40,8 +40,23 @@ public class IncidentOperationsTests
 
         var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung", from: "ILS");
 
-        Assert.Single(incident.Journal);
+        // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start.
+        Assert.Equal(entry, incident.Journal[^1]);
         Assert.Equal(T0.AddMinutes(5), entry.Timestamp);
+        Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
+    }
+
+    [Fact]
+    public void Resume_editing_logs_etb_entry()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        clock.Now = T0.AddHours(1);
+
+        incident.ResumeEditing(clock, op);
+
+        var entry = Assert.Single(incident.Journal, e => e.Text == "Bearbeitung fortgesetzt");
+        Assert.Equal(EtbDirection.Internal, entry.Direction);
+        Assert.Equal(T0.AddHours(1), entry.Timestamp);
         Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
     }
 

@@ -47,9 +47,11 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("aufgenommen", loaded.Status);
         Assert.Equal(2, loaded.Checklist.Count);
         Assert.True(loaded.Checklist[0].IsDone);
-        Assert.Single(loaded.Journal);
-        Assert.Equal(clock.Now, loaded.Journal[0].Timestamp);
-        Assert.Equal("Müller (FFB 12/1)", loaded.Journal[0].EnteredBy);
+        // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the
+        // manual one follows it in chronological order.
+        Assert.Equal(new[] { "Einsatz begonnen", "Meldung" }, loaded.Journal.Select(e => e.Text));
+        Assert.Equal(clock.Now, loaded.Journal[1].Timestamp);
+        Assert.Equal("Müller (FFB 12/1)", loaded.Journal[1].EnteredBy);
         Assert.Equal("EL", loaded.Roles[0].Role);
         Assert.Equal(12, loaded.TotalPersonnel);
         Assert.Equal(incident.Audit.Count, loaded.Audit.Count);

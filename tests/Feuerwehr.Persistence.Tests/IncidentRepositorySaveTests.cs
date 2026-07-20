@@ -33,8 +33,10 @@ public class IncidentRepositorySaveTests : IDisposable
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "SELECT ils_number FROM incident_meta;";
         Assert.Equal("4242", (string)cmd.ExecuteScalar()!);
+        // Two rows: the automatic "Einsatz begonnen" entry from Incident.Start plus the
+        // manual one above.
         cmd.CommandText = "SELECT count(*) FROM etb_entries;";
-        Assert.Equal(1L, (long)cmd.ExecuteScalar()!);
+        Assert.Equal(2L, (long)cmd.ExecuteScalar()!);
     }
 
     [Fact]

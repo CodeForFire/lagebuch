@@ -25,8 +25,11 @@ public class EtbViewModelTests
         Assert.True(vm.AddEntryCommand.CanExecute(null));
         vm.AddEntryCommand.Execute(null);
 
-        Assert.Single(session.Incident.Journal);
-        Assert.Single(vm.Entries);
+        // Journal[0] / Entries[^1] is the automatic "Einsatz begonnen" entry from StartNew;
+        // the grid is newest-first, so the manual entry lands at the top.
+        Assert.Equal(2, session.Incident.Journal.Count);
+        Assert.Equal("Lagemeldung", session.Incident.Journal[^1].Text);
+        Assert.Equal("Lagemeldung", vm.Entries[0].Text);
         Assert.Equal("", vm.NewText);
         Assert.Equal(1, changes);
     }
