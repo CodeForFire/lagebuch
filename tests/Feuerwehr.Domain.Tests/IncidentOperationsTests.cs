@@ -37,10 +37,10 @@ public class IncidentOperationsTests
     {
         // A unit's Status and Bemerkung change constantly during an Einsatz -- "Auf Anfahrt"
         // becomes "Im Einsatz" -- so they have to be correctable after the row was added.
-        var incident = NewIncident(out _, out _);
-        var unit = incident.AddForceUnit("FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
 
-        var updated = incident.UpdateForceUnit(unit.Id, "Im Einsatz", "über DLK angefordert");
+        var updated = incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", "über DLK angefordert");
 
         Assert.Equal("Im Einsatz", updated.Status);
         Assert.Equal("über DLK angefordert", updated.Notes);
@@ -56,10 +56,10 @@ public class IncidentOperationsTests
     [Fact]
     public void Update_force_unit_trims_and_nulls_blank_values()
     {
-        var incident = NewIncident(out _, out _);
-        var unit = incident.AddForceUnit("FFB Wache 1", 9, null, "Alarmiert", "Notiz");
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9, null, "Alarmiert", "Notiz");
 
-        var updated = incident.UpdateForceUnit(unit.Id, "  Im Einsatz  ", "   ");
+        var updated = incident.UpdateForceUnit(clock, op, unit.Id, "  Im Einsatz  ", "   ");
 
         // Matches ForceUnit.Create: trimmed, and blank means "nothing recorded" rather than "".
         Assert.Equal("Im Einsatz", updated.Status);
@@ -69,20 +69,141 @@ public class IncidentOperationsTests
     [Fact]
     public void Update_unknown_force_unit_throws()
     {
-        var incident = NewIncident(out _, out _);
-        Assert.Throws<ArgumentException>(() => incident.UpdateForceUnit(Guid.NewGuid(), "Im Einsatz", null));
+        var incident = NewIncident(out var clock, out var op);
+        Assert.Throws<ArgumentException>(
+            () => incident.UpdateForceUnit(clock, op, Guid.NewGuid(), "Im Einsatz", null));
     }
 
     [Fact]
     public void Update_force_unit_is_rejected_on_a_closed_incident()
     {
         var incident = NewIncident(out var clock, out var op);
-        var unit = incident.AddForceUnit("FFB Wache 1", 9);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9);
         incident.Close(clock, op);
 
         Assert.Throws<IncidentClosedException>(
-            () => incident.UpdateForceUnit(unit.Id, "Im Einsatz", null));
+            () => incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", null));
     }
+
+    // --- ETB logging for Kräfte -------------------------------------------------------------
+    // The Einsatztagebuch has to answer "when did which Feuerwehr arrive and change state", so
+    // these entries are generated in the domain: no caller can record a unit without one.
+
+    private static Etb.EtbEntry LastEntry(Incident incident) => incident.Journal[^1];
+
+    [Fact]
+    public void Adding_a_unit_logs_a_descriptive_etb_entry()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var before = incident.Journal.Count;
+
+        incident.AddForceUnit(clock, op, "FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
+
+        Assert.Equal(before + 1, incident.Journal.Count);
+        var entry = LastEntry(incident);
+        Assert.Equal(Etb.EtbDirection.Internal, entry.Direction);
+        Assert.Equal(
+            "Einheit aufgenommen: FFB Wache 1 (FFB 1/40/1), Stärke 9, davon 4 AGT — Status: Alarmiert",
+            entry.Text);
+        // The Einsatzleitung alarms the unit, so the call sign is the recipient -- same split
+        // ScbaViewModel uses for "bereitgestellt" versus "Druckkontrolle".
+        Assert.Equal("FFB 1/40/1", entry.To);
+        Assert.Null(entry.From);
+    }
+
+    [Fact]
+    public void Adding_a_bare_unit_omits_the_optional_clauses()
+    {
+        var incident = NewIncident(out var clock, out var op);
+
+        incident.AddForceUnit(clock, op, "Aich", 6);
+
+        var entry = LastEntry(incident);
+        // No call sign, no AGT, no status: none of them appear as empty decoration.
+        Assert.Equal("Einheit aufgenommen: Aich, Stärke 6", entry.Text);
+        Assert.Null(entry.To);
+    }
+
+    [Fact]
+    public void Changing_the_status_logs_the_transition()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert");
+        var before = incident.Journal.Count;
+
+        incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", null);
+
+        Assert.Equal(before + 1, incident.Journal.Count);
+        var entry = LastEntry(incident);
+        Assert.Equal("FFB Wache 1 (FFB 1/40/1): Status Alarmiert → Im Einsatz", entry.Text);
+        // The unit reports its own status, so here the call sign is the source.
+        Assert.Equal("FFB 1/40/1", entry.From);
+        Assert.Null(entry.To);
+    }
+
+    [Fact]
+    public void Setting_a_status_for_the_first_time_reads_without_an_arrow()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "Aich", 6);
+
+        incident.UpdateForceUnit(clock, op, unit.Id, "Auf Anfahrt", null);
+
+        Assert.Equal("Aich: Status Auf Anfahrt", LastEntry(incident).Text);
+    }
+
+    [Fact]
+    public void Clearing_a_status_records_what_it_was()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "Aich", 6, status: "Im Einsatz");
+
+        incident.UpdateForceUnit(clock, op, unit.Id, null, null);
+
+        Assert.Equal("Aich: Status aufgehoben (vorher Im Einsatz)", LastEntry(incident).Text);
+    }
+
+    [Fact]
+    public void Editing_only_the_bemerkung_logs_nothing()
+    {
+        // The Bemerkung is a working note, not a reportable event -- and the grid writes it
+        // through on every keystroke, so logging it would bury the ETB.
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9, status: "Alarmiert");
+        var before = incident.Journal.Count;
+
+        incident.UpdateForceUnit(clock, op, unit.Id, "Alarmiert", "über DLK angefordert");
+
+        Assert.Equal(before, incident.Journal.Count);
+        Assert.Equal("über DLK angefordert", incident.Forces[0].Notes);
+    }
+
+    [Fact]
+    public void Re_selecting_the_same_status_logs_nothing()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9, status: "Alarmiert");
+        var before = incident.Journal.Count;
+
+        incident.UpdateForceUnit(clock, op, unit.Id, "  Alarmiert  ", null);
+
+        // Trimming happens before the comparison, so whitespace alone is not a transition.
+        Assert.Equal(before, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void A_closed_incident_logs_nothing_because_it_throws_first()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9);
+        incident.Close(clock, op);
+        var after = incident.Journal.Count;
+
+        Assert.Throws<IncidentClosedException>(
+            () => incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", null));
+        Assert.Equal(after, incident.Journal.Count);
+    }
+
 
     [Fact]
     public void Add_journal_entry_appends_with_clock_timestamp()
@@ -115,19 +236,19 @@ public class IncidentOperationsTests
     [Fact]
     public void Total_personnel_sums_force_units()
     {
-        var incident = NewIncident(out _, out _);
-        incident.AddForceUnit("FFB", 12);
-        incident.AddForceUnit("Emmering", 9);
+        var incident = NewIncident(out var clock, out var op);
+        incident.AddForceUnit(clock, op, "FFB", 12);
+        incident.AddForceUnit(clock, op, "Emmering", 9);
         Assert.Equal(21, incident.TotalPersonnel);
     }
 
     [Fact]
     public void Total_scba_sums_the_agt_of_every_unit()
     {
-        var incident = NewIncident(out _, out _);
-        incident.AddForceUnit("FFB Wache 1", 12, scbaCount: 6);
-        incident.AddForceUnit("Emmering", 9, scbaCount: 4);
-        incident.AddForceUnit("Aich", 5);
+        var incident = NewIncident(out var clock, out var op);
+        incident.AddForceUnit(clock, op, "FFB Wache 1", 12, scbaCount: 6);
+        incident.AddForceUnit(clock, op, "Emmering", 9, scbaCount: 4);
+        incident.AddForceUnit(clock, op, "Aich", 5);
 
         Assert.Equal(26, incident.TotalPersonnel);
         Assert.Equal(10, incident.TotalScba);
@@ -136,8 +257,8 @@ public class IncidentOperationsTests
     [Fact]
     public void A_force_unit_records_status_and_notes()
     {
-        var incident = NewIncident(out _, out _);
-        incident.AddForceUnit("FFB Wache 1", 9, status: " Im Einsatz ", notes: " über DLK ");
+        var incident = NewIncident(out var clock, out var op);
+        incident.AddForceUnit(clock, op, "FFB Wache 1", 9, status: " Im Einsatz ", notes: " über DLK ");
 
         var unit = Assert.Single(incident.Forces);
         Assert.Equal("Im Einsatz", unit.Status);
@@ -147,20 +268,20 @@ public class IncidentOperationsTests
     [Fact]
     public void Agt_cannot_outnumber_the_crew()
     {
-        var incident = NewIncident(out _, out _);
+        var incident = NewIncident(out var clock, out var op);
 
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => incident.AddForceUnit("FFB Wache 1", 4, scbaCount: 5));
+            () => incident.AddForceUnit(clock, op, "FFB Wache 1", 4, scbaCount: 5));
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => incident.AddForceUnit("FFB Wache 1", 4, scbaCount: -1));
+            () => incident.AddForceUnit(clock, op, "FFB Wache 1", 4, scbaCount: -1));
         Assert.Empty(incident.Forces);
     }
 
     [Fact]
     public void Every_crew_member_may_be_an_agt()
     {
-        var incident = NewIncident(out _, out _);
-        incident.AddForceUnit("FFB Wache 1", 4, scbaCount: 4);
+        var incident = NewIncident(out var clock, out var op);
+        incident.AddForceUnit(clock, op, "FFB Wache 1", 4, scbaCount: 4);
         Assert.Equal(4, Assert.Single(incident.Forces).ScbaCount);
     }
 

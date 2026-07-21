@@ -33,7 +33,7 @@ public class IncidentRoundTripTests : IDisposable
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
         incident.AssignRole("EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
             section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
-        incident.AddForceUnit("FFB", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
+        incident.AddForceUnit(clock, op, "FFB", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
             notes: "über DLK angefordert", scbaCount: 6);
 
         var repo = new IncidentRepository();
@@ -49,9 +49,18 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("aufgenommen", loaded.Status);
         Assert.Equal(2, loaded.Checklist.Count);
         Assert.True(loaded.Checklist[0].IsDone);
-        // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the
-        // manual one follows it in chronological order.
-        Assert.Equal(new[] { "Einsatz begonnen", "Meldung" }, loaded.Journal.Select(e => e.Text));
+        // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the manual one
+        // follows it in chronological order, then the automatic entry for the recorded unit --
+        // which is also the proof that a generated entry survives the round trip.
+        Assert.Equal(
+            new[]
+            {
+                "Einsatz begonnen",
+                "Meldung",
+                "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 12, davon 6 AGT — Status: Im Einsatz",
+            },
+            loaded.Journal.Select(e => e.Text));
+        Assert.Equal("FFB 1/40/1", loaded.Journal[2].To);
         Assert.Equal(clock.Now, loaded.Journal[1].Timestamp);
         Assert.Equal("Müller (FFB 12/1)", loaded.Journal[1].EnteredBy);
         Assert.Equal("EL", loaded.Roles[0].Role);
@@ -74,9 +83,9 @@ public class IncidentRoundTripTests : IDisposable
         var clock = new Clock();
         var op = new Domain.SessionOperator("Müller", "FFB 12/1");
         var incident = Domain.Incident.Start(clock, op, "Brand");
-        var unit = incident.AddForceUnit("FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
 
-        incident.UpdateForceUnit(unit.Id, "Im Einsatz", "Innenangriff");
+        incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", "Innenangriff");
 
         var repo = new IncidentRepository();
         repo.Save(_path, incident);

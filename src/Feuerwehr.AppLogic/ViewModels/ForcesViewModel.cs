@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Feuerwehr.Domain.Time;
 using Feuerwehr.Persistence.MasterData;
 
 namespace Feuerwehr.AppLogic.ViewModels;
@@ -72,11 +73,14 @@ public sealed partial class ForceRow : ObservableObject
 public sealed partial class ForcesViewModel : ObservableObject
 {
     private readonly IncidentSession _session;
+    private readonly IClock _clock;
     private readonly Action _onChanged;
 
-    public ForcesViewModel(IncidentSession session, MasterDataSet masterData, Action onChanged)
+    public ForcesViewModel(
+        IncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
     {
         _session = session;
+        _clock = clock;
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
         BrigadeOptions = masterData.Brigades;
@@ -136,6 +140,7 @@ public sealed partial class ForcesViewModel : ObservableObject
     private void AddForce()
     {
         var unit = _session.Incident.AddForceUnit(
+            _clock, _session.Operator!,
             NewBrigade, NewPersonnelCount, NewCallSign, NewStatus, NewNotes, NewScbaCount);
         Forces.Add(ToRow(unit));
         TotalPersonnel = _session.Incident.TotalPersonnel;
@@ -152,7 +157,7 @@ public sealed partial class ForcesViewModel : ObservableObject
     private ForceRow ToRow(Domain.ForceUnit f) =>
         new(f, StatusOptions, IsReadOnly, (status, notes) =>
         {
-            _session.Incident.UpdateForceUnit(f.Id, status, notes);
+            _session.Incident.UpdateForceUnit(_clock, _session.Operator!, f.Id, status, notes);
             _onChanged();
         });
 }

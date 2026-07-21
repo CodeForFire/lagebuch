@@ -21,7 +21,7 @@ public class ForcesViewModelTests
         var changes = 0;
         var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var vm = new ForcesViewModel(session, Md(), () => changes++)
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB",
             NewPersonnelCount = 12
@@ -136,7 +136,7 @@ public class ForcesViewModelTests
         var changes = 0;
         var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var vm = new ForcesViewModel(session, Md(), () => changes++)
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB Wache 1",
             NewPersonnelCount = 9,
@@ -158,7 +158,7 @@ public class ForcesViewModelTests
     {
         var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var vm = new ForcesViewModel(session, Md(), () => { })
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
             NewPersonnelCount = 9,
@@ -176,7 +176,7 @@ public class ForcesViewModelTests
     {
         var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        var vm = new ForcesViewModel(session, Md(), () => { })
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
             NewCallSign = "FFB 1/40/1",
@@ -205,11 +205,11 @@ public class ForcesViewModelTests
         var store = new FakeStore();
         var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", Array.Empty<string>());
-        seed.Incident.AddForceUnit("FFB Wache 1", 9, null, "Alarmiert");
+        seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9, null, "Alarmiert");
         seed.Close(clock);
 
         var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
-        var vm = new ForcesViewModel(ro, Md(), () => { });
+        var vm = new ForcesViewModel(ro, new FixedClock(T0), Md(), () => { });
 
         var row = Assert.Single(vm.Forces);
         Assert.True(row.IsReadOnly);
@@ -220,10 +220,63 @@ public class ForcesViewModelTests
         Assert.Equal("Alarmiert", ro.Incident.Forces[0].Status);
     }
 
+    [Fact]
+    public void Adding_and_restatusing_a_unit_writes_the_etb_entries_as_the_session_operator()
+    {
+        // Pins that the view model hands the real clock and operator down: the domain guarantees
+        // an entry exists, but only this layer decides whose name is on it.
+        var clock = new FixedClock(T0);
+        var session = IncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => { })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewCallSign = "FFB 1/40/1",
+            NewPersonnelCount = 9,
+            NewStatus = "Alarmiert",
+        };
+        var before = session.Incident.Journal.Count;
+
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(before + 1, session.Incident.Journal.Count);
+        Assert.Equal("Müller (FFB 12/1)", session.Incident.Journal[^1].EnteredBy);
+        Assert.Equal(T0, session.Incident.Journal[^1].Timestamp);
+
+        vm.Forces[0].Status = "Im Einsatz";
+        Assert.Equal(before + 2, session.Incident.Journal.Count);
+        Assert.Contains("Status Alarmiert → Im Einsatz", session.Incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void Editing_only_the_bemerkung_adds_no_etb_entry()
+    {
+        // The grid writes the Bemerkung through on every keystroke, so this is what keeps a typed
+        // note from burying the Einsatztagebuch.
+        var clock = new FixedClock(T0);
+        var session = IncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => { })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewPersonnelCount = 9,
+            NewStatus = "Alarmiert",
+        };
+        vm.AddForceCommand.Execute(null);
+        var after = session.Incident.Journal.Count;
+
+        vm.Forces[0].Notes = "ü";
+        vm.Forces[0].Notes = "üb";
+        vm.Forces[0].Notes = "übe";
+
+        Assert.Equal(after, session.Incident.Journal.Count);
+        Assert.Equal("übe", session.Incident.Forces[0].Notes);
+    }
+
+
     private static ForcesViewModel NewVm()
     {
         var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        return new ForcesViewModel(session, Md(), () => { });
+        return new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
     }
 }

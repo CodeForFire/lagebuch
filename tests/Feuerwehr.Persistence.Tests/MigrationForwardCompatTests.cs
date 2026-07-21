@@ -47,7 +47,7 @@ public class MigrationForwardCompatTests : IDisposable
         var clock = new Clock();
         var op = new Domain.SessionOperator("Müller", "FFB 12/1");
         var incident = Domain.Incident.Start(clock, op, "Brand");
-        incident.AddForceUnit("FFB", 12);
+        incident.AddForceUnit(clock, op, "FFB", 12);
 
         var repo = new IncidentRepository();
         repo.Save(_path, incident);

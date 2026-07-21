@@ -57,7 +57,7 @@ public sealed class Incident
             IlsNumber = ilsNumber
         };
         incident._audit.Add(new AuditEvent(clock.Now, "opened", openedBy.Display));
-        incident.LogLifecycle(clock, openedBy, ilsNumber is null
+        incident.AppendInternalEntry(clock, openedBy, ilsNumber is null
             ? "Einsatz begonnen"
             : $"Einsatz begonnen (ILS {ilsNumber.Value})");
         return incident;
@@ -111,11 +111,12 @@ public sealed class Incident
             throw new IncidentClosedException();
     }
 
-    // Appends a lifecycle entry straight to the journal, deliberately bypassing
-    // AddJournalEntry's EnsureOpen guard: Close has to log its own entry, and it is only
-    // ever called from the transition methods, which guard themselves.
-    private void LogLifecycle(IClock clock, SessionOperator op, string text) =>
-        _journal.Add(EtbEntry.Create(clock.Now, EtbDirection.Internal, text, op));
+    // Appends an automatic entry straight to the journal, deliberately bypassing
+    // AddJournalEntry's EnsureOpen guard: Close has to log its own entry, and this is only
+    // ever called from methods that guard themselves.
+    private void AppendInternalEntry(
+        IClock clock, SessionOperator op, string text, string? from = null, string? to = null) =>
+        _journal.Add(EtbEntry.Create(clock.Now, EtbDirection.Internal, text, op, from, to));
 
     public void ResumeEditing(IClock clock, SessionOperator resumedBy)
     {
@@ -123,7 +124,7 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(resumedBy);
         EnsureOpen();
         _audit.Add(new AuditEvent(clock.Now, "resumed", resumedBy.Display));
-        LogLifecycle(clock, resumedBy, "Bearbeitung fortgesetzt");
+        AppendInternalEntry(clock, resumedBy, "Bearbeitung fortgesetzt");
     }
 
     public void Close(IClock clock, SessionOperator closedBy)
@@ -132,7 +133,7 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(closedBy);
         EnsureOpen();
         // Must precede the state flip — a closed incident rejects journal writes.
-        LogLifecycle(clock, closedBy, "Einsatz abgeschlossen");
+        AppendInternalEntry(clock, closedBy, "Einsatz abgeschlossen");
         State = IncidentState.Closed;
         ClosedAt = clock.Now;
         ClosedBy = closedBy.Display;
@@ -242,7 +243,14 @@ public sealed class Incident
         return ended;
     }
 
+    /// <summary>
+    /// Records a unit and logs it to the ETB. The clock and operator are required rather than
+    /// optional because the entry is the point: the Einsatztagebuch has to answer when which
+    /// Feuerwehr was alarmed, so no caller may record a unit without leaving that trace.
+    /// </summary>
     public ForceUnit AddForceUnit(
+        IClock clock,
+        SessionOperator op,
         string brigade,
         int personnelCount,
         string? callSign = null,
@@ -251,8 +259,21 @@ public sealed class Incident
         int scbaCount = 0)
     {
         EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
         var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount);
         _forces.Add(unit);
+
+        // Optional clauses are omitted rather than printed empty, so a bare unit reads as
+        // "Einheit aufgenommen: Aich, Stärke 6" instead of trailing "davon 0 AGT — Status: ".
+        var text = $"Einheit aufgenommen: {Label(unit)}, Stärke {unit.PersonnelCount}";
+        if (unit.ScbaCount > 0)
+            text += $", davon {unit.ScbaCount} AGT";
+        if (unit.Status is not null)
+            text += $" — Status: {unit.Status}";
+
+        AppendInternalEntry(clock, op, text, to: unit.CallSign);
         return unit;
     }
 
@@ -260,18 +281,43 @@ public sealed class Incident
     /// Updates a unit's Status and Bemerkung in place, keeping its identity and position. Mirrors
     /// <see cref="EndRoleAssignment"/>: ForceUnit is a record, so "changing" it means replacing the
     /// entry rather than mutating it.
+    ///
+    /// Only a real status transition reaches the ETB. The Bemerkung is a working note rather than
+    /// a reportable event, and the grid writes it through on every keystroke, so logging it would
+    /// bury the journal it is supposed to inform.
     /// </summary>
-    public ForceUnit UpdateForceUnit(Guid unitId, string? status, string? notes)
+    public ForceUnit UpdateForceUnit(
+        IClock clock, SessionOperator op, Guid unitId, string? status, string? notes)
     {
         EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
         var index = _forces.FindIndex(f => f.Id == unitId);
         if (index < 0)
             throw new ArgumentException("Einheit nicht gefunden.", nameof(unitId));
 
-        var updated = _forces[index].WithStatusAndNotes(status, notes);
+        var previous = _forces[index];
+        var updated = previous.WithStatusAndNotes(status, notes);
         _forces[index] = updated;
+
+        // Compare the normalised values, so re-selecting the same status -- or the same status
+        // with stray whitespace -- is not a transition.
+        if (!string.Equals(previous.Status, updated.Status, StringComparison.Ordinal))
+            AppendInternalEntry(clock, op, StatusChangeText(previous, updated), from: updated.CallSign);
+
         return updated;
     }
+
+    private static string Label(ForceUnit unit) =>
+        unit.CallSign is null ? unit.Brigade : $"{unit.Brigade} ({unit.CallSign})";
+
+    private static string StatusChangeText(ForceUnit previous, ForceUnit updated) => updated.Status switch
+    {
+        null => $"{Label(updated)}: Status aufgehoben (vorher {previous.Status})",
+        _ when previous.Status is null => $"{Label(updated)}: Status {updated.Status}",
+        _ => $"{Label(updated)}: Status {previous.Status} → {updated.Status}",
+    };
 
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,

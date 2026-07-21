@@ -42,6 +42,71 @@ public class IncidentWorkspaceViewModelTests
         return new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService());
     }
 
+    // --- ETB stays live ---------------------------------------------------------------------
+    // Entries appended by a module used to sit invisible in the journal until the Einsatz was
+    // closed, resumed or reopened, because Etb.Entries was a snapshot taken in BuildChildren and
+    // only the ETB tab's own AddEntry inserted into it. Atemschutz has shipped with this.
+
+    [Fact]
+    public void An_entry_logged_from_the_kraefte_tab_appears_in_the_etb_immediately()
+    {
+        var vm = NewWorkspace(out _, out _);
+        var before = vm.Etb.Entries.Count;
+
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewPersonnelCount = 9;
+        vm.Forces.AddForceCommand.Execute(null);
+
+        Assert.Equal(before + 1, vm.Etb.Entries.Count);
+        // Newest first, matching how the tab renders.
+        Assert.Contains("Einheit aufgenommen: FFB Wache 1", vm.Etb.Entries[0].Text);
+    }
+
+    [Fact]
+    public void An_entry_logged_from_the_atemschutz_tab_appears_in_the_etb_immediately()
+    {
+        var vm = NewWorkspace(out _, out _);
+        var before = vm.Etb.Entries.Count;
+
+        vm.Scba.NewDesignation = "Angriffstrupp";
+        vm.Scba.NewMembers = "Müller / Schmidt";
+        vm.Scba.AddTruppCommand.Execute(null);
+
+        Assert.Equal(before + 1, vm.Etb.Entries.Count);
+        Assert.Contains("Angriffstrupp", vm.Etb.Entries[0].Text);
+    }
+
+    [Fact]
+    public void Repeated_saves_do_not_duplicate_etb_rows()
+    {
+        // Sync runs on every OnChanged, so it has to be idempotent -- a Bemerkung edit alone
+        // triggers it without adding a journal entry.
+        var vm = NewWorkspace(out _, out _);
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewPersonnelCount = 9;
+        vm.Forces.AddForceCommand.Execute(null);
+        var after = vm.Etb.Entries.Count;
+
+        vm.Forces.Forces[0].Notes = "über DLK angefordert";
+        vm.Forces.Forces[0].Notes = "über DLK angefordert, Wasser ab";
+
+        Assert.Equal(after, vm.Etb.Entries.Count);
+    }
+
+    [Fact]
+    public void Typing_in_the_etb_tab_still_lists_the_entry_once()
+    {
+        var vm = NewWorkspace(out _, out _);
+        var before = vm.Etb.Entries.Count;
+
+        vm.Etb.NewText = "Lagemeldung erhalten";
+        vm.Etb.AddEntryCommand.Execute(null);
+
+        Assert.Equal(before + 1, vm.Etb.Entries.Count);
+        Assert.Equal("Lagemeldung erhalten", vm.Etb.Entries[0].Text);
+    }
+
+
     [Fact]
     public void Editing_a_child_autosaves()
     {
