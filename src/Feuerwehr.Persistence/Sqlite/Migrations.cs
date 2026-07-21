@@ -23,6 +23,14 @@ public static class Migrations
     public static void Migrate(SqliteConnection cn)
     {
         var version = GetVersion(cn);
+
+        // Refuse a file from the future rather than treating "no migration applies" as "already
+        // current". Without this, SetVersion below stamps CurrentVersion over the higher marker,
+        // so the file silently claims a schema it does not have -- and the next read fails deep in
+        // a SELECT against a column the newer build had already dropped.
+        if (version > CurrentVersion)
+            throw new UnsupportedSchemaVersionException(version, CurrentVersion);
+
         using var tx = cn.BeginTransaction();
         if (version < 1)
         {

@@ -31,6 +31,12 @@ public sealed partial class HomeViewModel : ObservableObject
     public ObservableCollection<string> RecentFiles { get; }
     public Action<IncidentWorkspaceViewModel>? WorkspaceOpened { get; set; }
 
+    /// <summary>
+    /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
+    /// </summary>
+    [ObservableProperty]
+    private string? _openError;
+
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
@@ -49,8 +55,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // Opening is always read-only and prompt-free. The workspace offers "Weiter bearbeiten"
     // to upgrade a still-open incident to editable (which prompts for the operator there).
     [RelayCommand]
-    private void OpenRecent(string path) =>
-        OpenWorkspace(IncidentSession.OpenReadOnly(_store, path), path, _masterData.Get());
+    private void OpenRecent(string path) => TryOpen(path);
 
     [RelayCommand]
     private async Task OpenFileAsync()
@@ -58,7 +63,30 @@ public sealed partial class HomeViewModel : ObservableObject
         var path = await _dialogs.PickOpenAsync();
         if (string.IsNullOrWhiteSpace(path))
             return;
-        OpenWorkspace(IncidentSession.OpenReadOnly(_store, path), path, _masterData.Get());
+        TryOpen(path);
+    }
+
+    /// <summary>
+    /// Opens a file, turning any failure into a banner rather than an unhandled exception.
+    ///
+    /// The catch is deliberately broad. Every everyday reason an open fails -- the file was moved,
+    /// truncated, written by a newer build, or was never a .fwincident at all -- surfaces here as a
+    /// different exception type, and on the Home screen they all have the same answer: tell the
+    /// user which file and why, and leave the app standing. Letting any of them escape kills the
+    /// process, which during an Einsatz is the worst possible outcome.
+    /// </summary>
+    private void TryOpen(string path)
+    {
+        try
+        {
+            var session = IncidentSession.OpenReadOnly(_store, path);
+            OpenError = null;
+            OpenWorkspace(session, path, _masterData.Get());
+        }
+        catch (Exception ex)
+        {
+            OpenError = $"{Path.GetFileName(path)} konnte nicht geöffnet werden. {ex.Message}";
+        }
     }
 
     private void OpenWorkspace(IncidentSession session, string path, Persistence.MasterData.MasterDataSet md)
