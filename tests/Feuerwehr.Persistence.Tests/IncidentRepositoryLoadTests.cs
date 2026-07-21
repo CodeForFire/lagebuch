@@ -38,5 +38,11 @@ public class IncidentRepositoryLoadTests : IDisposable
         Assert.ThrowsAny<Exception>(() => new IncidentRepository().Load(_path));
 
         Assert.Equal("nicht wirklich eine Einsatzdatei", File.ReadAllText(_path));
+
+        // A failed open must not leave a handle behind. Windows enforces this -- a leaked handle
+        // makes the file undeletable and the read above throws "used by another process" -- while
+        // on Linux an open handle blocks neither, so only the Windows CI leg can see it fail.
+        File.Delete(_path);
+        Assert.False(File.Exists(_path));
     }
 }
