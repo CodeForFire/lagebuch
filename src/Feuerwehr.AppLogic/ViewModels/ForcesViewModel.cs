@@ -5,8 +5,69 @@ using Feuerwehr.Persistence.MasterData;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
-public sealed record ForceRow(
-    string Brigade, string? CallSign, int PersonnelCount, int ScbaCount, string? Status, string? Notes);
+/// <summary>
+/// One row of the Kräfteübersicht. Status and Bemerkung move while the Einsatz runs -- a unit goes
+/// from Alarmiert to Im Einsatz -- so they are settable and write straight through to the domain,
+/// following the ScbaTruppRow pattern. The rest of the row describes what was alarmed and stays
+/// read-only: a wrong crew size means the row was entered wrong, which is a correction, not
+/// routine status keeping.
+/// </summary>
+public sealed partial class ForceRow : ObservableObject
+{
+    private readonly Action<string?, string?> _onEdited;
+
+    public ForceRow(
+        Domain.ForceUnit unit, IReadOnlyList<string> statusOptions, bool isReadOnly,
+        Action<string?, string?> onEdited)
+    {
+        Id = unit.Id;
+        Brigade = unit.Brigade;
+        CallSign = unit.CallSign;
+        PersonnelCount = unit.PersonnelCount;
+        ScbaCount = unit.ScbaCount;
+        StatusOptions = statusOptions;
+        IsReadOnly = isReadOnly;
+        _onEdited = onEdited;
+        _status = unit.Status;
+        _notes = unit.Notes;
+    }
+
+    public Guid Id { get; }
+    public string Brigade { get; }
+    public string? CallSign { get; }
+    public int PersonnelCount { get; }
+    public int ScbaCount { get; }
+    public bool IsReadOnly { get; }
+
+    /// <summary>
+    /// Carried on the row rather than read off the parent: a DataGrid cell template binds against
+    /// the row, and reaching back up to the ForcesViewModel from inside it is a brittle
+    /// $parent expression for no gain.
+    /// </summary>
+    public IReadOnlyList<string> StatusOptions { get; }
+
+    [ObservableProperty]
+    private string? _status;
+
+    [ObservableProperty]
+    private string? _notes;
+
+    partial void OnStatusChanged(string? value) => Push();
+
+    partial void OnNotesChanged(string? value) => Push();
+
+    /// <summary>
+    /// Writes both fields through on any edit. A closed incident is a historical record, so the
+    /// push is skipped rather than throwing: the grid binds two-way, and a stray edit on a
+    /// read-only row must not take the app down.
+    /// </summary>
+    private void Push()
+    {
+        if (IsReadOnly)
+            return;
+        _onEdited(Status, Notes);
+    }
+}
 
 public sealed partial class ForcesViewModel : ObservableObject
 {
@@ -88,6 +149,10 @@ public sealed partial class ForcesViewModel : ObservableObject
         _onChanged();
     }
 
-    private static ForceRow ToRow(Domain.ForceUnit f) =>
-        new(f.Brigade, f.CallSign, f.PersonnelCount, f.ScbaCount, f.Status, f.Notes);
+    private ForceRow ToRow(Domain.ForceUnit f) =>
+        new(f, StatusOptions, IsReadOnly, (status, notes) =>
+        {
+            _session.Incident.UpdateForceUnit(f.Id, status, notes);
+            _onChanged();
+        });
 }

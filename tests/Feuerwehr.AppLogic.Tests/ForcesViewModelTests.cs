@@ -130,6 +130,96 @@ public class ForcesViewModelTests
         Assert.Null(vm.NewNotes);
     }
 
+    [Fact]
+    public void Editing_a_row_status_reaches_the_domain_and_persists()
+    {
+        var changes = 0;
+        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var vm = new ForcesViewModel(session, Md(), () => changes++)
+        {
+            NewBrigade = "FFB Wache 1",
+            NewPersonnelCount = 9,
+            NewStatus = "Alarmiert",
+        };
+        vm.AddForceCommand.Execute(null);
+        changes = 0;
+
+        var row = Assert.Single(vm.Forces);
+        row.Status = "Im Einsatz";
+
+        Assert.Equal("Im Einsatz", session.Incident.Forces[0].Status);
+        // An edit is a change to the Einsatz record, so it has to trigger the same save the add does.
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Editing_a_row_bemerkung_reaches_the_domain()
+    {
+        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var vm = new ForcesViewModel(session, Md(), () => { })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewPersonnelCount = 9,
+        };
+        vm.AddForceCommand.Execute(null);
+
+        var row = Assert.Single(vm.Forces);
+        row.Notes = "über DLK angefordert";
+
+        Assert.Equal("über DLK angefordert", session.Incident.Forces[0].Notes);
+    }
+
+    [Fact]
+    public void Editing_a_row_leaves_the_rest_of_the_unit_alone()
+    {
+        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var vm = new ForcesViewModel(session, Md(), () => { })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewCallSign = "FFB 1/40/1",
+            NewPersonnelCount = 9,
+            NewScbaCount = 4,
+        };
+        vm.AddForceCommand.Execute(null);
+
+        var row = Assert.Single(vm.Forces);
+        row.Status = "Im Einsatz";
+
+        var unit = session.Incident.Forces[0];
+        Assert.Equal("FFB Wache 1", unit.Brigade);
+        Assert.Equal("FFB 1/40/1", unit.CallSign);
+        Assert.Equal(9, unit.PersonnelCount);
+        Assert.Equal(4, unit.ScbaCount);
+        // Totals are derived from the units, so they must not drift on a status edit.
+        Assert.Equal(9, vm.TotalPersonnel);
+        Assert.Equal(4, vm.TotalScba);
+    }
+
+    [Fact]
+    public void Rows_of_a_readonly_incident_are_not_editable()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<string>());
+        seed.Incident.AddForceUnit("FFB Wache 1", 9, null, "Alarmiert");
+        seed.Close(clock);
+
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        var vm = new ForcesViewModel(ro, Md(), () => { });
+
+        var row = Assert.Single(vm.Forces);
+        Assert.True(row.IsReadOnly);
+
+        // A closed Einsatz is a historical record. Setting must be inert rather than throwing --
+        // the grid binds two-way and would otherwise blow up on a stray edit.
+        row.Status = "Im Einsatz";
+        Assert.Equal("Alarmiert", ro.Incident.Forces[0].Status);
+    }
+
     private static ForcesViewModel NewVm()
     {
         var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),

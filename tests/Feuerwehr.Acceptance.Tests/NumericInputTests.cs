@@ -5,7 +5,9 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Feuerwehr.App.Views;
+using Feuerwehr.AppLogic;
 using Feuerwehr.AppLogic.ViewModels;
+using Feuerwehr.Domain;
 
 namespace Feuerwehr.Acceptance.Tests;
 
@@ -106,5 +108,67 @@ public class NumericInputTests
             Assert.Equal(System.Globalization.NumberStyles.Integer, box.ParsingNumberStyle);
             Assert.Equal("0", box.FormatString);
         }
+    }
+}
+
+// Status and Bemerkung move constantly during an Einsatz -- a unit goes from Alarmiert to Im
+// Einsatz -- so the Kräfte grid has to offer them as controls, not as printed text. This pins the
+// affordance itself: the columns were DataGridTextColumn in a grid marked IsReadOnly, which is why
+// neither could be changed once the row was added.
+public class ForcesGridEditingTests
+{
+    private static (ForcesView View, IncidentWorkspaceViewModel Vm) ShowForces(out IncidentSession session)
+    {
+        session = IncidentSession.StartNew(new FakeStore(), new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
+            WorkspaceRenderHelper.MasterData(), new FakeDialogs(), new NoopAlarmService());
+        var view = new ForcesView { DataContext = vm.Forces };
+        var window = new Window { Content = view, Width = 1200, Height = 700 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return (view, vm);
+    }
+
+    private static DataGridColumn Column(ForcesView view, string header) =>
+        view.GetControl<DataGrid>("ForcesGrid").Columns.First(c => (string)c.Header == header);
+
+    [AvaloniaFact]
+    public void Status_and_bemerkung_are_editable_columns()
+    {
+        var (view, _) = ShowForces(out _);
+
+        Assert.IsType<DataGridTemplateColumn>(Column(view, "STATUS"));
+        Assert.IsType<DataGridTemplateColumn>(Column(view, "BEMERKUNG"));
+    }
+
+    [AvaloniaFact]
+    public void The_descriptive_columns_stay_read_only_text()
+    {
+        // Which Feuerwehr, how many people, how many AGT are facts about what was alarmed.
+        var (view, _) = ShowForces(out _);
+
+        foreach (var header in new[] { "FEUERWEHR", "FUNKRUFNAME", "STÄRKE", "AGT" })
+            Assert.IsType<DataGridTextColumn>(Column(view, header));
+    }
+
+    [AvaloniaFact]
+    public void Editing_status_on_a_row_reaches_the_incident()
+    {
+        var (view, vm) = ShowForces(out var session);
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewPersonnelCount = 9;
+        vm.Forces.NewStatus = "Alarmiert";
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Forces.Forces);
+        row.Status = "Im Einsatz";
+        row.Notes = "über DLK angefordert";
+        Dispatcher.UIThread.RunJobs();
+
+        var unit = Assert.Single(session.Incident.Forces);
+        Assert.Equal("Im Einsatz", unit.Status);
+        Assert.Equal("über DLK angefordert", unit.Notes);
     }
 }

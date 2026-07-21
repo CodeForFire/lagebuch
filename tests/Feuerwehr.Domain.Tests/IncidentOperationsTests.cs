@@ -33,6 +33,58 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Update_force_unit_sets_status_and_notes()
+    {
+        // A unit's Status and Bemerkung change constantly during an Einsatz -- "Auf Anfahrt"
+        // becomes "Im Einsatz" -- so they have to be correctable after the row was added.
+        var incident = NewIncident(out _, out _);
+        var unit = incident.AddForceUnit("FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
+
+        var updated = incident.UpdateForceUnit(unit.Id, "Im Einsatz", "über DLK angefordert");
+
+        Assert.Equal("Im Einsatz", updated.Status);
+        Assert.Equal("über DLK angefordert", updated.Notes);
+        // Replaced in place: same identity, same position, everything else untouched.
+        Assert.Equal(unit.Id, updated.Id);
+        Assert.Same(updated, Assert.Single(incident.Forces));
+        Assert.Equal("FFB Wache 1", updated.Brigade);
+        Assert.Equal(9, updated.PersonnelCount);
+        Assert.Equal(4, updated.ScbaCount);
+        Assert.Equal("FFB 1/40/1", updated.CallSign);
+    }
+
+    [Fact]
+    public void Update_force_unit_trims_and_nulls_blank_values()
+    {
+        var incident = NewIncident(out _, out _);
+        var unit = incident.AddForceUnit("FFB Wache 1", 9, null, "Alarmiert", "Notiz");
+
+        var updated = incident.UpdateForceUnit(unit.Id, "  Im Einsatz  ", "   ");
+
+        // Matches ForceUnit.Create: trimmed, and blank means "nothing recorded" rather than "".
+        Assert.Equal("Im Einsatz", updated.Status);
+        Assert.Null(updated.Notes);
+    }
+
+    [Fact]
+    public void Update_unknown_force_unit_throws()
+    {
+        var incident = NewIncident(out _, out _);
+        Assert.Throws<ArgumentException>(() => incident.UpdateForceUnit(Guid.NewGuid(), "Im Einsatz", null));
+    }
+
+    [Fact]
+    public void Update_force_unit_is_rejected_on_a_closed_incident()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var unit = incident.AddForceUnit("FFB Wache 1", 9);
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(
+            () => incident.UpdateForceUnit(unit.Id, "Im Einsatz", null));
+    }
+
+    [Fact]
     public void Add_journal_entry_appends_with_clock_timestamp()
     {
         var incident = NewIncident(out var clock, out var op);

@@ -39,4 +39,17 @@ public sealed record ForceUnit(
             string.IsNullOrWhiteSpace(status) ? null : status.Trim(),
             string.IsNullOrWhiteSpace(notes) ? null : notes.Trim());
     }
+
+    /// <summary>
+    /// The two fields that move while the Einsatz runs: a unit goes from Alarmiert to Auf Anfahrt
+    /// to Im Einsatz, and the Bemerkung is where the Einsatzleiter notes why. Everything else --
+    /// which Feuerwehr, how many people, how many AGT -- is a fact about what was alarmed, so it
+    /// is deliberately not settable here; a wrong crew size means the row was entered wrong and
+    /// belongs to a correction path, not to routine status keeping.
+    /// </summary>
+    public ForceUnit WithStatusAndNotes(string? status, string? notes) => this with
+    {
+        Status = string.IsNullOrWhiteSpace(status) ? null : status.Trim(),
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+    };
 }

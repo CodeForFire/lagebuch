@@ -67,6 +67,31 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void An_edited_status_and_bemerkung_survive_a_round_trip()
+    {
+        // The point of making them editable is that the corrected value is what ends up in the
+        // Einsatz record -- so the edit has to reach disk, not just the in-memory unit.
+        var clock = new Clock();
+        var op = new Domain.SessionOperator("Müller", "FFB 12/1");
+        var incident = Domain.Incident.Start(clock, op, "Brand");
+        var unit = incident.AddForceUnit("FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
+
+        incident.UpdateForceUnit(unit.Id, "Im Einsatz", "Innenangriff");
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+        var loaded = repo.Load(_path);
+
+        var reloaded = Assert.Single(loaded.Forces);
+        Assert.Equal("Im Einsatz", reloaded.Status);
+        Assert.Equal("Innenangriff", reloaded.Notes);
+        // Identity and the descriptive fields ride along unchanged.
+        Assert.Equal(unit.Id, reloaded.Id);
+        Assert.Equal(9, reloaded.PersonnelCount);
+        Assert.Equal(4, reloaded.ScbaCount);
+    }
+
+    [Fact]
     public void Closed_incident_round_trips_and_stays_closed()
     {
         var clock = new Clock();

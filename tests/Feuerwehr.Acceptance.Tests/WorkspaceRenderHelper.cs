@@ -16,6 +16,8 @@ internal sealed class ManualTicker : ITicker
 
 internal static class WorkspaceRenderHelper
 {
+    public static MasterDataSet MasterData() => Md();
+
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         Roles = new[] { "EL" },

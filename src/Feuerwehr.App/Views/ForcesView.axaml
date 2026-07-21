@@ -54,8 +54,28 @@
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
           <DataGridTextColumn Header="STÄRKE" Binding="{Binding PersonnelCount}" />
           <DataGridTextColumn Header="AGT" Binding="{Binding ScbaCount}" />
-          <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" />
-          <DataGridTextColumn Header="BEMERKUNG" Binding="{Binding Notes}" Width="*" />
+          <!-- Status and Bemerkung are live controls rather than printed text: both move while the
+               Einsatz runs, so they have to stay changeable after the row was added. Template
+               columns keep them one click away instead of behind DataGrid's edit mode. -->
+          <DataGridTemplateColumn Header="STATUS" Width="180">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <ComboBox Margin="6,4" HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding StatusOptions}"
+                          SelectedItem="{Binding Status}"
+                          IsEnabled="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="BEMERKUNG" Width="*">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <TextBox Margin="6,4" Watermark="Bemerkung"
+                         Text="{Binding Notes}"
+                         IsEnabled="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
         </DataGrid.Columns>
       </DataGrid>
     </Border>

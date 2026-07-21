@@ -256,6 +256,23 @@ public sealed class Incident
         return unit;
     }
 
+    /// <summary>
+    /// Updates a unit's Status and Bemerkung in place, keeping its identity and position. Mirrors
+    /// <see cref="EndRoleAssignment"/>: ForceUnit is a record, so "changing" it means replacing the
+    /// entry rather than mutating it.
+    /// </summary>
+    public ForceUnit UpdateForceUnit(Guid unitId, string? status, string? notes)
+    {
+        EnsureOpen();
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+            throw new ArgumentException("Einheit nicht gefunden.", nameof(unitId));
+
+        var updated = _forces[index].WithStatusAndNotes(status, notes);
+        _forces[index] = updated;
+        return updated;
+    }
+
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,
         string designation,
