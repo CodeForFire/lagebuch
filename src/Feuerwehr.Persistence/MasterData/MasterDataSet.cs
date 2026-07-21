@@ -21,10 +21,25 @@ public sealed record MasterDataSet(
     IReadOnlyList<string> Equipment,
     IReadOnlyList<string> Districts,
     IReadOnlyList<string> RadioCallSigns,
+    IReadOnlyList<string> Brigades,
+    // UnitStatus is the status of a single unit (Alarmiert, Auf Anfahrt, ...) and is deliberately
+    // separate from Status above, which is the incident-level vocabulary (aufgenommen, ...).
+    IReadOnlyList<string> UnitStatus,
     IReadOnlyList<Street> Streets,
     IReadOnlyList<string> ChecklistTemplate,
     IReadOnlyList<string> TruppTypes,
-    IReadOnlyList<Person> Personnel);
+    IReadOnlyList<Person> Personnel)
+{
+    /// <summary>
+    /// Every category empty. Intended for tests and for callers that need a starting point to
+    /// override with a <c>with</c> expression, so that adding a category to this positional record
+    /// does not force an edit in every construction site.
+    /// </summary>
+    public static MasterDataSet Empty { get; } = new(
+        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Street>(),
+        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Person>());
+}
 
 public static class MasterDataDefaults
 {
@@ -46,6 +61,8 @@ public static class MasterDataDefaults
             Arr(root, "equipment"),
             Arr(root, "districts"),
             Arr(root, "radioCallSigns"),
+            Arr(root, "brigades"),
+            Arr(root, "unitStatus"),
             streets,
             Arr(root, "checklistTemplate"),
             Arr(root, "truppTypes"),

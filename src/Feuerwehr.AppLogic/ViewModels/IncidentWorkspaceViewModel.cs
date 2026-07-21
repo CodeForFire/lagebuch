@@ -80,6 +80,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     private void OnChanged()
     {
+        // Every module funnels through here after mutating, so this is the one place that keeps
+        // the ETB list level with the journal regardless of which tab produced the entry.
+        Etb.Sync();
         _session.Save();
         LastSavedAt = _clock.Now;
     }
@@ -89,7 +92,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Checklist = new ChecklistViewModel(_session, OnChanged);
         Etb = new EtbViewModel(_session, _clock, OnChanged);
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
-        Forces = new ForcesViewModel(_session, _masterData, OnChanged);
+        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
 
         Scba?.Dispose();
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);

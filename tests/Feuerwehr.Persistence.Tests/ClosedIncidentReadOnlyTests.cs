@@ -41,6 +41,7 @@ public class ClosedIncidentReadOnlyTests : IDisposable
         SaveClosedIncident();
         var loaded = new IncidentRepository().Load(_path);
         Assert.Equal(IncidentState.Closed, loaded.State);
-        Assert.Throws<IncidentClosedException>(() => loaded.AddForceUnit("FFB", 1));
+        Assert.Throws<IncidentClosedException>(
+            () => loaded.AddForceUnit(new Clock(), new Domain.SessionOperator("Müller"), "FFB", 1));
     }
 }

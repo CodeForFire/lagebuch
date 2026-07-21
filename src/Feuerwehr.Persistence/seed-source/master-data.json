@@ -18,6 +18,12 @@
     "kein Eingreifen",
     "abbestellt"
   ],
+  "unitStatus": [
+    "Alarmiert",
+    "Auf Anfahrt",
+    "Bereitstellungsraum",
+    "Im Einsatz"
+  ],
   "equipment": [
     "Mobilteil 1",
     "Mobilteil 2",
@@ -38,6 +44,19 @@
     "FFB",
     "Puch"
   ],
+  "brigades": [
+    "FFB Wache 1",
+    "FFB Wache 2",
+    "Aich",
+    "Puch",
+    "Emmering",
+    "Schöngeising",
+    "Biburg",
+    "Maisach",
+    "Germering",
+    "Mammendorf",
+    "Landkreis"
+  ],
   "radioCallSigns": [
     "FFB 1/10/1",
     "FFB 1/11/1",
@@ -46,12 +65,14 @@
     "FFB 1/14/2",
     "FFB 1/23/1",
     "FFB 1/30/1",
+    "FFB 1/39/1",
     "FFB 1/40/1",
     "FFB 1/40/2",
     "FFB 1/41/1",
     "FFB 1/53/1",
     "FFB 1/56/1",
     "FFB 1/58/1",
+    "FFB 1/59/1",
     "FFB 1/61/1",
     "FFB 1/65/1",
     "FFB 1/94/1",
@@ -63,7 +84,13 @@
     "Aich 11/1",
     "Aich 42/1",
     "Puch 14/1",
-    "Puch 43/1"
+    "Puch 43/1",
+    "Kater 13/1",
+    "Land 13/1",
+    "Land 1",
+    "Land 2",
+    "Land 3",
+    "Land 4"
   ],
   "streets": [
     {

@@ -107,6 +107,6 @@ public class IncidentCloseTests
     {
         var incident = OpenIncident(out var clock, out var op);
         incident.Close(clock, op);
-        Assert.Throws<IncidentClosedException>(() => incident.AddForceUnit("FFB", 12));
+        Assert.Throws<IncidentClosedException>(() => incident.AddForceUnit(clock, op, "FFB", 12));
     }
 }

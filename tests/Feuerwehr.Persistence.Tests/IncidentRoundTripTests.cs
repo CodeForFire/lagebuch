@@ -33,7 +33,8 @@ public class IncidentRoundTripTests : IDisposable
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
         incident.AssignRole("EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
             section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
-        incident.AddForceUnit("FFB", 12, callSign: "FFB 1/40/1");
+        incident.AddForceUnit(clock, op, "FFB", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
+            notes: "über DLK angefordert", scbaCount: 6);
 
         var repo = new IncidentRepository();
         repo.Save(_path, incident);
@@ -48,9 +49,18 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("aufgenommen", loaded.Status);
         Assert.Equal(2, loaded.Checklist.Count);
         Assert.True(loaded.Checklist[0].IsDone);
-        // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the
-        // manual one follows it in chronological order.
-        Assert.Equal(new[] { "Einsatz begonnen", "Meldung" }, loaded.Journal.Select(e => e.Text));
+        // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the manual one
+        // follows it in chronological order, then the automatic entry for the recorded unit --
+        // which is also the proof that a generated entry survives the round trip.
+        Assert.Equal(
+            new[]
+            {
+                "Einsatz begonnen",
+                "Meldung",
+                "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 12, davon 6 AGT — Status: Im Einsatz",
+            },
+            loaded.Journal.Select(e => e.Text));
+        Assert.Equal("FFB 1/40/1", loaded.Journal[2].To);
         Assert.Equal(clock.Now, loaded.Journal[1].Timestamp);
         Assert.Equal("Müller (FFB 12/1)", loaded.Journal[1].EnteredBy);
         Assert.Equal("EL", loaded.Roles[0].Role);
@@ -59,7 +69,35 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(clock.Now, loaded.Roles[0].From);
         Assert.Null(loaded.Roles[0].To);
         Assert.Equal(12, loaded.TotalPersonnel);
+        Assert.Equal(6, loaded.TotalScba);
+        Assert.Equal("Im Einsatz", loaded.Forces[0].Status);
+        Assert.Equal("über DLK angefordert", loaded.Forces[0].Notes);
         Assert.Equal(incident.Audit.Count, loaded.Audit.Count);
+    }
+
+    [Fact]
+    public void An_edited_status_and_bemerkung_survive_a_round_trip()
+    {
+        // The point of making them editable is that the corrected value is what ends up in the
+        // Einsatz record -- so the edit has to reach disk, not just the in-memory unit.
+        var clock = new Clock();
+        var op = new Domain.SessionOperator("Müller", "FFB 12/1");
+        var incident = Domain.Incident.Start(clock, op, "Brand");
+        var unit = incident.AddForceUnit(clock, op, "FFB Wache 1", 9, "FFB 1/40/1", "Alarmiert", null, 4);
+
+        incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", "Innenangriff");
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+        var loaded = repo.Load(_path);
+
+        var reloaded = Assert.Single(loaded.Forces);
+        Assert.Equal("Im Einsatz", reloaded.Status);
+        Assert.Equal("Innenangriff", reloaded.Notes);
+        // Identity and the descriptive fields ride along unchanged.
+        Assert.Equal(unit.Id, reloaded.Id);
+        Assert.Equal(9, reloaded.PersonnelCount);
+        Assert.Equal(4, reloaded.ScbaCount);
     }
 
     [Fact]

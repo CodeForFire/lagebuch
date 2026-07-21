@@ -28,8 +28,25 @@ public sealed partial class EtbViewModel : ObservableObject
         _clock = clock;
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
-        Entries = new ObservableCollection<EtbEntryRow>(
-            session.Incident.Journal.Reverse().Select(ToRow));
+        Entries = new ObservableCollection<EtbEntryRow>();
+        Sync();
+    }
+
+    /// <summary>
+    /// Brings the list up to date with the journal. Entries reach the journal from every module --
+    /// Kräfte, Atemschutz, the ILS reminder -- not only from this tab, and without this they stayed
+    /// invisible until the Einsatz was closed, resumed or reopened.
+    ///
+    /// The journal is append-only, so this renders just the tail it has not rendered yet and
+    /// inserts at the top to keep the newest-first order. That leaves the existing rows untouched,
+    /// which matters because rebuilding the collection resets the grid's scroll and selection --
+    /// and it makes the method idempotent, so calling it on every save is free.
+    /// </summary>
+    public void Sync()
+    {
+        var journal = _session.Incident.Journal;
+        for (var i = Entries.Count; i < journal.Count; i++)
+            Entries.Insert(0, ToRow(journal[i]));
     }
 
     public bool IsReadOnly { get; }
@@ -57,8 +74,8 @@ public sealed partial class EtbViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntry()
     {
-        var entry = _session.Incident.AddJournalEntry(_clock, _session.Operator!, NewDirection, NewText, NewFrom, NewTo);
-        Entries.Insert(0, ToRow(entry));
+        _session.Incident.AddJournalEntry(_clock, _session.Operator!, NewDirection, NewText, NewFrom, NewTo);
+        Sync();
         NewText = string.Empty;
         NewFrom = null;
         NewTo = null;
