@@ -25,6 +25,21 @@
                      Text="Dokumentation für den Einsatz. Lege einen neuen Einsatz an oder öffne ein bestehendes Lagebuch." />
         </StackPanel>
 
+        <!-- Open-failure banner: matches the read-only banner in the workspace -->
+        <Border x:Name="OpenErrorBanner" Background="#241608"
+                BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+                IsVisible="{Binding OpenError, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <!-- Grid, not a horizontal StackPanel: the latter measures children at infinite width,
+               so the message would never wrap and the banner would outgrow the column. -->
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Top" Margin="0,0,12,0" />
+            <TextBlock Grid.Column="1" x:Name="OpenErrorMessage" Text="{Binding OpenError}"
+                       FontWeight="SemiBold" TextWrapping="Wrap"
+                       Foreground="{StaticResource AmberBrush}" />
+          </Grid>
+        </Border>
+
         <!-- Recent incidents panel -->
         <Border Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
