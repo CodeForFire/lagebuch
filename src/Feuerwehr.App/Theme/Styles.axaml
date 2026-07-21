@@ -186,8 +186,18 @@
     <Setter Property="Padding" Value="11,8" />
   </Style>
 
-  <!-- NumericUpDown -->
+  <!-- NumericUpDown
+
+       Integer by default. Every numeric input in this app is a count — Personen, AGT, Minuten,
+       bar — and none has a fractional meaning. Left at the control's defaults (ParsingNumberStyle
+       Any, no FormatString) a typed "3.5" is kept as 3.5 by the control and displayed as such,
+       while the int-typed view-model property rounds it to 4: the number on screen is not the
+       number written into the Einsatz record. Integer parsing refuses the fraction outright, and
+       FormatString pins the display to whole numbers. A future input that genuinely needs decimals
+       can override both locally. -->
   <Style Selector="NumericUpDown">
+    <Setter Property="ParsingNumberStyle" Value="Integer" />
+    <Setter Property="FormatString" Value="0" />
     <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
     <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
     <Setter Property="Background" Value="#0C1119" />
