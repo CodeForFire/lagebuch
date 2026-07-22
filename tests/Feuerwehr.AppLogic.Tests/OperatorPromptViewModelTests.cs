@@ -41,6 +41,34 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
+    public void CallSignOptions_default_to_empty()
+    {
+        var vm = new OperatorPromptViewModel();
+        Assert.Empty(vm.CallSignOptions);
+    }
+
+    [Fact]
+    public void CallSignOptions_expose_the_supplied_list()
+    {
+        var options = new[] { "FFB 1/40/1", "Aich 42/1" };
+        var vm = new OperatorPromptViewModel(callSignOptions: options);
+        Assert.Equal(options, vm.CallSignOptions);
+    }
+
+    [Fact]
+    public void Call_sign_stays_free_text_even_when_not_in_the_options()
+    {
+        // The dropdown is a hint, not a closed set: an off-list Funkrufname must still confirm.
+        var vm = new OperatorPromptViewModel(callSignOptions: new[] { "FFB 1/40/1" })
+        {
+            OperatorName = "Müller",
+            OperatorCallSign = "Land 9",
+        };
+        vm.ConfirmCommand.Execute(null);
+        Assert.Equal("Müller (Land 9)", vm.Result!.Display);
+    }
+
+    [Fact]
     public void Valid_four_digit_ils_parses()
     {
         var vm = new OperatorPromptViewModel(collectIlsNumber: true)

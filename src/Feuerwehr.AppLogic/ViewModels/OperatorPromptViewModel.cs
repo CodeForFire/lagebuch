@@ -7,13 +7,20 @@ namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed partial class OperatorPromptViewModel : ObservableObject
 {
-    public OperatorPromptViewModel(bool collectIlsNumber = false)
+    public OperatorPromptViewModel(
+        bool collectIlsNumber = false, IReadOnlyList<string>? callSignOptions = null)
     {
         CollectsIlsNumber = collectIlsNumber;
+        CallSignOptions = callSignOptions ?? Array.Empty<string>();
     }
 
     // True only for the new-incident flow; the continue-editing flow leaves it false.
     public bool CollectsIlsNumber { get; }
+
+    // Radio call signs offered as dropdown suggestions for the Funkrufname field. The field stays
+    // free-text (an operator's call sign need not be in the master list), so this is only a hint;
+    // empty when a caller supplies none, in which case the control is a plain text box.
+    public IReadOnlyList<string> CallSignOptions { get; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]

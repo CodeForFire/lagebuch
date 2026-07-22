@@ -141,7 +141,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public bool CanContinueEditing => IsReadOnly && _session.Incident.State == IncidentState.Open;
 
     [RelayCommand(CanExecute = nameof(CanContinueEditing))]
-    private void ContinueEditing() => PendingPrompt = new OperatorPromptViewModel();
+    private void ContinueEditing() =>
+        PendingPrompt = new OperatorPromptViewModel(callSignOptions: _masterData.RadioCallSigns);
 
     // Called by the view when the prompt confirms (Result set).
     public void ConfirmContinueEditing()

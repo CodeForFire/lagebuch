@@ -22,6 +22,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
         Roles = new[] { "EL" },
         ChecklistTemplate = new[] { "A?" },
         TruppTypes = new[] { "Angriffstrupp" },
+        RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
     };
 }
 internal sealed class FakeRecent : IRecentFilesStore
@@ -74,6 +75,14 @@ public class MainWindowViewModelTests
         vm.RequestNewIncidentCommand.Execute(null);
         Assert.NotNull(vm.PendingPrompt);
         Assert.True(vm.PendingPrompt!.CollectsIlsNumber);
+    }
+
+    [Fact]
+    public void RequestNewIncident_prompt_offers_the_master_data_call_signs()
+    {
+        var vm = New();
+        vm.RequestNewIncidentCommand.Execute(null);
+        Assert.Equal(new[] { "FFB 1/40/1", "Aich 42/1" }, vm.PendingPrompt!.CallSignOptions);
     }
 
     [Fact]
