@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:b="clr-namespace:Feuerwehr.App.Behaviors"
              x:Class="Feuerwehr.App.Views.RolesView"
              x:DataType="vm:RolesViewModel">
   <DockPanel>
@@ -19,11 +20,8 @@
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal"
                          MinimumPrefixLength="0"
-                         Text="{Binding NewPersonName}">
-          <AutoCompleteBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AddRoleCommand}" />
-          </AutoCompleteBox.KeyBindings>
-        </AutoCompleteBox>
+                         Text="{Binding NewPersonName}"
+                         b:EnterSubmit.Command="{Binding AddRoleCommand}" />
         <TextBox x:Name="SectionBox" Width="130" Watermark="Abschnitt" Text="{Binding NewSection}" />
         <ComboBox Width="150" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
         <TextBox x:Name="PhoneBox" Width="150" Watermark="Handynummer" Text="{Binding NewPhone}" />
