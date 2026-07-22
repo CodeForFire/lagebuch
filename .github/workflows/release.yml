@@ -1,11 +1,18 @@
 name: Release
 
-# Every merge to main publishes a prerelease with installers for all three platforms.
-# workflow_dispatch runs the same build for testing but creates no release (see the release job's if:).
+# Pushing a version tag (v0.2.0) builds and publishes the Windows + Linux installers. Building on a
+# private repo bills Actions minutes with steep multipliers (macOS 10x, Windows 2x), so releases are
+# deliberate — tag when you mean it — rather than one per merge. macOS carries the 10x multiplier and
+# is built only on demand via workflow_dispatch, which attaches the .dmg to the release for that
+# version.
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build the macOS .dmg for (e.g. 0.2.0), matching an existing v-tag release.
+        required: true
 
 permissions:
   contents: write
@@ -22,11 +29,21 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
+      # tag push -> strip the leading 'v' from the tag; dispatch -> the supplied input.
       - id: v
-        run: echo "version=0.1.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${INPUT_VERSION}" >> "$GITHUB_OUTPUT"
+          fi
 
   windows:
     needs: version
+    if: github.event_name == 'push'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,6 +75,7 @@ jobs:
 
   linux:
     needs: version
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,8 +100,43 @@ jobs:
           path: dist/*.deb
           if-no-files-found: error
 
+  release:
+    needs: [version, windows, linux]
+    runs-on: ubuntu-latest
+    # Publish the Windows + Linux installers to the release for the pushed tag.
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: Lagebuch v${{ needs.version.outputs.version }}
+          prerelease: true
+          files: dist/**/*
+          body: |
+            Getaggter Release-Build.
+
+            | Plattform | Datei |
+            |-----------|-------|
+            | Windows   | `lagebuch-${{ needs.version.outputs.version }}-x64.msi` |
+            | Linux     | `lagebuch_${{ needs.version.outputs.version }}_amd64.deb` |
+
+            Ein macOS-Build (Apple Silicon, `.dmg`) wird auf Anfrage bereitgestellt und dann hier
+            angehängt.
+
+            **Die Pakete sind nicht signiert.** Beim ersten Start:
+            - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
+            - **Linux**: `sudo dpkg -i lagebuch_*.deb` (oder `sudo apt install ./lagebuch_*.deb`).
+            - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
+              oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`.
+
+  # macOS carries the 10x minute multiplier, so it is not built on every tag. Run this workflow
+  # manually (workflow_dispatch) with the version of an existing release to add the .dmg to it.
   macos:
     needs: version
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -102,39 +155,19 @@ jobs:
             publish \
             src/Feuerwehr.App/Assets/icon-1024.png \
             dist
+      # Always downloadable from the run; also attach to the matching release if one exists.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dmg
           path: dist/*.dmg
           if-no-files-found: error
-
-  release:
-    needs: [version, windows, linux, macos]
-    runs-on: ubuntu-latest
-    # Only publish a real release on a merge to main. A manual dispatch still builds all three
-    # installers (downloadable from the run's artifacts) but creates no release or tag.
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: dist
-      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
-        with:
-          tag_name: v${{ needs.version.outputs.version }}
-          name: Lagebuch v${{ needs.version.outputs.version }}
-          prerelease: true
-          files: dist/**/*
-          body: |
-            Automatischer Build von `main`.
-
-            | Plattform | Datei |
-            |-----------|-------|
-            | Windows   | `lagebuch-${{ needs.version.outputs.version }}-x64.msi` |
-            | Linux     | `lagebuch_${{ needs.version.outputs.version }}_amd64.deb` |
-            | macOS (Apple Silicon) | `lagebuch-${{ needs.version.outputs.version }}-macos-arm64.dmg` |
-
-            **Die Pakete sind nicht signiert.** Beim ersten Start:
-            - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
-              oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`.
-            - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
-            - **Linux**: `sudo dpkg -i lagebuch_*.deb` (oder `sudo apt install ./lagebuch_*.deb`).
+      - name: Attach .dmg to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release upload "v${VERSION}" dist/*.dmg --clobber
+          else
+            echo "No release v${VERSION} yet — .dmg is available as a workflow artifact only."
+          fi

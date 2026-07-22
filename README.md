@@ -10,14 +10,22 @@ Under construction. See plans under `docs/` (note: design/plan artifacts are not
 
 ## Install
 
-Every merge to `main` publishes a prerelease under
-[Releases](../../releases) with an installer per platform:
+Pushing a version tag publishes a release under [Releases](../../releases) with an installer per
+platform:
 
-| Platform | File |
-|----------|------|
-| Windows | `lagebuch-<version>-x64.msi` |
-| Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` |
-| macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+| Platform | File | Built |
+|----------|------|-------|
+| Windows | `lagebuch-<version>-x64.msi` | on every tag |
+| Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` | on every tag |
+| macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` | on request |
+
+macOS runners bill Actions minutes at 10× on a private repo, so the `.dmg` is built on demand rather
+than on every tag: run the **Release** workflow manually (Actions → Release → *Run workflow*) with
+the release version, and the `.dmg` is attached to that release.
 
 The packages are **not code-signed**, so the OS warns on first launch:
 
