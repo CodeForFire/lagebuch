@@ -57,7 +57,7 @@ public sealed class Incident
             IlsNumber = ilsNumber
         };
         incident._audit.Add(new AuditEvent(clock.Now, "opened", openedBy.Display));
-        incident.AppendInternalEntry(clock, openedBy, ilsNumber is null
+        incident.AppendSystemEntry(clock, openedBy, ilsNumber is null
             ? "Einsatz begonnen"
             : $"Einsatz begonnen (ILS {ilsNumber.Value})");
         return incident;
@@ -111,12 +111,14 @@ public sealed class Incident
             throw new IncidentClosedException();
     }
 
-    // Appends an automatic entry straight to the journal, deliberately bypassing
-    // AddJournalEntry's EnsureOpen guard: Close has to log its own entry, and this is only
-    // ever called from methods that guard themselves.
-    private void AppendInternalEntry(
+    // Appends an automatic (system-generated) entry straight to the journal, deliberately
+    // bypassing AddJournalEntry's EnsureOpen guard: Close has to log its own entry, and this is
+    // only ever called from methods that guard themselves. Uses EtbDirection.System so these
+    // machine-written lines are distinguishable from -- and filterable apart from -- human
+    // "Intern" notes.
+    private void AppendSystemEntry(
         IClock clock, SessionOperator op, string text, string? from = null, string? to = null) =>
-        _journal.Add(EtbEntry.Create(clock.Now, EtbDirection.Internal, text, op, from, to));
+        _journal.Add(EtbEntry.Create(clock.Now, EtbDirection.System, text, op, from, to));
 
     public void ResumeEditing(IClock clock, SessionOperator resumedBy)
     {
@@ -124,7 +126,7 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(resumedBy);
         EnsureOpen();
         _audit.Add(new AuditEvent(clock.Now, "resumed", resumedBy.Display));
-        AppendInternalEntry(clock, resumedBy, "Bearbeitung fortgesetzt");
+        AppendSystemEntry(clock, resumedBy, "Bearbeitung fortgesetzt");
     }
 
     public void Close(IClock clock, SessionOperator closedBy)
@@ -133,7 +135,7 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(closedBy);
         EnsureOpen();
         // Must precede the state flip — a closed incident rejects journal writes.
-        AppendInternalEntry(clock, closedBy, "Einsatz abgeschlossen");
+        AppendSystemEntry(clock, closedBy, "Einsatz abgeschlossen");
         State = IncidentState.Closed;
         ClosedAt = clock.Now;
         ClosedBy = closedBy.Display;
@@ -273,7 +275,7 @@ public sealed class Incident
         if (unit.Status is not null)
             text += $" — Status: {unit.Status}";
 
-        AppendInternalEntry(clock, op, text, to: unit.CallSign);
+        AppendSystemEntry(clock, op, text, to: unit.CallSign);
         return unit;
     }
 
@@ -304,7 +306,7 @@ public sealed class Incident
         // Compare the normalised values, so re-selecting the same status -- or the same status
         // with stray whitespace -- is not a transition.
         if (!string.Equals(previous.Status, updated.Status, StringComparison.Ordinal))
-            AppendInternalEntry(clock, op, StatusChangeText(previous, updated), from: updated.CallSign);
+            AppendSystemEntry(clock, op, StatusChangeText(previous, updated), from: updated.CallSign);
 
         return updated;
     }

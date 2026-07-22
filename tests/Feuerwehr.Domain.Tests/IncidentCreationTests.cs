@@ -40,7 +40,7 @@ public class IncidentCreationTests
 
         var entry = Assert.Single(incident.Journal);
         Assert.Equal("Einsatz begonnen", entry.Text);
-        Assert.Equal(EtbDirection.Internal, entry.Direction);
+        Assert.Equal(EtbDirection.System, entry.Direction);
         Assert.Equal(T0, entry.Timestamp);
         Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
         Assert.Null(entry.From);

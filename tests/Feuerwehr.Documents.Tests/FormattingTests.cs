@@ -16,6 +16,7 @@ public class FormattingTests
     [InlineData(EtbDirection.Incoming, "Eingang")]
     [InlineData(EtbDirection.Outgoing, "Ausgang")]
     [InlineData(EtbDirection.Internal, "Intern")]
+    [InlineData(EtbDirection.System, "System")]
     public void Direction_is_german(EtbDirection direction, string expected)
     {
         Assert.Equal(expected, Formatting.Direction(direction));

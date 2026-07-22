@@ -59,12 +59,59 @@ public class EtbViewModelTests
     }
 
     [Fact]
-    public void DirectionOptions_contains_all_directions()
+    public void DirectionOptions_offers_the_human_directions_only()
     {
         var vm = NewVm();
         Assert.Contains(EtbDirection.Incoming, vm.DirectionOptions.Select(o => o.Value));
         Assert.Contains(EtbDirection.Outgoing, vm.DirectionOptions.Select(o => o.Value));
         Assert.Contains(EtbDirection.Internal, vm.DirectionOptions.Select(o => o.Value));
+        // System is written only by the app, never picked by a human.
+        Assert.DoesNotContain(EtbDirection.System, vm.DirectionOptions.Select(o => o.Value));
+    }
+
+    [Fact]
+    public void HideSystemEntries_hides_system_rows_and_keeps_human_rows()
+    {
+        var clock = new FixedClock(T0);
+        var session = IncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+        // StartNew logs "Einsatz begonnen" (System); add one human entry.
+        var vm = new EtbViewModel(session, clock, () => { }) { NewText = "Lagemeldung" };
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.Equal(2, vm.Entries.Count);
+
+        vm.HideSystemEntries = true;
+
+        var only = Assert.Single(vm.Entries);
+        Assert.Equal("Lagemeldung", only.Text);
+        Assert.Equal(EtbDirection.Incoming, only.DirectionValue);
+
+        // Toggling back restores the hidden System row.
+        vm.HideSystemEntries = false;
+        Assert.Equal(2, vm.Entries.Count);
+    }
+
+    [Fact]
+    public void System_entry_added_while_filtering_stays_hidden_but_human_entry_appears()
+    {
+        var clock = new FixedClock(T0);
+        var session = IncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+        var vm = new EtbViewModel(session, clock, () => { });
+        vm.HideSystemEntries = true;
+        Assert.Empty(vm.Entries); // the "Einsatz begonnen" System row is hidden
+
+        // A unit is added elsewhere -> a System entry reaches the journal.
+        session.Incident.AddForceUnit(clock, session.Operator!, "FFB", 6);
+        vm.Sync();
+        Assert.Empty(vm.Entries); // still hidden
+
+        // A human entry, by contrast, shows immediately.
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var only = Assert.Single(vm.Entries);
+        Assert.Equal("Lagemeldung", only.Text);
     }
 
     // The picker used to bind the bare enum, so Avalonia rendered "Incoming"/"Outgoing"/

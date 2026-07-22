@@ -49,7 +49,7 @@ public class IncidentCloseTests
 
         Assert.Equal(IncidentState.Closed, incident.State);
         var entry = Assert.Single(incident.Journal, e => e.Text == "Einsatz abgeschlossen");
-        Assert.Equal(EtbDirection.Internal, entry.Direction);
+        Assert.Equal(EtbDirection.System, entry.Direction);
         Assert.Equal(T0.AddHours(2), entry.Timestamp);
         Assert.Equal("Müller", entry.EnteredBy);
         Assert.Equal(incident.Journal[^1], entry);

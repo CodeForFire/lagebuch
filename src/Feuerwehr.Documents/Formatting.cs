@@ -15,6 +15,7 @@ public static class Formatting
         EtbDirection.Incoming => "Eingang",
         EtbDirection.Outgoing => "Ausgang",
         EtbDirection.Internal => "Intern",
+        EtbDirection.System => "System",
         _ => direction.ToString()
     };
 

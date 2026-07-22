@@ -5,7 +5,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -55,6 +55,10 @@ public static class Migrations
         if (version < 6)
         {
             ApplyV6(cn, tx);
+        }
+        if (version < 7)
+        {
+            ApplyV7(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -294,6 +298,14 @@ public static class Migrations
             """);
         Exec(cn, tx, "DROP TABLE scba_trupps;");
         Exec(cn, tx, "ALTER TABLE scba_trupps_v6 RENAME TO scba_trupps;");
+    }
+
+    // Deliberately a no-op: no table changed shape. The bump to 7 exists solely so that a file
+    // written by this build -- which may store the new EtbDirection.System (ordinal 3) in
+    // etb_entries.direction -- is refused by an older build via the version > CurrentVersion guard
+    // in Migrate, instead of silently mis-rendering the unknown ordinal as "3".
+    private static void ApplyV7(SqliteConnection cn, SqliteTransaction tx)
+    {
     }
 
     /// <summary>

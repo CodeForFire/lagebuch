@@ -61,6 +61,10 @@ public class IncidentRoundTripTests : IDisposable
                 "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 12, davon 6 AGT — Status: Im Einsatz",
             },
             loaded.Journal.Select(e => e.Text));
+        // The direction rides along too: generated lines are System, the manual one keeps Incoming.
+        Assert.Equal(
+            new[] { EtbDirection.System, EtbDirection.Incoming, EtbDirection.System },
+            loaded.Journal.Select(e => e.Direction));
         Assert.Equal("FFB 1/40/1", loaded.Journal[2].To);
         Assert.Equal(clock.Now, loaded.Journal[1].Timestamp);
         Assert.Equal("Müller (FFB 12/1)", loaded.Journal[1].EnteredBy);
