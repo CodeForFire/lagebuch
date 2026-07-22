@@ -1,26 +1,36 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- Placeholder app icon for Lagebuch. Signal-red Feuerwehr cross on the app's dark tile,
-       matching the UI theme (AppBgColor #0B0E13, SignalColor #FF3D2E). Swap for a real mark later. -->
+  <!-- App icon for Lagebuch: a flame in the app's signal-red/amber on its dark tile
+       (AppBgColor #0B0E13, SurfaceColor #141A24, SignalColor #FF3D2E, AmberColor #FFB23E). -->
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#141A24"/>
       <stop offset="1" stop-color="#0B0E13"/>
     </linearGradient>
-    <linearGradient id="cross" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FF5A47"/>
-      <stop offset="1" stop-color="#FF3D2E"/>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#FF3D2E"/>
+      <stop offset="0.6" stop-color="#FF5A3C"/>
+      <stop offset="1" stop-color="#FFB23E"/>
     </linearGradient>
   </defs>
 
   <rect x="32" y="32" width="960" height="960" rx="200" fill="url(#tile)"/>
-  <rect x="32" y="32" width="960" height="960" rx="200" fill="none" stroke="#FF3D2E" stroke-opacity="0.20" stroke-width="8"/>
+  <rect x="32" y="32" width="960" height="960" rx="200" fill="none" stroke="#FF3D2E" stroke-opacity="0.18" stroke-width="8"/>
 
-  <!-- Feuerwehr cross pattée: four flaring arms meeting over a solid centre -->
-  <g fill="url(#cross)" transform="translate(512 512)">
-    <rect x="-72" y="-72" width="144" height="144"/>
-    <path d="M -70 -70 L -320 -150 L -320 150 L -70 70 Z"/>
-    <path d="M 70 -70 L 320 -150 L 320 150 L 70 70 Z"/>
-    <path d="M -70 -70 L -150 -320 L 150 -320 L 70 -70 Z"/>
-    <path d="M -70 70 L -150 320 L 150 320 L 70 70 Z"/>
-  </g>
+  <!-- outer flame -->
+  <path fill="url(#flame)" d="M540 175
+    C 545 330 660 400 682 520
+    C 720 720 590 838 512 838
+    C 414 838 320 742 320 604
+    C 320 512 372 468 420 430
+    C 452 512 442 556 492 578
+    C 548 548 512 372 540 175 Z"/>
+
+  <!-- inner flame -->
+  <path fill="#FFD27A" fill-opacity="0.92" d="M512 470
+    C 520 548 566 566 578 620
+    C 600 712 546 760 500 760
+    C 452 760 420 716 420 660
+    C 420 616 452 596 476 578
+    C 486 618 486 636 508 648
+    C 528 632 506 540 512 470 Z"/>
 </svg>
