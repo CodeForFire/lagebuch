@@ -1,42 +1,140 @@
 name: Release
 
+# Every merge to main publishes a prerelease with installers for all three platforms.
+# workflow_dispatch runs the same build for testing but creates no release (see the release job's if:).
 on:
   push:
-    tags: [ 'v*' ]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+env:
+  PUBLISH_FLAGS: >-
+    -c Release --self-contained true
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+    -p:DebugType=none -p:DebugSymbols=false
+
 jobs:
-  publish:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            rid: win-x64
-            asset: lagebuch-win-x64.exe
-            artifact: Feuerwehr.App.exe
-          - os: ubuntu-latest
-            rid: linux-x64
-            asset: lagebuch-linux-x64
-            artifact: Feuerwehr.App
-    runs-on: ${{ matrix.os }}
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - id: v
+        run: echo "version=0.1.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '8.0.x'
       - name: Publish
         run: >
-          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj
-          -c Release -r ${{ matrix.rid }} --self-contained true
-          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-          -o publish
-      - name: Rename artifact
-        shell: bash
-        run: cp "publish/${{ matrix.artifact }}" "${{ matrix.asset }}"
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
+          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r win-x64 ${{ env.PUBLISH_FLAGS }}
+          -p:Version=${{ needs.version.outputs.version }} -o publish
+      - name: Install WiX
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+      - name: Build MSI
+        # Absolute paths: WiX resolves <Files Include> relative to the .wxs file's own directory,
+        # not the working directory, so a bare "publish" would look under packaging/windows.
+        run: >
+          wix build packaging/windows/Lagebuch.wxs
+          -d Version=${{ needs.version.outputs.version }}
+          -d "PublishDir=${{ github.workspace }}\publish"
+          -d "IconFile=${{ github.workspace }}\src\Feuerwehr.App\Assets\icon.ico"
+          -o "lagebuch-${{ needs.version.outputs.version }}-x64.msi"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          files: ${{ matrix.asset }}
+          name: msi
+          path: '*.msi'
+          if-no-files-found: error
+
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish
+        run: >
+          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
+          -p:Version=${{ needs.version.outputs.version }} -o publish
+      - name: Build .deb
+        run: |
+          chmod +x packaging/linux/build-deb.sh
+          packaging/linux/build-deb.sh \
+            "${{ needs.version.outputs.version }}" \
+            publish \
+            src/Feuerwehr.App/Assets/icon-1024.png \
+            dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish
+        run: >
+          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r osx-arm64 ${{ env.PUBLISH_FLAGS }}
+          -p:Version=${{ needs.version.outputs.version }} -o publish
+      - name: Build .dmg
+        run: |
+          chmod +x packaging/macos/build-dmg.sh
+          packaging/macos/build-dmg.sh \
+            "${{ needs.version.outputs.version }}" \
+            publish \
+            src/Feuerwehr.App/Assets/icon-1024.png \
+            dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    needs: [version, windows, linux, macos]
+    runs-on: ubuntu-latest
+    # Only publish a real release on a merge to main. A manual dispatch still builds all three
+    # installers (downloadable from the run's artifacts) but creates no release or tag.
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: Lagebuch v${{ needs.version.outputs.version }}
+          prerelease: true
+          files: dist/**/*
+          body: |
+            Automatischer Build von `main`.
+
+            | Plattform | Datei |
+            |-----------|-------|
+            | Windows   | `lagebuch-${{ needs.version.outputs.version }}-x64.msi` |
+            | Linux     | `lagebuch_${{ needs.version.outputs.version }}_amd64.deb` |
+            | macOS (Apple Silicon) | `lagebuch-${{ needs.version.outputs.version }}-macos-arm64.dmg` |
+
+            **Die Pakete sind nicht signiert.** Beim ersten Start:
+            - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
+              oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`.
+            - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
+            - **Linux**: `sudo dpkg -i lagebuch_*.deb` (oder `sudo apt install ./lagebuch_*.deb`).

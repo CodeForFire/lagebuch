@@ -8,6 +8,26 @@ Replaces a legacy macro-enabled Excel template with a robust, offline, cross-pla
 
 Under construction. See plans under `docs/` (note: design/plan artifacts are not committed).
 
+## Install
+
+Every merge to `main` publishes a prerelease under
+[Releases](../../releases) with an installer per platform:
+
+| Platform | File |
+|----------|------|
+| Windows | `lagebuch-<version>-x64.msi` |
+| Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` |
+| macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
+
+The packages are **not code-signed**, so the OS warns on first launch:
+
+- **Windows** — run the `.msi`; if SmartScreen appears, *More info → Run anyway*.
+- **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click the app → Open**
+  once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
+- **Linux** — `sudo dpkg -i lagebuch_*.deb` (or `sudo apt install ./lagebuch_*.deb`).
+
+All builds are self-contained; no .NET runtime needs to be installed separately.
+
 ## Build & Test
 
 ```bash

@@ -1,0 +1,26 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Placeholder app icon for Lagebuch. Signal-red Feuerwehr cross on the app's dark tile,
+       matching the UI theme (AppBgColor #0B0E13, SignalColor #FF3D2E). Swap for a real mark later. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#141A24"/>
+      <stop offset="1" stop-color="#0B0E13"/>
+    </linearGradient>
+    <linearGradient id="cross" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF5A47"/>
+      <stop offset="1" stop-color="#FF3D2E"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="32" y="32" width="960" height="960" rx="200" fill="url(#tile)"/>
+  <rect x="32" y="32" width="960" height="960" rx="200" fill="none" stroke="#FF3D2E" stroke-opacity="0.20" stroke-width="8"/>
+
+  <!-- Feuerwehr cross pattée: four flaring arms meeting over a solid centre -->
+  <g fill="url(#cross)" transform="translate(512 512)">
+    <rect x="-72" y="-72" width="144" height="144"/>
+    <path d="M -70 -70 L -320 -150 L -320 150 L -70 70 Z"/>
+    <path d="M 70 -70 L 320 -150 L 320 150 L 70 70 Z"/>
+    <path d="M -70 -70 L -150 -320 L 150 -320 L 70 -70 Z"/>
+    <path d="M -70 70 L -150 320 L 150 320 L 70 70 Z"/>
+  </g>
+</svg>
