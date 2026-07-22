@@ -186,6 +186,26 @@
     <Setter Property="Padding" Value="11,8" />
   </Style>
 
+  <!-- AutoCompleteBox — an editable text field backed by a suggestion list (call-sign, personnel
+       names). Fluent's template hosts an inner TextBox and pushes the AutoCompleteBox's OWN
+       Background/Foreground/BorderBrush/BorderThickness/CornerRadius/Padding down onto it via
+       {TemplateBinding}. Those bindings apply at Template priority, which outranks the global
+       "TextBox" style (Style priority) — so without this style the field ignores the app tokens and
+       falls back to Fluent's pale default border (#99FFFFFF) and fill. Set them here to match the
+       TextBox theme; the hover/focus edge is already handled, because the inner TextBox is a real
+       TextBox and picks up the TextBox:pointerover / :focus template-child styles above. -->
+  <Style Selector="AutoCompleteBox">
+    <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
+    <Setter Property="Padding" Value="11,7" />
+    <Setter Property="Background" Value="#0C1119" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+  </Style>
+
   <!-- NumericUpDown
 
        Integer by default. Every numeric input in this app is a count — Personen, AGT, Minuten,
