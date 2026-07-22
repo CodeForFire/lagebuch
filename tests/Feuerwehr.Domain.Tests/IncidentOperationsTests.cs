@@ -101,7 +101,7 @@ public class IncidentOperationsTests
 
         Assert.Equal(before + 1, incident.Journal.Count);
         var entry = LastEntry(incident);
-        Assert.Equal(Etb.EtbDirection.Internal, entry.Direction);
+        Assert.Equal(Etb.EtbDirection.System, entry.Direction);
         Assert.Equal(
             "Einheit aufgenommen: FFB Wache 1 (FFB 1/40/1), Stärke 9, davon 4 AGT — Status: Alarmiert",
             entry.Text);
@@ -228,7 +228,7 @@ public class IncidentOperationsTests
         incident.ResumeEditing(clock, op);
 
         var entry = Assert.Single(incident.Journal, e => e.Text == "Bearbeitung fortgesetzt");
-        Assert.Equal(EtbDirection.Internal, entry.Direction);
+        Assert.Equal(EtbDirection.System, entry.Direction);
         Assert.Equal(T0.AddHours(1), entry.Timestamp);
         Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
     }

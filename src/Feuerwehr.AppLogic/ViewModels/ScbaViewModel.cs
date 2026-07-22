@@ -316,7 +316,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             pressureControlIntervalMinutes: NewControlIntervalMinutes);
         Trupps.Add(CreateRow(trupp));
         _session.Incident.AddJournalEntry(
-            _clock, _session.Operator!, EtbDirection.Internal,
+            _clock, _session.Operator!, EtbDirection.System,
             $"Atemschutztrupp {trupp.Designation} bereitgestellt: {trupp.MembersDisplay}",
             from: null, to: trupp.CallSign);
 
@@ -342,7 +342,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     {
         var trupp = _session.Incident.StartScbaTrupp(_clock, truppId, startPressure);
         _session.Incident.AddJournalEntry(
-            _clock, _session.Operator!, EtbDirection.Internal,
+            _clock, _session.Operator!, EtbDirection.System,
             $"Atemschutztrupp {trupp.Designation} unter PA: Einstiegsdruck {startPressure} bar",
             from: null, to: trupp.CallSign);
         RefreshRow(truppId);
@@ -354,7 +354,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     {
         var trupp = _session.Incident.RecordScbaPressure(_clock, truppId, bar);
         _session.Incident.AddJournalEntry(
-            _clock, _session.Operator!, EtbDirection.Internal,
+            _clock, _session.Operator!, EtbDirection.System,
             $"Druckkontrolle Atemschutz {trupp.Designation}: {bar} bar", from: trupp.CallSign, to: null);
         RefreshRow(truppId);
         var tripped = LogNewAlarms(); // a low reading may immediately trip the Rückzugsdruck alarm
@@ -367,7 +367,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     {
         var trupp = _session.Incident.MarkScbaReturned(_clock, truppId);
         _session.Incident.AddJournalEntry(
-            _clock, _session.Operator!, EtbDirection.Internal,
+            _clock, _session.Operator!, EtbDirection.System,
             $"Atemschutztrupp {trupp.Designation} zurück", from: trupp.CallSign, to: null);
         RefreshRow(truppId);
         UpdateAlarm(newAlarmTripped: false); // a returned trupp may clear the last alarm
@@ -409,7 +409,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
                 continue;
             var reason = AlarmReason(trupp);
             _session.Incident.AddJournalEntry(
-                _clock, _session.Operator!, EtbDirection.Internal,
+                _clock, _session.Operator!, EtbDirection.System,
                 $"Rückzugsalarm Atemschutz {trupp.Designation}: {reason}", from: null, to: trupp.CallSign);
             logged = true;
         }

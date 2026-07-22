@@ -221,6 +221,45 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void V6_etb_entries_survive_the_v7_bump()
+    {
+        // V7 changes no table shape -- it exists only to trip the "refuse a newer file" guard for
+        // files that may carry the new EtbDirection.System (ordinal 3). A v6 file must still upgrade
+        // cleanly and keep its existing ETB rows readable.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (6);
+                CREATE TABLE etb_entries (
+                    id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, timestamp TEXT NOT NULL,
+                    direction INTEGER NOT NULL, from_party TEXT, to_party TEXT, text TEXT NOT NULL,
+                    entered_by TEXT NOT NULL);
+                INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by)
+                VALUES ('55555555-5555-5555-5555-555555555555', 0, '2026-06-22T09:00:00.0000000+02:00',
+                        2, NULL, NULL, 'Einsatz begonnen', 'Müller (FFB 12/1)');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Assert.Equal(6, Migrations.GetVersion(cn));
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var read = cn.CreateCommand();
+            read.CommandText = "SELECT direction, text FROM etb_entries;";
+            using var r = read.ExecuteReader();
+            Assert.True(r.Read());
+            Assert.Equal(2, r.GetInt32(0));
+            Assert.Equal("Einsatz begonnen", r.GetString(1));
+        }
+    }
+
+    [Fact]
     public void A_file_from_a_newer_version_is_refused_and_its_marker_left_alone()
     {
         // A file written by a build that is ahead of this one. Migrate has no migration to run --

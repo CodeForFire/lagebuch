@@ -7,7 +7,9 @@ using Feuerwehr.Domain.Time;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
-public sealed record EtbEntryRow(string Time, string Direction, string? From, string? To, string Text, string EnteredBy);
+public sealed record EtbEntryRow(
+    string Time, string Direction, string? From, string? To, string Text, string EnteredBy,
+    EtbDirection DirectionValue);
 
 /// <summary>
 /// An <see cref="EtbDirection"/> paired with its German label, so the picker shows the same
@@ -21,6 +23,10 @@ public sealed partial class EtbViewModel : ObservableObject
     private readonly IncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
+
+    // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
+    // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
+    private readonly List<EtbEntryRow> _all = new();
 
     public EtbViewModel(IncidentSession session, IClock clock, Action onChanged)
     {
@@ -45,14 +51,38 @@ public sealed partial class EtbViewModel : ObservableObject
     public void Sync()
     {
         var journal = _session.Incident.Journal;
-        for (var i = Entries.Count; i < journal.Count; i++)
-            Entries.Insert(0, ToRow(journal[i]));
+        for (var i = _all.Count; i < journal.Count; i++)
+        {
+            var row = ToRow(journal[i]);
+            _all.Insert(0, row);
+            if (IsVisible(row))
+                Entries.Insert(0, row);
+        }
     }
 
     public bool IsReadOnly { get; }
     public ObservableCollection<EtbEntryRow> Entries { get; }
+
+    // System-generated lines (Kräfte, Atemschutz, Einsatz-Lebenszyklus) are usually less important
+    // than human entries, so the operator can hide them. Off by default -- the journal shows all.
+    [ObservableProperty]
+    private bool _hideSystemEntries;
+
+    partial void OnHideSystemEntriesChanged(bool value)
+    {
+        Entries.Clear();
+        foreach (var row in _all)
+            if (IsVisible(row))
+                Entries.Add(row);
+    }
+
+    private bool IsVisible(EtbEntryRow row) =>
+        !HideSystemEntries || row.DirectionValue != EtbDirection.System;
+
+    // System is written only by the app, never chosen by a human, so it is omitted from the picker.
     public IReadOnlyList<EtbDirectionOption> DirectionOptions { get; } =
         Enum.GetValues<EtbDirection>()
+            .Where(d => d != EtbDirection.System)
             .Select(d => new EtbDirectionOption(d, Formatting.Direction(d)))
             .ToArray();
 
@@ -83,5 +113,6 @@ public sealed partial class EtbViewModel : ObservableObject
     }
 
     private static EtbEntryRow ToRow(EtbEntry e) =>
-        new(Formatting.Timestamp(e.Timestamp), Formatting.Direction(e.Direction), e.From, e.To, e.Text, e.EnteredBy);
+        new(Formatting.Timestamp(e.Timestamp), Formatting.Direction(e.Direction), e.From, e.To,
+            e.Text, e.EnteredBy, e.Direction);
 }
