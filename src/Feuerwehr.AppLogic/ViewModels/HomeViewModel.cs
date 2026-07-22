@@ -31,6 +31,9 @@ public sealed partial class HomeViewModel : ObservableObject
     public ObservableCollection<string> RecentFiles { get; }
     public Action<IncidentWorkspaceViewModel>? WorkspaceOpened { get; set; }
 
+    /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
+    public IReadOnlyList<string> CallSignOptions => _masterData.Get().RadioCallSigns;
+
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
     /// </summary>

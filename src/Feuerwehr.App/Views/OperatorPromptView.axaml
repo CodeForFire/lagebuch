@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:b="clr-namespace:Feuerwehr.App.Behaviors"
              x:Class="Feuerwehr.App.Views.OperatorPromptView"
              x:DataType="vm:OperatorPromptViewModel">
   <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
@@ -23,11 +24,15 @@
             </TextBox.KeyBindings>
           </TextBox>
           <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" Margin="0,8,0,3" />
-          <TextBox Watermark="optional" Text="{Binding OperatorCallSign}">
-            <TextBox.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-            </TextBox.KeyBindings>
-          </TextBox>
+          <!-- Call sign is a suggestion list, not a closed set: an operator's Funkrufname need
+               not be in the master list, so this is an AutoCompleteBox (Avalonia's ComboBox
+               cannot be made editable) mirroring RolesView's personnel-name field. -->
+          <AutoCompleteBox Watermark="optional"
+                           ItemsSource="{Binding CallSignOptions}"
+                           FilterMode="ContainsOrdinal"
+                           MinimumPrefixLength="0"
+                           Text="{Binding OperatorCallSign}"
+                           b:EnterSubmit.Command="{Binding ConfirmCommand}" />
           <StackPanel IsVisible="{Binding CollectsIlsNumber}" Spacing="3">
             <TextBlock Text="ILS-NUMMER" Classes="overline" FontSize="10" Margin="0,8,0,3" />
             <TextBox x:Name="IlsNumberBox" MaxLength="4" Watermark="4-stellig, optional"

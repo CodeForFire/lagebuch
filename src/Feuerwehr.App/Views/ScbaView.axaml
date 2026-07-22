@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:b="clr-namespace:Feuerwehr.App.Behaviors"
              x:Class="Feuerwehr.App.Views.ScbaView"
              x:DataType="vm:ScbaViewModel">
   <UserControl.Styles>
@@ -43,28 +44,19 @@
         <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170" Watermark="Truppführer"
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Text="{Binding NewTruppfuehrer}">
-          <AutoCompleteBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
-          </AutoCompleteBox.KeyBindings>
-        </AutoCompleteBox>
+                         Text="{Binding NewTruppfuehrer}"
+                         b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         <AutoCompleteBox x:Name="TruppmannBox" Width="170" Watermark="Truppmann"
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Text="{Binding NewTruppmann}">
-          <AutoCompleteBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
-          </AutoCompleteBox.KeyBindings>
-        </AutoCompleteBox>
+                         Text="{Binding NewTruppmann}"
+                         b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170" Watermark="2. Truppmann (CSA)"
                          IsVisible="{Binding RequiresThirdMember}"
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Text="{Binding NewZweiterTruppmann}">
-          <AutoCompleteBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
-          </AutoCompleteBox.KeyBindings>
-        </AutoCompleteBox>
+                         Text="{Binding NewZweiterTruppmann}"
+                         b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         <ComboBox Width="140" PlaceholderText="Funkrufname" ItemsSource="{Binding CallSignOptions}"
                   SelectedItem="{Binding NewCallSign}" />
         <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"

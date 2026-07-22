@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:b="clr-namespace:Feuerwehr.App.Behaviors"
              x:Class="Feuerwehr.App.Views.ForcesView"
              x:DataType="vm:ForcesViewModel">
   <DockPanel>
@@ -32,11 +33,8 @@
                          ItemsSource="{Binding BrigadeOptions}"
                          FilterMode="ContainsOrdinal"
                          MinimumPrefixLength="0"
-                         Text="{Binding NewBrigade}">
-          <AutoCompleteBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AddForceCommand}" />
-          </AutoCompleteBox.KeyBindings>
-        </AutoCompleteBox>
+                         Text="{Binding NewBrigade}"
+                         b:EnterSubmit.Command="{Binding AddForceCommand}" />
         <ComboBox Width="140" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
         <NumericUpDown x:Name="PersonnelBox" Width="110" Minimum="0" Value="{Binding NewPersonnelCount}" />
         <NumericUpDown x:Name="ScbaBox" Width="110" Minimum="0" Value="{Binding NewScbaCount}" />

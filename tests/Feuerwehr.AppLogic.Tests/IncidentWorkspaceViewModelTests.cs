@@ -275,6 +275,23 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void ContinueEditing_prompt_offers_the_master_data_call_signs()
+    {
+        var callSigns = new[] { "FFB 1/40/1", "Aich 42/1" };
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", new[] { "A?" });
+        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        var vm = new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(),
+            MasterDataSet.Empty with { RadioCallSigns = callSigns },
+            new FakeDialogs(), new FakeAlarmService());
+
+        vm.ContinueEditingCommand.Execute(null);
+
+        Assert.Equal(callSigns, vm.PendingPrompt!.CallSignOptions);
+    }
+
+    [Fact]
     public void Confirming_continue_editing_makes_workspace_editable_and_rebuilds_children()
     {
         var vm = ReadOnlyWorkspace(out _);

@@ -28,7 +28,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RequestNewIncident()
     {
         _pending = PendingAction.New;
-        PendingPrompt = new OperatorPromptViewModel(collectIlsNumber: true);
+        PendingPrompt = new OperatorPromptViewModel(
+            collectIlsNumber: true, callSignOptions: _home.CallSignOptions);
     }
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
