@@ -69,7 +69,8 @@ public class IncidentWorkspaceViewModelTests
         var before = vm.Etb.Entries.Count;
 
         vm.Scba.NewDesignation = "Angriffstrupp";
-        vm.Scba.NewMembers = "Müller / Schmidt";
+        vm.Scba.NewTruppfuehrer = "Müller";
+        vm.Scba.NewTruppmann = "Schmidt";
         vm.Scba.AddTruppCommand.Execute(null);
 
         Assert.Equal(before + 1, vm.Etb.Entries.Count);

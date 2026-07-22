@@ -13,6 +13,17 @@
     <Style Selector="TextBlock.scbaStatus.control">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
     </Style>
+    <!-- WrapPanel has no ItemSpacing/LineSpacing in Avalonia 11, so the dock spaces its children. -->
+    <Style Selector="WrapPanel#RegistrationDock > :is(Control)">
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+    <!-- Field label inside a stacked cell. Small and dim so the value still reads first. -->
+    <Style Selector="TextBlock.cellLabel">
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,6,0" />
+    </Style>
   </UserControl.Styles>
   <DockPanel>
     <TextBlock DockPanel.Dock="Top" Text="ATEMSCHUTZÜBERWACHUNG" Classes="overline"
@@ -24,15 +35,36 @@
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
-      <StackPanel Orientation="Horizontal" Spacing="8">
+      <WrapPanel x:Name="RegistrationDock" Orientation="Horizontal">
         <ComboBox Width="150" PlaceholderText="Trupp" ItemsSource="{Binding TruppTypeOptions}"
                   SelectedItem="{Binding NewDesignation}" />
-        <TextBox x:Name="MembersBox" Width="200" Watermark="Mannschaft (z. B. Müller / Schmidt)"
-                 Text="{Binding NewMembers}">
-          <TextBox.KeyBindings>
+        <!-- One box per position rather than a single free-text field: a Trupp is two people
+             (three in CSA), and the third box only appears when the type calls for it. -->
+        <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170" Watermark="Truppführer"
+                         ItemsSource="{Binding PersonOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewTruppfuehrer}">
+          <AutoCompleteBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
+          </AutoCompleteBox.KeyBindings>
+        </AutoCompleteBox>
+        <AutoCompleteBox x:Name="TruppmannBox" Width="170" Watermark="Truppmann"
+                         ItemsSource="{Binding PersonOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewTruppmann}">
+          <AutoCompleteBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
+          </AutoCompleteBox.KeyBindings>
+        </AutoCompleteBox>
+        <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170" Watermark="2. Truppmann (CSA)"
+                         IsVisible="{Binding RequiresThirdMember}"
+                         ItemsSource="{Binding PersonOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewZweiterTruppmann}">
+          <AutoCompleteBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddTruppCommand}" />
+          </AutoCompleteBox.KeyBindings>
+        </AutoCompleteBox>
         <ComboBox Width="140" PlaceholderText="Funkrufname" ItemsSource="{Binding CallSignOptions}"
                   SelectedItem="{Binding NewCallSign}" />
         <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"
@@ -42,22 +74,90 @@
                        FormatString="0" />
         <TextBlock Text="Min. Abfrage" Classes="secondary" VerticalAlignment="Center" />
         <Button Classes="signal" Content="BEREITSTELLEN" Command="{Binding AddTruppCommand}" />
-      </StackPanel>
+      </WrapPanel>
     </Border>
 
     <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False">
+      <!-- Rows size to their content here, unlike the other grids. A Trupp is two people and a
+           CSA-Trupp three, each on its own line, so the shared 40px RowHeight from Styles.axaml
+           would clip the last crew member. -->
+      <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
+                RowHeight="NaN">
         <DataGrid.Columns>
-          <DataGridTextColumn Header="TRUPP" Binding="{Binding Designation}" />
-          <DataGridTextColumn Header="MANNSCHAFT" Binding="{Binding Members}" Width="*" />
-          <DataGridTextColumn Header="FUNK" Binding="{Binding CallSign}" />
-          <DataGridTextColumn Header="START" Binding="{Binding StartTimeDisplay}" />
-          <DataGridTextColumn Header="EINGESETZT" Binding="{Binding ElapsedDisplay}" />
-          <DataGridTextColumn Header="RESTZEIT" Binding="{Binding RemainingDisplay}" />
-          <DataGridTextColumn Header="DRUCK" Binding="{Binding PressureDisplay}" />
-          <DataGridTextColumn Header="ABFRAGE IN" Binding="{Binding ControlRemainingDisplay}" />
-          <DataGridTemplateColumn Header="STATUS">
+          <!-- Ten columns needed ~1460px and overflowed on a normal window, so related values are
+               stacked into one cell each: Trupp over its call sign, the two clock values together,
+               and current pressure over the next-check countdown. Seven columns at fixed widths
+               now fit in ~1135px, and fixed widths mean content growth can no longer squeeze the
+               crew column. -->
+          <DataGridTemplateColumn Header="TRUPP" Width="170">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <StackPanel VerticalAlignment="Center" Margin="12,6">
+                  <TextBlock Text="{Binding Designation}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding CallSign}" Classes="mono" FontSize="11.5"
+                             IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}"
+                             TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <!-- MinWidth matters: this is the only star-sized column, so it absorbs every other
+               column's content growth. Without a floor it collapses to the DataGrid's 20px
+               minimum on a narrow window and the crew silently disappears. Scrolling the grid
+               is the right trade-off; hiding who is under air is not. -->
+          <DataGridTemplateColumn Header="MANNSCHAFT" Width="*" MinWidth="180">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <ItemsControl ItemsSource="{Binding MemberLines}" VerticalAlignment="Center"
+                              Margin="12,6" ToolTip.Tip="{Binding MembersDetail}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="ZEIT" Width="135">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+                      VerticalAlignment="Center" Margin="12,6">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Text="Start" Classes="cellLabel" />
+                  <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding StartTimeDisplay}" Classes="mono" />
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Einsatz" Classes="cellLabel" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ElapsedDisplay}" Classes="mono" />
+                </Grid>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <!-- Restzeit stays a column of its own and is alarm-coloured: it is the value that says
+               whether the crew has to turn around now. -->
+          <DataGridTemplateColumn Header="RESTZEIT" Width="125">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <TextBlock Text="{Binding RemainingDisplay}" VerticalAlignment="Center" Margin="12,0"
+                           FontWeight="SemiBold" Classes="scbaStatus" Classes.alarm="{Binding IsAlarm}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="DRUCK" Width="145">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ScbaTruppRow">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+                      VerticalAlignment="Center" Margin="12,6">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Text="akt." Classes="cellLabel" />
+                  <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PressureDisplay}" Classes="mono" />
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Abfrage" Classes="cellLabel" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ControlRemainingDisplay}"
+                             Classes="mono" Classes.control="{Binding IsControlDue}" />
+                </Grid>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="STATUS" Width="130">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <TextBlock Text="{Binding StatusDisplay}" VerticalAlignment="Center" Margin="12,0"
@@ -66,7 +166,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="DRUCK [bar] / AKTION" Width="300">
+          <DataGridTemplateColumn Header="AKTION" Width="300">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,4" VerticalAlignment="Center">

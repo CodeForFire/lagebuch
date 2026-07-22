@@ -1,7 +1,8 @@
-using Feuerwehr.Domain;
+using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
+using Feuerwehr.Domain;
 using Microsoft.Data.Sqlite;
 
 namespace Feuerwehr.Persistence.Tests;
@@ -128,7 +129,7 @@ public class IncidentRoundTripTests : IDisposable
         var incident = Incident.Start(clock, op);
 
         // Active trupp: registered, started under air, two pressure readings.
-        var active = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt",
+        var active = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"),
             callSign: "FFB 1/40/1", maxDurationMinutes: 30, returnPressureBar: 60,
             pressureControlIntervalMinutes: 5);
         clock.Now = clock.Now.AddMinutes(3);
@@ -139,23 +140,36 @@ public class IncidentRoundTripTests : IDisposable
         incident.RecordScbaPressure(clock, active.Id, 180);
 
         // Returned trupp: started then came back.
-        var returned = incident.AddScbaTrupp(clock, "Sicherheitstrupp", "Huber / Mayr");
+        var returned = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Mayr"));
         incident.StartScbaTrupp(clock, returned.Id, 280);
         clock.Now = clock.Now.AddMinutes(8);
         incident.MarkScbaReturned(clock, returned.Id);
 
+        // CSA trupp: three people, to prove the crew size round-trips rather than being assumed.
+        incident.AddScbaTrupp(clock, AtemschutzTrupp.ChemicalTruppDesignation,
+            TruppMember.Crew("Berger", "Frank", "Lang"));
+
         // Waiting trupp: registered only, never started.
-        var waiting = incident.AddScbaTrupp(clock, "Wassertrupp", "Bauer / Klein");
+        var waiting = incident.AddScbaTrupp(clock, "Wassertrupp", TruppMember.Crew("Bauer", "Klein"));
         var waitingId = waiting.Id;
 
         var repo = new IncidentRepository();
         repo.Save(_path, incident);
         var loaded = repo.Load(_path);
 
-        Assert.Equal(3, loaded.ScbaTrupps.Count);
+        Assert.Equal(4, loaded.ScbaTrupps.Count);
 
         var loadedActive = loaded.ScbaTrupps[0];
         Assert.Equal("Angriffstrupp", loadedActive.Designation);
+        // Crew survives as addressable members in position order, not as a re-parsed string.
+        Assert.Equal(new[] { TruppRole.Truppfuehrer, TruppRole.Truppmann },
+            loadedActive.Members.Select(m => m.Role));
+        Assert.Equal(new[] { "Müller", "Schmidt" }, loadedActive.Members.Select(m => m.Name));
+
+        var loadedCsa = loaded.ScbaTrupps[2];
+        Assert.Equal(AtemschutzTrupp.ChemicalTruppDesignation, loadedCsa.Designation);
+        Assert.Equal(3, loadedCsa.Members.Count);
+        Assert.Equal("Berger / Frank / Lang", loadedCsa.MembersDisplay);
         Assert.Equal("FFB 1/40/1", loadedActive.CallSign);
         Assert.Equal(active.StartTime, loadedActive.StartTime);
         Assert.Equal(300, loadedActive.StartPressure);
@@ -170,7 +184,7 @@ public class IncidentRoundTripTests : IDisposable
         Assert.True(loadedReturned.IsReturned);
         Assert.Equal(returned.ExitTime, loadedReturned.ExitTime);
 
-        var loadedWaiting = loaded.ScbaTrupps[2];
+        var loadedWaiting = loaded.ScbaTrupps[3];
         Assert.Equal(waitingId, loadedWaiting.Id);
         Assert.True(loadedWaiting.IsWaiting);
         Assert.Null(loadedWaiting.StartTime);

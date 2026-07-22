@@ -1,3 +1,5 @@
+using Feuerwehr.Domain.Atemschutz;
+
 namespace Feuerwehr.Domain.Tests;
 
 public class AtemschutzTests
@@ -15,7 +17,7 @@ public class AtemschutzTests
     public void Registered_trupp_is_waiting_and_clock_not_running()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", callSign: "FFB 1/40/1");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), callSign: "FFB 1/40/1");
 
         Assert.Same(trupp, Assert.Single(incident.ScbaTrupps));
         Assert.True(trupp.IsWaiting);
@@ -30,7 +32,7 @@ public class AtemschutzTests
     public void Start_sends_trupp_under_air_and_records_start_pressure()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
 
         clock.Now = T0.AddMinutes(7);
         incident.StartScbaTrupp(clock, trupp.Id, 300);
@@ -45,7 +47,7 @@ public class AtemschutzTests
     public void Time_alarm_is_anchored_on_start_not_registration()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", maxDurationMinutes: 30);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), maxDurationMinutes: 30);
 
         // Registered at T0 but waits 10 minutes before going under air.
         clock.Now = T0.AddMinutes(10);
@@ -59,7 +61,7 @@ public class AtemschutzTests
     public void Pressure_readings_append_and_track_latest()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
         incident.StartScbaTrupp(clock, trupp.Id, 300);
 
         clock.Now = T0.AddMinutes(5);
@@ -76,7 +78,7 @@ public class AtemschutzTests
     public void Pressure_control_countdown_resets_on_each_reading()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt",
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"),
             pressureControlIntervalMinutes: 5);
         incident.StartScbaTrupp(clock, trupp.Id, 300);
 
@@ -94,7 +96,7 @@ public class AtemschutzTests
     public void Mark_returned_sets_exit_and_clears_active()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
         incident.StartScbaTrupp(clock, trupp.Id, 300);
 
         clock.Now = T0.AddMinutes(18);
@@ -110,7 +112,7 @@ public class AtemschutzTests
     public void Pressure_alarm_fires_at_return_threshold()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt", returnPressureBar: 60);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), returnPressureBar: 60);
         incident.StartScbaTrupp(clock, trupp.Id, 300);
 
         Assert.False(trupp.IsPressureAlarm);
@@ -122,11 +124,11 @@ public class AtemschutzTests
     public void Closed_incident_rejects_scba_mutations()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
         incident.StartScbaTrupp(clock, trupp.Id, 300);
         incident.Close(clock, new SessionOperator("Müller"));
 
-        Assert.Throws<IncidentClosedException>(() => incident.AddScbaTrupp(clock, "Wassertrupp", "A / B"));
+        Assert.Throws<IncidentClosedException>(() => incident.AddScbaTrupp(clock, "Wassertrupp", TruppMember.Crew("A", "B")));
         Assert.Throws<IncidentClosedException>(() => incident.StartScbaTrupp(clock, trupp.Id, 280));
         Assert.Throws<IncidentClosedException>(() => incident.RecordScbaPressure(clock, trupp.Id, 200));
         Assert.Throws<IncidentClosedException>(() => incident.MarkScbaReturned(clock, trupp.Id));
@@ -137,18 +139,104 @@ public class AtemschutzTests
     {
         var incident = NewIncident(out var clock);
 
-        Assert.Throws<ArgumentException>(() => incident.AddScbaTrupp(clock, "Angriffstrupp", "  "));
-        Assert.Throws<ArgumentException>(() => incident.AddScbaTrupp(clock, "  ", "Müller"));
+        Assert.Throws<ArgumentException>(
+            () => incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "  ")));
+        Assert.Throws<ArgumentException>(
+            () => incident.AddScbaTrupp(clock, "  ", TruppMember.Crew("Müller", "Schmidt")));
 
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
         Assert.Throws<ArgumentOutOfRangeException>(() => incident.StartScbaTrupp(clock, trupp.Id, 500));
+    }
+
+    // --- Crew cardinality (issue #15) ---
+
+    [Fact]
+    public void An_ordinary_trupp_is_exactly_two_people()
+    {
+        var incident = NewIncident(out var clock);
+
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
+
+        Assert.Equal(2, trupp.Members.Count);
+        Assert.Equal(TruppRole.Truppfuehrer, trupp.Members[0].Role);
+        Assert.Equal("Müller", trupp.Members[0].Name);
+        Assert.Equal(TruppRole.Truppmann, trupp.Members[1].Role);
+        Assert.Equal("Müller / Schmidt", trupp.MembersDisplay);
+    }
+
+    [Fact]
+    public void A_single_person_is_not_a_trupp()
+    {
+        var incident = NewIncident(out var clock);
+        var lone = new[] { TruppMember.Create(TruppRole.Truppfuehrer, "Müller") };
+
+        // The whole point of issue #15: Atemschutz is never a solo activity.
+        Assert.Throws<ArgumentException>(() => incident.AddScbaTrupp(clock, "Angriffstrupp", lone));
+    }
+
+    [Fact]
+    public void An_ordinary_trupp_rejects_a_third_person()
+    {
+        var incident = NewIncident(out var clock);
+
+        Assert.Throws<ArgumentException>(() => incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt", "Huber")));
+    }
+
+    [Fact]
+    public void A_csa_trupp_is_exactly_three_people()
+    {
+        var incident = NewIncident(out var clock);
+
+        var trupp = incident.AddScbaTrupp(
+            clock, AtemschutzTrupp.ChemicalTruppDesignation, TruppMember.Crew("Müller", "Schmidt", "Huber"));
+
+        Assert.Equal(3, trupp.Members.Count);
+        Assert.Equal(TruppRole.ZweiterTruppmann, trupp.Members[2].Role);
+        Assert.Equal("Müller / Schmidt / Huber", trupp.MembersDisplay);
+    }
+
+    [Fact]
+    public void A_csa_trupp_rejects_a_crew_of_two()
+    {
+        var incident = NewIncident(out var clock);
+
+        Assert.Throws<ArgumentException>(() => incident.AddScbaTrupp(
+            clock, AtemschutzTrupp.ChemicalTruppDesignation, TruppMember.Crew("Müller", "Schmidt")));
+    }
+
+    [Fact]
+    public void The_same_position_cannot_be_filled_twice()
+    {
+        var incident = NewIncident(out var clock);
+        var duplicated = new[]
+        {
+            TruppMember.Create(TruppRole.Truppfuehrer, "Müller"),
+            TruppMember.Create(TruppRole.Truppfuehrer, "Schmidt"),
+        };
+
+        Assert.Throws<ArgumentException>(() => incident.AddScbaTrupp(clock, "Angriffstrupp", duplicated));
+    }
+
+    [Fact]
+    public void Rehydrate_accepts_a_crew_the_current_rules_would_reject()
+    {
+        // Stored Trupps are history. Refusing to load an incident because an old record has an
+        // odd crew size would make the file unreadable rather than merely imperfect.
+        var trupp = AtemschutzTrupp.Rehydrate(
+            Guid.NewGuid(), T0, null, "Angriffstrupp",
+            new[] { TruppMember.Create(TruppRole.Truppfuehrer, "Allein") },
+            null, null, null, 30, 60, 5, null, Array.Empty<PressureReading>());
+
+        Assert.Single(trupp.Members);
+        Assert.Equal("Allein", trupp.MembersDisplay);
     }
 
     [Fact]
     public void Cannot_start_twice_or_act_before_start_or_after_return()
     {
         var incident = NewIncident(out var clock);
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", "Müller / Schmidt");
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
 
         // Before start: recording pressure / returning is invalid.
         Assert.Throws<InvalidOperationException>(() => incident.RecordScbaPressure(clock, trupp.Id, 200));
@@ -167,5 +255,30 @@ public class AtemschutzTests
     {
         var incident = NewIncident(out var clock);
         Assert.Throws<KeyNotFoundException>(() => incident.StartScbaTrupp(clock, Guid.NewGuid(), 300));
+    }
+
+    [Fact]
+    public void Elapsed_stops_when_the_trupp_returns()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
+        incident.StartScbaTrupp(clock, trupp.Id, 300);
+        clock.Now = T0.AddMinutes(12);
+        incident.MarkScbaReturned(clock, trupp.Id);
+
+        // Time under air is a fact about the past. Left running, a Trupp returned months ago
+        // reads as tens of thousands of hours -- which is what the live grid was showing.
+        Assert.Equal(TimeSpan.FromMinutes(12), trupp.Elapsed(T0.AddMinutes(12)));
+        Assert.Equal(TimeSpan.FromMinutes(12), trupp.Elapsed(T0.AddDays(30)));
+    }
+
+    [Fact]
+    public void Elapsed_still_runs_while_the_trupp_is_under_air()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
+        incident.StartScbaTrupp(clock, trupp.Id, 300);
+
+        Assert.Equal(TimeSpan.FromMinutes(7), trupp.Elapsed(T0.AddMinutes(7)));
     }
 }

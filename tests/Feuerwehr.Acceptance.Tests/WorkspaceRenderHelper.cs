@@ -29,7 +29,7 @@ internal static class WorkspaceRenderHelper
             "PC eingeschaltet und VPN Verbindung aktiviert?",
             "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
         },
-        TruppTypes = new[] { "Angriffstrupp" },
+        TruppTypes = new[] { "Angriffstrupp", "Sicherheitstrupp", "CSA-Trupp" },
         Brigades = new[] { "FFB Wache 1", "FFB Wache 2", "Aich", "Puch", "Emmering" },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
         RadioCallSigns = new[] { "FFB 1/40/1", "FFB 1/23/1", "Aich 42/1", "Land 1" },
@@ -64,7 +64,8 @@ internal static class WorkspaceRenderHelper
         vm.Reminder!.StartCommand.Execute(null);
 
         vm.Scba.NewDesignation = "Angriffstrupp";
-        vm.Scba.NewMembers = "Müller / Schmidt";
+        vm.Scba.NewTruppfuehrer = "Müller";
+        vm.Scba.NewTruppmann = "Schmidt";
         vm.Scba.AddTruppCommand.Execute(null);
         var row = vm.Scba.Trupps[^1];
         row.PressureInput = 300;

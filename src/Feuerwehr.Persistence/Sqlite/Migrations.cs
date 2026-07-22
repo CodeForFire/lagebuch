@@ -5,7 +5,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -51,6 +51,10 @@ public static class Migrations
         if (version < 5)
         {
             ApplyV5(cn, tx);
+        }
+        if (version < 6)
+        {
+            ApplyV6(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -206,6 +210,90 @@ public static class Migrations
         // default of 0 is safe here: existing rows genuinely have no recorded AGT count, and 0
         // reads the same as "none recorded" for the sum that feeds the header tile.
         AddColumnIfMissing(cn, tx, "force_units", "scba_count", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void ApplyV6(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // A Trupp's crew stops being one free-text string and becomes addressable rows, mirroring
+        // how scba_pressure_readings already hangs off a Trupp.
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS scba_trupp_members (
+                trupp_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                role INTEGER NOT NULL,
+                name TEXT NOT NULL
+            );
+            """);
+
+        if (!TableExists(cn, tx, "scba_trupps") || !ColumnExists(cn, tx, "scba_trupps", "members"))
+            return;
+
+        // Split the old "Müller / Schmidt" convention into rows. The separator was only ever a
+        // watermark hint, so anything that does not split cleanly is kept whole as the Truppführer
+        // rather than discarded -- an imperfect record beats a lost one, and Rehydrate does not
+        // re-validate crew size precisely so that these rows stay loadable.
+        var legacy = new List<(string Id, string Members)>();
+        using (var read = cn.CreateCommand())
+        {
+            read.Transaction = tx;
+            read.CommandText = "SELECT id, members FROM scba_trupps;";
+            using var r = read.ExecuteReader();
+            while (r.Read())
+                legacy.Add((r.GetString(0), r.IsDBNull(1) ? string.Empty : r.GetString(1)));
+        }
+
+        foreach (var (id, members) in legacy)
+        {
+            var names = members
+                .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+            if (names.Count == 0)
+                names.Add(string.IsNullOrWhiteSpace(members) ? "Unbekannt" : members.Trim());
+
+            for (var i = 0; i < names.Count; i++)
+            {
+                using var insert = cn.CreateCommand();
+                insert.Transaction = tx;
+                insert.CommandText =
+                    "INSERT INTO scba_trupp_members (trupp_id, ordinal, role, name) VALUES ($t,$o,$r,$n);";
+                insert.Parameters.AddWithValue("$t", id);
+                insert.Parameters.AddWithValue("$o", i);
+                insert.Parameters.AddWithValue("$r", i);
+                insert.Parameters.AddWithValue("$n", names[i]);
+                insert.ExecuteNonQuery();
+            }
+        }
+
+        // Drop the members column by rebuilding, exactly as V3 did: portable across SQLite
+        // versions, and the explicit DDL keeps the resulting shape visible in the diff.
+        Exec(cn, tx, """
+            CREATE TABLE scba_trupps_v6 (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                designation TEXT NOT NULL,
+                call_sign TEXT,
+                task TEXT,
+                registered_at TEXT NOT NULL,
+                start_time TEXT,
+                start_pressure INTEGER,
+                max_duration_minutes INTEGER NOT NULL,
+                return_pressure_bar INTEGER NOT NULL,
+                pressure_control_interval_minutes INTEGER NOT NULL,
+                exit_time TEXT
+            );
+            """);
+        Exec(cn, tx, """
+            INSERT INTO scba_trupps_v6
+                (id, ordinal, designation, call_sign, task, registered_at, start_time,
+                 start_pressure, max_duration_minutes, return_pressure_bar,
+                 pressure_control_interval_minutes, exit_time)
+            SELECT id, ordinal, designation, call_sign, task, registered_at, start_time,
+                   start_pressure, max_duration_minutes, return_pressure_bar,
+                   pressure_control_interval_minutes, exit_time
+            FROM scba_trupps;
+            """);
+        Exec(cn, tx, "DROP TABLE scba_trupps;");
+        Exec(cn, tx, "ALTER TABLE scba_trupps_v6 RENAME TO scba_trupps;");
     }
 
     /// <summary>
