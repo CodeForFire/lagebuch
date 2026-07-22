@@ -1,42 +1,173 @@
 name: Release
 
+# Pushing a version tag (v0.2.0) builds and publishes the Windows + Linux installers. Building on a
+# private repo bills Actions minutes with steep multipliers (macOS 10x, Windows 2x), so releases are
+# deliberate — tag when you mean it — rather than one per merge. macOS carries the 10x multiplier and
+# is built only on demand via workflow_dispatch, which attaches the .dmg to the release for that
+# version.
 on:
   push:
-    tags: [ 'v*' ]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build the macOS .dmg for (e.g. 0.2.0), matching an existing v-tag release.
+        required: true
 
 permissions:
   contents: write
 
+env:
+  PUBLISH_FLAGS: >-
+    -c Release --self-contained true
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+    -p:DebugType=none -p:DebugSymbols=false
+
 jobs:
-  publish:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            rid: win-x64
-            asset: lagebuch-win-x64.exe
-            artifact: Feuerwehr.App.exe
-          - os: ubuntu-latest
-            rid: linux-x64
-            asset: lagebuch-linux-x64
-            artifact: Feuerwehr.App
-    runs-on: ${{ matrix.os }}
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      # tag push -> strip the leading 'v' from the tag; dispatch -> the supplied input.
+      - id: v
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${INPUT_VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+  windows:
+    needs: version
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '8.0.x'
       - name: Publish
         run: >
-          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj
-          -c Release -r ${{ matrix.rid }} --self-contained true
-          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-          -o publish
-      - name: Rename artifact
-        shell: bash
-        run: cp "publish/${{ matrix.artifact }}" "${{ matrix.asset }}"
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
+          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r win-x64 ${{ env.PUBLISH_FLAGS }}
+          -p:Version=${{ needs.version.outputs.version }} -o publish
+      - name: Install WiX
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+      - name: Build MSI
+        # Absolute paths: WiX resolves <Files Include> relative to the .wxs file's own directory,
+        # not the working directory, so a bare "publish" would look under packaging/windows.
+        run: >
+          wix build packaging/windows/Lagebuch.wxs
+          -d Version=${{ needs.version.outputs.version }}
+          -d "PublishDir=${{ github.workspace }}\publish"
+          -d "IconFile=${{ github.workspace }}\src\Feuerwehr.App\Assets\icon.ico"
+          -o "lagebuch-${{ needs.version.outputs.version }}-x64.msi"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          files: ${{ matrix.asset }}
+          name: msi
+          path: '*.msi'
+          if-no-files-found: error
+
+  linux:
+    needs: version
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish
+        run: >
+          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
+          -p:Version=${{ needs.version.outputs.version }} -o publish
+      - name: Build .deb
+        run: |
+          chmod +x packaging/linux/build-deb.sh
+          packaging/linux/build-deb.sh \
+            "${{ needs.version.outputs.version }}" \
+            publish \
+            src/Feuerwehr.App/Assets/icon-1024.png \
+            dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: [version, windows, linux]
+    runs-on: ubuntu-latest
+    # Publish the Windows + Linux installers to the release for the pushed tag.
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: Lagebuch v${{ needs.version.outputs.version }}
+          prerelease: true
+          files: dist/**/*
+          body: |
+            Getaggter Release-Build.
+
+            | Plattform | Datei |
+            |-----------|-------|
+            | Windows   | `lagebuch-${{ needs.version.outputs.version }}-x64.msi` |
+            | Linux     | `lagebuch_${{ needs.version.outputs.version }}_amd64.deb` |
+
+            Ein macOS-Build (Apple Silicon, `.dmg`) wird auf Anfrage bereitgestellt und dann hier
+            angehängt.
+
+            **Die Pakete sind nicht signiert.** Beim ersten Start:
+            - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
+            - **Linux**: `sudo dpkg -i lagebuch_*.deb` (oder `sudo apt install ./lagebuch_*.deb`).
+            - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
+              oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`.
+
+  # macOS carries the 10x minute multiplier, so it is not built on every tag. Run this workflow
+  # manually (workflow_dispatch) with the version of an existing release to add the .dmg to it.
+  macos:
+    needs: version
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish
+        run: >
+          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r osx-arm64 ${{ env.PUBLISH_FLAGS }}
+          -p:Version=${{ needs.version.outputs.version }} -o publish
+      - name: Build .dmg
+        run: |
+          chmod +x packaging/macos/build-dmg.sh
+          packaging/macos/build-dmg.sh \
+            "${{ needs.version.outputs.version }}" \
+            publish \
+            src/Feuerwehr.App/Assets/icon-1024.png \
+            dist
+      # Always downloadable from the run; also attach to the matching release if one exists.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+      - name: Attach .dmg to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release upload "v${VERSION}" dist/*.dmg --clobber
+          else
+            echo "No release v${VERSION} yet — .dmg is available as a workflow artifact only."
+          fi

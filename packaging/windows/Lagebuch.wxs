@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WiX v5 authoring for the Lagebuch MSI. Built in CI with:
+    wix build packaging/windows/Lagebuch.wxs -d Version=<v> -d PublishDir=<dir> -d IconFile=<ico> -o out.msi
+
+  The UpgradeCode is fixed forever: it is what lets a new version replace the old one instead of
+  installing side by side. The ProductCode is auto-generated per build (Package/@Id defaults to "*").
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Lagebuch"
+           Manufacturer="Feuerwehr"
+           Version="$(Version)"
+           UpgradeCode="a03eaa1b-3d77-4ff0-a60a-5abe27c27b18"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <!-- Block a downgrade with a clear message rather than a confusing installer error. -->
+    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von Lagebuch ist bereits installiert." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="LagebuchIcon" SourceFile="$(IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="LagebuchIcon" />
+
+    <!-- Install into Program Files\Lagebuch. -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Lagebuch" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main">
+      <!-- Auto-harvest the entire published output into INSTALLFOLDER (WiX v5's heat replacement). -->
+      <Files Include="$(PublishDir)\**" Directory="INSTALLFOLDER" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <!-- Start-menu shortcut. A shortcut component needs its own keypath, hence the HKCU value. -->
+    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder" Guid="*">
+      <Shortcut Id="LagebuchShortcut"
+                Name="Lagebuch"
+                Description="Einsatzdokumentation für die Feuerwehr"
+                Target="[INSTALLFOLDER]Feuerwehr.App.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="LagebuchIcon" />
+      <RegistryValue Root="HKCU" Key="Software\Feuerwehr\Lagebuch"
+                     Name="installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>

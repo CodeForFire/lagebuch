@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keep the SHA-pinned GitHub Actions current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # NuGet packages across the solution.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly

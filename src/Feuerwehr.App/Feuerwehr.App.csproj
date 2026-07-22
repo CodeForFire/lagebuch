@@ -6,7 +6,13 @@
     <Nullable>enable</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Product metadata; Version is overridden per release build with -p:Version=. -->
+    <Product>Lagebuch</Product>
+    <AssemblyTitle>Lagebuch</AssemblyTitle>
+    <Company>Feuerwehr</Company>
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

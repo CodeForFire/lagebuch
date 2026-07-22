@@ -8,6 +8,34 @@ Replaces a legacy macro-enabled Excel template with a robust, offline, cross-pla
 
 Under construction. See plans under `docs/` (note: design/plan artifacts are not committed).
 
+## Install
+
+Pushing a version tag publishes a release under [Releases](../../releases) with an installer per
+platform:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+| Platform | File | Built |
+|----------|------|-------|
+| Windows | `lagebuch-<version>-x64.msi` | on every tag |
+| Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` | on every tag |
+| macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` | on request |
+
+macOS runners bill Actions minutes at 10× on a private repo, so the `.dmg` is built on demand rather
+than on every tag: run the **Release** workflow manually (Actions → Release → *Run workflow*) with
+the release version, and the `.dmg` is attached to that release.
+
+The packages are **not code-signed**, so the OS warns on first launch:
+
+- **Windows** — run the `.msi`; if SmartScreen appears, *More info → Run anyway*.
+- **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click the app → Open**
+  once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
+- **Linux** — `sudo dpkg -i lagebuch_*.deb` (or `sudo apt install ./lagebuch_*.deb`).
+
+All builds are self-contained; no .NET runtime needs to be installed separately.
+
 ## Build & Test
 
 ```bash
