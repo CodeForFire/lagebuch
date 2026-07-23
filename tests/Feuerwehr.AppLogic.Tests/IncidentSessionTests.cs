@@ -11,6 +11,7 @@ internal sealed class FakeStore : IIncidentStore
     public int SaveCount { get; private set; }
     public void Save(string path, Incident incident) { _saved[path] = incident; SaveCount++; }
     public Incident Load(string path) => _saved[path];
+    public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 }
 
 internal sealed class FixedClock : IClock

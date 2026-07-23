@@ -44,6 +44,7 @@ public class HomeOpenErrorTests
         public void Save(string path, Incident incident) { }
         public Incident Load(string path) =>
             throw new Feuerwehr.Persistence.Sqlite.UnsupportedSchemaVersionException(6, 5);
+        public IncidentState? TryReadState(string path) => null;
     }
 
     private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null)
