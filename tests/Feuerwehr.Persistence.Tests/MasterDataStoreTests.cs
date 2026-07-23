@@ -303,6 +303,25 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_custom_value_survives_a_restart_that_also_delivers_a_new_seed_value()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);                            // first run: seeds + writes snapshot
+
+        // A user-added custom role, plus a real seed role made "new since snapshot" again by
+        // forgetting it in both the table and the snapshot -- simulating a seed update landing on
+        // the same restart as a local edit.
+        ExecRaw("INSERT INTO md_roles (value) VALUES ('Eigene Rolle');"
+              + "DELETE FROM md_roles WHERE value = 'EL';"
+              + "DELETE FROM md_seed_snapshot WHERE item_key = 'EL';");
+
+        var set = store.GetOrSeed(_path);
+
+        Assert.Contains("Eigene Rolle", set.Roles);        // custom addition not dropped
+        Assert.Contains("EL", set.Roles);                  // re-added seed value reappeared
+    }
+
+    [Fact]
     public void Once_a_snapshot_exists_the_stored_order_is_preserved()
     {
         var store = new MasterDataStore();

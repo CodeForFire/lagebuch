@@ -215,6 +215,12 @@ public sealed class MasterDataStore
     /// when not already present. Never deletes and never reorders — the editor and any local
     /// additions own the existing rows.
     /// </summary>
+    /// <remarks>
+    /// Personnel are keyed on (LastName, FirstName) only, so this append path never touches an
+    /// existing person's role/call-sign/phone when a newer seed changes them -- by design, this
+    /// path never modifies existing rows, only adds ones whose key is wholly new. A consequence is
+    /// that two roster entries sharing the same last and first name collide on that key.
+    /// </remarks>
     private static void AppendNewSinceSnapshot(SqliteConnection cn, MasterDataSet seed)
     {
         var snapshot = ReadSnapshotKeys(cn);

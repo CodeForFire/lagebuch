@@ -31,7 +31,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void NavigateAway(Action proceed)
     {
         if (ReferenceEquals(CurrentView, _editor))
+        {
+            if (_editor.PendingConfirm is not null)
+                return; // a discard prompt is already up — don't stack a second one
             _editor.ConfirmDiscardThen(proceed);
+        }
         else
             proceed();
     }
@@ -76,5 +80,5 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void GoHome() => NavigateAway(() => CurrentView = _home);
 
-    public void OpenRecent(string path) => _home.OpenRecentCommand.Execute(path);
+    public void OpenRecent(string path) => NavigateAway(() => _home.OpenRecentCommand.Execute(path));
 }

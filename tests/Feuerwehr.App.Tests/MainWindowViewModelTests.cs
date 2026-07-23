@@ -174,6 +174,24 @@ public class MainWindowViewModelTests
         editor.PendingConfirm!.ConfirmCommand.Execute(null);
         Assert.IsType<HomeViewModel>(vm.CurrentView);
     }
+
+    [Fact]
+    public void A_second_nav_command_while_the_discard_prompt_is_up_does_not_stack_another()
+    {
+        var vm = New();
+        vm.ShowMasterDataCommand.Execute(null);
+        var editor = Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+        editor.Sections.OfType<EditableListSection>().First().AddCommand.Execute(null); // make dirty
+
+        vm.GoHomeCommand.Execute(null);
+        var firstPrompt = editor.PendingConfirm;
+        Assert.NotNull(firstPrompt);
+
+        vm.RequestOpenFileCommand.Execute(null); // a second nav attempt while the prompt is up
+
+        Assert.Same(firstPrompt, editor.PendingConfirm); // still the same dialog, not a second one
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView); // navigation did not proceed
+    }
 }
 
 internal sealed class OpenPathDialogs : IFileDialogService
