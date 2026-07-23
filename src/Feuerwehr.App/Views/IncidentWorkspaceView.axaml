@@ -89,11 +89,19 @@
                 <Button x:Name="ReminderStartButton" Content="TIMER STARTEN" Command="{Binding StartCommand}" />
               </StackPanel>
 
-              <!-- Running, not due: countdown + stop -->
+              <!-- Running, not due: countdown + stop. The remaining time is the hero of the bar —
+                   large tactical monospace (stable digit width as it ticks every second) behind a
+                   quiet "NOCH" kicker and a hairline, rather than a small lowercase "in 11:32". -->
               <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
                           IsVisible="{Binding IsRunning}">
-                <TextBlock Classes="mono" FontSize="17" Foreground="{StaticResource IncomingBrush}"
-                           Text="{Binding RemainingDisplay, StringFormat='in {0}'}"
+                <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}"
+                        IsVisible="{Binding !IsDue}" VerticalAlignment="Center" />
+                <TextBlock Text="NOCH" Classes="overline" FontSize="9"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           IsVisible="{Binding !IsDue}" VerticalAlignment="Center" />
+                <TextBlock x:Name="ReminderCountdownText" Classes="mono" FontSize="21" FontWeight="Medium"
+                           Foreground="{StaticResource IncomingBrush}"
+                           Text="{Binding RemainingDisplay}"
                            IsVisible="{Binding !IsDue}" VerticalAlignment="Center" />
                 <Button x:Name="ReminderStopButton" Content="STOPP" Command="{Binding StopCommand}"
                         IsVisible="{Binding !IsDue}" />
