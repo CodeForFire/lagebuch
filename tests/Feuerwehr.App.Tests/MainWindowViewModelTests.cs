@@ -25,6 +25,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
         TruppTypes = new[] { "Angriffstrupp" },
         RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
     };
+    public void Save(MasterDataSet set) { }
 }
 internal sealed class FakeRecent : IRecentFilesStore
 {

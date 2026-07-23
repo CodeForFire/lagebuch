@@ -14,6 +14,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
         ChecklistTemplate = new[] { "A?" },
         TruppTypes = new[] { "Angriffstrupp" },
     };
+    public void Save(MasterDataSet set) { }
 }
 
 internal sealed class FakeRecent : IRecentFilesStore
