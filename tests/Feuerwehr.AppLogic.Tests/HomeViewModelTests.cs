@@ -59,9 +59,43 @@ public class HomeViewModelTests
         var ils = IlsNumber.Parse("1234");
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), ils));
 
-        Assert.Equal("Einsatz-1234.fwincident", dialogs.LastSuggestedName);
+        // Filename carries the ILS number and the incident date (dd-MM-yyyy) so files sort and read
+        // sensibly on disk. T0 is 2026-06-22.
+        Assert.Equal("Einsatz-1234-22-06-2026.fwincident", dialogs.LastSuggestedName);
         Assert.NotNull(opened);
         Assert.Equal("1234", opened!.IlsNumberDisplay);
+    }
+
+    [Fact]
+    public void NewIncident_without_ils_still_dates_the_filename()
+    {
+        var dialogs = new CapturingSaveDialogs();
+        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
+            new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
+
+        Assert.Equal("Einsatz-22-06-2026.fwincident", dialogs.LastSuggestedName);
+    }
+
+    [Fact]
+    public void RecentFiles_marks_closed_incidents_and_leaves_open_ones_unmarked()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var closed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<string>());
+        closed.Close(clock);
+        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/open.fwincident", Array.Empty<string>());
+
+        var recent = new FakeRecent();
+        recent.Add("/open.fwincident");
+        recent.Add("/closed.fwincident");
+
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+
+        Assert.True(vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").IsClosed);
+        Assert.False(vm.RecentFiles.Single(f => f.Path == "/open.fwincident").IsClosed);
+        Assert.Equal("closed.fwincident", vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").FileName);
     }
 
     [Fact]
@@ -164,7 +198,7 @@ public class HomeViewModelTests
         vm.OpenRecentCommand.Execute("/gone.fwincident");
 
         Assert.Empty(recent.GetRecent());
-        Assert.DoesNotContain("/gone.fwincident", vm.RecentFiles);
+        Assert.DoesNotContain(vm.RecentFiles, f => f.Path == "/gone.fwincident");
     }
 
     [Fact]
@@ -226,6 +260,7 @@ internal sealed class ThrowingStore : IIncidentStore
     public ThrowingStore(string message) => _message = message;
     public void Save(string path, Incident incident) { }
     public Incident Load(string path) => throw new InvalidOperationException(_message);
+    public IncidentState? TryReadState(string path) => null;
 }
 
 // Loads what was saved; anything else throws — lets one test fail an open, then succeed.
@@ -235,6 +270,7 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
     public void Save(string path, Incident incident) => _saved[path] = incident;
     public Incident Load(string path) =>
         _saved.TryGetValue(path, out var i) ? i : throw new InvalidOperationException("Datei kaputt.");
+    public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 }
 
 // Counts Load calls to guard against the old double-load regression.
@@ -245,4 +281,6 @@ internal sealed class CountingStore : IIncidentStore
     public void ResetLoadCount() => LoadCount = 0;
     public void Save(string path, Incident incident) => _saved[path] = incident;
     public Incident Load(string path) { LoadCount++; return _saved[path]; }
+    // A passive peek, not a load — must not count against the load-once guard.
+    public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 }

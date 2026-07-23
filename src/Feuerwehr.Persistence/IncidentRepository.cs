@@ -146,6 +146,30 @@ public sealed class IncidentRepository
         tx.Commit();
     }
 
+    /// <summary>
+    /// Reads only the incident's lifecycle state, read-only and without migrating the file — meant
+    /// for the Home overview's closed marker, which must not mutate files just to display them.
+    /// `state` lives in the base schema's <c>incident_meta</c>, so this works across schema versions;
+    /// any failure (missing, corrupt, locked, too new) returns null so the overview degrades quietly.
+    /// </summary>
+    public IncidentState? TryReadState(string path)
+    {
+        if (!File.Exists(path))
+            return null;
+        try
+        {
+            using var cn = SqliteConnectionFactory.OpenReadOnly(path);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "SELECT state FROM incident_meta LIMIT 1;";
+            var raw = cmd.ExecuteScalar();
+            return raw is null ? null : (IncidentState)Convert.ToInt32(raw);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public Incident Load(string path)
     {
         // Check before opening: SQLite would otherwise report a missing file as a bare "unable to

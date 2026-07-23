@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Feuerwehr.AppLogic.Services;
+using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
 
 namespace Feuerwehr.AppLogic.ViewModels;
@@ -25,10 +27,15 @@ public sealed partial class HomeViewModel : ObservableObject
         _clock = clock;
         _ticker = ticker;
         _alarm = alarm;
-        RecentFiles = new ObservableCollection<string>(recent.GetRecent());
+        RecentFiles = new ObservableCollection<RecentFileItem>(
+            recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path))));
     }
 
-    public ObservableCollection<string> RecentFiles { get; }
+    public ObservableCollection<RecentFileItem> RecentFiles { get; }
+
+    // Passive peek: never migrates or mutates the file. A moved, corrupt, or too-new file just
+    // shows no marker (TryReadState returns null) rather than blocking the overview.
+    private bool IsClosed(string path) => _store.TryReadState(path) == IncidentState.Closed;
     public Action<IncidentWorkspaceViewModel>? WorkspaceOpened { get; set; }
 
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
@@ -43,9 +50,10 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
+        var date = _clock.Now.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
         var suggestedName = request.IlsNumber is { } ils
-            ? $"Einsatz-{ils.Value}.fwincident"
-            : "Einsatz.fwincident";
+            ? $"Einsatz-{ils.Value}-{date}.fwincident"
+            : $"Einsatz-{date}.fwincident";
         var path = await _dialogs.PickSaveAsync(suggestedName);
         if (string.IsNullOrWhiteSpace(path))
             return;
@@ -95,8 +103,10 @@ public sealed partial class HomeViewModel : ObservableObject
     private void OpenWorkspace(IncidentSession session, string path, Persistence.MasterData.MasterDataSet md)
     {
         _recent.Add(path);
-        if (!RecentFiles.Contains(path))
-            RecentFiles.Insert(0, path);
+        var existing = RecentFiles.FirstOrDefault(f => f.Path == path);
+        if (existing is not null)
+            RecentFiles.Remove(existing);
+        RecentFiles.Insert(0, new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
         var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm);
         WorkspaceOpened?.Invoke(workspace);
     }

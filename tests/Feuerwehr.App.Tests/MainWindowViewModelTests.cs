@@ -14,6 +14,7 @@ internal sealed class FakeStore : IIncidentStore
     private readonly Dictionary<string, Incident> _d = new();
     public void Save(string path, Incident incident) => _d[path] = incident;
     public Incident Load(string path) => _d[path];
+    public IncidentState? TryReadState(string path) => _d.TryGetValue(path, out var i) ? i.State : null;
 }
 internal sealed class FakeMasterData : IMasterDataProvider
 {

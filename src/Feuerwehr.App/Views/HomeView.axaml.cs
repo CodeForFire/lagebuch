@@ -10,8 +10,8 @@ public partial class HomeView : UserControl
         InitializeComponent();
         RecentList.DoubleTapped += (_, _) =>
         {
-            if (DataContext is HomeViewModel vm && RecentList.SelectedItem is string path)
-                vm.OpenRecentCommand.Execute(path);
+            if (DataContext is HomeViewModel vm && RecentList.SelectedItem is RecentFileItem item)
+                vm.OpenRecentCommand.Execute(item.Path);
         };
     }
 }

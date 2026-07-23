@@ -10,4 +10,6 @@ public sealed class IncidentStore : IIncidentStore
     public void Save(string path, Incident incident) => _repository.Save(path, incident);
 
     public Incident Load(string path) => _repository.Load(path);
+
+    public IncidentState? TryReadState(string path) => _repository.TryReadState(path);
 }
