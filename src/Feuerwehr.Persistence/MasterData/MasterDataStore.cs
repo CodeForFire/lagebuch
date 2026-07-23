@@ -25,6 +25,60 @@ public sealed class MasterDataStore
         return Read(cn);
     }
 
+    /// <summary>
+    /// Replaces the editable master data with <paramref name="set"/>, in the given order. A full
+    /// transactional replace, so deletes and reorders take effect exactly as supplied. The seed
+    /// snapshot is intentionally left alone -- <see cref="GetOrSeed"/> owns it -- so a value removed
+    /// here is not re-added on the next start.
+    /// </summary>
+    public void Save(string path, MasterDataSet set)
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(path);
+        EnsureSchema(cn);
+        using var tx = cn.BeginTransaction();
+
+        ReplaceList(cn, tx, "md_roles", set.Roles);
+        ReplaceList(cn, tx, "md_status", set.Status);
+        ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
+        ReplaceList(cn, tx, "md_equipment", set.Equipment);
+        ReplaceList(cn, tx, "md_districts", set.Districts);
+        ReplaceList(cn, tx, "md_call_signs", set.RadioCallSigns);
+        ReplaceList(cn, tx, "md_brigades", set.Brigades);
+        ReplaceList(cn, tx, "md_trupp_types", set.TruppTypes);
+
+        Run(cn, tx, "DELETE FROM md_streets;", _ => { });
+        foreach (var s in set.Streets)
+            Run(cn, tx, "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
+                p => { p("$n", s.Name); p("$d", s.District); });
+
+        Run(cn, tx, "DELETE FROM md_checklist_template;", _ => { });
+        for (var i = 0; i < set.ChecklistTemplate.Count; i++)
+        {
+            var text = set.ChecklistTemplate[i];
+            Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text) VALUES ($o,$t);",
+                p => { p("$o", i); p("$t", text); });
+        }
+
+        Run(cn, tx, "DELETE FROM md_personnel;", _ => { });
+        foreach (var person in set.Personnel)
+            Run(cn, tx, "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone) VALUES ($l,$f,$r,$c,$p);",
+                p =>
+                {
+                    p("$l", person.LastName); p("$f", person.FirstName);
+                    p("$r", (object?)person.Role ?? DBNull.Value);
+                    p("$c", (object?)person.CallSign ?? DBNull.Value);
+                    p("$p", (object?)person.Phone ?? DBNull.Value);
+                });
+
+        tx.Commit();
+    }
+
+    private static void ReplaceList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
+    {
+        Run(cn, tx, $"DELETE FROM {table};", _ => { });
+        InsertList(cn, tx, table, values);
+    }
+
     private static void EnsureSchema(SqliteConnection cn)
     {
         Exec(cn, """

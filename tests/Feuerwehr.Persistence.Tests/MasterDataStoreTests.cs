@@ -317,6 +317,40 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new[] { "ZF", "EL" }, set.Roles);
     }
 
+    // --- Save write path (issue #28) ---
+
+    [Fact]
+    public void Save_round_trips_every_category_including_personnel()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+
+        var edited = seeded with
+        {
+            Roles = new[] { "EL", "Eigene Rolle" },
+            TruppTypes = new[] { "Angriffstrupp" },
+            Personnel = new[] { new Person("Neu", "Person", "GF", "Land 1", "01 71 / 0 00 00 00") },
+        };
+        store.Save(_path, edited);
+
+        var reopened = store.GetOrSeed(_path);
+        Assert.Equal(new[] { "EL", "Eigene Rolle" }, reopened.Roles);
+        Assert.Contains(reopened.Personnel, p => p.LastName == "Neu" && p.CallSign == "Land 1");
+        Assert.Equal(seeded.Streets.Count, reopened.Streets.Count); // streets carried through untouched
+    }
+
+    [Fact]
+    public void A_value_deleted_through_Save_does_not_come_back_on_the_next_start()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+
+        store.Save(_path, seeded with { Roles = seeded.Roles.Where(r => r != "EL").ToList() });
+
+        var reopened = store.GetOrSeed(_path);
+        Assert.DoesNotContain("EL", reopened.Roles);
+    }
+
     private void SeedLegacy(string table, params string[] values)
     {
         var sql = $"CREATE TABLE {table} (value TEXT NOT NULL);"
