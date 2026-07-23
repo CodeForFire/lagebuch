@@ -25,6 +25,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
         TruppTypes = new[] { "Angriffstrupp" },
         RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
     };
+    public void Save(MasterDataSet set) { }
 }
 internal sealed class FakeRecent : IRecentFilesStore
 {
@@ -58,7 +59,7 @@ public class MainWindowViewModelTests
     private static MainWindowViewModel New()
     {
         var home = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(), new NoopTicker(), new NoopAlarmService());
-        return new MainWindowViewModel(home);
+        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData()));
     }
 
     [Fact]
@@ -116,7 +117,7 @@ public class MainWindowViewModelTests
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new NoopTicker(), new NoopAlarmService());
-        var vm = new MainWindowViewModel(home);
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData()));
 
         vm.RequestOpenFileCommand.Execute(null);
 
@@ -132,13 +133,64 @@ public class MainWindowViewModelTests
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new NoopTicker(), new NoopAlarmService());
-        var vm = new MainWindowViewModel(home);
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData()));
 
         vm.OpenRecent("/x.fwincident");
 
         Assert.Null(vm.PendingPrompt);
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
         Assert.True(workspace.IsReadOnly);
+    }
+
+    [Fact]
+    public void ShowMasterData_navigates_to_the_editor()
+    {
+        var vm = New();
+        vm.ShowMasterDataCommand.Execute(null);
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+    }
+
+    [Fact]
+    public void Leaving_a_clean_editor_navigates_without_a_prompt()
+    {
+        var vm = New();
+        vm.ShowMasterDataCommand.Execute(null);
+        vm.GoHomeCommand.Execute(null);
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+    }
+
+    [Fact]
+    public void Leaving_a_dirty_editor_prompts_and_stays_until_confirmed()
+    {
+        var vm = New();
+        vm.ShowMasterDataCommand.Execute(null);
+        var editor = Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+        editor.Sections.OfType<EditableListSection>().First().AddCommand.Execute(null); // make dirty
+
+        vm.GoHomeCommand.Execute(null);
+        Assert.NotNull(editor.PendingConfirm);
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView); // still on editor
+
+        editor.PendingConfirm!.ConfirmCommand.Execute(null);
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+    }
+
+    [Fact]
+    public void A_second_nav_command_while_the_discard_prompt_is_up_does_not_stack_another()
+    {
+        var vm = New();
+        vm.ShowMasterDataCommand.Execute(null);
+        var editor = Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+        editor.Sections.OfType<EditableListSection>().First().AddCommand.Execute(null); // make dirty
+
+        vm.GoHomeCommand.Execute(null);
+        var firstPrompt = editor.PendingConfirm;
+        Assert.NotNull(firstPrompt);
+
+        vm.RequestOpenFileCommand.Execute(null); // a second nav attempt while the prompt is up
+
+        Assert.Same(firstPrompt, editor.PendingConfirm); // still the same dialog, not a second one
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView); // navigation did not proceed
     }
 }
 

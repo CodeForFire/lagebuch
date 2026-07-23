@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Feuerwehr.App.ViewModels;
 using Feuerwehr.App.Views;
 
 namespace Feuerwehr.App;
@@ -15,8 +14,7 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             MainWindow window = null!;
-            var home = CompositionRoot.CreateHome(() => window);
-            var mainViewModel = new MainWindowViewModel(home);
+            var mainViewModel = CompositionRoot.CreateMainWindowViewModel(() => window);
             window = new MainWindow(mainViewModel);
             desktop.MainWindow = window;
         }

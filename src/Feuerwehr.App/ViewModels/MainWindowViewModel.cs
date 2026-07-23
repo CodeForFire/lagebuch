@@ -9,11 +9,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private enum PendingAction { None, New }
 
     private readonly HomeViewModel _home;
+    private readonly MasterDataEditorViewModel _editor;
     private PendingAction _pending = PendingAction.None;
 
-    public MainWindowViewModel(HomeViewModel home)
+    public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor)
     {
         _home = home;
+        _editor = editor;
         _home.WorkspaceOpened = ws => CurrentView = ws;
         _currentView = home;
     }
@@ -24,17 +26,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
 
+    // Every path that leaves the editor goes through here, so unsaved Stammdaten edits prompt first.
+    // When the editor is not the current view, or has no unsaved changes, navigation is immediate.
+    private void NavigateAway(Action proceed)
+    {
+        if (ReferenceEquals(CurrentView, _editor))
+        {
+            if (_editor.PendingConfirm is not null)
+                return; // a discard prompt is already up — don't stack a second one
+            _editor.ConfirmDiscardThen(proceed);
+        }
+        else
+            proceed();
+    }
+
     [RelayCommand]
-    private void RequestNewIncident()
+    private void RequestNewIncident() => NavigateAway(() =>
     {
         _pending = PendingAction.New;
         PendingPrompt = new OperatorPromptViewModel(
             collectIlsNumber: true, callSignOptions: _home.CallSignOptions);
-    }
+    });
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
     [RelayCommand]
-    private void RequestOpenFile() => _home.OpenFileCommand.Execute(null);
+    private void RequestOpenFile() => NavigateAway(() => _home.OpenFileCommand.Execute(null));
+
+    [RelayCommand]
+    private void ShowMasterData() => NavigateAway(() => CurrentView = _editor);
 
     [RelayCommand]
     private void ConfirmOperator()
@@ -59,7 +78,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void GoHome() => CurrentView = _home;
+    private void GoHome() => NavigateAway(() => CurrentView = _home);
 
-    public void OpenRecent(string path) => _home.OpenRecentCommand.Execute(path);
+    public void OpenRecent(string path) => NavigateAway(() => _home.OpenRecentCommand.Execute(path));
 }

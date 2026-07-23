@@ -24,6 +24,7 @@ public class HomeOpenErrorTests
         // `Empty with` rather than the positional constructor: master data gains fields often
         // enough that spelling every one out here just breaks the build on the next addition.
         public MasterDataSet Get() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
+        public void Save(MasterDataSet set) { }
     }
 
     private sealed class SeededRecent : IRecentFilesStore

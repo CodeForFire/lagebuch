@@ -274,6 +274,143 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(MasterDataDefaults.LoadEmbedded().ChecklistTemplate[0], set.ChecklistTemplate[0]);
     }
 
+    // --- Snapshot-aware seeding (issue #27) ---
+
+    [Fact]
+    public void Deleting_a_seed_value_after_the_first_seed_stays_deleted()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);                       // first run: seeds + writes snapshot
+        ExecRaw("DELETE FROM md_roles WHERE value = 'EL';");
+
+        var set = store.GetOrSeed(_path);             // snapshot path: must not resurrect 'EL'
+
+        Assert.DoesNotContain("EL", set.Roles);
+    }
+
+    [Fact]
+    public void A_value_absent_from_the_snapshot_is_added_as_new_seed()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);
+        // Simulate a value the previously-applied seed did not contain: forget it in the snapshot
+        // AND remove it from the table, so the next start sees it as genuinely new.
+        ExecRaw("DELETE FROM md_roles WHERE value = 'EL'; DELETE FROM md_seed_snapshot WHERE item_key = 'EL';");
+
+        var set = store.GetOrSeed(_path);
+
+        Assert.Contains("EL", set.Roles);             // reappears: new since snapshot
+    }
+
+    [Fact]
+    public void A_custom_value_survives_a_restart_that_also_delivers_a_new_seed_value()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);                            // first run: seeds + writes snapshot
+
+        // A user-added custom role, plus a real seed role made "new since snapshot" again by
+        // forgetting it in both the table and the snapshot -- simulating a seed update landing on
+        // the same restart as a local edit.
+        ExecRaw("INSERT INTO md_roles (value) VALUES ('Eigene Rolle');"
+              + "DELETE FROM md_roles WHERE value = 'EL';"
+              + "DELETE FROM md_seed_snapshot WHERE item_key = 'EL';");
+
+        var set = store.GetOrSeed(_path);
+
+        Assert.Contains("Eigene Rolle", set.Roles);        // custom addition not dropped
+        Assert.Contains("EL", set.Roles);                  // re-added seed value reappeared
+    }
+
+    [Fact]
+    public void Once_a_snapshot_exists_the_stored_order_is_preserved()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);
+        // Replace roles with two entries in a custom order. The snapshot already remembers the full
+        // seed, so nothing is re-added and nothing is reordered to seed-first.
+        ExecRaw("DELETE FROM md_roles;"
+              + "INSERT INTO md_roles (value) VALUES ('ZF'), ('EL');");
+
+        var set = store.GetOrSeed(_path);
+
+        Assert.Equal(new[] { "ZF", "EL" }, set.Roles);
+    }
+
+    // --- Save write path (issue #28) ---
+
+    [Fact]
+    public void Save_round_trips_every_category_including_personnel()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+
+        var edited = seeded with
+        {
+            Roles = new[] { "EL", "Eigene Rolle" },
+            TruppTypes = new[] { "Angriffstrupp" },
+            Personnel = new[] { new Person("Neu", "Person", "GF", "Land 1", "01 71 / 0 00 00 00") },
+        };
+        store.Save(_path, edited);
+
+        var reopened = store.GetOrSeed(_path);
+        Assert.Equal(new[] { "EL", "Eigene Rolle" }, reopened.Roles);
+        Assert.Contains(reopened.Personnel, p => p.LastName == "Neu" && p.CallSign == "Land 1");
+        Assert.Equal(seeded.Streets.Count, reopened.Streets.Count); // streets carried through untouched
+    }
+
+    [Fact]
+    public void Save_round_trips_an_added_and_a_removed_street()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+        var originalCount = seeded.Streets.Count;
+        var removed = seeded.Streets[0];
+        var added = new Street("Eigene Str. 1", "FFB");
+
+        var edited = seeded with
+        {
+            Streets = seeded.Streets.Skip(1).Append(added).ToList(),
+        };
+        store.Save(_path, edited);
+
+        var reopened = store.GetOrSeed(_path);
+
+        Assert.Contains(reopened.Streets, s => s.Name == added.Name && s.District == added.District);
+        Assert.DoesNotContain(reopened.Streets, s => s.Name == removed.Name && s.District == removed.District);
+        Assert.Equal(originalCount, reopened.Streets.Count); // one removed, one added -> same total
+    }
+
+    [Fact]
+    public void Save_round_trips_a_checklist_reorder_and_delete()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+
+        // Reverse the order, then drop what is now the first entry (the seed's original last step).
+        var reversed = seeded.ChecklistTemplate.Reverse().ToList();
+        var removedStep = reversed[0];
+        var edited = seeded with { ChecklistTemplate = reversed.Skip(1).ToList() };
+        store.Save(_path, edited);
+
+        var reopened = store.GetOrSeed(_path);
+
+        Assert.Equal(edited.ChecklistTemplate, reopened.ChecklistTemplate); // order preserved exactly
+        Assert.DoesNotContain(removedStep, reopened.ChecklistTemplate);
+        Assert.Equal(seeded.ChecklistTemplate.Count - 1, reopened.ChecklistTemplate.Count);
+    }
+
+    [Fact]
+    public void A_value_deleted_through_Save_does_not_come_back_on_the_next_start()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+
+        store.Save(_path, seeded with { Roles = seeded.Roles.Where(r => r != "EL").ToList() });
+
+        var reopened = store.GetOrSeed(_path);
+        Assert.DoesNotContain("EL", reopened.Roles);
+    }
+
     private void SeedLegacy(string table, params string[] values)
     {
         var sql = $"CREATE TABLE {table} (value TEXT NOT NULL);"
