@@ -8,12 +8,19 @@ public class MasterDataEditorViewModelTests
 {
     private sealed class InMemoryProvider : IMasterDataProvider
     {
-        private MasterDataSet _set = MasterDataSet.Empty with
+        private static readonly MasterDataSet DefaultSet = MasterDataSet.Empty with
         {
             Roles = new[] { "EL", "ZF" },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
+
+        private MasterDataSet _set;
+
+        public InMemoryProvider() : this(DefaultSet) { }
+
+        public InMemoryProvider(MasterDataSet initial) => _set = initial;
+
         public int SaveCount { get; private set; }
         public MasterDataSet Get() => _set;
         public void Save(MasterDataSet set) { _set = set; SaveCount++; }
@@ -21,6 +28,12 @@ public class MasterDataEditorViewModelTests
 
     private static EditableListSection Roles(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<EditableListSection>().First(s => s.Title == "Rollen");
+
+    private static EditableListSection Section(MasterDataEditorViewModel vm, string title) =>
+        vm.Sections.OfType<EditableListSection>().First(s => s.Title == title);
+
+    private static PersonnelSection Personnel(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<PersonnelSection>().First(s => s.Title == "Personal");
 
     [Fact]
     public void Loads_a_section_per_category_and_starts_clean()
@@ -109,5 +122,49 @@ public class MasterDataEditorViewModelTests
         Assert.False(proceeded);
         Assert.Null(vm.PendingConfirm);
         Assert.True(vm.IsDirty);
+    }
+
+    /// <summary>
+    /// Every one of the ten sections must land in its own category on Save. Each section gets a
+    /// marker value unique to that category, so a swapped mapping in BuildSet (e.g. writing
+    /// _status where _unitStatus belongs) puts a marker in the wrong list and fails the assertion
+    /// for the category that should have received it.
+    /// </summary>
+    [Fact]
+    public void Save_maps_every_category_to_its_own_list_in_BuildSet()
+    {
+        var listTitles = new[]
+        {
+            "Rollen", "Status", "Einheiten-Status", "Ausrüstung", "Bezirke",
+            "Wachen", "Funkrufnamen", "Trupp-Typen", "Checkliste",
+        };
+
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = new MasterDataEditorViewModel(provider);
+
+        foreach (var title in listTitles)
+        {
+            var section = Section(vm, title);
+            section.AddCommand.Execute(null);
+            section.Items[^1].Value = $"MARK-{title}";
+        }
+
+        var personnel = Personnel(vm);
+        personnel.AddCommand.Execute(null);
+        personnel.Rows[^1].LastName = "MarkPersonal";
+
+        vm.SaveCommand.Execute(null);
+
+        var set = provider.Get();
+        Assert.Contains("MARK-Rollen", set.Roles);
+        Assert.Contains("MARK-Status", set.Status);
+        Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
+        Assert.Contains("MARK-Ausrüstung", set.Equipment);
+        Assert.Contains("MARK-Bezirke", set.Districts);
+        Assert.Contains("MARK-Wachen", set.Brigades);
+        Assert.Contains("MARK-Funkrufnamen", set.RadioCallSigns);
+        Assert.Contains("MARK-Trupp-Typen", set.TruppTypes);
+        Assert.Contains("MARK-Checkliste", set.ChecklistTemplate);
+        Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
     }
 }

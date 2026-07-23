@@ -50,7 +50,8 @@ public class MasterDataEditorRenderTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "master-data-editor.png");
-        window.CaptureRenderedFrame()!.Save(path);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.Save(path);
         Assert.True(new FileInfo(path).Length > 0);
     }
 }

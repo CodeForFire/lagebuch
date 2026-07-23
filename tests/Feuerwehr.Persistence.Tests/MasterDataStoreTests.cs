@@ -340,6 +340,47 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Save_round_trips_an_added_and_a_removed_street()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+        var originalCount = seeded.Streets.Count;
+        var removed = seeded.Streets[0];
+        var added = new Street("Eigene Str. 1", "FFB");
+
+        var edited = seeded with
+        {
+            Streets = seeded.Streets.Skip(1).Append(added).ToList(),
+        };
+        store.Save(_path, edited);
+
+        var reopened = store.GetOrSeed(_path);
+
+        Assert.Contains(reopened.Streets, s => s.Name == added.Name && s.District == added.District);
+        Assert.DoesNotContain(reopened.Streets, s => s.Name == removed.Name && s.District == removed.District);
+        Assert.Equal(originalCount, reopened.Streets.Count); // one removed, one added -> same total
+    }
+
+    [Fact]
+    public void Save_round_trips_a_checklist_reorder_and_delete()
+    {
+        var store = new MasterDataStore();
+        var seeded = store.GetOrSeed(_path);
+
+        // Reverse the order, then drop what is now the first entry (the seed's original last step).
+        var reversed = seeded.ChecklistTemplate.Reverse().ToList();
+        var removedStep = reversed[0];
+        var edited = seeded with { ChecklistTemplate = reversed.Skip(1).ToList() };
+        store.Save(_path, edited);
+
+        var reopened = store.GetOrSeed(_path);
+
+        Assert.Equal(edited.ChecklistTemplate, reopened.ChecklistTemplate); // order preserved exactly
+        Assert.DoesNotContain(removedStep, reopened.ChecklistTemplate);
+        Assert.Equal(seeded.ChecklistTemplate.Count - 1, reopened.ChecklistTemplate.Count);
+    }
+
+    [Fact]
     public void A_value_deleted_through_Save_does_not_come_back_on_the_next_start()
     {
         var store = new MasterDataStore();
