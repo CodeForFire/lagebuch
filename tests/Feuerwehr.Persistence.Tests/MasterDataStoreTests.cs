@@ -274,6 +274,49 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(MasterDataDefaults.LoadEmbedded().ChecklistTemplate[0], set.ChecklistTemplate[0]);
     }
 
+    // --- Snapshot-aware seeding (issue #27) ---
+
+    [Fact]
+    public void Deleting_a_seed_value_after_the_first_seed_stays_deleted()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);                       // first run: seeds + writes snapshot
+        ExecRaw("DELETE FROM md_roles WHERE value = 'EL';");
+
+        var set = store.GetOrSeed(_path);             // snapshot path: must not resurrect 'EL'
+
+        Assert.DoesNotContain("EL", set.Roles);
+    }
+
+    [Fact]
+    public void A_value_absent_from_the_snapshot_is_added_as_new_seed()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);
+        // Simulate a value the previously-applied seed did not contain: forget it in the snapshot
+        // AND remove it from the table, so the next start sees it as genuinely new.
+        ExecRaw("DELETE FROM md_roles WHERE value = 'EL'; DELETE FROM md_seed_snapshot WHERE item_key = 'EL';");
+
+        var set = store.GetOrSeed(_path);
+
+        Assert.Contains("EL", set.Roles);             // reappears: new since snapshot
+    }
+
+    [Fact]
+    public void Once_a_snapshot_exists_the_stored_order_is_preserved()
+    {
+        var store = new MasterDataStore();
+        store.GetOrSeed(_path);
+        // Replace roles with two entries in a custom order. The snapshot already remembers the full
+        // seed, so nothing is re-added and nothing is reordered to seed-first.
+        ExecRaw("DELETE FROM md_roles;"
+              + "INSERT INTO md_roles (value) VALUES ('ZF'), ('EL');");
+
+        var set = store.GetOrSeed(_path);
+
+        Assert.Equal(new[] { "ZF", "EL" }, set.Roles);
+    }
+
     private void SeedLegacy(string table, params string[] values)
     {
         var sql = $"CREATE TABLE {table} (value TEXT NOT NULL);"
