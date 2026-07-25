@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace Feuerwehr.Persistence.MasterData;
@@ -5,8 +6,9 @@ namespace Feuerwehr.Persistence.MasterData;
 public sealed record Street(string Name, string District);
 
 /// <summary>
-/// A person from the local roster. Sourced from the gitignored personnel.json, so this list is
-/// empty on a fresh clone and on CI — every consumer must treat that as normal rather than as a
+/// A person from the local roster. Personal data (names, mobile numbers) that must never be
+/// compiled into the app, so it only ever reaches a running install through an explicit import.
+/// The roster is empty until then — every consumer must treat that as normal rather than as a
 /// configuration error, and must still accept a freely typed name.
 /// </summary>
 public sealed record Person(string LastName, string FirstName, string? Role, string? CallSign, string? Phone)
@@ -39,21 +41,44 @@ public sealed record MasterDataSet(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Street>(),
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Person>());
+
+    /// <summary>
+    /// True when no category holds a single entry. A fresh install starts here, and it is the
+    /// condition under which the Stammdaten editor offers Import — a bootstrap, not a merge.
+    /// </summary>
+    public bool IsEmpty =>
+        Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
+        && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
+        && Streets.Count == 0 && ChecklistTemplate.Count == 0 && TruppTypes.Count == 0
+        && Personnel.Count == 0;
 }
 
-public static class MasterDataDefaults
+/// <summary>
+/// Reads and writes the master-data interchange format — one JSON object whose top-level keys are
+/// all optional (a missing key means an empty category). The same shape covers the whole set, so a
+/// file holding only <c>personnel</c>, only the non-personal lists, or everything at once all parse.
+/// This is the format the Stammdaten editor's Import/Export use; nothing is embedded in the app.
+/// </summary>
+public static class MasterDataJson
 {
-    public static MasterDataSet LoadEmbedded()
+    public static MasterDataSet Parse(Stream json)
     {
-        using var doc = JsonDocument.Parse(OpenRequired("master-data.json"));
+        using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         static IReadOnlyList<string> Arr(JsonElement e, string prop) =>
-            e.GetProperty(prop).EnumerateArray().Select(x => x.GetString()!).ToList();
+            e.TryGetProperty(prop, out var a) && a.ValueKind == JsonValueKind.Array
+                ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
+                : Array.Empty<string>();
 
-        var streets = root.GetProperty("streets").EnumerateArray()
-            .Select(s => new Street(s.GetProperty("name").GetString()!, s.GetProperty("district").GetString() ?? string.Empty))
-            .ToList();
+        IReadOnlyList<Street> streets =
+            root.TryGetProperty("streets", out var st) && st.ValueKind == JsonValueKind.Array
+                ? st.EnumerateArray()
+                    .Select(s => new Street(
+                        s.GetProperty("name").GetString()!,
+                        s.TryGetProperty("district", out var d) ? d.GetString() ?? string.Empty : string.Empty))
+                    .ToList()
+                : Array.Empty<Street>();
 
         return new MasterDataSet(
             Arr(root, "roles"),
@@ -66,25 +91,18 @@ public static class MasterDataDefaults
             streets,
             Arr(root, "checklistTemplate"),
             Arr(root, "truppTypes"),
-            LoadPersonnel());
+            ParsePersonnel(root));
     }
 
-    /// <summary>
-    /// Reads the optional personnel roster. It lives in a separate, gitignored file because it is
-    /// the only PII in the seed, and it is only embedded when a local export exists — so an absent
-    /// resource is the expected state on CI and on a fresh clone, not a failure.
-    /// </summary>
-    private static IReadOnlyList<Person> LoadPersonnel()
+    private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
     {
-        using var stream = Open("personnel.json");
-        if (stream is null)
+        if (!root.TryGetProperty("personnel", out var arr) || arr.ValueKind != JsonValueKind.Array)
             return Array.Empty<Person>();
 
-        using var doc = JsonDocument.Parse(stream);
-        return doc.RootElement.GetProperty("personnel").EnumerateArray()
+        return arr.EnumerateArray()
             .Select(p => new Person(
                 p.GetProperty("lastName").GetString()!,
-                p.GetProperty("firstName").GetString() ?? string.Empty,
+                p.TryGetProperty("firstName", out var f) ? f.GetString() ?? string.Empty : string.Empty,
                 Opt(p, "role"),
                 Opt(p, "callSign"),
                 Opt(p, "phone")))
@@ -94,14 +112,38 @@ public static class MasterDataDefaults
             e.TryGetProperty(prop, out var v) && v.ValueKind is not JsonValueKind.Null ? v.GetString() : null;
     }
 
-    private static Stream OpenRequired(string fileName) =>
-        Open(fileName) ?? throw new InvalidOperationException($"Embedded {fileName} not found.");
-
-    private static Stream? Open(string fileName)
+    /// <summary>
+    /// Serializes the whole set in the superset schema, so a file written here re-parses identically.
+    /// Indented and with relaxed escaping so umlauts and slashes stay readable in a hand-edited file.
+    /// </summary>
+    public static string Serialize(MasterDataSet set)
     {
-        var asm = typeof(MasterDataDefaults).Assembly;
-        var resourceName = asm.GetManifestResourceNames()
-            .SingleOrDefault(n => n.EndsWith(fileName, StringComparison.Ordinal));
-        return resourceName is null ? null : asm.GetManifestResourceStream(resourceName);
+        var model = new
+        {
+            roles = set.Roles,
+            status = set.Status,
+            unitStatus = set.UnitStatus,
+            equipment = set.Equipment,
+            districts = set.Districts,
+            radioCallSigns = set.RadioCallSigns,
+            brigades = set.Brigades,
+            truppTypes = set.TruppTypes,
+            checklistTemplate = set.ChecklistTemplate,
+            streets = set.Streets.Select(s => new { name = s.Name, district = s.District }),
+            personnel = set.Personnel.Select(p => new
+            {
+                lastName = p.LastName,
+                firstName = p.FirstName,
+                role = p.Role,
+                callSign = p.CallSign,
+                phone = p.Phone,
+            }),
+        };
+
+        return JsonSerializer.Serialize(model, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        });
     }
 }

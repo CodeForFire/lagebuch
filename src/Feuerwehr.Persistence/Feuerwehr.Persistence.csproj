@@ -8,14 +8,6 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="seed-source\master-data.json" />
-    <!-- The personnel roster is names and mobile numbers, so it is gitignored and absent on CI
-         and on any fresh clone. Embed it only when a local CLS export has been dropped in;
-         without it the app simply starts with an empty roster. See personnel.example.json. -->
-    <EmbeddedResource Include="seed-source\personnel.json" Condition="Exists('seed-source\personnel.json')" />
-  </ItemGroup>
-
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

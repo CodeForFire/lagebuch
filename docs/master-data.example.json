@@ -1,0 +1,22 @@
+{
+  "roles": ["EL", "EAL", "ZF", "GF"],
+  "status": ["aufgenommen", "übermittelt", "abgearbeitet"],
+  "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz"],
+  "equipment": ["Mobilteil 1", "Digitalkamera"],
+  "districts": ["Musterstadt", "Musterdorf"],
+  "radioCallSigns": ["Florian Musterstadt 1", "Florian Musterstadt 11/1"],
+  "brigades": ["FF Musterstadt", "FF Musterdorf"],
+  "truppTypes": ["Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "CSA-Trupp"],
+  "checklistTemplate": [
+    "Aufstellort ELW frei?",
+    "Kennleuchte ein, Blaulicht aus?"
+  ],
+  "streets": [
+    { "name": "Bahnhofstraße", "district": "Musterstadt" },
+    { "name": "Hauptstraße", "district": "Musterdorf" }
+  ],
+  "personnel": [
+    { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000" },
+    { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null }
+  ]
+}

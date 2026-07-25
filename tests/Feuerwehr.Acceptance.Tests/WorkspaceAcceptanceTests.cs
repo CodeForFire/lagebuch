@@ -27,6 +27,8 @@ internal sealed class FakeDialogs : IFileDialogService
     public Task<string?> PickSaveAsync(string s) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
 }
 internal sealed class FixedClock : IClock
 {

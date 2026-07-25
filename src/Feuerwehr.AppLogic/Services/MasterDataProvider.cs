@@ -10,13 +10,13 @@ public sealed class MasterDataProvider : IMasterDataProvider
 
     public MasterDataProvider(string masterDataPath) => _path = masterDataPath;
 
-    public MasterDataSet Get() => _cached ??= _store.GetOrSeed(_path);
+    public MasterDataSet Get() => _cached ??= _store.GetOrCreate(_path);
 
     public void Save(MasterDataSet set)
     {
         _store.Save(_path, set);
         // Re-read rather than trust the in-memory copy: the store is the canonical shape
         // (e.g. personnel comes back name-sorted), so callers see exactly what a fresh start would.
-        _cached = _store.GetOrSeed(_path);
+        _cached = _store.GetOrCreate(_path);
     }
 }

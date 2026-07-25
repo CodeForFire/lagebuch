@@ -15,8 +15,15 @@
             <TextBlock Text="Nicht gespeichert" FontSize="11" FontWeight="SemiBold"
                        Foreground="{StaticResource AmberBrush}" />
           </Border>
+          <Border x:Name="FileErrorBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding FileError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding FileError}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
+          </Border>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button x:Name="ImportButton" Content="IMPORTIEREN" Command="{Binding ImportCommand}" />
+          <Button x:Name="ExportButton" Content="EXPORTIEREN" Command="{Binding ExportCommand}" />
           <Button x:Name="DiscardButton" Content="VERWERFEN" Command="{Binding DiscardCommand}" />
           <Button x:Name="SaveButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveCommand}" />
         </StackPanel>

@@ -17,7 +17,7 @@ public static class CompositionRoot
         var dialogs = new StorageProviderFileDialogService(topLevel);
         var home = new HomeViewModel(store, masterData, recent, dialogs,
             new SystemClock(), new DispatcherTimerTicker(), new SystemAlarmService());
-        var editor = new MasterDataEditorViewModel(masterData);
+        var editor = new MasterDataEditorViewModel(masterData, dialogs, new MasterDataFileService());
         return new MainWindowViewModel(home, editor);
     }
 }
