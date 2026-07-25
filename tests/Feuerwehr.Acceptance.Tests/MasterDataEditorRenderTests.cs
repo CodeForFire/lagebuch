@@ -33,10 +33,16 @@ public class MasterDataEditorRenderTests
         public void Save(MasterDataSet set) { }
     }
 
+    private sealed class NoFiles : IMasterDataFileService
+    {
+        public MasterDataSet Read(string path) => MasterDataSet.Empty;
+        public void Write(string path, MasterDataSet set) { }
+    }
+
     [AvaloniaFact]
     public void The_editor_renders_with_every_category()
     {
-        var vm = new MasterDataEditorViewModel(new SampleProvider());
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         var view = new MasterDataEditorView { DataContext = vm };
         var window = new Window { Content = view, Width = 1080, Height = 680 };
         window.Show();

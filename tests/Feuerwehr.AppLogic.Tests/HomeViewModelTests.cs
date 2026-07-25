@@ -239,6 +239,8 @@ internal sealed class OpenReturningDialogs : IFileDialogService
     public Task<string?> PickSaveAsync(string suggestedFileName) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 }
 
 // Captures the suggested filename passed to PickSaveAsync.
@@ -252,6 +254,8 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     }
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
 }
 
 // Every Load fails, standing in for a moved, truncated, or too-new file.

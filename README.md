@@ -51,58 +51,54 @@ dotnet run --project src/Feuerwehr.App/Feuerwehr.App.csproj
 
 ## Master data
 
-Dropdown contents (roles, radio call signs, streets, ...) are seeded from
-`src/Feuerwehr.Persistence/seed-source/master-data.json` into a local
-`masterdata.db` on first start.
+Dropdown contents (roles, radio call signs, streets, personnel, ...) are treated
+as PII and are **never compiled into the application**. A fresh install starts
+with **empty** master data; you populate it in the in-app **Stammdaten** editor
+by importing a JSON file, and can write your own data back out again.
 
-Seeding fills a category only while its table is still empty, so **changes to
-the seed file do not reach an existing installation**. To pick them up, delete
-the database and let it be recreated:
+### Where it is stored
+
+On first start an empty `masterdata.db` is created. It is the live database the
+app reads and writes from then on, and where the Stammdaten editor saves:
 
 | Platform | Path |
 |---|---|
 | Windows | `%AppData%\Lagebuch\masterdata.db` |
 | Linux   | `~/.config/Lagebuch/masterdata.db` |
+| macOS   | `~/.config/Lagebuch/masterdata.db` |
 
-This is a deliberate pre-release simplification — there is no master-data
-versioning or in-app editor yet.
+On macOS the app uses `~/.config`, **not** `~/Library/Application Support` —
+that is simply where .NET's `ApplicationData` folder resolves on Unix. To start
+over, delete `masterdata.db`; the app recreates it empty on the next launch.
 
-### Personnel roster
+### Import and export
 
-Names and mobile numbers are the only personal data in the seed, so they live in
-a separate file that is **never committed**:
+Open **Stammdaten** and use the header buttons:
 
-```
-src/Feuerwehr.Persistence/seed-source/personnel.json   (gitignored)
-```
+- **IMPORTIEREN** — offered only while the data is still empty (a first-run
+  bootstrap, not a merge). Pick a JSON file; its contents load into the editor as
+  unsaved changes for review, and reach `masterdata.db` only when you press
+  **SPEICHERN** (or **VERWERFEN** to discard).
+- **EXPORTIEREN** — writes the current master data (including unsaved edits) to a
+  JSON file you can back up or hand to another install.
 
-Copy `personnel.example.json` next to it, rename it, and replace the entries
-with the CLS export. The format is one array of people:
+The file is one JSON object; every top-level key is optional, so a file may hold
+the whole set, only the roster, or anything in between. See
+[`docs/master-data.example.json`](docs/master-data.example.json) for the full
+schema. The keys are the string lists `roles`, `status`, `unitStatus`,
+`equipment`, `districts`, `radioCallSigns`, `brigades`, `truppTypes` and
+`checklistTemplate`; `streets` (`{ name, district }`); and `personnel`
+(`{ lastName, firstName, role?, callSign?, phone? }` — `lastName` is required,
+`firstName` may be `null`, and `role`/`callSign`/`phone` may each be `null` or
+omitted).
 
-```json
-{
-  "personnel": [
-    {
-      "lastName": "Mustermann",
-      "firstName": "Max",
-      "role": "ZF",
-      "callSign": "Land 1",
-      "phone": "01 71 / 1 23 45 67"
-    }
-  ]
-}
-```
+### PII
 
-`lastName` and `firstName` must both be present — `firstName` may be `null`, but
-leaving the key out entirely fails the load. `role`, `callSign` and `phone` may
-each be `null` or omitted.
-
-The file is embedded into the build **only if it exists**, so a fresh clone and
-CI compile and run without it — the app simply starts with an empty roster. That
-is a supported state, not a misconfiguration: the name field on the Funktionen
-tab offers the roster as suggestions but always accepts free text, so off-roster
-and mutual-aid personnel can be entered either way.
-
-Because the roster is seeded like every other category, the same caveat above
-applies: adding people only reaches an installation whose `masterdata.db` does
-not yet have them.
+Any real master-data or personnel JSON — street lists, station and call-sign
+names, and above all names and mobile numbers — is personal/identifying data and
+must be kept **out of the repository**. `seed-source/` and `*.masterdata.json`
+are gitignored for exactly this reason; only the anonymised
+`docs/master-data.example.json` is tracked. An empty roster is a fully supported
+state: the name field on the Funktionen tab offers the roster as suggestions but
+always accepts free text, so off-roster and mutual-aid personnel can be entered
+either way.

@@ -38,6 +38,13 @@ internal sealed class FakeDialogs : IFileDialogService
     public Task<string?> PickSaveAsync(string s) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+}
+internal sealed class NoFiles : IMasterDataFileService
+{
+    public MasterDataSet Read(string path) => MasterDataSet.Empty;
+    public void Write(string path, MasterDataSet set) { }
 }
 internal sealed class FixedClock : IClock
 {
@@ -59,7 +66,7 @@ public class MainWindowViewModelTests
     private static MainWindowViewModel New()
     {
         var home = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(), new NoopTicker(), new NoopAlarmService());
-        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData()));
+        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData(), new FakeDialogs(), new NoFiles()));
     }
 
     [Fact]
@@ -117,7 +124,7 @@ public class MainWindowViewModelTests
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new NoopTicker(), new NoopAlarmService());
-        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData()));
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData(), new FakeDialogs(), new NoFiles()));
 
         vm.RequestOpenFileCommand.Execute(null);
 
@@ -133,7 +140,7 @@ public class MainWindowViewModelTests
         var clock = new FixedClock();
         IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var home = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new NoopTicker(), new NoopAlarmService());
-        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData()));
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new FakeMasterData(), new FakeDialogs(), new NoFiles()));
 
         vm.OpenRecent("/x.fwincident");
 
@@ -199,4 +206,6 @@ internal sealed class OpenPathDialogs : IFileDialogService
     public Task<string?> PickSaveAsync(string s) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
 }
