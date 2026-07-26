@@ -19,8 +19,7 @@ public class IncidentPdfTests
         var clock = new Clock();
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, "Brand");
-        incident.SetIncidentNumber(new IncidentNumber("B 4242"));
-        incident.SetIlsNumber(IlsNumber.Parse("4242"));
+        incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.SetAddress("Hauptstr. 12", "FFB");
         incident.SetStatus("aufgenommen");
         incident.SeedChecklist(new[] { "Blaulicht aus?", "Bei ILS gemeldet?" });

@@ -30,7 +30,9 @@ public sealed record MasterDataSet(
     IReadOnlyList<Street> Streets,
     IReadOnlyList<string> ChecklistTemplate,
     IReadOnlyList<string> TruppTypes,
-    IReadOnlyList<Person> Personnel)
+    IReadOnlyList<Person> Personnel,
+    // Einsatzart values (ABek Bayern) — the leading token of the complete Einsatznummer.
+    IReadOnlyList<string> Einsatzarten)
 {
     /// <summary>
     /// Every category empty. Intended for tests and for callers that need a starting point to
@@ -40,7 +42,7 @@ public sealed record MasterDataSet(
     public static MasterDataSet Empty { get; } = new(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Street>(),
-        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Person>());
+        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>());
 
     /// <summary>
     /// True when no category holds a single entry. A fresh install starts here, and it is the
@@ -50,7 +52,7 @@ public sealed record MasterDataSet(
         Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
         && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
         && Streets.Count == 0 && ChecklistTemplate.Count == 0 && TruppTypes.Count == 0
-        && Personnel.Count == 0;
+        && Personnel.Count == 0 && Einsatzarten.Count == 0;
 }
 
 /// <summary>
@@ -91,7 +93,8 @@ public static class MasterDataJson
             streets,
             Arr(root, "checklistTemplate"),
             Arr(root, "truppTypes"),
-            ParsePersonnel(root));
+            ParsePersonnel(root),
+            Arr(root, "einsatzarten"));
     }
 
     private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
@@ -128,6 +131,7 @@ public static class MasterDataJson
             radioCallSigns = set.RadioCallSigns,
             brigades = set.Brigades,
             truppTypes = set.TruppTypes,
+            einsatzarten = set.Einsatzarten,
             checklistTemplate = set.ChecklistTemplate,
             streets = set.Streets.Select(s => new { name = s.Name, district = s.District }),
             personnel = set.Personnel.Select(p => new

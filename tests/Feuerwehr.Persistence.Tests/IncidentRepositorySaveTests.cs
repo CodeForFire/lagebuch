@@ -24,19 +24,39 @@ public class IncidentRepositorySaveTests : IDisposable
         var clock = new Clock();
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, "Brand");
-        incident.SetIlsNumber(IlsNumber.Parse("4242"));
+        incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
 
         new IncidentRepository().Save(_path, incident);
 
         using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT ils_number FROM incident_meta;";
-        Assert.Equal("4242", (string)cmd.ExecuteScalar()!);
+        cmd.CommandText = "SELECT incident_number FROM incident_meta;";
+        Assert.Equal("B 1.2 260715 4242", (string)cmd.ExecuteScalar()!);
         // Two rows: the automatic "Einsatz begonnen" entry from Incident.Start plus the
         // manual one above.
         cmd.CommandText = "SELECT count(*) FROM etb_entries;";
         Assert.Equal(2L, (long)cmd.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void Legacy_ils_number_loads_as_the_incident_number()
+    {
+        var clock = new Clock();
+        var repo = new IncidentRepository();
+        repo.Save(_path, Incident.Start(clock, new SessionOperator("Müller")));
+
+        // Simulate a file written before the unification: the number lived in ils_number and
+        // incident_number was empty.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "UPDATE incident_meta SET incident_number = NULL, ils_number = '4711';";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal("4711", repo.Load(_path).IncidentNumber!.Value);
     }
 
     [Fact]

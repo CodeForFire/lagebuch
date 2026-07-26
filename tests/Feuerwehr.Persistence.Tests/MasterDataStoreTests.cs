@@ -44,6 +44,7 @@ public class MasterDataStoreTests : IDisposable
             Brigades = new[] { "FFB Wache 1" },
             RadioCallSigns = new[] { "Land 1" },
             TruppTypes = new[] { "Angriffstrupp" },
+            Einsatzarten = new[] { "B", "THL" },
             ChecklistTemplate = new[] { "Schritt 1", "Schritt 2" },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
@@ -52,6 +53,7 @@ public class MasterDataStoreTests : IDisposable
 
         var reopened = store.GetOrCreate(_path);
         Assert.Equal(new[] { "EL", "ZF" }, reopened.Roles);
+        Assert.Equal(new[] { "B", "THL" }, reopened.Einsatzarten);
         Assert.Equal(new[] { "Schritt 1", "Schritt 2" }, reopened.ChecklistTemplate);
         Assert.Contains(reopened.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");

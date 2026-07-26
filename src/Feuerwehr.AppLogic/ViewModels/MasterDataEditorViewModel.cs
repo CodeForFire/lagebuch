@@ -22,7 +22,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private EditableListSection _roles = null!, _status = null!, _unitStatus = null!, _equipment = null!,
-        _districts = null!, _brigades = null!, _callSigns = null!, _truppTypes = null!, _checklist = null!;
+        _districts = null!, _brigades = null!, _callSigns = null!, _truppTypes = null!, _einsatzarten = null!,
+        _checklist = null!;
     private PersonnelSection _personnel = null!;
 
     public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
@@ -76,6 +77,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Sections.Add(_brigades = new EditableListSection("Wachen", set.Brigades, MarkDirty));
         Sections.Add(_callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty));
         Sections.Add(_truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty));
+        Sections.Add(_einsatzarten = new EditableListSection("Einsatzarten", set.Einsatzarten, MarkDirty));
         Sections.Add(_checklist = new EditableListSection("Checkliste", set.ChecklistTemplate, MarkDirty));
         Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
 
@@ -92,6 +94,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Brigades = _brigades.ToValues(),
         RadioCallSigns = _callSigns.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
+        Einsatzarten = _einsatzarten.ToValues(),
         ChecklistTemplate = _checklist.ToValues(),
         Personnel = _personnel.ToPeople(),
         // Streets are not editable here; _original carries them through unchanged.

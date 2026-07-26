@@ -34,10 +34,18 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
-    public void Ils_not_collected_by_default()
+    public void Incident_number_not_collected_by_default()
     {
         var vm = new OperatorPromptViewModel();
-        Assert.False(vm.CollectsIlsNumber);
+        Assert.False(vm.CollectsIncidentNumber);
+    }
+
+    [Fact]
+    public void EinsatzartOptions_default_to_empty_and_expose_the_supplied_list()
+    {
+        Assert.Empty(new OperatorPromptViewModel().EinsatzartOptions);
+        var options = new[] { "B", "THL" };
+        Assert.Equal(options, new OperatorPromptViewModel(einsatzartOptions: options).EinsatzartOptions);
     }
 
     [Fact]
@@ -69,37 +77,37 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
-    public void Valid_four_digit_ils_parses()
+    public void Composes_the_complete_einsatznummer_from_its_parts()
     {
-        var vm = new OperatorPromptViewModel(collectIlsNumber: true)
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true)
         {
             OperatorName = "Müller",
-            IlsNumberInput = "1234",
+            EinsatzartInput = "B",
+            EinsatzDateInput = "260715",
+            EinsatzNumberInput = "1297",
         };
         Assert.True(vm.ConfirmCommand.CanExecute(null));
-        Assert.False(vm.ShowIlsError);
-        Assert.Equal("1234", vm.IlsNumber!.Value);
+        Assert.Equal("B 1.2 260715 1297", vm.IncidentNumber!.Value);
     }
 
     [Fact]
-    public void Non_four_digit_ils_blocks_confirm_and_shows_error()
+    public void Einsatzart_is_free_text_even_when_not_in_the_options()
     {
-        var vm = new OperatorPromptViewModel(collectIlsNumber: true)
+        // The dropdown is a hint, not a closed set: an off-list Einsatzart must still compose.
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true, einsatzartOptions: new[] { "B" })
         {
             OperatorName = "Müller",
-            IlsNumberInput = "12",
+            EinsatzartInput = "XYZ",
+            EinsatzNumberInput = "5",
         };
-        Assert.False(vm.ConfirmCommand.CanExecute(null));
-        Assert.True(vm.ShowIlsError);
-        Assert.Null(vm.IlsNumber);
+        Assert.Equal("XYZ 1.2 5", vm.IncidentNumber!.Value);
     }
 
     [Fact]
-    public void Empty_ils_is_allowed()
+    public void Empty_einsatznummer_is_allowed_and_confirms()
     {
-        var vm = new OperatorPromptViewModel(collectIlsNumber: true) { OperatorName = "Müller" };
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true) { OperatorName = "Müller" };
         Assert.True(vm.ConfirmCommand.CanExecute(null));
-        Assert.False(vm.ShowIlsError);
-        Assert.Null(vm.IlsNumber);
+        Assert.Null(vm.IncidentNumber);
     }
 }

@@ -86,8 +86,8 @@ The file is one JSON object; every top-level key is optional, so a file may hold
 the whole set, only the roster, or anything in between. See
 [`docs/master-data.example.json`](docs/master-data.example.json) for the full
 schema. The keys are the string lists `roles`, `status`, `unitStatus`,
-`equipment`, `districts`, `radioCallSigns`, `brigades`, `truppTypes` and
-`checklistTemplate`; `streets` (`{ name, district }`); and `personnel`
+`equipment`, `districts`, `radioCallSigns`, `brigades`, `truppTypes`,
+`einsatzarten` and `checklistTemplate`; `streets` (`{ name, district }`); and `personnel`
 (`{ lastName, firstName, role?, callSign?, phone? }` — `lastName` is required,
 `firstName` may be `null`, and `role`/`callSign`/`phone` may each be `null` or
 omitted).

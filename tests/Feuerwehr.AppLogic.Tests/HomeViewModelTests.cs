@@ -48,7 +48,7 @@ public class HomeViewModelTests
     }
 
     [Fact]
-    public void NewIncident_with_ils_sets_number_and_suggests_filename()
+    public void NewIncident_with_number_sets_it_and_suggests_a_sanitised_filename()
     {
         var store = new FakeStore();
         var dialogs = new CapturingSaveDialogs();
@@ -57,14 +57,14 @@ public class HomeViewModelTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        var ils = IlsNumber.Parse("1234");
-        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), ils));
+        var number = new IncidentNumber("B 1.2 260715 1297");
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), number));
 
-        // Filename carries the ILS number and the incident date (dd-MM-yyyy) so files sort and read
-        // sensibly on disk. T0 is 2026-06-22.
-        Assert.Equal("Einsatz-1234-22-06-2026.fwincident", dialogs.LastSuggestedName);
+        // The Einsatznummer has spaces, so the filename collapses them to '-', then appends the
+        // incident date (dd-MM-yyyy). T0 is 2026-06-22.
+        Assert.Equal("Einsatz-B-1.2-260715-1297-22-06-2026.fwincident", dialogs.LastSuggestedName);
         Assert.NotNull(opened);
-        Assert.Equal("1234", opened!.IlsNumberDisplay);
+        Assert.Equal("B 1.2 260715 1297", opened!.IncidentNumberInput);
     }
 
     [Fact]

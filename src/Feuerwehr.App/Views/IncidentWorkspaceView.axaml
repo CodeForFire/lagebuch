@@ -23,18 +23,10 @@
                       CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
                 <StackPanel>
                   <TextBlock Text="EINSATZNR" Classes="overline" FontSize="9" />
-                  <TextBox Classes="mono" FontSize="15" Width="120" Watermark="—"
+                  <TextBox Classes="mono" FontSize="15" Width="210" Watermark="—"
                            Foreground="{StaticResource TextPrimaryBrush}"
                            IsEnabled="{Binding !IsReadOnly}"
                            Text="{Binding IncidentNumberInput}" />
-                </StackPanel>
-              </Border>
-              <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-                      CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
-                <StackPanel>
-                  <TextBlock Text="ILS" Classes="overline" FontSize="9" />
-                  <TextBlock Classes="mono" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}"
-                             Text="{Binding IlsNumberDisplay}" />
                 </StackPanel>
               </Border>
               <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"

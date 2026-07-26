@@ -48,13 +48,14 @@ public class IncidentCreationTests
     }
 
     [Fact]
-    public void Start_with_ils_number_names_it_in_the_opening_entry()
+    public void Start_with_incident_number_names_it_in_the_opening_entry()
     {
         var incident = Incident.Start(
-            new FixedClock(T0), new SessionOperator("Müller"), ilsNumber: IlsNumber.Parse("4711"));
+            new FixedClock(T0), new SessionOperator("Müller"),
+            incidentNumber: new IncidentNumber("B 1.2 260715 1297"));
 
-        Assert.Equal("4711", incident.IlsNumber!.Value);
-        Assert.Equal("Einsatz begonnen (ILS 4711)", Assert.Single(incident.Journal).Text);
+        Assert.Equal("B 1.2 260715 1297", incident.IncidentNumber!.Value);
+        Assert.Equal("Einsatz begonnen (Einsatznummer B 1.2 260715 1297)", Assert.Single(incident.Journal).Text);
     }
 
     [Fact]
@@ -62,13 +63,11 @@ public class IncidentCreationTests
     {
         var incident = Incident.Start(new FixedClock(T0), new SessionOperator("Müller"));
 
-        incident.SetIncidentNumber(new IncidentNumber("B 4242"));
-        incident.SetIlsNumber(IlsNumber.Parse("4242"));
+        incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.SetAddress("Hauptstr. 12", "Buchenau");
         incident.SetStatus("in Bearbeitung");
 
-        Assert.Equal("B 4242", incident.IncidentNumber!.Value);
-        Assert.Equal("4242", incident.IlsNumber!.Value);
+        Assert.Equal("B 1.2 260715 4242", incident.IncidentNumber!.Value);
         Assert.Equal("Hauptstr. 12", incident.Street);
         Assert.Equal("Buchenau", incident.District);
         Assert.Equal("in Bearbeitung", incident.Status);

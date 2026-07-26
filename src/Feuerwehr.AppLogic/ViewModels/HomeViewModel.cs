@@ -41,6 +41,9 @@ public sealed partial class HomeViewModel : ObservableObject
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
     public IReadOnlyList<string> CallSignOptions => _masterData.Get().RadioCallSigns;
 
+    /// <summary>Einsatzart values offered as the dropdown in the new-incident operator prompt.</summary>
+    public IReadOnlyList<string> EinsatzartOptions => _masterData.Get().Einsatzarten;
+
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
     /// </summary>
@@ -51,16 +54,26 @@ public sealed partial class HomeViewModel : ObservableObject
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
         var date = _clock.Now.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
-        var suggestedName = request.IlsNumber is { } ils
-            ? $"Einsatz-{ils.Value}-{date}.fwincident"
+        var suggestedName = request.IncidentNumber is { } num
+            ? $"Einsatz-{SanitizeForFileName(num.Value)}-{date}.fwincident"
             : $"Einsatz-{date}.fwincident";
         var path = await _dialogs.PickSaveAsync(suggestedName);
         if (string.IsNullOrWhiteSpace(path))
             return;
         var md = _masterData.Get();
         var session = IncidentSession.StartNew(
-            _store, _clock, request.Operator, path, md.ChecklistTemplate, request.IlsNumber);
+            _store, _clock, request.Operator, path, md.ChecklistTemplate, request.IncidentNumber);
         OpenWorkspace(session, path, md);
+    }
+
+    // The complete Einsatznummer contains spaces (and possibly dots), so it cannot go into a file
+    // name verbatim: collapse whitespace runs to a single '-' and drop characters the filesystem
+    // rejects, leaving e.g. "B 1.2 260715 1297" as "B-1.2-260715-1297".
+    private static string SanitizeForFileName(string value)
+    {
+        var collapsed = string.Join('-', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var invalid = Path.GetInvalidFileNameChars();
+        return new string(collapsed.Where(c => Array.IndexOf(invalid, c) < 0).ToArray());
     }
 
     // Opening is always read-only and prompt-free. The workspace offers "Weiter bearbeiten"

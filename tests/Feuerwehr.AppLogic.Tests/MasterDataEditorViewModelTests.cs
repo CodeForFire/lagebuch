@@ -80,7 +80,7 @@ public class MasterDataEditorViewModelTests
     public void Loads_a_section_per_category_and_starts_clean()
     {
         var vm = Vm(new InMemoryProvider());
-        Assert.Equal(10, vm.Sections.Count);
+        Assert.Equal(11, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
@@ -177,7 +177,7 @@ public class MasterDataEditorViewModelTests
         var listTitles = new[]
         {
             "Rollen", "Status", "Einheiten-Status", "Ausrüstung", "Bezirke",
-            "Wachen", "Funkrufnamen", "Trupp-Typen", "Checkliste",
+            "Wachen", "Funkrufnamen", "Trupp-Typen", "Einsatzarten", "Checkliste",
         };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
@@ -205,6 +205,7 @@ public class MasterDataEditorViewModelTests
         Assert.Contains("MARK-Wachen", set.Brigades);
         Assert.Contains("MARK-Funkrufnamen", set.RadioCallSigns);
         Assert.Contains("MARK-Trupp-Typen", set.TruppTypes);
+        Assert.Contains("MARK-Einsatzarten", set.Einsatzarten);
         Assert.Contains("MARK-Checkliste", set.ChecklistTemplate);
         Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
     }

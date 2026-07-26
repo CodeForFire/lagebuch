@@ -8,19 +8,26 @@ namespace Feuerwehr.AppLogic.ViewModels;
 public sealed partial class OperatorPromptViewModel : ObservableObject
 {
     public OperatorPromptViewModel(
-        bool collectIlsNumber = false, IReadOnlyList<string>? callSignOptions = null)
+        bool collectIncidentNumber = false,
+        IReadOnlyList<string>? callSignOptions = null,
+        IReadOnlyList<string>? einsatzartOptions = null)
     {
-        CollectsIlsNumber = collectIlsNumber;
+        CollectsIncidentNumber = collectIncidentNumber;
         CallSignOptions = callSignOptions ?? Array.Empty<string>();
+        EinsatzartOptions = einsatzartOptions ?? Array.Empty<string>();
     }
 
     // True only for the new-incident flow; the continue-editing flow leaves it false.
-    public bool CollectsIlsNumber { get; }
+    public bool CollectsIncidentNumber { get; }
 
     // Radio call signs offered as dropdown suggestions for the Funkrufname field. The field stays
     // free-text (an operator's call sign need not be in the master list), so this is only a hint;
     // empty when a caller supplies none, in which case the control is a plain text box.
     public IReadOnlyList<string> CallSignOptions { get; }
+
+    // Einsatzart values offered as dropdown suggestions for the Einsatznummer's leading token; also
+    // free-text, so an art not in the master list is still accepted.
+    public IReadOnlyList<string> EinsatzartOptions { get; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
@@ -29,21 +36,22 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     [ObservableProperty]
     private string? _operatorCallSign;
 
+    // The three editable parts of the complete Einsatznummer "<Art> 1.2 <JJMMTT> <lfd.Nr>". The "1.2"
+    // segment is fixed and not entered here. All parts are free text and the whole number is optional.
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
-    [NotifyPropertyChangedFor(nameof(ShowIlsError))]
-    private string _ilsNumberInput = string.Empty;
+    private string _einsatzartInput = string.Empty;
 
-    // Parsed ILS number, or null when the field is empty. Invalid input yields null too,
-    // but is blocked from confirming via CanConfirm.
-    public IlsNumber? IlsNumber =>
-        IlsNumber.TryParse(IlsNumberInput, out var parsed) ? parsed : null;
+    [ObservableProperty]
+    private string _einsatzDateInput = string.Empty;
 
-    // Empty is valid (ILS optional); non-empty must be exactly 4 digits.
-    public bool IsIlsNumberValid =>
-        string.IsNullOrWhiteSpace(IlsNumberInput) || IlsNumber.TryParse(IlsNumberInput, out _);
+    [ObservableProperty]
+    private string _einsatzNumberInput = string.Empty;
 
-    public bool ShowIlsError => CollectsIlsNumber && !IsIlsNumberValid;
+    // The composed Einsatznummer, or null when every part is blank.
+    public IncidentNumber? IncidentNumber =>
+        EinsatznummerFormat.Compose(EinsatzartInput, EinsatzDateInput, EinsatzNumberInput) is { } s
+            ? new IncidentNumber(s)
+            : null;
 
     private SessionOperator? _result;
 
@@ -53,7 +61,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
         private set => SetProperty(ref _result, value);
     }
 
-    private bool CanConfirm => !string.IsNullOrWhiteSpace(OperatorName) && IsIlsNumberValid;
+    private bool CanConfirm => !string.IsNullOrWhiteSpace(OperatorName);
 
     [RelayCommand(CanExecute = nameof(CanConfirm))]
     private void Confirm()

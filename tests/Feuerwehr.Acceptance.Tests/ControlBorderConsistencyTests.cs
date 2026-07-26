@@ -3,7 +3,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 using Feuerwehr.App.Views;
 using Feuerwehr.AppLogic.ViewModels;
 
@@ -31,7 +30,7 @@ public class ControlBorderConsistencyTests
         Dispatcher.UIThread.RunJobs();
 
         var textBox = view.GetControl<TextBox>("OperatorNameBox");
-        var callSign = view.GetVisualDescendants().OfType<AutoCompleteBox>().Single();
+        var callSign = view.GetControl<AutoCompleteBox>("CallSignBox");
 
         Assert.Equal(BorderColor(textBox), BorderColor(callSign));
     }

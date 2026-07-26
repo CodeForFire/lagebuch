@@ -23,7 +23,6 @@ public sealed class Incident
     public IncidentState State { get; private set; }
 
     public IncidentNumber? IncidentNumber { get; private set; }
-    public IlsNumber? IlsNumber { get; private set; }
     public string? Keyword { get; private set; }
     public string? Street { get; private set; }
     public string? District { get; private set; }
@@ -43,7 +42,7 @@ public sealed class Incident
         IClock clock,
         SessionOperator openedBy,
         string? keyword = null,
-        IlsNumber? ilsNumber = null)
+        IncidentNumber? incidentNumber = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(openedBy);
@@ -54,12 +53,12 @@ public sealed class Incident
             StartedAt = clock.Now,
             State = IncidentState.Open,
             Keyword = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim(),
-            IlsNumber = ilsNumber
+            IncidentNumber = incidentNumber
         };
         incident._audit.Add(new AuditEvent(clock.Now, "opened", openedBy.Display));
-        incident.AppendSystemEntry(clock, openedBy, ilsNumber is null
+        incident.AppendSystemEntry(clock, openedBy, incidentNumber is null
             ? "Einsatz begonnen"
-            : $"Einsatz begonnen (ILS {ilsNumber.Value})");
+            : $"Einsatz begonnen (Einsatznummer {incidentNumber.Value})");
         return incident;
     }
 
@@ -68,7 +67,6 @@ public sealed class Incident
         DateTimeOffset startedAt,
         IncidentState state,
         IncidentNumber? incidentNumber,
-        IlsNumber? ilsNumber,
         string? keyword,
         string? street,
         string? district,
@@ -88,7 +86,6 @@ public sealed class Incident
             StartedAt = startedAt,
             State = state,
             IncidentNumber = incidentNumber,
-            IlsNumber = ilsNumber,
             Keyword = keyword,
             Street = street,
             District = district,
@@ -146,12 +143,6 @@ public sealed class Incident
     {
         EnsureOpen();
         IncidentNumber = number;
-    }
-
-    public void SetIlsNumber(IlsNumber? number)
-    {
-        EnsureOpen();
-        IlsNumber = number;
     }
 
     public void SetKeyword(string? keyword)

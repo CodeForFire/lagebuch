@@ -23,6 +23,7 @@ public class MasterDataEditorRenderTests
             Brigades = new[] { "FFB Wache 1", "Aich", "Puch" },
             RadioCallSigns = new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
             TruppTypes = new[] { "Angriffstrupp", "Wassertrupp", "CSA-Trupp" },
+            Einsatzarten = new[] { "B", "THL", "R" },
             ChecklistTemplate = new[] { "Aufstellort ELW frei?", "Kennleuchte ein, Blaulicht aus?" },
             Personnel = new[]
             {
@@ -49,7 +50,7 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
-        Assert.Equal(10, list.ItemCount);
+        Assert.Equal(11, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).

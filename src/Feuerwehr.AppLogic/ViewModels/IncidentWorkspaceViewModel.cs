@@ -69,7 +69,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public ScbaViewModel Scba { get; private set; } = null!;
     public ReminderViewModel? Reminder { get; private set; }
 
-    public string IlsNumberDisplay => Formatting.OrDash(_session.Incident.IlsNumber?.Value);
     public string StatusDisplay => Formatting.State(_session.Incident.State);
 
     public string ReadOnlyReason => _session.Incident.State == IncidentState.Closed
