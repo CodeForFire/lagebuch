@@ -48,7 +48,7 @@ public class HomeViewModelTests
     }
 
     [Fact]
-    public void NewIncident_with_number_sets_it_and_suggests_a_sanitised_filename()
+    public void NewIncident_with_number_suggests_a_filename_with_the_literal_number()
     {
         var store = new FakeStore();
         var dialogs = new CapturingSaveDialogs();
@@ -60,23 +60,24 @@ public class HomeViewModelTests
         var number = new IncidentNumber("B 1.2 260715 1297");
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), number));
 
-        // The Einsatznummer has spaces, so the filename collapses them to '-', then appends the
-        // incident date (dd-MM-yyyy). T0 is 2026-06-22.
-        Assert.Equal("Einsatz-B-1.2-260715-1297-22-06-2026.fwincident", dialogs.LastSuggestedName);
+        // Spaces in the Einsatznummer are kept literally in the filename; no date suffix.
+        Assert.Equal("Einsatz B 1.2 260715 1297.fwincident", dialogs.LastSuggestedName);
         Assert.NotNull(opened);
         Assert.Equal("B 1.2 260715 1297", opened!.IncidentNumberInput);
     }
 
     [Fact]
-    public void NewIncident_without_ils_still_dates_the_filename()
+    public void NewIncident_without_number_falls_back_to_a_plain_filename()
     {
+        // Defense-in-depth: the operator prompt enforces a number before this command can be
+        // invoked for real, but HomeViewModel itself should stay total rather than crash on null.
         var dialogs = new CapturingSaveDialogs();
         var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
             new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
 
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
 
-        Assert.Equal("Einsatz-22-06-2026.fwincident", dialogs.LastSuggestedName);
+        Assert.Equal("Einsatz.fwincident", dialogs.LastSuggestedName);
     }
 
     [Fact]

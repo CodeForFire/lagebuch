@@ -104,10 +104,55 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
-    public void Empty_einsatznummer_is_allowed_and_confirms()
+    public void Empty_einsatznummer_blocks_confirm_when_the_number_is_collected()
     {
         var vm = new OperatorPromptViewModel(collectIncidentNumber: true) { OperatorName = "Müller" };
-        Assert.True(vm.ConfirmCommand.CanExecute(null));
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
         Assert.Null(vm.IncidentNumber);
+    }
+
+    [Fact]
+    public void Incomplete_einsatznummer_blocks_confirm()
+    {
+        // Only Einsatzart filled — the classic "half-entered" case a mere non-null-Compose check
+        // wouldn't catch.
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true)
+        {
+            OperatorName = "Müller",
+            EinsatzartInput = "B",
+        };
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Complete_einsatznummer_required_to_confirm_when_collected()
+    {
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true)
+        {
+            OperatorName = "Müller",
+            EinsatzartInput = "B",
+            EinsatzDateInput = "260715",
+            EinsatzNumberInput = "1297",
+        };
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Einsatznummer_not_required_when_not_collected()
+    {
+        // The continue-editing flow (collectIncidentNumber: false) never shows these fields at
+        // all, so they must not gate Confirm there.
+        var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Typing_into_any_einsatznummer_field_reevaluates_confirm()
+    {
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true) { OperatorName = "Müller" };
+        var changed = false;
+        vm.ConfirmCommand.CanExecuteChanged += (_, _) => changed = true;
+        vm.EinsatzartInput = "B";
+        Assert.True(changed);
     }
 }

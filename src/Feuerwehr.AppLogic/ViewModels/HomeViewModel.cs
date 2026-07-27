@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Feuerwehr.AppLogic.Services;
@@ -53,10 +52,12 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
-        var date = _clock.Now.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+        // The Einsatznummer is mandatory in the new-incident prompt (OperatorPromptViewModel),
+        // so request.IncidentNumber should always be set here. The null branch is defense-in-depth
+        // only, so this method stays total rather than throwing if that gate is ever bypassed.
         var suggestedName = request.IncidentNumber is { } num
-            ? $"Einsatz-{SanitizeForFileName(num.Value)}-{date}.fwincident"
-            : $"Einsatz-{date}.fwincident";
+            ? $"Einsatz {StripInvalidFileNameChars(num.Value)}.fwincident"
+            : "Einsatz.fwincident";
         var path = await _dialogs.PickSaveAsync(suggestedName);
         if (string.IsNullOrWhiteSpace(path))
             return;
@@ -66,14 +67,13 @@ public sealed partial class HomeViewModel : ObservableObject
         OpenWorkspace(session, path, md);
     }
 
-    // The complete Einsatznummer contains spaces (and possibly dots), so it cannot go into a file
-    // name verbatim: collapse whitespace runs to a single '-' and drop characters the filesystem
-    // rejects, leaving e.g. "B 1.2 260715 1297" as "B-1.2-260715-1297".
-    private static string SanitizeForFileName(string value)
+    // Filesystem-invalid characters differ per platform; Path.GetInvalidFileNameChars() reflects
+    // whichever OS is running, so this drops only what that platform actually rejects and
+    // otherwise preserves the composed Einsatznummer verbatim, spaces included.
+    private static string StripInvalidFileNameChars(string value)
     {
-        var collapsed = string.Join('-', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         var invalid = Path.GetInvalidFileNameChars();
-        return new string(collapsed.Where(c => Array.IndexOf(invalid, c) < 0).ToArray());
+        return new string(value.Where(c => Array.IndexOf(invalid, c) < 0).ToArray());
     }
 
     // Opening is always read-only and prompt-free. The workspace offers "Weiter bearbeiten"

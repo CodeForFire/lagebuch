@@ -124,26 +124,17 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
-    public void Setting_incident_number_autosaves_and_updates_domain()
+    public void IncidentNumberInput_has_no_write_back_to_the_domain_or_store()
     {
+        // The Einsatznummer is fixed at incident creation and displayed read-only on the main
+        // screen from then on -- setting the bound property (as the old editable TextBox used to)
+        // must not autosave or mutate the domain anymore.
         var vm = NewWorkspace(out var store, out _);
         var before = store.SaveCount;
 
         vm.IncidentNumberInput = "B 4242";
 
-        Assert.True(store.SaveCount > before);
-        Assert.NotNull(vm.LastSavedAt);
-        Assert.Equal("B 4242", store.Load("/x.fwincident").IncidentNumber!.Value);
-    }
-
-    [Fact]
-    public void Clearing_incident_number_sets_value_to_null()
-    {
-        var vm = NewWorkspace(out var store, out _);
-        vm.IncidentNumberInput = "B 4242";
-
-        vm.IncidentNumberInput = "";
-
+        Assert.Equal(before, store.SaveCount);
         Assert.Null(store.Load("/x.fwincident").IncidentNumber);
     }
 

@@ -37,14 +37,19 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     private string? _operatorCallSign;
 
     // The three editable parts of the complete Einsatznummer "<Art> 1.2 <JJMMTT> <lfd.Nr>". The "1.2"
-    // segment is fixed and not entered here. All parts are free text and the whole number is optional.
+    // segment is fixed and not entered here. All parts are free text; when CollectsIncidentNumber is
+    // true (new-incident flow) all three are mandatory, since the number can never be changed once the
+    // incident is created. They never appear in the continue-editing flow, where they don't gate anything.
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private string _einsatzartInput = string.Empty;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private string _einsatzDateInput = string.Empty;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private string _einsatzNumberInput = string.Empty;
 
     // The composed Einsatznummer, or null when every part is blank.
@@ -61,7 +66,18 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
         private set => SetProperty(ref _result, value);
     }
 
-    private bool CanConfirm => !string.IsNullOrWhiteSpace(OperatorName);
+    private bool CanConfirm =>
+        !string.IsNullOrWhiteSpace(OperatorName) &&
+        (!CollectsIncidentNumber || HasCompleteIncidentNumber);
+
+    // EinsatznummerFormat.Compose only returns null when ALL THREE parts are blank, which is too
+    // weak for "mandatory" -- an operator who fills only the Einsatzart would pass that check with
+    // an incomplete, meaningless number. Require every part explicitly whenever the number is
+    // being collected at all.
+    private bool HasCompleteIncidentNumber =>
+        !string.IsNullOrWhiteSpace(EinsatzartInput) &&
+        !string.IsNullOrWhiteSpace(EinsatzDateInput) &&
+        !string.IsNullOrWhiteSpace(EinsatzNumberInput);
 
     [RelayCommand(CanExecute = nameof(CanConfirm))]
     private void Confirm()

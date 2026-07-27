@@ -4,7 +4,6 @@ using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Documents;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
-using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Persistence.MasterData;
 
 namespace Feuerwehr.AppLogic.ViewModels;
@@ -47,20 +46,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
 
-    // Editable Einsatznummer; optional and changeable any time the incident is open.
-    // Blank clears the value. Writes through to the domain and autosaves.
+    // Display-only projection of the domain IncidentNumber, seeded once above from the session. The
+    // Einsatznummer is now captured exclusively at incident creation (OperatorPromptView, mandatory
+    // there) and is never edited afterwards -- this property intentionally has no write-back path.
     [ObservableProperty]
     private string _incidentNumberInput = string.Empty;
-
-    partial void OnIncidentNumberInputChanged(string value)
-    {
-        if (IsReadOnly)
-            return;
-        var trimmed = value?.Trim();
-        _session.Incident.SetIncidentNumber(
-            string.IsNullOrWhiteSpace(trimmed) ? null : new IncidentNumber(trimmed));
-        OnChanged();
-    }
 
     public ChecklistViewModel Checklist { get; private set; } = null!;
     public EtbViewModel Etb { get; private set; } = null!;

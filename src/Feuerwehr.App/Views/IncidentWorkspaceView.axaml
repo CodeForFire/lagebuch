@@ -25,8 +25,8 @@
                   <TextBlock Text="EINSATZNR" Classes="overline" FontSize="9" />
                   <TextBox Classes="mono" FontSize="15" Width="210" Watermark="—"
                            Foreground="{StaticResource TextPrimaryBrush}"
-                           IsEnabled="{Binding !IsReadOnly}"
-                           Text="{Binding IncidentNumberInput}" />
+                           IsReadOnly="True"
+                           Text="{Binding IncidentNumberInput, Mode=OneWay}" />
                 </StackPanel>
               </Border>
               <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
