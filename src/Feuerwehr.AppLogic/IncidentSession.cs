@@ -33,13 +33,13 @@ public sealed class IncidentSession
         SessionOperator op,
         string path,
         IEnumerable<string> checklistTemplate,
-        IlsNumber? ilsNumber = null)
+        IncidentNumber? incidentNumber = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(op);
-        // ILS number goes through the factory rather than SetIlsNumber afterwards, so the
+        // The Einsatznummer goes through the factory rather than SetIncidentNumber afterwards, so the
         // automatic "Einsatz begonnen" entry can name it.
-        var incident = Incident.Start(clock, op, keyword: null, ilsNumber: ilsNumber);
+        var incident = Incident.Start(clock, op, keyword: null, incidentNumber: incidentNumber);
         incident.SeedChecklist(checklistTemplate);
         var session = new IncidentSession(store, incident, path, op);
         session.Save();

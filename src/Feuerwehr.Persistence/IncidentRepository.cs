@@ -32,7 +32,9 @@ public sealed class IncidentRepository
                 p("$started", incident.StartedAt.ToString(Iso));
                 p("$state", (int)incident.State);
                 p("$num", (object?)incident.IncidentNumber?.Value ?? DBNull.Value);
-                p("$ils", (object?)incident.IlsNumber?.Value ?? DBNull.Value);
+                // ils_number is retired: the complete Einsatznummer lives in incident_number now.
+                // The column is kept (dormant) so the schema is unchanged; always written null.
+                p("$ils", DBNull.Value);
                 p("$kw", (object?)incident.Keyword ?? DBNull.Value);
                 p("$street", (object?)incident.Street ?? DBNull.Value);
                 p("$district", (object?)incident.District ?? DBNull.Value);
@@ -249,15 +251,19 @@ public sealed class IncidentRepository
         var audit = ReadAll(cn, "SELECT at, action, by_operator FROM audit_events ORDER BY ordinal;",
             r => new Domain.AuditEvent(ParseDate(r.GetString(0)), r.GetString(1), r.GetString(2)));
 
-        var incidentNumber = meta[3] is string n ? new Domain.ValueObjects.IncidentNumber(n) : null;
-        var ilsNumber = meta[4] is string ils ? Domain.ValueObjects.IlsNumber.Parse(ils) : null;
+        // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
+        // number in ils_number and nothing in incident_number. Load that old value as the
+        // Einsatznummer so pre-existing incidents keep their number.
+        var incidentNumber =
+            meta[3] is string n ? new Domain.ValueObjects.IncidentNumber(n)
+            : meta[4] is string legacyIls ? new Domain.ValueObjects.IncidentNumber(legacyIls)
+            : null;
 
         return Incident.Rehydrate(
             Guid.Parse((string)meta[0]!),
             ParseDate((string)meta[1]!),
             (IncidentState)Convert.ToInt32(meta[2]),
             incidentNumber,
-            ilsNumber,
             meta[5] as string,
             meta[6] as string,
             meta[7] as string,

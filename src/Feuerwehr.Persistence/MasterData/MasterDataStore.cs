@@ -35,6 +35,7 @@ public sealed class MasterDataStore
         ReplaceList(cn, tx, "md_call_signs", set.RadioCallSigns);
         ReplaceList(cn, tx, "md_brigades", set.Brigades);
         ReplaceList(cn, tx, "md_trupp_types", set.TruppTypes);
+        ReplaceList(cn, tx, "md_einsatzarten", set.Einsatzarten);
 
         Run(cn, tx, "DELETE FROM md_streets;", _ => { });
         foreach (var s in set.Streets)
@@ -82,6 +83,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_einsatzarten (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_personnel (
                 last_name TEXT NOT NULL,
                 first_name TEXT NOT NULL,
@@ -103,7 +105,8 @@ public sealed class MasterDataStore
         ReadStreets(cn),
         ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"),
         ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
-        ReadPersonnel(cn));
+        ReadPersonnel(cn),
+        ReadColumn(cn, "SELECT value FROM md_einsatzarten;"));
 
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
     {

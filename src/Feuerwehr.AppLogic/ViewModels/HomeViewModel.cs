@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Feuerwehr.AppLogic.Services;
@@ -41,6 +40,9 @@ public sealed partial class HomeViewModel : ObservableObject
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
     public IReadOnlyList<string> CallSignOptions => _masterData.Get().RadioCallSigns;
 
+    /// <summary>Einsatzart values offered as the dropdown in the new-incident operator prompt.</summary>
+    public IReadOnlyList<string> EinsatzartOptions => _masterData.Get().Einsatzarten;
+
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
     /// </summary>
@@ -50,17 +52,28 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
-        var date = _clock.Now.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
-        var suggestedName = request.IlsNumber is { } ils
-            ? $"Einsatz-{ils.Value}-{date}.fwincident"
-            : $"Einsatz-{date}.fwincident";
+        // The Einsatznummer is mandatory in the new-incident prompt (OperatorPromptViewModel),
+        // so request.IncidentNumber should always be set here. The null branch is defense-in-depth
+        // only, so this method stays total rather than throwing if that gate is ever bypassed.
+        var suggestedName = request.IncidentNumber is { } num
+            ? $"Einsatz {StripInvalidFileNameChars(num.Value)}.fwincident"
+            : "Einsatz.fwincident";
         var path = await _dialogs.PickSaveAsync(suggestedName);
         if (string.IsNullOrWhiteSpace(path))
             return;
         var md = _masterData.Get();
         var session = IncidentSession.StartNew(
-            _store, _clock, request.Operator, path, md.ChecklistTemplate, request.IlsNumber);
+            _store, _clock, request.Operator, path, md.ChecklistTemplate, request.IncidentNumber);
         OpenWorkspace(session, path, md);
+    }
+
+    // Filesystem-invalid characters differ per platform; Path.GetInvalidFileNameChars() reflects
+    // whichever OS is running, so this drops only what that platform actually rejects and
+    // otherwise preserves the composed Einsatznummer verbatim, spaces included.
+    private static string StripInvalidFileNameChars(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        return new string(value.Where(c => Array.IndexOf(invalid, c) < 0).ToArray());
     }
 
     // Opening is always read-only and prompt-free. The workspace offers "Weiter bearbeiten"

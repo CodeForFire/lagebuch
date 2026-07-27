@@ -24,8 +24,7 @@ public class IncidentRoundTripTests : IDisposable
         var clock = new Clock();
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, "Brand");
-        incident.SetIncidentNumber(new IncidentNumber("B 4242"));
-        incident.SetIlsNumber(IlsNumber.Parse("4242"));
+        incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.SetAddress("Hauptstr. 12", "FFB");
         incident.SetStatus("aufgenommen");
         incident.SeedChecklist(new[] { "Blaulicht aus?", "Bei ILS gemeldet?" });
@@ -43,8 +42,7 @@ public class IncidentRoundTripTests : IDisposable
 
         Assert.Equal(incident.Id, loaded.Id);
         Assert.Equal(IncidentState.Open, loaded.State);
-        Assert.Equal("B 4242", loaded.IncidentNumber!.Value);
-        Assert.Equal("4242", loaded.IlsNumber!.Value);
+        Assert.Equal("B 1.2 260715 4242", loaded.IncidentNumber!.Value);
         Assert.Equal("Hauptstr. 12", loaded.Street);
         Assert.Equal("FFB", loaded.District);
         Assert.Equal("aufgenommen", loaded.Status);

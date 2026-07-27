@@ -7,6 +7,7 @@
   "radioCallSigns": ["Florian Musterstadt 1", "Florian Musterstadt 11/1"],
   "brigades": ["FF Musterstadt", "FF Musterdorf"],
   "truppTypes": ["Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "CSA-Trupp"],
+  "einsatzarten": ["B", "THL", "R", "ABC", "Sonstiges"],
   "checklistTemplate": [
     "Aufstellort ELW frei?",
     "Kennleuchte ein, Blaulicht aus?"

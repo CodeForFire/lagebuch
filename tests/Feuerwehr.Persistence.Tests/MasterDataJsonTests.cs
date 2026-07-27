@@ -22,6 +22,7 @@ public class MasterDataJsonTests
               "radioCallSigns": ["Land 1"],
               "brigades": ["FFB Wache 1"],
               "truppTypes": ["Angriffstrupp"],
+              "einsatzarten": ["B", "THL"],
               "checklistTemplate": ["Schritt 1"],
               "streets": [{ "name": "Bahnhofstr.", "district": "FFB" }],
               "personnel": [{ "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Land 1", "phone": "0171" }]
@@ -30,6 +31,7 @@ public class MasterDataJsonTests
 
         Assert.Equal(new[] { "EL", "ZF" }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
+        Assert.Equal(new[] { "B", "THL" }, set.Einsatzarten);
         Assert.Contains(set.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
         var max = set.Personnel.Single();
         Assert.Equal("Max", max.FirstName);
@@ -75,6 +77,7 @@ public class MasterDataJsonTests
         {
             Roles = new[] { "EL", "ZF" },
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
+            Einsatzarten = new[] { "B", "THL", "R" },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             ChecklistTemplate = new[] { "Ä ö ü / ß Schritt" }, // relaxed escaping must survive the round trip
             Personnel = new[]
@@ -89,6 +92,7 @@ public class MasterDataJsonTests
         Assert.Equal(original.Roles, reparsed.Roles);
         Assert.Equal(original.UnitStatus, reparsed.UnitStatus);
         Assert.Equal(original.ChecklistTemplate, reparsed.ChecklistTemplate);
+        Assert.Equal(original.Einsatzarten, reparsed.Einsatzarten);
         Assert.Equal(original.Streets, reparsed.Streets);
         Assert.Equal(original.Personnel, reparsed.Personnel);
     }

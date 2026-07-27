@@ -25,11 +25,6 @@ public static class IncidentHeaderSection
                 });
                 row.RelativeItem().Text(t =>
                 {
-                    t.Span("ILS-Nummer: ").SemiBold();
-                    t.Span(Formatting.OrDash(incident.IlsNumber?.Value));
-                });
-                row.RelativeItem().Text(t =>
-                {
                     t.Span("Status: ").SemiBold();
                     t.Span(Formatting.State(incident.State));
                 });

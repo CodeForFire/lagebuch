@@ -36,7 +36,7 @@ public class RehydrationTests
         var entry = EtbEntry.Rehydrate(Guid.NewGuid(), T0, EtbDirection.Internal, "x", "Müller", null, null);
         var incident = Incident.Rehydrate(
             id, T0, IncidentState.Closed,
-            new IncidentNumber("B 1"), IlsNumber.Parse("4242"),
+            new IncidentNumber("B 1.2 260715 4242"),
             "Brand", "Hauptstr. 1", "FFB", "abgearbeitet",
             T0.AddHours(2), "Müller",
             new[] { ChecklistItem.Rehydrate(Guid.NewGuid(), "c", false, null) },
@@ -48,7 +48,7 @@ public class RehydrationTests
 
         Assert.Equal(id, incident.Id);
         Assert.Equal(IncidentState.Closed, incident.State);
-        Assert.Equal("4242", incident.IlsNumber!.Value);
+        Assert.Equal("B 1.2 260715 4242", incident.IncidentNumber!.Value);
         Assert.Equal(T0.AddHours(2), incident.ClosedAt);
         Assert.Single(incident.Journal);
         Assert.Equal(12, incident.TotalPersonnel);
@@ -59,7 +59,7 @@ public class RehydrationTests
     {
         var incident = Incident.Rehydrate(
             Guid.NewGuid(), T0, IncidentState.Closed,
-            null, null, null, null, null, null, T0, "Müller",
+            null, null, null, null, null, T0, "Müller",
             Array.Empty<ChecklistItem>(), Array.Empty<EtbEntry>(),
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(),

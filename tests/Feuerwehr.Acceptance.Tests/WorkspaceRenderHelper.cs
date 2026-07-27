@@ -2,6 +2,7 @@ using Feuerwehr.AppLogic;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;
+using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Persistence.MasterData;
 
 namespace Feuerwehr.Acceptance.Tests;
@@ -53,11 +54,11 @@ internal static class WorkspaceRenderHelper
             "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
         };
         var session = IncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklist);
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklist,
+            new IncidentNumber("B 1.2 260715 123"));
         var ticker = new ManualTicker();
         var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(),
             new FakeDialogs(), new NoopAlarmService());
-        vm.IncidentNumberInput = "123";
 
         // Drive the three header bars into their visible states (like the reported screenshot):
         //   1) ILS reminder running, 2) SCBA pressure-control due, 3) Rückzugsalarm active.

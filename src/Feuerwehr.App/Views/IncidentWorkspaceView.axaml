@@ -19,25 +19,15 @@
 
             <!-- Status chips -->
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-              <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+              <Border x:Name="EinsatznummerChip" Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                       CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
                 <StackPanel>
-                  <TextBlock Text="EINSATZNR" Classes="overline" FontSize="9" />
-                  <TextBox Classes="mono" FontSize="15" Width="120" Watermark="—"
-                           Foreground="{StaticResource TextPrimaryBrush}"
-                           IsEnabled="{Binding !IsReadOnly}"
-                           Text="{Binding IncidentNumberInput}" />
-                </StackPanel>
-              </Border>
-              <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-                      CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
-                <StackPanel>
-                  <TextBlock Text="ILS" Classes="overline" FontSize="9" />
+                  <TextBlock Text="EINSATZNUMMER" Classes="overline" FontSize="9" />
                   <TextBlock Classes="mono" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}"
-                             Text="{Binding IlsNumberDisplay}" />
+                             Text="{Binding IncidentNumberInput}" />
                 </StackPanel>
               </Border>
-              <Border Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+              <Border x:Name="StatusChip" Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                       CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
                 <StackPanel>
                   <TextBlock Text="STATUS" Classes="overline" FontSize="9" />

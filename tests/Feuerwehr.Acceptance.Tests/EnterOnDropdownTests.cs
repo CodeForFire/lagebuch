@@ -3,7 +3,6 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 using Feuerwehr.App.Views;
 using Feuerwehr.AppLogic;
 using Feuerwehr.AppLogic.ViewModels;
@@ -98,7 +97,7 @@ public class EnterOnDropdownTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var box = view.GetVisualDescendants().OfType<AutoCompleteBox>().Single();
+        var box = view.GetControl<AutoCompleteBox>("CallSignBox");
         box.Focus();
         box.IsDropDownOpen = true;
         Dispatcher.UIThread.RunJobs();

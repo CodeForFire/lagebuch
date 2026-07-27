@@ -34,10 +34,18 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
-    public void Ils_not_collected_by_default()
+    public void Incident_number_not_collected_by_default()
     {
         var vm = new OperatorPromptViewModel();
-        Assert.False(vm.CollectsIlsNumber);
+        Assert.False(vm.CollectsIncidentNumber);
+    }
+
+    [Fact]
+    public void EinsatzartOptions_default_to_empty_and_expose_the_supplied_list()
+    {
+        Assert.Empty(new OperatorPromptViewModel().EinsatzartOptions);
+        var options = new[] { "B", "THL" };
+        Assert.Equal(options, new OperatorPromptViewModel(einsatzartOptions: options).EinsatzartOptions);
     }
 
     [Fact]
@@ -69,37 +77,82 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
-    public void Valid_four_digit_ils_parses()
+    public void Composes_the_complete_einsatznummer_from_its_parts()
     {
-        var vm = new OperatorPromptViewModel(collectIlsNumber: true)
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true)
         {
             OperatorName = "Müller",
-            IlsNumberInput = "1234",
+            EinsatzartInput = "B",
+            EinsatzDateInput = "260715",
+            EinsatzNumberInput = "1297",
         };
         Assert.True(vm.ConfirmCommand.CanExecute(null));
-        Assert.False(vm.ShowIlsError);
-        Assert.Equal("1234", vm.IlsNumber!.Value);
+        Assert.Equal("B 1.2 260715 1297", vm.IncidentNumber!.Value);
     }
 
     [Fact]
-    public void Non_four_digit_ils_blocks_confirm_and_shows_error()
+    public void Einsatzart_is_free_text_even_when_not_in_the_options()
     {
-        var vm = new OperatorPromptViewModel(collectIlsNumber: true)
+        // The dropdown is a hint, not a closed set: an off-list Einsatzart must still compose.
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true, einsatzartOptions: new[] { "B" })
         {
             OperatorName = "Müller",
-            IlsNumberInput = "12",
+            EinsatzartInput = "XYZ",
+            EinsatzNumberInput = "5",
+        };
+        Assert.Equal("XYZ 1.2 5", vm.IncidentNumber!.Value);
+    }
+
+    [Fact]
+    public void Empty_einsatznummer_blocks_confirm_when_the_number_is_collected()
+    {
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true) { OperatorName = "Müller" };
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+        Assert.Null(vm.IncidentNumber);
+    }
+
+    [Fact]
+    public void Incomplete_einsatznummer_blocks_confirm()
+    {
+        // Only Einsatzart filled — the classic "half-entered" case a mere non-null-Compose check
+        // wouldn't catch.
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true)
+        {
+            OperatorName = "Müller",
+            EinsatzartInput = "B",
         };
         Assert.False(vm.ConfirmCommand.CanExecute(null));
-        Assert.True(vm.ShowIlsError);
-        Assert.Null(vm.IlsNumber);
     }
 
     [Fact]
-    public void Empty_ils_is_allowed()
+    public void Complete_einsatznummer_required_to_confirm_when_collected()
     {
-        var vm = new OperatorPromptViewModel(collectIlsNumber: true) { OperatorName = "Müller" };
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true)
+        {
+            OperatorName = "Müller",
+            EinsatzartInput = "B",
+            EinsatzDateInput = "260715",
+            EinsatzNumberInput = "1297",
+        };
         Assert.True(vm.ConfirmCommand.CanExecute(null));
-        Assert.False(vm.ShowIlsError);
-        Assert.Null(vm.IlsNumber);
+    }
+
+    [Fact]
+    public void Einsatznummer_not_required_when_not_collected()
+    {
+        // The continue-editing flow (collectIncidentNumber: false) never shows these fields at
+        // all, so they must not gate Confirm there.
+        var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Typing_into_any_einsatznummer_field_reevaluates_confirm()
+    {
+        var vm = new OperatorPromptViewModel(collectIncidentNumber: true) { OperatorName = "Müller" };
+        var changed = false;
+        vm.ConfirmCommand.CanExecuteChanged += (_, _) => changed = true;
+        vm.EinsatzartInput = "B";
+        Assert.True(changed);
     }
 }
