@@ -26,6 +26,7 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\Fonts\*.ttf" />
     <AvaloniaResource Include="Assets\alarm.wav" />
+    <AvaloniaResource Include="Assets\icon-1024.png" />
   </ItemGroup>
 
   <ItemGroup>
