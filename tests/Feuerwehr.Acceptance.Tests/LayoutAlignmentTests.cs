@@ -18,6 +18,9 @@ public class LayoutAlignmentTests
     private static double LeftInWindow(Visual v, Window window) =>
         v.TranslatePoint(new Point(0, 0), window)!.Value.X;
 
+    private static double LeftInWindowY(Visual v, Window window) =>
+        v.TranslatePoint(new Point(0, 0), window)!.Value.Y;
+
     // The TabControl's own tab-strip presenter (there are other ItemsPresenters in the tree).
     private static ItemsPresenter TabStrip(Window window) =>
         window.GetVisualDescendants().OfType<TabControl>().First()
@@ -44,6 +47,34 @@ public class LayoutAlignmentTests
         var window = ShowWorkspace();
 
         Assert.Equal(Gutter, LeftInWindow(TabStrip(window), window), precision: 0);
+    }
+
+    // EINSATZNR used to be a live-editable TextBox left over from before the number became fixed
+    // at creation (see #50's follow-up). Both chips' outer Borders already share one height (the
+    // horizontal StackPanel stretches them to the tallest sibling), so that's not the bug. The
+    // actual misalignment is inside: Fluent's TextBox chrome (36px MinHeight, 11,7 padding, 1px
+    // border) makes the number's value row taller than STATUS's bare Ellipse+TextBlock row (23px),
+    // and since both rows start at the same top y, the number text ends up vertically centered
+    // several pixels lower than the status text. A bare TextBlock (matching STATUS, and
+    // ForcesView's GESAMTSTÄRKE/DAVON AGT chip) has no such chrome, so its row is the same height
+    // and the two value texts land on the same line.
+    [AvaloniaFact]
+    public void Einsatznummer_value_row_is_the_same_height_as_the_status_value_row()
+    {
+        var window = ShowWorkspace();
+
+        var einsatznummerChip = window.GetVisualDescendants().OfType<Control>().First(c => c.Name == "EinsatznummerChip");
+        var statusChip = window.GetVisualDescendants().OfType<Control>().First(c => c.Name == "StatusChip");
+        var numberValueRow = ((StackPanel)einsatznummerChip.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "EINSATZNUMMER").Parent!).Children[1];
+        var statusValueRow = ((StackPanel)statusChip.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "STATUS").Parent!).Children[1];
+
+        // A few px of slack: the number is deliberately set in MonoFont (digit alignment) against
+        // STATUS's DisplayFont, and the two have slightly different line-height metrics at the same
+        // pixel size -- that residual gap is a font trait, not a layout bug, and varies a little
+        // across platforms (this app's CI matrix includes windows-latest).
+        var heightDelta = Math.Abs(numberValueRow.Bounds.Height - statusValueRow.Bounds.Height);
+        Assert.True(heightDelta <= 6,
+            $"Einsatznummer value row is {numberValueRow.Bounds.Height:F0}px, status value row is {statusValueRow.Bounds.Height:F0}px — {heightDelta:F0}px apart, so their text doesn't sit on the same line.");
     }
 
     [AvaloniaFact]
