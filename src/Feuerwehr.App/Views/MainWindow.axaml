@@ -18,12 +18,9 @@
           <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Stretch">
             <Border Width="4" Background="{StaticResource SignalGradientBrush}" />
             <StackPanel Orientation="Horizontal" Spacing="12" Margin="20,0,0,0" VerticalAlignment="Center">
-              <Border Width="34" Height="34" CornerRadius="{StaticResource RadiusSm}"
-                      Background="{StaticResource SignalGradientBrush}"
-                      BoxShadow="0 4 14 -4 #99FF3D2E">
-                <TextBlock Text="L" FontFamily="{StaticResource DisplayFont}"
-                           FontSize="22" FontWeight="SemiBold" Foreground="#FFFFFF"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Border Width="34" Height="34" CornerRadius="{StaticResource RadiusSm}">
+                <Image Source="avares://Feuerwehr.App/Assets/icon-1024.png"
+                       Width="34" Height="34" Stretch="Uniform" />
               </Border>
               <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="LAGEBUCH" FontFamily="{StaticResource DisplayFont}"
