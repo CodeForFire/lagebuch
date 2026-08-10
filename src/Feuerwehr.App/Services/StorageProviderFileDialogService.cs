@@ -84,4 +84,8 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
         });
         return file?.TryGetLocalPath();
     }
+
+    // The user already chose the exact destination via the native save dialog above — there is
+    // nothing further to hand off on desktop.
+    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }

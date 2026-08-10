@@ -14,6 +14,7 @@ internal sealed class FakeDialogs : IFileDialogService
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(ExportPath);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
 public class IncidentWorkspaceViewModelTests

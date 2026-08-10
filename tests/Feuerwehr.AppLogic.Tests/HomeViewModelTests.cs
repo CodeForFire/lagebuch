@@ -242,6 +242,7 @@ internal sealed class OpenReturningDialogs : IFileDialogService
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
 // Captures the suggested filename passed to PickSaveAsync.
@@ -257,6 +258,7 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
 // Every Load fails, standing in for a moved, truncated, or too-new file.
