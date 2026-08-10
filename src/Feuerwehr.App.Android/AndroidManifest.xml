@@ -4,5 +4,11 @@
           package="org.feuerwehr.lagebuch">
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
     <application android:label="Lagebuch" android:icon="@drawable/icon" android:usesCleartextTraffic="false">
+        <provider android:name="androidx.core.content.FileProvider"
+                  android:authorities="org.feuerwehr.lagebuch.fileprovider"
+                  android:exported="false"
+                  android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

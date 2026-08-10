@@ -25,21 +25,11 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
             new IncidentStore(),
             new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
             new JsonRecentFilesStore(AndroidAppPaths.RecentFilesJsonPath(this)),
-            new ThrowingFileDialogService(), // replaced in Task 9
+            new AndroidFileDialogService(this),
             new SystemClock(),
             new Feuerwehr.App.Shared.Services.DispatcherTimerTicker(),
             new AndroidAlarmService(),
             new MasterDataFileService());
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
-}
-
-internal sealed class ThrowingFileDialogService : IFileDialogService
-{
-    public Task<string?> PickSaveAsync(string suggestedFileName) => throw new NotImplementedException();
-    public Task<string?> PickOpenAsync() => throw new NotImplementedException();
-    public Task<string?> PickExportPdfAsync(string suggestedFileName) => throw new NotImplementedException();
-    public Task<string?> PickImportJsonAsync() => throw new NotImplementedException();
-    public Task<string?> PickExportJsonAsync(string suggestedFileName) => throw new NotImplementedException();
-    public Task ShareFileAsync(string path, string mimeType) => throw new NotImplementedException();
 }
