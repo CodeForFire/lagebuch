@@ -1,4 +1,6 @@
 using Android.Content.PM;
+using AndroidX.Activity.Result;
+using AndroidX.Activity.Result.Contract;
 using Avalonia;
 using Avalonia.Android;
 using Feuerwehr.App.Android.Services;
@@ -19,13 +21,35 @@ namespace Feuerwehr.App.Android;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity<SharedApp>
 {
+    private ActivityResultLauncher? _importLauncher;
+    private AndroidFileDialogService? _dialogs;
+
+    protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
+    {
+        _importLauncher = RegisterForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            new ImportCallback(uri => _dialogs?.CompleteImport(uri)));
+        base.OnCreate(savedInstanceState);
+    }
+
+    // AndroidX's RegisterForActivityResult takes an IActivityResultCallback, not a delegate, so the
+    // document picker's result is routed through this thin adapter back to the file-dialog service.
+    private sealed class ImportCallback : Java.Lang.Object, IActivityResultCallback
+    {
+        private readonly Action<global::Android.Net.Uri?> _onResult;
+        public ImportCallback(Action<global::Android.Net.Uri?> onResult) => _onResult = onResult;
+        public void OnActivityResult(Java.Lang.Object? result) => _onResult(result as global::Android.Net.Uri);
+    }
+
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
+        _dialogs = new AndroidFileDialogService(this);
+        _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
         SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
             new IncidentStore(),
             new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
             new JsonRecentFilesStore(AndroidAppPaths.RecentFilesJsonPath(this)),
-            new AndroidFileDialogService(this),
+            _dialogs,
             new SystemClock(),
             new Feuerwehr.App.Shared.Services.DispatcherTimerTicker(),
             new AndroidAlarmService(),

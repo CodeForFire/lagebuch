@@ -42,9 +42,40 @@ public sealed class AndroidFileDialogService : IFileDialogService
     public Task<string?> PickExportJsonAsync(string suggestedFileName) =>
         Task.FromResult<string?>(System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), suggestedFileName));
 
-    // Implemented in Task 10 — needs the ActivityResultLauncher document-picker registered in
-    // MainActivity.OnCreate.
-    public Task<string?> PickImportJsonAsync() => throw new NotImplementedException();
+    private TaskCompletionSource<string?>? _pendingImport;
+
+    public Task<string?> PickImportJsonAsync()
+    {
+        _pendingImport = new TaskCompletionSource<string?>();
+        OnLaunchImportPicker?.Invoke();
+        return _pendingImport.Task;
+    }
+
+    /// <summary>Set by MainActivity to the registered ActivityResultLauncher's Launch call.</summary>
+    public Action? OnLaunchImportPicker { get; set; }
+
+    /// <summary>
+    /// Called by MainActivity's registered picker callback once the user selects a file (or cancels).
+    /// Copies the content:// URI's bytes into app-private cache, since IMasterDataFileService.Read
+    /// needs a real filesystem path.
+    /// </summary>
+    public void CompleteImport(global::Android.Net.Uri? uri)
+    {
+        var pending = _pendingImport;
+        _pendingImport = null;
+        if (pending is null)
+            return;
+        if (uri is null)
+        {
+            pending.SetResult(null);
+            return;
+        }
+        var destPath = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), "import.json");
+        using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
+        using (var output = System.IO.File.Create(destPath))
+            input.CopyTo(output);
+        pending.SetResult(destPath);
+    }
 
     public Task ShareFileAsync(string path, string mimeType)
     {
