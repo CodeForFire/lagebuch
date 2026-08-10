@@ -5,7 +5,7 @@ using Avalonia.Threading;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Persistence.MasterData;
-using Feuerwehr.App.Views;
+using Feuerwehr.App.Shared.Views;
 
 namespace Feuerwehr.Acceptance.Tests;
 

@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Feuerwehr.App\Feuerwehr.App.csproj" />
+    <ProjectReference Include="..\..\src\Feuerwehr.App.Shared\Feuerwehr.App.Shared.csproj" />
   </ItemGroup>
 
 </Project>

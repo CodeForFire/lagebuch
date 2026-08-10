@@ -7,8 +7,6 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
-    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <!-- Product metadata; Version is overridden per release build with -p:Version=. -->
     <Product>Lagebuch</Product>
     <AssemblyTitle>Lagebuch</AssemblyTitle>
     <Company>Feuerwehr</Company>
@@ -18,18 +16,15 @@
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.2" />
     <PackageReference Include="Avalonia.Desktop" Version="11.2.2" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.2" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.2" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets\Fonts\*.ttf" />
     <AvaloniaResource Include="Assets\alarm.wav" />
-    <AvaloniaResource Include="Assets\icon-1024.png" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Feuerwehr.App.Shared\Feuerwehr.App.Shared.csproj" />
     <ProjectReference Include="..\Feuerwehr.AppLogic\Feuerwehr.AppLogic.csproj" />
   </ItemGroup>
 
