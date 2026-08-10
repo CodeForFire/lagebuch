@@ -1,6 +1,7 @@
 using Android.Content.PM;
 using Avalonia;
 using Avalonia.Android;
+using Feuerwehr.App.Android.Services;
 using Feuerwehr.App.Shared;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Domain.Time;
@@ -22,12 +23,12 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
     {
         SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
             new IncidentStore(),
-            new MasterDataProvider("/data/local/tmp/lagebuch-masterdata.db"), // replaced in Task 8
-            new JsonRecentFilesStore("/data/local/tmp/lagebuch-recent.json"), // replaced in Task 8
+            new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
+            new JsonRecentFilesStore(AndroidAppPaths.RecentFilesJsonPath(this)),
             new ThrowingFileDialogService(), // replaced in Task 9
             new SystemClock(),
             new Feuerwehr.App.Shared.Services.DispatcherTimerTicker(),
-            new NoopAlarmService(), // replaced in Task 8
+            new AndroidAlarmService(),
             new MasterDataFileService());
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
@@ -41,10 +42,4 @@ internal sealed class ThrowingFileDialogService : IFileDialogService
     public Task<string?> PickImportJsonAsync() => throw new NotImplementedException();
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => throw new NotImplementedException();
     public Task ShareFileAsync(string path, string mimeType) => throw new NotImplementedException();
-}
-
-internal sealed class NoopAlarmService : IAlarmService
-{
-    public void Start() { }
-    public void Stop() { }
 }
