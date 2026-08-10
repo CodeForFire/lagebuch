@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ApplicationId>org.feuerwehr.lagebuch</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Avalonia.Android's generated Resource designer code isn't documented and would otherwise
+         trip CS1591 under this repo's TreatWarningsAsErrors + GenerateDocumentationFile default. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Feuerwehr.App.Shared\Feuerwehr.App.Shared.csproj" />
+    <ProjectReference Include="..\Feuerwehr.AppLogic\Feuerwehr.AppLogic.csproj" />
+  </ItemGroup>
+
+</Project>
