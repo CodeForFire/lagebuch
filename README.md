@@ -38,6 +38,12 @@ All builds are self-contained; no .NET runtime needs to be installed separately.
 
 ## Build & Test
 
+Building the Android head requires the .NET Android workload (one-time, per machine):
+
+```bash
+dotnet workload install android
+```
+
 ```bash
 dotnet build
 dotnet test
