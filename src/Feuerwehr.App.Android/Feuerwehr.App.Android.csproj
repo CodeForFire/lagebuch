@@ -2,6 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0-android</TargetFramework>
+    <!-- Without OutputType=Exe a net8.0-android project builds as a library (.aar); the app head
+         must be Exe so publish packages a launchable .apk. -->
+    <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <ApplicationId>org.feuerwehr.lagebuch</ApplicationId>
     <ApplicationVersion>1</ApplicationVersion>
