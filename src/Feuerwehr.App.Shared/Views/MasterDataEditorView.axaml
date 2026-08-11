@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             x:Class="Feuerwehr.App.Shared.Views.MasterDataEditorView"
+             x:DataType="vm:MasterDataEditorViewModel">
+  <Panel>
+    <DockPanel Margin="28,24">
+      <!-- Header -->
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <TextBlock Text="STAMMDATEN" Classes="display" FontSize="26" />
+          <Border x:Name="DirtyDot" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#241608" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                  Padding="8,3" IsVisible="{Binding IsDirty}">
+            <TextBlock Text="Nicht gespeichert" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{StaticResource AmberBrush}" />
+          </Border>
+          <Border x:Name="FileErrorBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding FileError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding FileError}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
+          </Border>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <Button x:Name="ImportButton" Content="IMPORTIEREN" Command="{Binding ImportCommand}" />
+          <Button x:Name="ExportButton" Content="EXPORTIEREN" Command="{Binding ExportCommand}" />
+          <Button x:Name="DiscardButton" Content="VERWERFEN" Command="{Binding DiscardCommand}" />
+          <Button x:Name="SaveButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveCommand}" />
+        </StackPanel>
+      </Grid>
+
+      <!-- Master-detail -->
+      <Grid ColumnDefinitions="220,*">
+        <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                CornerRadius="{StaticResource RadiusMd}" Padding="6" Margin="0,0,16,0">
+          <ListBox x:Name="CategoryList" ItemsSource="{Binding Sections}"
+                   SelectedItem="{Binding SelectedSection}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:EditorSection">
+                <TextBlock Text="{Binding Title}" Padding="6,4" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+
+        <Border Grid.Column="1" Background="#0C1119"
+                BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+                CornerRadius="{StaticResource RadiusMd}" Padding="16" ClipToBounds="True">
+          <ContentControl Content="{Binding SelectedSection}">
+            <ContentControl.DataTemplates>
+
+              <!-- String-list / checklist editor -->
+              <DataTemplate x:DataType="vm:EditableListSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Items}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MasterDataItem">
+                          <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Text="{Binding Value}" />
+                            <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
+                                 DataContext, whose static type is object under compiled bindings, so a
+                                 compiled $parent cast path won't resolve. -->
+                            <Button Grid.Column="1" Content="▲" Margin="6,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="2" Content="▼" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="3" Content="✕" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
+              <!-- Personnel editor -->
+              <DataTemplate x:DataType="vm:PersonnelSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ PERSON"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PersonRow">
+                          <Grid ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Watermark="Nachname" Text="{Binding LastName}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1" Watermark="Vorname" Text="{Binding FirstName}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="2" Watermark="Rolle" Text="{Binding Role}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="3" Watermark="Rufname" Text="{Binding CallSign}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="4" Watermark="Telefon" Text="{Binding Phone}" Margin="0,0,6,0" />
+                            <Button Grid.Column="5" Content="✕"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
+            </ContentControl.DataTemplates>
+          </ContentControl>
+        </Border>
+      </Grid>
+    </DockPanel>
+
+    <!-- Discard-guard overlay, resolved by ViewLocator to ConfirmDialogView -->
+    <ContentControl Content="{Binding PendingConfirm}"
+                    IsVisible="{Binding PendingConfirm, Converter={x:Static ObjectConverters.IsNotNull}}" />
+  </Panel>
+</UserControl>

@@ -152,6 +152,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         try
         {
             _files.Write(path, BuildSet());
+            await _dialogs.ShareFileAsync(path, "application/json");
         }
         catch (Exception ex)
         {

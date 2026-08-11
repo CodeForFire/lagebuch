@@ -21,6 +21,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Install Android workload
+        run: dotnet workload install android
+
       - name: Restore
         run: dotnet restore
 

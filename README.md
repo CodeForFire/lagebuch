@@ -21,6 +21,7 @@ git tag v0.2.0 && git push origin v0.2.0
 |----------|------|-------|
 | Windows | `lagebuch-<version>-x64.msi` | on every tag |
 | Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` | on every tag |
+| Android | `lagebuch-<version>.apk` | on every tag |
 | macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` | on request |
 
 macOS runners bill Actions minutes at 10× on a private repo, so the `.dmg` is built on demand rather
@@ -33,10 +34,18 @@ The packages are **not code-signed**, so the OS warns on first launch:
 - **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click the app → Open**
   once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
 - **Linux** — `sudo dpkg -i lagebuch_*.deb` (or `sudo apt install ./lagebuch_*.deb`).
+- **Android** — open the `.apk` from your file manager/browser; enable *install from unknown
+  sources* for that app once when prompted. The package is unsigned, same as the desktop builds.
 
 All builds are self-contained; no .NET runtime needs to be installed separately.
 
 ## Build & Test
+
+Building the Android head requires the .NET Android workload (one-time, per machine):
+
+```bash
+dotnet workload install android
+```
 
 ```bash
 dotnet build

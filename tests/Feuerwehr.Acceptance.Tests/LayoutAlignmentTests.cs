@@ -4,7 +4,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using Feuerwehr.App.Views;
+using Feuerwehr.App.Shared.Views;
 
 namespace Feuerwehr.Acceptance.Tests;
 

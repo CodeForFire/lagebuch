@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using Feuerwehr.App.Views;
+using Feuerwehr.App.Shared.Views;
 using Feuerwehr.AppLogic;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;

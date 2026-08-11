@@ -3,7 +3,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
-using Feuerwehr.App.Views;
+using Feuerwehr.App.Shared.Views;
 using Feuerwehr.AppLogic.ViewModels;
 
 namespace Feuerwehr.Acceptance.Tests;

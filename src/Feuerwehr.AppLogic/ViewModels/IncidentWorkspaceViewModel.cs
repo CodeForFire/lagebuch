@@ -156,5 +156,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(path))
             return;
         await File.WriteAllBytesAsync(path, _session.ExportPdf());
+        await _dialogs.ShareFileAsync(path, "application/pdf");
     }
 }

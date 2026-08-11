@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             x:Class="Feuerwehr.App.Shared.Views.ConfirmDialogView"
+             x:DataType="vm:ConfirmDialogViewModel">
+  <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
+    <Border Width="420" VerticalAlignment="Center" HorizontalAlignment="Center"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <!-- Accent header strip -->
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <StackPanel Margin="26,22,26,24" Spacing="10">
+          <TextBlock Text="{Binding Title}" Classes="display" FontSize="22" />
+          <TextBlock Text="{Binding Message}" Classes="secondary" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+            <Button x:Name="ConfirmButton" Classes="signal" Content="{Binding ConfirmLabel}"
+                    Command="{Binding ConfirmCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

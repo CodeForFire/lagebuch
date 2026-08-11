@@ -35,6 +35,7 @@ public class MasterDataEditorViewModelTests
         public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
         public Task<string?> PickImportJsonAsync() => Task.FromResult(ImportPath);
         public Task<string?> PickExportJsonAsync(string s) => Task.FromResult(ExportPath);
+        public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 
     private sealed class FakeFileService : IMasterDataFileService

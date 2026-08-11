@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:b="clr-namespace:Feuerwehr.App.Shared.Behaviors"
+             x:Class="Feuerwehr.App.Shared.Views.RolesView"
+             x:DataType="vm:RolesViewModel">
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" Text="FÜHRUNG &amp; FUNKTIONEN" Classes="overline" Margin="0,0,0,14" />
+
+    <!-- Input dock -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <ComboBox Width="120" ItemsSource="{Binding RoleOptions}" SelectedItem="{Binding NewRole}" />
+        <!-- Name is a suggestion list, not a closed set: off-roster and mutual-aid personnel must
+             stay enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia
+             cannot make editable). -->
+        <AutoCompleteBox x:Name="PersonNameBox" Width="200" Watermark="Name"
+                         ItemsSource="{Binding PersonOptions}"
+                         FilterMode="ContainsOrdinal"
+                         MinimumPrefixLength="0"
+                         Text="{Binding NewPersonName}"
+                         b:EnterSubmit.Command="{Binding AddRoleCommand}" />
+        <TextBox x:Name="SectionBox" Width="130" Watermark="Abschnitt" Text="{Binding NewSection}" />
+        <ComboBox Width="150" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+        <TextBox x:Name="PhoneBox" Width="150" Watermark="Handynummer" Text="{Binding NewPhone}" />
+        <Button Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}" />
+      </StackPanel>
+    </Border>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid x:Name="RolesGrid" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="FUNKTION" Binding="{Binding Role}" />
+          <DataGridTextColumn Header="NAME" Binding="{Binding PersonName}" Width="*" />
+          <DataGridTextColumn Header="ABSCHNITT" Binding="{Binding Section}" />
+          <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
+          <DataGridTextColumn Header="HANDYNUMMER" Binding="{Binding Phone}" />
+          <DataGridTextColumn Header="VON" Binding="{Binding FromDisplay}" />
+          <DataGridTextColumn Header="BIS" Binding="{Binding ToDisplay}" />
+          <DataGridTemplateColumn Header="AKTION" Width="120">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:RoleAssignmentRow">
+                <Button Content="BEENDEN" Margin="4,2"
+                        IsVisible="{Binding IsRunning}"
+                        Command="{Binding EndCommand}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+  </DockPanel>
+</UserControl>
