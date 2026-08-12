@@ -85,9 +85,9 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var closed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<string>());
-        closed.Close(clock);
-        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/open.fwincident", Array.Empty<string>());
+        var closed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<string>());
+        closed.Close();
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/open.fwincident", Array.Empty<string>());
 
         var recent = new FakeRecent();
         recent.Add("/open.fwincident");
@@ -105,8 +105,8 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        seed.Close(clock);
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        seed.Close();
 
         var recent = new FakeRecent();
         var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
@@ -125,7 +125,7 @@ public class HomeViewModelTests
         // Previously double-tapping a recent OPEN incident dead-ended (no workspace opened).
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
         IncidentWorkspaceViewModel? opened = null;
@@ -143,7 +143,7 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
         // Dialog returns the seeded path so OpenFile has something to open.
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenReturningDialogs(), clock, new FakeTicker(), new FakeAlarmService());
@@ -208,7 +208,7 @@ public class HomeViewModelTests
     {
         var store = new SelectivelyThrowingStore();
         var clock = new FixedClock(T0);
-        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
         vm.OpenRecentCommand.Execute("/gone.fwincident");
@@ -224,7 +224,7 @@ public class HomeViewModelTests
     {
         var store = new CountingStore();
         var clock = new FixedClock(T0);
-        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         store.ResetLoadCount();
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());

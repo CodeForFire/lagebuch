@@ -7,16 +7,15 @@ namespace Feuerwehr.Sync;
 
 /// <summary>
 /// The mutation surface the ViewModels drive, with two implementations behind it: a local session
-/// (apply to the in-memory <see cref="Incident"/>, save, notify) and a remote session (POST the
-/// command to the host, do nothing locally — the UI updates only when the host's broadcast lands).
-/// Methods are fire-and-forget: they never return the created/changed entity, because a remote
-/// session cannot produce it synchronously. Callers react to <see cref="Changed"/> and read the
-/// current <see cref="Incident"/> instead.
+/// (apply to the in-memory <see cref="Incident"/>, save via the store, raise <see cref="Changed"/>)
+/// and — from a later phase — a remote session that POSTs the command to the host and lets the UI
+/// update when the host's broadcast lands.
 ///
 /// The session owns the clock and operator, so these signatures drop the <c>IClock</c>/
-/// <see cref="SessionOperator"/> arguments the domain methods take — the local session supplies its
-/// own; the remote session's host supplies its authoritative clock and the per-device operator that
-/// rode along with the command.
+/// <see cref="SessionOperator"/> arguments the domain methods take. Methods return the created/
+/// changed entity as the domain methods do, which the local caller uses to build a row; the remote
+/// implementation (and the ViewModels' switch to rebuilding rows from <see cref="Changed"/>) is
+/// handled where the remote session lands.
 /// </summary>
 public interface IIncidentSession
 {
@@ -30,22 +29,22 @@ public interface IIncidentSession
     /// <summary>Raised after the incident state changes (a local mutation, or a host broadcast).</summary>
     event Action? Changed;
 
-    void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
-    void ToggleChecklistItem(Guid itemId);
-    void AssignRole(string role, string personName, string? callSign = null,
+    EtbEntry AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
+    ChecklistItem ToggleChecklistItem(Guid itemId);
+    RoleAssignment AssignRole(string role, string personName, string? callSign = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null);
-    void EndRoleAssignment(Guid assignmentId);
-    void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
+    RoleAssignment EndRoleAssignment(Guid assignmentId);
+    ForceUnit AddForceUnit(string brigade, int personnelCount, string? callSign = null,
         string? status = null, string? notes = null, int scbaCount = 0);
-    void UpdateForceUnit(Guid unitId, string? status, string? notes);
-    void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
+    ForceUnit UpdateForceUnit(Guid unitId, string? status, string? notes);
+    AtemschutzTrupp AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes);
-    void StartScbaTrupp(Guid truppId, int startPressure);
-    void RecordScbaPressure(Guid truppId, int bar);
-    void MarkScbaReturned(Guid truppId);
+    AtemschutzTrupp StartScbaTrupp(Guid truppId, int startPressure);
+    AtemschutzTrupp RecordScbaPressure(Guid truppId, int bar);
+    AtemschutzTrupp MarkScbaReturned(Guid truppId);
     void SetIncidentNumber(IncidentNumber? number);
     void SetKeyword(string? keyword);
     void SetAddress(string? street, string? district);

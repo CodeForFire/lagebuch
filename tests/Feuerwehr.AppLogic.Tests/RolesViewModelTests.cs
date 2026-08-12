@@ -19,7 +19,7 @@ public class RolesViewModelTests
 
     private static RolesViewModel NewVm(FixedClock clock, MasterDataSet md, Action? onChanged = null)
     {
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         return new RolesViewModel(session, clock, md, onChanged ?? (() => { }));
     }
@@ -29,7 +29,7 @@ public class RolesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var vm = new RolesViewModel(session, clock, Md(), () => changes++)
         {
@@ -67,9 +67,9 @@ public class RolesViewModelTests
     public void ReadOnly_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        session.Close(clock);
+        session.Close();
         var vm = new RolesViewModel(session, clock, Md(), () => { }) { NewRole = "EL", NewPersonName = "Müller" };
         Assert.False(vm.AddRoleCommand.CanExecute(null));
     }
@@ -137,12 +137,12 @@ public class RolesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", Array.Empty<string>());
         seed.Incident.AssignRole("EL", "Müller", from: T0);
         seed.Save();
 
-        var vm = new RolesViewModel(IncidentSession.OpenReadOnly(store, "/x.fwincident"), clock, Md(), () => { });
+        var vm = new RolesViewModel(LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident"), clock, Md(), () => { });
 
         var row = Assert.Single(vm.Roles);
         Assert.True(row.IsRunning);

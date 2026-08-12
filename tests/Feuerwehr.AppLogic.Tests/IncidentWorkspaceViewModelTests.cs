@@ -27,7 +27,7 @@ public class IncidentWorkspaceViewModelTests
     {
         store = new FakeStore();
         clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", new[] { "A?" });
         return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), dialogs ?? new FakeDialogs(), new FakeAlarmService());
     }
@@ -37,11 +37,11 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         clock = new FixedClock(T0);
-        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", new[] { "A?" });
         if (closed)
-            seed.Close(clock);
-        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+            seed.Close();
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         return new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService());
     }
 
@@ -144,11 +144,11 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", new[] { "A?" });
         seed.Incident.SetIncidentNumber(new Domain.ValueObjects.IncidentNumber("B 99"));
         seed.Save();
-        var reopened = IncidentSession.Open(store, "/x.fwincident", new SessionOperator("Müller"));
+        var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
 
         var vm = new IncidentWorkspaceViewModel(reopened, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService());
 
@@ -274,8 +274,8 @@ public class IncidentWorkspaceViewModelTests
         var callSigns = new[] { "FFB 1/40/1", "Aich 42/1" };
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", new[] { "A?" });
-        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", new[] { "A?" });
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         var vm = new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(),
             MasterDataSet.Empty with { RadioCallSigns = callSigns },
             new FakeDialogs(), new FakeAlarmService());
@@ -349,7 +349,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var session = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", new[] { "A?" });
         var ticker = new FakeTicker();
         var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService());

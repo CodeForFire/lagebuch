@@ -10,14 +10,14 @@ namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 {
-    private readonly IncidentSession _session;
+    private readonly LocalIncidentSession _session;
     private readonly IClock _clock;
     private readonly ITicker _ticker;
     private readonly MasterDataSet _masterData;
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
 
-    public IncidentWorkspaceViewModel(IncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm)
+    public IncidentWorkspaceViewModel(LocalIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm)
     {
         _session = session;
         _clock = clock;
@@ -72,7 +72,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         // Every module funnels through here after mutating, so this is the one place that keeps
         // the ETB list level with the journal regardless of which tab produced the entry.
         Etb.Sync();
-        _session.Save();
         LastSavedAt = _clock.Now;
     }
 
@@ -119,7 +118,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     private void PerformClose()
     {
-        _session.Close(_clock);
+        _session.Close();
         IsReadOnly = true; // notifies CanContinueEditing + both commands
         LastSavedAt = _clock.Now;
         BuildChildren();
@@ -140,7 +139,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         PendingPrompt = null;
         if (op is null)
             return;
-        _session.ContinueEditing(_clock, op);
+        _session.ContinueEditing(op);
         IsReadOnly = false; // notifies CanContinueEditing + both commands
         LastSavedAt = _clock.Now;
         BuildChildren();

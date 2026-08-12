@@ -117,9 +117,9 @@ public class NumericInputTests
 // neither could be changed once the row was added.
 public class ForcesGridEditingTests
 {
-    private static (ForcesView View, IncidentWorkspaceViewModel Vm) ShowForces(out IncidentSession session)
+    private static (ForcesView View, IncidentWorkspaceViewModel Vm) ShowForces(out LocalIncidentSession session)
     {
-        session = IncidentSession.StartNew(new FakeStore(), new FixedClock(),
+        session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
         var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
             WorkspaceRenderHelper.MasterData(), new FakeDialogs(), new NoopAlarmService());

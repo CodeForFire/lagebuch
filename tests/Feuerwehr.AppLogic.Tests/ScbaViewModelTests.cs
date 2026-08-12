@@ -15,11 +15,11 @@ public class ScbaViewModelTests
         TruppTypes = new[] { "Angriffstrupp", "Wassertrupp" },
     };
 
-    private static IncidentSession NewSession(FixedClock clock) =>
-        IncidentSession.StartNew(new FakeStore(), clock,
+    private static LocalIncidentSession NewSession(FixedClock clock) =>
+        LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
 
-    private static ScbaViewModel Vm(FixedClock clock, IncidentSession session, Action? onChanged = null, FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
+    private static ScbaViewModel Vm(FixedClock clock, LocalIncidentSession session, Action? onChanged = null, FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
         new(session, Md(), clock, ticker ?? new FakeTicker(), alarm ?? new FakeAlarmService(), onChanged ?? (() => { }));
 
     private static ScbaTruppRow Register(ScbaViewModel vm, string designation = "Angriffstrupp",
@@ -188,9 +188,9 @@ public class ScbaViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        seed.Close(clock);
-        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        seed.Close();
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
 
         var vm = Vm(clock, ro);
         vm.NewDesignation = "Angriffstrupp";
