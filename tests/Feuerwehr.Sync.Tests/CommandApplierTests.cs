@@ -1,0 +1,64 @@
+using Feuerwehr.Domain;
+using Feuerwehr.Domain.Atemschutz;
+using Feuerwehr.Domain.Etb;
+
+namespace Feuerwehr.Sync.Tests;
+
+public class CommandApplierTests
+{
+    private static Incident NewIncident(FixedClock clock) =>
+        Incident.Start(clock, new SessionOperator("Host", "FFB 1"), keyword: null, incidentNumber: null);
+
+    private static void ApplyOverWire(SyncCommand command, Incident incident, FixedClock clock) =>
+        CommandApplier.Apply(SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize(command)), incident, clock);
+
+    [Fact]
+    public void Journal_entry_is_attributed_to_the_commands_operator_not_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
+            EtbDirection.Incoming, "Meldung von der Einsatzstelle", "Leitstelle", "ELW"), incident, clock);
+
+        var entry = incident.Journal.Last();
+        Assert.Equal("Meldung von der Einsatzstelle", entry.Text);
+        Assert.Equal("Client (RUF 1)", entry.EnteredBy); // the device's operator, not "Host (FFB 1)"
+    }
+
+    [Fact]
+    public void Applying_a_sequence_of_commands_converges_the_incident()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        incident.SeedChecklist(new[] { "Punkt A", "Punkt B" });
+        var op = new OperatorDto("Client", "RUF 1");
+
+        ApplyOverWire(new ToggleChecklistItemCommand(incident.Checklist[0].Id), incident, clock);
+        ApplyOverWire(new AssignRoleCommand("EL", "Huber", "FFB 1", clock.Now, null, null, null), incident, clock);
+        ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", "Im Einsatz", null, 4), incident, clock);
+        ApplyOverWire(new AddScbaTruppCommand("Angriffstrupp",
+            new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
+            "AT-1", null, 30, 60, 5), incident, clock);
+        ApplyOverWire(new StartScbaTruppCommand(incident.ScbaTrupps.Last().Id, 300), incident, clock);
+
+        Assert.True(incident.Checklist[0].IsDone);
+        Assert.Single(incident.Roles);
+        Assert.Equal(9, incident.TotalPersonnel);
+        var trupp = Assert.Single(incident.ScbaTrupps);
+        Assert.Equal(300, trupp.StartPressure);
+    }
+
+    [Fact]
+    public void A_command_against_a_closed_incident_is_rejected_by_the_domain_guard()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        ApplyOverWire(new CloseIncidentCommand(new OperatorDto("Host", "FFB 1")), incident, clock);
+
+        Assert.Throws<IncidentClosedException>(() =>
+            ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", null),
+                EtbDirection.Internal, "zu spät", null, null), incident, clock));
+    }
+}

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The embedded host: Kestrel + SignalR exposing one open incident over Tailscale. ASP.NET Core
+       only targets net8.0 (never net8.0-android), so this project is referenced by the desktop head
+       ONLY — never by AppLogic or the Android head. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Feuerwehr.AppLogic\Feuerwehr.AppLogic.csproj" />
+    <ProjectReference Include="..\Feuerwehr.Sync\Feuerwehr.Sync.csproj" />
+  </ItemGroup>
+
+</Project>
