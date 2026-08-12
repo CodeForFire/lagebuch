@@ -58,9 +58,9 @@ public class WorkspaceAcceptanceTests
         Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
     };
 
-    private static IncidentWorkspaceViewModel BuildWorkspace(out IncidentSession session)
+    private static IncidentWorkspaceViewModel BuildWorkspace(out LocalIncidentSession session)
     {
-        session = IncidentSession.StartNew(new FakeStore(), new FixedClock(),
+        session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
         return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
     }
@@ -70,11 +70,11 @@ public class WorkspaceAcceptanceTests
     {
         var store = new FakeStore();
         var clock = new FixedClock();
-        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
             "/x.fwincident", new[] { "Blaulicht aus?" });
         if (closed)
-            seed.Close(clock);
-        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+            seed.Close();
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
     }
 

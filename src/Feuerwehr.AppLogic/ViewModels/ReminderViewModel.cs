@@ -4,17 +4,19 @@ using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 
+using Feuerwehr.Sync;
+
 namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 {
-    private readonly IncidentSession _session;
+    private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
     private readonly ReminderTimer _timer = new();
     private readonly IDisposable _subscription;
 
-    public ReminderViewModel(IncidentSession session, IClock clock, ITicker ticker, Action onChanged)
+    public ReminderViewModel(IIncidentSession session, IClock clock, ITicker ticker, Action onChanged)
     {
         _session = session;
         _clock = clock;
@@ -83,8 +85,8 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private void Acknowledge()
     {
         _timer.Acknowledge(_clock);
-        _session.Incident.AddJournalEntry(
-            _clock, _session.Operator!, EtbDirection.Outgoing, "Rückmeldung an ILS", from: null, to: "ILS");
+        _session.AddJournalEntry(
+            EtbDirection.Outgoing, "Rückmeldung an ILS", from: null, to: "ILS");
         _onChanged();
         RefreshState();
     }

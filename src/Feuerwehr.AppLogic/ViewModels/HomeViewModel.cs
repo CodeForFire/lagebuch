@@ -62,7 +62,7 @@ public sealed partial class HomeViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(path))
             return;
         var md = _masterData.Get();
-        var session = IncidentSession.StartNew(
+        var session = LocalIncidentSession.StartNew(
             _store, _clock, request.Operator, path, md.ChecklistTemplate, request.IncidentNumber);
         OpenWorkspace(session, path, md);
     }
@@ -103,7 +103,7 @@ public sealed partial class HomeViewModel : ObservableObject
     {
         try
         {
-            var session = IncidentSession.OpenReadOnly(_store, path);
+            var session = LocalIncidentSession.OpenReadOnly(_store, _clock, path);
             OpenError = null;
             OpenWorkspace(session, path, _masterData.Get());
         }
@@ -113,7 +113,7 @@ public sealed partial class HomeViewModel : ObservableObject
         }
     }
 
-    private void OpenWorkspace(IncidentSession session, string path, Persistence.MasterData.MasterDataSet md)
+    private void OpenWorkspace(LocalIncidentSession session, string path, Persistence.MasterData.MasterDataSet md)
     {
         _recent.Add(path);
         var existing = RecentFiles.FirstOrDefault(f => f.Path == path);

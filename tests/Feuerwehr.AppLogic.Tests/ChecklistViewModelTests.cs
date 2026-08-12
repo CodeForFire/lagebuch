@@ -11,7 +11,7 @@ public class ChecklistViewModelTests
     public void Setting_isdone_marks_item_done_and_fires_onchanged()
     {
         var changes = 0;
-        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", new[] { "A?" });
         var vm = new ChecklistViewModel(session, () => changes++);
 
@@ -27,7 +27,7 @@ public class ChecklistViewModelTests
     [Fact]
     public void Toggling_isdone_off_again_clears_the_item()
     {
-        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", new[] { "A?" });
         var vm = new ChecklistViewModel(session, () => { });
 
@@ -42,9 +42,9 @@ public class ChecklistViewModelTests
     public void ReadOnly_session_does_not_mutate_domain()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", new[] { "A?" });
-        session.Close(clock);
+        session.Close();
         var vm = new ChecklistViewModel(session, () => Assert.Fail("onChanged must not fire when read-only"));
 
         Assert.True(vm.IsReadOnly);

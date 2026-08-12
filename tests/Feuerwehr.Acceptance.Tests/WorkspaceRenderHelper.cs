@@ -53,7 +53,7 @@ internal static class WorkspaceRenderHelper
             "PC eingeschaltet und VPN Verbindung aktiviert?",
             "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
         };
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklist,
             new IncidentNumber("B 1.2 260715 123"));
         var ticker = new ManualTicker();

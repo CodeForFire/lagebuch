@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Feuerwehr.Domain\Feuerwehr.Domain.csproj" />
+    <ProjectReference Include="..\Feuerwehr.Sync\Feuerwehr.Sync.csproj" />
     <ProjectReference Include="..\Feuerwehr.Persistence\Feuerwehr.Persistence.csproj" />
     <ProjectReference Include="..\Feuerwehr.Documents\Feuerwehr.Documents.csproj" />
   </ItemGroup>

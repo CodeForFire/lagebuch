@@ -38,10 +38,10 @@ public class ReminderViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 23, 9, 0, 0, TimeSpan.FromHours(2));
 
-    private static (IncidentSession session, FixedClock clock) NewSession()
+    private static (LocalIncidentSession session, FixedClock clock) NewSession()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
         return (session, clock);
     }

@@ -22,9 +22,9 @@ public class OperatorPromptFocusTests
     {
         var store = new FakeStore();
         var clock = new FixedClock();
-        IncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
             "/x.fwincident", new[] { "Blaulicht aus?" });
-        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
     }
 

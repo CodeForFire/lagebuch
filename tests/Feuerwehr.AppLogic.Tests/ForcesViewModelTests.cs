@@ -19,7 +19,7 @@ public class ForcesViewModelTests
     public void AddForce_appends_and_updates_total()
     {
         var changes = 0;
-        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
@@ -134,7 +134,7 @@ public class ForcesViewModelTests
     public void Editing_a_row_status_reaches_the_domain_and_persists()
     {
         var changes = 0;
-        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
@@ -156,7 +156,7 @@ public class ForcesViewModelTests
     [Fact]
     public void Editing_a_row_bemerkung_reaches_the_domain()
     {
-        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
@@ -174,7 +174,7 @@ public class ForcesViewModelTests
     [Fact]
     public void Editing_a_row_leaves_the_rest_of_the_unit_alone()
     {
-        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
@@ -203,12 +203,12 @@ public class ForcesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = IncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", Array.Empty<string>());
         seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9, null, "Alarmiert");
-        seed.Close(clock);
+        seed.Close();
 
-        var ro = IncidentSession.OpenReadOnly(store, "/x.fwincident");
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         var vm = new ForcesViewModel(ro, new FixedClock(T0), Md(), () => { });
 
         var row = Assert.Single(vm.Forces);
@@ -226,7 +226,7 @@ public class ForcesViewModelTests
         // Pins that the view model hands the real clock and operator down: the domain guarantees
         // an entry exists, but only this layer decides whose name is on it.
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
@@ -253,7 +253,7 @@ public class ForcesViewModelTests
         // The grid writes the Bemerkung through on every keystroke, so this is what keeps a typed
         // note from burying the Einsatztagebuch.
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
@@ -275,7 +275,7 @@ public class ForcesViewModelTests
 
     private static ForcesViewModel NewVm()
     {
-        var session = IncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         return new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
     }

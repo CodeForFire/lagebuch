@@ -1,0 +1,80 @@
+using Feuerwehr.Domain;
+using Feuerwehr.Domain.Atemschutz;
+using Feuerwehr.Domain.Etb;
+
+namespace Feuerwehr.Sync;
+
+/// <summary>
+/// A JSON-serializable snapshot of the whole <see cref="Incident"/> aggregate — the wire form the
+/// host broadcasts and a joining client reconstructs from. The fields mirror
+/// <see cref="Incident.Rehydrate"/> exactly, so <see cref="SnapshotMapper"/> is a JSON-shaped
+/// sibling of the SQL mapping in <c>Feuerwehr.Persistence.IncidentRepository</c>.
+/// </summary>
+public sealed record IncidentSnapshot(
+    Guid Id,
+    DateTimeOffset StartedAt,
+    IncidentState State,
+    string? IncidentNumber,
+    string? Keyword,
+    string? Street,
+    string? District,
+    string? Status,
+    DateTimeOffset? ClosedAt,
+    string? ClosedBy,
+    IReadOnlyList<ChecklistItemDto> Checklist,
+    IReadOnlyList<EtbEntryDto> Journal,
+    IReadOnlyList<RoleAssignmentDto> Roles,
+    IReadOnlyList<ForceUnitDto> Forces,
+    IReadOnlyList<ScbaTruppDto> ScbaTrupps,
+    IReadOnlyList<AuditEventDto> Audit);
+
+public sealed record ChecklistItemDto(Guid Id, string Text, bool IsDone, string? Note);
+
+public sealed record EtbEntryDto(
+    Guid Id,
+    DateTimeOffset Timestamp,
+    EtbDirection Direction,
+    string Text,
+    string EnteredBy,
+    string? From,
+    string? To);
+
+public sealed record RoleAssignmentDto(
+    Guid Id,
+    string Role,
+    string PersonName,
+    string? CallSign,
+    DateTimeOffset? From,
+    DateTimeOffset? To,
+    string? Section,
+    string? Phone);
+
+public sealed record ForceUnitDto(
+    Guid Id,
+    string Brigade,
+    string? CallSign,
+    int PersonnelCount,
+    int ScbaCount,
+    string? Status,
+    string? Notes);
+
+public sealed record TruppMemberDto(TruppRole Role, string Name);
+
+public sealed record PressureReadingDto(DateTimeOffset Time, int Bar);
+
+public sealed record ScbaTruppDto(
+    Guid Id,
+    DateTimeOffset RegisteredAt,
+    DateTimeOffset? StartTime,
+    string Designation,
+    IReadOnlyList<TruppMemberDto> Members,
+    string? CallSign,
+    string? Task,
+    int? StartPressure,
+    int MaxDurationMinutes,
+    int ReturnPressureBar,
+    int PressureControlIntervalMinutes,
+    DateTimeOffset? ExitTime,
+    IReadOnlyList<PressureReadingDto> Readings);
+
+public sealed record AuditEventDto(DateTimeOffset At, string Action, string By);

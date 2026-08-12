@@ -5,6 +5,8 @@ using Feuerwehr.Documents;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Persistence.MasterData;
 
+using Feuerwehr.Sync;
+
 namespace Feuerwehr.AppLogic.ViewModels;
 
 /// <summary>
@@ -62,12 +64,12 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
 public sealed partial class RolesViewModel : ObservableObject
 {
-    private readonly IncidentSession _session;
+    private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
     private readonly IReadOnlyList<Person> _personnel;
 
-    public RolesViewModel(IncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
+    public RolesViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
     {
         _session = session;
         _clock = clock;
@@ -134,7 +136,7 @@ public sealed partial class RolesViewModel : ObservableObject
     {
         // Von is stamped rather than typed: an assignment is recorded at the moment it happens,
         // and every other time in this application comes from the injected clock the same way.
-        var role = _session.Incident.AssignRole(
+        var role = _session.AssignRole(
             NewRole, NewPersonName, NewCallSign, from: _clock.Now, to: null,
             section: NewSection, phone: NewPhone);
         Roles.Add(CreateRow(role));
@@ -151,7 +153,7 @@ public sealed partial class RolesViewModel : ObservableObject
 
     private void EndAssignment(RoleAssignmentRow row)
     {
-        var ended = _session.Incident.EndRoleAssignment(row.Id, _clock.Now);
+        var ended = _session.EndRoleAssignment(row.Id);
         row.To = ended.To;
         _onChanged();
     }

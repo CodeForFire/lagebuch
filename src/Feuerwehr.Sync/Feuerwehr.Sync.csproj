@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Cross-platform sync layer: snapshot/command DTOs, the JSON mapper, and the IIncidentSession
+       abstraction. References Domain only, so it builds for the net8.0-android head too (the
+       SignalR/HTTP *client* lands here in a later phase; the Kestrel *server* lives in the
+       desktop-only Feuerwehr.Sync.Hosting project). -->
+  <ItemGroup>
+    <ProjectReference Include="..\Feuerwehr.Domain\Feuerwehr.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

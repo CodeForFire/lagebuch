@@ -5,6 +5,8 @@ using Feuerwehr.Documents;
 using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 
+using Feuerwehr.Sync;
+
 namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed record EtbEntryRow(
@@ -20,7 +22,7 @@ public sealed record EtbDirectionOption(EtbDirection Value, string Label);
 
 public sealed partial class EtbViewModel : ObservableObject
 {
-    private readonly IncidentSession _session;
+    private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
 
@@ -28,7 +30,7 @@ public sealed partial class EtbViewModel : ObservableObject
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
     private readonly List<EtbEntryRow> _all = new();
 
-    public EtbViewModel(IncidentSession session, IClock clock, Action onChanged)
+    public EtbViewModel(IIncidentSession session, IClock clock, Action onChanged)
     {
         _session = session;
         _clock = clock;
@@ -104,7 +106,7 @@ public sealed partial class EtbViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntry()
     {
-        _session.Incident.AddJournalEntry(_clock, _session.Operator!, NewDirection, NewText, NewFrom, NewTo);
+        _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo);
         Sync();
         NewText = string.Empty;
         NewFrom = null;

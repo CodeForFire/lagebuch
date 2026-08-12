@@ -30,7 +30,7 @@ public class EnterOnDropdownTests
     private static ScbaViewModel BuildScba()
     {
         var clock = new FixedClock();
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
         return new ScbaViewModel(session, Md(), clock, new NoopTicker(), new NoopAlarmService(), () => { });
     }

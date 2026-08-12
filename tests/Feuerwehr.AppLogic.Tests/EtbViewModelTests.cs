@@ -13,7 +13,7 @@ public class EtbViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
         var vm = new EtbViewModel(session, clock, () => changes++)
         {
@@ -38,7 +38,7 @@ public class EtbViewModelTests
     public void AddEntry_disabled_when_text_blank()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         var vm = new EtbViewModel(session, clock, () => { }) { NewText = "  " };
 
@@ -49,9 +49,9 @@ public class EtbViewModelTests
     public void ReadOnly_session_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
-        session.Close(clock);
+        session.Close();
         var vm = new EtbViewModel(session, clock, () => { }) { NewText = "x" };
 
         Assert.True(vm.IsReadOnly);
@@ -73,7 +73,7 @@ public class EtbViewModelTests
     public void HideSystemEntries_hides_system_rows_and_keeps_human_rows()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
         // StartNew logs "Einsatz begonnen" (System); add one human entry.
         var vm = new EtbViewModel(session, clock, () => { }) { NewText = "Lagemeldung" };
@@ -96,7 +96,7 @@ public class EtbViewModelTests
     public void System_entry_added_while_filtering_stays_hidden_but_human_entry_appears()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
         var vm = new EtbViewModel(session, clock, () => { });
         vm.HideSystemEntries = true;
@@ -142,7 +142,7 @@ public class EtbViewModelTests
     private static EtbViewModel NewVm()
     {
         var clock = new FixedClock(T0);
-        var session = IncidentSession.StartNew(new FakeStore(), clock,
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         return new EtbViewModel(session, clock, () => { });
     }

@@ -1,10 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using Feuerwehr.Sync;
+
 namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed partial class ChecklistViewModel : ObservableObject
 {
-    public ChecklistViewModel(IncidentSession session, Action onChanged)
+    public ChecklistViewModel(IIncidentSession session, Action onChanged)
     {
         IsReadOnly = session.IsReadOnly;
         Items = session.Incident.Checklist
@@ -18,11 +20,11 @@ public sealed partial class ChecklistViewModel : ObservableObject
 
 public sealed partial class ChecklistItemViewModel : ObservableObject
 {
-    private readonly IncidentSession _session;
+    private readonly IIncidentSession _session;
     private readonly Guid _id;
     private readonly Action _onChanged;
 
-    public ChecklistItemViewModel(IncidentSession session, Guid id, string text, bool isDone, string? note, bool isReadOnly, Action onChanged)
+    public ChecklistItemViewModel(IIncidentSession session, Guid id, string text, bool isDone, string? note, bool isReadOnly, Action onChanged)
     {
         _session = session;
         _id = id;
@@ -52,7 +54,7 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
             return;
         var item = _session.Incident.Checklist.First(c => c.Id == _id);
         if (item.IsDone != value)
-            _session.Incident.ToggleChecklistItem(_id);
+            _session.ToggleChecklistItem(_id);
         _onChanged();
     }
 }
