@@ -34,7 +34,7 @@ public class HomeViewModelTests
         var store = new FakeStore();
         var recent = new FakeRecent();
         var dialogs = new FakeDialogs(); // PickSaveAsync returns "/x.fwincident"
-        var vm = new HomeViewModel(store, new FakeMasterData(), recent, dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
 
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
@@ -52,7 +52,7 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var dialogs = new CapturingSaveDialogs();
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
 
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
@@ -73,7 +73,7 @@ public class HomeViewModelTests
         // invoked for real, but HomeViewModel itself should stay total rather than crash on null.
         var dialogs = new CapturingSaveDialogs();
         var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
-            new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+            new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
 
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
 
@@ -93,7 +93,7 @@ public class HomeViewModelTests
         recent.Add("/open.fwincident");
         recent.Add("/closed.fwincident");
 
-        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
 
         Assert.True(vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").IsClosed);
         Assert.False(vm.RecentFiles.Single(f => f.Path == "/open.fwincident").IsClosed);
@@ -109,7 +109,7 @@ public class HomeViewModelTests
         seed.Close();
 
         var recent = new FakeRecent();
-        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -127,7 +127,7 @@ public class HomeViewModelTests
         var clock = new FixedClock(T0);
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -146,7 +146,7 @@ public class HomeViewModelTests
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
         // Dialog returns the seeded path so OpenFile has something to open.
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenReturningDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenReturningDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -162,7 +162,7 @@ public class HomeViewModelTests
         // A recent entry that has since been moved, truncated, or written by a newer build. The
         // Home screen has to survive it: an Einsatz is exactly the moment not to lose the app.
         var vm = new HomeViewModel(new ThrowingStore("Datei kaputt."), new FakeMasterData(), new FakeRecent(),
-            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -178,7 +178,7 @@ public class HomeViewModelTests
     public void OpenFile_of_an_unreadable_file_reports_instead_of_crashing()
     {
         var vm = new HomeViewModel(new ThrowingStore("Datei kaputt."), new FakeMasterData(), new FakeRecent(),
-            new OpenReturningDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+            new OpenReturningDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -195,7 +195,7 @@ public class HomeViewModelTests
         // just hand the user a button that fails again.
         var recent = new FakeRecent();
         var vm = new HomeViewModel(new ThrowingStore("kaputt"), new FakeMasterData(), recent,
-            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService());
+            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
 
         vm.OpenRecentCommand.Execute("/gone.fwincident");
 
@@ -210,7 +210,7 @@ public class HomeViewModelTests
         var clock = new FixedClock(T0);
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
 
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
         vm.OpenRecentCommand.Execute("/gone.fwincident");
         Assert.NotNull(vm.OpenError);
 
@@ -227,7 +227,7 @@ public class HomeViewModelTests
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
         store.ResetLoadCount();
 
-        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController());
         vm.OpenRecentCommand.Execute("/x.fwincident");
 
         Assert.Equal(1, store.LoadCount);

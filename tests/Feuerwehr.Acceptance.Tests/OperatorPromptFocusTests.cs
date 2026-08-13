@@ -8,6 +8,8 @@ using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;
 using Feuerwehr.Persistence.MasterData;
 
+using Feuerwehr.AppLogic.Services;
+
 namespace Feuerwehr.Acceptance.Tests;
 
 public class OperatorPromptFocusTests
@@ -25,7 +27,7 @@ public class OperatorPromptFocusTests
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
             "/x.fwincident", new[] { "Blaulicht aus?" });
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
-        return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
+        return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
 
     [AvaloniaFact]

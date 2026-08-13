@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Feuerwehr.App.Shared\Feuerwehr.App.Shared.csproj" />
     <ProjectReference Include="..\Feuerwehr.AppLogic\Feuerwehr.AppLogic.csproj" />
+    <ProjectReference Include="..\Feuerwehr.Sync.Hosting\Feuerwehr.Sync.Hosting.csproj" />
   </ItemGroup>
 
 </Project>

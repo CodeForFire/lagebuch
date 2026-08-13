@@ -9,6 +9,8 @@ using Feuerwehr.AppLogic;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;
 
+using Feuerwehr.AppLogic.Services;
+
 namespace Feuerwehr.Acceptance.Tests;
 
 // Every numeric input in this app is a count: Personen, Atemschutzgeräteträger, Minuten, bar.
@@ -122,7 +124,7 @@ public class ForcesGridEditingTests
         session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
         var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
-            WorkspaceRenderHelper.MasterData(), new FakeDialogs(), new NoopAlarmService());
+            WorkspaceRenderHelper.MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
         var view = new ForcesView { DataContext = vm.Forces };
         var window = new Window { Content = view, Width = 1200, Height = 700 };
         window.Show();

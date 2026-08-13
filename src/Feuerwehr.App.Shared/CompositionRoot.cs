@@ -20,9 +20,10 @@ public static class CompositionRoot
         IClock clock,
         ITicker ticker,
         IAlarmService alarm,
-        IMasterDataFileService masterDataFileService)
+        IMasterDataFileService masterDataFileService,
+        IIncidentHostController hostController)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
         return new MainWindowViewModel(home, editor);
     }

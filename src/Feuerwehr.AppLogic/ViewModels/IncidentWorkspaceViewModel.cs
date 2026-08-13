@@ -16,8 +16,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly MasterDataSet _masterData;
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
+    private readonly IIncidentHostController _hostController;
 
-    public IncidentWorkspaceViewModel(LocalIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm)
+    public IncidentWorkspaceViewModel(LocalIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
     {
         _session = session;
         _clock = clock;
@@ -25,6 +26,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _masterData = masterData;
         _dialogs = dialogs;
         _alarm = alarm;
+        _hostController = hostController;
         IsReadOnly = session.IsReadOnly;
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
@@ -33,6 +35,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanContinueEditing))]
+    [NotifyPropertyChangedFor(nameof(CanHost))]
     [NotifyCanExecuteChangedFor(nameof(CloseIncidentCommand))]
     [NotifyCanExecuteChangedFor(nameof(ContinueEditingCommand))]
     private bool _isReadOnly;
@@ -156,5 +159,41 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             return;
         await File.WriteAllBytesAsync(path, _session.ExportPdf());
         await _dialogs.ShareFileAsync(path, "application/pdf");
+    }
+
+    // ===== Multi-device hosting (#52): flip "Im Netzwerk freigeben" to expose this open incident. =====
+
+    // Only offered on a platform that can host and while the incident is editable — a read-only
+    // (closed or unresumed) incident is nothing to collaborate on.
+    public bool CanHost => _hostController.CanHost && !IsReadOnly;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShareButtonText))]
+    private bool _isSharing;
+
+    // The one-line status under the toggle: the address to share, or "Tailscale nicht verbunden".
+    [ObservableProperty]
+    private string? _shareStatus;
+
+    public string ShareButtonText => IsSharing ? "FREIGABE BEENDEN" : "IM NETZWERK FREIGEBEN";
+
+    [RelayCommand]
+    private async Task ToggleSharing()
+    {
+        if (IsSharing)
+        {
+            await _hostController.StopAsync();
+            IsSharing = false;
+            ShareStatus = null;
+            return;
+        }
+        if (!_hostController.IsTailscaleConnected)
+        {
+            ShareStatus = "Tailscale nicht verbunden";
+            return;
+        }
+        await _hostController.StartAsync(_session);
+        IsSharing = true;
+        ShareStatus = _hostController.ShareHint;
     }
 }
