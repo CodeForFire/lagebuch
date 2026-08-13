@@ -43,6 +43,15 @@
             </StackPanel>
           </Grid>
 
+          <!-- Multi-device sharing (#52): expose this open incident to other devices over Tailscale -->
+          <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding CanHost}">
+            <Button Classes="ghost" Content="{Binding ShareButtonText}" Command="{Binding ToggleSharingCommand}" />
+            <TextBlock Classes="body" VerticalAlignment="Center"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Text="{Binding ShareStatus}"
+                       IsVisible="{Binding ShareStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
+
           <!-- Read-only banner -->
           <Border x:Name="ReadOnlyBanner" Background="#241608"
                   BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"

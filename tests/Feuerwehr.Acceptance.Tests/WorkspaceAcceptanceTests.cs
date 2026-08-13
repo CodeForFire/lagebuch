@@ -62,7 +62,7 @@ public class WorkspaceAcceptanceTests
     {
         session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
-        return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
+        return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
 
     // A read-only-opened workspace over a still-open (or optionally closed) incident.
@@ -75,7 +75,7 @@ public class WorkspaceAcceptanceTests
         if (closed)
             seed.Close();
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
-        return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService());
+        return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
 
     [AvaloniaFact]

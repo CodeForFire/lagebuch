@@ -22,15 +22,18 @@ internal static class Program
         // chicken-and-egg problem of needing a TopLevel before the Window that provides one exists.
         var dialogs = new StorageProviderFileDialogService(() =>
             (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow);
+        var clock = new SystemClock();
+        var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
         return Feuerwehr.App.Shared.CompositionRoot.CreateMainWindowViewModel(
             new IncidentStore(),
             new MasterDataProvider(AppPaths.MasterDataDbPath),
             new JsonRecentFilesStore(AppPaths.RecentFilesJsonPath),
             dialogs,
-            new SystemClock(),
+            clock,
             new Feuerwehr.App.Shared.Services.DispatcherTimerTicker(),
             new SystemAlarmService(),
-            new MasterDataFileService());
+            new MasterDataFileService(),
+            new IncidentHostController(clock, version));
     }
 
     public static AppBuilder BuildAvaloniaApp() =>

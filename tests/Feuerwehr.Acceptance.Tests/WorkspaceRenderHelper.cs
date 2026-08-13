@@ -58,7 +58,7 @@ internal static class WorkspaceRenderHelper
             new IncidentNumber("B 1.2 260715 123"));
         var ticker = new ManualTicker();
         var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(),
-            new FakeDialogs(), new NoopAlarmService());
+            new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
 
         // Drive the three header bars into their visible states (like the reported screenshot):
         //   1) ILS reminder running, 2) SCBA pressure-control due, 3) Rückzugsalarm active.
