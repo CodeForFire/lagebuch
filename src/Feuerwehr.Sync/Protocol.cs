@@ -17,3 +17,14 @@ public static class SyncProtocol
 
 /// <summary>Exchanged on connect; a client refuses a host whose <see cref="Version"/> differs (§7).</summary>
 public sealed record VersionInfo(string Version);
+
+/// <summary>
+/// Thrown when a joining client's app version differs from the host's. Mixed versions across a
+/// volunteer-run, un-auto-updated fleet are a realistic scenario to guard against explicitly (§7).
+/// </summary>
+public sealed class VersionMismatchException(string localVersion, string hostVersion)
+    : Exception($"Version stimmt nicht überein: dieses Gerät {localVersion}, Host {hostVersion}.")
+{
+    public string LocalVersion { get; } = localVersion;
+    public string HostVersion { get; } = hostVersion;
+}
