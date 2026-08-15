@@ -5,12 +5,16 @@ using Feuerwehr.Documents;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Persistence.MasterData;
+using Feuerwehr.Sync;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 {
-    private readonly LocalIncidentSession _session;
+    private readonly IIncidentSession _session;
+    // The concrete local session, or null on a joined client. Guards the two capabilities that only
+    // exist on the device that owns the .fwincident file: PDF export and resuming a read-only file.
+    private readonly LocalIncidentSession? _local;
     private readonly IClock _clock;
     private readonly ITicker _ticker;
     private readonly MasterDataSet _masterData;
@@ -18,9 +22,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
 
-    public IncidentWorkspaceViewModel(LocalIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
     {
         _session = session;
+        _local = session as LocalIncidentSession;
         _clock = clock;
         _ticker = ticker;
         _masterData = masterData;
@@ -31,6 +36,16 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
         BuildChildren();
+
+        // A joined client renders exactly what the host broadcasts; wire the connection lifecycle so
+        // the workspace disables input while reconnecting and drops back to Home once the host is gone.
+        if (session is RemoteIncidentSession remote)
+        {
+            remote.Changed += OnRemoteLifecycle;
+            remote.Disconnected += () => IsConnected = false;
+            remote.Reconnected += () => IsConnected = true;
+            remote.Ended += () => GoHomeRequested?.Invoke();
+        }
     }
 
     [ObservableProperty]
@@ -70,6 +85,44 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     public bool HasReminder => Reminder is not null;
 
+    // ===== Joined-client connection state (#52 §7). Always "connected" locally; on a remote session
+    // it tracks the SignalR link so the view can grey out input while reconnecting. =====
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsInputEnabled))]
+    private bool _isConnected = true;
+
+    /// <summary>Modules are interactive only while connected — a reconnecting client can't send commands.</summary>
+    public bool IsInputEnabled => IsConnected;
+
+    /// <summary>Set by the shell to navigate back to Home (host gone, or the user left the client).</summary>
+    public Action? GoHomeRequested { get; set; }
+
+    [RelayCommand]
+    private void LeaveToHome() => GoHomeRequested?.Invoke();
+
+    /// <summary>
+    /// Called by the shell when this workspace is being left. Tears down a joined client's
+    /// SignalR/HTTP connection; a local session owns no such resources and is a no-op.
+    /// </summary>
+    public async ValueTask LeaveAsync()
+    {
+        if (_session is IAsyncDisposable disposable)
+            await disposable.DisposeAsync();
+    }
+
+    // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
+    // incident); keep the header live and flip the whole workspace to read-only when it does.
+    private void OnRemoteLifecycle()
+    {
+        OnPropertyChanged(nameof(StatusDisplay));
+        if (_session.IsReadOnly != IsReadOnly)
+        {
+            IsReadOnly = _session.IsReadOnly;
+            BuildChildren();
+        }
+    }
+
     private void OnChanged()
     {
         // Every module funnels through here after mutating, so this is the one place that keeps
@@ -89,7 +142,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
         Reminder?.Dispose();
-        Reminder = _session.IsReadOnly ? null : new ReminderViewModel(_session, _clock, _ticker, OnChanged);
+        // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
+        // client must not run its own, or the host's journal would be double-logged.
+        Reminder = _session.IsReadOnly || _session.IsRemote
+            ? null
+            : new ReminderViewModel(_session, _clock, _ticker, OnChanged);
 
         OnPropertyChanged(nameof(Checklist));
         OnPropertyChanged(nameof(Etb));
@@ -128,8 +185,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(StatusDisplay));
     }
 
-    // Editable only when read-only AND not finished — a closed incident stays read-only.
-    public bool CanContinueEditing => IsReadOnly && _session.Incident.State == IncidentState.Open;
+    // Editable only when read-only AND not finished — a closed incident stays read-only. Resuming a
+    // file is a local-only concept: a joined client has no local file to reopen (_local is null).
+    public bool CanContinueEditing => _local is not null && IsReadOnly && _session.Incident.State == IncidentState.Open;
 
     [RelayCommand(CanExecute = nameof(CanContinueEditing))]
     private void ContinueEditing() =>
@@ -142,7 +200,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         PendingPrompt = null;
         if (op is null)
             return;
-        _session.ContinueEditing(op);
+        _local!.ContinueEditing(op); // CanContinueEditing guarantees _local is not null
         IsReadOnly = false; // notifies CanContinueEditing + both commands
         LastSavedAt = _clock.Now;
         BuildChildren();
@@ -150,14 +208,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     public void CancelContinueEditing() => PendingPrompt = null;
 
-    [RelayCommand]
+    // PDF export renders from the local .fwincident, so it belongs to the host that owns the file;
+    // a joined client (_local is null) hides the button and lets the host export instead.
+    public bool CanExport => _local is not null;
+
+    [RelayCommand(CanExecute = nameof(CanExport))]
     private async Task ExportPdfAsync()
     {
         var suggested = (_session.Incident.IncidentNumber?.Value ?? "Einsatz") + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
             return;
-        await File.WriteAllBytesAsync(path, _session.ExportPdf());
+        await File.WriteAllBytesAsync(path, _local!.ExportPdf());
         await _dialogs.ShareFileAsync(path, "application/pdf");
     }
 
@@ -180,6 +242,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private async Task ToggleSharing()
     {
+        // Hosting exposes the local .fwincident, so it needs the concrete local session. The toggle is
+        // only shown when CanHost (a hostable platform with a local session), so _local is non-null here.
+        if (_local is null)
+            return;
         if (IsSharing)
         {
             await _hostController.StopAsync();
@@ -192,7 +258,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             ShareStatus = "Tailscale nicht verbunden";
             return;
         }
-        await _hostController.StartAsync(_session);
+        await _hostController.StartAsync(_local);
         IsSharing = true;
         ShareStatus = _hostController.ShareHint;
     }

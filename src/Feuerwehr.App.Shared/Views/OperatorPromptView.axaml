@@ -17,6 +17,16 @@
         <StackPanel Margin="26,22,26,24" Spacing="6">
           <TextBlock Text="DOKUMENTATION" Classes="overline" />
           <TextBlock Text="Wer dokumentiert?" Classes="display" FontSize="22" Margin="0,0,0,8" />
+          <!-- Join flow only (§6): the host's Tailscale name or IP, entered alongside "who documents
+               here" so a joining device provides both in one prompt. -->
+          <StackPanel IsVisible="{Binding CollectsHost}" Spacing="3">
+            <TextBlock Text="GERÄT (TAILSCALE-NAME ODER IP)" Classes="overline" FontSize="10" Margin="0,4,0,3" />
+            <TextBox x:Name="HostBox" Watermark="z. B. elw-1 oder 100.x.y.z" Text="{Binding Host}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </StackPanel>
           <TextBlock Text="NAME" Classes="overline" FontSize="10" Margin="0,4,0,3" />
           <TextBox x:Name="OperatorNameBox" Watermark="z. B. Müller" Text="{Binding OperatorName}">
             <TextBox.KeyBindings>

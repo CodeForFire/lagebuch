@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Net.Sockets;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
+using Feuerwehr.Persistence.MasterData;
+using Feuerwehr.Sync;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
@@ -17,8 +20,9 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly ITicker _ticker;
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
+    private readonly string _appVersion;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion)
     {
         _store = store;
         _masterData = masterData;
@@ -28,6 +32,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _ticker = ticker;
         _alarm = alarm;
         _hostController = hostController;
+        _appVersion = appVersion;
         RecentFiles = new ObservableCollection<RecentFileItem>(
             recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path))));
     }
@@ -50,6 +55,13 @@ public sealed partial class HomeViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private string? _openError;
+
+    /// <summary>
+    /// Why the last join attempt failed, or null. Shown as a banner on the Home screen (§7): a
+    /// version mismatch, or a host that isn't reachable / isn't currently sharing an incident.
+    /// </summary>
+    [ObservableProperty]
+    private string? _joinError;
 
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
@@ -123,6 +135,52 @@ public sealed partial class HomeViewModel : ObservableObject
             RecentFiles.Remove(existing);
         RecentFiles.Insert(0, new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
         var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController);
+        WorkspaceOpened?.Invoke(workspace);
+    }
+
+    // ===== Multi-device join (#52 §4/§6): connect to another device's hosted incident as a thin client. =====
+
+    [RelayCommand]
+    private async Task JoinDeviceAsync(JoinRequest request)
+    {
+        var (host, port) = ParseHost(request.Host);
+        try
+        {
+            var session = await RemoteIncidentSession.ConnectAsync(host, request.Operator, _appVersion, port);
+            JoinError = null;
+            OpenRemoteWorkspace(session, _masterData.Get());
+        }
+        catch (VersionMismatchException ex)
+        {
+            // Distinct, explicit message: mixed versions across an un-auto-updated fleet are expected (§7).
+            JoinError = ex.Message;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
+        {
+            // Host unreachable, or up but not currently sharing an incident — same answer for the user:
+            // say which device and why, and leave them on Home to try again.
+            JoinError = $"Verbindung zu {request.Host} nicht möglich. Teilt dieses Gerät gerade einen Einsatz? ({ex.Message})";
+        }
+    }
+
+    // The address is normally just a Tailscale name (the host binds the fixed SyncProtocol.Port), but
+    // an explicit "host:port" is accepted too — handy for a non-standard port or for reaching a host
+    // on the same machine during testing.
+    private static (string Host, int Port) ParseHost(string address)
+    {
+        var trimmed = address.Trim();
+        var colon = trimmed.LastIndexOf(':');
+        if (colon > 0 && int.TryParse(trimmed[(colon + 1)..], out var port))
+            return (trimmed[..colon], port);
+        return (trimmed, SyncProtocol.Port);
+    }
+
+    // The remote workspace can't host (a client isn't hostable) and has no local file, so it gets a
+    // no-op host controller — the "Im Netzwerk freigeben" toggle and PDF export stay hidden.
+    private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md)
+    {
+        var workspace = new IncidentWorkspaceViewModel(
+            session, _clock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController());
         WorkspaceOpened?.Invoke(workspace);
     }
 }

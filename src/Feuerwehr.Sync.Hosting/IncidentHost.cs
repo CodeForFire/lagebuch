@@ -63,7 +63,7 @@ public sealed class IncidentHost : IAsyncDisposable
         _app = app;
     }
 
-    private async Task<IResult> HandleCommand(SyncCommand command)
+    private IResult HandleCommand(SyncCommand command)
     {
         try
         {
@@ -75,10 +75,11 @@ public sealed class IncidentHost : IAsyncDisposable
             return Results.BadRequest(ex.Message);
         }
 
-        _session.Save();
-        var snapshot = SnapshotMapper.ToSnapshot(_session.Incident);
-        await Broadcast(snapshot);
-        return Results.Json(snapshot, SyncJson.Options);
+        // Persist + raise the session's Changed, which refreshes the host's own UI and, through
+        // OnSessionChanged, broadcasts the new snapshot to every client — the same path a host edit
+        // takes (§5), so a client's contribution appears live on the host too, not just on clients.
+        _session.SaveExternalChange();
+        return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
     }
 
     private void OnSessionChanged() => _ = Broadcast(SnapshotMapper.ToSnapshot(_session.Incident));

@@ -35,11 +35,21 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <summary>Raised after the cached incident is replaced by a host broadcast (or a resync).</summary>
     public event Action? Changed;
 
-    /// <summary>Raised when the connection drops — the UI should disable input and show "verbinde neu…".</summary>
+    /// <summary>
+    /// Raised when the connection drops but automatic reconnect is still trying — the UI should
+    /// disable input and show "Verbindung getrennt — verbinde neu…". A successful retry raises
+    /// <see cref="Reconnected"/>; giving up raises <see cref="Ended"/>.
+    /// </summary>
     public event Action? Disconnected;
 
     /// <summary>Raised after a reconnect + full resync — the UI can re-enable input.</summary>
     public event Action? Reconnected;
+
+    /// <summary>
+    /// Raised when the connection is gone for good — reconnect attempts were exhausted or the host
+    /// stopped sharing. The UI returns to Home (§7); nothing further arrives on this session.
+    /// </summary>
+    public event Action? Ended;
 
     private RemoteIncidentSession(HttpClient http, HubConnection hub, SessionOperator op, Incident initial)
     {
@@ -55,7 +65,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable.
     /// </summary>
     public static async Task<RemoteIncidentSession> ConnectAsync(
-        string host, SessionOperator op, string localVersion, int port = SyncProtocol.Port, CancellationToken ct = default)
+        string host, SessionOperator op, string localVersion, int port = SyncProtocol.Port,
+        IRetryPolicy? reconnectPolicy = null, CancellationToken ct = default)
     {
         var baseUri = new Uri($"http://{host}:{port}");
         var http = new HttpClient { BaseAddress = baseUri };
@@ -70,14 +81,17 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
             var hub = new HubConnectionBuilder()
                 .WithUrl(new Uri(baseUri, SyncProtocol.HubPath))
-                .WithAutomaticReconnect()
+                .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
             var session = new RemoteIncidentSession(http, hub, op, initial);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
-            hub.Closed += _ => { session.Disconnected?.Invoke(); return Task.CompletedTask; };
+            // Reconnecting = transient drop (keep the workspace open, disable input); Closed = the
+            // reconnect window ran out or the host went away for good (return to Home).
+            hub.Reconnecting += _ => { session.Disconnected?.Invoke(); return Task.CompletedTask; };
             hub.Reconnected += async _ => { await session.ResyncAsync(); session.Reconnected?.Invoke(); };
+            hub.Closed += _ => { session.Ended?.Invoke(); return Task.CompletedTask; };
             await hub.StartAsync(ct);
             return session;
         }
@@ -154,5 +168,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     {
         await _hub.DisposeAsync();
         _http.Dispose();
+    }
+
+    // SignalR's default policy gives up after ~30s; on a callout a device's mobile data can blip for
+    // longer than that, and dumping the user back to Home over a brief outage is worse than waiting.
+    // Retry every few seconds for a couple of minutes, then give up (→ Closed → Ended → Home).
+    private sealed class ReconnectForAWhile : IRetryPolicy
+    {
+        public TimeSpan? NextRetryDelay(RetryContext retryContext) =>
+            retryContext.ElapsedTime < TimeSpan.FromMinutes(2) ? TimeSpan.FromSeconds(3) : null;
     }
 }

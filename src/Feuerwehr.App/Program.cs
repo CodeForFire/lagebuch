@@ -33,7 +33,8 @@ internal static class Program
             new Feuerwehr.App.Shared.Services.DispatcherTimerTicker(),
             new SystemAlarmService(),
             new MasterDataFileService(),
-            new IncidentHostController(clock, version));
+            new IncidentHostController(clock, version),
+            version);
     }
 
     public static AppBuilder BuildAvaloniaApp() =>

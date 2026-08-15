@@ -10,15 +10,26 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     public OperatorPromptViewModel(
         bool collectIncidentNumber = false,
         IReadOnlyList<string>? callSignOptions = null,
-        IReadOnlyList<string>? einsatzartOptions = null)
+        IReadOnlyList<string>? einsatzartOptions = null,
+        bool collectHost = false)
     {
         CollectsIncidentNumber = collectIncidentNumber;
+        CollectsHost = collectHost;
         CallSignOptions = callSignOptions ?? Array.Empty<string>();
         EinsatzartOptions = einsatzartOptions ?? Array.Empty<string>();
     }
 
     // True only for the new-incident flow; the continue-editing flow leaves it false.
     public bool CollectsIncidentNumber { get; }
+
+    // True only for the join flow (§6): show the host address field on top of the operator prompt,
+    // so the joining device says who documents here and which host to reach in one step.
+    public bool CollectsHost { get; }
+
+    // The host's Tailscale name or IP, entered only in the join flow. Mandatory there (gates Confirm).
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    private string _host = string.Empty;
 
     // Radio call signs offered as dropdown suggestions for the Funkrufname field. The field stays
     // free-text (an operator's call sign need not be in the master list), so this is only a hint;
@@ -68,7 +79,8 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
 
     private bool CanConfirm =>
         !string.IsNullOrWhiteSpace(OperatorName) &&
-        (!CollectsIncidentNumber || HasCompleteIncidentNumber);
+        (!CollectsIncidentNumber || HasCompleteIncidentNumber) &&
+        (!CollectsHost || !string.IsNullOrWhiteSpace(Host));
 
     // EinsatznummerFormat.Compose only returns null when ALL THREE parts are blank, which is too
     // weak for "mandatory" -- an operator who fills only the Einsatzart would pass that check with
