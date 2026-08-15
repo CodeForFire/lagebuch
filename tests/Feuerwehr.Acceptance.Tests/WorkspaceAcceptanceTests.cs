@@ -320,7 +320,8 @@ public class WorkspaceAcceptanceTests
         var row = Assert.Single(vm.Roles.Roles);
         Assert.True(row.IsRunning);
         row.EndCommand.Execute(null);
-        Assert.False(row.IsRunning);
+        // The roles grid rebuilds from the aggregate on change, so re-read the row.
+        Assert.False(Assert.Single(vm.Roles.Roles).IsRunning);
         Assert.NotNull(Assert.Single(session.Incident.Roles).To);
     }
 }

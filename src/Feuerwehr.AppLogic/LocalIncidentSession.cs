@@ -40,6 +40,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     // read-only — the domain rejects mutations either way).
     public bool IsReadOnly => Operator is null || Incident.State == IncidentState.Closed;
 
+    // This device is authoritative — it does its own time-driven logging (see IIncidentSession.IsRemote).
+    public bool IsRemote => false;
+
     public static LocalIncidentSession StartNew(
         IIncidentStore store,
         IClock clock,
@@ -95,26 +98,26 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
 
-    public EtbEntry AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
+    public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         Mutate(() => Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to));
 
-    public ChecklistItem ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(itemId));
+    public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(itemId));
 
-    public RoleAssignment AssignRole(string role, string personName, string? callSign = null,
+    public void AssignRole(string role, string personName, string? callSign = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null) =>
         Mutate(() => Incident.AssignRole(role, personName, callSign, from, to, section, phone));
 
-    public RoleAssignment EndRoleAssignment(Guid assignmentId) =>
+    public void EndRoleAssignment(Guid assignmentId) =>
         Mutate(() => Incident.EndRoleAssignment(assignmentId, _clock.Now));
 
-    public ForceUnit AddForceUnit(string brigade, int personnelCount, string? callSign = null,
+    public void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
         string? status = null, string? notes = null, int scbaCount = 0) =>
         Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount));
 
-    public ForceUnit UpdateForceUnit(Guid unitId, string? status, string? notes) =>
+    public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
         Mutate(() => Incident.UpdateForceUnit(_clock, RequireOperator(), unitId, status, notes));
 
-    public AtemschutzTrupp AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
+    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
@@ -122,13 +125,13 @@ public sealed class LocalIncidentSession : IIncidentSession
         Mutate(() => Incident.AddScbaTrupp(_clock, designation, members, callSign, task,
             maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes));
 
-    public AtemschutzTrupp StartScbaTrupp(Guid truppId, int startPressure) =>
+    public void StartScbaTrupp(Guid truppId, int startPressure) =>
         Mutate(() => Incident.StartScbaTrupp(_clock, truppId, startPressure));
 
-    public AtemschutzTrupp RecordScbaPressure(Guid truppId, int bar) =>
+    public void RecordScbaPressure(Guid truppId, int bar) =>
         Mutate(() => Incident.RecordScbaPressure(_clock, truppId, bar));
 
-    public AtemschutzTrupp MarkScbaReturned(Guid truppId) =>
+    public void MarkScbaReturned(Guid truppId) =>
         Mutate(() => Incident.MarkScbaReturned(_clock, truppId));
 
     public void SetIncidentNumber(IncidentNumber? number) => Mutate(() => Incident.SetIncidentNumber(number));
@@ -143,14 +146,6 @@ public sealed class LocalIncidentSession : IIncidentSession
         Incident.Close(_clock, RequireOperator());
         Save();
         Changed?.Invoke();
-    }
-
-    private T Mutate<T>(Func<T> apply)
-    {
-        var result = apply();
-        Save();
-        Changed?.Invoke();
-        return result;
     }
 
     private void Mutate(Action apply)

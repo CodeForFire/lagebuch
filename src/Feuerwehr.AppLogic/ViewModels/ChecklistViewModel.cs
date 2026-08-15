@@ -23,6 +23,7 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly Guid _id;
     private readonly Action _onChanged;
+    private bool _suppressWriteback;
 
     public ChecklistItemViewModel(IIncidentSession session, Guid id, string text, bool isDone, string? note, bool isReadOnly, Action onChanged)
     {
@@ -33,6 +34,19 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
         _isDone = isDone;
         _note = note;
         IsReadOnly = isReadOnly;
+        // Reflect toggles made elsewhere (another tab, or another device once joined).
+        _session.Changed += SyncFromIncident;
+    }
+
+    private void SyncFromIncident()
+    {
+        var item = _session.Incident.Checklist.FirstOrDefault(c => c.Id == _id);
+        if (item is null)
+            return;
+        _suppressWriteback = true; // this is a state pull, not a user toggle — don't write it back
+        IsDone = item.IsDone;
+        Note = item.Note;
+        _suppressWriteback = false;
     }
 
     public string Text { get; }
@@ -50,7 +64,7 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     // and the visible value would revert, so the checkbox never appeared to persist.
     partial void OnIsDoneChanged(bool value)
     {
-        if (IsReadOnly)
+        if (IsReadOnly || _suppressWriteback)
             return;
         var item = _session.Incident.Checklist.First(c => c.Id == _id);
         if (item.IsDone != value)

@@ -159,6 +159,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         CallSignOptions = masterData.RadioCallSigns;
         PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
         Trupps = new ObservableCollection<ScbaTruppRow>(session.Incident.ScbaTrupps.Select(CreateRow));
+        _session.Changed += RefreshTrupps;
 
         // Suppress re-logging alarms for trupps already alarming when the incident is reopened.
         foreach (var t in session.Incident.ScbaTrupps)
@@ -312,15 +313,19 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanAddTrupp))]
     private void AddTrupp()
     {
-        var trupp = _session.AddScbaTrupp(
-            NewDesignation, BuildCrew(), NewCallSign,
+        // Compose the ETB line from the inputs, not from a return value — the mutation is
+        // fire-and-forget, and the row itself is rendered by RefreshTrupps on the Changed event.
+        var crew = BuildCrew();
+        var membersDisplay = string.Join(" / ", crew.Select(m => m.Name));
+        var designation = NewDesignation;
+        var callSign = NewCallSign;
+        _session.AddScbaTrupp(designation, crew, callSign,
             task: null, maxDurationMinutes: NewMaxDurationMinutes, returnPressureBar: NewReturnPressureBar,
             pressureControlIntervalMinutes: NewControlIntervalMinutes);
-        Trupps.Add(CreateRow(trupp));
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Atemschutztrupp {trupp.Designation} bereitgestellt: {trupp.MembersDisplay}",
-            from: null, to: trupp.CallSign);
+            $"Atemschutztrupp {designation} bereitgestellt: {membersDisplay}",
+            from: null, to: callSign);
 
         NewDesignation = string.Empty;
         NewTruppfuehrer = string.Empty;
@@ -340,25 +345,34 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             bar => RecordPressure(trupp.Id, bar),
             () => MarkReturned(trupp.Id));
 
+    // Designation/call-sign for the ETB line are read from the current snapshot before mutating
+    // (they don't change on start/pressure/return) — so this works whether the trupp lives in a
+    // local aggregate or a host snapshot.
+    private (string Designation, string? CallSign) TruppLabel(Guid truppId)
+    {
+        var trupp = _session.Incident.ScbaTrupps.First(t => t.Id == truppId);
+        return (trupp.Designation, trupp.CallSign);
+    }
+
     private void Start(Guid truppId, int startPressure)
     {
-        var trupp = _session.StartScbaTrupp(truppId, startPressure);
+        var (designation, callSign) = TruppLabel(truppId);
+        _session.StartScbaTrupp(truppId, startPressure);
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Atemschutztrupp {trupp.Designation} unter PA: Einstiegsdruck {startPressure} bar",
-            from: null, to: trupp.CallSign);
-        RefreshRow(truppId);
+            $"Atemschutztrupp {designation} unter PA: Einstiegsdruck {startPressure} bar",
+            from: null, to: callSign);
         RefreshHeader();
         _onChanged();
     }
 
     private void RecordPressure(Guid truppId, int bar)
     {
-        var trupp = _session.RecordScbaPressure(truppId, bar);
+        var (designation, callSign) = TruppLabel(truppId);
+        _session.RecordScbaPressure(truppId, bar);
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Druckkontrolle Atemschutz {trupp.Designation}: {bar} bar", from: trupp.CallSign, to: null);
-        RefreshRow(truppId);
+            $"Druckkontrolle Atemschutz {designation}: {bar} bar", from: callSign, to: null);
         var tripped = LogNewAlarms(); // a low reading may immediately trip the Rückzugsdruck alarm
         UpdateAlarm(tripped);
         RefreshHeader();
@@ -367,18 +381,24 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     private void MarkReturned(Guid truppId)
     {
-        var trupp = _session.MarkScbaReturned(truppId);
+        var (designation, callSign) = TruppLabel(truppId);
+        _session.MarkScbaReturned(truppId);
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Atemschutztrupp {trupp.Designation} zurück", from: trupp.CallSign, to: null);
-        RefreshRow(truppId);
+            $"Atemschutztrupp {designation} zurück", from: callSign, to: null);
         UpdateAlarm(newAlarmTripped: false); // a returned trupp may clear the last alarm
         RefreshHeader();
         _onChanged();
     }
 
-    private void RefreshRow(Guid truppId) =>
-        Trupps.FirstOrDefault(r => r.Id == truppId)?.Refresh();
+    // Rebuild the trupp rows from the incident on any change — this device's edit, or another's.
+    private void RefreshTrupps()
+    {
+        Trupps.Clear();
+        foreach (var trupp in _session.Incident.ScbaTrupps)
+            Trupps.Add(CreateRow(trupp));
+        RefreshHeader();
+    }
 
     private void RefreshHeader()
     {
@@ -402,7 +422,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     /// Returns whether anything was logged (so callers can persist). No-op when read-only.</summary>
     private bool LogNewAlarms()
     {
-        if (IsReadOnly)
+        // Only the authoritative device auto-logs alarms; a joined client would double-log (§ IsRemote).
+        if (IsReadOnly || _session.IsRemote)
             return false;
         var logged = false;
         foreach (var trupp in _session.Incident.ScbaTrupps)
@@ -420,6 +441,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _session.Changed -= RefreshTrupps;
         _alarm.Stop();
         _subscription?.Dispose();
     }

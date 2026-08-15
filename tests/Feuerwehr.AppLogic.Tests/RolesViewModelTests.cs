@@ -108,12 +108,12 @@ public class RolesViewModelTests
         Assert.True(row.EndCommand.CanExecute(null));
         row.EndCommand.Execute(null);
 
-        Assert.Equal(T0.AddMinutes(45), row.To);
-        Assert.False(row.IsRunning);
-        Assert.NotEqual("—", row.ToDisplay);
+        // The collection is rebuilt from the aggregate on change, so re-read the row.
+        var ended = Assert.Single(vm.Roles);
+        Assert.Equal(T0.AddMinutes(45), ended.To);
+        Assert.False(ended.IsRunning);
+        Assert.NotEqual("—", ended.ToDisplay);
         Assert.Equal(1, changes);
-        // The row is a view over the aggregate, so the domain must have moved too.
-        Assert.Equal(T0.AddMinutes(45), Assert.Single(vm.Roles).To);
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class RolesViewModelTests
         row.EndCommand.Execute(null);
 
         // The button hides itself rather than silently overwriting the handover time.
-        Assert.False(row.EndCommand.CanExecute(null));
+        Assert.False(Assert.Single(vm.Roles).EndCommand.CanExecute(null));
     }
 
     [Fact]

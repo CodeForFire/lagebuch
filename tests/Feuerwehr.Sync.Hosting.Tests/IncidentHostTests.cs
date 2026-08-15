@@ -1,38 +1,13 @@
 using System.Net;
-using System.Net.Sockets;
 using System.Text;
 using Feuerwehr.AppLogic;
-using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Etb;
-using Feuerwehr.Domain.Time;
 
 namespace Feuerwehr.Sync.Hosting.Tests;
 
 public class IncidentHostTests
 {
-    private sealed class InMemoryStore : IIncidentStore
-    {
-        private readonly Dictionary<string, Incident> _byPath = new();
-        public void Save(string path, Incident incident) => _byPath[path] = incident;
-        public Incident Load(string path) => _byPath[path];
-        public IncidentState? TryReadState(string path) => _byPath.TryGetValue(path, out var i) ? i.State : null;
-    }
-
-    private sealed class FixedClock : IClock
-    {
-        public DateTimeOffset Now { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
-    }
-
-    private static int FreeTcpPort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
-
     private static async Task<IncidentSnapshot> GetSnapshotAsync(HttpClient http) =>
         SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(SyncProtocol.SnapshotPath));
 
@@ -43,7 +18,7 @@ public class IncidentHostTests
         var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
             new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { "Punkt A" });
         await using var host = new IncidentHost(session, clock, "1.2.3");
-        var port = FreeTcpPort();
+        var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
@@ -76,7 +51,7 @@ public class IncidentHostTests
             new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
         session.Close();
         await using var host = new IncidentHost(session, clock, "1.0.0");
-        var port = FreeTcpPort();
+        var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };

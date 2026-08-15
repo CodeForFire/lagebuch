@@ -91,6 +91,17 @@ public sealed partial class ForcesViewModel : ObservableObject
         Forces = new ObservableCollection<ForceRow>(session.Incident.Forces.Select(ToRow));
         TotalPersonnel = session.Incident.TotalPersonnel;
         TotalScba = session.Incident.TotalScba;
+        _session.Changed += RefreshForces;
+    }
+
+    // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
+    private void RefreshForces()
+    {
+        Forces.Clear();
+        foreach (var f in _session.Incident.Forces)
+            Forces.Add(ToRow(f));
+        TotalPersonnel = _session.Incident.TotalPersonnel;
+        TotalScba = _session.Incident.TotalScba;
     }
 
     public bool IsReadOnly { get; }
@@ -141,11 +152,8 @@ public sealed partial class ForcesViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanAddForce))]
     private void AddForce()
     {
-        var unit = _session.AddForceUnit(
-            NewBrigade, NewPersonnelCount, NewCallSign, NewStatus, NewNotes, NewScbaCount);
-        Forces.Add(ToRow(unit));
-        TotalPersonnel = _session.Incident.TotalPersonnel;
-        TotalScba = _session.Incident.TotalScba;
+        _session.AddForceUnit(
+            NewBrigade, NewPersonnelCount, NewCallSign, NewStatus, NewNotes, NewScbaCount); // Changed → RefreshForces
         NewBrigade = string.Empty;
         NewCallSign = null;
         NewPersonnelCount = 0;
