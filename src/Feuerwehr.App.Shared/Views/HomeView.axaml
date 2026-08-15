@@ -40,6 +40,19 @@
           </Grid>
         </Border>
 
+        <!-- Join-failure banner: version mismatch, or a host that isn't reachable / isn't sharing -->
+        <Border x:Name="JoinErrorBanner" Background="#241608"
+                BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+                IsVisible="{Binding JoinError, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="Auto,*">
+            <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Top" Margin="0,0,12,0" />
+            <TextBlock Grid.Column="1" x:Name="JoinErrorMessage" Text="{Binding JoinError}"
+                       FontWeight="SemiBold" TextWrapping="Wrap"
+                       Foreground="{StaticResource AmberBrush}" />
+          </Grid>
+        </Border>
+
         <!-- Recent incidents panel -->
         <Border Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"

@@ -5,7 +5,7 @@ namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    private enum PendingAction { None, New }
+    private enum PendingAction { None, New, Join }
 
     private readonly HomeViewModel _home;
     private readonly MasterDataEditorViewModel _editor;
@@ -15,8 +15,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         _home = home;
         _editor = editor;
-        _home.WorkspaceOpened = ws => CurrentView = ws;
+        _home.WorkspaceOpened = ShowWorkspace;
         _currentView = home;
+    }
+
+    // Every opened workspace (local or joined client) routes its "back to Home" here, so a joined
+    // client's connection is always torn down on the way out — whether the user left or the host went
+    // away (IncidentWorkspaceViewModel.GoHomeRequested). LeaveAsync is a no-op for a local session.
+    private void ShowWorkspace(IncidentWorkspaceViewModel ws)
+    {
+        ws.GoHomeRequested = () =>
+        {
+            _ = ws.LeaveAsync();
+            CurrentView = _home;
+        };
+        CurrentView = ws;
     }
 
     [ObservableProperty]
@@ -53,6 +66,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void RequestOpenFile() => NavigateAway(() => _home.OpenFileCommand.Execute(null));
 
+    // Joining another device's hosted incident (§6): one prompt collects the host address and who
+    // documents on this device, then HomeViewModel.JoinDeviceAsync connects.
+    [RelayCommand]
+    private void RequestJoinDevice() => NavigateAway(() =>
+    {
+        _pending = PendingAction.Join;
+        PendingPrompt = new OperatorPromptViewModel(
+            collectHost: true,
+            callSignOptions: _home.CallSignOptions);
+    });
+
     [RelayCommand]
     private void ShowMasterData() => NavigateAway(() => CurrentView = _editor);
 
@@ -68,6 +92,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (action == PendingAction.New)
             _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.IncidentNumber));
+        else if (action == PendingAction.Join)
+            _home.JoinDeviceCommand.Execute(new JoinRequest(op, prompt!.Host));
     }
 
     [RelayCommand]

@@ -51,7 +51,7 @@ public class HomeOpenErrorTests
     private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null)
     {
         var vm = new HomeViewModel(new BrokenStore(), new Md(), new SeededRecent(),
-            new FakeDialogs(), new FixedClock(), new ManualTicker(), new NoopAlarmService(), new NoopIncidentHostController());
+            new FakeDialogs(), new FixedClock(), new ManualTicker(), new NoopAlarmService(), new NoopIncidentHostController(), "1.0.0");
         if (triggerError)
             vm.OpenRecentCommand.Execute("/home/deepdiver/FFW/Einsatz-1234.fwincident");
 

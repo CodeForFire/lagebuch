@@ -34,6 +34,8 @@
             <Button x:Name="HomeButton" Classes="ghost" Content="ÜBERSICHT" Command="{Binding GoHomeCommand}" />
             <Button x:Name="MasterDataButton" Classes="ghost" Content="STAMMDATEN" Command="{Binding ShowMasterDataCommand}" />
             <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}" Margin="4,0" />
+            <Button x:Name="JoinDeviceButton" Classes="ghost" Content="VERBINDEN" Command="{Binding RequestJoinDeviceCommand}"
+                    ToolTip.Tip="Mit einem Gerät verbinden, das einen Einsatz im Netzwerk freigegeben hat" />
             <Button x:Name="OpenFileButton" Content="ÖFFNEN" Command="{Binding RequestOpenFileCommand}" />
             <Button x:Name="NewIncidentButton" Classes="signal" Content="NEUER EINSATZ" Command="{Binding RequestNewIncidentCommand}" />
           </StackPanel>

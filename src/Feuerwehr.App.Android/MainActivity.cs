@@ -54,7 +54,8 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
             new Feuerwehr.App.Shared.Services.DispatcherTimerTicker(),
             new AndroidAlarmService(),
             new MasterDataFileService(),
-            new NoopIncidentHostController());
+            new NoopIncidentHostController(),
+            typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0");
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
 }

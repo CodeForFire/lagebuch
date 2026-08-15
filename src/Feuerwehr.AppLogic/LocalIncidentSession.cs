@@ -157,6 +157,19 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void Save() => _store.Save(Path, Incident);
 
+    /// <summary>
+    /// Persists and announces a change applied to <see cref="Incident"/> from outside this session's
+    /// own mutation methods — specifically a command the host received from a joined client (applied
+    /// via <c>CommandApplier</c>). Raising <see cref="Changed"/> refreshes the host's own UI and,
+    /// through the host's <see cref="Changed"/> subscription, rebroadcasts the new snapshot to every
+    /// client — so a client's edit travels the exact same path as one the host typed itself (§5).
+    /// </summary>
+    public void SaveExternalChange()
+    {
+        Save();
+        Changed?.Invoke();
+    }
+
     private SessionOperator RequireOperator() =>
         Operator ?? throw new InvalidOperationException("Kein Bearbeiter für diese Änderung vorhanden.");
 }
