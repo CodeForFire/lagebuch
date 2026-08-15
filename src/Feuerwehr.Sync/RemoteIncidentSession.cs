@@ -1,6 +1,9 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using Feuerwehr.Domain;
+using Feuerwehr.Domain.Atemschutz;
+using Feuerwehr.Domain.Etb;
+using Feuerwehr.Domain.ValueObjects;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,14 +16,21 @@ namespace Feuerwehr.Sync;
 /// On a dropped connection it raises <see cref="Disconnected"/>; on reconnect it re-fetches the full
 /// snapshot rather than attempting incremental catch-up (§7).
 /// </summary>
-public sealed class RemoteIncidentSession : IAsyncDisposable
+public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 {
     private readonly HttpClient _http;
     private readonly HubConnection _hub;
     private Incident _incident;
 
-    public SessionOperator Operator { get; }
+    public SessionOperator? Operator { get; }
     public Incident Incident => _incident;
+
+    // The client never writes locally, so it is never "read-only" in the editing sense — but a
+    // closed incident rejects mutations at the host anyway, and the workspace uses this to grey out.
+    public bool IsReadOnly => _incident.State == IncidentState.Closed;
+
+    // This is the joined-client side: autonomous time-driven logging belongs to the host (§ IsRemote).
+    public bool IsRemote => true;
 
     /// <summary>Raised after the cached incident is replaced by a host broadcast (or a resync).</summary>
     public event Action? Changed;
@@ -77,6 +87,51 @@ public sealed class RemoteIncidentSession : IAsyncDisposable
             throw;
         }
     }
+
+    // --- IIncidentSession mutation surface: every call is a fire-and-forget command to the host;
+    //     the resulting state arrives via the broadcast, never from these calls. ---
+
+    public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
+        Send(new AddJournalEntryCommand(Op(), direction, text, from, to));
+
+    public void ToggleChecklistItem(Guid itemId) => Send(new ToggleChecklistItemCommand(itemId));
+
+    public void AssignRole(string role, string personName, string? callSign = null,
+        DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null) =>
+        Send(new AssignRoleCommand(role, personName, callSign, from, to, section, phone));
+
+    public void EndRoleAssignment(Guid assignmentId) => Send(new EndRoleAssignmentCommand(assignmentId));
+
+    public void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
+        string? status = null, string? notes = null, int scbaCount = 0) =>
+        Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount));
+
+    public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
+        Send(new UpdateForceUnitCommand(Op(), unitId, status, notes));
+
+    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
+        string? task = null,
+        int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
+        int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
+        int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
+        Send(new AddScbaTruppCommand(designation,
+            members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
+            callSign, task, maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes));
+
+    public void StartScbaTrupp(Guid truppId, int startPressure) => Send(new StartScbaTruppCommand(truppId, startPressure));
+    public void RecordScbaPressure(Guid truppId, int bar) => Send(new RecordScbaPressureCommand(truppId, bar));
+    public void MarkScbaReturned(Guid truppId) => Send(new MarkScbaReturnedCommand(truppId));
+    public void SetIncidentNumber(IncidentNumber? number) => Send(new SetIncidentNumberCommand(number?.Value));
+    public void SetKeyword(string? keyword) => Send(new SetKeywordCommand(keyword));
+    public void SetAddress(string? street, string? district) => Send(new SetAddressCommand(street, district));
+    public void SetStatus(string? status) => Send(new SetStatusCommand(status));
+    public void Close() => Send(new CloseIncidentCommand(Op()));
+
+    private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
+
+    // Fire-and-forget: the command is POSTed; the host's broadcast (or a rejection the host swallows)
+    // is what the UI ultimately reflects. Connection loss surfaces separately via Disconnected.
+    private void Send(SyncCommand command) => _ = SendAsync(command);
 
     /// <summary>Sends one command to the host. The resulting state arrives via the broadcast, not this call.</summary>
     public async Task SendAsync(SyncCommand command, CancellationToken ct = default)

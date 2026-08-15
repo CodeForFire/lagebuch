@@ -37,6 +37,9 @@ public sealed partial class EtbViewModel : ObservableObject
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
         Entries = new ObservableCollection<EtbEntryRow>();
+        // Any change to the incident — from this tab, another tab, or (when joined) another device —
+        // brings the journal up to date through the same path.
+        _session.Changed += Sync;
         Sync();
     }
 
@@ -106,8 +109,7 @@ public sealed partial class EtbViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntry()
     {
-        _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo);
-        Sync();
+        _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo); // Changed → Sync() renders it
         NewText = string.Empty;
         NewFrom = null;
         NewTo = null;

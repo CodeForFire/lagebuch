@@ -81,6 +81,15 @@ public sealed partial class RolesViewModel : ObservableObject
         PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
         Roles = new ObservableCollection<RoleAssignmentRow>(
             session.Incident.Roles.Select(CreateRow));
+        _session.Changed += RefreshRoles;
+    }
+
+    // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
+    private void RefreshRoles()
+    {
+        Roles.Clear();
+        foreach (var r in _session.Incident.Roles)
+            Roles.Add(CreateRow(r));
     }
 
     public bool IsReadOnly { get; }
@@ -136,10 +145,9 @@ public sealed partial class RolesViewModel : ObservableObject
     {
         // Von is stamped rather than typed: an assignment is recorded at the moment it happens,
         // and every other time in this application comes from the injected clock the same way.
-        var role = _session.AssignRole(
+        _session.AssignRole(
             NewRole, NewPersonName, NewCallSign, from: _clock.Now, to: null,
-            section: NewSection, phone: NewPhone);
-        Roles.Add(CreateRow(role));
+            section: NewSection, phone: NewPhone); // Changed → RefreshRoles renders the row
         NewRole = string.Empty;
         NewPersonName = string.Empty;
         NewSection = null;
@@ -153,8 +161,7 @@ public sealed partial class RolesViewModel : ObservableObject
 
     private void EndAssignment(RoleAssignmentRow row)
     {
-        var ended = _session.EndRoleAssignment(row.Id);
-        row.To = ended.To;
+        _session.EndRoleAssignment(row.Id); // Changed → RefreshRoles rebuilds the row with its end time
         _onChanged();
     }
 }
