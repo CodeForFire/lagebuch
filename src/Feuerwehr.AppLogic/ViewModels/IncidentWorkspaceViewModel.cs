@@ -253,12 +253,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             ShareStatus = null;
             return;
         }
-        if (!_hostController.IsTailscaleConnected)
+        try
         {
-            ShareStatus = "Tailscale nicht verbunden";
+            // Binds every interface (loopback + LAN + tailnet). Can still fail — most likely the
+            // port is already taken by another instance sharing on this machine — so surface that
+            // in the status line rather than letting it escape the command.
+            await _hostController.StartAsync(_local);
+        }
+        catch (Exception ex)
+        {
+            ShareStatus = $"Freigabe fehlgeschlagen: {ex.Message}";
             return;
         }
-        await _hostController.StartAsync(_local);
         IsSharing = true;
         ShareStatus = _hostController.ShareHint;
     }
