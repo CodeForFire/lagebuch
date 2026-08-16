@@ -137,4 +137,41 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void A_person_without_a_first_name_displays_as_the_last_name_alone()
         => Assert.Equal("Mustermann", new Person("Mustermann", "", null, null, null).DisplayName);
+
+    [Fact]
+    public void A_fresh_database_reads_the_default_settings()
+    {
+        var set = new MasterDataStore().GetOrCreate(_path);
+        Assert.Equal(IncidentSettings.Defaults, set.Settings);
+    }
+
+    [Fact]
+    public void Save_then_GetOrCreate_round_trips_settings()
+    {
+        var store = new MasterDataStore();
+        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 4, 55) });
+
+        Assert.Equal(new IncidentSettings(12, 25, 18, 4, 55), store.GetOrCreate(_path).Settings);
+    }
+
+    [Fact]
+    public void A_missing_setting_key_falls_back_to_its_default()
+    {
+        var store = new MasterDataStore();
+        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 4, 55) });
+
+        // Simulate a store written before a setting existed: drop one row, which read must backfill.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "DELETE FROM md_settings WHERE key = 'return_pressure_bar';";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var settings = store.GetOrCreate(_path).Settings;
+        Assert.Equal(IncidentSettings.Defaults.ReturnPressureBar, settings.ReturnPressureBar);
+        Assert.Equal(12, settings.IlsReminderIntervalMinutes); // the other keys are untouched
+    }
 }

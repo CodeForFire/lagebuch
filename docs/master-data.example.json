@@ -19,5 +19,12 @@
   "personnel": [
     { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000" },
     { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null }
-  ]
+  ],
+  "settings": {
+    "ilsReminderIntervalMinutes": 15,
+    "agtMaxDurationMinutes": 30,
+    "csaMaxDurationMinutes": 20,
+    "pressureControlIntervalMinutes": 5,
+    "returnPressureBar": 60
+  }
 }

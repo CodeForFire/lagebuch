@@ -50,7 +50,7 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
-        Assert.Equal(11, list.ItemCount);
+        Assert.Equal(12, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).

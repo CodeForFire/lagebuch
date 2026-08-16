@@ -61,8 +61,24 @@ public sealed class MasterDataStore
                     p("$p", (object?)person.Phone ?? DBNull.Value);
                 });
 
+        // Settings are a single row per key; UPSERT rather than delete-and-reinsert so a key the
+        // store already carries keeps its identity, and so writing a subset never drops the rest.
+        foreach (var (key, value) in SettingsRows(set.Settings))
+            Run(cn, tx,
+                "INSERT INTO md_settings (key, value) VALUES ($k,$v) ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
+                p => { p("$k", key); p("$v", value); });
+
         tx.Commit();
     }
+
+    private static IEnumerable<(string Key, int Value)> SettingsRows(IncidentSettings s) => new[]
+    {
+        ("ils_reminder_interval_minutes", s.IlsReminderIntervalMinutes),
+        ("agt_max_duration_minutes", s.AgtMaxDurationMinutes),
+        ("csa_max_duration_minutes", s.CsaMaxDurationMinutes),
+        ("pressure_control_interval_minutes", s.PressureControlIntervalMinutes),
+        ("return_pressure_bar", s.ReturnPressureBar),
+    };
 
     private static void ReplaceList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
     {
@@ -91,6 +107,7 @@ public sealed class MasterDataStore
                 call_sign TEXT,
                 phone TEXT
             );
+            CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             """);
     }
 
@@ -106,7 +123,30 @@ public sealed class MasterDataStore
         ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"),
         ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
         ReadPersonnel(cn),
-        ReadColumn(cn, "SELECT value FROM md_einsatzarten;"));
+        ReadColumn(cn, "SELECT value FROM md_einsatzarten;"),
+        ReadSettings(cn));
+
+    private static IncidentSettings ReadSettings(SqliteConnection cn)
+    {
+        var stored = new Dictionary<string, int>(StringComparer.Ordinal);
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT key, value FROM md_settings;";
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) stored[r.GetString(0)] = r.GetInt32(1);
+        }
+
+        // Per-key fallback to the defaults: a store written before a given setting existed simply
+        // has no row for it, and reads the compiled-in default rather than a zero.
+        var d = IncidentSettings.Defaults;
+        int Get(string key, int fallback) => stored.TryGetValue(key, out var v) ? v : fallback;
+        return new IncidentSettings(
+            Get("ils_reminder_interval_minutes", d.IlsReminderIntervalMinutes),
+            Get("agt_max_duration_minutes", d.AgtMaxDurationMinutes),
+            Get("csa_max_duration_minutes", d.CsaMaxDurationMinutes),
+            Get("pressure_control_interval_minutes", d.PressureControlIntervalMinutes),
+            Get("return_pressure_bar", d.ReturnPressureBar));
+    }
 
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
     {

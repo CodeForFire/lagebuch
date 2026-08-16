@@ -77,11 +77,14 @@ public class MasterDataEditorViewModelTests
     private static PersonnelSection Personnel(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<PersonnelSection>().First(s => s.Title == "Personal");
 
+    private static SettingsSection Settings(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<SettingsSection>().Single();
+
     [Fact]
     public void Loads_a_section_per_category_and_starts_clean()
     {
         var vm = Vm(new InMemoryProvider());
-        Assert.Equal(11, vm.Sections.Count);
+        Assert.Equal(12, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
@@ -209,6 +212,37 @@ public class MasterDataEditorViewModelTests
         Assert.Contains("MARK-Einsatzarten", set.Einsatzarten);
         Assert.Contains("MARK-Checkliste", set.ChecklistTemplate);
         Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
+    }
+
+    [Fact]
+    public void Settings_section_is_seeded_from_the_provider()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Settings = new IncidentSettings(12, 25, 18, 4, 55),
+        });
+        var settings = Settings(Vm(provider));
+
+        Assert.Equal(12, settings.IlsReminderIntervalMinutes);
+        Assert.Equal(25, settings.AgtMaxDurationMinutes);
+        Assert.Equal(18, settings.CsaMaxDurationMinutes);
+        Assert.Equal(4, settings.PressureControlIntervalMinutes);
+        Assert.Equal(55, settings.ReturnPressureBar);
+    }
+
+    [Fact]
+    public void Editing_a_setting_marks_dirty_and_Save_persists_it()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+
+        Settings(vm).AgtMaxDurationMinutes = 40;
+        Assert.True(vm.IsDirty);
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(1, provider.SaveCount);
+        Assert.Equal(40, provider.Get().Settings.AgtMaxDurationMinutes);
     }
 
     // --- Import / Export (issue #46 follow-up) ---

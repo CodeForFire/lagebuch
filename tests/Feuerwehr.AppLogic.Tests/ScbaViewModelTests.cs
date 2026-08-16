@@ -411,4 +411,64 @@ public class ScbaViewModelTests
         Assert.Equal("", vm.NewTruppmann);
         Assert.Equal("", vm.NewZweiterTruppmann);
     }
+
+    // Distinct values so a swapped mapping is caught; nothing here matches a compiled-in default.
+    private static readonly IncidentSettings CustomSettings = new(
+        IlsReminderIntervalMinutes: 15, AgtMaxDurationMinutes: 35, CsaMaxDurationMinutes: 22,
+        PressureControlIntervalMinutes: 7, ReturnPressureBar: 55);
+
+    private static ScbaViewModel VmWith(FixedClock clock, LocalIncidentSession session, IncidentSettings settings) =>
+        new(session, MasterDataSet.Empty with { TruppTypes = new[] { "Angriffstrupp" }, Settings = settings },
+            clock, new FakeTicker(), new FakeAlarmService(), () => { });
+
+    [Fact]
+    public void New_trupp_defaults_come_from_settings()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        Assert.Equal(35, vm.NewMaxDurationMinutes);   // no designation yet => AGT default
+        Assert.Equal(7, vm.NewControlIntervalMinutes);
+        Assert.Equal(55, vm.NewReturnPressureBar);
+    }
+
+    [Fact]
+    public void Selecting_a_CSA_trupp_suggests_the_CSA_einsatzzeit_and_reverts_for_an_AGT()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        Assert.Equal(22, vm.NewMaxDurationMinutes);   // CSA default
+
+        vm.NewDesignation = "Angriffstrupp";
+        Assert.Equal(35, vm.NewMaxDurationMinutes);   // back to AGT default
+    }
+
+    [Fact]
+    public void A_hand_edited_einsatzzeit_survives_a_trupp_type_switch()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        vm.NewMaxDurationMinutes = 45;                // user overrides
+        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+
+        Assert.Equal(45, vm.NewMaxDurationMinutes);   // not overwritten by the CSA default
+    }
+
+    [Fact]
+    public void Registering_resets_the_einsatzzeit_to_the_AGT_default_and_clears_the_override()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+        vm.NewMaxDurationMinutes = 45;                // user override before adding
+
+        Register(vm);                                 // adds an Angriffstrupp, then resets the form
+
+        Assert.Equal(35, vm.NewMaxDurationMinutes);   // reset to AGT default
+        // Override cleared: a CSA selection now re-suggests the CSA default again.
+        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        Assert.Equal(22, vm.NewMaxDurationMinutes);
+    }
 }

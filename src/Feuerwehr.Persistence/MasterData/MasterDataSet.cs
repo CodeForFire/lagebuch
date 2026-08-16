@@ -1,9 +1,41 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using Feuerwehr.Domain.Atemschutz;
 
 namespace Feuerwehr.Persistence.MasterData;
 
 public sealed record Street(string Name, string District);
+
+/// <summary>
+/// Configurable operational defaults — the timer/duration values the app used to bake in as
+/// constants. Stored alongside the master-data lists so an install can tune them once and have
+/// every new incident pick them up. Every field is a plain minute/bar count with a sensible
+/// <see cref="Defaults"/>, so a fresh or older store (which has never written these) still yields
+/// usable values rather than zeros.
+/// </summary>
+public sealed record IncidentSettings(
+    // Recurring "Rückmeldung an ILS" reminder interval.
+    int IlsReminderIntervalMinutes,
+    // Atemschutz Einsatzzeit for an ordinary AGT-Trupp.
+    int AgtMaxDurationMinutes,
+    // Atemschutz Einsatzzeit for a CSA-Trupp (chemical suit) — shorter than an AGT.
+    int CsaMaxDurationMinutes,
+    // Interval between Druckkontrollen (Atemschutzkontrolle).
+    int PressureControlIntervalMinutes,
+    // Rückzugsdruck: pressure at or below which a Trupp must turn back.
+    int ReturnPressureBar)
+{
+    /// <summary>
+    /// The compiled-in fallbacks, kept in step with the domain's Atemschutz constants so there is a
+    /// single source of truth for the shared values. Used whenever the store holds no override.
+    /// </summary>
+    public static IncidentSettings Defaults { get; } = new(
+        IlsReminderIntervalMinutes: 15,
+        AgtMaxDurationMinutes: AtemschutzTrupp.DefaultMaxDurationMinutes,
+        CsaMaxDurationMinutes: AtemschutzTrupp.DefaultChemicalMaxDurationMinutes,
+        PressureControlIntervalMinutes: AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
+        ReturnPressureBar: AtemschutzTrupp.DefaultReturnPressureBar);
+}
 
 /// <summary>
 /// A person from the local roster. Personal data (names, mobile numbers) that must never be
@@ -32,7 +64,10 @@ public sealed record MasterDataSet(
     IReadOnlyList<string> TruppTypes,
     IReadOnlyList<Person> Personnel,
     // Einsatzart values (ABek Bayern) — the leading token of the complete Einsatznummer.
-    IReadOnlyList<string> Einsatzarten)
+    IReadOnlyList<string> Einsatzarten,
+    // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
+    // no overrides yields IncidentSettings.Defaults, never a zeroed record.
+    IncidentSettings Settings)
 {
     /// <summary>
     /// Every category empty. Intended for tests and for callers that need a starting point to
@@ -42,11 +77,14 @@ public sealed record MasterDataSet(
     public static MasterDataSet Empty { get; } = new(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Street>(),
-        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>());
+        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>(),
+        IncidentSettings.Defaults);
 
     /// <summary>
     /// True when no category holds a single entry. A fresh install starts here, and it is the
     /// condition under which the Stammdaten editor offers Import — a bootstrap, not a merge.
+    /// <see cref="Settings"/> deliberately does not count: it always carries defaults, and letting it
+    /// mark the set non-empty would suppress the Import bootstrap on an otherwise fresh install.
     /// </summary>
     public bool IsEmpty =>
         Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
@@ -94,7 +132,30 @@ public static class MasterDataJson
             Arr(root, "checklistTemplate"),
             Arr(root, "truppTypes"),
             ParsePersonnel(root),
-            Arr(root, "einsatzarten"));
+            Arr(root, "einsatzarten"),
+            ParseSettings(root));
+    }
+
+    /// <summary>
+    /// Reads the optional <c>settings</c> object. A missing object, or any missing field within it,
+    /// falls back to <see cref="IncidentSettings.Defaults"/> so an older or partial file still yields
+    /// a complete record.
+    /// </summary>
+    private static IncidentSettings ParseSettings(JsonElement root)
+    {
+        var d = IncidentSettings.Defaults;
+        if (!root.TryGetProperty("settings", out var s) || s.ValueKind != JsonValueKind.Object)
+            return d;
+
+        static int Int(JsonElement e, string prop, int fallback) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : fallback;
+
+        return new IncidentSettings(
+            Int(s, "ilsReminderIntervalMinutes", d.IlsReminderIntervalMinutes),
+            Int(s, "agtMaxDurationMinutes", d.AgtMaxDurationMinutes),
+            Int(s, "csaMaxDurationMinutes", d.CsaMaxDurationMinutes),
+            Int(s, "pressureControlIntervalMinutes", d.PressureControlIntervalMinutes),
+            Int(s, "returnPressureBar", d.ReturnPressureBar));
     }
 
     private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
@@ -142,6 +203,14 @@ public static class MasterDataJson
                 callSign = p.CallSign,
                 phone = p.Phone,
             }),
+            settings = new
+            {
+                ilsReminderIntervalMinutes = set.Settings.IlsReminderIntervalMinutes,
+                agtMaxDurationMinutes = set.Settings.AgtMaxDurationMinutes,
+                csaMaxDurationMinutes = set.Settings.CsaMaxDurationMinutes,
+                pressureControlIntervalMinutes = set.Settings.PressureControlIntervalMinutes,
+                returnPressureBar = set.Settings.ReturnPressureBar,
+            },
         };
 
         return JsonSerializer.Serialize(model, new JsonSerializerOptions

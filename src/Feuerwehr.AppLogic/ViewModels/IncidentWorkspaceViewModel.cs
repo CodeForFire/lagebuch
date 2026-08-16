@@ -146,7 +146,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         // client must not run its own, or the host's journal would be double-logged.
         Reminder = _session.IsReadOnly || _session.IsRemote
             ? null
-            : new ReminderViewModel(_session, _clock, _ticker, OnChanged);
+            : new ReminderViewModel(_session, _clock, _ticker, OnChanged, _masterData.Settings.IlsReminderIntervalMinutes);
 
         OnPropertyChanged(nameof(Checklist));
         OnPropertyChanged(nameof(Etb));
