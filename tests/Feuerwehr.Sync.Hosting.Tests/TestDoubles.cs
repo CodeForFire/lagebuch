@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using Feuerwehr.AppLogic;
@@ -68,11 +69,51 @@ internal static class TestHost
     }
 
     public static async Task<(IncidentHost host, int port)> StartAsync(
-        LocalIncidentSession session, IClock clock, string version = "1.0.0")
+        LocalIncidentSession session, IClock clock, string version = "1.0.0", IUiDispatcher? ui = null)
     {
-        var host = new IncidentHost(session, clock, version);
+        var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher());
         var port = FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
         return (host, port);
     }
+}
+
+/// <summary>
+/// An <see cref="IUiDispatcher"/> that runs every callback on one dedicated background thread, standing
+/// in for the app's single UI thread. Lets a test assert that a host broadcast is marshalled onto that
+/// thread (as the real Avalonia dispatcher demands) rather than mutating bound state on SignalR's
+/// receive loop or a Kestrel request thread.
+/// </summary>
+internal sealed class SingleThreadUiDispatcher : IUiDispatcher, IDisposable
+{
+    private readonly BlockingCollection<Action> _queue = new();
+    private readonly Thread _thread;
+
+    public SingleThreadUiDispatcher()
+    {
+        _thread = new Thread(() =>
+        {
+            foreach (var work in _queue.GetConsumingEnumerable())
+                work();
+        }) { IsBackground = true, Name = "test-ui-thread" };
+        _thread.Start();
+    }
+
+    /// <summary>The managed id of the stand-in UI thread, to compare against where work actually ran.</summary>
+    public int ThreadId => _thread.ManagedThreadId;
+
+    public void Post(Action action) => _queue.Add(action);
+
+    public Task<T> InvokeAsync<T>(Func<T> func)
+    {
+        var tcs = new TaskCompletionSource<T>();
+        _queue.Add(() =>
+        {
+            try { tcs.SetResult(func()); }
+            catch (Exception ex) { tcs.SetException(ex); }
+        });
+        return tcs.Task;
+    }
+
+    public void Dispose() => _queue.CompleteAdding();
 }

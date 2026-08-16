@@ -1,6 +1,7 @@
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain.Time;
+using Feuerwehr.Sync;
 
 namespace Feuerwehr.App.Shared;
 
@@ -22,9 +23,10 @@ public static class CompositionRoot
         IAlarmService alarm,
         IMasterDataFileService masterDataFileService,
         IIncidentHostController hostController,
+        IUiDispatcher uiDispatcher,
         string appVersion)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
         return new MainWindowViewModel(home, editor);
     }

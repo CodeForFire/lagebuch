@@ -17,7 +17,7 @@ public class IncidentHostTests
         var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
             new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { "Punkt A" });
-        await using var host = new IncidentHost(session, clock, "1.2.3");
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher());
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
@@ -50,7 +50,7 @@ public class IncidentHostTests
         var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
             new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
         session.Close();
-        await using var host = new IncidentHost(session, clock, "1.0.0");
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher());
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 

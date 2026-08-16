@@ -21,8 +21,12 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
     private readonly string _appVersion;
+    // Marshals a joined client's host broadcasts onto the UI thread (see IUiDispatcher). Production
+    // wires the real dispatcher via CompositionRoot; the immediate default keeps the many non-join
+    // HomeViewModel tests (which never open a RemoteIncidentSession) construction-noise free.
+    private readonly IUiDispatcher _uiDispatcher;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null)
     {
         _store = store;
         _masterData = masterData;
@@ -33,6 +37,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _alarm = alarm;
         _hostController = hostController;
         _appVersion = appVersion;
+        _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         RecentFiles = new ObservableCollection<RecentFileItem>(
             recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path))));
     }
@@ -146,7 +151,7 @@ public sealed partial class HomeViewModel : ObservableObject
         var (host, port) = ParseHost(request.Host);
         try
         {
-            var session = await RemoteIncidentSession.ConnectAsync(host, request.Operator, _appVersion, port);
+            var session = await RemoteIncidentSession.ConnectAsync(host, request.Operator, _appVersion, _uiDispatcher, port);
             JoinError = null;
             OpenRemoteWorkspace(session, _masterData.Get());
         }

@@ -20,6 +20,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 {
     private readonly HttpClient _http;
     private readonly HubConnection _hub;
+    private readonly IUiDispatcher _ui;
     private Incident _incident;
 
     public SessionOperator? Operator { get; }
@@ -51,10 +52,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </summary>
     public event Action? Ended;
 
-    private RemoteIncidentSession(HttpClient http, HubConnection hub, SessionOperator op, Incident initial)
+    private RemoteIncidentSession(HttpClient http, HubConnection hub, IUiDispatcher ui, SessionOperator op, Incident initial)
     {
         _http = http;
         _hub = hub;
+        _ui = ui;
         Operator = op;
         _incident = initial;
     }
@@ -65,8 +67,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable.
     /// </summary>
     public static async Task<RemoteIncidentSession> ConnectAsync(
-        string host, SessionOperator op, string localVersion, int port = SyncProtocol.Port,
-        IRetryPolicy? reconnectPolicy = null, CancellationToken ct = default)
+        string host, SessionOperator op, string localVersion, IUiDispatcher ui,
+        int port = SyncProtocol.Port, IRetryPolicy? reconnectPolicy = null, CancellationToken ct = default)
     {
         var baseUri = new Uri($"http://{host}:{port}");
         var http = new HttpClient { BaseAddress = baseUri };
@@ -85,13 +87,16 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, hub, op, initial);
+            var session = new RemoteIncidentSession(http, hub, ui, op, initial);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
+            // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
+            // marshalled onto the UI thread because it drives view state (the reconnect banner, the
+            // return-Home navigation) exactly as OnSnapshot drives the journal.
             // Reconnecting = transient drop (keep the workspace open, disable input); Closed = the
             // reconnect window ran out or the host went away for good (return to Home).
-            hub.Reconnecting += _ => { session.Disconnected?.Invoke(); return Task.CompletedTask; };
-            hub.Reconnected += async _ => { await session.ResyncAsync(); session.Reconnected?.Invoke(); };
-            hub.Closed += _ => { session.Ended?.Invoke(); return Task.CompletedTask; };
+            hub.Reconnecting += _ => { session._ui.Post(() => session.Disconnected?.Invoke()); return Task.CompletedTask; };
+            hub.Reconnected += async _ => { await session.ResyncAsync(); session._ui.Post(() => session.Reconnected?.Invoke()); };
+            hub.Closed += _ => { session._ui.Post(() => session.Ended?.Invoke()); return Task.CompletedTask; };
             await hub.StartAsync(ct);
             return session;
         }
@@ -155,11 +160,17 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         response.EnsureSuccessStatusCode();
     }
 
-    private void OnSnapshot(IncidentSnapshot snapshot)
+    // Arrives on SignalR's receive loop. Swap the cached incident and raise Changed on the UI thread:
+    // the subscribers (EtbViewModel.Sync et al.) mutate Avalonia-bound collections, which Avalonia
+    // rejects off-thread — so a broadcast raised here would otherwise never reach the view.
+    // Arrives on SignalR's receive loop. Swap the cached incident and raise Changed on the UI thread:
+    // the subscribers (EtbViewModel.Sync et al.) mutate Avalonia-bound collections, which Avalonia
+    // rejects off-thread — so a broadcast raised here would otherwise never reach the view.
+    private void OnSnapshot(IncidentSnapshot snapshot) => _ui.Post(() =>
     {
         _incident = SnapshotMapper.FromSnapshot(snapshot);
         Changed?.Invoke();
-    }
+    });
 
     private async Task ResyncAsync() =>
         OnSnapshot(SyncJson.Deserialize<IncidentSnapshot>(await _http.GetStringAsync(SyncProtocol.SnapshotPath)));

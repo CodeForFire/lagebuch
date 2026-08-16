@@ -24,14 +24,16 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly LocalIncidentSession _session;
     private readonly IClock _clock;
     private readonly string _appVersion;
+    private readonly IUiDispatcher _ui;
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
 
-    public IncidentHost(LocalIncidentSession session, IClock clock, string appVersion)
+    public IncidentHost(LocalIncidentSession session, IClock clock, string appVersion, IUiDispatcher ui)
     {
         _session = session;
         _clock = clock;
         _appVersion = appVersion;
+        _ui = ui;
     }
 
     public bool IsRunning => _app is not null;
@@ -63,23 +65,28 @@ public sealed class IncidentHost : IAsyncDisposable
         _app = app;
     }
 
-    private IResult HandleCommand(SyncCommand command)
+    private async Task<IResult> HandleCommand(SyncCommand command)
     {
+        // A Kestrel request thread runs this. Apply + persist + notify on the UI thread so the host's
+        // authoritative Incident is only ever mutated there (matching solo mode) and the Changed it
+        // raises reaches the host's own Avalonia-bound views — which reject an off-thread mutation.
         try
         {
-            CommandApplier.Apply(command, _session.Incident, _clock);
+            return await _ui.InvokeAsync(() =>
+            {
+                CommandApplier.Apply(command, _session.Incident, _clock);
+                // Persist + raise the session's Changed, which refreshes the host's own UI and, through
+                // OnSessionChanged, broadcasts the new snapshot to every client — the same path a host
+                // edit takes (§5), so a client's contribution appears live on the host too.
+                _session.SaveExternalChange();
+                return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
+            });
         }
         catch (Exception ex) when (ex is IncidentClosedException or ArgumentException or InvalidOperationException)
         {
             // The same domain guards a local edit hits — reject cleanly rather than 500.
             return Results.BadRequest(ex.Message);
         }
-
-        // Persist + raise the session's Changed, which refreshes the host's own UI and, through
-        // OnSessionChanged, broadcasts the new snapshot to every client — the same path a host edit
-        // takes (§5), so a client's contribution appears live on the host too, not just on clients.
-        _session.SaveExternalChange();
-        return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
     }
 
     private void OnSessionChanged() => _ = Broadcast(SnapshotMapper.ToSnapshot(_session.Incident));
