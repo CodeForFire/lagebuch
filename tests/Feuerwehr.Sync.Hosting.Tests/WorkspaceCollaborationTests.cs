@@ -46,7 +46,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), port);
         var clientWs = Workspace(client, clock);
 
         var change = NextChange(client);
@@ -66,7 +66,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), port);
 
         var change = NextChange(client);
         client.AddJournalEntry(EtbDirection.Outgoing, "Rückmeldung an ILS", "ELW", "Leitstelle");
@@ -87,7 +87,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), port);
         var clientWs = Workspace(client, clock);
         Assert.False(clientWs.IsReadOnly);
 
@@ -108,7 +108,7 @@ public class WorkspaceCollaborationTests
         // Reconnect once quickly then give up, so "host gone" resolves in the test rather than after
         // the production two-minute window — while still exercising the transient-drop banner first.
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", port, new GiveUpAfterOneRetry());
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), port, new GiveUpAfterOneRetry());
         var clientWs = Workspace(client, clock);
 
         var disconnected = new TaskCompletionSource();
@@ -123,6 +123,61 @@ public class WorkspaceCollaborationTests
         Assert.False(clientWs.IsInputEnabled);
 
         await wentHome.Task.WaitAsync(TimeSpan.FromSeconds(10)); // reconnect gave up → back to Home
+    }
+
+    // A joined client's view only updates if the host broadcast is marshalled onto the UI thread:
+    // EtbViewModel mutates an Avalonia-bound ObservableCollection, which Avalonia rejects off-thread.
+    // The other tests here pass because a headless xUnit run has no UI thread to reject the mutation;
+    // this one pins the thread down so a regression to raising Changed on SignalR's receive loop fails.
+    [Fact]
+    public async Task Client_applies_a_host_broadcast_on_the_ui_thread()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        using var ui = new SingleThreadUiDispatcher();
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", ui, port);
+        var clientWs = Workspace(client, clock);
+
+        int? mutatedOnThread = null;
+        clientWs.Etb.Entries.CollectionChanged += (_, _) => mutatedOnThread = Environment.CurrentManagedThreadId;
+
+        var change = NextChange(client);
+        hostSession.AddJournalEntry(EtbDirection.Incoming, "Lage erkundet", "Leitstelle", "ELW");
+        await change;
+
+        Assert.Contains(clientWs.Etb.Entries, e => e.Text == "Lage erkundet");
+        Assert.Equal(ui.ThreadId, mutatedOnThread); // marshalled onto the UI thread, not SignalR's receive loop
+    }
+
+    // The symmetric guard for the host: a client's command is applied on a Kestrel request thread, so
+    // IncidentHost must hop onto the UI thread before SaveExternalChange raises Changed into the host's
+    // own bound views.
+    [Fact]
+    public async Task Host_applies_a_client_command_on_the_ui_thread()
+    {
+        var clock = new FixedClock();
+        using var ui = new SingleThreadUiDispatcher();
+        var hostSession = HostSession(clock);
+        var hostWs = Workspace(hostSession, clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0", ui);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), port);
+
+        int? mutatedOnThread = null;
+        hostWs.Etb.Entries.CollectionChanged += (_, _) => mutatedOnThread = Environment.CurrentManagedThreadId;
+
+        var change = NextChange(client);
+        client.AddJournalEntry(EtbDirection.Outgoing, "Rückmeldung an ILS", "ELW", "Leitstelle");
+        await change; // the command has round-tripped: host applied + broadcast, client received
+
+        Assert.Contains(hostWs.Etb.Entries, e => e.Text == "Rückmeldung an ILS");
+        Assert.Equal(ui.ThreadId, mutatedOnThread); // applied on the UI thread, not a Kestrel request thread
     }
 
     // One quick retry, then give up. The first (non-null) delay makes SignalR raise Reconnecting

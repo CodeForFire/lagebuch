@@ -17,12 +17,14 @@ public sealed class IncidentHostController : IIncidentHostController
 {
     private readonly IClock _clock;
     private readonly string _appVersion;
+    private readonly IUiDispatcher _ui;
     private IncidentHost? _host;
 
-    public IncidentHostController(IClock clock, string appVersion)
+    public IncidentHostController(IClock clock, string appVersion, IUiDispatcher ui)
     {
         _clock = clock;
         _appVersion = appVersion;
+        _ui = ui;
     }
 
     public bool CanHost => true;
@@ -33,7 +35,7 @@ public sealed class IncidentHostController : IIncidentHostController
     {
         if (_host is not null)
             return;
-        var host = new IncidentHost(session, _clock, _appVersion);
+        var host = new IncidentHost(session, _clock, _appVersion, _ui);
         await host.StartAsync(IPAddress.Any);
         _host = host;
         // Bound on every interface; show the nicest address to dial plus the same-machine shortcut.

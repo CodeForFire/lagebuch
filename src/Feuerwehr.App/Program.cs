@@ -24,6 +24,7 @@ internal static class Program
             (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow);
         var clock = new SystemClock();
         var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+        var uiDispatcher = new Feuerwehr.App.Shared.Services.AvaloniaUiDispatcher();
         return Feuerwehr.App.Shared.CompositionRoot.CreateMainWindowViewModel(
             new IncidentStore(),
             new MasterDataProvider(AppPaths.MasterDataDbPath),
@@ -33,7 +34,8 @@ internal static class Program
             new Feuerwehr.App.Shared.Services.DispatcherTimerTicker(),
             new SystemAlarmService(),
             new MasterDataFileService(),
-            new IncidentHostController(clock, version),
+            new IncidentHostController(clock, version, uiDispatcher),
+            uiDispatcher,
             version);
     }
 
