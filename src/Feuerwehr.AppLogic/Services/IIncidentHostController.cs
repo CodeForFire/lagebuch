@@ -11,9 +11,6 @@ public interface IIncidentHostController
     /// <summary>Whether this platform can host at all (false hides the toggle).</summary>
     bool CanHost { get; }
 
-    /// <summary>Whether the Tailscale interface is up right now.</summary>
-    bool IsTailscaleConnected { get; }
-
     bool IsHosting { get; }
 
     /// <summary>A short line to show while hosting — e.g. the address other devices dial.</summary>
@@ -28,7 +25,6 @@ public interface IIncidentHostController
 public sealed class NoopIncidentHostController : IIncidentHostController
 {
     public bool CanHost => false;
-    public bool IsTailscaleConnected => false;
     public bool IsHosting => false;
     public string? ShareHint => null;
     public Task StartAsync(LocalIncidentSession session) => Task.CompletedTask;

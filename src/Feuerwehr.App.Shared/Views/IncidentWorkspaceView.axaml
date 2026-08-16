@@ -43,7 +43,8 @@
             </StackPanel>
           </Grid>
 
-          <!-- Multi-device sharing (#52): expose this open incident to other devices over Tailscale -->
+          <!-- Multi-device sharing (#52): expose this open incident to other devices over the
+               network (loopback, LAN, or a tailnet) — the status line shows the address to dial. -->
           <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding CanHost}">
             <Button Classes="ghost" Content="{Binding ShareButtonText}" Command="{Binding ToggleSharingCommand}" />
             <TextBlock Classes="body" VerticalAlignment="Center"

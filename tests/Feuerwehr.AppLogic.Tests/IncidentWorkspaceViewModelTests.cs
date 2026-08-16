@@ -17,11 +17,79 @@ internal sealed class FakeDialogs : IFileDialogService
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
+// Hostable controller double: unlike NoopIncidentHostController (CanHost=false, which hides the
+// toggle) this reports CanHost=true so ToggleSharing runs. Optionally fails StartAsync to exercise
+// the bind-failure path (e.g. port already in use).
+internal sealed class FakeHostController : IIncidentHostController
+{
+    private readonly Exception? _failWith;
+    public FakeHostController(string shareHint = "Erreichbar unter 192.168.0.5:5859", Exception? failWith = null)
+    {
+        ShareHint = shareHint;
+        _failWith = failWith;
+    }
+
+    public bool CanHost => true;
+    public bool IsHosting { get; private set; }
+    public string? ShareHint { get; }
+    public bool StartCalled { get; private set; }
+
+    public Task StartAsync(LocalIncidentSession session)
+    {
+        StartCalled = true;
+        if (_failWith is not null)
+            throw _failWith;
+        IsHosting = true;
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync()
+    {
+        IsHosting = false;
+        return Task.CompletedTask;
+    }
+}
+
 public class IncidentWorkspaceViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
     private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
+
+    private static IncidentWorkspaceViewModel EditableWorkspace(IIncidentHostController host)
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { "A?" });
+        return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), host);
+    }
+
+    // --- Network sharing (no Tailscale required) --------------------------------------------
+
+    [Fact]
+    public async Task Toggling_sharing_on_starts_the_host_and_shows_its_hint()
+    {
+        var host = new FakeHostController(shareHint: "Erreichbar unter 192.168.0.5:5859 · auf diesem Gerät: localhost:5859");
+        var vm = EditableWorkspace(host);
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.True(host.StartCalled);
+        Assert.True(vm.IsSharing);
+        Assert.Equal(host.ShareHint, vm.ShareStatus);
+    }
+
+    [Fact]
+    public async Task A_failed_bind_surfaces_in_the_status_line_and_leaves_sharing_off()
+    {
+        var host = new FakeHostController(failWith: new InvalidOperationException("Port 5859 belegt"));
+        var vm = EditableWorkspace(host);
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsSharing);
+        Assert.Contains("Port 5859 belegt", vm.ShareStatus);
+    }
 
     private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
     {
