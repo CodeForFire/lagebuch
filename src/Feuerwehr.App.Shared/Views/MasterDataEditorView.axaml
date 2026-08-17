@@ -50,6 +50,44 @@
           <ContentControl Content="{Binding SelectedSection}">
             <ContentControl.DataTemplates>
 
+              <!-- Operational defaults (timers/durations) -->
+              <DataTemplate x:DataType="vm:SettingsSection">
+                <ScrollViewer>
+                  <StackPanel Spacing="12" MaxWidth="440" HorizontalAlignment="Left">
+                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
+                      <TextBlock Grid.Column="0" Text="Rückmeldung an ILS – Intervall" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding IlsReminderIntervalMinutes}"
+                                     Minimum="1" Maximum="120" Increment="1" FormatString="0" />
+                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
+                      <TextBlock Grid.Column="0" Text="Einsatzzeit AGT" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding AgtMaxDurationMinutes}"
+                                     Minimum="1" Maximum="180" Increment="1" FormatString="0" />
+                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
+                      <TextBlock Grid.Column="0" Text="Einsatzzeit CSA-Trupp" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding CsaMaxDurationMinutes}"
+                                     Minimum="1" Maximum="180" Increment="1" FormatString="0" />
+                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
+                      <TextBlock Grid.Column="0" Text="Atemschutzkontrolle – Intervall" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding PressureControlIntervalMinutes}"
+                                     Minimum="1" Maximum="60" Increment="1" FormatString="0" />
+                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
+                      <TextBlock Grid.Column="0" Text="Rückzugsdruck" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding ReturnPressureBar}"
+                                     Minimum="0" Maximum="400" Increment="5" FormatString="0" />
+                      <TextBlock Grid.Column="2" Text="bar" Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                  </StackPanel>
+                </ScrollViewer>
+              </DataTemplate>
+
               <!-- String-list / checklist editor -->
               <DataTemplate x:DataType="vm:EditableListSection">
                 <DockPanel>

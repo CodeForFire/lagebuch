@@ -16,17 +16,18 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private readonly ReminderTimer _timer = new();
     private readonly IDisposable _subscription;
 
-    public ReminderViewModel(IIncidentSession session, IClock clock, ITicker ticker, Action onChanged)
+    public ReminderViewModel(IIncidentSession session, IClock clock, ITicker ticker, Action onChanged, int defaultIntervalMinutes)
     {
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
+        IntervalMinutes = defaultIntervalMinutes;
         _subscription = ticker.Subscribe(OnTick);
     }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
-    private int _intervalMinutes = 15;
+    private int _intervalMinutes;
 
     public bool IsRunning => _timer.IsRunning;
     public bool IsDue => _timer.IsDue(_clock.Now);

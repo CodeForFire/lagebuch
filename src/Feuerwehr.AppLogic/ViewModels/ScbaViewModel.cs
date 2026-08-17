@@ -147,6 +147,13 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     private readonly Action _onChanged;
     private readonly IDisposable? _subscription;
     private readonly HashSet<Guid> _alarmLogged = new();
+    private readonly IncidentSettings _settings;
+
+    // True once the user has hand-edited the Einsatzzeit; after that a Trupp-type switch must not
+    // overwrite it. Programmatic sets (default application, form reset) are fenced by _applyingDefault
+    // so they do not count as a user edit.
+    private bool _maxDurationUserEdited;
+    private bool _applyingDefault;
 
     public ScbaViewModel(IIncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
     {
@@ -154,6 +161,12 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         _clock = clock;
         _alarm = alarm;
         _onChanged = onChanged;
+        _settings = masterData.Settings;
+        // Seed the add-Trupp form defaults from the configured settings (empty designation => AGT).
+        // Direct field writes so no OnChanged fires and the fields do not read as user-edited.
+        _newMaxDurationMinutes = _settings.AgtMaxDurationMinutes;
+        _newReturnPressureBar = _settings.ReturnPressureBar;
+        _newControlIntervalMinutes = _settings.PressureControlIntervalMinutes;
         IsReadOnly = session.IsReadOnly;
         TruppTypeOptions = masterData.TruppTypes;
         CallSignOptions = masterData.RadioCallSigns;
@@ -212,13 +225,37 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     private string? _newCallSign;
 
     [ObservableProperty]
-    private int _newMaxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes;
+    private int _newMaxDurationMinutes;
 
     [ObservableProperty]
-    private int _newReturnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar;
+    private int _newReturnPressureBar;
 
     [ObservableProperty]
-    private int _newControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes;
+    private int _newControlIntervalMinutes;
+
+    partial void OnNewMaxDurationMinutesChanged(int value)
+    {
+        if (!_applyingDefault)
+            _maxDurationUserEdited = true;
+    }
+
+    // Switching the Trupp type re-suggests its Einsatzzeit (CSA is shorter than AGT), but only while
+    // the user has not overridden the field — a hand-typed value survives the switch.
+    partial void OnNewDesignationChanged(string value)
+    {
+        if (!_maxDurationUserEdited)
+            ApplyDefaultMaxDuration();
+    }
+
+    private void ApplyDefaultMaxDuration()
+    {
+        var previous = _applyingDefault;
+        _applyingDefault = true;
+        NewMaxDurationMinutes = AtemschutzTrupp.IsChemicalTrupp(NewDesignation)
+            ? _settings.CsaMaxDurationMinutes
+            : _settings.AgtMaxDurationMinutes;
+        _applyingDefault = previous;
+    }
 
     // ----- Header reminder: the most urgent next pressure-control across all active trupps -----
 
@@ -327,14 +364,15 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             $"Atemschutztrupp {designation} bereitgestellt: {membersDisplay}",
             from: null, to: callSign);
 
+        _maxDurationUserEdited = false;
         NewDesignation = string.Empty;
         NewTruppfuehrer = string.Empty;
         NewTruppmann = string.Empty;
         NewZweiterTruppmann = string.Empty;
         NewCallSign = null;
-        NewMaxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes;
-        NewReturnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar;
-        NewControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes;
+        NewReturnPressureBar = _settings.ReturnPressureBar;
+        NewControlIntervalMinutes = _settings.PressureControlIntervalMinutes;
+        ApplyDefaultMaxDuration(); // empty designation => AGT default
         RefreshHeader();
         _onChanged();
     }

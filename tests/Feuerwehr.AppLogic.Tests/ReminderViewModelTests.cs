@@ -50,7 +50,7 @@ public class ReminderViewModelTests
     public void Default_interval_is_15_and_not_running()
     {
         var (session, clock) = NewSession();
-        var vm = new ReminderViewModel(session, clock, new FakeTicker(), () => { });
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), () => { }, defaultIntervalMinutes: 15);
 
         Assert.Equal(15, vm.IntervalMinutes);
         Assert.False(vm.IsRunning);
@@ -63,7 +63,7 @@ public class ReminderViewModelTests
     public void Start_runs_and_shows_countdown()
     {
         var (session, clock) = NewSession();
-        var vm = new ReminderViewModel(session, clock, new FakeTicker(), () => { }) { IntervalMinutes = 15 };
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), () => { }, defaultIntervalMinutes: 15);
 
         vm.StartCommand.Execute(null);
 
@@ -77,7 +77,7 @@ public class ReminderViewModelTests
     {
         var (session, clock) = NewSession();
         var ticker = new FakeTicker();
-        var vm = new ReminderViewModel(session, clock, ticker, () => { }) { IntervalMinutes = 15 };
+        var vm = new ReminderViewModel(session, clock, ticker, () => { }, defaultIntervalMinutes: 15);
         vm.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(15);
@@ -94,7 +94,7 @@ public class ReminderViewModelTests
         var (session, clock) = NewSession();
         var changes = 0;
         var ticker = new FakeTicker();
-        var vm = new ReminderViewModel(session, clock, ticker, () => changes++) { IntervalMinutes = 15 };
+        var vm = new ReminderViewModel(session, clock, ticker, () => changes++, defaultIntervalMinutes: 15);
         vm.StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(16);
         ticker.Fire();
@@ -115,7 +115,7 @@ public class ReminderViewModelTests
     public void Stop_disables_running_state()
     {
         var (session, clock) = NewSession();
-        var vm = new ReminderViewModel(session, clock, new FakeTicker(), () => { });
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), () => { }, defaultIntervalMinutes: 15);
         vm.StartCommand.Execute(null);
 
         vm.StopCommand.Execute(null);
@@ -129,7 +129,7 @@ public class ReminderViewModelTests
     {
         var (session, clock) = NewSession();
         var ticker = new FakeTicker();
-        var vm = new ReminderViewModel(session, clock, ticker, () => { });
+        var vm = new ReminderViewModel(session, clock, ticker, () => { }, defaultIntervalMinutes: 15);
         Assert.Equal(1, ticker.SubscriberCount);
 
         vm.Dispose();

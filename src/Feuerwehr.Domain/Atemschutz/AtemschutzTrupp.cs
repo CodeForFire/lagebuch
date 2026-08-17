@@ -13,6 +13,13 @@ namespace Feuerwehr.Domain.Atemschutz;
 public sealed class AtemschutzTrupp
 {
     public const int DefaultMaxDurationMinutes = 30;
+
+    /// <summary>
+    /// Default operational time for a <see cref="ChemicalTruppDesignation"/>: a chemical-suit Trupp
+    /// works to a shorter limit than an ordinary AGT, so it defaults lower than
+    /// <see cref="DefaultMaxDurationMinutes"/> rather than sharing it.
+    /// </summary>
+    public const int DefaultChemicalMaxDurationMinutes = 20;
     public const int DefaultReturnPressureBar = 60;
     public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;
