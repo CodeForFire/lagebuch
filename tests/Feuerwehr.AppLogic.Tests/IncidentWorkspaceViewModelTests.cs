@@ -32,6 +32,7 @@ internal sealed class FakeHostController : IIncidentHostController
     public bool CanHost => true;
     public bool IsHosting { get; private set; }
     public string? ShareHint { get; }
+    public string? SharePin { get; private set; }
     public bool StartCalled { get; private set; }
 
     public Task StartAsync(LocalIncidentSession session)
@@ -40,12 +41,14 @@ internal sealed class FakeHostController : IIncidentHostController
         if (_failWith is not null)
             throw _failWith;
         IsHosting = true;
+        SharePin = "1234";
         return Task.CompletedTask;
     }
 
     public Task StopAsync()
     {
         IsHosting = false;
+        SharePin = null;
         return Task.CompletedTask;
     }
 }

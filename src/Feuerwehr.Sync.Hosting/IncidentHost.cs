@@ -24,15 +24,17 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly LocalIncidentSession _session;
     private readonly IClock _clock;
     private readonly string _appVersion;
+    private readonly string _pin;
     private readonly IUiDispatcher _ui;
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
 
-    public IncidentHost(LocalIncidentSession session, IClock clock, string appVersion, IUiDispatcher ui)
+    public IncidentHost(LocalIncidentSession session, IClock clock, string appVersion, IUiDispatcher ui, string pin)
     {
         _session = session;
         _clock = clock;
         _appVersion = appVersion;
+        _pin = pin;
         _ui = ui;
     }
 
@@ -54,6 +56,21 @@ public sealed class IncidentHost : IAsyncDisposable
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         var app = builder.Build();
+
+        // The join gate (§ #64): every request — the version/snapshot/command HTTP calls and the hub's
+        // negotiate/transport requests — must carry the share PIN in SyncProtocol.PinHeader. Rejecting
+        // here, before routing, keeps every endpoint and the hub gated with one check. Plain HTTP means
+        // the PIN is not secret against a LAN sniffer; it blocks uninvited joins, not eavesdropping.
+        app.Use(async (context, next) =>
+        {
+            if (!PinMatches(context.Request.Headers[SyncProtocol.PinHeader]))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+            await next();
+        });
+
         app.MapHub<IncidentHub>(SyncProtocol.HubPath);
         app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(_appVersion), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options));
@@ -88,6 +105,12 @@ public sealed class IncidentHost : IAsyncDisposable
             return Results.BadRequest(ex.Message);
         }
     }
+
+    // Exactly one PIN header, matching the host's, is accepted. A missing/duplicated/mismatched header
+    // is refused. The comparison is ordinal — the PIN is a short numeric string, not a secret to defend
+    // against timing analysis over a LAN it is already sent in cleartext on.
+    private bool PinMatches(Microsoft.Extensions.Primitives.StringValues header) =>
+        header.Count == 1 && string.Equals(header[0], _pin, StringComparison.Ordinal);
 
     private void OnSessionChanged() => _ = Broadcast(SnapshotMapper.ToSnapshot(_session.Incident));
 

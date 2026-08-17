@@ -51,6 +51,18 @@
                        Foreground="{StaticResource TextSecondaryBrush}"
                        Text="{Binding ShareStatus}"
                        IsVisible="{Binding ShareStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <!-- The PIN a joining device must enter; read it out to whoever is connecting (#64). -->
+            <Border VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                    Background="#241608" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                    Padding="8,3"
+                    IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="PIN" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                           Foreground="{StaticResource AmberBrush}" />
+                <TextBlock Text="{Binding SharePin}" FontWeight="SemiBold" FontFamily="{StaticResource MonoFont}"
+                           Foreground="{StaticResource AmberBrush}" />
+              </StackPanel>
+            </Border>
           </StackPanel>
 
           <!-- Joined-client disconnect banner (#52 §7): auto-reconnect is running; input is greyed

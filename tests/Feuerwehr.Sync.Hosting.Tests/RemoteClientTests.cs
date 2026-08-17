@@ -29,7 +29,7 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
 
         var change = NextChange(client);
         await client.SendAsync(new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
@@ -47,8 +47,8 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
 
-        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), port);
-        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), port);
+        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
 
         var aChange = NextChange(a);
         var bChange = NextChange(b);
@@ -67,6 +67,29 @@ public class RemoteClientTests
         await using var _ = host;
 
         await Assert.ThrowsAsync<VersionMismatchException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port));
+    }
+
+    [Fact]
+    public async Task Connect_refuses_a_wrong_pin()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        // A wrong PIN is refused at the first request, before the version compare — auth precedes content.
+        await Assert.ThrowsAsync<PinRejectedException>(() =>
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), "9999", port));
+    }
+
+    [Fact]
+    public async Task Connect_refuses_a_missing_pin()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        await Assert.ThrowsAsync<PinRejectedException>(() =>
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), pin: null, port));
     }
 }

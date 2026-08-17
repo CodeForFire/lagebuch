@@ -59,6 +59,9 @@ internal sealed class NoRecentFiles : IRecentFilesStore
 
 internal static class TestHost
 {
+    /// <summary>The share PIN the test host runs with; clients pass this to ConnectAsync to be let in.</summary>
+    public const string DefaultPin = "1234";
+
     public static int FreeTcpPort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -69,9 +72,10 @@ internal static class TestHost
     }
 
     public static async Task<(IncidentHost host, int port)> StartAsync(
-        LocalIncidentSession session, IClock clock, string version = "1.0.0", IUiDispatcher? ui = null)
+        LocalIncidentSession session, IClock clock, string version = "1.0.0", IUiDispatcher? ui = null,
+        string pin = DefaultPin)
     {
-        var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher());
+        var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher(), pin);
         var port = FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
         return (host, port);

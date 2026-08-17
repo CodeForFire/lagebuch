@@ -20,6 +20,7 @@ public class SharePanelRenderTests
         public bool CanHost => true;
         public bool IsHosting { get; private set; }
         public string? ShareHint => "Erreichbar unter 192.168.0.5:5859 · auf diesem Gerät: localhost:5859";
+        public string? SharePin => IsHosting ? "1234" : null;
         public Task StartAsync(LocalIncidentSession session) { IsHosting = true; return Task.CompletedTask; }
         public Task StopAsync() { IsHosting = false; return Task.CompletedTask; }
     }
@@ -68,6 +69,8 @@ public class SharePanelRenderTests
 
         Assert.Equal("FREIGABE BEENDEN", vm.ShareButtonText);
         Assert.Contains("localhost:5859", ShareStatus(window).Text!);
+        Assert.Equal("1234", vm.SharePin);
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "1234");
         Capture(window, "share-after.png");
     }
 }

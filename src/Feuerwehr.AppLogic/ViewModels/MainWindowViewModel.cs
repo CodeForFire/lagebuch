@@ -93,7 +93,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (action == PendingAction.New)
             _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.IncidentNumber));
         else if (action == PendingAction.Join)
-            _home.JoinDeviceCommand.Execute(new JoinRequest(op, prompt!.Host));
+            _home.JoinDeviceCommand.Execute(new JoinRequest(op, prompt!.Host, prompt.Pin));
     }
 
     [RelayCommand]

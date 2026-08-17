@@ -151,9 +151,15 @@ public sealed partial class HomeViewModel : ObservableObject
         var (host, port) = ParseHost(request.Host);
         try
         {
-            var session = await RemoteIncidentSession.ConnectAsync(host, request.Operator, _appVersion, _uiDispatcher, port);
+            var session = await RemoteIncidentSession.ConnectAsync(
+                host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port);
             JoinError = null;
             OpenRemoteWorkspace(session, _masterData.Get());
+        }
+        catch (PinRejectedException ex)
+        {
+            // Wrong/missing share PIN — say so plainly and leave them on Home to retry.
+            JoinError = ex.Message;
         }
         catch (VersionMismatchException ex)
         {

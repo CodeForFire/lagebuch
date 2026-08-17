@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
 using Feuerwehr.Domain;
@@ -63,18 +64,28 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     /// <summary>
     /// Version-handshakes, fetches the initial snapshot, and opens the push channel. Throws
-    /// <see cref="VersionMismatchException"/> on a version mismatch and
+    /// <see cref="PinRejectedException"/> when the host refuses the share PIN,
+    /// <see cref="VersionMismatchException"/> on a version mismatch, and
     /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable.
     /// </summary>
     public static async Task<RemoteIncidentSession> ConnectAsync(
-        string host, SessionOperator op, string localVersion, IUiDispatcher ui,
+        string host, SessionOperator op, string localVersion, IUiDispatcher ui, string? pin = null,
         int port = SyncProtocol.Port, IRetryPolicy? reconnectPolicy = null, CancellationToken ct = default)
     {
         var baseUri = new Uri($"http://{host}:{port}");
         var http = new HttpClient { BaseAddress = baseUri };
+        if (!string.IsNullOrEmpty(pin))
+            http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
         try
         {
-            var hostVersion = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(SyncProtocol.VersionPath, ct)).Version;
+            // The PIN gates every endpoint, so the first request already reflects it: a 401 means the
+            // PIN is wrong/missing — reported as such before the version compare (auth precedes content).
+            var versionResponse = await http.GetAsync(SyncProtocol.VersionPath, ct);
+            if (versionResponse.StatusCode == HttpStatusCode.Unauthorized)
+                throw new PinRejectedException();
+            versionResponse.EnsureSuccessStatusCode();
+
+            var hostVersion = SyncJson.Deserialize<VersionInfo>(await versionResponse.Content.ReadAsStringAsync(ct)).Version;
             if (hostVersion != localVersion)
                 throw new VersionMismatchException(localVersion, hostVersion);
 
@@ -82,7 +93,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(SyncProtocol.SnapshotPath, ct)));
 
             var hub = new HubConnectionBuilder()
-                .WithUrl(new Uri(baseUri, SyncProtocol.HubPath))
+                .WithUrl(new Uri(baseUri, SyncProtocol.HubPath), o =>
+                {
+                    if (!string.IsNullOrEmpty(pin))
+                        o.Headers.Add(SyncProtocol.PinHeader, pin);
+                })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();

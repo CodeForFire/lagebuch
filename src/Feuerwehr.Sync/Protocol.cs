@@ -13,10 +13,22 @@ public static class SyncProtocol
 
     /// <summary>SignalR method the host pushes the full snapshot on, after every applied command.</summary>
     public const string SnapshotMethod = "snapshot";
+
+    /// <summary>
+    /// Request header carrying the share PIN. Sent on every client request — the version/snapshot/command
+    /// HTTP calls and the SignalR hub connection alike — so a single host middleware gates them all.
+    /// </summary>
+    public const string PinHeader = "X-Lagebuch-Pin";
 }
 
 /// <summary>Exchanged on connect; a client refuses a host whose <see cref="Version"/> differs (§7).</summary>
 public sealed record VersionInfo(string Version);
+
+/// <summary>
+/// Thrown when the host rejects the join because the supplied share PIN is wrong or missing (§ #64).
+/// Surfaced to the joining user on the same banner as <see cref="VersionMismatchException"/>.
+/// </summary>
+public sealed class PinRejectedException() : Exception("Falsche PIN.");
 
 /// <summary>
 /// Thrown when a joining client's app version differs from the host's. Mixed versions across a

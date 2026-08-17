@@ -46,7 +46,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         var change = NextChange(client);
@@ -66,7 +66,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
 
         var change = NextChange(client);
         client.AddJournalEntry(EtbDirection.Outgoing, "Rückmeldung an ILS", "ELW", "Leitstelle");
@@ -87,7 +87,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
         Assert.False(clientWs.IsReadOnly);
 
@@ -108,7 +108,7 @@ public class WorkspaceCollaborationTests
         // Reconnect once quickly then give up, so "host gone" resolves in the test rather than after
         // the production two-minute window — while still exercising the transient-drop banner first.
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), port, new GiveUpAfterOneRetry());
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
         var clientWs = Workspace(client, clock);
 
         var disconnected = new TaskCompletionSource();
@@ -139,7 +139,7 @@ public class WorkspaceCollaborationTests
 
         using var ui = new SingleThreadUiDispatcher();
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", ui, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", ui, TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         int? mutatedOnThread = null;
@@ -167,7 +167,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
 
         int? mutatedOnThread = null;
         hostWs.Etb.Entries.CollectionChanged += (_, _) => mutatedOnThread = Environment.CurrentManagedThreadId;
