@@ -237,6 +237,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     private string? _shareStatus;
 
+    // The 4-digit PIN a joining device must enter; shown next to the address while sharing (§ #64).
+    [ObservableProperty]
+    private string? _sharePin;
+
     public string ShareButtonText => IsSharing ? "FREIGABE BEENDEN" : "IM NETZWERK FREIGEBEN";
 
     [RelayCommand]
@@ -251,6 +255,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             await _hostController.StopAsync();
             IsSharing = false;
             ShareStatus = null;
+            SharePin = null;
             return;
         }
         try
@@ -267,5 +272,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         }
         IsSharing = true;
         ShareStatus = _hostController.ShareHint;
+        SharePin = _hostController.SharePin;
     }
 }

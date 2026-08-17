@@ -155,4 +155,22 @@ public class OperatorPromptViewModelTests
         vm.EinsatzartInput = "B";
         Assert.True(changed);
     }
+
+    [Fact]
+    public void Join_flow_requires_both_host_and_pin_to_confirm()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1" };
+        Assert.False(vm.ConfirmCommand.CanExecute(null)); // host given, PIN still missing
+
+        vm.Pin = "1234";
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Pin_is_not_required_when_not_joining()
+    {
+        // The new-incident / continue-editing flows never show the PIN field, so it must not gate them.
+        var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+    }
 }

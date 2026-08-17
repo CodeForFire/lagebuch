@@ -16,6 +16,9 @@ public interface IIncidentHostController
     /// <summary>A short line to show while hosting — e.g. the address other devices dial.</summary>
     string? ShareHint { get; }
 
+    /// <summary>The PIN a joining device must enter while hosting; null when not hosting.</summary>
+    string? SharePin { get; }
+
     Task StartAsync(LocalIncidentSession session);
 
     Task StopAsync();
@@ -27,6 +30,7 @@ public sealed class NoopIncidentHostController : IIncidentHostController
     public bool CanHost => false;
     public bool IsHosting => false;
     public string? ShareHint => null;
+    public string? SharePin => null;
     public Task StartAsync(LocalIncidentSession session) => Task.CompletedTask;
     public Task StopAsync() => Task.CompletedTask;
 }

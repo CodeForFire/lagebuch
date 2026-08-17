@@ -32,7 +32,7 @@ public class HomeViewModelJoinTests
         vm.WorkspaceOpened = ws => opened = ws;
 
         await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}"));
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
 
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
@@ -53,11 +53,29 @@ public class HomeViewModelJoinTests
         vm.WorkspaceOpened = _ => opened = true;
 
         await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}"));
+            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
         Assert.Contains("2.0.0", vm.JoinError); // names the host version it refused
+    }
+
+    [Fact]
+    public async Task Wrong_pin_shows_a_banner_and_opens_nothing()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        var vm = Home();
+        var opened = false;
+        vm.WorkspaceOpened = _ => opened = true;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "9999"));
+
+        Assert.False(opened);
+        Assert.Equal("Falsche PIN.", vm.JoinError);
     }
 
     [Fact]
@@ -69,7 +87,7 @@ public class HomeViewModelJoinTests
         vm.WorkspaceOpened = _ => opened = true;
 
         await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}"));
+            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);

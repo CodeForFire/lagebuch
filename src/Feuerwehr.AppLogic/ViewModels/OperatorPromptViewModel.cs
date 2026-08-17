@@ -31,6 +31,12 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private string _host = string.Empty;
 
+    // The share PIN the host displays, entered only in the join flow. Mandatory there (gates Confirm).
+    // Read separately by the caller after Confirm — it is not part of SessionOperator.
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    private string _pin = string.Empty;
+
     // Radio call signs offered as dropdown suggestions for the Funkrufname field. The field stays
     // free-text (an operator's call sign need not be in the master list), so this is only a hint;
     // empty when a caller supplies none, in which case the control is a plain text box.
@@ -80,7 +86,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     private bool CanConfirm =>
         !string.IsNullOrWhiteSpace(OperatorName) &&
         (!CollectsIncidentNumber || HasCompleteIncidentNumber) &&
-        (!CollectsHost || !string.IsNullOrWhiteSpace(Host));
+        (!CollectsHost || (!string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(Pin)));
 
     // EinsatznummerFormat.Compose only returns null when ALL THREE parts are blank, which is too
     // weak for "mandatory" -- an operator who fills only the Einsatzart would pass that check with
