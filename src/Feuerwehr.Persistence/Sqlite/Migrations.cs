@@ -5,7 +5,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -59,6 +59,10 @@ public static class Migrations
         if (version < 7)
         {
             ApplyV7(cn, tx);
+        }
+        if (version < 8)
+        {
+            ApplyV8(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -306,6 +310,22 @@ public static class Migrations
     // in Migrate, instead of silently mis-rendering the unknown ordinal as "3".
     private static void ApplyV7(SqliteConnection cn, SqliteTransaction tx)
     {
+    }
+
+    // Adds the generic incident-level timer store. Old files gain the empty table on their next
+    // open (Load migrates before reading), so nothing breaks. Keyed by the timer's identity; only
+    // the anchor + cadence are stored, live values are recomputed from now (like the SCBA countdowns).
+    private static void ApplyV8(SqliteConnection cn, SqliteTransaction tx)
+    {
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS incident_timers (
+                key TEXT PRIMARY KEY,
+                cycle_anchor TEXT NOT NULL,
+                interval_minutes INTEGER NOT NULL,
+                recurring_interval_minutes INTEGER NOT NULL,
+                is_running INTEGER NOT NULL
+            );
+            """);
     }
 
     /// <summary>

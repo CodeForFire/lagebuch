@@ -1,6 +1,7 @@
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain.Etb;
+using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
 
 namespace Feuerwehr.Sync;
@@ -32,7 +33,8 @@ public static class SnapshotMapper
             incident.Roles.Select(r => new RoleAssignmentDto(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)).ToList(),
             incident.Forces.Select(f => new ForceUnitDto(f.Id, f.Brigade, f.CallSign, f.PersonnelCount, f.ScbaCount, f.Status, f.Notes)).ToList(),
             incident.ScbaTrupps.Select(ToDto).ToList(),
-            incident.Audit.Select(a => new AuditEventDto(a.At, a.Action, a.By)).ToList());
+            incident.Audit.Select(a => new AuditEventDto(a.At, a.Action, a.By)).ToList(),
+            incident.Timers.Select(t => new TimerDto(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -54,7 +56,8 @@ public static class SnapshotMapper
             snapshot.Roles.Select(r => new RoleAssignment(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)),
             snapshot.Forces.Select(f => new ForceUnit(f.Id, f.Brigade, f.CallSign, f.PersonnelCount, f.ScbaCount, f.Status, f.Notes)),
             snapshot.ScbaTrupps.Select(FromDto),
-            snapshot.Audit.Select(a => new AuditEvent(a.At, a.Action, a.By)));
+            snapshot.Audit.Select(a => new AuditEvent(a.At, a.Action, a.By)),
+            snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

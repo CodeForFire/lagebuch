@@ -33,6 +33,24 @@ public sealed class ReminderTimer
         IsRunning = true;
     }
 
+    /// <summary>
+    /// Restores a running timer from persisted state (an anchor in the past) — the rehydration
+    /// counterpart to <see cref="Start"/>, used after a reopen/crash. The current cycle length is
+    /// supplied directly (the first interval until the first acknowledgement, the recurring interval
+    /// thereafter). May leave the timer already due when the anchor is older than the interval.
+    /// </summary>
+    public void Resume(DateTimeOffset anchor, int currentIntervalMinutes, int recurringIntervalMinutes)
+    {
+        if (currentIntervalMinutes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(currentIntervalMinutes), "Interval must be positive.");
+        if (recurringIntervalMinutes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(recurringIntervalMinutes), "Interval must be positive.");
+        IntervalMinutes = currentIntervalMinutes;
+        RecurringIntervalMinutes = recurringIntervalMinutes;
+        CycleAnchor = anchor;
+        IsRunning = true;
+    }
+
     public void Stop() => IsRunning = false;
 
     public void Acknowledge(IClock clock)

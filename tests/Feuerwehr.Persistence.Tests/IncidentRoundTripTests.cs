@@ -192,4 +192,24 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Null(loadedWaiting.StartTime);
         Assert.Null(loadedWaiting.StartPressure);
     }
+
+    [Fact]
+    public void Incident_timers_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.UpsertTimer("ils-reminder", clock.Now, intervalMinutes: 15, recurringIntervalMinutes: 30, isRunning: true);
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+        var loaded = repo.Load(_path);
+
+        var timer = loaded.FindTimer("ils-reminder");
+        Assert.NotNull(timer);
+        Assert.Equal(clock.Now, timer!.CycleAnchor);
+        Assert.Equal(15, timer.IntervalMinutes);
+        Assert.Equal(30, timer.RecurringIntervalMinutes);
+        Assert.True(timer.IsRunning);
+    }
 }

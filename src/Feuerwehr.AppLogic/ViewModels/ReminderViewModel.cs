@@ -24,6 +24,10 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private readonly ReminderTimer _timer = new();
     private readonly IDisposable _subscription;
 
+    // The key under which this reminder's state is persisted on the incident, so it survives a
+    // close+reopen or a crash instead of restarting a fresh cycle.
+    private const string TimerKey = "ils-reminder";
+
     // The spoken cue fires once when a cycle falls due; this guards against re-announcing it on
     // every subsequent tick until the next Acknowledge opens a fresh cycle.
     private bool _dueAnnounced;
@@ -36,10 +40,26 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         _clock = clock;
         _alarm = alarm;
         _onChanged = onChanged;
-        // Autonomous: the reminder runs for the whole incident, no manual start required.
-        _timer.Start(_clock, firstIntervalMinutes, recurringIntervalMinutes);
+
+        // Autonomous: the reminder runs for the whole incident, no manual start required. Recover the
+        // running cycle from persisted state after a reopen/crash; otherwise start fresh and persist
+        // the anchor so a later reopen resumes where this left off rather than restarting at 15:00.
+        var saved = _session.Incident.FindTimer(TimerKey);
+        if (saved is { IsRunning: true })
+        {
+            _timer.Resume(saved.CycleAnchor, saved.IntervalMinutes, saved.RecurringIntervalMinutes);
+        }
+        else
+        {
+            _timer.Start(_clock, firstIntervalMinutes, recurringIntervalMinutes);
+            PersistTimer();
+        }
+
         _subscription = ticker.Subscribe(OnTick);
     }
+
+    private void PersistTimer() =>
+        _session.UpsertTimer(TimerKey, _timer.CycleAnchor, _timer.IntervalMinutes, _timer.RecurringIntervalMinutes, _timer.IsRunning);
 
     public bool IsRunning => _timer.IsRunning;
     public bool IsDue => _timer.IsDue(_clock.Now);
@@ -76,6 +96,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     {
         _timer.Acknowledge(_clock);
         _dueAnnounced = false;
+        PersistTimer(); // durable anchor for the new (recurring) cycle
         // "Von" is us — the logged-in operator's call sign (e.g. the ELW's Funkrufname).
         _session.AddJournalEntry(
             EtbDirection.Outgoing, "Rückmeldung an ILS", from: _session.Operator?.CallSign, to: "ILS");
