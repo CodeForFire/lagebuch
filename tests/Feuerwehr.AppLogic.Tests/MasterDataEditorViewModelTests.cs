@@ -219,13 +219,14 @@ public class MasterDataEditorViewModelTests
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty with
         {
-            Settings = new IncidentSettings(12, 25, 18, 4, 55),
+            Settings = new IncidentSettings(12, 25, 18, 40, 4, 55),
         });
         var settings = Settings(Vm(provider));
 
         Assert.Equal(12, settings.IlsReminderIntervalMinutes);
         Assert.Equal(25, settings.AgtMaxDurationMinutes);
         Assert.Equal(18, settings.CsaMaxDurationMinutes);
+        Assert.Equal(40, settings.LpaMaxDurationMinutes);
         Assert.Equal(4, settings.PressureControlIntervalMinutes);
         Assert.Equal(55, settings.ReturnPressureBar);
     }

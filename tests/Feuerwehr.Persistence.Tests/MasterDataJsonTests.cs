@@ -106,13 +106,14 @@ public class MasterDataJsonTests
                 "ilsReminderIntervalMinutes": 12,
                 "agtMaxDurationMinutes": 25,
                 "csaMaxDurationMinutes": 18,
+                "lpaMaxDurationMinutes": 40,
                 "pressureControlIntervalMinutes": 4,
                 "returnPressureBar": 55
               }
             }
             """);
 
-        Assert.Equal(new IncidentSettings(12, 25, 18, 4, 55), set.Settings);
+        Assert.Equal(new IncidentSettings(12, 25, 18, 40, 4, 55), set.Settings);
     }
 
     [Fact]
@@ -125,6 +126,7 @@ public class MasterDataJsonTests
         var set = Parse("""{ "settings": { "agtMaxDurationMinutes": 25 } }""");
 
         Assert.Equal(25, set.Settings.AgtMaxDurationMinutes);
+        Assert.Equal(IncidentSettings.Defaults.LpaMaxDurationMinutes, set.Settings.LpaMaxDurationMinutes);
         Assert.Equal(IncidentSettings.Defaults.ReturnPressureBar, set.Settings.ReturnPressureBar);
         Assert.Equal(IncidentSettings.Defaults.IlsReminderIntervalMinutes, set.Settings.IlsReminderIntervalMinutes);
     }
@@ -132,7 +134,7 @@ public class MasterDataJsonTests
     [Fact]
     public void Serialize_round_trips_settings()
     {
-        var original = MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 4, 55) };
+        var original = MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 40, 4, 55) };
 
         Assert.Equal(original.Settings, Parse(MasterDataJson.Serialize(original)).Settings);
     }
@@ -142,7 +144,7 @@ public class MasterDataJsonTests
     {
         Assert.True(MasterDataSet.Empty.IsEmpty);
         // Settings always carry values, so they must not count toward emptiness (else Import hides).
-        Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3, 4, 5) }).IsEmpty);
+        Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3, 4, 5, 6) }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Roles = new[] { "EL" } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Streets = new[] { new Street("S", "D") } }).IsEmpty);

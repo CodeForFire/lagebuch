@@ -149,16 +149,16 @@ public class MasterDataStoreTests : IDisposable
     public void Save_then_GetOrCreate_round_trips_settings()
     {
         var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 4, 55) });
+        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 40, 4, 55) });
 
-        Assert.Equal(new IncidentSettings(12, 25, 18, 4, 55), store.GetOrCreate(_path).Settings);
+        Assert.Equal(new IncidentSettings(12, 25, 18, 40, 4, 55), store.GetOrCreate(_path).Settings);
     }
 
     [Fact]
     public void A_missing_setting_key_falls_back_to_its_default()
     {
         var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 4, 55) });
+        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 25, 18, 40, 4, 55) });
 
         // Simulate a store written before a setting existed: drop one row, which read must backfill.
         using (var cn = new SqliteConnection($"Data Source={_path}"))

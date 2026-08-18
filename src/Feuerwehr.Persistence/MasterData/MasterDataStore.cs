@@ -76,6 +76,7 @@ public sealed class MasterDataStore
         ("ils_reminder_interval_minutes", s.IlsReminderIntervalMinutes),
         ("agt_max_duration_minutes", s.AgtMaxDurationMinutes),
         ("csa_max_duration_minutes", s.CsaMaxDurationMinutes),
+        ("lpa_max_duration_minutes", s.LpaMaxDurationMinutes),
         ("pressure_control_interval_minutes", s.PressureControlIntervalMinutes),
         ("return_pressure_bar", s.ReturnPressureBar),
     };
@@ -144,6 +145,7 @@ public sealed class MasterDataStore
             Get("ils_reminder_interval_minutes", d.IlsReminderIntervalMinutes),
             Get("agt_max_duration_minutes", d.AgtMaxDurationMinutes),
             Get("csa_max_duration_minutes", d.CsaMaxDurationMinutes),
+            Get("lpa_max_duration_minutes", d.LpaMaxDurationMinutes),
             Get("pressure_control_interval_minutes", d.PressureControlIntervalMinutes),
             Get("return_pressure_bar", d.ReturnPressureBar));
     }

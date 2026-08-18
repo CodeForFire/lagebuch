@@ -20,6 +20,8 @@ public sealed record IncidentSettings(
     int AgtMaxDurationMinutes,
     // Atemschutz Einsatzzeit for a CSA-Trupp (chemical suit) — shorter than an AGT.
     int CsaMaxDurationMinutes,
+    // Atemschutz Einsatzzeit for an LPA-Trupp (long-duration apparatus) — longer than an AGT.
+    int LpaMaxDurationMinutes,
     // Interval between Druckkontrollen (Atemschutzkontrolle).
     int PressureControlIntervalMinutes,
     // Rückzugsdruck: pressure at or below which a Trupp must turn back.
@@ -33,6 +35,7 @@ public sealed record IncidentSettings(
         IlsReminderIntervalMinutes: 15,
         AgtMaxDurationMinutes: AtemschutzTrupp.DefaultMaxDurationMinutes,
         CsaMaxDurationMinutes: AtemschutzTrupp.DefaultChemicalMaxDurationMinutes,
+        LpaMaxDurationMinutes: AtemschutzTrupp.DefaultLpaMaxDurationMinutes,
         PressureControlIntervalMinutes: AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
         ReturnPressureBar: AtemschutzTrupp.DefaultReturnPressureBar);
 }
@@ -154,6 +157,7 @@ public static class MasterDataJson
             Int(s, "ilsReminderIntervalMinutes", d.IlsReminderIntervalMinutes),
             Int(s, "agtMaxDurationMinutes", d.AgtMaxDurationMinutes),
             Int(s, "csaMaxDurationMinutes", d.CsaMaxDurationMinutes),
+            Int(s, "lpaMaxDurationMinutes", d.LpaMaxDurationMinutes),
             Int(s, "pressureControlIntervalMinutes", d.PressureControlIntervalMinutes),
             Int(s, "returnPressureBar", d.ReturnPressureBar));
     }
@@ -208,6 +212,7 @@ public static class MasterDataJson
                 ilsReminderIntervalMinutes = set.Settings.IlsReminderIntervalMinutes,
                 agtMaxDurationMinutes = set.Settings.AgtMaxDurationMinutes,
                 csaMaxDurationMinutes = set.Settings.CsaMaxDurationMinutes,
+                lpaMaxDurationMinutes = set.Settings.LpaMaxDurationMinutes,
                 pressureControlIntervalMinutes = set.Settings.PressureControlIntervalMinutes,
                 returnPressureBar = set.Settings.ReturnPressureBar,
             },

@@ -20,7 +20,14 @@ public sealed class AtemschutzTrupp
     /// <see cref="DefaultMaxDurationMinutes"/> rather than sharing it.
     /// </summary>
     public const int DefaultChemicalMaxDurationMinutes = 20;
-    public const int DefaultReturnPressureBar = 60;
+
+    /// <summary>
+    /// Default operational time for an <see cref="LpaTruppDesignation"/>: a long-duration
+    /// breathing apparatus works to a longer limit than an ordinary AGT, so it defaults higher
+    /// than <see cref="DefaultMaxDurationMinutes"/>.
+    /// </summary>
+    public const int DefaultLpaMaxDurationMinutes = 60;
+    public const int DefaultReturnPressureBar = 50;
     public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;
 
@@ -30,6 +37,13 @@ public sealed class AtemschutzTrupp
     /// tests, because the cardinality rule keys off it.
     /// </summary>
     public const string ChemicalTruppDesignation = "CSA-Trupp";
+
+    /// <summary>
+    /// The Trupp type that operates a long-duration breathing apparatus and defaults to a longer
+    /// Einsatzzeit than an ordinary AGT. Named here so the duration-suggestion keys off it rather
+    /// than a literal in the ViewModel. Crewed normally (two) — no special cardinality rule.
+    /// </summary>
+    public const string LpaTruppDesignation = "LPA-Trupp";
 
     /// <summary>Crew size of an ordinary Trupp: Truppführer + Truppmann.</summary>
     public const int StandardMemberCount = 2;
@@ -115,6 +129,10 @@ public sealed class AtemschutzTrupp
     /// <summary>True when this designation denotes a three-person chemical-protection Trupp.</summary>
     public static bool IsChemicalTrupp(string designation) =>
         string.Equals(designation?.Trim(), ChemicalTruppDesignation, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>True when this designation denotes a long-duration-apparatus (LPA) Trupp.</summary>
+    public static bool IsLpaTrupp(string designation) =>
+        string.Equals(designation?.Trim(), LpaTruppDesignation, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Required crew size for a designation: three for CSA, two otherwise.</summary>
     public static int RequiredMemberCount(string designation) =>
