@@ -44,6 +44,7 @@ internal sealed class NoopAlarmService : IAlarmService
 {
     public void Start() { }
     public void Stop() { }
+    public void Play(AlarmSound sound) { }
 }
 
 public class WorkspaceAcceptanceTests

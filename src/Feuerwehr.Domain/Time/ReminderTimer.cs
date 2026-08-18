@@ -1,23 +1,34 @@
 namespace Feuerwehr.Domain.Time;
 
 /// <summary>
-/// Transient (session-only) recurring reminder for the "Rückmeldung an ILS".
-/// Pure time math driven by a supplied clock/now — no threads, no events, not persisted.
+/// Transient (session-only) two-stage reminder for the "Rückmeldung an ILS": the first cycle runs
+/// for <see cref="IntervalMinutes"/> after <see cref="Start"/>, and every acknowledged cycle
+/// thereafter runs for <see cref="RecurringIntervalMinutes"/>. Pure time math driven by a supplied
+/// clock/now — no threads, no events, not persisted.
 /// </summary>
 public sealed class ReminderTimer
 {
     public bool IsRunning { get; private set; }
+
+    /// <summary>Length of the current cycle: the first interval until acknowledged, then recurring.</summary>
     public int IntervalMinutes { get; private set; }
+
+    /// <summary>Length of every cycle after the first acknowledgement.</summary>
+    public int RecurringIntervalMinutes { get; private set; }
+
     public DateTimeOffset CycleAnchor { get; private set; }
 
     public DateTimeOffset DueAt => CycleAnchor + TimeSpan.FromMinutes(IntervalMinutes);
 
-    public void Start(IClock clock, int intervalMinutes)
+    public void Start(IClock clock, int firstIntervalMinutes, int recurringIntervalMinutes)
     {
         ArgumentNullException.ThrowIfNull(clock);
-        if (intervalMinutes <= 0)
-            throw new ArgumentOutOfRangeException(nameof(intervalMinutes), "Interval must be positive.");
-        IntervalMinutes = intervalMinutes;
+        if (firstIntervalMinutes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(firstIntervalMinutes), "Interval must be positive.");
+        if (recurringIntervalMinutes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(recurringIntervalMinutes), "Interval must be positive.");
+        IntervalMinutes = firstIntervalMinutes;
+        RecurringIntervalMinutes = recurringIntervalMinutes;
         CycleAnchor = clock.Now;
         IsRunning = true;
     }
@@ -29,6 +40,9 @@ public sealed class ReminderTimer
         ArgumentNullException.ThrowIfNull(clock);
         if (!IsRunning)
             return;
+        // Subsequent cycles run on the recurring interval — the first "after 15 min" gives way to
+        // the "then every 30 min" cadence once the crew has reported back at least once.
+        IntervalMinutes = RecurringIntervalMinutes;
         CycleAnchor = clock.Now;
     }
 

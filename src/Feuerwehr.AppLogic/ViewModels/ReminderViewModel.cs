@@ -12,16 +12,26 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
+    private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
     private readonly ReminderTimer _timer = new();
     private readonly IDisposable _subscription;
+    private readonly int _recurringIntervalMinutes;
 
-    public ReminderViewModel(IIncidentSession session, IClock clock, ITicker ticker, Action onChanged, int defaultIntervalMinutes)
+    // The spoken cue fires once when a cycle falls due; this guards against re-announcing it on
+    // every subsequent tick until the next Start/Acknowledge opens a fresh cycle.
+    private bool _dueAnnounced;
+
+    public ReminderViewModel(
+        IIncidentSession session, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged,
+        int firstIntervalMinutes, int recurringIntervalMinutes)
     {
         _session = session;
         _clock = clock;
+        _alarm = alarm;
         _onChanged = onChanged;
-        IntervalMinutes = defaultIntervalMinutes;
+        IntervalMinutes = firstIntervalMinutes;
+        _recurringIntervalMinutes = recurringIntervalMinutes;
         _subscription = ticker.Subscribe(OnTick);
     }
 
@@ -47,6 +57,13 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 
     private void OnTick()
     {
+        // Announce the moment the cycle crosses due, exactly once per cycle.
+        if (_timer.IsDue(_clock.Now) && !_dueAnnounced)
+        {
+            _alarm.Play(AlarmSound.IlsReminderDue);
+            _dueAnnounced = true;
+        }
+
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(IsDue));
         AcknowledgeCommand.NotifyCanExecuteChanged();
@@ -67,7 +84,8 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanStart))]
     private void Start()
     {
-        _timer.Start(_clock, IntervalMinutes);
+        _timer.Start(_clock, IntervalMinutes, _recurringIntervalMinutes);
+        _dueAnnounced = false;
         RefreshState();
     }
 
@@ -77,6 +95,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private void Stop()
     {
         _timer.Stop();
+        _dueAnnounced = false;
         RefreshState();
     }
 
@@ -86,6 +105,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private void Acknowledge()
     {
         _timer.Acknowledge(_clock);
+        _dueAnnounced = false;
         _session.AddJournalEntry(
             EtbDirection.Outgoing, "Rückmeldung an ILS", from: null, to: "ILS");
         _onChanged();

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Avalonia.Platform;
 using Feuerwehr.AppLogic.Services;
@@ -5,9 +6,12 @@ using Feuerwehr.AppLogic.Services;
 namespace Feuerwehr.App.Services;
 
 /// <summary>
-/// Plays a looping alarm tone on Windows (the field deployment target) via winmm's PlaySound,
-/// fed from a bundled WAV held in memory. On non-Windows hosts (developer machines, headless
-/// test runs) it degrades to a silent no-op so nothing crashes. Both Start/Stop are idempotent.
+/// Audio for the desktop deployment. The looping life-safety alarm (<see cref="Start"/>/
+/// <see cref="Stop"/>) uses winmm's PlaySound on Windows and is a no-op elsewhere, unchanged.
+/// The one-shot spoken cues (<see cref="Play"/>) work on Windows, macOS and Linux: winmm in-memory
+/// on Windows, and <c>afplay</c>/<c>aplay</c> on macOS/Linux fed a WAV extracted to a temp file.
+/// Every path degrades to a silent no-op when the asset or the player is missing, so a build with
+/// no voice clip yet — or a host without the CLI player — simply stays quiet rather than crashing.
 /// </summary>
 public sealed class SystemAlarmService : IAlarmService
 {
@@ -18,19 +22,28 @@ public sealed class SystemAlarmService : IAlarmService
 
     private static readonly Uri AlarmAsset = new("avares://Feuerwehr.App/Assets/alarm.wav");
 
+    // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent.
+    private static readonly IReadOnlyDictionary<AlarmSound, string> VoiceAssets =
+        new Dictionary<AlarmSound, string>
+        {
+            [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-ils.wav",
+        };
+
     private readonly byte[]? _wav;
+    private readonly Dictionary<AlarmSound, byte[]> _voiceBytes = new();
+    private readonly Dictionary<AlarmSound, string> _voiceTempFiles = new();
     private bool _sounding;
 
     public SystemAlarmService()
     {
-        // Load the WAV once. Only needed on Windows; skip the work elsewhere.
+        // Load the looping alarm WAV once. Only needed on Windows; skip the work elsewhere.
         if (OperatingSystem.IsWindows())
-        {
-            using var stream = AssetLoader.Open(AlarmAsset);
-            using var ms = new MemoryStream();
-            stream.CopyTo(ms);
-            _wav = ms.ToArray();
-        }
+            _wav = TryLoad(AlarmAsset);
+
+        // Preload the voice clips (all platforms). Absent files are simply skipped.
+        foreach (var (sound, file) in VoiceAssets)
+            if (TryLoad(new Uri($"avares://Feuerwehr.App/Assets/{file}")) is { } bytes)
+                _voiceBytes[sound] = bytes;
     }
 
     public void Start()
@@ -47,6 +60,70 @@ public sealed class SystemAlarmService : IAlarmService
             return;
         PlaySound(null, IntPtr.Zero, 0); // null sound stops any current playback
         _sounding = false;
+    }
+
+    public void Play(AlarmSound sound)
+    {
+        if (!_voiceBytes.TryGetValue(sound, out var bytes))
+            return; // no clip bundled for this cue yet
+
+        if (OperatingSystem.IsWindows())
+        {
+            // One-shot (no SndLoop). Deliberately distinct from Start's looping playback.
+            PlaySound(bytes, IntPtr.Zero, SndAsync | SndMemory | SndNodefault);
+            return;
+        }
+
+        var path = TempFileFor(sound, bytes);
+        if (path is null)
+            return;
+
+        var player = OperatingSystem.IsMacOS() ? "afplay" : "aplay";
+        try
+        {
+            Process.Start(new ProcessStartInfo(player, $"\"{path}\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+        }
+        catch
+        {
+            // Player binary missing (e.g. a headless Linux host without ALSA) — stay silent.
+        }
+    }
+
+    // afplay/aplay need a file path, so materialize the embedded WAV to a temp file once and cache it.
+    private string? TempFileFor(AlarmSound sound, byte[] bytes)
+    {
+        if (_voiceTempFiles.TryGetValue(sound, out var cached))
+            return cached;
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"lagebuch-{sound}.wav");
+            File.WriteAllBytes(path, bytes);
+            _voiceTempFiles[sound] = path;
+            return path;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[]? TryLoad(Uri asset)
+    {
+        try
+        {
+            using var stream = AssetLoader.Open(asset);
+            using var ms = new MemoryStream();
+            stream.CopyTo(ms);
+            return ms.ToArray();
+        }
+        catch
+        {
+            return null; // asset not bundled — that cue stays silent
+        }
     }
 
     [DllImport("winmm.dll", CharSet = CharSet.Auto)]

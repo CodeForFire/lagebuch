@@ -33,6 +33,7 @@ internal sealed class NoAlarm : IAlarmService
 {
     public void Start() { }
     public void Stop() { }
+    public void Play(AlarmSound sound) { }
 }
 
 internal sealed class NoDialogs : IFileDialogService
