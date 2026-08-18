@@ -76,8 +76,9 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     {
         _timer.Acknowledge(_clock);
         _dueAnnounced = false;
+        // "Von" is us — the logged-in operator's call sign (e.g. the ELW's Funkrufname).
         _session.AddJournalEntry(
-            EtbDirection.Outgoing, "Rückmeldung an ILS", from: null, to: "ILS");
+            EtbDirection.Outgoing, "Rückmeldung an ILS", from: _session.Operator?.CallSign, to: "ILS");
         _onChanged();
         OnPropertyChanged(nameof(IsDue));
         OnPropertyChanged(nameof(RemainingDisplay));

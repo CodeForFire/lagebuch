@@ -93,6 +93,7 @@ public class ReminderViewModelTests
         // exactly one more.
         var entry = Assert.Single(session.Incident.Journal, e => e.Text == "Rückmeldung an ILS");
         Assert.Equal(EtbDirection.Outgoing, entry.Direction);
+        Assert.Equal("FFB 12/1", entry.From);   // the logged-in operator's call sign
         Assert.Equal("ILS", entry.To);
         Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
         Assert.False(vm.IsDue);                 // re-anchored to now
