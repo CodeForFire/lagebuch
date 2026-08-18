@@ -260,6 +260,34 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void V7_file_gains_an_empty_incident_timers_table_on_upgrade_to_v8()
+    {
+        // V8 adds the generic incident_timers table (persisted ILS reminder / future timers). A v7
+        // file must upgrade cleanly and simply gain the empty table.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (7);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Assert.Equal(7, Migrations.GetVersion(cn));
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var read = cn.CreateCommand();
+            read.CommandText = "SELECT count(*) FROM incident_timers;";
+            Assert.Equal(0L, (long)read.ExecuteScalar()!);
+        }
+    }
+
+    [Fact]
     public void A_file_from_a_newer_version_is_refused_and_its_marker_left_alone()
     {
         // A file written by a build that is ahead of this one. Migrate has no migration to run --

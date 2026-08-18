@@ -44,7 +44,8 @@ public class RehydrationTests
             new[] { RoleAssignment.Create("EL", "Müller") },
             new[] { ForceUnit.Create("FFB", 12) },
             Array.Empty<Atemschutz.AtemschutzTrupp>(),
-            new[] { new AuditEvent(T0, "opened", "Müller") });
+            new[] { new AuditEvent(T0, "opened", "Müller") },
+            Array.Empty<Time.IncidentTimerState>());
 
         Assert.Equal(id, incident.Id);
         Assert.Equal(IncidentState.Closed, incident.State);
@@ -63,7 +64,8 @@ public class RehydrationTests
             Array.Empty<ChecklistItem>(), Array.Empty<EtbEntry>(),
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(),
-            Array.Empty<AuditEvent>());
+            Array.Empty<AuditEvent>(),
+            Array.Empty<Time.IncidentTimerState>());
         Assert.Throws<IncidentClosedException>(() => incident.SetStatus("x"));
     }
 }

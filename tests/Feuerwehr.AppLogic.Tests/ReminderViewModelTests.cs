@@ -155,4 +155,55 @@ public class ReminderViewModelTests
         ticker.Fire();
         Assert.True(vm.IsDue);
     }
+
+    [Fact]
+    public void A_fresh_reminder_persists_its_running_state_on_the_incident()
+    {
+        var (session, clock) = NewSession();
+        _ = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { },
+            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        var timer = session.Incident.FindTimer("ils-reminder");
+        Assert.NotNull(timer);
+        Assert.Equal(T0, timer!.CycleAnchor);
+        Assert.Equal(15, timer.IntervalMinutes);
+        Assert.True(timer.IsRunning);
+    }
+
+    [Fact]
+    public void Reopening_recovers_the_running_cycle_from_persisted_state()
+    {
+        var (session, clock) = NewSession();
+        // First build persists a fresh cycle anchored at T0 (first interval 15).
+        _ = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { },
+            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        // Time passes, then the workspace is rebuilt (reopen/crash) from the SAME incident.
+        clock.Now = T0.AddMinutes(5);
+        var reopened = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { },
+            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        // Resumes the elapsed cycle — 10:00 left, not a fresh 15:00.
+        Assert.True(reopened.IsRunning);
+        Assert.Equal("10:00", reopened.RemainingDisplay);
+        Assert.False(reopened.IsDue);
+    }
+
+    [Fact]
+    public void Acknowledge_updates_the_persisted_timer_to_the_recurring_cadence()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { },
+            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+        vm.AcknowledgeCommand.Execute(null);
+
+        var timer = session.Incident.FindTimer("ils-reminder");
+        Assert.NotNull(timer);
+        Assert.Equal(T0.AddMinutes(15), timer!.CycleAnchor);
+        Assert.Equal(30, timer.IntervalMinutes); // switched to the recurring cadence, durably
+    }
 }

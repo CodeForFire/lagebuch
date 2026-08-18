@@ -139,6 +139,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetAddress(string? street, string? district) => Mutate(() => Incident.SetAddress(street, district));
     public void SetStatus(string? status) => Mutate(() => Incident.SetStatus(status));
 
+    public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) =>
+        Mutate(() => Incident.UpsertTimer(key, cycleAnchor, intervalMinutes, recurringIntervalMinutes, isRunning));
+
     public void Close()
     {
         if (IsReadOnly)

@@ -128,4 +128,30 @@ public class ReminderTimerTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => timer.Start(clock, 15, minutes));
     }
+
+    [Fact]
+    public void Resume_restores_a_running_cycle_from_a_past_anchor()
+    {
+        var timer = new ReminderTimer();
+
+        // Anchored at T0 on the recurring cadence — as if reopened mid-cycle.
+        timer.Resume(T0, currentIntervalMinutes: 30, recurringIntervalMinutes: 30);
+
+        Assert.True(timer.IsRunning);
+        Assert.Equal(30, timer.IntervalMinutes);
+        Assert.Equal(T0.AddMinutes(30), timer.DueAt);
+        Assert.False(timer.IsDue(T0.AddMinutes(29)));
+        Assert.True(timer.IsDue(T0.AddMinutes(30)));   // already due when reopened past the interval
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Resume_rejects_nonpositive_intervals(int minutes)
+    {
+        var timer = new ReminderTimer();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => timer.Resume(T0, minutes, 30));
+        Assert.Throws<ArgumentOutOfRangeException>(() => timer.Resume(T0, 15, minutes));
+    }
 }

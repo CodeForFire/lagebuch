@@ -55,5 +55,13 @@ public interface IIncidentSession
     void SetKeyword(string? keyword);
     void SetAddress(string? street, string? district);
     void SetStatus(string? status);
+
+    /// <summary>
+    /// Records the state of an incident-level timer (keyed) so it survives a reopen/crash. Driven
+    /// only by the authoritative device (the ILS reminder is gated <c>!IsRemote</c>), so a joined
+    /// client never calls this.
+    /// </summary>
+    void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning);
+
     void Close();
 }

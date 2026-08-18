@@ -15,6 +15,7 @@ public sealed class Incident
     private readonly List<ForceUnit> _forces = new();
     private readonly List<AtemschutzTrupp> _scbaTrupps = new();
     private readonly List<AuditEvent> _audit = new();
+    private readonly List<IncidentTimerState> _timers = new();
 
     private Incident() { }
 
@@ -37,6 +38,12 @@ public sealed class Incident
     public IReadOnlyList<ForceUnit> Forces => _forces;
     public IReadOnlyList<AtemschutzTrupp> ScbaTrupps => _scbaTrupps;
     public IReadOnlyList<AuditEvent> Audit => _audit;
+
+    /// <summary>Persisted incident-level timers, keyed by <see cref="IncidentTimerState.Key"/>.</summary>
+    public IReadOnlyList<IncidentTimerState> Timers => _timers;
+
+    /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
+    public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
 
     public static Incident Start(
         IClock clock,
@@ -78,7 +85,8 @@ public sealed class Incident
         IEnumerable<RoleAssignment> roles,
         IEnumerable<ForceUnit> forces,
         IEnumerable<AtemschutzTrupp> scbaTrupps,
-        IEnumerable<AuditEvent> audit)
+        IEnumerable<AuditEvent> audit,
+        IEnumerable<IncidentTimerState> timers)
     {
         var incident = new Incident
         {
@@ -99,7 +107,23 @@ public sealed class Incident
         incident._forces.AddRange(forces);
         incident._scbaTrupps.AddRange(scbaTrupps);
         incident._audit.AddRange(audit);
+        incident._timers.AddRange(timers);
         return incident;
+    }
+
+    /// <summary>
+    /// Records (or replaces) the state of an incident-level timer keyed by <paramref name="key"/>.
+    /// Persisted so the timer survives a reopen/crash; live due/remaining values are recomputed from
+    /// the anchor. Guarded like every other edit — a closed incident takes no mutations.
+    /// </summary>
+    public void UpsertTimer(
+        string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning)
+    {
+        EnsureOpen();
+        if (string.IsNullOrWhiteSpace(key))
+            throw new ArgumentException("Timer key must not be blank.", nameof(key));
+        _timers.RemoveAll(t => t.Key == key);
+        _timers.Add(new IncidentTimerState(key.Trim(), cycleAnchor, intervalMinutes, recurringIntervalMinutes, isRunning));
     }
 
     private void EnsureOpen()

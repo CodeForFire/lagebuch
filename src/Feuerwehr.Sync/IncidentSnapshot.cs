@@ -26,7 +26,15 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<RoleAssignmentDto> Roles,
     IReadOnlyList<ForceUnitDto> Forces,
     IReadOnlyList<ScbaTruppDto> ScbaTrupps,
-    IReadOnlyList<AuditEventDto> Audit);
+    IReadOnlyList<AuditEventDto> Audit,
+    IReadOnlyList<TimerDto> Timers);
+
+public sealed record TimerDto(
+    string Key,
+    DateTimeOffset CycleAnchor,
+    int IntervalMinutes,
+    int RecurringIntervalMinutes,
+    bool IsRunning);
 
 public sealed record ChecklistItemDto(Guid Id, string Text, bool IsDone, string? Note);
 

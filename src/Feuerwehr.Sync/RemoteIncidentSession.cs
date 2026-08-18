@@ -159,6 +159,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetKeyword(string? keyword) => Send(new SetKeywordCommand(keyword));
     public void SetAddress(string? street, string? district) => Send(new SetAddressCommand(street, district));
     public void SetStatus(string? status) => Send(new SetStatusCommand(status));
+
+    // No-op: incident-level timers (the ILS reminder) are host-authoritative and never built on a
+    // joined client (IncidentWorkspaceViewModel gates the reminder on !IsRemote), so this is unreachable
+    // here. The host's persisted timer state still rides the broadcast snapshot as read-only display.
+    public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) { }
+
     public void Close() => Send(new CloseIncidentCommand(Op()));
 
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);

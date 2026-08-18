@@ -18,7 +18,8 @@ public sealed class IncidentRepository
         foreach (var table in new[]
                  { "incident_meta", "checklist_items", "etb_entries",
                    "role_assignments", "force_units", "scba_trupps",
-                   "scba_trupp_members", "scba_pressure_readings", "audit_events" })
+                   "scba_trupp_members", "scba_pressure_readings", "audit_events",
+                   "incident_timers" })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
         }
@@ -145,6 +146,18 @@ public sealed class IncidentRepository
                 p => { p("$o", i); p("$at", a.At.ToString(Iso)); p("$act", a.Action); p("$by", a.By); });
         }
 
+        foreach (var t in incident.Timers)
+        {
+            Run(cn, tx,
+                "INSERT INTO incident_timers (key, cycle_anchor, interval_minutes, recurring_interval_minutes, is_running) VALUES ($k,$a,$i,$r,$run);",
+                p =>
+                {
+                    p("$k", t.Key); p("$a", t.CycleAnchor.ToString(Iso));
+                    p("$i", t.IntervalMinutes); p("$r", t.RecurringIntervalMinutes);
+                    p("$run", t.IsRunning ? 1 : 0);
+                });
+        }
+
         tx.Commit();
     }
 
@@ -251,6 +264,11 @@ public sealed class IncidentRepository
         var audit = ReadAll(cn, "SELECT at, action, by_operator FROM audit_events ORDER BY ordinal;",
             r => new Domain.AuditEvent(ParseDate(r.GetString(0)), r.GetString(1), r.GetString(2)));
 
+        var timers = ReadAll(cn,
+            "SELECT key, cycle_anchor, interval_minutes, recurring_interval_minutes, is_running FROM incident_timers;",
+            r => new Domain.Time.IncidentTimerState(
+                r.GetString(0), ParseDate(r.GetString(1)), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4) != 0));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -270,7 +288,7 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            checklist, journal, roles, forces, scbaTrupps, audit);
+            checklist, journal, roles, forces, scbaTrupps, audit, timers);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

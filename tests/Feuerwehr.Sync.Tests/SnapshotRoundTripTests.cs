@@ -91,4 +91,22 @@ public class SnapshotRoundTripTests
         Assert.Contains(trupp.PressureReadings, p => p.Bar == 250);
         Assert.NotEmpty(r.Audit);
     }
+
+    [Fact]
+    public void Round_trip_preserves_incident_timers()
+    {
+        var clock = new FixedClock();
+        var incident = Incident.Start(clock, new SessionOperator("Müller", "FFB 12/1"));
+        incident.UpsertTimer("ils-reminder", clock.Now, intervalMinutes: 15, recurringIntervalMinutes: 30, isRunning: true);
+
+        var r = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        var timer = r.FindTimer("ils-reminder");
+        Assert.NotNull(timer);
+        Assert.Equal(clock.Now, timer!.CycleAnchor);
+        Assert.Equal(15, timer.IntervalMinutes);
+        Assert.Equal(30, timer.RecurringIntervalMinutes);
+        Assert.True(timer.IsRunning);
+    }
 }
