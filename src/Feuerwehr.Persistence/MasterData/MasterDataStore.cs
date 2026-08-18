@@ -74,6 +74,7 @@ public sealed class MasterDataStore
     private static IEnumerable<(string Key, int Value)> SettingsRows(IncidentSettings s) => new[]
     {
         ("ils_reminder_interval_minutes", s.IlsReminderIntervalMinutes),
+        ("ils_reminder_follow_up_interval_minutes", s.IlsReminderFollowUpIntervalMinutes),
         ("agt_max_duration_minutes", s.AgtMaxDurationMinutes),
         ("csa_max_duration_minutes", s.CsaMaxDurationMinutes),
         ("lpa_max_duration_minutes", s.LpaMaxDurationMinutes),
@@ -143,6 +144,7 @@ public sealed class MasterDataStore
         int Get(string key, int fallback) => stored.TryGetValue(key, out var v) ? v : fallback;
         return new IncidentSettings(
             Get("ils_reminder_interval_minutes", d.IlsReminderIntervalMinutes),
+            Get("ils_reminder_follow_up_interval_minutes", d.IlsReminderFollowUpIntervalMinutes),
             Get("agt_max_duration_minutes", d.AgtMaxDurationMinutes),
             Get("csa_max_duration_minutes", d.CsaMaxDurationMinutes),
             Get("lpa_max_duration_minutes", d.LpaMaxDurationMinutes),

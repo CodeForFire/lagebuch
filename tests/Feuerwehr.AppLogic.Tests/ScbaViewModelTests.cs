@@ -414,7 +414,8 @@ public class ScbaViewModelTests
 
     // Distinct values so a swapped mapping is caught; nothing here matches a compiled-in default.
     private static readonly IncidentSettings CustomSettings = new(
-        IlsReminderIntervalMinutes: 15, AgtMaxDurationMinutes: 35, CsaMaxDurationMinutes: 22,
+        IlsReminderIntervalMinutes: 15, IlsReminderFollowUpIntervalMinutes: 30,
+        AgtMaxDurationMinutes: 35, CsaMaxDurationMinutes: 22,
         LpaMaxDurationMinutes: 48, PressureControlIntervalMinutes: 7, ReturnPressureBar: 55);
 
     private static ScbaViewModel VmWith(FixedClock clock, LocalIncidentSession session, IncidentSettings settings) =>

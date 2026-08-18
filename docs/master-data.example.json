@@ -22,6 +22,7 @@
   ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,
+    "ilsReminderFollowUpIntervalMinutes": 30,
     "agtMaxDurationMinutes": 30,
     "csaMaxDurationMinutes": 20,
     "lpaMaxDurationMinutes": 60,

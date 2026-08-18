@@ -219,11 +219,12 @@ public class MasterDataEditorViewModelTests
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty with
         {
-            Settings = new IncidentSettings(12, 25, 18, 40, 4, 55),
+            Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55),
         });
         var settings = Settings(Vm(provider));
 
         Assert.Equal(12, settings.IlsReminderIntervalMinutes);
+        Assert.Equal(33, settings.IlsReminderFollowUpIntervalMinutes);
         Assert.Equal(25, settings.AgtMaxDurationMinutes);
         Assert.Equal(18, settings.CsaMaxDurationMinutes);
         Assert.Equal(40, settings.LpaMaxDurationMinutes);
@@ -244,6 +245,21 @@ public class MasterDataEditorViewModelTests
 
         Assert.Equal(1, provider.SaveCount);
         Assert.Equal(40, provider.Get().Settings.AgtMaxDurationMinutes);
+    }
+
+    [Fact]
+    public void Editing_the_ILS_follow_up_interval_marks_dirty_and_Save_persists_it()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+
+        Settings(vm).IlsReminderFollowUpIntervalMinutes = 45;
+        Assert.True(vm.IsDirty);
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(1, provider.SaveCount);
+        Assert.Equal(45, provider.Get().Settings.IlsReminderFollowUpIntervalMinutes);
     }
 
     // --- Import / Export (issue #46 follow-up) ---

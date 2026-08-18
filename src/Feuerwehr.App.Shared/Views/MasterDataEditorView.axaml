@@ -55,8 +55,14 @@
                 <ScrollViewer>
                   <StackPanel Spacing="12" MaxWidth="440" HorizontalAlignment="Left">
                     <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
-                      <TextBlock Grid.Column="0" Text="Rückmeldung an ILS – Intervall" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Text="Rückmeldung an ILS – Erstmeldung nach" VerticalAlignment="Center" />
                       <NumericUpDown Grid.Column="1" Value="{Binding IlsReminderIntervalMinutes}"
+                                     Minimum="1" Maximum="120" Increment="1" FormatString="0" />
+                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
+                      <TextBlock Grid.Column="0" Text="Rückmeldung an ILS – Intervall" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding IlsReminderFollowUpIntervalMinutes}"
                                      Minimum="1" Maximum="120" Increment="1" FormatString="0" />
                       <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
