@@ -92,7 +92,7 @@ jobs:
           packaging/linux/build-deb.sh \
             "${{ needs.version.outputs.version }}" \
             publish \
-            src/Feuerwehr.App/Assets/icon-1024.png \
+            src/Feuerwehr.App.Shared/Assets/icon-1024.png \
             dist
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -185,7 +185,7 @@ jobs:
           packaging/macos/build-dmg.sh \
             "${{ needs.version.outputs.version }}" \
             publish \
-            src/Feuerwehr.App/Assets/icon-1024.png \
+            src/Feuerwehr.App.Shared/Assets/icon-1024.png \
             dist
       # Always downloadable from the run; also attach to the matching release if one exists.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
