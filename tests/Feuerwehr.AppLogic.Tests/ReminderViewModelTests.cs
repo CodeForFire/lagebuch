@@ -50,29 +50,16 @@ public class ReminderViewModelTests
     }
 
     [Fact]
-    public void Default_interval_is_15_and_not_running()
+    public void Reminder_auto_starts_running_at_the_first_interval()
     {
         var (session, clock) = NewSession();
         var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
 
-        Assert.Equal(15, vm.IntervalMinutes);
-        Assert.False(vm.IsRunning);
-        Assert.True(vm.StartCommand.CanExecute(null));
-        Assert.False(vm.StopCommand.CanExecute(null));
-        Assert.False(vm.AcknowledgeCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void Start_runs_and_shows_countdown()
-    {
-        var (session, clock) = NewSession();
-        var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
-
-        vm.StartCommand.Execute(null);
-
+        // The ILS report-back obligation runs for the whole incident — no manual start.
         Assert.True(vm.IsRunning);
-        Assert.False(vm.IsDue);
         Assert.Equal("15:00", vm.RemainingDisplay);
+        Assert.False(vm.IsDue);
+        Assert.False(vm.AcknowledgeCommand.CanExecute(null));
     }
 
     [Fact]
@@ -81,7 +68,6 @@ public class ReminderViewModelTests
         var (session, clock) = NewSession();
         var ticker = new FakeTicker();
         var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
-        vm.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(15);
         ticker.Fire();
@@ -98,7 +84,6 @@ public class ReminderViewModelTests
         var changes = 0;
         var ticker = new FakeTicker();
         var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => changes++, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
-        vm.StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(16);
         ticker.Fire();
 
@@ -112,19 +97,6 @@ public class ReminderViewModelTests
         Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
         Assert.False(vm.IsDue);                 // re-anchored to now
         Assert.Equal(1, changes);               // save triggered once
-    }
-
-    [Fact]
-    public void Stop_disables_running_state()
-    {
-        var (session, clock) = NewSession();
-        var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
-        vm.StartCommand.Execute(null);
-
-        vm.StopCommand.Execute(null);
-
-        Assert.False(vm.IsRunning);
-        Assert.True(vm.StartCommand.CanExecute(null));
     }
 
     [Fact]
@@ -147,7 +119,6 @@ public class ReminderViewModelTests
         var ticker = new FakeTicker();
         var alarm = new FakeAlarmService();
         var vm = new ReminderViewModel(session, clock, ticker, alarm, () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
-        vm.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(15);
         ticker.Fire();
@@ -169,7 +140,6 @@ public class ReminderViewModelTests
         var (session, clock) = NewSession();
         var ticker = new FakeTicker();
         var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
-        vm.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(15);
         ticker.Fire();

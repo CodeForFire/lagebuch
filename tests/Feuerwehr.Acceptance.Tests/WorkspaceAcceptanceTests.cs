@@ -218,9 +218,11 @@ public class WorkspaceAcceptanceTests
         Assert.True(reminderBar.IsVisible);
         Assert.True(vm.HasReminder);
 
-        var startButton = window.GetVisualDescendants().OfType<Button>()
-            .Single(b => b.Name == "ReminderStartButton");
-        Assert.True(startButton.IsVisible);
+        // The reminder is autonomous — it is already running (no manual start button).
+        Assert.True(vm.Reminder!.IsRunning);
+        var countdown = window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(t => t.Name == "ReminderCountdownText");
+        Assert.True(countdown.IsVisible);
     }
 
     [AvaloniaFact]

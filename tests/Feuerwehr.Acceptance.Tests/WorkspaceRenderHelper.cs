@@ -63,8 +63,7 @@ internal static class WorkspaceRenderHelper
 
         // Drive the three header bars into their visible states (like the reported screenshot):
         //   1) ILS reminder running, 2) SCBA pressure-control due, 3) Rückzugsalarm active.
-        vm.Reminder!.StartCommand.Execute(null);
-
+        // The ILS reminder auto-starts with the incident (no manual start).
         vm.Scba.NewDesignation = "Angriffstrupp";
         vm.Scba.NewTruppfuehrer = "Müller";
         vm.Scba.NewTruppmann = "Schmidt";
@@ -76,6 +75,10 @@ internal static class WorkspaceRenderHelper
         // Advance past the 30-min max duration so the trupp is in Rückzugsalarm.
         clock.Now = clock.Now.AddMinutes(31);
         ticker.Pulse();
+
+        // The advance also carried the auto-started reminder past its first interval; acknowledge it
+        // so the bar shows a running countdown (not "fällig") for the composite screenshot.
+        vm.Reminder!.AcknowledgeCommand.Execute(null);
 
         return vm;
     }

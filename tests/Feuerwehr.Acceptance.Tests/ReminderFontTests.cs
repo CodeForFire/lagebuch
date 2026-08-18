@@ -15,11 +15,9 @@ public class ReminderFontTests
     [AvaloniaFact]
     public void The_ils_countdown_is_the_monospace_hero()
     {
+        // The helper leaves the auto-started ILS reminder in the running-not-due state (acknowledged
+        // after the time-advance), so the countdown text is present.
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
-        // Put the ILS reminder into the running-not-due state so the countdown text is present.
-        vm.Reminder!.StopCommand.Execute(null);
-        vm.Reminder!.IntervalMinutes = 15;
-        vm.Reminder!.StartCommand.Execute(null);
 
         var view = new IncidentWorkspaceView { DataContext = vm };
         var window = new Window { Content = view, Width = 1280, Height = 720 };
