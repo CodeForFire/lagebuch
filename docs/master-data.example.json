@@ -6,7 +6,7 @@
   "districts": ["Musterstadt", "Musterdorf"],
   "radioCallSigns": ["Florian Musterstadt 1", "Florian Musterstadt 11/1"],
   "brigades": ["FF Musterstadt", "FF Musterdorf"],
-  "truppTypes": ["Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "CSA-Trupp"],
+  "truppTypes": ["Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "CSA-Trupp", "LPA-Trupp"],
   "einsatzarten": ["B", "THL", "R", "ABC", "Sonstiges"],
   "checklistTemplate": [
     "Aufstellort ELW frei?",
@@ -22,9 +22,11 @@
   ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,
+    "ilsReminderFollowUpIntervalMinutes": 30,
     "agtMaxDurationMinutes": 30,
     "csaMaxDurationMinutes": 20,
+    "lpaMaxDurationMinutes": 60,
     "pressureControlIntervalMinutes": 5,
-    "returnPressureBar": 60
+    "returnPressureBar": 50
   }
 }

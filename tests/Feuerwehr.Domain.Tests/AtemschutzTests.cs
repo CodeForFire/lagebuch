@@ -281,4 +281,27 @@ public class AtemschutzTests
 
         Assert.Equal(TimeSpan.FromMinutes(7), trupp.Elapsed(T0.AddMinutes(7)));
     }
+
+    [Theory]
+    [InlineData("LPA-Trupp", true)]
+    [InlineData("lpa-trupp", true)]
+    [InlineData(" LPA-Trupp ", true)]
+    [InlineData("Angriffstrupp", false)]
+    [InlineData("CSA-Trupp", false)]
+    public void IsLpaTrupp_recognises_the_LPA_designation(string designation, bool expected) =>
+        Assert.Equal(expected, AtemschutzTrupp.IsLpaTrupp(designation));
+
+    [Fact]
+    public void An_LPA_trupp_keeps_the_standard_two_person_crew() =>
+        Assert.Equal(AtemschutzTrupp.StandardMemberCount,
+            AtemschutzTrupp.RequiredMemberCount(AtemschutzTrupp.LpaTruppDesignation));
+
+    [Fact]
+    public void Return_pressure_defaults_to_50_bar()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"));
+
+        Assert.Equal(50, trupp.ReturnPressureBar);
+    }
 }

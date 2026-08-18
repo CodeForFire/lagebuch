@@ -14,12 +14,17 @@ public sealed record Street(string Name, string District);
 /// usable values rather than zeros.
 /// </summary>
 public sealed record IncidentSettings(
-    // Recurring "Rückmeldung an ILS" reminder interval.
+    // "Rückmeldung an ILS" — minutes until the first reminder is due.
     int IlsReminderIntervalMinutes,
+    // "Rückmeldung an ILS" — recurring interval after the first reminder. Stored/editable
+    // here but not yet consumed by the reminder timer (see #70).
+    int IlsReminderFollowUpIntervalMinutes,
     // Atemschutz Einsatzzeit for an ordinary AGT-Trupp.
     int AgtMaxDurationMinutes,
     // Atemschutz Einsatzzeit for a CSA-Trupp (chemical suit) — shorter than an AGT.
     int CsaMaxDurationMinutes,
+    // Atemschutz Einsatzzeit for an LPA-Trupp (long-duration apparatus) — longer than an AGT.
+    int LpaMaxDurationMinutes,
     // Interval between Druckkontrollen (Atemschutzkontrolle).
     int PressureControlIntervalMinutes,
     // Rückzugsdruck: pressure at or below which a Trupp must turn back.
@@ -31,8 +36,10 @@ public sealed record IncidentSettings(
     /// </summary>
     public static IncidentSettings Defaults { get; } = new(
         IlsReminderIntervalMinutes: 15,
+        IlsReminderFollowUpIntervalMinutes: 30,
         AgtMaxDurationMinutes: AtemschutzTrupp.DefaultMaxDurationMinutes,
         CsaMaxDurationMinutes: AtemschutzTrupp.DefaultChemicalMaxDurationMinutes,
+        LpaMaxDurationMinutes: AtemschutzTrupp.DefaultLpaMaxDurationMinutes,
         PressureControlIntervalMinutes: AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
         ReturnPressureBar: AtemschutzTrupp.DefaultReturnPressureBar);
 }
@@ -152,8 +159,10 @@ public static class MasterDataJson
 
         return new IncidentSettings(
             Int(s, "ilsReminderIntervalMinutes", d.IlsReminderIntervalMinutes),
+            Int(s, "ilsReminderFollowUpIntervalMinutes", d.IlsReminderFollowUpIntervalMinutes),
             Int(s, "agtMaxDurationMinutes", d.AgtMaxDurationMinutes),
             Int(s, "csaMaxDurationMinutes", d.CsaMaxDurationMinutes),
+            Int(s, "lpaMaxDurationMinutes", d.LpaMaxDurationMinutes),
             Int(s, "pressureControlIntervalMinutes", d.PressureControlIntervalMinutes),
             Int(s, "returnPressureBar", d.ReturnPressureBar));
     }
@@ -206,8 +215,10 @@ public static class MasterDataJson
             settings = new
             {
                 ilsReminderIntervalMinutes = set.Settings.IlsReminderIntervalMinutes,
+                ilsReminderFollowUpIntervalMinutes = set.Settings.IlsReminderFollowUpIntervalMinutes,
                 agtMaxDurationMinutes = set.Settings.AgtMaxDurationMinutes,
                 csaMaxDurationMinutes = set.Settings.CsaMaxDurationMinutes,
+                lpaMaxDurationMinutes = set.Settings.LpaMaxDurationMinutes,
                 pressureControlIntervalMinutes = set.Settings.PressureControlIntervalMinutes,
                 returnPressureBar = set.Settings.ReturnPressureBar,
             },

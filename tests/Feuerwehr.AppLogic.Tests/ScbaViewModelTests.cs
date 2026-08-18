@@ -94,11 +94,11 @@ public class ScbaViewModelTests
         row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
-        row.PressureInput = 55;
+        row.PressureInput = 45;
         row.RecordPressureCommand.Execute(null);
 
         Assert.True(row.IsAlarm);
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Druckkontrolle") && e.Text.Contains("55 bar"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Druckkontrolle") && e.Text.Contains("45 bar"));
         Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Rückzugsalarm"));
     }
 
@@ -414,8 +414,9 @@ public class ScbaViewModelTests
 
     // Distinct values so a swapped mapping is caught; nothing here matches a compiled-in default.
     private static readonly IncidentSettings CustomSettings = new(
-        IlsReminderIntervalMinutes: 15, AgtMaxDurationMinutes: 35, CsaMaxDurationMinutes: 22,
-        PressureControlIntervalMinutes: 7, ReturnPressureBar: 55);
+        IlsReminderIntervalMinutes: 15, IlsReminderFollowUpIntervalMinutes: 30,
+        AgtMaxDurationMinutes: 35, CsaMaxDurationMinutes: 22,
+        LpaMaxDurationMinutes: 48, PressureControlIntervalMinutes: 7, ReturnPressureBar: 55);
 
     private static ScbaViewModel VmWith(FixedClock clock, LocalIncidentSession session, IncidentSettings settings) =>
         new(session, MasterDataSet.Empty with { TruppTypes = new[] { "Angriffstrupp" }, Settings = settings },
@@ -440,6 +441,19 @@ public class ScbaViewModelTests
 
         vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
         Assert.Equal(22, vm.NewMaxDurationMinutes);   // CSA default
+
+        vm.NewDesignation = "Angriffstrupp";
+        Assert.Equal(35, vm.NewMaxDurationMinutes);   // back to AGT default
+    }
+
+    [Fact]
+    public void Selecting_an_LPA_trupp_suggests_the_LPA_einsatzzeit_and_reverts_for_an_AGT()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        vm.NewDesignation = AtemschutzTrupp.LpaTruppDesignation;
+        Assert.Equal(48, vm.NewMaxDurationMinutes);   // LPA default (longer than AGT)
 
         vm.NewDesignation = "Angriffstrupp";
         Assert.Equal(35, vm.NewMaxDurationMinutes);   // back to AGT default

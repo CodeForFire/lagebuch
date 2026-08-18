@@ -17,8 +17,10 @@ public sealed partial class SettingsSection : EditorSection
     {
         _onChanged = onChanged;
         _ilsReminderIntervalMinutes = settings.IlsReminderIntervalMinutes;
+        _ilsReminderFollowUpIntervalMinutes = settings.IlsReminderFollowUpIntervalMinutes;
         _agtMaxDurationMinutes = settings.AgtMaxDurationMinutes;
         _csaMaxDurationMinutes = settings.CsaMaxDurationMinutes;
+        _lpaMaxDurationMinutes = settings.LpaMaxDurationMinutes;
         _pressureControlIntervalMinutes = settings.PressureControlIntervalMinutes;
         _returnPressureBar = settings.ReturnPressureBar;
     }
@@ -27,10 +29,16 @@ public sealed partial class SettingsSection : EditorSection
     private int _ilsReminderIntervalMinutes;
 
     [ObservableProperty]
+    private int _ilsReminderFollowUpIntervalMinutes;
+
+    [ObservableProperty]
     private int _agtMaxDurationMinutes;
 
     [ObservableProperty]
     private int _csaMaxDurationMinutes;
+
+    [ObservableProperty]
+    private int _lpaMaxDurationMinutes;
 
     [ObservableProperty]
     private int _pressureControlIntervalMinutes;
@@ -39,15 +47,19 @@ public sealed partial class SettingsSection : EditorSection
     private int _returnPressureBar;
 
     partial void OnIlsReminderIntervalMinutesChanged(int value) => _onChanged();
+    partial void OnIlsReminderFollowUpIntervalMinutesChanged(int value) => _onChanged();
     partial void OnAgtMaxDurationMinutesChanged(int value) => _onChanged();
     partial void OnCsaMaxDurationMinutesChanged(int value) => _onChanged();
+    partial void OnLpaMaxDurationMinutesChanged(int value) => _onChanged();
     partial void OnPressureControlIntervalMinutesChanged(int value) => _onChanged();
     partial void OnReturnPressureBarChanged(int value) => _onChanged();
 
     public IncidentSettings ToSettings() => new(
         IlsReminderIntervalMinutes,
+        IlsReminderFollowUpIntervalMinutes,
         AgtMaxDurationMinutes,
         CsaMaxDurationMinutes,
+        LpaMaxDurationMinutes,
         PressureControlIntervalMinutes,
         ReturnPressureBar);
 }

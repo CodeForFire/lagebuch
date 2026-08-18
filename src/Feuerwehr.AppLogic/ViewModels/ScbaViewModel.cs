@@ -239,8 +239,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             _maxDurationUserEdited = true;
     }
 
-    // Switching the Trupp type re-suggests its Einsatzzeit (CSA is shorter than AGT), but only while
-    // the user has not overridden the field — a hand-typed value survives the switch.
+    // Switching the Trupp type re-suggests its Einsatzzeit (CSA is shorter, LPA is longer than an
+    // AGT), but only while the user has not overridden the field — a hand-typed value survives.
     partial void OnNewDesignationChanged(string value)
     {
         if (!_maxDurationUserEdited)
@@ -251,8 +251,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     {
         var previous = _applyingDefault;
         _applyingDefault = true;
-        NewMaxDurationMinutes = AtemschutzTrupp.IsChemicalTrupp(NewDesignation)
-            ? _settings.CsaMaxDurationMinutes
+        NewMaxDurationMinutes =
+            AtemschutzTrupp.IsChemicalTrupp(NewDesignation) ? _settings.CsaMaxDurationMinutes
+            : AtemschutzTrupp.IsLpaTrupp(NewDesignation) ? _settings.LpaMaxDurationMinutes
             : _settings.AgtMaxDurationMinutes;
         _applyingDefault = previous;
     }
