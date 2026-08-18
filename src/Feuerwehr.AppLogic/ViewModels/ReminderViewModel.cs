@@ -8,26 +8,38 @@ using Feuerwehr.Sync;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
+/// <summary>
+/// The "Rückmeldung an ILS" reminder. It is autonomous: it starts running the moment the workspace
+/// is built for a live incident (there is no manual start/stop — reporting back to the ILS is an
+/// ongoing obligation for the whole incident), alerts first after the configured "Erstmeldung nach"
+/// interval and then cyclically on the follow-up "Intervall", speaking a cue and offering ERLEDIGT
+/// each time it falls due. The intervals come from the Stammdaten settings.
+/// </summary>
 public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
+    private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
     private readonly ReminderTimer _timer = new();
     private readonly IDisposable _subscription;
 
-    public ReminderViewModel(IIncidentSession session, IClock clock, ITicker ticker, Action onChanged, int defaultIntervalMinutes)
+    // The spoken cue fires once when a cycle falls due; this guards against re-announcing it on
+    // every subsequent tick until the next Acknowledge opens a fresh cycle.
+    private bool _dueAnnounced;
+
+    public ReminderViewModel(
+        IIncidentSession session, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged,
+        int firstIntervalMinutes, int recurringIntervalMinutes)
     {
         _session = session;
         _clock = clock;
+        _alarm = alarm;
         _onChanged = onChanged;
-        IntervalMinutes = defaultIntervalMinutes;
+        // Autonomous: the reminder runs for the whole incident, no manual start required.
+        _timer.Start(_clock, firstIntervalMinutes, recurringIntervalMinutes);
         _subscription = ticker.Subscribe(OnTick);
     }
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
-    private int _intervalMinutes;
 
     public bool IsRunning => _timer.IsRunning;
     public bool IsDue => _timer.IsDue(_clock.Now);
@@ -36,8 +48,6 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (!_timer.IsRunning)
-                return "—";
             if (_timer.IsDue(_clock.Now))
                 return "fällig";
             var remaining = _timer.Remaining(_clock.Now);
@@ -47,37 +57,16 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 
     private void OnTick()
     {
+        // Announce the moment the cycle crosses due, exactly once per cycle.
+        if (_timer.IsDue(_clock.Now) && !_dueAnnounced)
+        {
+            _alarm.Play(AlarmSound.IlsReminderDue);
+            _dueAnnounced = true;
+        }
+
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(IsDue));
         AcknowledgeCommand.NotifyCanExecuteChanged();
-    }
-
-    private void RefreshState()
-    {
-        OnPropertyChanged(nameof(IsRunning));
-        OnPropertyChanged(nameof(IsDue));
-        OnPropertyChanged(nameof(RemainingDisplay));
-        StartCommand.NotifyCanExecuteChanged();
-        StopCommand.NotifyCanExecuteChanged();
-        AcknowledgeCommand.NotifyCanExecuteChanged();
-    }
-
-    private bool CanStart => !_timer.IsRunning && IntervalMinutes > 0;
-
-    [RelayCommand(CanExecute = nameof(CanStart))]
-    private void Start()
-    {
-        _timer.Start(_clock, IntervalMinutes);
-        RefreshState();
-    }
-
-    private bool CanStop => _timer.IsRunning;
-
-    [RelayCommand(CanExecute = nameof(CanStop))]
-    private void Stop()
-    {
-        _timer.Stop();
-        RefreshState();
     }
 
     private bool CanAcknowledge => _timer.IsDue(_clock.Now);
@@ -86,10 +75,14 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private void Acknowledge()
     {
         _timer.Acknowledge(_clock);
+        _dueAnnounced = false;
+        // "Von" is us — the logged-in operator's call sign (e.g. the ELW's Funkrufname).
         _session.AddJournalEntry(
-            EtbDirection.Outgoing, "Rückmeldung an ILS", from: null, to: "ILS");
+            EtbDirection.Outgoing, "Rückmeldung an ILS", from: _session.Operator?.CallSign, to: "ILS");
         _onChanged();
-        RefreshState();
+        OnPropertyChanged(nameof(IsDue));
+        OnPropertyChanged(nameof(RemainingDisplay));
+        AcknowledgeCommand.NotifyCanExecuteChanged();
     }
 
     public void Dispose() => _subscription.Dispose();

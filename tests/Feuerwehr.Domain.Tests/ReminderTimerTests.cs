@@ -20,7 +20,7 @@ public class ReminderTimerTests
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
 
-        timer.Start(clock, 15);
+        timer.Start(clock, 15, 30);
 
         Assert.True(timer.IsRunning);
         Assert.Equal(15, timer.IntervalMinutes);
@@ -33,7 +33,7 @@ public class ReminderTimerTests
     {
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
-        timer.Start(clock, 15);
+        timer.Start(clock, 15, 30);
 
         Assert.False(timer.IsDue(T0.AddMinutes(14)));
         Assert.Equal(TimeSpan.FromMinutes(1), timer.Remaining(T0.AddMinutes(14)));
@@ -44,7 +44,7 @@ public class ReminderTimerTests
     {
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
-        timer.Start(clock, 15);
+        timer.Start(clock, 15, 30);
 
         Assert.True(timer.IsDue(T0.AddMinutes(15)));
         Assert.True(timer.IsDue(T0.AddMinutes(20)));
@@ -56,7 +56,7 @@ public class ReminderTimerTests
     {
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
-        timer.Start(clock, 15);
+        timer.Start(clock, 15, 15); // equal intervals to isolate re-anchoring
 
         clock.Now = T0.AddMinutes(20); // overdue
         timer.Acknowledge(clock);
@@ -67,11 +67,28 @@ public class ReminderTimerTests
     }
 
     [Fact]
+    public void First_cycle_uses_the_first_interval_then_acknowledge_switches_to_recurring()
+    {
+        var clock = new FixedClock(T0);
+        var timer = new ReminderTimer();
+
+        timer.Start(clock, 15, 30);
+        Assert.Equal(15, timer.IntervalMinutes);
+        Assert.Equal(T0.AddMinutes(15), timer.DueAt); // first alert after 15
+
+        clock.Now = T0.AddMinutes(15);
+        timer.Acknowledge(clock);
+
+        Assert.Equal(30, timer.IntervalMinutes);            // now on the recurring cadence
+        Assert.Equal(T0.AddMinutes(45), timer.DueAt);       // then every 30
+    }
+
+    [Fact]
     public void Stop_clears_running_and_due()
     {
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
-        timer.Start(clock, 15);
+        timer.Start(clock, 15, 30);
 
         timer.Stop();
 
@@ -98,6 +115,17 @@ public class ReminderTimerTests
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => timer.Start(clock, minutes));
+        Assert.Throws<ArgumentOutOfRangeException>(() => timer.Start(clock, minutes, 30));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Start_rejects_nonpositive_recurring_interval(int minutes)
+    {
+        var clock = new FixedClock(T0);
+        var timer = new ReminderTimer();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => timer.Start(clock, 15, minutes));
     }
 }
