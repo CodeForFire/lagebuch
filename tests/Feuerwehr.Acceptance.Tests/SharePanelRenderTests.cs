@@ -70,7 +70,28 @@ public class SharePanelRenderTests
         Assert.Equal("FREIGABE BEENDEN", vm.ShareButtonText);
         Assert.Contains("localhost:5859", ShareStatus(window).Text!);
         Assert.Equal("1234", vm.SharePin);
-        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "1234");
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text != null && t.Text.Contains("1234"));
         Capture(window, "share-after.png");
+    }
+
+    // Regression (#66 follow-up): the first time an incident is shared the PIN pill appeared but its
+    // number was blank. The pill's Border gates IsVisible on SharePin while the value lives in a
+    // nested child TextBlock; when the Border un-collapses and the child's Text is set in the same
+    // notification, the child is left with a stale zero-width measure and only recovers on a later
+    // relayout (window resize, a timer tick) — so on a fresh share, nothing forced it and it stayed
+    // blank. Existing-in-the-tree is not enough (the old assertion above passed while nothing showed):
+    // the value must actually be laid out with a non-zero width right after the first share.
+    [AvaloniaFact]
+    public async Task First_share_lays_out_the_pin_value_with_a_visible_width()
+    {
+        var (window, vm) = ShowWorkspace();
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var pinValue = window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "PinValue");
+        Assert.Equal(vm.SharePin, pinValue.Text);   // the number itself, no static prefix to mask a 0-width bug
+        Assert.True(pinValue.Bounds.Width > 0,
+            $"PIN number '{pinValue.Text}' rendered at {pinValue.Bounds.Width:F0}px wide — it exists in the tree but is not laid out, so the number is invisible on first share.");
     }
 }
