@@ -8,38 +8,25 @@
       <!-- ===================== Status header ===================== -->
       <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
-              Padding="24,16">
+              Padding="24,14">
         <StackPanel Spacing="14">
-          <Grid ColumnDefinitions="Auto,*,Auto">
-            <!-- Title block -->
-            <StackPanel Grid.Column="0" Spacing="2">
-              <TextBlock Text="EINSATZDOKUMENTATION" Classes="overline" />
-              <TextBlock Text="Lagebuch" Classes="display" FontSize="24" />
-            </StackPanel>
+          <!-- Incident identity. The Einsatznummer is what identifies THIS incident, so it is the
+               hero — large tactical monospace under a single quiet "EINSATZ" label — rather than the
+               app's own name boxed off small to the side. Status shares the number's line on the
+               right as a bare dot + word, no chrome. The app name lives once, up in the command bar. -->
+          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="EINSATZ" Classes="overline" Margin="0,0,0,2" />
+            <TextBlock Grid.Row="1" Grid.Column="0" x:Name="EinsatznummerValue" Classes="mono"
+                       FontSize="26" FontWeight="Medium" LetterSpacing="1"
+                       Foreground="{StaticResource TextPrimaryBrush}"
+                       Text="{Binding IncidentNumberInput}" />
 
-            <!-- Status chips -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-              <Border x:Name="EinsatznummerChip" Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-                      CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
-                <StackPanel>
-                  <TextBlock Text="EINSATZNUMMER" Classes="overline" FontSize="9" />
-                  <TextBlock Classes="mono" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}"
-                             Text="{Binding IncidentNumberInput}" />
-                </StackPanel>
-              </Border>
-              <Border x:Name="StatusChip" Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-                      CornerRadius="{StaticResource RadiusSm}" Padding="14,8">
-                <StackPanel>
-                  <TextBlock Text="STATUS" Classes="overline" FontSize="9" />
-                  <StackPanel Orientation="Horizontal" Spacing="7">
-                    <Ellipse Width="9" Height="9" VerticalAlignment="Center"
-                             Fill="{StaticResource ActiveBrush}" />
-                    <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Medium" FontSize="15"
-                               Foreground="{StaticResource TextPrimaryBrush}"
-                               Text="{Binding StatusDisplay}" />
-                  </StackPanel>
-                </StackPanel>
-              </Border>
+            <StackPanel Grid.Row="1" Grid.Column="1" x:Name="StatusReadout"
+                        Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <Ellipse Width="10" Height="10" VerticalAlignment="Center" Fill="{StaticResource ActiveBrush}" />
+              <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Medium" FontSize="16"
+                         Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
+                         Text="{Binding StatusDisplay}" />
             </StackPanel>
           </Grid>
 
