@@ -164,6 +164,38 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Links editor: name + URL, reorderable -->
+              <DataTemplate x:DataType="vm:LinksSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LinkRow">
+                          <Grid ColumnDefinitions="*,*,Auto,Auto,Auto" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Watermark="Name" Text="{Binding Name}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1" Watermark="URL" Text="{Binding Url}" Margin="0,0,6,0" />
+                            <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
+                                 DataContext, whose static type is object under compiled bindings, so a
+                                 compiled $parent cast path won't resolve. -->
+                            <Button Grid.Column="2" Content="▲" Margin="0,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="3" Content="▼" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="4" Content="✕" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Personnel editor -->
               <DataTemplate x:DataType="vm:PersonnelSection">
                 <DockPanel>

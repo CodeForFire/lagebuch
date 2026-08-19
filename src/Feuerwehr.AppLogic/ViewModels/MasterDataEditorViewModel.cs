@@ -24,6 +24,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private EditableListSection _roles = null!, _status = null!, _unitStatus = null!, _equipment = null!,
         _districts = null!, _brigades = null!, _callSigns = null!, _truppTypes = null!, _einsatzarten = null!;
     private ChecklistTemplateSection _checklistAufbau = null!, _checklistAbbau = null!;
+    private LinksSection _links = null!;
     private PersonnelSection _personnel = null!;
     private SettingsSection _settings = null!;
 
@@ -80,6 +81,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Sections.Add(_callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty));
         Sections.Add(_truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty));
         Sections.Add(_einsatzarten = new EditableListSection("Einsatzarten", set.Einsatzarten, MarkDirty));
+        Sections.Add(_links = new LinksSection("Links", set.Links, MarkDirty));
         Sections.Add(_checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty));
         Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
         Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
@@ -98,6 +100,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         RadioCallSigns = _callSigns.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Einsatzarten = _einsatzarten.ToValues(),
+        Links = _links.ToValues(),
         ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
         ChecklistTemplateAbbau = _checklistAbbau.ToValues(),
         Personnel = _personnel.ToPeople(),

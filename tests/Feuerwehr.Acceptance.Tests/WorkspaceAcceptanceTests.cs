@@ -34,6 +34,7 @@ internal sealed class FakeDialogs : IFileDialogService
     public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+    public Task OpenUrlAsync(string url) => Task.CompletedTask;
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 // Mirrors FakeDialogs but returns a caller-supplied path from PickAttachmentAsync, so a UI-driven
@@ -43,6 +44,7 @@ internal sealed class AttachmentDialogs : IFileDialogService
     private readonly string? _path;
     public AttachmentDialogs(string? path) => _path = path;
     public string? LastOpenedPath { get; private set; }
+    public string? LastOpenedUrl { get; private set; }
     public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
@@ -50,6 +52,7 @@ internal sealed class AttachmentDialogs : IFileDialogService
     public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
     public Task<string?> PickAttachmentAsync() => Task.FromResult(_path);
     public Task OpenFileAsync(string path) { LastOpenedPath = path; return Task.CompletedTask; }
+    public Task OpenUrlAsync(string url) { LastOpenedUrl = url; return Task.CompletedTask; }
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 internal sealed class FixedClock : IClock
@@ -102,14 +105,14 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_with_seven_tabs()
+    public void Workspace_renders_with_eight_tabs()
     {
         var vm = BuildWorkspace(out _);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(7, tabs.Items.Count);
+        Assert.Equal(8, tabs.Items.Count);
     }
 
     [AvaloniaFact]

@@ -37,6 +37,7 @@ public class MasterDataEditorViewModelTests
         public Task<string?> PickExportJsonAsync(string s) => Task.FromResult(ExportPath);
         public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
         public Task OpenFileAsync(string path) => Task.CompletedTask;
+        public Task OpenUrlAsync(string url) => Task.CompletedTask;
         public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 
@@ -79,6 +80,9 @@ public class MasterDataEditorViewModelTests
     private static ChecklistTemplateSection ChecklistSection(MasterDataEditorViewModel vm, string title) =>
         vm.Sections.OfType<ChecklistTemplateSection>().First(s => s.Title == title);
 
+    private static LinksSection Links(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<LinksSection>().Single();
+
     private static PersonnelSection Personnel(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<PersonnelSection>().First(s => s.Title == "Personal");
 
@@ -89,7 +93,7 @@ public class MasterDataEditorViewModelTests
     public void Loads_a_section_per_category_and_starts_clean()
     {
         var vm = Vm(new InMemoryProvider());
-        Assert.Equal(13, vm.Sections.Count);
+        Assert.Equal(14, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
@@ -211,6 +215,11 @@ public class MasterDataEditorViewModelTests
         personnel.AddCommand.Execute(null);
         personnel.Rows[^1].LastName = "MarkPersonal";
 
+        var links = Links(vm);
+        links.AddCommand.Execute(null);
+        links.Rows[^1].Name = "MARK-Links";
+        links.Rows[^1].Url = "https://example.org/mark";
+
         vm.SaveCommand.Execute(null);
 
         var set = provider.Get();
@@ -226,6 +235,26 @@ public class MasterDataEditorViewModelTests
         Assert.Contains(set.ChecklistTemplateAufbau, i => i.Text == "MARK-ChecklisteAufbau");
         Assert.Contains(set.ChecklistTemplateAbbau, i => i.Text == "MARK-ChecklisteAbbau");
         Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
+        Assert.Contains(set.Links, l => l.Name == "MARK-Links" && l.Url == "https://example.org/mark");
+    }
+
+    [Fact]
+    public void Save_persists_a_link_and_drops_rows_missing_a_name_or_url()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+        var links = Links(vm);
+
+        links.AddCommand.Execute(null);
+        links.Rows[^1].Name = "Wetterdienst";
+        links.Rows[^1].Url = "https://dwd.de";
+
+        links.AddCommand.Execute(null);
+        links.Rows[^1].Name = "Ohne URL";
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(provider.Get().Links));
     }
 
     [Fact]

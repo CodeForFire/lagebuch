@@ -48,6 +48,7 @@ internal sealed class NoDialogs : IFileDialogService
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+    public Task OpenUrlAsync(string url) => Task.CompletedTask;
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 

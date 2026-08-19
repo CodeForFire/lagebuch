@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:md="clr-namespace:Feuerwehr.Persistence.MasterData;assembly=Feuerwehr.Persistence"
+             x:Class="Feuerwehr.App.Shared.Views.LinksView"
+             x:DataType="vm:LinksViewModel">
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" Text="LINKS" Classes="overline" Margin="0,0,0,14" />
+
+    <TextBlock DockPanel.Dock="Top" x:Name="EmptyText" Text="Keine Links hinterlegt."
+               Foreground="{StaticResource TextMutedBrush}"
+               IsVisible="{Binding !Links.Count}" />
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14"
+            IsVisible="{Binding Links.Count}">
+      <ScrollViewer>
+        <ItemsControl x:Name="LinksList" ItemsSource="{Binding Links}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="md:Link">
+              <Grid ColumnDefinitions="*,*,Auto" Margin="0,0,0,10">
+                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Url}" Margin="10,0"
+                           VerticalAlignment="Center" />
+                <!-- ReflectionBinding: OpenCommand lives on the parent ItemsControl's DataContext
+                     (LinksViewModel), whose static type is object under compiled bindings, so a
+                     compiled $parent cast path won't resolve. -->
+                <Button Grid.Column="2" Content="ÖFFNEN"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenCommand}"
+                        CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</UserControl>

@@ -24,6 +24,9 @@ public interface IFileDialogService
     /// <summary>Opens a local file with the OS's/platform's default viewer for its type.</summary>
     Task OpenFileAsync(string path);
 
+    /// <summary>Opens an http(s) URL in the OS's default browser.</summary>
+    Task OpenUrlAsync(string url);
+
     /// <summary>
     /// Offers a written file to the user for hand-off (share sheet, "reveal in folder", or a no-op
     /// where the destination the user already picked via <see cref="PickExportPdfAsync"/>/

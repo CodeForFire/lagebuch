@@ -156,6 +156,15 @@ public sealed class AndroidFileDialogService : IFileDialogService
         return Task.CompletedTask;
     }
 
+    // Unlike OpenFileAsync, this is a remote http(s) URL, not a local file -- no FileProvider
+    // involved, just hand it straight to whatever app the device has registered for the scheme.
+    public Task OpenUrlAsync(string url)
+    {
+        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(url));
+        _activity.StartActivity(intent);
+        return Task.CompletedTask;
+    }
+
     private static string MimeTypeOf(string path) => System.IO.Path.GetExtension(path).ToLowerInvariant() switch
     {
         ".jpg" or ".jpeg" => "image/jpeg",

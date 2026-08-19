@@ -38,6 +38,7 @@ internal static class WorkspaceRenderHelper
         Brigades = new[] { "FFB Wache 1", "FFB Wache 2", "Aich", "Puch", "Emmering" },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
         RadioCallSigns = new[] { "FFB 1/40/1", "FFB 1/23/1", "Aich 42/1", "Land 1" },
+        Links = new[] { new Link("Wetterdienst", "https://dwd.de"), new Link("Kartendienst", "https://example.org/karte") },
         // Fictional roster: the real personnel.json is gitignored, so tests supply their own.
         Personnel = new[]
         {

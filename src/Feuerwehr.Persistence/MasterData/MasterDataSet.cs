@@ -6,6 +6,9 @@ namespace Feuerwehr.Persistence.MasterData;
 
 public sealed record Street(string Name, string District);
 
+/// <summary>A named link — Stammdaten entry so useful external resources can be opened from an Einsatz.</summary>
+public sealed record Link(string Name, string Url);
+
 /// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's Aufbau/Abbau
 /// checklist is seeded from at start.</summary>
 public sealed record ChecklistTemplateItem(string Text, bool IsMandatory);
@@ -71,6 +74,7 @@ public sealed record MasterDataSet(
     // separate from Status above, which is the incident-level vocabulary (aufgenommen, ...).
     IReadOnlyList<string> UnitStatus,
     IReadOnlyList<Street> Streets,
+    IReadOnlyList<Link> Links,
     IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
     IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau,
     IReadOnlyList<string> TruppTypes,
@@ -89,6 +93,7 @@ public sealed record MasterDataSet(
     public static MasterDataSet Empty { get; } = new(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Street>(),
+        Array.Empty<Link>(),
         Array.Empty<ChecklistTemplateItem>(), Array.Empty<ChecklistTemplateItem>(),
         Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>(),
         IncidentSettings.Defaults);
@@ -102,7 +107,7 @@ public sealed record MasterDataSet(
     public bool IsEmpty =>
         Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
         && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
-        && Streets.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
+        && Streets.Count == 0 && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0 && Einsatzarten.Count == 0;
 }
@@ -134,6 +139,13 @@ public static class MasterDataJson
                     .ToList()
                 : Array.Empty<Street>();
 
+        IReadOnlyList<Link> links =
+            root.TryGetProperty("links", out var lk) && lk.ValueKind == JsonValueKind.Array
+                ? lk.EnumerateArray()
+                    .Select(l => new Link(l.GetProperty("name").GetString()!, l.GetProperty("url").GetString()!))
+                    .ToList()
+                : Array.Empty<Link>();
+
         var (checklistAufbau, checklistAbbau) = ParseChecklistTemplate(root);
 
         return new MasterDataSet(
@@ -145,6 +157,7 @@ public static class MasterDataJson
             Arr(root, "brigades"),
             Arr(root, "unitStatus"),
             streets,
+            links,
             checklistAufbau,
             checklistAbbau,
             Arr(root, "truppTypes"),
@@ -242,6 +255,7 @@ public static class MasterDataJson
             checklistTemplateAufbau = set.ChecklistTemplateAufbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             streets = set.Streets.Select(s => new { name = s.Name, district = s.District }),
+            links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
             personnel = set.Personnel.Select(p => new
             {
                 lastName = p.LastName,
