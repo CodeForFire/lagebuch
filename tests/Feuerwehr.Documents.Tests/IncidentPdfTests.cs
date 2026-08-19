@@ -78,4 +78,93 @@ public class IncidentPdfTests
         var bytes = new IncidentReportDocument(BuildFullIncident()).GeneratePdf();
         PdfAssert.IsPdf(bytes);
     }
+
+    // A minimal valid 1x1 JPEG — small enough to inline, real enough for QuestPDF's Skia-backed
+    // Image() to decode. No qpdf/native-merge dependency on this path (see PdfAttachmentMergerTests
+    // for the parts of #62 that do need it).
+    private static readonly byte[] TinyJpeg = Convert.FromBase64String(
+        "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=");
+
+    [Fact]
+    public void Generate_embeds_an_attached_image_as_a_new_section()
+    {
+        // A minimal incident, not BuildFullIncident's richer one: with that much content already
+        // flowing across the page, adding the "Angehängte Bilder" section can shift pagination
+        // (fewer/more lines before a break) and swing the total byte count either way — a confound
+        // unrelated to whether the image itself was embedded. A minimal incident keeps layout stable
+        // so the size delta below actually isolates the image's effect.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", TinyJpeg.Length);
+
+        var withoutImage = IncidentPdf.Generate(incident);
+        var withImage = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]> { [file.Id] = TinyJpeg });
+
+        PdfAssert.IsPdf(withImage);
+        // Embedding a real image adds real bytes to the stream — a cheap, dependency-free proxy for
+        // "the section actually rendered something" without parsing PDF content streams.
+        Assert.True(withImage.Length > withoutImage.Length,
+            $"Expected embedding the image to grow the PDF (without={withoutImage.Length}, with={withImage.Length}).");
+    }
+
+    [Fact]
+    public void Generate_lists_a_renamed_pdf_attachment_in_the_file_table()
+    {
+        // A minimal incident, same rationale as the image test above: keeps pagination stable so a
+        // size delta can be attributed to the new table row rather than an unrelated layout shift.
+        // No qpdf/native-merge dependency here — the table lists file metadata only, independent of
+        // whether bytes were supplied or the file is a PDF vs. an image.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        var withoutFile = IncidentPdf.Generate(incident);
+
+        var file = incident.AddFile(clock, op, "bericht.pdf", "application/pdf", 100);
+        incident.RenameFile(file.Id, "Lagebericht Erdgeschoss");
+        var withFile = IncidentPdf.Generate(incident);
+
+        PdfAssert.IsPdf(withFile);
+        // A PDF attachment's pages are appended separately and carry no caption of their own — the
+        // table row is the only place its (renamed) label shows up anywhere in the report.
+        Assert.True(withFile.Length > withoutFile.Length,
+            $"Expected the file table to grow the PDF even without embedded bytes (without={withoutFile.Length}, with={withFile.Length}).");
+    }
+
+    [Fact]
+    public void Generate_skips_a_file_whose_bytes_were_not_supplied_rather_than_failing()
+    {
+        var incident = BuildFullIncident();
+        incident.AddFile(new Clock(), new SessionOperator("Müller"), "brand.jpg", "image/jpeg", 123);
+
+        // No entry for the file's id in the dictionary — simulates a moved/missing sibling folder.
+        var bytes = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+
+        PdfAssert.IsPdf(bytes);
+    }
+
+    [Fact]
+    public void Generate_with_no_files_dictionary_at_all_still_works()
+    {
+        // The optional-parameter default (null -> empty) covers every pre-#62 caller unchanged.
+        var bytes = IncidentPdf.Generate(BuildFullIncident());
+        PdfAssert.IsPdf(bytes);
+    }
+
+    // Needs the native qpdf library (see PdfAttachmentMergerTests' remarks).
+    [Fact]
+    public void Generate_appends_an_attached_pdfs_pages_after_the_report()
+    {
+        var incident = BuildFullIncident();
+        var withoutAttachment = IncidentPdf.Generate(incident);
+        var reportPages = PdfAssert.CountPages(withoutAttachment);
+
+        var attachmentPdf = IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")));
+        var file = incident.AddFile(new Clock(), new SessionOperator("Müller"), "bericht.pdf", "application/pdf", attachmentPdf.Length);
+
+        var withAttachment = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]> { [file.Id] = attachmentPdf });
+
+        PdfAssert.IsPdf(withAttachment);
+        Assert.Equal(reportPages + PdfAssert.CountPages(attachmentPdf), PdfAssert.CountPages(withAttachment));
+    }
 }

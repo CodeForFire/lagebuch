@@ -21,6 +21,9 @@ internal sealed class FakeStore : IIncidentStore
     public void Save(string path, Incident incident) => _d[path] = incident;
     public Incident Load(string path) => _d[path];
     public IncidentState? TryReadState(string path) => _d.TryGetValue(path, out var i) ? i.State : null;
+    private readonly Dictionary<string, byte[]> _files = new();
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
 }
 internal sealed class FakeDialogs : IFileDialogService
 {
@@ -29,6 +32,24 @@ internal sealed class FakeDialogs : IFileDialogService
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+    public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+    public Task OpenFileAsync(string path) => Task.CompletedTask;
+    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
+}
+// Mirrors FakeDialogs but returns a caller-supplied path from PickAttachmentAsync, so a UI-driven
+// "add file" test can exercise a real AddFileCommand execution without a real OS file picker.
+internal sealed class AttachmentDialogs : IFileDialogService
+{
+    private readonly string? _path;
+    public AttachmentDialogs(string? path) => _path = path;
+    public string? LastOpenedPath { get; private set; }
+    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+    public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+    public Task<string?> PickAttachmentAsync() => Task.FromResult(_path);
+    public Task OpenFileAsync(string path) { LastOpenedPath = path; return Task.CompletedTask; }
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 internal sealed class FixedClock : IClock
@@ -81,14 +102,14 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_with_six_tabs()
+    public void Workspace_renders_with_seven_tabs()
     {
         var vm = BuildWorkspace(out _);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(6, tabs.Items.Count);
+        Assert.Equal(7, tabs.Items.Count);
     }
 
     [AvaloniaFact]
@@ -114,6 +135,67 @@ public class WorkspaceAcceptanceTests
         Assert.Equal(2, session.Incident.Journal.Count);
         Assert.Equal("Lagemeldung erhalten", vm.Etb.Entries[0].Text);
         Assert.Equal("Einsatz begonnen", vm.Etb.Entries[1].Text);
+    }
+
+    [AvaloniaFact]
+    public void Files_tab_renders_an_already_attached_file()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.Incident.AddFile(new FixedClock(), session.Operator!, "brand.jpg", "image/jpeg", 2048);
+        var view = new FilesView { DataContext = new FilesViewModel(session, new FakeDialogs(), () => { }) };
+        var window = new Window { Content = view, Width = 800, Height = 600 };
+        window.Show();
+
+        // The name is an editable TextBox now (display name), not a TextBlock.
+        var names = view.GetVisualDescendants().OfType<TextBox>().Select(t => t.Text).ToList();
+        Assert.Contains("brand.jpg", names);
+    }
+
+    [AvaloniaFact]
+    public void Renaming_a_file_via_ui_writes_through_to_the_domain()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.Incident.AddFile(new FixedClock(), session.Operator!, "brand.jpg", "image/jpeg", 2048);
+        var filesVm = new FilesViewModel(session, new FakeDialogs(), () => { });
+        var view = new FilesView { DataContext = filesVm };
+        var window = new Window { Content = view, Width = 800, Height = 600 };
+        window.Show();
+
+        var nameBox = view.GetVisualDescendants().OfType<TextBox>().First(t => t.Text == "brand.jpg");
+        nameBox.Focus();
+        nameBox.SelectAll();
+        window.KeyTextInput("Küchenbrand");
+
+        Assert.Equal("Küchenbrand", filesVm.Files[0].DisplayName);
+        Assert.Equal("Küchenbrand", session.Incident.Files.Single().DisplayName);
+        Assert.Equal("brand.jpg", session.Incident.Files.Single().FileName); // the original name is untouched
+    }
+
+    [AvaloniaFact]
+    public void Adding_file_via_ui_updates_the_list_and_logs_to_the_etb()
+    {
+        var vm = BuildWorkspace(out var session);
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
+        try
+        {
+            var dialogs = new AttachmentDialogs(path);
+            var filesVm = new FilesViewModel(session, dialogs, () => { });
+            var view = new FilesView { DataContext = filesVm };
+            var window = new Window { Content = view, Width = 800, Height = 600 };
+            window.Show();
+
+            var addButton = view.GetControl<Button>("AddFileButton");
+            addButton.Command!.Execute(null);
+            Dispatcher.UIThread.RunJobs(); // let the async command's continuation reach the UI thread
+
+            Assert.Single(session.Incident.Files);
+            Assert.Contains(session.Incident.Journal, e => e.Text.StartsWith("Datei hinzugefügt:"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [AvaloniaFact]

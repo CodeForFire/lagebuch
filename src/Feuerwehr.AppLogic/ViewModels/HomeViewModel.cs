@@ -29,8 +29,11 @@ public sealed partial class HomeViewModel : ObservableObject
     // wherever the OS last remembered. Null when not supplied (e.g. most tests) -- every use site
     // is null-guarded, so the feature is simply inert rather than required.
     private readonly ILastSaveFolderStore? _lastSaveFolder;
+    // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
+    // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
+    private readonly string? _attachmentCacheRoot;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null)
     {
         _store = store;
         _masterData = masterData;
@@ -43,6 +46,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _appVersion = appVersion;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         _lastSaveFolder = lastSaveFolder;
+        _attachmentCacheRoot = attachmentCacheRoot;
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -176,7 +180,7 @@ public sealed partial class HomeViewModel : ObservableObject
         try
         {
             var session = await RemoteIncidentSession.ConnectAsync(
-                host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port);
+                host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port, cacheRoot: _attachmentCacheRoot);
             JoinError = null;
             OpenRemoteWorkspace(session, _masterData.Get());
         }

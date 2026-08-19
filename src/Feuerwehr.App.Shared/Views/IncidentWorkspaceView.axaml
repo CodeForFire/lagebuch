@@ -281,6 +281,11 @@
               <ContentControl Content="{Binding Scba}" />
             </Border>
           </TabItem>
+          <TabItem Header="DATEIEN">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Files}" />
+            </Border>
+          </TabItem>
         </TabControl>
       </Border>
     </DockPanel>

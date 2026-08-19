@@ -12,6 +12,9 @@ internal sealed class FakeStore : IIncidentStore
     public void Save(string path, Incident incident) { _saved[path] = incident; SaveCount++; }
     public Incident Load(string path) => _saved[path];
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
+    private readonly Dictionary<string, byte[]> _files = new();
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
 }
 
 internal sealed class FixedClock : IClock
@@ -60,6 +63,48 @@ public class IncidentSessionTests
 
         Assert.True(session.IsReadOnly);
         Assert.Equal(IncidentState.Closed, session.Incident.State);
+    }
+
+    [Fact]
+    public async Task AddFileAsync_records_it_writes_bytes_and_saves()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var savesBefore = store.SaveCount;
+
+        var bytes = new byte[] { 1, 2, 3 };
+        await session.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+
+        var file = Assert.Single(session.Incident.Files);
+        Assert.Equal("brand.jpg", file.FileName);
+        Assert.True(store.SaveCount > savesBefore);
+        Assert.Equal(bytes, await session.GetFileBytesAsync(file.Id));
+    }
+
+    [Fact]
+    public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
+    {
+        var store = new FakeStore();
+        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+
+        Assert.Null(await session.GetFileBytesAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task AddFileAsync_raises_Changed()
+    {
+        var store = new FakeStore();
+        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var raised = false;
+        session.Changed += () => raised = true;
+
+        await session.AddFileAsync("bericht.pdf", "application/pdf", new byte[] { 1 });
+
+        Assert.True(raised);
     }
 
     [Fact]
@@ -179,12 +224,12 @@ public class IncidentSessionTests
     }
 
     [Fact]
-    public void ExportPdf_returns_a_pdf()
+    public async Task ExportPdfAsync_returns_a_pdf()
     {
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
             "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        var bytes = session.ExportPdf();
+        var bytes = await session.ExportPdfAsync();
         Assert.True(bytes.Length > 100);
         Assert.Equal(0x25, bytes[0]); // %
     }

@@ -9,11 +9,15 @@ namespace Feuerwehr.AppLogic.Tests;
 internal sealed class FakeDialogs : IFileDialogService
 {
     public string? ExportPath { get; set; }
+    public string? AttachmentPath { get; set; }
+    public string? LastOpenedPath { get; private set; }
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(ExportPath);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task<string?> PickAttachmentAsync() => Task.FromResult(AttachmentPath);
+    public Task OpenFileAsync(string path) { LastOpenedPath = path; return Task.CompletedTask; }
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 

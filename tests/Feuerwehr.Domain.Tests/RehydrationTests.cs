@@ -47,7 +47,8 @@ public class RehydrationTests
             new[] { ForceUnit.Create("FFB", 12) },
             Array.Empty<Atemschutz.AtemschutzTrupp>(),
             new[] { new AuditEvent(T0, "opened", "Müller") },
-            Array.Empty<Time.IncidentTimerState>());
+            Array.Empty<Time.IncidentTimerState>(),
+            Array.Empty<Files.IncidentFile>());
 
         Assert.Equal(id, incident.Id);
         Assert.Equal(IncidentState.Closed, incident.State);
@@ -55,6 +56,34 @@ public class RehydrationTests
         Assert.Equal(T0.AddHours(2), incident.ClosedAt);
         Assert.Single(incident.Journal);
         Assert.Equal(12, incident.TotalPersonnel);
+    }
+
+    [Fact]
+    public void IncidentFile_rehydrate_restores_metadata()
+    {
+        var id = Guid.NewGuid();
+        var file = Files.IncidentFile.Rehydrate(id, "brand.jpg", "Küchenbrand", "image/jpeg", 2048, T0, "Müller (FFB 12/1)");
+        Assert.Equal(id, file.Id);
+        Assert.Equal("brand.jpg", file.FileName);
+        Assert.Equal("Küchenbrand", file.DisplayName);
+        Assert.Equal(2048, file.SizeBytes);
+    }
+
+    [Fact]
+    public void Incident_rehydrate_carries_files()
+    {
+        var fileId = Guid.NewGuid();
+        var incident = Incident.Rehydrate(
+            Guid.NewGuid(), T0, IncidentState.Open, null, null, null, null, null, null, null,
+            Array.Empty<ChecklistItem>(), Array.Empty<ChecklistItem>(), Array.Empty<EtbEntry>(),
+            Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
+            Array.Empty<Atemschutz.AtemschutzTrupp>(), Array.Empty<AuditEvent>(),
+            Array.Empty<Time.IncidentTimerState>(),
+            new[] { Files.IncidentFile.Rehydrate(fileId, "bericht.pdf", "bericht.pdf", "application/pdf", 4096, T0, "Müller") });
+
+        var file = Assert.Single(incident.Files);
+        Assert.Equal(fileId, file.Id);
+        Assert.Equal("bericht.pdf", file.FileName);
     }
 
     [Fact]
@@ -67,7 +96,8 @@ public class RehydrationTests
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(),
             Array.Empty<AuditEvent>(),
-            Array.Empty<Time.IncidentTimerState>());
+            Array.Empty<Time.IncidentTimerState>(),
+            Array.Empty<Files.IncidentFile>());
         Assert.Throws<IncidentClosedException>(() => incident.SetStatus("x"));
     }
 }

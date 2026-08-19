@@ -25,9 +25,10 @@ public static class CompositionRoot
         IIncidentHostController hostController,
         IUiDispatcher uiDispatcher,
         string appVersion,
-        ILastSaveFolderStore? lastSaveFolder = null)
+        ILastSaveFolderStore? lastSaveFolder = null,
+        string? attachmentCacheRoot = null)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
         return new MainWindowViewModel(home, editor);
     }

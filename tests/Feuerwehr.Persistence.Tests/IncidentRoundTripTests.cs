@@ -3,6 +3,7 @@ using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Domain;
+using Feuerwehr.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
 namespace Feuerwehr.Persistence.Tests;
@@ -200,6 +201,60 @@ public class IncidentRoundTripTests : IDisposable
         Assert.True(loadedWaiting.IsWaiting);
         Assert.Null(loadedWaiting.StartTime);
         Assert.Null(loadedWaiting.StartPressure);
+    }
+
+    [Fact]
+    public void Attached_files_metadata_round_trips()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var brand = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
+        incident.RenameFile(brand.Id, "Küchenbrand");
+        clock.Now = clock.Now.AddMinutes(1);
+        incident.AddFile(clock, op, "bericht.pdf", "application/pdf", 4096);
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+        var loaded = repo.Load(_path);
+
+        Assert.Equal(2, loaded.Files.Count);
+        Assert.Equal("brand.jpg", loaded.Files[0].FileName);
+        Assert.Equal("Küchenbrand", loaded.Files[0].DisplayName);
+        Assert.Equal("image/jpeg", loaded.Files[0].ContentType);
+        Assert.Equal(2048, loaded.Files[0].SizeBytes);
+        Assert.Equal("bericht.pdf", loaded.Files[1].FileName);
+        // Never renamed -- display name still defaults to the original file name.
+        Assert.Equal("bericht.pdf", loaded.Files[1].DisplayName);
+        // The auto ETB entries land alongside the manual ones, same as every other module.
+        Assert.Contains("Datei hinzugefügt: brand.jpg", loaded.Journal.Select(e => e.Text));
+        Assert.Contains("Datei hinzugefügt: bericht.pdf", loaded.Journal.Select(e => e.Text));
+    }
+
+    [Fact]
+    public void A_file_row_written_before_display_name_existed_falls_back_to_the_file_name()
+    {
+        // Simulates a .fwincident saved by a build before this column existed: no code path in this
+        // build ever writes a NULL display_name, so the only way to reproduce that state is a raw
+        // UPDATE against the column directly, mirroring how a genuinely older file would look.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "UPDATE incident_files SET display_name = NULL;";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var loaded = repo.Load(_path);
+
+        Assert.Equal("brand.jpg", Assert.Single(loaded.Files).DisplayName);
     }
 
     [Fact]

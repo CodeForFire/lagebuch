@@ -9,11 +9,23 @@ namespace Feuerwehr.Documents;
 public sealed class IncidentReportDocument : IDocument
 {
     private readonly Incident _incident;
+    private readonly IReadOnlyDictionary<Guid, byte[]> _imageBytesById;
 
-    public IncidentReportDocument(Incident incident)
+    /// <param name="incident">The incident to render.</param>
+    /// <param name="fileBytes">
+    /// Bytes for entries in <see cref="Incident.Files"/>, keyed by <c>IncidentFile.Id</c> —
+    /// resolved by the caller (this project stays filesystem-free). Every attached file is listed
+    /// by name regardless of whether bytes were supplied; only image entries with bytes present
+    /// are additionally rendered inline (see <see cref="Sections.FilesSection"/>).
+    /// </param>
+    public IncidentReportDocument(Incident incident, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null)
     {
         ArgumentNullException.ThrowIfNull(incident);
         _incident = incident;
+        _imageBytesById = incident.Files
+            .Where(f => f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            .Where(f => fileBytes is not null && fileBytes.ContainsKey(f.Id))
+            .ToDictionary(f => f.Id, f => fileBytes![f.Id]);
     }
 
     public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
@@ -39,6 +51,7 @@ public sealed class IncidentReportDocument : IDocument
                 column.Item().Element(c => RolesSection.Compose(c, _incident));
                 column.Item().Element(c => ForcesSection.Compose(c, _incident));
                 column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
+                column.Item().Element(c => FilesSection.Compose(c, _incident.Files, _imageBytesById));
             });
 
             page.Footer().AlignCenter().Text(t =>

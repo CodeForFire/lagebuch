@@ -50,6 +50,51 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void AddFileCommand_records_metadata_and_invokes_the_byte_writer()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var saved = new List<(string StorageFileName, byte[] Bytes)>();
+        var bytes = new byte[] { 1, 2, 3 };
+
+        CommandApplier.Apply(new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", bytes),
+            incident, clock, (name, b) => saved.Add((name, b)));
+
+        var file = Assert.Single(incident.Files);
+        Assert.Equal("brand.jpg", file.FileName);
+        Assert.Equal("Client (RUF 1)", file.AddedBy);
+        var write = Assert.Single(saved);
+        Assert.Equal($"{file.Id}.jpg", write.StorageFileName);
+        Assert.Equal(bytes, write.Bytes);
+    }
+
+    [Fact]
+    public void AddFileCommand_without_a_byte_writer_still_records_metadata()
+    {
+        // saveFileBytes is optional so every other command's test (this file) doesn't need to
+        // supply one; production (IncidentHost) always does.
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        CommandApplier.Apply(new AddFileCommand(new OperatorDto("Client", null), "x.pdf", "application/pdf", new byte[] { 1 }),
+            incident, clock);
+
+        Assert.Single(incident.Files);
+    }
+
+    [Fact]
+    public void RenameFileCommand_updates_the_display_name()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var file = incident.AddFile(clock, new SessionOperator("Host", "FFB 1"), "brand.jpg", "image/jpeg", 100);
+
+        ApplyOverWire(new RenameFileCommand(file.Id, "Küchenbrand"), incident, clock);
+
+        Assert.Equal("Küchenbrand", Assert.Single(incident.Files).DisplayName);
+    }
+
+    [Fact]
     public void A_command_against_a_closed_incident_is_rejected_by_the_domain_guard()
     {
         var clock = new FixedClock();

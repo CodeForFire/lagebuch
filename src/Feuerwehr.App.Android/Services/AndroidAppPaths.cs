@@ -24,4 +24,7 @@ internal static class AndroidAppPaths
         System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "recent.json");
 
     public static string CacheDir(Context context) => context.CacheDir!.AbsolutePath;
+
+    public static string AttachmentCacheDir(Context context) =>
+        System.IO.Path.Combine(CacheDir(context), "attachment-cache");
 }

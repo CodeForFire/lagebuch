@@ -315,6 +315,8 @@ internal sealed class OpenReturningDialogs : IFileDialogService
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+    public Task OpenFileAsync(string path) => Task.CompletedTask;
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -334,6 +336,8 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+    public Task OpenFileAsync(string path) => Task.CompletedTask;
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -345,6 +349,8 @@ internal sealed class ThrowingStore : IIncidentStore
     public void Save(string path, Incident incident) { }
     public Incident Load(string path) => throw new InvalidOperationException(_message);
     public IncidentState? TryReadState(string path) => null;
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) { }
+    public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
 }
 
 // Loads what was saved; anything else throws — lets one test fail an open, then succeed.
@@ -355,6 +361,8 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
     public Incident Load(string path) =>
         _saved.TryGetValue(path, out var i) ? i : throw new InvalidOperationException("Datei kaputt.");
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) { }
+    public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
 }
 
 // Counts Load calls to guard against the old double-load regression.
@@ -367,4 +375,6 @@ internal sealed class CountingStore : IIncidentStore
     public Incident Load(string path) { LoadCount++; return _saved[path]; }
     // A passive peek, not a load — must not count against the load-once guard.
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) { }
+    public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
 }

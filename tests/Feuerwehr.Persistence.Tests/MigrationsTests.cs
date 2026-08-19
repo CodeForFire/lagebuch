@@ -49,6 +49,26 @@ public class MigrationsTests : IDisposable
     }
 
     [Fact]
+    public void Migrate_creates_the_incident_files_table()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='incident_files';";
+        Assert.Equal(1L, (long)cmd.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void Migrate_adds_the_display_name_column_to_incident_files()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT count(*) FROM pragma_table_info('incident_files') WHERE name='display_name';";
+        Assert.Equal(1L, (long)cmd.ExecuteScalar()!);
+    }
+
+    [Fact]
     public void V1_database_upgrades_to_v2_and_gains_scba_tables()
     {
         // Build a database stamped at version 1, before the SCBA tables existed.

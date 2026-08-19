@@ -78,6 +78,59 @@ public sealed class AndroidFileDialogService : IFileDialogService
         pending.SetResult(destPath);
     }
 
+    private TaskCompletionSource<string?>? _pendingAttachment;
+
+    public Task<string?> PickAttachmentAsync()
+    {
+        _pendingAttachment = new TaskCompletionSource<string?>();
+        OnLaunchAttachmentPicker?.Invoke();
+        return _pendingAttachment.Task;
+    }
+
+    /// <summary>Set by MainActivity to the registered ActivityResultLauncher's Launch call.</summary>
+    public Action? OnLaunchAttachmentPicker { get; set; }
+
+    /// <summary>
+    /// Called by MainActivity's registered picker callback once the user selects a file (or
+    /// cancels). Copies the content:// URI's bytes into app-private cache under its original
+    /// display name (falling back to a generic one), preserving the extension both
+    /// <see cref="FilesViewModel"/>'s content-type inference and the sibling-folder attachment
+    /// naming scheme rely on.
+    /// </summary>
+    public void CompleteAttachment(global::Android.Net.Uri? uri)
+    {
+        var pending = _pendingAttachment;
+        _pendingAttachment = null;
+        if (pending is null)
+            return;
+        if (uri is null)
+        {
+            pending.SetResult(null);
+            return;
+        }
+        var destPath = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), DisplayNameOf(uri));
+        using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
+        using (var output = System.IO.File.Create(destPath))
+            input.CopyTo(output);
+        pending.SetResult(destPath);
+    }
+
+    private string DisplayNameOf(global::Android.Net.Uri uri)
+    {
+        using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
+        if (cursor is not null && cursor.MoveToFirst())
+        {
+            var index = cursor.GetColumnIndex(Android.Provider.OpenableColumns.DisplayName);
+            if (index >= 0)
+            {
+                var name = cursor.GetString(index);
+                if (!string.IsNullOrWhiteSpace(name))
+                    return name;
+            }
+        }
+        return "anhang";
+    }
+
     public Task ShareFileAsync(string path, string mimeType)
     {
         var authority = $"{_activity.PackageName}.fileprovider";
@@ -89,4 +142,27 @@ public sealed class AndroidFileDialogService : IFileDialogService
         _activity.StartActivity(Intent.CreateChooser(intent, "Teilen"));
         return Task.CompletedTask;
     }
+
+    // View-in-place (not a share sheet): opens whatever app the device has registered for the
+    // type, exactly like a desktop double-click.
+    public Task OpenFileAsync(string path)
+    {
+        var authority = $"{_activity.PackageName}.fileprovider";
+        var uri = FileProvider.GetUriForFile(_activity, authority, new Java.IO.File(path));
+        var intent = new Intent(Intent.ActionView);
+        intent.SetDataAndType(uri, MimeTypeOf(path));
+        intent.AddFlags(ActivityFlags.GrantReadUriPermission);
+        _activity.StartActivity(intent);
+        return Task.CompletedTask;
+    }
+
+    private static string MimeTypeOf(string path) => System.IO.Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".jpg" or ".jpeg" => "image/jpeg",
+        ".png" => "image/png",
+        ".gif" => "image/gif",
+        ".webp" => "image/webp",
+        ".pdf" => "application/pdf",
+        _ => "*/*"
+    };
 }

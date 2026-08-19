@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain.Etb;
+using Feuerwehr.Domain.Files;
 using Feuerwehr.Domain.ValueObjects;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private readonly HttpClient _http;
     private readonly HubConnection _hub;
     private readonly IUiDispatcher _ui;
+    private readonly string? _cacheRoot;
     private Incident _incident;
 
     public SessionOperator? Operator { get; }
@@ -53,13 +55,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </summary>
     public event Action? Ended;
 
-    private RemoteIncidentSession(HttpClient http, HubConnection hub, IUiDispatcher ui, SessionOperator op, Incident initial)
+    private RemoteIncidentSession(HttpClient http, HubConnection hub, IUiDispatcher ui, SessionOperator op, Incident initial, string? cacheRoot)
     {
         _http = http;
         _hub = hub;
         _ui = ui;
         Operator = op;
         _incident = initial;
+        _cacheRoot = cacheRoot;
     }
 
     /// <summary>
@@ -68,9 +71,24 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <see cref="VersionMismatchException"/> on a version mismatch, and
     /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable.
     /// </summary>
+    /// <param name="host">The host's Tailscale/LAN address to dial.</param>
+    /// <param name="op">This device's operator, attributed on every command it sends.</param>
+    /// <param name="localVersion">This device's app version, compared against the host's.</param>
+    /// <param name="ui">Dispatcher used to marshal SignalR callbacks onto the UI thread.</param>
+    /// <param name="pin">The host's share PIN, if it requires one.</param>
+    /// <param name="port">The host's port — <see cref="SyncProtocol.Port"/> unless overridden (tests).</param>
+    /// <param name="reconnectPolicy">Overrides the default reconnect policy (tests only).</param>
+    /// <param name="cacheRoot">
+    /// Folder to cache pulled attachment bytes in, keyed by incident and file id (see
+    /// <see cref="GetFileBytesAsync"/>). This project has no platform path knowledge, so callers
+    /// supply it (a folder under the app's data/cache dir). Null disables caching — bytes are
+    /// re-fetched from the host on every call, which is correct, just not free.
+    /// </param>
+    /// <param name="ct">Cancels the connect handshake.</param>
     public static async Task<RemoteIncidentSession> ConnectAsync(
         string host, SessionOperator op, string localVersion, IUiDispatcher ui, string? pin = null,
-        int port = SyncProtocol.Port, IRetryPolicy? reconnectPolicy = null, CancellationToken ct = default)
+        int port = SyncProtocol.Port, IRetryPolicy? reconnectPolicy = null, string? cacheRoot = null,
+        CancellationToken ct = default)
     {
         var baseUri = new Uri($"http://{host}:{port}");
         var http = new HttpClient { BaseAddress = baseUri };
@@ -102,7 +120,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, hub, ui, op, initial);
+            var session = new RemoteIncidentSession(http, hub, ui, op, initial, cacheRoot);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
             // marshalled onto the UI thread because it drives view state (the reconnect banner, the
@@ -166,6 +184,59 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) { }
 
     public void Close() => Send(new CloseIncidentCommand(Op()));
+
+    // Unlike every other mutation, this is a real upload — genuinely awaited (per IIncidentSession's
+    // doc comment) rather than fire-and-forget, so the caller can show a spinner and catch a
+    // rejection (over the size cap, unsupported type, closed incident, or a network failure here).
+    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes)
+    {
+        if (bytes.LongLength > IncidentFile.MaxSizeBytes)
+            throw new ArgumentException(
+                $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.", nameof(bytes));
+        await SendAsync(new AddFileCommand(Op(), fileName, contentType, bytes));
+    }
+
+    // On-demand pull (§5): the cached incident carries only file metadata (from the snapshot), so
+    // bytes are fetched from the host the first time they're needed and cached locally afterwards —
+    // mirroring how a join fetches GET /snapshot once rather than having it pushed continuously.
+    public async Task<byte[]?> GetFileBytesAsync(Guid fileId)
+    {
+        var file = _incident.Files.FirstOrDefault(f => f.Id == fileId);
+        if (file is null)
+            return null;
+
+        var cachePath = CachePathFor(fileId, file.FileName);
+        if (cachePath is not null && File.Exists(cachePath))
+            return await File.ReadAllBytesAsync(cachePath);
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.GetAsync(SyncProtocol.FilesPath(fileId));
+        }
+        catch (HttpRequestException)
+        {
+            return null; // host unreachable — degrade quietly, same as a missing local file
+        }
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        if (cachePath is not null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
+            await File.WriteAllBytesAsync(cachePath, bytes);
+        }
+        return bytes;
+    }
+
+    // One subfolder per incident, so a stale cache entry from a previously joined incident can
+    // never collide with this one's file ids.
+    private string? CachePathFor(Guid fileId, string fileName) => _cacheRoot is null
+        ? null
+        : Path.Combine(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
+
+    public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
 
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 

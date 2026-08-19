@@ -37,7 +37,8 @@ internal static class Program
             new IncidentHostController(clock, version, uiDispatcher),
             uiDispatcher,
             version,
-            new JsonLastSaveFolderStore(AppPaths.LastSaveFolderJsonPath));
+            new JsonLastSaveFolderStore(AppPaths.LastSaveFolderJsonPath),
+            AppPaths.AttachmentCacheDir);
     }
 
     public static AppBuilder BuildAvaloniaApp() =>

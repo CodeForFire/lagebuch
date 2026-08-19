@@ -1,5 +1,6 @@
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Atemschutz;
+using Feuerwehr.Domain.Files;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
 
@@ -15,7 +16,16 @@ namespace Feuerwehr.Sync;
 /// </summary>
 public static class CommandApplier
 {
-    public static void Apply(SyncCommand command, Incident incident, IClock clock)
+    /// <param name="command">The received command to apply.</param>
+    /// <param name="incident">The host's authoritative aggregate to mutate.</param>
+    /// <param name="clock">The host's clock — authoritative timestamps for every applied command.</param>
+    /// <param name="saveFileBytes">
+    /// Called with (storage file name, bytes) only for <see cref="AddFileCommand"/> — the one
+    /// command whose application has a filesystem side effect, since attachment bytes are kept out
+    /// of the domain/snapshot (see <see cref="IncidentSnapshot"/>). Production callers (the host)
+    /// must always supply this; it is optional only so every other command's tests don't need to.
+    /// </param>
+    public static void Apply(SyncCommand command, Incident incident, IClock clock, Action<string, byte[]>? saveFileBytes = null)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(incident);
@@ -70,6 +80,13 @@ public static class CommandApplier
                 break;
             case CloseIncidentCommand c:
                 incident.Close(clock, Operator(c.Operator));
+                break;
+            case AddFileCommand c:
+                var file = incident.AddFile(clock, Operator(c.Operator), c.FileName, c.ContentType, c.Bytes.LongLength);
+                saveFileBytes?.Invoke(IncidentFile.StorageFileName(file.Id, file.FileName), c.Bytes);
+                break;
+            case RenameFileCommand c:
+                incident.RenameFile(c.FileId, c.DisplayName);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(command),

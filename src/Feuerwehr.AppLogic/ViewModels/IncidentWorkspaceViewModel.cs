@@ -147,6 +147,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public RolesViewModel Roles { get; private set; } = null!;
     public ForcesViewModel Forces { get; private set; } = null!;
     public ScbaViewModel Scba { get; private set; } = null!;
+    public FilesViewModel Files { get; private set; } = null!;
     public ReminderViewModel? Reminder { get; private set; }
 
     public string StatusDisplay => Formatting.State(_session.Incident.State);
@@ -216,6 +217,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Scba?.Dispose();
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
+        Files = new FilesViewModel(_session, _dialogs, OnChanged);
+
         Reminder?.Dispose();
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.
@@ -231,6 +234,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(Scba));
+        OnPropertyChanged(nameof(Files));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
     }
@@ -297,7 +301,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
             return;
-        await File.WriteAllBytesAsync(path, _local!.ExportPdf());
+        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync());
         await _dialogs.ShareFileAsync(path, "application/pdf");
     }
 

@@ -28,7 +28,8 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<ForceUnitDto> Forces,
     IReadOnlyList<ScbaTruppDto> ScbaTrupps,
     IReadOnlyList<AuditEventDto> Audit,
-    IReadOnlyList<TimerDto> Timers);
+    IReadOnlyList<TimerDto> Timers,
+    IReadOnlyList<IncidentFileDto> Files);
 
 public sealed record TimerDto(
     string Key,
@@ -87,3 +88,11 @@ public sealed record ScbaTruppDto(
     IReadOnlyList<PressureReadingDto> Readings);
 
 public sealed record AuditEventDto(DateTimeOffset At, string Action, string By);
+
+/// <summary>
+/// Metadata only — deliberately no bytes here, so the snapshot broadcast every command triggers
+/// (§5) stays small regardless of how large or numerous the attached files are. A client fetches
+/// the actual bytes on demand via <c>GET /files/{id}</c> (see <c>IncidentHost</c>).
+/// </summary>
+public sealed record IncidentFileDto(
+    Guid Id, string FileName, string DisplayName, string ContentType, long SizeBytes, DateTimeOffset AddedAt, string AddedBy);

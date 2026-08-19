@@ -22,6 +22,7 @@ namespace Feuerwehr.App.Android;
 public class MainActivity : AvaloniaMainActivity<SharedApp>
 {
     private ActivityResultLauncher? _importLauncher;
+    private ActivityResultLauncher? _attachmentLauncher;
     private AndroidFileDialogService? _dialogs;
 
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
@@ -29,6 +30,11 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
         _importLauncher = RegisterForActivityResult(
             new ActivityResultContracts.GetContent(),
             new ImportCallback(uri => _dialogs?.CompleteImport(uri)));
+        // OpenDocument (rather than GetContent) accepts multiple MIME types on Launch, needed
+        // since an attachment can be any of several image types or a PDF.
+        _attachmentLauncher = RegisterForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            new ImportCallback(uri => _dialogs?.CompleteAttachment(uri)));
         base.OnCreate(savedInstanceState);
     }
 
@@ -45,6 +51,8 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
     {
         _dialogs = new AndroidFileDialogService(this);
         _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
+        _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(
+            new[] { "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf" });
         SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
             new IncidentStore(),
             new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
@@ -56,7 +64,9 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
             new MasterDataFileService(),
             new NoopIncidentHostController(),
             new Feuerwehr.App.Shared.Services.AvaloniaUiDispatcher(),
-            typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0");
+            typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+            lastSaveFolder: null,
+            attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this));
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
 }
