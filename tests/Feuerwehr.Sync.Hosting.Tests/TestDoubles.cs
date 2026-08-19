@@ -15,6 +15,9 @@ internal sealed class InMemoryStore : IIncidentStore
     public void Save(string path, Incident incident) => _byPath[path] = incident;
     public Incident Load(string path) => _byPath[path];
     public IncidentState? TryReadState(string path) => _byPath.TryGetValue(path, out var i) ? i.State : null;
+    private readonly Dictionary<string, byte[]> _files = new();
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
 }
 
 internal sealed class FixedClock : IClock
@@ -43,6 +46,8 @@ internal sealed class NoDialogs : IFileDialogService
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+    public Task OpenFileAsync(string path) => Task.CompletedTask;
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 

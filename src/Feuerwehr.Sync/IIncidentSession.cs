@@ -64,4 +64,16 @@ public interface IIncidentSession
     void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning);
 
     void Close();
+
+    /// <summary>
+    /// Attaches a file. Unlike every mutation above, this is genuinely awaited rather than
+    /// fire-and-forget: a multi-MB upload is neither instant nor safe to fail silently, so the
+    /// caller needs to show a spinner and surface a thrown exception (closed incident, unsupported
+    /// type, over the size cap, or — on a joined client — a network failure).
+    /// </summary>
+    Task AddFileAsync(string fileName, string contentType, byte[] bytes);
+
+    /// <summary>Null when the bytes are unavailable — never throws, so a caller (a file-row "open"
+    /// action, or the PDF exporter) degrades quietly rather than crashing on a missing attachment.</summary>
+    Task<byte[]?> GetFileBytesAsync(Guid fileId);
 }

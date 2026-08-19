@@ -19,7 +19,7 @@ public sealed class IncidentRepository
                  { "incident_meta", "checklist_items", "etb_entries",
                    "role_assignments", "force_units", "scba_trupps",
                    "scba_trupp_members", "scba_pressure_readings", "audit_events",
-                   "incident_timers" })
+                   "incident_timers", "incident_files" })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
         }
@@ -153,6 +153,19 @@ public sealed class IncidentRepository
                 });
         }
 
+        for (var i = 0; i < incident.Files.Count; i++)
+        {
+            var f = incident.Files[i];
+            Run(cn, tx,
+                "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by) VALUES ($id,$o,$fn,$ct,$sz,$at,$by);",
+                p =>
+                {
+                    p("$id", f.Id.ToString()); p("$o", i); p("$fn", f.FileName);
+                    p("$ct", f.ContentType); p("$sz", f.SizeBytes);
+                    p("$at", f.AddedAt.ToString(Iso)); p("$by", f.AddedBy);
+                });
+        }
+
         tx.Commit();
     }
 
@@ -283,6 +296,11 @@ public sealed class IncidentRepository
             r => new Domain.Time.IncidentTimerState(
                 r.GetString(0), ParseDate(r.GetString(1)), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4) != 0));
 
+        var files = ReadAll(cn,
+            "SELECT id, file_name, content_type, size_bytes, added_at, added_by FROM incident_files ORDER BY ordinal;",
+            r => Domain.Files.IncidentFile.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),
+                r.GetInt64(3), ParseDate(r.GetString(4)), r.GetString(5)));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -302,7 +320,7 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers);
+            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers, files);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

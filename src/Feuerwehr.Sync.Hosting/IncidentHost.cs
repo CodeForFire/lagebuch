@@ -75,6 +75,7 @@ public sealed class IncidentHost : IAsyncDisposable
         app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(_appVersion), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options));
         app.MapPost(SyncProtocol.CommandPath, HandleCommand);
+        app.MapGet(SyncProtocol.FilesRouteTemplate, HandleGetFile);
 
         _hub = app.Services.GetRequiredService<IHubContext<IncidentHub>>();
         _session.Changed += OnSessionChanged; // the host's own edits reach clients too
@@ -91,7 +92,7 @@ public sealed class IncidentHost : IAsyncDisposable
         {
             return await _ui.InvokeAsync(() =>
             {
-                CommandApplier.Apply(command, _session.Incident, _clock);
+                CommandApplier.Apply(command, _session.Incident, _clock, _session.SaveFileBytes);
                 // Persist + raise the session's Changed, which refreshes the host's own UI and, through
                 // OnSessionChanged, broadcasts the new snapshot to every client — the same path a host
                 // edit takes (§5), so a client's contribution appears live on the host too.
@@ -104,6 +105,19 @@ public sealed class IncidentHost : IAsyncDisposable
             // The same domain guards a local edit hits — reject cleanly rather than 500.
             return Results.BadRequest(ex.Message);
         }
+    }
+
+    // On-demand pull (§5): the snapshot carries file metadata only, so a client fetches the actual
+    // bytes here — the first time it needs them (opening the tab, exporting a PDF), not on every
+    // broadcast. Runs on a Kestrel request thread like HandleCommand, but this is a pure read
+    // against already-persisted state, so it doesn't need the UI-thread dispatch HandleCommand uses.
+    private async Task<IResult> HandleGetFile(Guid id)
+    {
+        var bytes = await _session.GetFileBytesAsync(id);
+        if (bytes is null)
+            return Results.NotFound();
+        var file = _session.Incident.Files.FirstOrDefault(f => f.Id == id);
+        return Results.Bytes(bytes, file?.ContentType ?? "application/octet-stream", fileDownloadName: file?.FileName);
     }
 
     // Exactly one PIN header, matching the host's, is accepted. A missing/duplicated/mismatched header

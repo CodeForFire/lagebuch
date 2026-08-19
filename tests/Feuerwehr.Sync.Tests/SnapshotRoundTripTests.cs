@@ -47,6 +47,8 @@ public class SnapshotRoundTripTests
         clock.Now = clock.Now.AddMinutes(3);
         incident.MarkScbaReturned(clock, trupp.Id);
 
+        incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
+
         clock.Now = clock.Now.AddMinutes(1);
         incident.Close(clock, op);
         return incident;
@@ -94,6 +96,26 @@ public class SnapshotRoundTripTests
         Assert.NotNull(trupp.ExitTime);
         Assert.Contains(trupp.PressureReadings, p => p.Bar == 250);
         Assert.NotEmpty(r.Audit);
+
+        var file = Assert.Single(r.Files);
+        Assert.Equal("brand.jpg", file.FileName);
+        Assert.Equal("image/jpeg", file.ContentType);
+        Assert.Equal(2048, file.SizeBytes);
+    }
+
+    [Fact]
+    public void Snapshot_carries_file_metadata_but_never_bytes()
+    {
+        // IncidentFileDto has no byte[] member at all — this pins that down at the JSON level too,
+        // so a future field addition can't accidentally leak attachment bytes into every broadcast.
+        var incident = BuildRichIncident();
+
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident));
+
+        Assert.Contains("\"fileName\":\"brand.jpg\"", json);
+        // Not `Contains("bytes")` -- that's a false positive on "sizeBytes". The DTO simply has no
+        // "bytes" property to serialize (unlike AddFileCommand, which does).
+        Assert.DoesNotContain("\"bytes\":", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

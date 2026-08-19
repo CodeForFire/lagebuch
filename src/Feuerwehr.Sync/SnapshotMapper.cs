@@ -1,6 +1,7 @@
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain.Etb;
+using Feuerwehr.Domain.Files;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
 
@@ -35,7 +36,8 @@ public static class SnapshotMapper
             incident.Forces.Select(f => new ForceUnitDto(f.Id, f.Brigade, f.CallSign, f.PersonnelCount, f.ScbaCount, f.Status, f.Notes)).ToList(),
             incident.ScbaTrupps.Select(ToDto).ToList(),
             incident.Audit.Select(a => new AuditEventDto(a.At, a.Action, a.By)).ToList(),
-            incident.Timers.Select(t => new TimerDto(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)).ToList());
+            incident.Timers.Select(t => new TimerDto(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)).ToList(),
+            incident.Files.Select(f => new IncidentFileDto(f.Id, f.FileName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -59,7 +61,8 @@ public static class SnapshotMapper
             snapshot.Forces.Select(f => new ForceUnit(f.Id, f.Brigade, f.CallSign, f.PersonnelCount, f.ScbaCount, f.Status, f.Notes)),
             snapshot.ScbaTrupps.Select(FromDto),
             snapshot.Audit.Select(a => new AuditEvent(a.At, a.Action, a.By)),
-            snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)));
+            snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)),
+            snapshot.Files.Select(f => IncidentFile.Rehydrate(f.Id, f.FileName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

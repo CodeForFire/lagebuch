@@ -60,6 +60,91 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task AddFileAsync_uploads_and_the_other_client_sees_metadata_and_can_pull_bytes()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        await using var uploader = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+        await using var observer = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+
+        var uploaderChange = NextChange(uploader);
+        var observerChange = NextChange(observer);
+        var bytes = new byte[] { 9, 8, 7, 6 };
+        await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+        await Task.WhenAll(uploaderChange, observerChange);
+
+        var uploaderFile = Assert.Single(uploader.Incident.Files);
+        var observerFile = Assert.Single(observer.Incident.Files);
+        Assert.Equal(uploaderFile.Id, observerFile.Id);
+        Assert.Equal("A (RUF 1)", observerFile.AddedBy);
+
+        // The metadata above arrived via the ordinary broadcast; bytes are a separate, on-demand pull.
+        Assert.Equal(bytes, await observer.GetFileBytesAsync(observerFile.Id));
+    }
+
+    [Fact]
+    public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+
+        Assert.Null(await client.GetFileBytesAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task AddFileAsync_rejects_a_file_over_the_size_cap_before_ever_sending_it()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+
+        var tooBig = new byte[Feuerwehr.Domain.Files.IncidentFile.MaxSizeBytes + 1];
+        await Assert.ThrowsAsync<ArgumentException>(() => client.AddFileAsync("huge.pdf", "application/pdf", tooBig));
+        Assert.Empty(client.Incident.Files);
+    }
+
+    [Fact]
+    public async Task GetFileBytesAsync_caches_pulled_bytes_to_disk_when_a_cache_root_is_supplied()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        var cacheRoot = Path.Combine(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        try
+        {
+            await using var uploader = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            var bytes = new byte[] { 1, 2, 3 };
+            var uploaderChange = NextChange(uploader);
+            await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+            await uploaderChange; // AddFileAsync's HTTP response can outrace the self-broadcast
+            var fileId = Assert.Single(uploader.Incident.Files).Id;
+
+            await using var puller = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port,
+                cacheRoot: cacheRoot);
+            await puller.GetFileBytesAsync(fileId);
+
+            var cached = Directory.EnumerateFiles(cacheRoot, "*", SearchOption.AllDirectories).ToList();
+            var cachedFile = Assert.Single(cached);
+            Assert.Equal(bytes, await File.ReadAllBytesAsync(cachedFile));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot)) Directory.Delete(cacheRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Connect_refuses_a_version_mismatch()
     {
         var clock = new FixedClock();

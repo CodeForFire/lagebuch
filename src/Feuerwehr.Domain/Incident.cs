@@ -1,5 +1,6 @@
 using Feuerwehr.Domain.Atemschutz;
 using Feuerwehr.Domain.Etb;
+using Feuerwehr.Domain.Files;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Domain.ValueObjects;
 
@@ -17,6 +18,7 @@ public sealed class Incident
     private readonly List<AtemschutzTrupp> _scbaTrupps = new();
     private readonly List<AuditEvent> _audit = new();
     private readonly List<IncidentTimerState> _timers = new();
+    private readonly List<IncidentFile> _files = new();
 
     private Incident() { }
 
@@ -43,6 +45,8 @@ public sealed class Incident
 
     /// <summary>Persisted incident-level timers, keyed by <see cref="IncidentTimerState.Key"/>.</summary>
     public IReadOnlyList<IncidentTimerState> Timers => _timers;
+
+    public IReadOnlyList<IncidentFile> Files => _files;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -89,7 +93,8 @@ public sealed class Incident
         IEnumerable<ForceUnit> forces,
         IEnumerable<AtemschutzTrupp> scbaTrupps,
         IEnumerable<AuditEvent> audit,
-        IEnumerable<IncidentTimerState> timers)
+        IEnumerable<IncidentTimerState> timers,
+        IEnumerable<IncidentFile> files)
     {
         var incident = new Incident
         {
@@ -112,6 +117,7 @@ public sealed class Incident
         incident._scbaTrupps.AddRange(scbaTrupps);
         incident._audit.AddRange(audit);
         incident._timers.AddRange(timers);
+        incident._files.AddRange(files);
         return incident;
     }
 
@@ -417,6 +423,24 @@ public sealed class Incident
         var trupp = FindScbaTrupp(truppId);
         trupp.MarkReturned(clock.Now);
         return trupp;
+    }
+
+    /// <summary>
+    /// Records an attached file's metadata and logs it to the ETB. Bytes never pass through the
+    /// domain — the caller writes them to storage separately, keyed by
+    /// <see cref="IncidentFile.StorageFileName"/> on the returned <see cref="IncidentFile"/>.
+    /// </summary>
+    public IncidentFile AddFile(
+        IClock clock, SessionOperator op, string fileName, string contentType, long sizeBytes)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var file = IncidentFile.Create(fileName, contentType, sizeBytes, clock.Now, op.Display);
+        _files.Add(file);
+        AppendSystemEntry(clock, op, $"Datei hinzugefügt: {file.FileName}");
+        return file;
     }
 
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>

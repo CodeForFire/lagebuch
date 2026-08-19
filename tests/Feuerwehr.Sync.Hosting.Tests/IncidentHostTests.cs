@@ -95,6 +95,77 @@ public class IncidentHostTests
     }
 
     [Fact]
+    public async Task Client_uploads_a_file_and_can_pull_its_bytes_back()
+    {
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var bytes = new byte[] { 1, 2, 3, 4, 5 };
+        var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", bytes);
+        var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+        var postResponse = await http.PostAsync(SyncProtocol.CommandPath, content);
+        postResponse.EnsureSuccessStatusCode();
+
+        // Broadcast/response snapshot carries metadata only — no bytes, small regardless of file size.
+        var snapshot = SyncJson.Deserialize<IncidentSnapshot>(await postResponse.Content.ReadAsStringAsync());
+        var fileMeta = Assert.Single(snapshot.Files);
+        Assert.Equal("brand.jpg", fileMeta.FileName);
+        Assert.Equal("Client (RUF 1)", fileMeta.AddedBy);
+
+        // Also lands in the host's own persisted state (attributed correctly, an ETB entry logged).
+        Assert.Single(session.Incident.Files);
+        Assert.Contains(session.Incident.Journal, e => e.Text == "Datei hinzugefügt: brand.jpg");
+
+        // A client pulls the bytes back on demand.
+        var getResponse = await http.GetAsync(SyncProtocol.FilesPath(fileMeta.Id));
+        getResponse.EnsureSuccessStatusCode();
+        Assert.Equal("image/jpeg", getResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(bytes, await getResponse.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task GetFile_returns_404_for_an_unknown_id()
+    {
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var response = await http.GetAsync(SyncProtocol.FilesPath(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetFile_requires_the_pin_like_every_other_route()
+    {
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+
+        var response = await http.GetAsync(SyncProtocol.FilesPath(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Host_accepts_the_hub_negotiate_with_the_right_pin()
     {
         var clock = new FixedClock();

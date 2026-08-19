@@ -26,6 +26,7 @@ namespace Feuerwehr.Sync;
 [JsonDerivedType(typeof(SetAddressCommand), "setAddress")]
 [JsonDerivedType(typeof(SetStatusCommand), "setStatus")]
 [JsonDerivedType(typeof(CloseIncidentCommand), "close")]
+[JsonDerivedType(typeof(AddFileCommand), "addFile")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -70,3 +71,7 @@ public sealed record SetAddressCommand(string? Street, string? District) : SyncC
 public sealed record SetStatusCommand(string? Status) : SyncCommand;
 
 public sealed record CloseIncidentCommand(OperatorDto Operator) : SyncCommand;
+
+// Bytes ride this one-shot upload command (System.Text.Json base64-encodes byte[] automatically),
+// but never the broadcast snapshot that follows every command — see IncidentSnapshot/IncidentFileDto.
+public sealed record AddFileCommand(OperatorDto Operator, string FileName, string ContentType, byte[] Bytes) : SyncCommand;

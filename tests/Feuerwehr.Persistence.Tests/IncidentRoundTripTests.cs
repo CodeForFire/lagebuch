@@ -203,6 +203,30 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void Attached_files_metadata_round_trips()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
+        clock.Now = clock.Now.AddMinutes(1);
+        incident.AddFile(clock, op, "bericht.pdf", "application/pdf", 4096);
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+        var loaded = repo.Load(_path);
+
+        Assert.Equal(2, loaded.Files.Count);
+        Assert.Equal("brand.jpg", loaded.Files[0].FileName);
+        Assert.Equal("image/jpeg", loaded.Files[0].ContentType);
+        Assert.Equal(2048, loaded.Files[0].SizeBytes);
+        Assert.Equal("bericht.pdf", loaded.Files[1].FileName);
+        // The auto ETB entries land alongside the manual ones, same as every other module.
+        Assert.Contains("Datei hinzugefügt: brand.jpg", loaded.Journal.Select(e => e.Text));
+        Assert.Contains("Datei hinzugefügt: bericht.pdf", loaded.Journal.Select(e => e.Text));
+    }
+
+    [Fact]
     public void Incident_timers_round_trip()
     {
         var clock = new Clock();

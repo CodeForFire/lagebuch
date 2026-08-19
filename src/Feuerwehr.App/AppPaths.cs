@@ -11,6 +11,8 @@ public static class AppPaths
 
     public static string LastSaveFolderJsonPath => Path.Combine(AppDataDir, "last-save-folder.json");
 
+    public static string AttachmentCacheDir => Path.Combine(AppDataDir, "attachment-cache");
+
     public static string GetAppDataDir(string baseDir)
     {
         var dir = Path.Combine(baseDir, "Lagebuch");

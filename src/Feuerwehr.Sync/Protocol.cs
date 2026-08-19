@@ -11,6 +11,11 @@ public static class SyncProtocol
     public const string VersionPath = "/version";
     public const string HubPath = "/hub";
 
+    /// <summary>Route template for the on-demand attachment-bytes pull, keyed by <see cref="Feuerwehr.Domain.Files.IncidentFile.Id"/>.</summary>
+    public const string FilesRouteTemplate = "/files/{id:guid}";
+
+    public static string FilesPath(Guid id) => $"/files/{id}";
+
     /// <summary>SignalR method the host pushes the full snapshot on, after every applied command.</summary>
     public const string SnapshotMethod = "snapshot";
 

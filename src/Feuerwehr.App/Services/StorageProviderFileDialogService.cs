@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Feuerwehr.AppLogic.Services;
@@ -12,6 +13,8 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
         new("PDF-Dokument") { Patterns = new[] { "*.pdf" } };
     private static readonly FilePickerFileType Json =
         new("Stammdaten (JSON)") { Patterns = new[] { "*.json" } };
+    private static readonly FilePickerFileType Attachment =
+        new("Bild oder PDF") { Patterns = new[] { "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp", "*.pdf" } };
 
     private readonly Func<TopLevel?> _topLevel;
 
@@ -100,6 +103,30 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
             FileTypeChoices = new[] { Json }
         });
         return file?.TryGetLocalPath();
+    }
+
+    public async Task<string?> PickAttachmentAsync()
+    {
+        var top = _topLevel();
+        if (top is null) return null;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Datei anhängen",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { Attachment }
+        });
+        return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+    }
+
+    public Task OpenFileAsync(string path)
+    {
+        // UseShellExecute launches the OS's registered default viewer on Windows/macOS; Linux has
+        // no such shell-execute concept in .NET, so xdg-open is the desktop-agnostic equivalent.
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        else
+            Process.Start(new ProcessStartInfo("xdg-open", $"\"{path}\"") { UseShellExecute = false });
+        return Task.CompletedTask;
     }
 
     // The user already chose the exact destination via the native save dialog above — there is

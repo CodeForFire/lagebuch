@@ -5,7 +5,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 9;
+    public const int CurrentVersion = 11;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -67,6 +67,14 @@ public static class Migrations
         if (version < 9)
         {
             ApplyV9(cn, tx);
+        }
+        if (version < 10)
+        {
+            ApplyV10(cn, tx);
+        }
+        if (version < 11)
+        {
+            ApplyV11(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -340,6 +348,29 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "checklist_items", "is_mandatory", "INTEGER NOT NULL DEFAULT 0");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "checklist_items", "kind", "INTEGER NOT NULL DEFAULT 0");
     }
+
+    // Adds the metadata store for attached files (#62). Only metadata lives here — the actual
+    // bytes sit in a sibling ".files" folder next to the .fwincident file, kept out of this
+    // full-rewrite-per-save table set so an unrelated edit never rewrites attachment content.
+    private static void ApplyV10(SqliteConnection cn, SqliteTransaction tx)
+    {
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS incident_files (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                file_name TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                added_at TEXT NOT NULL,
+                added_by TEXT NOT NULL
+            );
+            """);
+    }
+
+    // A file's display label, editable independently of its original file_name (#62 follow-up).
+    // Nullable: existing rows predate the column, and Load falls back to file_name for those.
+    private static void ApplyV11(SqliteConnection cn, SqliteTransaction tx) =>
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_files", "display_name", "TEXT");
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

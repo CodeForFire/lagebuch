@@ -26,6 +26,7 @@ public class CommandSerializationTests
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),
         new SetStatusCommand(null),
         new CloseIncidentCommand(Op),
+        new AddFileCommand(Op, "brand.jpg", "image/jpeg", new byte[] { 1, 2, 3, 4 }),
     }.Select(c => new object[] { c });
 
     [Theory]
@@ -47,5 +48,16 @@ public class CommandSerializationTests
     {
         var json = SyncJson.Serialize<SyncCommand>(new ToggleChecklistItemCommand(Op, Guid.NewGuid()));
         Assert.Contains("\"$type\":\"toggleChecklistItem\"", json);
+    }
+
+    [Fact]
+    public void AddFileCommand_bytes_base64_round_trip_exactly()
+    {
+        var bytes = new byte[] { 0, 1, 254, 255, 42 };
+        var json = SyncJson.Serialize<SyncCommand>(new AddFileCommand(Op, "brand.jpg", "image/jpeg", bytes));
+
+        var back = Assert.IsType<AddFileCommand>(SyncJson.Deserialize<SyncCommand>(json));
+
+        Assert.Equal(bytes, back.Bytes);
     }
 }

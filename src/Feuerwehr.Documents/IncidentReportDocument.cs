@@ -9,11 +9,23 @@ namespace Feuerwehr.Documents;
 public sealed class IncidentReportDocument : IDocument
 {
     private readonly Incident _incident;
+    private readonly IReadOnlyList<(string FileName, byte[] Bytes)> _images;
 
-    public IncidentReportDocument(Incident incident)
+    /// <param name="incident">The incident to render.</param>
+    /// <param name="imageBytes">
+    /// Bytes for the image-typed entries in <see cref="Incident.Files"/>, keyed by
+    /// <c>IncidentFile.Id</c> — resolved by the caller (this project stays filesystem-free). Missing
+    /// or non-image entries are simply not shown, rather than failing the export.
+    /// </param>
+    public IncidentReportDocument(Incident incident, IReadOnlyDictionary<Guid, byte[]>? imageBytes = null)
     {
         ArgumentNullException.ThrowIfNull(incident);
         _incident = incident;
+        _images = incident.Files
+            .Where(f => f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            .Where(f => imageBytes is not null && imageBytes.ContainsKey(f.Id))
+            .Select(f => (f.FileName, imageBytes![f.Id]))
+            .ToList();
     }
 
     public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
@@ -39,6 +51,7 @@ public sealed class IncidentReportDocument : IDocument
                 column.Item().Element(c => RolesSection.Compose(c, _incident));
                 column.Item().Element(c => ForcesSection.Compose(c, _incident));
                 column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
+                column.Item().Element(c => FilesSection.Compose(c, _images));
             });
 
             page.Footer().AlignCenter().Text(t =>
