@@ -54,9 +54,11 @@ internal static class WorkspaceRenderHelper
             "PC eingeschaltet und VPN Verbindung aktiviert?",
             "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
         };
+        // Keyword + Einsatznummer both set: the common post-#69 shape once ILS has called back --
+        // Stichwort as the header hero, the Einsatznummer as the secondary chip beside it.
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklist,
-            new IncidentNumber("B 1.2 260715 123"));
+            new IncidentNumber("B 1.2 260715 123"), keyword: "B3P");
         var ticker = new ManualTicker();
         var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(),
             new FakeDialogs(), new NoopAlarmService(), host ?? new NoopIncidentHostController());

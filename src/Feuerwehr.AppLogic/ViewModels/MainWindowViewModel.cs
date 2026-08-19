@@ -57,9 +57,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         _pending = PendingAction.New;
         PendingPrompt = new OperatorPromptViewModel(
-            collectIncidentNumber: true,
-            callSignOptions: _home.CallSignOptions,
-            einsatzartOptions: _home.EinsatzartOptions);
+            collectKeyword: true,
+            callSignOptions: _home.CallSignOptions);
     });
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
@@ -91,7 +90,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (op is null) return;
 
         if (action == PendingAction.New)
-            _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.IncidentNumber));
+            _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.Keyword));
         else if (action == PendingAction.Join)
             _home.JoinDeviceCommand.Execute(new JoinRequest(op, prompt!.Host, prompt.Pin));
     }

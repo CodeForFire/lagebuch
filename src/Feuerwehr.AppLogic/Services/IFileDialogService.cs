@@ -2,7 +2,12 @@ namespace Feuerwehr.AppLogic.Services;
 
 public interface IFileDialogService
 {
-    Task<string?> PickSaveAsync(string suggestedFileName);
+    /// <summary>
+    /// <paramref name="initialFolder"/> is a hint only (e.g. the last folder a save succeeded to);
+    /// implementations that have no concept of a picker location (Android's app-managed storage)
+    /// ignore it.
+    /// </summary>
+    Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null);
     Task<string?> PickOpenAsync();
     Task<string?> PickExportPdfAsync(string suggestedFileName);
     Task<string?> PickImportJsonAsync();

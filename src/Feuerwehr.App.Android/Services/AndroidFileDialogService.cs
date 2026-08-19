@@ -18,7 +18,8 @@ public sealed class AndroidFileDialogService : IFileDialogService
 
     public AndroidFileDialogService(Activity activity) => _activity = activity;
 
-    public Task<string?> PickSaveAsync(string suggestedFileName)
+    // initialFolder is meaningless here -- incidents always land in app-private storage (§ above).
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
     {
         var dir = AndroidAppPaths.IncidentsDir(_activity);
         var path = System.IO.Path.Combine(dir, suggestedFileName);

@@ -38,7 +38,7 @@ internal sealed class NoAlarm : IAlarmService
 
 internal sealed class NoDialogs : IFileDialogService
 {
-    public Task<string?> PickSaveAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>(null);
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);

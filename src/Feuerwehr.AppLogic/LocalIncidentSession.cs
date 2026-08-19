@@ -49,13 +49,14 @@ public sealed class LocalIncidentSession : IIncidentSession
         SessionOperator op,
         string path,
         IEnumerable<string> checklistTemplate,
-        IncidentNumber? incidentNumber = null)
+        IncidentNumber? incidentNumber = null,
+        string? keyword = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(op);
         // The Einsatznummer goes through the factory rather than SetIncidentNumber afterwards, so the
         // automatic "Einsatz begonnen" entry can name it.
-        var incident = Incident.Start(clock, op, keyword: null, incidentNumber: incidentNumber);
+        var incident = Incident.Start(clock, op, keyword: keyword, incidentNumber: incidentNumber);
         incident.SeedChecklist(checklistTemplate);
         var session = new LocalIncidentSession(store, clock, incident, path, op);
         session.Save();

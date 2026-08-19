@@ -24,9 +24,10 @@ public static class CompositionRoot
         IMasterDataFileService masterDataFileService,
         IIncidentHostController hostController,
         IUiDispatcher uiDispatcher,
-        string appVersion)
+        string appVersion,
+        ILastSaveFolderStore? lastSaveFolder = null)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
         return new MainWindowViewModel(home, editor);
     }
