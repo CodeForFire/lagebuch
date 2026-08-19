@@ -126,7 +126,14 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
 
     public Task OpenUrlAsync(string url)
     {
-        LaunchWithOsDefault(url);
+        // Belt-and-suspenders: LaunchWithOsDefault below is Process.Start with UseShellExecute=true,
+        // which resolves arbitrary URI handlers and even local executable paths, so this refuses
+        // anything but http(s) regardless of what a caller passes in.
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            return Task.CompletedTask;
+
+        LaunchWithOsDefault(uri.AbsoluteUri);
         return Task.CompletedTask;
     }
 

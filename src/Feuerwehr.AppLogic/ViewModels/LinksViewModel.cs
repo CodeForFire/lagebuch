@@ -23,10 +23,20 @@ public sealed partial class LinksViewModel : ObservableObject
 
     public IReadOnlyList<Link> Links { get; }
 
+    /// <summary>
+    /// Refuses anything but http(s) before it reaches the OS: on desktop, OpenUrlAsync ultimately
+    /// runs Process.Start with UseShellExecute=true, which resolves arbitrary URI handlers and even
+    /// local executable paths, and a Link's URL can come from an imported Stammdaten JSON file, not
+    /// just what the user themselves typed here.
+    /// </summary>
     [RelayCommand]
     private Task OpenAsync(Link link)
     {
-        var target = link.Url.Contains("://", StringComparison.Ordinal) ? link.Url : $"https://{link.Url}";
-        return _dialogs.OpenUrlAsync(target);
+        var candidate = link.Url.Contains("://", StringComparison.Ordinal) ? link.Url : $"https://{link.Url}";
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            return Task.CompletedTask;
+
+        return _dialogs.OpenUrlAsync(uri.AbsoluteUri);
     }
 }
