@@ -30,7 +30,7 @@ public class MasterDataEditorViewModelTests
     {
         public string? ImportPath { get; set; }
         public string? ExportPath { get; set; }
-        public Task<string?> PickSaveAsync(string s) => Task.FromResult<string?>(null);
+        public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>(null);
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
         public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
         public Task<string?> PickImportJsonAsync() => Task.FromResult(ImportPath);

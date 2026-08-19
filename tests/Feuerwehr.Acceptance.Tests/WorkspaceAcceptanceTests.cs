@@ -24,7 +24,7 @@ internal sealed class FakeStore : IIncidentStore
 }
 internal sealed class FakeDialogs : IFileDialogService
 {
-    public Task<string?> PickSaveAsync(string s) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);

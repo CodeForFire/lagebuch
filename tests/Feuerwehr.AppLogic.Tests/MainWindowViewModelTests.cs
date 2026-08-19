@@ -51,12 +51,12 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void RequestNewIncident_shows_operator_prompt_collecting_incident_number()
+    public void RequestNewIncident_shows_operator_prompt_collecting_keyword()
     {
         var vm = New();
         vm.RequestNewIncidentCommand.Execute(null);
         Assert.NotNull(vm.PendingPrompt);
-        Assert.True(vm.PendingPrompt!.CollectsIncidentNumber);
+        Assert.True(vm.PendingPrompt!.CollectsKeyword);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class MainWindowViewModelTests
 
 internal sealed class OpenPathDialogs : IFileDialogService
 {
-    public Task<string?> PickSaveAsync(string s) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);

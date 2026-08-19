@@ -17,7 +17,7 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
 
     public StorageProviderFileDialogService(Func<TopLevel?> topLevel) => _topLevel = topLevel;
 
-    public async Task<string?> PickSaveAsync(string suggestedFileName)
+    public async Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
     {
         var top = _topLevel();
         if (top is null) return null;
@@ -26,9 +26,26 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
             Title = "Einsatz speichern",
             SuggestedFileName = suggestedFileName,
             DefaultExtension = "fwincident",
-            FileTypeChoices = new[] { Incident }
+            FileTypeChoices = new[] { Incident },
+            SuggestedStartLocation = await ResolveStartLocation(top, initialFolder)
         });
         return file?.TryGetLocalPath();
+    }
+
+    // A missing/moved/inaccessible folder just means no start-location hint — the OS picker falls
+    // back to wherever it last remembered, exactly like today's behavior with no hint at all.
+    private static async Task<IStorageFolder?> ResolveStartLocation(TopLevel top, string? folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder))
+            return null;
+        try
+        {
+            return await top.StorageProvider.TryGetFolderFromPathAsync(folder);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async Task<string?> PickOpenAsync()

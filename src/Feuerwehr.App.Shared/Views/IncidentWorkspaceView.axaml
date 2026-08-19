@@ -10,16 +10,50 @@
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
               Padding="24,14">
         <StackPanel Spacing="14">
-          <!-- Incident identity. The Einsatznummer is what identifies THIS incident, so it is the
-               hero — large tactical monospace under a single quiet "EINSATZ" label — rather than the
-               app's own name boxed off small to the side. Status shares the number's line on the
+          <!-- Incident identity. The Stichwort is what identifies THIS incident from the first minute
+               (the Einsatznummer is usually unknown until ILS calls back, #69), so it is the hero —
+               large tactical monospace under a single quiet "EINSATZ" label — rather than the app's
+               own name boxed off small to the side. The Einsatznummer becomes a secondary chip once
+               known, with a quiet add-affordance while it isn't. Status shares the hero's line on the
                right as a bare dot + word, no chrome. The app name lives once, up in the command bar. -->
           <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="EINSATZ" Classes="overline" Margin="0,0,0,2" />
-            <TextBlock Grid.Row="1" Grid.Column="0" x:Name="EinsatznummerValue" Classes="mono"
-                       FontSize="26" FontWeight="Medium" LetterSpacing="1"
-                       Foreground="{StaticResource TextPrimaryBrush}"
-                       Text="{Binding IncidentNumberInput}" />
+            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+              <TextBlock x:Name="EinsatznummerValue" Classes="metric" Text="{Binding HeroText}" />
+
+              <!-- The three Einsatznummer-slot states are independent siblings (not nested inside a
+                   shared collapsing wrapper): a data-bound text element stranded inside an
+                   IsVisible-collapsed container measures to zero width the first time the container
+                   un-collapses if its content changes in the same update (see the sharing row above
+                   for the same fix applied to ShareStatus/SharePin). -->
+              <Button x:Name="IncidentNumberChip" Classes="ghost"
+                      IsVisible="{Binding ShowEinsatznummerChip}"
+                      Command="{Binding BeginEditIncidentNumberCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Classes="mono" Text="{Binding IncidentNumberInput}" />
+                  <TextBlock Text="✎" />
+                </StackPanel>
+              </Button>
+
+              <Button x:Name="AddIncidentNumberButton" Classes="ghost" Content="+ ILS-Nr. hinzufügen"
+                      IsVisible="{Binding ShowAddEinsatznummerAffordance}"
+                      Command="{Binding BeginEditIncidentNumberCommand}" />
+
+              <StackPanel x:Name="IncidentNumberEditRow" Orientation="Horizontal" Spacing="6"
+                          VerticalAlignment="Center" IsVisible="{Binding ShowEinsatznummerEdit}">
+                <TextBox x:Name="IncidentNumberEditBox" Width="220" Watermark="z. B. B 1.2 260715 123"
+                         Text="{Binding IncidentNumberEditInput}">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding ConfirmIncidentNumberCommand}" />
+                    <KeyBinding Gesture="Escape" Command="{Binding CancelEditIncidentNumberCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+                <Button x:Name="ConfirmIncidentNumberButton" Classes="ghost" Content="✓"
+                        Command="{Binding ConfirmIncidentNumberCommand}" />
+                <Button x:Name="CancelIncidentNumberButton" Classes="ghost" Content="✕"
+                        Command="{Binding CancelEditIncidentNumberCommand}" />
+              </StackPanel>
+            </StackPanel>
 
             <StackPanel Grid.Row="1" Grid.Column="1" x:Name="StatusReadout"
                         Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">

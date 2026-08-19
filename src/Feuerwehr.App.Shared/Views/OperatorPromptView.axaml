@@ -50,30 +50,16 @@
                            MinimumPrefixLength="0"
                            Text="{Binding OperatorCallSign}"
                            b:EnterSubmit.Command="{Binding ConfirmCommand}" />
-          <StackPanel IsVisible="{Binding CollectsIncidentNumber}" Spacing="3">
-            <TextBlock Text="EINSATZNUMMER" Classes="overline" FontSize="10" Margin="0,8,0,3" />
-            <!-- Complete format "<Einsatzart> 1.2 <JJMMTT> <lfd.Nr>". The Einsatzart is a free-text
-                 suggestion list (like the Funkrufname box); "1.2" is fixed; date and number are free
-                 text. The whole number is optional. -->
-            <Grid ColumnDefinitions="*,Auto,84,84">
-              <AutoCompleteBox Grid.Column="0" Watermark="Art"
-                               ItemsSource="{Binding EinsatzartOptions}"
-                               FilterMode="ContainsOrdinal"
-                               MinimumPrefixLength="0"
-                               Text="{Binding EinsatzartInput}"
-                               b:EnterSubmit.Command="{Binding ConfirmCommand}" />
-              <TextBlock Grid.Column="1" Text="1.2" Classes="mono" VerticalAlignment="Center" Margin="8,0" />
-              <TextBox Grid.Column="2" Watermark="JJMMTT" Text="{Binding EinsatzDateInput}">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
-              <TextBox Grid.Column="3" Watermark="lfd. Nr." Margin="6,0,0,0" Text="{Binding EinsatzNumberInput}">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
-            </Grid>
+          <!-- The Einsatznummer is unknown at the start of most incidents and not worth blocking on
+               (#69), so the Stichwort (dispatch's short keyword, e.g. "B3P") is collected here
+               instead. The Einsatznummer itself can be added later, from the workspace header. -->
+          <StackPanel IsVisible="{Binding CollectsKeyword}" Spacing="3">
+            <TextBlock Text="STICHWORT" Classes="overline" FontSize="10" Margin="0,8,0,3" />
+            <TextBox x:Name="KeywordBox" Watermark="optional, z. B. B3P" Text="{Binding Keyword}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
           </StackPanel>
           <Button x:Name="ConfirmButton" Classes="signal" Content="BESTÄTIGEN" Command="{Binding ConfirmCommand}"
                   HorizontalAlignment="Right" Margin="0,16,0,0" />

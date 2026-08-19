@@ -4,6 +4,7 @@ using Feuerwehr.AppLogic.Services;
 using Feuerwehr.Documents;
 using Feuerwehr.Domain;
 using Feuerwehr.Domain.Time;
+using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Persistence.MasterData;
 using Feuerwehr.Sync;
 
@@ -35,6 +36,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         IsReadOnly = session.IsReadOnly;
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
+        // The Stichwort is creation-time-only (unlike the Einsatznummer above, it has no write-back
+        // path), so a plain property seeded once is enough -- no ObservableProperty needed.
+        KeywordDisplay = _session.Incident.Keyword;
         BuildChildren();
 
         // A joined client renders exactly what the host broadcasts; wire the connection lifecycle so
@@ -51,8 +55,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanContinueEditing))]
     [NotifyPropertyChangedFor(nameof(CanHost))]
+    [NotifyPropertyChangedFor(nameof(CanEditIncidentNumber))]
     [NotifyCanExecuteChangedFor(nameof(CloseIncidentCommand))]
     [NotifyCanExecuteChangedFor(nameof(ContinueEditingCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginEditIncidentNumberCommand))]
     private bool _isReadOnly;
 
     [ObservableProperty]
@@ -64,11 +70,76 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
 
-    // Display-only projection of the domain IncidentNumber, seeded once above from the session. The
-    // Einsatznummer is now captured exclusively at incident creation (OperatorPromptView, mandatory
-    // there) and is never edited afterwards -- this property intentionally has no write-back path.
+    // The Stichwort, captured once at creation (#69) and never edited afterward -- unlike the
+    // Einsatznummer below, which the header lets you add/edit later.
+    public string? KeywordDisplay { get; private set; }
+
+    // Display projection of the domain IncidentNumber, seeded once from the session and kept in
+    // sync by ConfirmIncidentNumber/OnRemoteLifecycle. Unlike KeywordDisplay this DOES have a
+    // write-back path (#69): the header offers an inline add/edit affordance, since the number is
+    // commonly unknown at creation and gets filled in once ILS calls back.
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeroText))]
+    [NotifyPropertyChangedFor(nameof(HasEinsatznummer))]
+    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
+    [NotifyPropertyChangedFor(nameof(ShowAddEinsatznummerAffordance))]
     private string _incidentNumberInput = string.Empty;
+
+    // The header's hero: the Stichwort when known, else the Einsatznummer, else a placeholder for
+    // the rare incident that was given neither.
+    public string HeroText =>
+        !string.IsNullOrWhiteSpace(KeywordDisplay) ? KeywordDisplay
+        : !string.IsNullOrWhiteSpace(IncidentNumberInput) ? IncidentNumberInput
+        : "Unbenannter Einsatz";
+
+    // The Einsatznummer slot (chip / add-affordance / edit row) only shows when the Einsatznummer
+    // isn't already occupying the hero slot itself -- i.e. whenever a Stichwort is the hero instead.
+    public bool ShowEinsatznummerSlot => !string.IsNullOrWhiteSpace(KeywordDisplay);
+
+    public bool HasEinsatznummer => !string.IsNullOrWhiteSpace(IncidentNumberInput);
+
+    public bool ShowEinsatznummerChip => ShowEinsatznummerSlot && HasEinsatznummer && !IsEditingIncidentNumber;
+
+    public bool ShowAddEinsatznummerAffordance => ShowEinsatznummerSlot && !HasEinsatznummer && !IsEditingIncidentNumber;
+
+    public bool ShowEinsatznummerEdit => ShowEinsatznummerSlot && IsEditingIncidentNumber;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
+    [NotifyPropertyChangedFor(nameof(ShowAddEinsatznummerAffordance))]
+    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerEdit))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmIncidentNumberCommand))]
+    private bool _isEditingIncidentNumber;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmIncidentNumberCommand))]
+    private string _incidentNumberEditInput = string.Empty;
+
+    public bool CanEditIncidentNumber => !IsReadOnly;
+
+    [RelayCommand(CanExecute = nameof(CanEditIncidentNumber))]
+    private void BeginEditIncidentNumber()
+    {
+        IncidentNumberEditInput = IncidentNumberInput;
+        IsEditingIncidentNumber = true;
+    }
+
+    private bool CanConfirmIncidentNumber => !string.IsNullOrWhiteSpace(IncidentNumberEditInput);
+
+    [RelayCommand(CanExecute = nameof(CanConfirmIncidentNumber))]
+    private void ConfirmIncidentNumber()
+    {
+        var number = new IncidentNumber(IncidentNumberEditInput.Trim());
+        _session.SetIncidentNumber(number);
+        // A local session applies this immediately in-process; a remote/joined session only
+        // reflects it once the host's broadcast round-trips (OnRemoteLifecycle) -- updating here
+        // too is harmless, it just gets overwritten with the same value shortly after.
+        IncidentNumberInput = number.Value;
+        IsEditingIncidentNumber = false;
+    }
+
+    [RelayCommand]
+    private void CancelEditIncidentNumber() => IsEditingIncidentNumber = false;
 
     public ChecklistViewModel Checklist { get; private set; } = null!;
     public EtbViewModel Etb { get; private set; } = null!;
@@ -112,10 +183,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     }
 
     // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
-    // incident); keep the header live and flip the whole workspace to read-only when it does.
+    // incident, or someone adds the Einsatznummer from another device); keep the header live and
+    // flip the whole workspace to read-only when the lifecycle itself changes.
     private void OnRemoteLifecycle()
     {
         OnPropertyChanged(nameof(StatusDisplay));
+        IncidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
         if (_session.IsReadOnly != IsReadOnly)
         {
             IsReadOnly = _session.IsReadOnly;

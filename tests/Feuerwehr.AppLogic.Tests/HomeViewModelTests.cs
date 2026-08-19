@@ -1,7 +1,6 @@
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;
-using Feuerwehr.Domain.ValueObjects;
 using Feuerwehr.Persistence.MasterData;
 
 namespace Feuerwehr.AppLogic.Tests;
@@ -22,6 +21,13 @@ internal sealed class FakeRecent : IRecentFilesStore
     private readonly List<string> _list = new();
     public IReadOnlyList<string> GetRecent() => _list;
     public void Add(string path) { _list.Remove(path); _list.Insert(0, path); }
+}
+
+internal sealed class FakeLastSaveFolderStore : ILastSaveFolderStore
+{
+    public string? Saved { get; set; }
+    public string? GetLastFolder() => Saved;
+    public void SetLastFolder(string folder) => Saved = folder;
 }
 
 public class HomeViewModelTests
@@ -48,7 +54,7 @@ public class HomeViewModelTests
     }
 
     [Fact]
-    public void NewIncident_with_number_suggests_a_filename_with_the_literal_number()
+    public void NewIncident_with_keyword_suggests_a_date_time_stichwort_filename()
     {
         var store = new FakeStore();
         var dialogs = new CapturingSaveDialogs();
@@ -57,27 +63,94 @@ public class HomeViewModelTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        var number = new IncidentNumber("B 1.2 260715 1297");
-        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), number));
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
 
-        // Spaces in the Einsatznummer are kept literally in the filename; no date suffix.
-        Assert.Equal("Einsatz B 1.2 260715 1297.fwincident", dialogs.LastSuggestedName);
+        // The Einsatznummer is unknown at creation (#69) -- the filename is date + time + Stichwort.
+        Assert.Equal("20260622-0900-B3P.fwincident", dialogs.LastSuggestedName);
         Assert.NotNull(opened);
-        Assert.Equal("B 1.2 260715 1297", opened!.IncidentNumberInput);
     }
 
     [Fact]
-    public void NewIncident_without_number_falls_back_to_a_plain_filename()
+    public void NewIncident_without_keyword_falls_back_to_a_timestamp_only_filename()
     {
-        // Defense-in-depth: the operator prompt enforces a number before this command can be
-        // invoked for real, but HomeViewModel itself should stay total rather than crash on null.
         var dialogs = new CapturingSaveDialogs();
         var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
             new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
 
-        Assert.Equal("Einsatz.fwincident", dialogs.LastSuggestedName);
+        Assert.Equal("20260622-0900.fwincident", dialogs.LastSuggestedName);
+    }
+
+    [Fact]
+    public void NewIncident_passes_the_last_known_folder_as_the_initial_folder()
+    {
+        var dialogs = new CapturingSaveDialogs();
+        var lastFolder = new FakeLastSaveFolderStore { Saved = "/einsaetze/2026" };
+        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
+            new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0",
+            lastSaveFolder: lastFolder);
+
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
+
+        Assert.Equal("/einsaetze/2026", dialogs.LastInitialFolder);
+    }
+
+    [Fact]
+    public void NewIncident_remembers_the_folder_it_saved_to()
+    {
+        var dialogs = new CapturingSaveDialogs { ReturnPath = "/einsaetze/2027/20260622-0900-B3P.fwincident" };
+        var lastFolder = new FakeLastSaveFolderStore();
+        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
+            new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0",
+            lastSaveFolder: lastFolder);
+
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
+
+        Assert.Equal("/einsaetze/2027", lastFolder.Saved);
+    }
+
+    [Fact]
+    public void RecentFiles_is_sorted_by_filename_descending_regardless_of_open_order()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<string>());
+
+        var recent = new FakeRecent();
+        recent.Add("/20260101-0900-A.fwincident");
+        recent.Add("/20260301-0900-B.fwincident");
+        recent.Add("/20260201-0900-C.fwincident");
+
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        Assert.Equal(
+            new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" },
+            vm.RecentFiles.Select(f => f.FileName));
+    }
+
+    [Fact]
+    public void Newly_opened_incident_is_inserted_into_sorted_position_not_just_at_front()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<string>());
+
+        var recent = new FakeRecent();
+        recent.Add("/20260101-0900-A.fwincident");
+        recent.Add("/20260301-0900-B.fwincident");
+
+        var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<string>());
+        vm.OpenRecentCommand.Execute("/20260201-0900-C.fwincident");
+
+        Assert.Equal(
+            new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" },
+            vm.RecentFiles.Select(f => f.FileName));
     }
 
     [Fact]
@@ -237,7 +310,7 @@ public class HomeViewModelTests
 // PickOpenAsync that returns a real path (the base FakeDialogs returns null).
 internal sealed class OpenReturningDialogs : IFileDialogService
 {
-    public Task<string?> PickSaveAsync(string suggestedFileName) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
@@ -245,14 +318,17 @@ internal sealed class OpenReturningDialogs : IFileDialogService
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
-// Captures the suggested filename passed to PickSaveAsync.
+// Captures the suggested filename and initial folder passed to PickSaveAsync.
 internal sealed class CapturingSaveDialogs : IFileDialogService
 {
     public string? LastSuggestedName { get; private set; }
-    public Task<string?> PickSaveAsync(string suggestedFileName)
+    public string? LastInitialFolder { get; private set; }
+    public string ReturnPath { get; set; } = "/x.fwincident";
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
     {
         LastSuggestedName = suggestedFileName;
-        return Task.FromResult<string?>("/x.fwincident");
+        LastInitialFolder = initialFolder;
+        return Task.FromResult<string?>(ReturnPath);
     }
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);

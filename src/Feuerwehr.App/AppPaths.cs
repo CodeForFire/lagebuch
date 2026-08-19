@@ -9,6 +9,8 @@ public static class AppPaths
 
     public static string RecentFilesJsonPath => Path.Combine(AppDataDir, "recent.json");
 
+    public static string LastSaveFolderJsonPath => Path.Combine(AppDataDir, "last-save-folder.json");
+
     public static string GetAppDataDir(string baseDir)
     {
         var dir = Path.Combine(baseDir, "Lagebuch");

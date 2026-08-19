@@ -9,7 +9,7 @@ namespace Feuerwehr.AppLogic.Tests;
 internal sealed class FakeDialogs : IFileDialogService
 {
     public string? ExportPath { get; set; }
-    public Task<string?> PickSaveAsync(string suggestedFileName) => Task.FromResult<string?>("/x.fwincident");
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(ExportPath);
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
@@ -196,11 +196,11 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
-    public void IncidentNumberInput_has_no_write_back_to_the_domain_or_store()
+    public void Setting_IncidentNumberInput_directly_does_not_write_back()
     {
-        // The Einsatznummer is fixed at incident creation and displayed read-only on the main
-        // screen from then on -- setting the bound property (as the old editable TextBox used to)
-        // must not autosave or mutate the domain anymore.
+        // IncidentNumberInput is a display projection; the only write-back path is the
+        // ConfirmIncidentNumberCommand flow below (#69) -- assigning the bound property directly
+        // (as a plain data-bound control would) must not autosave or mutate the domain.
         var vm = NewWorkspace(out var store, out _);
         var before = store.SaveCount;
 
@@ -224,6 +224,112 @@ public class IncidentWorkspaceViewModelTests
         var vm = new IncidentWorkspaceViewModel(reopened, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
 
         Assert.Equal("B 99", vm.IncidentNumberInput);
+    }
+
+    // --- Header hero + Einsatznummer add-later (#69) -----------------------------------------
+
+    [Fact]
+    public void HeroText_shows_the_keyword_when_set()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { "A?" }, keyword: "B3P");
+        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+
+        Assert.Equal("B3P", vm.HeroText);
+        Assert.True(vm.ShowEinsatznummerSlot);
+        Assert.False(vm.HasEinsatznummer);
+        Assert.True(vm.ShowAddEinsatznummerAffordance);
+        Assert.False(vm.ShowEinsatznummerChip);
+    }
+
+    [Fact]
+    public void HeroText_falls_back_to_the_einsatznummer_when_there_is_no_keyword()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { "A?" }, incidentNumber: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
+        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+
+        Assert.Equal("B 1.2 260715 123", vm.HeroText);
+        // The number is already the hero -- no redundant chip alongside it.
+        Assert.False(vm.ShowEinsatznummerSlot);
+    }
+
+    [Fact]
+    public void HeroText_falls_back_to_a_placeholder_when_neither_is_set()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.Equal("Unbenannter Einsatz", vm.HeroText);
+        Assert.False(vm.ShowEinsatznummerSlot);
+    }
+
+    [Fact]
+    public void Begin_confirm_flow_sets_the_einsatznummer_persists_it_and_shows_the_chip()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { "A?" }, keyword: "B3P");
+        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+
+        vm.BeginEditIncidentNumberCommand.Execute(null);
+        Assert.True(vm.IsEditingIncidentNumber);
+        Assert.True(vm.ShowEinsatznummerEdit);
+        Assert.False(vm.ShowAddEinsatznummerAffordance);
+
+        vm.IncidentNumberEditInput = "B 1.2 260715 123";
+        vm.ConfirmIncidentNumberCommand.Execute(null);
+
+        Assert.False(vm.IsEditingIncidentNumber);
+        Assert.Equal("B 1.2 260715 123", vm.IncidentNumberInput);
+        Assert.True(vm.HasEinsatznummer);
+        Assert.True(vm.ShowEinsatznummerChip);
+        Assert.Equal("B 1.2 260715 123", store.Load("/x.fwincident").IncidentNumber!.Value);
+    }
+
+    [Fact]
+    public void Cancel_edit_discards_without_mutating()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { "A?" }, keyword: "B3P");
+        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+
+        vm.BeginEditIncidentNumberCommand.Execute(null);
+        vm.IncidentNumberEditInput = "B 1.2 260715 123";
+        vm.CancelEditIncidentNumberCommand.Execute(null);
+
+        Assert.False(vm.IsEditingIncidentNumber);
+        Assert.False(vm.HasEinsatznummer);
+        Assert.Null(store.Load("/x.fwincident").IncidentNumber);
+    }
+
+    [Fact]
+    public void Confirm_is_disabled_until_the_edit_input_is_non_blank()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.BeginEditIncidentNumberCommand.Execute(null);
+        Assert.False(vm.ConfirmIncidentNumberCommand.CanExecute(null));
+
+        vm.IncidentNumberEditInput = "   ";
+        Assert.False(vm.ConfirmIncidentNumberCommand.CanExecute(null));
+
+        vm.IncidentNumberEditInput = "B 1";
+        Assert.True(vm.ConfirmIncidentNumberCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Editing_the_einsatznummer_is_blocked_on_a_readonly_workspace()
+    {
+        var vm = ReadOnlyWorkspace(out _, closed: true);
+
+        Assert.False(vm.CanEditIncidentNumber);
+        Assert.False(vm.BeginEditIncidentNumberCommand.CanExecute(null));
     }
 
     [Fact]

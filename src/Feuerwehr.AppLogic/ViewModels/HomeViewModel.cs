@@ -25,8 +25,12 @@ public sealed partial class HomeViewModel : ObservableObject
     // wires the real dispatcher via CompositionRoot; the immediate default keeps the many non-join
     // HomeViewModel tests (which never open a RemoteIncidentSession) construction-noise free.
     private readonly IUiDispatcher _uiDispatcher;
+    // Where the last new-incident save landed, so the next one opens the picker there instead of
+    // wherever the OS last remembered. Null when not supplied (e.g. most tests) -- every use site
+    // is null-guarded, so the feature is simply inert rather than required.
+    private readonly ILastSaveFolderStore? _lastSaveFolder;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null)
     {
         _store = store;
         _masterData = masterData;
@@ -38,8 +42,9 @@ public sealed partial class HomeViewModel : ObservableObject
         _hostController = hostController;
         _appVersion = appVersion;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
+        _lastSaveFolder = lastSaveFolder;
         RecentFiles = new ObservableCollection<RecentFileItem>(
-            recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path))));
+            SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
 
     public ObservableCollection<RecentFileItem> RecentFiles { get; }
@@ -51,9 +56,6 @@ public sealed partial class HomeViewModel : ObservableObject
 
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
     public IReadOnlyList<string> CallSignOptions => _masterData.Get().RadioCallSigns;
-
-    /// <summary>Einsatzart values offered as the dropdown in the new-incident operator prompt.</summary>
-    public IReadOnlyList<string> EinsatzartOptions => _masterData.Get().Einsatzarten;
 
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
@@ -71,24 +73,29 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
-        // The Einsatznummer is mandatory in the new-incident prompt (OperatorPromptViewModel),
-        // so request.IncidentNumber should always be set here. The null branch is defense-in-depth
-        // only, so this method stays total rather than throwing if that gate is ever bypassed.
-        var suggestedName = request.IncidentNumber is { } num
-            ? $"Einsatz {StripInvalidFileNameChars(num.Value)}.fwincident"
-            : "Einsatz.fwincident";
-        var path = await _dialogs.PickSaveAsync(suggestedName);
+        // Date + time + Stichwort, e.g. "20260819-2217-B3P.fwincident" -- the Einsatznummer is
+        // unknown at creation (#69) and no longer part of the filename; it can be added later from
+        // the workspace header. No Stichwort at all just leaves the timestamp alone.
+        var timestamp = _clock.Now.ToString("yyyyMMdd-HHmm");
+        var stem = string.IsNullOrWhiteSpace(request.Keyword)
+            ? timestamp
+            : $"{timestamp}-{StripInvalidFileNameChars(request.Keyword.Trim())}";
+        var suggestedName = $"{stem}.fwincident";
+        var path = await _dialogs.PickSaveAsync(suggestedName, _lastSaveFolder?.GetLastFolder());
         if (string.IsNullOrWhiteSpace(path))
             return;
+        // Remember where this landed so the next new incident's picker opens there too.
+        if (Path.GetDirectoryName(path) is { Length: > 0 } dir)
+            _lastSaveFolder?.SetLastFolder(dir);
         var md = _masterData.Get();
         var session = LocalIncidentSession.StartNew(
-            _store, _clock, request.Operator, path, md.ChecklistTemplate, request.IncidentNumber);
+            _store, _clock, request.Operator, path, md.ChecklistTemplate, incidentNumber: null, keyword: request.Keyword);
         OpenWorkspace(session, path, md);
     }
 
     // Filesystem-invalid characters differ per platform; Path.GetInvalidFileNameChars() reflects
     // whichever OS is running, so this drops only what that platform actually rejects and
-    // otherwise preserves the composed Einsatznummer verbatim, spaces included.
+    // otherwise preserves the input verbatim, spaces included.
     private static string StripInvalidFileNameChars(string value)
     {
         var invalid = Path.GetInvalidFileNameChars();
@@ -138,9 +145,23 @@ public sealed partial class HomeViewModel : ObservableObject
         var existing = RecentFiles.FirstOrDefault(f => f.Path == path);
         if (existing is not null)
             RecentFiles.Remove(existing);
-        RecentFiles.Insert(0, new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
+        InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
         var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController);
         WorkspaceOpened?.Invoke(workspace);
+    }
+
+    // The Übersicht reads chronologically now that filenames start with date+time (#69), so the
+    // list is kept sorted by filename (newest first) rather than by open-order/MRU. The underlying
+    // recent.json store stays exactly as-is (still MRU-capped) -- only the displayed order changes.
+    private static IEnumerable<RecentFileItem> SortByFileNameDescending(IEnumerable<RecentFileItem> items) =>
+        items.OrderByDescending(f => f.FileName, StringComparer.OrdinalIgnoreCase);
+
+    private void InsertSortedByFileNameDescending(RecentFileItem item)
+    {
+        var insertAt = RecentFiles
+            .TakeWhile(f => string.Compare(f.FileName, item.FileName, StringComparison.OrdinalIgnoreCase) >= 0)
+            .Count();
+        RecentFiles.Insert(insertAt, item);
     }
 
     // ===== Multi-device join (#52 §4/§6): connect to another device's hosted incident as a thin client. =====

@@ -36,7 +36,8 @@ internal static class Program
             new MasterDataFileService(),
             new IncidentHostController(clock, version, uiDispatcher),
             uiDispatcher,
-            version);
+            version,
+            new JsonLastSaveFolderStore(AppPaths.LastSaveFolderJsonPath));
     }
 
     public static AppBuilder BuildAvaloniaApp() =>
