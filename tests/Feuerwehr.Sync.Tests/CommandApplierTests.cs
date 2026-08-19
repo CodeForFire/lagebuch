@@ -83,6 +83,18 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void RenameFileCommand_updates_the_display_name()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var file = incident.AddFile(clock, new SessionOperator("Host", "FFB 1"), "brand.jpg", "image/jpeg", 100);
+
+        ApplyOverWire(new RenameFileCommand(file.Id, "Küchenbrand"), incident, clock);
+
+        Assert.Equal("Küchenbrand", Assert.Single(incident.Files).DisplayName);
+    }
+
+    [Fact]
     public void A_command_against_a_closed_incident_is_rejected_by_the_domain_guard()
     {
         var clock = new FixedClock();

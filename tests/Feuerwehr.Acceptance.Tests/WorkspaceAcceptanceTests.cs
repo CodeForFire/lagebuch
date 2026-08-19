@@ -146,8 +146,29 @@ public class WorkspaceAcceptanceTests
         var window = new Window { Content = view, Width = 800, Height = 600 };
         window.Show();
 
-        var texts = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
-        Assert.Contains("brand.jpg", texts);
+        // The name is an editable TextBox now (display name), not a TextBlock.
+        var names = view.GetVisualDescendants().OfType<TextBox>().Select(t => t.Text).ToList();
+        Assert.Contains("brand.jpg", names);
+    }
+
+    [AvaloniaFact]
+    public void Renaming_a_file_via_ui_writes_through_to_the_domain()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.Incident.AddFile(new FixedClock(), session.Operator!, "brand.jpg", "image/jpeg", 2048);
+        var filesVm = new FilesViewModel(session, new FakeDialogs(), () => { });
+        var view = new FilesView { DataContext = filesVm };
+        var window = new Window { Content = view, Width = 800, Height = 600 };
+        window.Show();
+
+        var nameBox = view.GetVisualDescendants().OfType<TextBox>().First(t => t.Text == "brand.jpg");
+        nameBox.Focus();
+        nameBox.SelectAll();
+        window.KeyTextInput("Küchenbrand");
+
+        Assert.Equal("Küchenbrand", filesVm.Files[0].DisplayName);
+        Assert.Equal("Küchenbrand", session.Incident.Files.Single().DisplayName);
+        Assert.Equal("brand.jpg", session.Incident.Files.Single().FileName); // the original name is untouched
     }
 
     [AvaloniaFact]

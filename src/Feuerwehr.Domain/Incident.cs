@@ -443,6 +443,21 @@ public sealed class Incident
         return file;
     }
 
+    /// <summary>
+    /// Corrects a file's display label. Silent — no ETB entry — matching
+    /// <see cref="UpdateForceUnit"/>'s Bemerkung field: a label correction isn't a reportable event.
+    /// </summary>
+    public IncidentFile RenameFile(Guid fileId, string? displayName)
+    {
+        EnsureOpen();
+        var index = _files.FindIndex(f => f.Id == fileId);
+        if (index < 0)
+            throw new KeyNotFoundException($"Datei {fileId} nicht gefunden.");
+        var renamed = _files[index].WithDisplayName(displayName);
+        _files[index] = renamed;
+        return renamed;
+    }
+
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId)
             ?? throw new KeyNotFoundException($"Atemschutz-Trupp {truppId} not found.");

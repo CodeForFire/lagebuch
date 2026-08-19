@@ -29,7 +29,9 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IncidentFileRow">
               <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,10">
-                <TextBlock Grid.Column="0" Text="{Binding FileName}" VerticalAlignment="Center" />
+                <TextBox Grid.Column="0" Text="{Binding DisplayName}" Watermark="Name"
+                         BorderThickness="0" Background="Transparent" Padding="0"
+                         VerticalAlignment="Center" IsEnabled="{Binding !IsReadOnly}" />
                 <TextBlock Grid.Column="1" Classes="mono" Text="{Binding SizeDisplay}" Margin="10,0"
                            VerticalAlignment="Center" />
                 <TextBlock Grid.Column="2" Classes="mono" Text="{Binding AddedAtDisplay}" Margin="10,0"

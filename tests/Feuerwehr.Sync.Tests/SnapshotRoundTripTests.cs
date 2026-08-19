@@ -47,7 +47,8 @@ public class SnapshotRoundTripTests
         clock.Now = clock.Now.AddMinutes(3);
         incident.MarkScbaReturned(clock, trupp.Id);
 
-        incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
+        incident.RenameFile(file.Id, "Küchenbrand");
 
         clock.Now = clock.Now.AddMinutes(1);
         incident.Close(clock, op);
@@ -99,6 +100,7 @@ public class SnapshotRoundTripTests
 
         var file = Assert.Single(r.Files);
         Assert.Equal("brand.jpg", file.FileName);
+        Assert.Equal("Küchenbrand", file.DisplayName);
         Assert.Equal("image/jpeg", file.ContentType);
         Assert.Equal(2048, file.SizeBytes);
     }

@@ -236,6 +236,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         ? null
         : Path.Combine(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
 
+    public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
+
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 
     // Fire-and-forget: the command is POSTed; the host's broadcast (or a rejection the host swallows)

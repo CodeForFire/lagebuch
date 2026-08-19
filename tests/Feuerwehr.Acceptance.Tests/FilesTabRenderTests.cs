@@ -53,7 +53,10 @@ public class FilesTabRenderTests
     public void Selecting_the_dateien_tab_shows_an_attached_file()
     {
         var (window, vm, session) = ShowWorkspace();
-        session.Incident.AddFile(new FixedClock(), session.Operator!, "einsatzstelle.jpg", "image/jpeg", 1_200_000);
+        var file = session.Incident.AddFile(new FixedClock(), session.Operator!, "einsatzstelle.jpg", "image/jpeg", 1_200_000);
+        // A renamed display name (independent of the original file name) is the point of the
+        // screenshot below — the editable Name field.
+        session.Incident.RenameFile(file.Id, "Küchenbrand, Erdgeschoss");
         vm.Files.Sync();
         Dispatcher.UIThread.RunJobs();
 
@@ -63,6 +66,7 @@ public class FilesTabRenderTests
 
         Assert.Equal("DATEIEN", ((TabItem)tabs.SelectedItem!).Header);
         Assert.Single(vm.Files.Files);
+        Assert.Equal("Küchenbrand, Erdgeschoss", vm.Files.Files[0].DisplayName);
         Capture(window, "files-after.png");
     }
 }

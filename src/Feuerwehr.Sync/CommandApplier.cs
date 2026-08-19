@@ -85,6 +85,9 @@ public static class CommandApplier
                 var file = incident.AddFile(clock, Operator(c.Operator), c.FileName, c.ContentType, c.Bytes.LongLength);
                 saveFileBytes?.Invoke(IncidentFile.StorageFileName(file.Id, file.FileName), c.Bytes);
                 break;
+            case RenameFileCommand c:
+                incident.RenameFile(c.FileId, c.DisplayName);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(command),
                     $"Unbekannter Befehl: {command.GetType().Name}");

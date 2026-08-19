@@ -114,6 +114,50 @@ public class FilesViewModelTests
     }
 
     [Fact]
+    public void Row_seeds_DisplayName_from_the_file_name()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+        Assert.Equal("brand.jpg", Assert.Single(vm.Files).DisplayName);
+    }
+
+    [Fact]
+    public void Editing_DisplayName_writes_through_to_the_domain()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+        var file = session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+        var row = Assert.Single(vm.Files);
+
+        row.DisplayName = "Küchenbrand";
+
+        Assert.Equal("Küchenbrand", session.Incident.Files.Single(f => f.Id == file.Id).DisplayName);
+    }
+
+    [Fact]
+    public void Editing_DisplayName_on_a_readonly_session_is_ignored()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        session.Close();
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+        var row = Assert.Single(vm.Files);
+
+        row.DisplayName = "Küchenbrand"; // must not throw despite the closed incident
+
+        Assert.Equal("brand.jpg", session.Incident.Files.Single().DisplayName);
+    }
+
+    [Fact]
     public void Sync_renders_files_already_present_when_the_session_was_opened()
     {
         // Mirrors EtbViewModel's tail-sync: files added before this VM existed (a reopen, or

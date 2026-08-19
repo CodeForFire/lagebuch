@@ -157,12 +157,12 @@ public sealed class IncidentRepository
         {
             var f = incident.Files[i];
             Run(cn, tx,
-                "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by) VALUES ($id,$o,$fn,$ct,$sz,$at,$by);",
+                "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by, display_name) VALUES ($id,$o,$fn,$ct,$sz,$at,$by,$dn);",
                 p =>
                 {
                     p("$id", f.Id.ToString()); p("$o", i); p("$fn", f.FileName);
                     p("$ct", f.ContentType); p("$sz", f.SizeBytes);
-                    p("$at", f.AddedAt.ToString(Iso)); p("$by", f.AddedBy);
+                    p("$at", f.AddedAt.ToString(Iso)); p("$by", f.AddedBy); p("$dn", f.DisplayName);
                 });
         }
 
@@ -297,9 +297,11 @@ public sealed class IncidentRepository
                 r.GetString(0), ParseDate(r.GetString(1)), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4) != 0));
 
         var files = ReadAll(cn,
-            "SELECT id, file_name, content_type, size_bytes, added_at, added_by FROM incident_files ORDER BY ordinal;",
-            r => Domain.Files.IncidentFile.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),
-                r.GetInt64(3), ParseDate(r.GetString(4)), r.GetString(5)));
+            "SELECT id, file_name, content_type, size_bytes, added_at, added_by, display_name FROM incident_files ORDER BY ordinal;",
+            // display_name is null on rows written before this column existed -- fall back to
+            // file_name, same idiom as the Einsatznummer legacy fallback just below.
+            r => Domain.Files.IncidentFile.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 6) ?? r.GetString(1),
+                r.GetString(2), r.GetInt64(3), ParseDate(r.GetString(4)), r.GetString(5)));
 
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the

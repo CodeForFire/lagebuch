@@ -62,9 +62,10 @@ public class RehydrationTests
     public void IncidentFile_rehydrate_restores_metadata()
     {
         var id = Guid.NewGuid();
-        var file = Files.IncidentFile.Rehydrate(id, "brand.jpg", "image/jpeg", 2048, T0, "Müller (FFB 12/1)");
+        var file = Files.IncidentFile.Rehydrate(id, "brand.jpg", "Küchenbrand", "image/jpeg", 2048, T0, "Müller (FFB 12/1)");
         Assert.Equal(id, file.Id);
         Assert.Equal("brand.jpg", file.FileName);
+        Assert.Equal("Küchenbrand", file.DisplayName);
         Assert.Equal(2048, file.SizeBytes);
     }
 
@@ -78,7 +79,7 @@ public class RehydrationTests
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(), Array.Empty<AuditEvent>(),
             Array.Empty<Time.IncidentTimerState>(),
-            new[] { Files.IncidentFile.Rehydrate(fileId, "bericht.pdf", "application/pdf", 4096, T0, "Müller") });
+            new[] { Files.IncidentFile.Rehydrate(fileId, "bericht.pdf", "bericht.pdf", "application/pdf", 4096, T0, "Müller") });
 
         var file = Assert.Single(incident.Files);
         Assert.Equal(fileId, file.Id);

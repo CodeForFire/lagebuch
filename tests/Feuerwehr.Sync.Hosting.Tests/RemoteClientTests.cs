@@ -87,6 +87,33 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task RenameFile_syncs_to_other_joined_clients()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        await using var renamer = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+        await using var observer = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+
+        var renamerAdded = NextChange(renamer);
+        var observerAdded = NextChange(observer);
+        await renamer.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1 });
+        await Task.WhenAll(renamerAdded, observerAdded);
+        var fileId = Assert.Single(renamer.Incident.Files).Id;
+
+        var renamerRenamed = NextChange(renamer);
+        var observerRenamed = NextChange(observer);
+        renamer.RenameFile(fileId, "Küchenbrand");
+        await Task.WhenAll(renamerRenamed, observerRenamed);
+
+        Assert.Equal("Küchenbrand", Assert.Single(renamer.Incident.Files).DisplayName);
+        Assert.Equal("Küchenbrand", Assert.Single(observer.Incident.Files).DisplayName);
+    }
+
+    [Fact]
     public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
     {
         var clock = new FixedClock();

@@ -109,6 +109,29 @@ public class IncidentPdfTests
     }
 
     [Fact]
+    public void Generate_lists_a_renamed_pdf_attachment_in_the_file_table()
+    {
+        // A minimal incident, same rationale as the image test above: keeps pagination stable so a
+        // size delta can be attributed to the new table row rather than an unrelated layout shift.
+        // No qpdf/native-merge dependency here — the table lists file metadata only, independent of
+        // whether bytes were supplied or the file is a PDF vs. an image.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        var withoutFile = IncidentPdf.Generate(incident);
+
+        var file = incident.AddFile(clock, op, "bericht.pdf", "application/pdf", 100);
+        incident.RenameFile(file.Id, "Lagebericht Erdgeschoss");
+        var withFile = IncidentPdf.Generate(incident);
+
+        PdfAssert.IsPdf(withFile);
+        // A PDF attachment's pages are appended separately and carry no caption of their own — the
+        // table row is the only place its (renamed) label shows up anywhere in the report.
+        Assert.True(withFile.Length > withoutFile.Length,
+            $"Expected the file table to grow the PDF even without embedded bytes (without={withoutFile.Length}, with={withFile.Length}).");
+    }
+
+    [Fact]
     public void Generate_skips_a_file_whose_bytes_were_not_supplied_rather_than_failing()
     {
         var incident = BuildFullIncident();

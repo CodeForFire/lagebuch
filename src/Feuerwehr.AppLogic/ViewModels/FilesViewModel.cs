@@ -8,8 +8,49 @@ using Feuerwehr.Sync;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
-public sealed record IncidentFileRow(
-    Guid Id, string FileName, string SizeDisplay, string AddedAtDisplay, string AddedBy, bool IsImage);
+/// <summary>
+/// One row of the Dateien list. <see cref="DisplayName"/> is freely editable and writes through on
+/// every change (mirrors <c>ForceRow</c>'s Status/Bemerkung fields); <see cref="FileName"/> stays
+/// fixed and is used only for <see cref="FilesViewModel.OpenFileAsync"/>'s temp-file naming, so a
+/// display name without a recognizable extension can't break opening the file externally.
+/// </summary>
+public sealed partial class IncidentFileRow : ObservableObject
+{
+    private readonly Action<string?> _onRenamed;
+
+    public IncidentFileRow(
+        Guid id, string fileName, string displayName, string sizeDisplay, string addedAtDisplay,
+        string addedBy, bool isImage, bool isReadOnly, Action<string?> onRenamed)
+    {
+        Id = id;
+        FileName = fileName;
+        _displayName = displayName;
+        SizeDisplay = sizeDisplay;
+        AddedAtDisplay = addedAtDisplay;
+        AddedBy = addedBy;
+        IsImage = isImage;
+        IsReadOnly = isReadOnly;
+        _onRenamed = onRenamed;
+    }
+
+    public Guid Id { get; }
+    public string FileName { get; }
+    public string SizeDisplay { get; }
+    public string AddedAtDisplay { get; }
+    public string AddedBy { get; }
+    public bool IsImage { get; }
+    public bool IsReadOnly { get; }
+
+    [ObservableProperty]
+    private string _displayName;
+
+    partial void OnDisplayNameChanged(string value)
+    {
+        if (IsReadOnly)
+            return;
+        _onRenamed(value);
+    }
+}
 
 public sealed partial class FilesViewModel : ObservableObject
 {
@@ -87,7 +128,7 @@ public sealed partial class FilesViewModel : ObservableObject
         var bytes = await _session.GetFileBytesAsync(row.Id);
         if (bytes is null)
         {
-            ErrorMessage = $"„{row.FileName}“ ist nicht verfügbar.";
+            ErrorMessage = $"„{row.DisplayName}“ ist nicht verfügbar.";
             return;
         }
         var tempPath = Path.Combine(Path.GetTempPath(), row.FileName);
@@ -95,9 +136,10 @@ public sealed partial class FilesViewModel : ObservableObject
         await _dialogs.OpenFileAsync(tempPath);
     }
 
-    private static IncidentFileRow ToRow(IncidentFile f) => new(
-        f.Id, f.FileName, FormatSize(f.SizeBytes), Formatting.Timestamp(f.AddedAt), f.AddedBy,
-        f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase));
+    private IncidentFileRow ToRow(IncidentFile f) => new(
+        f.Id, f.FileName, f.DisplayName, FormatSize(f.SizeBytes), Formatting.Timestamp(f.AddedAt), f.AddedBy,
+        f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase), IsReadOnly,
+        displayName => _session.RenameFile(f.Id, displayName));
 
     private static string FormatSize(long bytes) => bytes switch
     {

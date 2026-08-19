@@ -33,6 +33,64 @@ public class FilesTests
     }
 
     [Fact]
+    public void AddFile_seeds_the_display_name_from_the_file_name()
+    {
+        var incident = NewIncident(out var clock, out var op);
+
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 1024);
+
+        Assert.Equal("brand.jpg", file.DisplayName);
+    }
+
+    [Fact]
+    public void RenameFile_changes_the_display_name_without_touching_the_journal()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 1024);
+        var journalCountBefore = incident.Journal.Count;
+
+        var renamed = incident.RenameFile(file.Id, "Küchenbrand, Erdgeschoss");
+
+        Assert.Equal("Küchenbrand, Erdgeschoss", renamed.DisplayName);
+        Assert.Equal("brand.jpg", renamed.FileName); // the original name never changes
+        Assert.Same(renamed, Assert.Single(incident.Files));
+        Assert.Equal(journalCountBefore, incident.Journal.Count); // silent — no ETB entry
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void RenameFile_with_a_blank_name_resets_to_the_original_file_name(string? blank)
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 1024);
+        incident.RenameFile(file.Id, "Küchenbrand");
+
+        var reset = incident.RenameFile(file.Id, blank);
+
+        Assert.Equal("brand.jpg", reset.DisplayName);
+    }
+
+    [Fact]
+    public void RenameFile_on_a_closed_incident_throws()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 1024);
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(() => incident.RenameFile(file.Id, "Neu"));
+    }
+
+    [Fact]
+    public void RenameFile_with_an_unknown_id_throws()
+    {
+        var incident = NewIncident(out _, out _);
+
+        Assert.Throws<KeyNotFoundException>(() => incident.RenameFile(Guid.NewGuid(), "Neu"));
+    }
+
+    [Fact]
     public void AddFile_on_a_closed_incident_throws()
     {
         var incident = NewIncident(out var clock, out var op);
@@ -55,6 +113,18 @@ public class FilesTests
         var ex = Assert.Throws<ArgumentException>(() =>
             IncidentFile.Create("x.pdf", "application/pdf", IncidentFile.MaxSizeBytes + 1, T0, "Müller"));
         Assert.Equal("sizeBytes", ex.ParamName);
+    }
+
+    [Fact]
+    public void WithDisplayName_returns_a_new_instance_leaving_the_original_untouched()
+    {
+        var original = IncidentFile.Create("brand.jpg", "image/jpeg", 1024, T0, "Müller");
+
+        var renamed = original.WithDisplayName("Küchenbrand");
+
+        Assert.Equal("brand.jpg", original.DisplayName); // unchanged
+        Assert.Equal("Küchenbrand", renamed.DisplayName);
+        Assert.Equal(original.Id, renamed.Id);
     }
 
     [Fact]

@@ -16,6 +16,7 @@ public sealed record IncidentFile
 
     public Guid Id { get; private init; }
     public string FileName { get; private init; } = string.Empty;
+    public string DisplayName { get; private init; } = string.Empty;
     public string ContentType { get; private init; } = string.Empty;
     public long SizeBytes { get; private init; }
     public DateTimeOffset AddedAt { get; private init; }
@@ -34,10 +35,12 @@ public sealed record IncidentFile
             throw new ArgumentException($"Datei ist größer als das Limit von {MaxSizeBytes / (1024 * 1024)} MB.", nameof(sizeBytes));
         ArgumentException.ThrowIfNullOrWhiteSpace(addedBy);
 
+        var trimmedName = fileName.Trim();
         return new IncidentFile
         {
             Id = Guid.NewGuid(),
-            FileName = fileName.Trim(),
+            FileName = trimmedName,
+            DisplayName = trimmedName,
             ContentType = contentType,
             SizeBytes = sizeBytes,
             AddedAt = addedAt,
@@ -46,16 +49,28 @@ public sealed record IncidentFile
     }
 
     public static IncidentFile Rehydrate(
-        Guid id, string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy)
+        Guid id, string fileName, string displayName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy)
         => new()
         {
             Id = id,
             FileName = fileName,
+            DisplayName = displayName,
             ContentType = contentType,
             SizeBytes = sizeBytes,
             AddedAt = addedAt,
             AddedBy = addedBy
         };
+
+    /// <summary>
+    /// A freely-editable label shown in the Dateien list and the PDF export, independent of
+    /// <see cref="FileName"/> (which stays fixed — it drives the storage extension and the
+    /// temp-file name "Öffnen" hands to the OS). Clearing the field resets to <see cref="FileName"/>
+    /// rather than persisting a blank label.
+    /// </summary>
+    public IncidentFile WithDisplayName(string? displayName) => this with
+    {
+        DisplayName = string.IsNullOrWhiteSpace(displayName) ? FileName : displayName.Trim()
+    };
 
     /// <summary>
     /// The name this file's bytes are stored under (sibling <c>.files</c> folder, or the

@@ -95,4 +95,4 @@ public sealed record AuditEventDto(DateTimeOffset At, string Action, string By);
 /// the actual bytes on demand via <c>GET /files/{id}</c> (see <c>IncidentHost</c>).
 /// </summary>
 public sealed record IncidentFileDto(
-    Guid Id, string FileName, string ContentType, long SizeBytes, DateTimeOffset AddedAt, string AddedBy);
+    Guid Id, string FileName, string DisplayName, string ContentType, long SizeBytes, DateTimeOffset AddedAt, string AddedBy);

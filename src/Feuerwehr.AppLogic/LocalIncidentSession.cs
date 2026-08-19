@@ -183,6 +183,8 @@ public sealed class LocalIncidentSession : IIncidentSession
         return Task.FromResult(bytes);
     }
 
+    public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));
+
     public void Close()
     {
         if (IsReadOnly)

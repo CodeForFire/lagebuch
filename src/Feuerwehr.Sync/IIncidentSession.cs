@@ -76,4 +76,8 @@ public interface IIncidentSession
     /// <summary>Null when the bytes are unavailable — never throws, so a caller (a file-row "open"
     /// action, or the PDF exporter) degrades quietly rather than crashing on a missing attachment.</summary>
     Task<byte[]?> GetFileBytesAsync(Guid fileId);
+
+    /// <summary>Corrects a file's display label. Silent — no ETB entry, matching UpdateForceUnit's
+    /// Bemerkung field. Null/blank resets the label back to the file's original name.</summary>
+    void RenameFile(Guid fileId, string? displayName);
 }

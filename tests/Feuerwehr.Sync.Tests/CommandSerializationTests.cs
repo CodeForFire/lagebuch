@@ -27,6 +27,8 @@ public class CommandSerializationTests
         new SetStatusCommand(null),
         new CloseIncidentCommand(Op),
         new AddFileCommand(Op, "brand.jpg", "image/jpeg", new byte[] { 1, 2, 3, 4 }),
+        new RenameFileCommand(Guid.NewGuid(), "Küchenbrand"),
+        new RenameFileCommand(Guid.NewGuid(), null),
     }.Select(c => new object[] { c });
 
     [Theory]
