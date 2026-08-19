@@ -75,7 +75,7 @@ public class RehydrationTests
         var fileId = Guid.NewGuid();
         var incident = Incident.Rehydrate(
             Guid.NewGuid(), T0, IncidentState.Open, null, null, null, null, null, null, null,
-            Array.Empty<ChecklistItem>(), Array.Empty<EtbEntry>(),
+            Array.Empty<ChecklistItem>(), Array.Empty<ChecklistItem>(), Array.Empty<EtbEntry>(),
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(), Array.Empty<AuditEvent>(),
             Array.Empty<Time.IncidentTimerState>(),

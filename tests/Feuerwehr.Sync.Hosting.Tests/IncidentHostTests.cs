@@ -99,7 +99,7 @@ public class IncidentHostTests
     {
         var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -135,7 +135,7 @@ public class IncidentHostTests
     {
         var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -153,7 +153,7 @@ public class IncidentHostTests
     {
         var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);

@@ -17,7 +17,8 @@ public class FilesTabRenderTests
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace()
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), WorkspaceRenderHelper.MasterData(),
             new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
@@ -40,12 +41,12 @@ public class FilesTabRenderTests
         ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
 
     [AvaloniaFact]
-    public void Workspace_renders_six_tabs_before_dateien_is_opened()
+    public void Workspace_renders_seven_tabs_before_dateien_is_opened()
     {
         var (window, _, _) = ShowWorkspace();
         var tabs = Tabs(window);
 
-        Assert.Equal(6, tabs.Items.Count);
+        Assert.Equal(7, tabs.Items.Count);
         Capture(window, "files-before.png");
     }
 
@@ -61,7 +62,7 @@ public class FilesTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var tabs = Tabs(window);
-        tabs.SelectedIndex = 5; // DATEIEN
+        tabs.SelectedIndex = 6; // DATEIEN
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("DATEIEN", ((TabItem)tabs.SelectedItem!).Header);
