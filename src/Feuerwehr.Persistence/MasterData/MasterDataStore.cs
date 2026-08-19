@@ -43,12 +43,8 @@ public sealed class MasterDataStore
                 p => { p("$n", s.Name); p("$d", s.District); });
 
         Run(cn, tx, "DELETE FROM md_checklist_template;", _ => { });
-        for (var i = 0; i < set.ChecklistTemplate.Count; i++)
-        {
-            var text = set.ChecklistTemplate[i];
-            Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text) VALUES ($o,$t);",
-                p => { p("$o", i); p("$t", text); });
-        }
+        InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAufbau, kind: 0, ordinalOffset: 0);
+        InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAbbau, kind: 1, ordinalOffset: set.ChecklistTemplateAufbau.Count);
 
         Run(cn, tx, "DELETE FROM md_personnel;", _ => { });
         foreach (var person in set.Personnel)
@@ -69,6 +65,20 @@ public sealed class MasterDataStore
                 p => { p("$k", key); p("$v", value); });
 
         tx.Commit();
+    }
+
+    // Ordinal is the table's PRIMARY KEY, so Aufbau and Abbau rows share one running sequence
+    // (Abbau continuing where Aufbau left off) rather than each restarting at 0.
+    private static void InsertChecklistTemplate(
+        SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<ChecklistTemplateItem> items, int kind, int ordinalOffset)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var ordinal = ordinalOffset + i;
+            Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text, is_mandatory, kind) VALUES ($o,$t,$m,$k);",
+                p => { p("$o", ordinal); p("$t", item.Text); p("$m", item.IsMandatory ? 1 : 0); p("$k", kind); });
+        }
     }
 
     private static IEnumerable<(string Key, int Value)> SettingsRows(IncidentSettings s) => new[]
@@ -99,7 +109,12 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_brigades (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_checklist_template (
+                ordinal INTEGER PRIMARY KEY,
+                text TEXT NOT NULL,
+                is_mandatory INTEGER NOT NULL DEFAULT 0,
+                kind INTEGER NOT NULL DEFAULT 0
+            );
             CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_einsatzarten (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_personnel (
@@ -111,22 +126,50 @@ public sealed class MasterDataStore
             );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             """);
+
+        // Widen a pre-existing md_checklist_template that predates the Aufbau/Abbau split — this
+        // store has no version marker, so every open re-checks rather than gating on one.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "is_mandatory", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "kind", "INTEGER NOT NULL DEFAULT 0");
     }
 
-    private static MasterDataSet Read(SqliteConnection cn) => new(
-        ReadColumn(cn, "SELECT value FROM md_roles;"),
-        ReadColumn(cn, "SELECT value FROM md_status;"),
-        ReadColumn(cn, "SELECT value FROM md_equipment;"),
-        ReadColumn(cn, "SELECT value FROM md_districts;"),
-        ReadColumn(cn, "SELECT value FROM md_call_signs;"),
-        ReadColumn(cn, "SELECT value FROM md_brigades;"),
-        ReadColumn(cn, "SELECT value FROM md_unit_status;"),
-        ReadStreets(cn),
-        ReadColumn(cn, "SELECT text FROM md_checklist_template ORDER BY ordinal;"),
-        ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
-        ReadPersonnel(cn),
-        ReadColumn(cn, "SELECT value FROM md_einsatzarten;"),
-        ReadSettings(cn));
+    private static MasterDataSet Read(SqliteConnection cn)
+    {
+        var (checklistAufbau, checklistAbbau) = ReadChecklistTemplate(cn);
+        return new(
+            ReadColumn(cn, "SELECT value FROM md_roles;"),
+            ReadColumn(cn, "SELECT value FROM md_status;"),
+            ReadColumn(cn, "SELECT value FROM md_equipment;"),
+            ReadColumn(cn, "SELECT value FROM md_districts;"),
+            ReadColumn(cn, "SELECT value FROM md_call_signs;"),
+            ReadColumn(cn, "SELECT value FROM md_brigades;"),
+            ReadColumn(cn, "SELECT value FROM md_unit_status;"),
+            ReadStreets(cn),
+            checklistAufbau,
+            checklistAbbau,
+            ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
+            ReadPersonnel(cn),
+            ReadColumn(cn, "SELECT value FROM md_einsatzarten;"),
+            ReadSettings(cn));
+    }
+
+    // Rows are ordered globally by ordinal (Aufbau's block precedes Abbau's — see
+    // InsertChecklistTemplate), so filtering by kind here preserves each list's own order.
+    private static (IReadOnlyList<ChecklistTemplateItem> Aufbau, IReadOnlyList<ChecklistTemplateItem> Abbau)
+        ReadChecklistTemplate(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT text, is_mandatory, kind FROM md_checklist_template ORDER BY ordinal;";
+        using var r = cmd.ExecuteReader();
+        var aufbau = new List<ChecklistTemplateItem>();
+        var abbau = new List<ChecklistTemplateItem>();
+        while (r.Read())
+        {
+            var item = new ChecklistTemplateItem(r.GetString(0), r.GetInt32(1) != 0);
+            (r.GetInt32(2) == 0 ? aufbau : abbau).Add(item);
+        }
+        return (aufbau, abbau);
+    }
 
     private static IncidentSettings ReadSettings(SqliteConnection cn)
     {

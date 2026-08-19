@@ -16,7 +16,7 @@ public class OperatorPromptFocusTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        ChecklistTemplate = new[] { "Blaulicht aus?" },
+        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Blaulicht aus?", false) },
         RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
     };
 
@@ -25,7 +25,7 @@ public class OperatorPromptFocusTests
         var store = new FakeStore();
         var clock = new FixedClock();
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident", new[] { "Blaulicht aus?" });
+            "/x.fwincident", new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }

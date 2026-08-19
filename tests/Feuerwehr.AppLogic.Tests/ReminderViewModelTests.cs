@@ -45,7 +45,7 @@ public class ReminderViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         return (session, clock);
     }
 

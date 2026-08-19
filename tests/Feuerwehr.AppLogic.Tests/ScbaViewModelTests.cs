@@ -17,7 +17,7 @@ public class ScbaViewModelTests
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
         LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
     private static ScbaViewModel Vm(FixedClock clock, LocalIncidentSession session, Action? onChanged = null, FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
         new(session, Md(), clock, ticker ?? new FakeTicker(), alarm ?? new FakeAlarmService(), onChanged ?? (() => { }));
@@ -188,7 +188,7 @@ public class ScbaViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Close();
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
 

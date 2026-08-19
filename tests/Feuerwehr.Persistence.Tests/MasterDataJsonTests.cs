@@ -23,7 +23,8 @@ public class MasterDataJsonTests
               "brigades": ["FFB Wache 1"],
               "truppTypes": ["Angriffstrupp"],
               "einsatzarten": ["B", "THL"],
-              "checklistTemplate": ["Schritt 1"],
+              "checklistTemplateAufbau": [{ "text": "Schritt 1", "mandatory": true }],
+              "checklistTemplateAbbau": [{ "text": "Abbauschritt", "mandatory": false }],
               "streets": [{ "name": "Bahnhofstr.", "district": "FFB" }],
               "personnel": [{ "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Land 1", "phone": "0171" }]
             }
@@ -32,10 +33,36 @@ public class MasterDataJsonTests
         Assert.Equal(new[] { "EL", "ZF" }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
         Assert.Equal(new[] { "B", "THL" }, set.Einsatzarten);
+        Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplateAufbau));
+        Assert.Equal(new ChecklistTemplateItem("Abbauschritt", false), Assert.Single(set.ChecklistTemplateAbbau));
         Assert.Contains(set.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
         var max = set.Personnel.Single();
         Assert.Equal("Max", max.FirstName);
         Assert.Equal("Land 1", max.CallSign);
+    }
+
+    [Fact]
+    public void Parse_maps_the_legacy_flat_checklistTemplate_array_to_optional_aufbau_items()
+    {
+        var set = Parse("""{ "checklistTemplate": ["Schritt 1", "Schritt 2"] }""");
+
+        Assert.Equal(
+            new[] { new ChecklistTemplateItem("Schritt 1", false), new ChecklistTemplateItem("Schritt 2", false) },
+            set.ChecklistTemplateAufbau);
+        Assert.Empty(set.ChecklistTemplateAbbau);
+    }
+
+    [Fact]
+    public void Parse_prefers_the_split_keys_over_the_legacy_flat_array_when_both_are_present()
+    {
+        var set = Parse("""
+            {
+              "checklistTemplate": ["Ignoriert"],
+              "checklistTemplateAufbau": [{ "text": "Neu", "mandatory": true }]
+            }
+            """);
+
+        Assert.Equal(new ChecklistTemplateItem("Neu", true), Assert.Single(set.ChecklistTemplateAufbau));
     }
 
     [Fact]
@@ -79,7 +106,9 @@ public class MasterDataJsonTests
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
             Einsatzarten = new[] { "B", "THL", "R" },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") },
-            ChecklistTemplate = new[] { "Ä ö ü / ß Schritt" }, // relaxed escaping must survive the round trip
+            // relaxed escaping must survive the round trip
+            ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Ä ö ü / ß Schritt", true) },
+            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbau Ä ö ü", false) },
             Personnel = new[]
             {
                 new Person("Mustermann", "Max", "ZF", "Land 1", "0171"),
@@ -91,7 +120,8 @@ public class MasterDataJsonTests
 
         Assert.Equal(original.Roles, reparsed.Roles);
         Assert.Equal(original.UnitStatus, reparsed.UnitStatus);
-        Assert.Equal(original.ChecklistTemplate, reparsed.ChecklistTemplate);
+        Assert.Equal(original.ChecklistTemplateAufbau, reparsed.ChecklistTemplateAufbau);
+        Assert.Equal(original.ChecklistTemplateAbbau, reparsed.ChecklistTemplateAbbau);
         Assert.Equal(original.Einsatzarten, reparsed.Einsatzarten);
         Assert.Equal(original.Streets, reparsed.Streets);
         Assert.Equal(original.Personnel, reparsed.Personnel);

@@ -22,8 +22,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private EditableListSection _roles = null!, _status = null!, _unitStatus = null!, _equipment = null!,
-        _districts = null!, _brigades = null!, _callSigns = null!, _truppTypes = null!, _einsatzarten = null!,
-        _checklist = null!;
+        _districts = null!, _brigades = null!, _callSigns = null!, _truppTypes = null!, _einsatzarten = null!;
+    private ChecklistTemplateSection _checklistAufbau = null!, _checklistAbbau = null!;
     private PersonnelSection _personnel = null!;
     private SettingsSection _settings = null!;
 
@@ -80,7 +80,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Sections.Add(_callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty));
         Sections.Add(_truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty));
         Sections.Add(_einsatzarten = new EditableListSection("Einsatzarten", set.Einsatzarten, MarkDirty));
-        Sections.Add(_checklist = new EditableListSection("Checkliste", set.ChecklistTemplate, MarkDirty));
+        Sections.Add(_checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty));
+        Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
         Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
@@ -97,7 +98,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         RadioCallSigns = _callSigns.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Einsatzarten = _einsatzarten.ToValues(),
-        ChecklistTemplate = _checklist.ToValues(),
+        ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
+        ChecklistTemplateAbbau = _checklistAbbau.ToValues(),
         Personnel = _personnel.ToPeople(),
         Settings = _settings.ToSettings(),
         // Streets are not editable here; _original carries them through unchanged.

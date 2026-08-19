@@ -20,7 +20,7 @@ public class WorkspaceCollaborationTests
 {
     private static LocalIncidentSession HostSession(FixedClock clock) =>
         LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { "Punkt A" });
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { ("Punkt A", false) }, Array.Empty<(string, bool)>());
 
     private static IncidentWorkspaceViewModel Workspace(IIncidentSession session, IClock clock) =>
         new(session, clock, new NoTicker(), MasterDataSet.Empty,

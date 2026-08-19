@@ -8,7 +8,7 @@ public class RemoteClientTests
 {
     private static LocalIncidentSession HostSession(FixedClock clock) =>
         LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { "Punkt A" });
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { ("Punkt A", false) }, Array.Empty<(string, bool)>());
 
     // Completes when the session next raises Changed (times out so a broken broadcast fails fast).
     private static Task NextChange(RemoteIncidentSession session, TimeSpan? timeout = null)

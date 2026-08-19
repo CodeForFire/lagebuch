@@ -45,7 +45,8 @@ public class MasterDataStoreTests : IDisposable
             RadioCallSigns = new[] { "Land 1" },
             TruppTypes = new[] { "Angriffstrupp" },
             Einsatzarten = new[] { "B", "THL" },
-            ChecklistTemplate = new[] { "Schritt 1", "Schritt 2" },
+            ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
+            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbauschritt", true) },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
@@ -54,7 +55,10 @@ public class MasterDataStoreTests : IDisposable
         var reopened = store.GetOrCreate(_path);
         Assert.Equal(new[] { "EL", "ZF" }, reopened.Roles);
         Assert.Equal(new[] { "B", "THL" }, reopened.Einsatzarten);
-        Assert.Equal(new[] { "Schritt 1", "Schritt 2" }, reopened.ChecklistTemplate);
+        Assert.Equal(
+            new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
+            reopened.ChecklistTemplateAufbau);
+        Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplateAbbau);
         Assert.Contains(reopened.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("Land 1", max.CallSign);
@@ -116,11 +120,55 @@ public class MasterDataStoreTests : IDisposable
     public void Save_round_trips_a_checklist_reorder_and_delete()
     {
         var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with { ChecklistTemplate = new[] { "A", "B", "C" } });
+        store.Save(_path, MasterDataSet.Empty with
+        {
+            ChecklistTemplateAufbau = Items("A", "B", "C"),
+        });
 
-        store.Save(_path, MasterDataSet.Empty with { ChecklistTemplate = new[] { "C", "A" } });
+        store.Save(_path, MasterDataSet.Empty with { ChecklistTemplateAufbau = Items("C", "A") });
 
-        Assert.Equal(new[] { "C", "A" }, store.GetOrCreate(_path).ChecklistTemplate);
+        Assert.Equal(Items("C", "A"), store.GetOrCreate(_path).ChecklistTemplateAufbau);
+
+        static IReadOnlyList<ChecklistTemplateItem> Items(params string[] texts) =>
+            texts.Select(t => new ChecklistTemplateItem(t, false)).ToList();
+    }
+
+    [Fact]
+    public void Save_round_trips_aufbau_and_abbau_independently_with_mandatory_flags()
+    {
+        var store = new MasterDataStore();
+        store.Save(_path, MasterDataSet.Empty with
+        {
+            ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Fahrzeug prüfen", true) },
+            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Material zählen", false) },
+        });
+
+        var reopened = store.GetOrCreate(_path);
+        Assert.Equal(new ChecklistTemplateItem("Fahrzeug prüfen", true), Assert.Single(reopened.ChecklistTemplateAufbau));
+        Assert.Equal(new ChecklistTemplateItem("Material zählen", false), Assert.Single(reopened.ChecklistTemplateAbbau));
+    }
+
+    [Fact]
+    public void A_pre_split_database_widens_in_place_and_reads_everything_as_optional_aufbau()
+    {
+        // Simulate a database written before the Aufbau/Abbau split: the table exists but without
+        // is_mandatory/kind. EnsureSchema must widen it in place rather than erroring on open.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_checklist_template (ordinal INTEGER PRIMARY KEY, text TEXT NOT NULL);
+                INSERT INTO md_checklist_template (ordinal, text) VALUES (0, 'Altes Item');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var set = new MasterDataStore().GetOrCreate(_path);
+
+        Assert.Equal(new ChecklistTemplateItem("Altes Item", false), Assert.Single(set.ChecklistTemplateAufbau));
+        Assert.Empty(set.ChecklistTemplateAbbau);
     }
 
     [Fact]

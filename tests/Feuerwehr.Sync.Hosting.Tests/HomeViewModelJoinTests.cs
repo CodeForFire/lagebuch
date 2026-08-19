@@ -18,7 +18,7 @@ public class HomeViewModelJoinTests
 
     private static LocalIncidentSession HostSession(FixedClock clock) =>
         LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { "Punkt A" });
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { ("Punkt A", false) }, Array.Empty<(string, bool)>());
 
     [Fact]
     public async Task Successful_join_opens_a_thin_client_workspace()

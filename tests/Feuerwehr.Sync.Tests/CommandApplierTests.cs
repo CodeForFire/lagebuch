@@ -31,10 +31,10 @@ public class CommandApplierTests
     {
         var clock = new FixedClock();
         var incident = NewIncident(clock);
-        incident.SeedChecklist(new[] { "Punkt A", "Punkt B" });
+        incident.SeedChecklist(new[] { ("Punkt A", false), ("Punkt B", false) }, Array.Empty<(string, bool)>());
         var op = new OperatorDto("Client", "RUF 1");
 
-        ApplyOverWire(new ToggleChecklistItemCommand(incident.Checklist[0].Id), incident, clock);
+        ApplyOverWire(new ToggleChecklistItemCommand(op, incident.ChecklistAufbau[0].Id), incident, clock);
         ApplyOverWire(new AssignRoleCommand("EL", "Huber", "FFB 1", clock.Now, null, null, null), incident, clock);
         ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", "Im Einsatz", null, 4), incident, clock);
         ApplyOverWire(new AddScbaTruppCommand("Angriffstrupp",
@@ -42,7 +42,7 @@ public class CommandApplierTests
             "AT-1", null, 30, 60, 5), incident, clock);
         ApplyOverWire(new StartScbaTruppCommand(incident.ScbaTrupps.Last().Id, 300), incident, clock);
 
-        Assert.True(incident.Checklist[0].IsDone);
+        Assert.True(incident.ChecklistAufbau[0].IsDone);
         Assert.Single(incident.Roles);
         Assert.Equal(9, incident.TotalPersonnel);
         var trupp = Assert.Single(incident.ScbaTrupps);

@@ -8,9 +8,12 @@
   "brigades": ["FF Musterstadt", "FF Musterdorf"],
   "truppTypes": ["Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "CSA-Trupp", "LPA-Trupp"],
   "einsatzarten": ["B", "THL", "R", "ABC", "Sonstiges"],
-  "checklistTemplate": [
-    "Aufstellort ELW frei?",
-    "Kennleuchte ein, Blaulicht aus?"
+  "checklistTemplateAufbau": [
+    { "text": "Aufstellort ELW frei?", "mandatory": true },
+    { "text": "Kennleuchte ein, Blaulicht aus?", "mandatory": false }
+  ],
+  "checklistTemplateAbbau": [
+    { "text": "Fahrzeug abgerüstet?", "mandatory": true }
   ],
   "streets": [
     { "name": "Bahnhofstraße", "district": "Musterstadt" },

@@ -89,7 +89,10 @@ public sealed partial class HomeViewModel : ObservableObject
             _lastSaveFolder?.SetLastFolder(dir);
         var md = _masterData.Get();
         var session = LocalIncidentSession.StartNew(
-            _store, _clock, request.Operator, path, md.ChecklistTemplate, incidentNumber: null, keyword: request.Keyword);
+            _store, _clock, request.Operator, path,
+            md.ChecklistTemplateAufbau.Select(i => (i.Text, i.IsMandatory)),
+            md.ChecklistTemplateAbbau.Select(i => (i.Text, i.IsMandatory)),
+            incidentNumber: null, keyword: request.Keyword);
         OpenWorkspace(session, path, md);
     }
 

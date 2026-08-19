@@ -231,9 +231,34 @@
           <TabControl.Background>
             <SolidColorBrush Color="Transparent" />
           </TabControl.Background>
-          <TabItem Header="CHECKLISTE">
+          <TabItem>
+            <TabItem.Header>
+              <StackPanel x:DataType="vm:ChecklistViewModel" DataContext="{Binding ChecklistAufbau}"
+                          Orientation="Horizontal" Spacing="7">
+                <TextBlock Text="AUFBAU" />
+                <Ellipse x:Name="AufbauCompleteDot" Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding AllMandatoryDone}" />
+                <Ellipse x:Name="AufbauIncompleteDot" Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding !AllMandatoryDone}" />
+              </StackPanel>
+            </TabItem.Header>
             <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Checklist}" />
+              <ContentControl Content="{Binding ChecklistAufbau}" />
+            </Border>
+          </TabItem>
+          <TabItem>
+            <TabItem.Header>
+              <StackPanel x:DataType="vm:ChecklistViewModel" DataContext="{Binding ChecklistAbbau}"
+                          Orientation="Horizontal" Spacing="7">
+                <TextBlock Text="ABBAU" />
+                <Ellipse x:Name="AbbauCompleteDot" Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding AllMandatoryDone}" />
+                <Ellipse x:Name="AbbauIncompleteDot" Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding !AllMandatoryDone}" />
+              </StackPanel>
+            </TabItem.Header>
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding ChecklistAbbau}" />
             </Border>
           </TabItem>
           <TabItem Header="ETB">

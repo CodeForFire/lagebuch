@@ -20,7 +20,7 @@ public class HeaderHeroTests
     private static IncidentWorkspaceViewModel BuildWorkspace(string? keyword)
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>(), keyword: keyword);
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>(), keyword: keyword);
         return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(),
             new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }

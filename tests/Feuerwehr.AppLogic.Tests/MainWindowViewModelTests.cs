@@ -23,7 +23,7 @@ internal sealed class MvFakeMasterData : IMasterDataProvider
     public MasterDataSet Get() => MasterDataSet.Empty with
     {
         Roles = new[] { "EL" },
-        ChecklistTemplate = new[] { "A?" },
+        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
         TruppTypes = new[] { "Angriffstrupp" },
         RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
     };
@@ -95,7 +95,7 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()));
 
@@ -111,7 +111,7 @@ public class MainWindowViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()));
 

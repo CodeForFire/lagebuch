@@ -27,8 +27,13 @@ public class IncidentRoundTripTests : IDisposable
         incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.SetAddress("Hauptstr. 12", "FFB");
         incident.SetStatus("aufgenommen");
-        incident.SeedChecklist(new[] { "Blaulicht aus?", "Bei ILS gemeldet?" });
-        incident.ToggleChecklistItem(incident.Checklist[0].Id);
+        // Item 0 stays mandatory-and-unchecked deliberately: toggling it would complete Aufbau and
+        // fire an extra ETB system entry, which this test isn't about — that's covered in
+        // IncidentOperationsTests. Toggling the optional item still proves IsDone round-trips.
+        incident.SeedChecklist(
+            new[] { ("Blaulicht aus?", true), ("Bei ILS gemeldet?", false) },
+            new[] { ("Fahrzeug abgerüstet?", true) });
+        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[1].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
         incident.AssignRole("EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
@@ -46,8 +51,12 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("Hauptstr. 12", loaded.Street);
         Assert.Equal("FFB", loaded.District);
         Assert.Equal("aufgenommen", loaded.Status);
-        Assert.Equal(2, loaded.Checklist.Count);
-        Assert.True(loaded.Checklist[0].IsDone);
+        Assert.Equal(2, loaded.ChecklistAufbau.Count);
+        Assert.False(loaded.ChecklistAufbau[0].IsDone);
+        Assert.True(loaded.ChecklistAufbau[0].IsMandatory);
+        Assert.True(loaded.ChecklistAufbau[1].IsDone);
+        Assert.False(loaded.ChecklistAufbau[1].IsMandatory);
+        Assert.True(Assert.Single(loaded.ChecklistAbbau).IsMandatory);
         // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the manual one
         // follows it in chronological order, then the automatic entry for the recorded unit --
         // which is also the proof that a generated entry survives the round trip.

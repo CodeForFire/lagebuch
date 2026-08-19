@@ -34,7 +34,7 @@ public sealed record OperatorDto(string Name, string? CallSign);
 public sealed record AddJournalEntryCommand(
     OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To) : SyncCommand;
 
-public sealed record ToggleChecklistItemCommand(Guid ItemId) : SyncCommand;
+public sealed record ToggleChecklistItemCommand(OperatorDto Operator, Guid ItemId) : SyncCommand;
 
 public sealed record AssignRoleCommand(
     string Role, string PersonName, string? CallSign,

@@ -22,14 +22,16 @@ public class SnapshotRoundTripTests
         var clock = new FixedClock();
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, keyword: "Brand", incidentNumber: new IncidentNumber("B 1.2 260812 001"));
-        incident.SeedChecklist(new[] { "Aufstellort ELW?", "Funk auf 0?" });
+        incident.SeedChecklist(
+            new[] { ("Aufstellort ELW?", true), ("Funk auf 0?", false) },
+            new[] { ("Fahrzeug abgerüstet?", false) });
         incident.SetAddress("Hauptstraße 1", "Bezirk 2");
         incident.SetStatus("Im Einsatz");
         incident.SetKeyword("Brand 2 – Wohnhaus");
 
         clock.Now = clock.Now.AddMinutes(1);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erstmeldung", from: "Leitstelle", to: "ELW");
-        incident.ToggleChecklistItem(incident.Checklist[0].Id);
+        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
         incident.AssignRole("EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
 
         var force = incident.AddForceUnit(clock, op, "Aich", personnelCount: 9, callSign: "Aich 42/1",
@@ -78,8 +80,10 @@ public class SnapshotRoundTripTests
         Assert.Equal("Hauptstraße 1", r.Street);
         Assert.Equal(original.ClosedAt, r.ClosedAt);
         Assert.Equal(original.ClosedBy, r.ClosedBy);
-        Assert.Equal(original.Checklist.Count, r.Checklist.Count);
-        Assert.True(r.Checklist[0].IsDone);
+        Assert.Equal(original.ChecklistAufbau.Count, r.ChecklistAufbau.Count);
+        Assert.True(r.ChecklistAufbau[0].IsDone);
+        Assert.True(r.ChecklistAufbau[0].IsMandatory);
+        Assert.Equal(original.ChecklistAbbau.Count, r.ChecklistAbbau.Count);
         Assert.Equal(original.Journal.Count, r.Journal.Count);
         Assert.Equal(9, r.Forces[0].PersonnelCount);
         Assert.Equal("Im Einsatz", r.Forces[0].Status);

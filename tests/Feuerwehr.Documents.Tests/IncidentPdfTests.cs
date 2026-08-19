@@ -22,8 +22,10 @@ public class IncidentPdfTests
         incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.SetAddress("Hauptstr. 12", "FFB");
         incident.SetStatus("aufgenommen");
-        incident.SeedChecklist(new[] { "Blaulicht aus?", "Bei ILS gemeldet?" });
-        incident.ToggleChecklistItem(incident.Checklist[0].Id);
+        incident.SeedChecklist(
+            new[] { ("Blaulicht aus?", true), ("Bei ILS gemeldet?", false) },
+            new[] { ("Fahrzeug abgerüstet?", true) });
+        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung erhalten", from: "ILS");
         // Exercise the widest Funktionszuweisung row: every one of the seven columns filled, so

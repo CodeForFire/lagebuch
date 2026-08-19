@@ -6,6 +6,10 @@ namespace Feuerwehr.Persistence.MasterData;
 
 public sealed record Street(string Name, string District);
 
+/// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's Aufbau/Abbau
+/// checklist is seeded from at start.</summary>
+public sealed record ChecklistTemplateItem(string Text, bool IsMandatory);
+
 /// <summary>
 /// Configurable operational defaults — the timer/duration values the app used to bake in as
 /// constants. Stored alongside the master-data lists so an install can tune them once and have
@@ -67,7 +71,8 @@ public sealed record MasterDataSet(
     // separate from Status above, which is the incident-level vocabulary (aufgenommen, ...).
     IReadOnlyList<string> UnitStatus,
     IReadOnlyList<Street> Streets,
-    IReadOnlyList<string> ChecklistTemplate,
+    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
+    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau,
     IReadOnlyList<string> TruppTypes,
     IReadOnlyList<Person> Personnel,
     // Einsatzart values (ABek Bayern) — the leading token of the complete Einsatznummer.
@@ -84,7 +89,8 @@ public sealed record MasterDataSet(
     public static MasterDataSet Empty { get; } = new(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Street>(),
-        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>(),
+        Array.Empty<ChecklistTemplateItem>(), Array.Empty<ChecklistTemplateItem>(),
+        Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -96,7 +102,8 @@ public sealed record MasterDataSet(
     public bool IsEmpty =>
         Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
         && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
-        && Streets.Count == 0 && ChecklistTemplate.Count == 0 && TruppTypes.Count == 0
+        && Streets.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
+        && TruppTypes.Count == 0
         && Personnel.Count == 0 && Einsatzarten.Count == 0;
 }
 
@@ -127,6 +134,8 @@ public static class MasterDataJson
                     .ToList()
                 : Array.Empty<Street>();
 
+        var (checklistAufbau, checklistAbbau) = ParseChecklistTemplate(root);
+
         return new MasterDataSet(
             Arr(root, "roles"),
             Arr(root, "status"),
@@ -136,11 +145,39 @@ public static class MasterDataJson
             Arr(root, "brigades"),
             Arr(root, "unitStatus"),
             streets,
-            Arr(root, "checklistTemplate"),
+            checklistAufbau,
+            checklistAbbau,
             Arr(root, "truppTypes"),
             ParsePersonnel(root),
             Arr(root, "einsatzarten"),
             ParseSettings(root));
+    }
+
+    /// <summary>
+    /// Reads the Aufbau/Abbau template lists. A file still on the old flat <c>checklistTemplate</c>
+    /// string array (pre-split) maps every item to Aufbau, all optional — the safest default, since
+    /// nothing silently becomes a blocking requirement — with Abbau left empty.
+    /// </summary>
+    private static (IReadOnlyList<ChecklistTemplateItem> Aufbau, IReadOnlyList<ChecklistTemplateItem> Abbau)
+        ParseChecklistTemplate(JsonElement root)
+    {
+        if (root.TryGetProperty("checklistTemplateAufbau", out _) || root.TryGetProperty("checklistTemplateAbbau", out _))
+            return (ChecklistItems(root, "checklistTemplateAufbau"), ChecklistItems(root, "checklistTemplateAbbau"));
+
+        if (root.TryGetProperty("checklistTemplate", out var legacy) && legacy.ValueKind == JsonValueKind.Array)
+            return (legacy.EnumerateArray().Select(x => new ChecklistTemplateItem(x.GetString()!, false)).ToList(),
+                Array.Empty<ChecklistTemplateItem>());
+
+        return (Array.Empty<ChecklistTemplateItem>(), Array.Empty<ChecklistTemplateItem>());
+
+        static IReadOnlyList<ChecklistTemplateItem> ChecklistItems(JsonElement e, string prop) =>
+            e.TryGetProperty(prop, out var a) && a.ValueKind == JsonValueKind.Array
+                ? a.EnumerateArray()
+                    .Select(x => new ChecklistTemplateItem(
+                        x.GetProperty("text").GetString()!,
+                        x.TryGetProperty("mandatory", out var m) && m.ValueKind == JsonValueKind.True))
+                    .ToList()
+                : Array.Empty<ChecklistTemplateItem>();
     }
 
     /// <summary>
@@ -202,7 +239,8 @@ public static class MasterDataJson
             brigades = set.Brigades,
             truppTypes = set.TruppTypes,
             einsatzarten = set.Einsatzarten,
-            checklistTemplate = set.ChecklistTemplate,
+            checklistTemplateAufbau = set.ChecklistTemplateAufbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
+            checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             streets = set.Streets.Select(s => new { name = s.Name, district = s.District }),
             personnel = set.Personnel.Select(p => new
             {

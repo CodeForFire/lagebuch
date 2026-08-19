@@ -10,7 +10,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
     public MasterDataSet Get() => MasterDataSet.Empty with
     {
         Roles = new[] { "EL" },
-        ChecklistTemplate = new[] { "A?" },
+        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
         TruppTypes = new[] { "Angriffstrupp" },
     };
     public void Save(MasterDataSet set) { }
@@ -50,7 +50,7 @@ public class HomeViewModelTests
         Assert.NotNull(opened);
         Assert.False(opened!.IsReadOnly);
         Assert.Contains("/x.fwincident", recent.GetRecent());
-        Assert.Equal("A?", opened.Checklist.Items[0].Text); // checklist template seeded
+        Assert.Equal("A?", opened.ChecklistAufbau.Items[0].Text); // checklist template seeded
     }
 
     [Fact]
@@ -115,9 +115,9 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<string>());
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<string>());
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var recent = new FakeRecent();
         recent.Add("/20260101-0900-A.fwincident");
@@ -136,8 +136,8 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<string>());
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260101-0900-A.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260301-0900-B.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var recent = new FakeRecent();
         recent.Add("/20260101-0900-A.fwincident");
@@ -145,7 +145,7 @@ public class HomeViewModelTests
 
         var vm = new HomeViewModel(store, new FakeMasterData(), recent, new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
 
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/20260201-0900-C.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         vm.OpenRecentCommand.Execute("/20260201-0900-C.fwincident");
 
         Assert.Equal(
@@ -158,9 +158,9 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var closed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<string>());
+        var closed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         closed.Close();
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/open.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/open.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var recent = new FakeRecent();
         recent.Add("/open.fwincident");
@@ -178,7 +178,7 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Close();
 
         var recent = new FakeRecent();
@@ -198,7 +198,7 @@ public class HomeViewModelTests
         // Previously double-tapping a recent OPEN incident dead-ended (no workspace opened).
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         IncidentWorkspaceViewModel? opened = null;
@@ -216,7 +216,7 @@ public class HomeViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         // Dialog returns the seeded path so OpenFile has something to open.
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new OpenReturningDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
@@ -281,7 +281,7 @@ public class HomeViewModelTests
     {
         var store = new SelectivelyThrowingStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         vm.OpenRecentCommand.Execute("/gone.fwincident");
@@ -297,7 +297,7 @@ public class HomeViewModelTests
     {
         var store = new CountingStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         store.ResetLoadCount();
 
         var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
