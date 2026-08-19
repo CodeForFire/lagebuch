@@ -141,7 +141,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void CancelEditIncidentNumber() => IsEditingIncidentNumber = false;
 
-    public ChecklistViewModel Checklist { get; private set; } = null!;
+    public ChecklistViewModel ChecklistAufbau { get; private set; } = null!;
+    public ChecklistViewModel ChecklistAbbau { get; private set; } = null!;
     public EtbViewModel Etb { get; private set; } = null!;
     public RolesViewModel Roles { get; private set; } = null!;
     public ForcesViewModel Forces { get; private set; } = null!;
@@ -206,7 +207,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     private void BuildChildren()
     {
-        Checklist = new ChecklistViewModel(_session, OnChanged);
+        ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
+        ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
         Etb = new EtbViewModel(_session, _clock, OnChanged);
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
@@ -223,7 +225,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
                 _masterData.Settings.IlsReminderIntervalMinutes,
                 _masterData.Settings.IlsReminderFollowUpIntervalMinutes);
 
-        OnPropertyChanged(nameof(Checklist));
+        OnPropertyChanged(nameof(ChecklistAufbau));
+        OnPropertyChanged(nameof(ChecklistAbbau));
         OnPropertyChanged(nameof(Etb));
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));

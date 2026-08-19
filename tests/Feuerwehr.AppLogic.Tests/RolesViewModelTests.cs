@@ -20,7 +20,7 @@ public class RolesViewModelTests
     private static RolesViewModel NewVm(FixedClock clock, MasterDataSet md, Action? onChanged = null)
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         return new RolesViewModel(session, clock, md, onChanged ?? (() => { }));
     }
 
@@ -30,7 +30,7 @@ public class RolesViewModelTests
         var changes = 0;
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new RolesViewModel(session, clock, Md(), () => changes++)
         {
             NewRole = "EL",
@@ -68,7 +68,7 @@ public class RolesViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         session.Close();
         var vm = new RolesViewModel(session, clock, Md(), () => { }) { NewRole = "EL", NewPersonName = "Müller" };
         Assert.False(vm.AddRoleCommand.CanExecute(null));
@@ -138,7 +138,7 @@ public class RolesViewModelTests
         var clock = new FixedClock(T0);
         var store = new FakeStore();
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Incident.AssignRole("EL", "Müller", from: T0);
         seed.Save();
 

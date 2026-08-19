@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Persistence.MasterData;
@@ -24,7 +25,12 @@ public class MasterDataEditorRenderTests
             RadioCallSigns = new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
             TruppTypes = new[] { "Angriffstrupp", "Wassertrupp", "CSA-Trupp" },
             Einsatzarten = new[] { "B", "THL", "R" },
-            ChecklistTemplate = new[] { "Aufstellort ELW frei?", "Kennleuchte ein, Blaulicht aus?" },
+            ChecklistTemplateAufbau = new[]
+            {
+                new ChecklistTemplateItem("Aufstellort ELW frei?", true),
+                new ChecklistTemplateItem("Kennleuchte ein, Blaulicht aus?", false),
+            },
+            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Fahrzeug abgerüstet?", true) },
             Personnel = new[]
             {
                 new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
@@ -50,7 +56,7 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
-        Assert.Equal(12, list.ItemCount);
+        Assert.Equal(13, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
@@ -60,5 +66,32 @@ public class MasterDataEditorRenderTests
         using var frame = window.CaptureRenderedFrame()!;
         frame.Save(path);
         Assert.True(new FileInfo(path).Length > 0);
+    }
+
+    // The Checkliste template editor split into Aufbau/Abbau sections, each row gaining a
+    // mandatory checkbox alongside the text (#72) -- distinct from the single-string-per-row
+    // EditableListSection the other categories still use.
+    [AvaloniaFact]
+    public void Checkliste_aufbau_section_renders_text_and_mandatory_checkbox_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Checkliste Aufbau");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var textBoxes = view.GetVisualDescendants().OfType<TextBox>()
+            .Where(t => t.Text is "Aufstellort ELW frei?" or "Kennleuchte ein, Blaulicht aus?").ToList();
+        Assert.Equal(2, textBoxes.Count);
+        var checkBoxes = view.GetVisualDescendants().OfType<CheckBox>().Where(c => c.Content as string == "Pflicht").ToList();
+        Assert.Equal(2, checkBoxes.Count);
+        Assert.Contains(checkBoxes, c => c.IsChecked == true);
+        Assert.Contains(checkBoxes, c => c.IsChecked == false);
+
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.Save(Path.Combine(dir, "master-data-editor-checkliste-aufbau.png"));
     }
 }

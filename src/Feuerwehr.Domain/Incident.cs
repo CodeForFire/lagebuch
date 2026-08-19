@@ -9,7 +9,8 @@ public sealed record AuditEvent(DateTimeOffset At, string Action, string By);
 
 public sealed class Incident
 {
-    private readonly List<ChecklistItem> _checklist = new();
+    private readonly List<ChecklistItem> _checklistAufbau = new();
+    private readonly List<ChecklistItem> _checklistAbbau = new();
     private readonly List<EtbEntry> _journal = new();
     private readonly List<RoleAssignment> _roles = new();
     private readonly List<ForceUnit> _forces = new();
@@ -32,7 +33,8 @@ public sealed class Incident
     public DateTimeOffset? ClosedAt { get; private set; }
     public string? ClosedBy { get; private set; }
 
-    public IReadOnlyList<ChecklistItem> Checklist => _checklist;
+    public IReadOnlyList<ChecklistItem> ChecklistAufbau => _checklistAufbau;
+    public IReadOnlyList<ChecklistItem> ChecklistAbbau => _checklistAbbau;
     public IReadOnlyList<EtbEntry> Journal => _journal;
     public IReadOnlyList<RoleAssignment> Roles => _roles;
     public IReadOnlyList<ForceUnit> Forces => _forces;
@@ -80,7 +82,8 @@ public sealed class Incident
         string? status,
         DateTimeOffset? closedAt,
         string? closedBy,
-        IEnumerable<ChecklistItem> checklist,
+        IEnumerable<ChecklistItem> checklistAufbau,
+        IEnumerable<ChecklistItem> checklistAbbau,
         IEnumerable<EtbEntry> journal,
         IEnumerable<RoleAssignment> roles,
         IEnumerable<ForceUnit> forces,
@@ -101,7 +104,8 @@ public sealed class Incident
             ClosedAt = closedAt,
             ClosedBy = closedBy
         };
-        incident._checklist.AddRange(checklist);
+        incident._checklistAufbau.AddRange(checklistAufbau);
+        incident._checklistAbbau.AddRange(checklistAbbau);
         incident._journal.AddRange(journal);
         incident._roles.AddRange(roles);
         incident._forces.AddRange(forces);
@@ -193,22 +197,55 @@ public sealed class Incident
     /// <summary>Total Atemschutzgeräteträger across all units — how many Trupps can be formed.</summary>
     public int TotalScba => _forces.Sum(f => f.ScbaCount);
 
-    public void SeedChecklist(IEnumerable<string> itemTexts)
+    public void SeedChecklist(
+        IEnumerable<(string Text, bool IsMandatory)> aufbauItems,
+        IEnumerable<(string Text, bool IsMandatory)> abbauItems)
     {
         EnsureOpen();
-        ArgumentNullException.ThrowIfNull(itemTexts);
-        foreach (var text in itemTexts)
-            _checklist.Add(new ChecklistItem(text));
+        ArgumentNullException.ThrowIfNull(aufbauItems);
+        ArgumentNullException.ThrowIfNull(abbauItems);
+        foreach (var (text, isMandatory) in aufbauItems)
+            _checklistAufbau.Add(new ChecklistItem(text, isMandatory));
+        foreach (var (text, isMandatory) in abbauItems)
+            _checklistAbbau.Add(new ChecklistItem(text, isMandatory));
     }
 
-    public ChecklistItem ToggleChecklistItem(Guid itemId)
+    /// <summary>
+    /// Toggles the item and, on a false→true "all mandatory items done" transition for its list,
+    /// logs a one-off ETB system entry — "Systemmeldung" per the issue means a journal line, not a
+    /// UI notification. Silent on the reverse transition (unchecking after completion) and on every
+    /// other toggle, mirroring how <see cref="UpdateForceUnit"/> only logs a real status change.
+    /// </summary>
+    public ChecklistItem ToggleChecklistItem(IClock clock, SessionOperator op, Guid itemId)
     {
         EnsureOpen();
-        var item = _checklist.FirstOrDefault(c => c.Id == itemId)
-            ?? throw new KeyNotFoundException($"Checklist item {itemId} not found.");
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var (list, kind) = FindChecklistOwning(itemId);
+        var item = list.First(c => c.Id == itemId);
+
+        var wasComplete = AllMandatoryDone(list);
         item.Toggle();
+        var isComplete = AllMandatoryDone(list);
+
+        if (!wasComplete && isComplete)
+            AppendSystemEntry(clock, op, $"Checkliste {kind} abgeschlossen: alle Pflichtpunkte erledigt");
+
         return item;
     }
+
+    private (List<ChecklistItem> List, ChecklistKind Kind) FindChecklistOwning(Guid itemId)
+    {
+        if (_checklistAufbau.Any(c => c.Id == itemId))
+            return (_checklistAufbau, ChecklistKind.Aufbau);
+        if (_checklistAbbau.Any(c => c.Id == itemId))
+            return (_checklistAbbau, ChecklistKind.Abbau);
+        throw new KeyNotFoundException($"Checklist item {itemId} not found.");
+    }
+
+    private static bool AllMandatoryDone(IReadOnlyList<ChecklistItem> items) =>
+        items.Where(i => i.IsMandatory).All(i => i.IsDone);
 
     public EtbEntry AddJournalEntry(
         IClock clock,

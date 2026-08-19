@@ -12,10 +12,11 @@ public class RehydrationTests
     public void ChecklistItem_rehydrate_restores_state()
     {
         var id = Guid.NewGuid();
-        var item = ChecklistItem.Rehydrate(id, "Blaulicht aus?", isDone: true, note: "ok");
+        var item = ChecklistItem.Rehydrate(id, "Blaulicht aus?", isDone: true, note: "ok", isMandatory: true);
         Assert.Equal(id, item.Id);
         Assert.True(item.IsDone);
         Assert.Equal("ok", item.Note);
+        Assert.True(item.IsMandatory);
     }
 
     [Fact]
@@ -39,7 +40,8 @@ public class RehydrationTests
             new IncidentNumber("B 1.2 260715 4242"),
             "Brand", "Hauptstr. 1", "FFB", "abgearbeitet",
             T0.AddHours(2), "Müller",
-            new[] { ChecklistItem.Rehydrate(Guid.NewGuid(), "c", false, null) },
+            new[] { ChecklistItem.Rehydrate(Guid.NewGuid(), "c", false, null, isMandatory: false) },
+            Array.Empty<ChecklistItem>(),
             new[] { entry },
             new[] { RoleAssignment.Create("EL", "Müller") },
             new[] { ForceUnit.Create("FFB", 12) },
@@ -61,7 +63,7 @@ public class RehydrationTests
         var incident = Incident.Rehydrate(
             Guid.NewGuid(), T0, IncidentState.Closed,
             null, null, null, null, null, T0, "Müller",
-            Array.Empty<ChecklistItem>(), Array.Empty<EtbEntry>(),
+            Array.Empty<ChecklistItem>(), Array.Empty<ChecklistItem>(), Array.Empty<EtbEntry>(),
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(),
             Array.Empty<AuditEvent>(),

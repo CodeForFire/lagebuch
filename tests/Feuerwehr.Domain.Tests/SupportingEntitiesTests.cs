@@ -5,7 +5,7 @@ public class SupportingEntitiesTests
     [Fact]
     public void ChecklistItem_toggles_done_state()
     {
-        var item = new ChecklistItem("Rote Kennleuchte ein, Blaulicht aus?");
+        var item = new ChecklistItem("Rote Kennleuchte ein, Blaulicht aus?", isMandatory: false);
         Assert.False(item.IsDone);
         item.Toggle();
         Assert.True(item.IsDone);
@@ -16,7 +16,7 @@ public class SupportingEntitiesTests
     [Fact]
     public void ChecklistItem_rejects_blank_text()
     {
-        Assert.Throws<ArgumentException>(() => new ChecklistItem(" "));
+        Assert.Throws<ArgumentException>(() => new ChecklistItem(" ", isMandatory: false));
     }
 
     [Fact]

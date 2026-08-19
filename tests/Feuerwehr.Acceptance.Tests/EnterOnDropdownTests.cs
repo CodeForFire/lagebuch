@@ -18,7 +18,7 @@ public class EnterOnDropdownTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        ChecklistTemplate = new[] { "Blaulicht aus?" },
+        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Blaulicht aus?", false) },
         TruppTypes = new[] { "Angriffstrupp" },
         Personnel = new[]
         {
@@ -31,7 +31,8 @@ public class EnterOnDropdownTests
     {
         var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
         return new ScbaViewModel(session, Md(), clock, new NoopTicker(), new NoopAlarmService(), () => { });
     }
 

@@ -22,13 +22,17 @@ internal static class WorkspaceRenderHelper
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         Roles = new[] { "EL" },
-        ChecklistTemplate = new[]
+        ChecklistTemplateAufbau = new[]
         {
-            "Aufstellort ELW weit genug weg um nicht zu behindern?",
-            "Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?",
-            "Rote Kennleuchte ein, Blaulicht aus?",
-            "PC eingeschaltet und VPN Verbindung aktiviert?",
-            "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
+            new ChecklistTemplateItem("Aufstellort ELW weit genug weg um nicht zu behindern?", true),
+            new ChecklistTemplateItem("Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?", false),
+            new ChecklistTemplateItem("Rote Kennleuchte ein, Blaulicht aus?", false),
+            new ChecklistTemplateItem("PC eingeschaltet und VPN Verbindung aktiviert?", false),
+            new ChecklistTemplateItem("Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?", false),
+        },
+        ChecklistTemplateAbbau = new[]
+        {
+            new ChecklistTemplateItem("Fahrzeug abgerüstet und einsatzbereit?", true),
         },
         TruppTypes = new[] { "Angriffstrupp", "Sicherheitstrupp", "CSA-Trupp" },
         Brigades = new[] { "FFB Wache 1", "FFB Wache 2", "Aich", "Puch", "Emmering" },
@@ -46,18 +50,19 @@ internal static class WorkspaceRenderHelper
         IIncidentHostController? host = null)
     {
         var clock = new FixedClock();
-        var checklist = new[]
+        var checklistAufbau = new[]
         {
-            "Aufstellort ELW weit genug weg um nicht zu behindern?",
-            "Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?",
-            "Rote Kennleuchte ein, Blaulicht aus?",
-            "PC eingeschaltet und VPN Verbindung aktiviert?",
-            "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?",
+            ("Aufstellort ELW weit genug weg um nicht zu behindern?", true),
+            ("Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?", false),
+            ("Rote Kennleuchte ein, Blaulicht aus?", false),
+            ("PC eingeschaltet und VPN Verbindung aktiviert?", false),
+            ("Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?", false),
         };
+        var checklistAbbau = new[] { ("Fahrzeug abgerüstet und einsatzbereit?", true) };
         // Keyword + Einsatznummer both set: the common post-#69 shape once ILS has called back --
         // Stichwort as the header hero, the Einsatznummer as the secondary chip beside it.
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklist,
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklistAufbau, checklistAbbau,
             new IncidentNumber("B 1.2 260715 123"), keyword: "B3P");
         var ticker = new ManualTicker();
         var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(),

@@ -20,7 +20,7 @@ public class ForcesViewModelTests
     {
         var changes = 0;
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB",
@@ -135,7 +135,7 @@ public class ForcesViewModelTests
     {
         var changes = 0;
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB Wache 1",
@@ -157,7 +157,7 @@ public class ForcesViewModelTests
     public void Editing_a_row_bemerkung_reaches_the_domain()
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -175,7 +175,7 @@ public class ForcesViewModelTests
     public void Editing_a_row_leaves_the_rest_of_the_unit_alone()
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -204,7 +204,7 @@ public class ForcesViewModelTests
         var clock = new FixedClock(T0);
         var store = new FakeStore();
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9, null, "Alarmiert");
         seed.Close();
 
@@ -227,7 +227,7 @@ public class ForcesViewModelTests
         // an entry exists, but only this layer decides whose name is on it.
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -254,7 +254,7 @@ public class ForcesViewModelTests
         // note from burying the Einsatztagebuch.
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -276,7 +276,7 @@ public class ForcesViewModelTests
     private static ForcesViewModel NewVm()
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         return new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
     }
 }

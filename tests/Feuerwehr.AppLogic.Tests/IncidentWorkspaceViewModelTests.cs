@@ -63,7 +63,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" });
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), host);
     }
 
@@ -99,7 +99,7 @@ public class IncidentWorkspaceViewModelTests
         store = new FakeStore();
         clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" });
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), dialogs ?? new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
     }
 
@@ -109,7 +109,7 @@ public class IncidentWorkspaceViewModelTests
         var store = new FakeStore();
         clock = new FixedClock(T0);
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" });
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
         if (closed)
             seed.Close();
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
@@ -149,6 +149,23 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.Equal(before + 1, vm.Etb.Entries.Count);
         Assert.Contains("Angriffstrupp", vm.Etb.Entries[0].Text);
+    }
+
+    [Fact]
+    public void Completing_a_mandatory_checklist_item_appears_in_the_etb_immediately()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", new[] { ("Blaulicht aus?", true) }, Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(),
+            new FakeAlarmService(), new NoopIncidentHostController());
+        var before = vm.Etb.Entries.Count;
+
+        vm.ChecklistAufbau.Items[0].IsDone = true;
+
+        Assert.Equal(before + 1, vm.Etb.Entries.Count);
+        Assert.Equal("Checkliste Aufbau abgeschlossen: alle Pflichtpunkte erledigt", vm.Etb.Entries[0].Text);
     }
 
     [Fact]
@@ -216,7 +233,7 @@ public class IncidentWorkspaceViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" });
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
         seed.Incident.SetIncidentNumber(new Domain.ValueObjects.IncidentNumber("B 99"));
         seed.Save();
         var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
@@ -234,7 +251,7 @@ public class IncidentWorkspaceViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" }, keyword: "B3P");
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), keyword: "B3P");
         var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
 
         Assert.Equal("B3P", vm.HeroText);
@@ -250,7 +267,7 @@ public class IncidentWorkspaceViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" }, incidentNumber: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), incidentNumber: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
         var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
 
         Assert.Equal("B 1.2 260715 123", vm.HeroText);
@@ -273,7 +290,7 @@ public class IncidentWorkspaceViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" }, keyword: "B3P");
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), keyword: "B3P");
         var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
 
         vm.BeginEditIncidentNumberCommand.Execute(null);
@@ -297,7 +314,7 @@ public class IncidentWorkspaceViewModelTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" }, keyword: "B3P");
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), keyword: "B3P");
         var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
 
         vm.BeginEditIncidentNumberCommand.Execute(null);
@@ -358,8 +375,8 @@ public class IncidentWorkspaceViewModelTests
         Assert.False(vm.CloseIncidentCommand.CanExecute(null));
         Assert.True(vm.Etb.IsReadOnly);
         Assert.False(vm.Etb.AddEntryCommand.CanExecute(null));
-        Assert.True(vm.Checklist.IsReadOnly);
-        Assert.True(vm.Checklist.Items[0].IsReadOnly);
+        Assert.True(vm.ChecklistAufbau.IsReadOnly);
+        Assert.True(vm.ChecklistAufbau.Items[0].IsReadOnly);
     }
 
     // The closing entry is appended after the ETB grid is already populated, so it only
@@ -451,7 +468,7 @@ public class IncidentWorkspaceViewModelTests
         var callSigns = new[] { "FFB 1/40/1", "Aich 42/1" };
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", new[] { "A?" });
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         var vm = new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(),
             MasterDataSet.Empty with { RadioCallSigns = callSigns },
@@ -527,7 +544,7 @@ public class IncidentWorkspaceViewModelTests
         var clock = new FixedClock(T0);
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?" });
+            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
         var ticker = new FakeTicker();
         var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
 

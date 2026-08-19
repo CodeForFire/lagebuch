@@ -30,10 +30,10 @@ public class IncidentSessionTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { "A?", "B?" });
+            "/x.fwincident", new[] { ("A?", false), ("B?", false) }, Array.Empty<(string, bool)>());
 
         Assert.False(session.IsReadOnly);
-        Assert.Equal(2, session.Incident.Checklist.Count);
+        Assert.Equal(2, session.Incident.ChecklistAufbau.Count);
         Assert.Equal(1, store.SaveCount);
     }
 
@@ -42,7 +42,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         session.Save();
         Assert.Equal(2, store.SaveCount); // start + explicit save
         Assert.Equal(session.Incident.Id, store.Load("/x.fwincident").Id);
@@ -54,7 +54,7 @@ public class IncidentSessionTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         clock.Now = T0.AddHours(1);
         session.Close();
 
@@ -68,7 +68,7 @@ public class IncidentSessionTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Close();
 
         var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", op: null);
@@ -80,7 +80,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         Assert.Throws<InvalidOperationException>(() => LocalIncidentSession.Open(store, new FixedClock(T0), "/x.fwincident", op: null));
     }
@@ -90,7 +90,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
 
@@ -105,7 +105,7 @@ public class IncidentSessionTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Close();
 
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
@@ -117,7 +117,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
 
         ro.ContinueEditing(new SessionOperator("Schmidt"));
@@ -132,7 +132,7 @@ public class IncidentSessionTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Close();
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
 
@@ -145,7 +145,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
 
         session.ContinueEditing(new SessionOperator("Schmidt"));
 
@@ -157,7 +157,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
 
         ro.ContinueEditing(new SessionOperator("Schmidt", "FFB 1"));
@@ -171,7 +171,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var editable = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         Assert.False(editable.IsReadOnly); // has operator
 
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
@@ -183,7 +183,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<string>());
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var bytes = session.ExportPdf();
         Assert.True(bytes.Length > 100);
         Assert.Equal(0x25, bytes[0]); // %

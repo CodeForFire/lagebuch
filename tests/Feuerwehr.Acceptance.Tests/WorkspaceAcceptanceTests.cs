@@ -52,7 +52,7 @@ public class WorkspaceAcceptanceTests
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         Roles = new[] { "EL" },
-        ChecklistTemplate = new[] { "Blaulicht aus?" },
+        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Blaulicht aus?", false) },
         TruppTypes = new[] { "Angriffstrupp" },
         Brigades = new[] { "FFB Wache 1", "Aich" },
         UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
@@ -62,7 +62,8 @@ public class WorkspaceAcceptanceTests
     private static IncidentWorkspaceViewModel BuildWorkspace(out LocalIncidentSession session)
     {
         session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", new[] { "Blaulicht aus?" });
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
 
@@ -72,7 +73,7 @@ public class WorkspaceAcceptanceTests
         var store = new FakeStore();
         var clock = new FixedClock();
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident", new[] { "Blaulicht aus?" });
+            "/x.fwincident", new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
         if (closed)
             seed.Close();
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
@@ -80,14 +81,14 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_with_five_tabs()
+    public void Workspace_renders_with_six_tabs()
     {
         var vm = BuildWorkspace(out _);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(5, tabs.Items.Count);
+        Assert.Equal(6, tabs.Items.Count);
     }
 
     [AvaloniaFact]
@@ -119,7 +120,7 @@ public class WorkspaceAcceptanceTests
     public void Clicking_checklist_checkbox_persists_done_state()
     {
         var vm = BuildWorkspace(out var session);
-        var view = new ChecklistView { DataContext = vm.Checklist };
+        var view = new ChecklistView { DataContext = vm.ChecklistAufbau };
         var window = new Window { Content = view, Width = 600, Height = 400 };
         window.Show();
 
@@ -133,8 +134,44 @@ public class WorkspaceAcceptanceTests
         window.MouseUp(center, Avalonia.Input.MouseButton.Left);
 
         Assert.True(checkBox.IsChecked);
-        Assert.True(vm.Checklist.Items[0].IsDone);
-        Assert.True(session.Incident.Checklist[0].IsDone);
+        Assert.True(vm.ChecklistAufbau.Items[0].IsDone);
+        Assert.True(session.Incident.ChecklistAufbau[0].IsDone);
+    }
+
+    // The AUFBAU/ABBAU tab headers carry a status dot: red while a mandatory item is still open,
+    // green once every mandatory item in that list is checked (#72).
+    [AvaloniaFact]
+    public void Aufbau_tab_dot_turns_green_once_its_mandatory_item_is_checked()
+    {
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
+            new[] { ("Blaulicht aus?", true) }, Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(),
+            new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var view = new IncidentWorkspaceView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1000, Height = 700 };
+        window.Show();
+
+        var completeDot = view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AufbauCompleteDot");
+        var incompleteDot = view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AufbauIncompleteDot");
+        Assert.False(completeDot.IsVisible);
+        Assert.True(incompleteDot.IsVisible);
+        // The neighboring ABBAU list has no items -- vacuously complete from the start.
+        Assert.True(view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AbbauCompleteDot").IsVisible);
+
+        // Capture the PR before/after screenshots (real Skia backend rasterizes embedded fonts).
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var before = window.CaptureRenderedFrame()!)
+            before.Save(Path.Combine(dir, "checkliste-aufbau-abbau-before.png"));
+
+        vm.ChecklistAufbau.Items[0].IsDone = true;
+
+        Assert.True(completeDot.IsVisible);
+        Assert.False(incompleteDot.IsVisible);
+
+        using (var after = window.CaptureRenderedFrame()!)
+            after.Save(Path.Combine(dir, "checkliste-aufbau-abbau-after.png"));
     }
 
     [AvaloniaFact]

@@ -1,36 +1,63 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using Feuerwehr.Domain;
 using Feuerwehr.Sync;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
 public sealed partial class ChecklistViewModel : ObservableObject
 {
-    public ChecklistViewModel(IIncidentSession session, Action onChanged)
+    private readonly IIncidentSession _session;
+    private readonly ChecklistKind _kind;
+
+    public ChecklistViewModel(IIncidentSession session, ChecklistKind kind, Action onChanged)
     {
+        _session = session;
+        _kind = kind;
         IsReadOnly = session.IsReadOnly;
-        Items = session.Incident.Checklist
-            .Select(item => new ChecklistItemViewModel(session, item.Id, item.Text, item.IsDone, item.Note, IsReadOnly, onChanged))
+        Items = ItemsFor(session.Incident, kind)
+            .Select(item => new ChecklistItemViewModel(
+                session, kind, item.Id, item.Text, item.IsDone, item.Note, item.IsMandatory, IsReadOnly, onChanged))
             .ToList();
+        _allMandatoryDone = ComputeAllMandatoryDone();
+        // Recomputed after every change to this incident (local toggle, or a remote broadcast),
+        // mirroring ScbaViewModel.UpdateAlarm — this is what the AUFBAU/ABBAU tab header dot binds to.
+        session.Changed += Recompute;
     }
 
     public bool IsReadOnly { get; }
     public IReadOnlyList<ChecklistItemViewModel> Items { get; }
+
+    [ObservableProperty]
+    private bool _allMandatoryDone;
+
+    private void Recompute() => AllMandatoryDone = ComputeAllMandatoryDone();
+
+    private bool ComputeAllMandatoryDone() =>
+        ItemsFor(_session.Incident, _kind).Where(i => i.IsMandatory).All(i => i.IsDone);
+
+    internal static IReadOnlyList<ChecklistItem> ItemsFor(Incident incident, ChecklistKind kind) =>
+        kind == ChecklistKind.Aufbau ? incident.ChecklistAufbau : incident.ChecklistAbbau;
 }
 
 public sealed partial class ChecklistItemViewModel : ObservableObject
 {
     private readonly IIncidentSession _session;
+    private readonly ChecklistKind _kind;
     private readonly Guid _id;
     private readonly Action _onChanged;
     private bool _suppressWriteback;
 
-    public ChecklistItemViewModel(IIncidentSession session, Guid id, string text, bool isDone, string? note, bool isReadOnly, Action onChanged)
+    public ChecklistItemViewModel(
+        IIncidentSession session, ChecklistKind kind, Guid id, string text, bool isDone, string? note,
+        bool isMandatory, bool isReadOnly, Action onChanged)
     {
         _session = session;
+        _kind = kind;
         _id = id;
         _onChanged = onChanged;
         Text = text;
+        IsMandatory = isMandatory;
         _isDone = isDone;
         _note = note;
         IsReadOnly = isReadOnly;
@@ -40,7 +67,7 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
 
     private void SyncFromIncident()
     {
-        var item = _session.Incident.Checklist.FirstOrDefault(c => c.Id == _id);
+        var item = ChecklistViewModel.ItemsFor(_session.Incident, _kind).FirstOrDefault(c => c.Id == _id);
         if (item is null)
             return;
         _suppressWriteback = true; // this is a state pull, not a user toggle — don't write it back
@@ -50,6 +77,7 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     }
 
     public string Text { get; }
+    public bool IsMandatory { get; }
     public bool IsReadOnly { get; }
 
     [ObservableProperty]
@@ -66,7 +94,7 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     {
         if (IsReadOnly || _suppressWriteback)
             return;
-        var item = _session.Incident.Checklist.First(c => c.Id == _id);
+        var item = ChecklistViewModel.ItemsFor(_session.Incident, _kind).First(c => c.Id == _id);
         if (item.IsDone != value)
             _session.ToggleChecklistItem(_id);
         _onChanged();

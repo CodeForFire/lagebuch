@@ -88,10 +88,10 @@ public class IncidentCloseTests
     public void Toggling_checklist_after_close_throws()
     {
         var incident = OpenIncident(out var clock, out var op);
-        incident.SeedChecklist(new[] { "Blaulicht aus?" });
-        var id = incident.Checklist[0].Id;
+        incident.SeedChecklist(new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
+        var id = incident.ChecklistAufbau[0].Id;
         incident.Close(clock, op);
-        Assert.Throws<IncidentClosedException>(() => incident.ToggleChecklistItem(id));
+        Assert.Throws<IncidentClosedException>(() => incident.ToggleChecklistItem(clock, op, id));
     }
 
     [Fact]

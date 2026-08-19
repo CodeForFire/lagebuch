@@ -44,13 +44,8 @@ public sealed class IncidentRepository
                 p("$closedBy", (object?)incident.ClosedBy ?? DBNull.Value);
             });
 
-        for (var i = 0; i < incident.Checklist.Count; i++)
-        {
-            var c = incident.Checklist[i];
-            Run(cn, tx,
-                "INSERT INTO checklist_items (id, ordinal, text, is_done, note) VALUES ($id,$o,$t,$d,$n);",
-                p => { p("$id", c.Id.ToString()); p("$o", i); p("$t", c.Text); p("$d", c.IsDone ? 1 : 0); p("$n", (object?)c.Note ?? DBNull.Value); });
-        }
+        WriteChecklist(cn, tx, incident.ChecklistAufbau, kind: 0);
+        WriteChecklist(cn, tx, incident.ChecklistAbbau, kind: 1);
 
         for (var i = 0; i < incident.Journal.Count; i++)
         {
@@ -161,6 +156,21 @@ public sealed class IncidentRepository
         tx.Commit();
     }
 
+    private static void WriteChecklist(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.ChecklistItem> items, int kind)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            var c = items[i];
+            Run(cn, tx,
+                "INSERT INTO checklist_items (id, ordinal, text, is_done, note, is_mandatory, kind) VALUES ($id,$o,$t,$d,$n,$m,$k);",
+                p =>
+                {
+                    p("$id", c.Id.ToString()); p("$o", i); p("$t", c.Text); p("$d", c.IsDone ? 1 : 0);
+                    p("$n", (object?)c.Note ?? DBNull.Value); p("$m", c.IsMandatory ? 1 : 0); p("$k", kind);
+                });
+        }
+    }
+
     /// <summary>
     /// Reads only the incident's lifecycle state, read-only and without migrating the file — meant
     /// for the Home overview's closed marker, which must not mutate files just to display them.
@@ -218,8 +228,12 @@ public sealed class IncidentRepository
         var meta = ReadRow(cn,
             "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by FROM incident_meta LIMIT 1;");
 
-        var checklist = ReadAll(cn, "SELECT id, text, is_done, note FROM checklist_items ORDER BY ordinal;",
-            r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3)));
+        var checklistAufbau = ReadAll(cn,
+            "SELECT id, text, is_done, note, is_mandatory FROM checklist_items WHERE kind = 0 ORDER BY ordinal;",
+            r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3), r.GetInt32(4) != 0));
+        var checklistAbbau = ReadAll(cn,
+            "SELECT id, text, is_done, note, is_mandatory FROM checklist_items WHERE kind = 1 ORDER BY ordinal;",
+            r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3), r.GetInt32(4) != 0));
 
         var journal = ReadAll(cn, "SELECT id, timestamp, direction, from_party, to_party, text, entered_by FROM etb_entries ORDER BY ordinal;",
             r => Domain.Etb.EtbEntry.Rehydrate(Guid.Parse(r.GetString(0)), ParseDate(r.GetString(1)),
@@ -288,7 +302,7 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            checklist, journal, roles, forces, scbaTrupps, audit, timers);
+            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

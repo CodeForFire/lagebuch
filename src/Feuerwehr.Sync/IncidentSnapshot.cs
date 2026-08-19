@@ -21,7 +21,8 @@ public sealed record IncidentSnapshot(
     string? Status,
     DateTimeOffset? ClosedAt,
     string? ClosedBy,
-    IReadOnlyList<ChecklistItemDto> Checklist,
+    IReadOnlyList<ChecklistItemDto> ChecklistAufbau,
+    IReadOnlyList<ChecklistItemDto> ChecklistAbbau,
     IReadOnlyList<EtbEntryDto> Journal,
     IReadOnlyList<RoleAssignmentDto> Roles,
     IReadOnlyList<ForceUnitDto> Forces,
@@ -36,7 +37,7 @@ public sealed record TimerDto(
     int RecurringIntervalMinutes,
     bool IsRunning);
 
-public sealed record ChecklistItemDto(Guid Id, string Text, bool IsDone, string? Note);
+public sealed record ChecklistItemDto(Guid Id, string Text, bool IsDone, string? Note, bool IsMandatory);
 
 public sealed record EtbEntryDto(
     Guid Id,

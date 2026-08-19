@@ -10,7 +10,7 @@ public class CommandSerializationTests
     public static IEnumerable<object[]> AllCommands() => new SyncCommand[]
     {
         new AddJournalEntryCommand(Op, EtbDirection.Outgoing, "Text", "Von", "An"),
-        new ToggleChecklistItemCommand(Guid.NewGuid()),
+        new ToggleChecklistItemCommand(Op, Guid.NewGuid()),
         new AssignRoleCommand("EL", "Huber", "FFB 1", DateTimeOffset.UnixEpoch, null, "Abschnitt", "0171"),
         new EndRoleAssignmentCommand(Guid.NewGuid()),
         new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4),
@@ -45,7 +45,7 @@ public class CommandSerializationTests
     [Fact]
     public void Discriminator_is_the_dollar_type_property()
     {
-        var json = SyncJson.Serialize<SyncCommand>(new ToggleChecklistItemCommand(Guid.NewGuid()));
+        var json = SyncJson.Serialize<SyncCommand>(new ToggleChecklistItemCommand(Op, Guid.NewGuid()));
         Assert.Contains("\"$type\":\"toggleChecklistItem\"", json);
     }
 }

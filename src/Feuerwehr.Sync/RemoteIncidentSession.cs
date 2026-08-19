@@ -128,7 +128,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         Send(new AddJournalEntryCommand(Op(), direction, text, from, to));
 
-    public void ToggleChecklistItem(Guid itemId) => Send(new ToggleChecklistItemCommand(itemId));
+    public void ToggleChecklistItem(Guid itemId) => Send(new ToggleChecklistItemCommand(Op(), itemId));
 
     public void AssignRole(string role, string personName, string? callSign = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null) =>

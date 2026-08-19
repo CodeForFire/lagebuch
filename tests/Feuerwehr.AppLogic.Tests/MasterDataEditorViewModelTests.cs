@@ -74,6 +74,9 @@ public class MasterDataEditorViewModelTests
     private static EditableListSection Section(MasterDataEditorViewModel vm, string title) =>
         vm.Sections.OfType<EditableListSection>().First(s => s.Title == title);
 
+    private static ChecklistTemplateSection ChecklistSection(MasterDataEditorViewModel vm, string title) =>
+        vm.Sections.OfType<ChecklistTemplateSection>().First(s => s.Title == title);
+
     private static PersonnelSection Personnel(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<PersonnelSection>().First(s => s.Title == "Personal");
 
@@ -84,7 +87,7 @@ public class MasterDataEditorViewModelTests
     public void Loads_a_section_per_category_and_starts_clean()
     {
         var vm = Vm(new InMemoryProvider());
-        Assert.Equal(12, vm.Sections.Count);
+        Assert.Equal(13, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
@@ -170,7 +173,7 @@ public class MasterDataEditorViewModelTests
     }
 
     /// <summary>
-    /// Every one of the ten sections must land in its own category on Save. Each section gets a
+    /// Every section must land in its own category on Save. Each section gets a
     /// marker value unique to that category, so a swapped mapping in BuildSet (e.g. writing
     /// _status where _unitStatus belongs) puts a marker in the wrong list and fails the assertion
     /// for the category that should have received it.
@@ -181,7 +184,7 @@ public class MasterDataEditorViewModelTests
         var listTitles = new[]
         {
             "Rollen", "Status", "Einheiten-Status", "Ausrüstung", "Bezirke",
-            "Wachen", "Funkrufnamen", "Trupp-Typen", "Einsatzarten", "Checkliste",
+            "Wachen", "Funkrufnamen", "Trupp-Typen", "Einsatzarten",
         };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
@@ -193,6 +196,14 @@ public class MasterDataEditorViewModelTests
             section.AddCommand.Execute(null);
             section.Items[^1].Value = $"MARK-{title}";
         }
+
+        var checklistAufbau = ChecklistSection(vm, "Checkliste Aufbau");
+        checklistAufbau.AddCommand.Execute(null);
+        checklistAufbau.Rows[^1].Text = "MARK-ChecklisteAufbau";
+
+        var checklistAbbau = ChecklistSection(vm, "Checkliste Abbau");
+        checklistAbbau.AddCommand.Execute(null);
+        checklistAbbau.Rows[^1].Text = "MARK-ChecklisteAbbau";
 
         var personnel = Personnel(vm);
         personnel.AddCommand.Execute(null);
@@ -210,7 +221,8 @@ public class MasterDataEditorViewModelTests
         Assert.Contains("MARK-Funkrufnamen", set.RadioCallSigns);
         Assert.Contains("MARK-Trupp-Typen", set.TruppTypes);
         Assert.Contains("MARK-Einsatzarten", set.Einsatzarten);
-        Assert.Contains("MARK-Checkliste", set.ChecklistTemplate);
+        Assert.Contains(set.ChecklistTemplateAufbau, i => i.Text == "MARK-ChecklisteAufbau");
+        Assert.Contains(set.ChecklistTemplateAbbau, i => i.Text == "MARK-ChecklisteAbbau");
         Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
     }
 

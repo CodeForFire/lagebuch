@@ -131,6 +131,39 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Checkliste template editor (Aufbau/Abbau): text + mandatory, reorderable -->
+              <DataTemplate x:DataType="vm:ChecklistTemplateSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ChecklistTemplateRow">
+                          <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Text="{Binding Text}" Margin="0,0,6,0" />
+                            <CheckBox Grid.Column="1" Content="Pflicht" IsChecked="{Binding IsMandatory}"
+                                      VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
+                                 DataContext, whose static type is object under compiled bindings, so a
+                                 compiled $parent cast path won't resolve. -->
+                            <Button Grid.Column="2" Content="▲" Margin="0,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="3" Content="▼" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="4" Content="✕" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Personnel editor -->
               <DataTemplate x:DataType="vm:PersonnelSection">
                 <DockPanel>

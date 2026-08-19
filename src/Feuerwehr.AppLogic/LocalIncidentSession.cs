@@ -48,7 +48,8 @@ public sealed class LocalIncidentSession : IIncidentSession
         IClock clock,
         SessionOperator op,
         string path,
-        IEnumerable<string> checklistTemplate,
+        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAufbau,
+        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAbbau,
         IncidentNumber? incidentNumber = null,
         string? keyword = null)
     {
@@ -57,7 +58,7 @@ public sealed class LocalIncidentSession : IIncidentSession
         // The Einsatznummer goes through the factory rather than SetIncidentNumber afterwards, so the
         // automatic "Einsatz begonnen" entry can name it.
         var incident = Incident.Start(clock, op, keyword: keyword, incidentNumber: incidentNumber);
-        incident.SeedChecklist(checklistTemplate);
+        incident.SeedChecklist(checklistTemplateAufbau, checklistTemplateAbbau);
         var session = new LocalIncidentSession(store, clock, incident, path, op);
         session.Save();
         return session;
@@ -102,7 +103,7 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         Mutate(() => Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to));
 
-    public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(itemId));
+    public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(_clock, RequireOperator(), itemId));
 
     public void AssignRole(string role, string personName, string? callSign = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null) =>

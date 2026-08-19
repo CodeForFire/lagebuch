@@ -122,7 +122,7 @@ public class ForcesGridEditingTests
     private static (ForcesView View, IncidentWorkspaceViewModel Vm) ShowForces(out LocalIncidentSession session)
     {
         session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
             WorkspaceRenderHelper.MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
         var view = new ForcesView { DataContext = vm.Forces };

@@ -14,7 +14,7 @@ public class EtbViewModelTests
         var changes = 0;
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, () => changes++)
         {
             NewText = "Lagemeldung",
@@ -39,7 +39,7 @@ public class EtbViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, () => { }) { NewText = "  " };
 
         Assert.False(vm.AddEntryCommand.CanExecute(null));
@@ -50,7 +50,7 @@ public class EtbViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         session.Close();
         var vm = new EtbViewModel(session, clock, () => { }) { NewText = "x" };
 
@@ -74,7 +74,7 @@ public class EtbViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         // StartNew logs "Einsatz begonnen" (System); add one human entry.
         var vm = new EtbViewModel(session, clock, () => { }) { NewText = "Lagemeldung" };
         vm.AddEntryCommand.Execute(null);
@@ -97,7 +97,7 @@ public class EtbViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, () => { });
         vm.HideSystemEntries = true;
         Assert.Empty(vm.Entries); // the "Einsatz begonnen" System row is hidden
@@ -143,7 +143,7 @@ public class EtbViewModelTests
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<string>());
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         return new EtbViewModel(session, clock, () => { });
     }
 }

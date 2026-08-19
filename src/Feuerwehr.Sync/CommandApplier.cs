@@ -27,7 +27,7 @@ public static class CommandApplier
                 incident.AddJournalEntry(clock, Operator(c.Operator), c.Direction, c.Text, c.From, c.To);
                 break;
             case ToggleChecklistItemCommand c:
-                incident.ToggleChecklistItem(c.ItemId);
+                incident.ToggleChecklistItem(clock, Operator(c.Operator), c.ItemId);
                 break;
             case AssignRoleCommand c:
                 incident.AssignRole(c.Role, c.PersonName, c.CallSign, c.From, c.To, c.Section, c.Phone);
