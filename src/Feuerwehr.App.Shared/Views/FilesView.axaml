@@ -29,7 +29,10 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IncidentFileRow">
               <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,10">
-                <TextBox Grid.Column="0" Text="{Binding DisplayName}" Watermark="Name"
+                <!-- Committing per keystroke saved the whole incident file on every character
+                     typed (#33). UpdateSourceTrigger=LostFocus pushes once, when the operator
+                     actually leaves the field. Mirrors ForcesView's Bemerkung fix. -->
+                <TextBox Grid.Column="0" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="Name"
                          BorderThickness="0" Background="Transparent" Padding="0"
                          VerticalAlignment="Center" IsEnabled="{Binding !IsReadOnly}" />
                 <TextBlock Grid.Column="1" Classes="mono" Text="{Binding SizeDisplay}" Margin="10,0"
