@@ -52,21 +52,30 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}">
-      <StackPanel Spacing="10">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBox x:Name="EditTextBox" Width="420" Watermark="Eintrag" Text="{Binding EditText}">
-            <TextBox.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
-            </TextBox.KeyBindings>
-          </TextBox>
-          <Button x:Name="SaveEditButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveEditCommand}" />
-          <Button x:Name="CancelEditButton" Content="ABBRECHEN" Command="{Binding CancelEditCommand}" />
-          <Button x:Name="ToggleHistoryButton" Content="VERLAUF" Command="{Binding ToggleEditHistoryCommand}"
-                  IsVisible="{Binding EditingEntry.WasEdited}" />
-        </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBox x:Name="EditTextBox" Width="420" Watermark="Eintrag" Text="{Binding EditText}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button x:Name="SaveEditButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveEditCommand}" />
+        <Button x:Name="CancelEditButton" Content="ABBRECHEN" Command="{Binding CancelEditCommand}" />
+      </StackPanel>
+    </Border>
 
-        <ItemsControl x:Name="EditHistoryList" ItemsSource="{Binding EditingEntry.Edits}"
-                      IsVisible="{Binding ShowEditHistory}">
+    <!-- History panel: read-only, available whenever the selected row has prior versions.
+         Deliberately independent of IsReadOnly and of the edit panel above, so a closed incident's
+         edit history is still reachable (a rewrite must stay auditable after the fact). -->
+    <Border DockPanel.Dock="Bottom" x:Name="HistoryPanel" Margin="0,16,0,0"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14"
+            IsVisible="{Binding HistoryEntry, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Text="Verlauf" Classes="overline" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="SCHLIESSEN" Command="{Binding CloseHistoryCommand}" />
+        </Grid>
+        <ItemsControl x:Name="HistoryList" ItemsSource="{Binding HistoryEntry.Edits}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="etb:EtbEntryEdit">
               <TextBlock Classes="mono" Foreground="{StaticResource TextMutedBrush}" Margin="0,2">
@@ -110,8 +119,14 @@
           <DataGridTemplateColumn Header="">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:EtbEntryRow">
-                <Button Content="BEARBEITEN" Margin="6,4" Command="{Binding BeginEditCommand}"
-                        IsVisible="{Binding IsEditable}" />
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,4">
+                  <Button Content="BEARBEITEN" Command="{Binding BeginEditCommand}"
+                          IsVisible="{Binding IsEditable}" />
+                  <!-- Not gated on IsEditable/IsReadOnly like BEARBEITEN: history must stay
+                       readable even for a System entry's neighbours or a closed incident. -->
+                  <Button Content="VERLAUF" Command="{Binding ShowHistoryCommand}"
+                          IsVisible="{Binding WasEdited}" />
+                </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>

@@ -100,9 +100,12 @@ public sealed class IncidentHost : IAsyncDisposable
                 return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
             });
         }
-        catch (Exception ex) when (ex is IncidentClosedException or ArgumentException or InvalidOperationException)
+        catch (Exception ex) when (ex is IncidentClosedException or ArgumentException or InvalidOperationException
+                                       or KeyNotFoundException)
         {
-            // The same domain guards a local edit hits — reject cleanly rather than 500.
+            // The same domain guards a local edit hits — reject cleanly rather than 500. An unknown
+            // id (KeyNotFoundException, e.g. EditJournalEntry/RenameFile/ToggleChecklistItem against
+            // a stale or forged id) belongs here too, not just the argument/state guards.
             return Results.BadRequest(ex.Message);
         }
     }

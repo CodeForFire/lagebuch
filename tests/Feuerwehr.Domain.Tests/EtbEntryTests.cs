@@ -30,6 +30,23 @@ public class EtbEntryTests
     }
 
     [Fact]
+    public void Create_rejects_text_longer_than_the_limit()
+    {
+        var op = new SessionOperator("Müller");
+        var tooLong = new string('x', EtbEntry.MaxTextLength + 1);
+        Assert.Throws<ArgumentException>(() => EtbEntry.Create(At, EtbDirection.Internal, tooLong, op));
+    }
+
+    [Fact]
+    public void Create_accepts_text_at_exactly_the_limit()
+    {
+        var op = new SessionOperator("Müller");
+        var atLimit = new string('x', EtbEntry.MaxTextLength);
+        var entry = EtbEntry.Create(At, EtbDirection.Internal, atLimit, op);
+        Assert.Equal(EtbEntry.MaxTextLength, entry.Text.Length);
+    }
+
+    [Fact]
     public void Each_entry_gets_a_unique_id()
     {
         var op = new SessionOperator("Müller");
@@ -76,6 +93,44 @@ public class EtbEntryTests
         var op = new SessionOperator("Müller");
         var entry = EtbEntry.Create(At, EtbDirection.Internal, "Original", op);
         Assert.Throws<ArgumentException>(() => entry.WithEditedText("   ", op, At.AddMinutes(1)));
+    }
+
+    [Fact]
+    public void WithEditedText_rejects_text_longer_than_the_limit()
+    {
+        var op = new SessionOperator("Müller");
+        var entry = EtbEntry.Create(At, EtbDirection.Internal, "Original", op);
+        var tooLong = new string('x', EtbEntry.MaxTextLength + 1);
+        Assert.Throws<ArgumentException>(() => entry.WithEditedText(tooLong, op, At.AddMinutes(1)));
+    }
+
+    /// <summary>
+    /// Resubmitting the same text is not an edit -- it must not grow Edits, both because it isn't a
+    /// real correction and because otherwise a flood of no-op "edits" could inflate the retained
+    /// history without bound (security review, #73).
+    /// </summary>
+    [Fact]
+    public void WithEditedText_is_a_no_op_when_the_text_is_unchanged()
+    {
+        var op = new SessionOperator("Müller");
+        var entry = EtbEntry.Create(At, EtbDirection.Internal, "Original", op);
+
+        var result = entry.WithEditedText("Original", op, At.AddMinutes(1));
+
+        Assert.Same(entry, result);
+        Assert.Empty(result.Edits);
+    }
+
+    [Fact]
+    public void WithEditedText_is_a_no_op_when_the_text_differs_only_by_surrounding_whitespace()
+    {
+        var op = new SessionOperator("Müller");
+        var entry = EtbEntry.Create(At, EtbDirection.Internal, "Original", op);
+
+        var result = entry.WithEditedText("  Original  ", op, At.AddMinutes(1));
+
+        Assert.Same(entry, result);
+        Assert.Empty(result.Edits);
     }
 
     [Fact]

@@ -182,8 +182,9 @@ public class EtbViewModelTests
 
         Assert.False(vm.IsEditing);
         Assert.Equal(string.Empty, vm.EditText);
-        var row = vm.Entries[0];
-        Assert.Equal("Lagemeldung korrigiert", row.Text);
+        // A save also appends a System trace of the correction (security review, #73), so the
+        // edited row is no longer necessarily Entries[0] -- find it by its new text instead.
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung korrigiert");
         Assert.True(row.WasEdited);
     }
 
@@ -244,6 +245,63 @@ public class EtbViewModelTests
 
         var row = Assert.Single(vm.Entries, r => r.Text == "Lagemeldung");
         Assert.False(row.BeginEditCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Viewing an edited entry's history must not require edit permission -- a closed incident's
+    /// history is exactly the case where it matters most (security review, #73).
+    /// </summary>
+    [Fact]
+    public void History_stays_viewable_on_a_read_only_session()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var entry = session.Incident.AddJournalEntry(clock, session.Operator!, EtbDirection.Incoming, "Lagemeldung");
+        session.Incident.EditJournalEntry(clock, session.Operator!, entry.Id, "Lagemeldung korrigiert");
+        session.Close();
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+
+        var row = Assert.Single(vm.Entries, r => r.Text == "Lagemeldung korrigiert");
+        Assert.True(row.WasEdited);
+        Assert.False(row.BeginEditCommand.CanExecute(null)); // still can't edit
+        Assert.True(row.ShowHistoryCommand.CanExecute(null)); // but can still view the history
+
+        row.ShowHistoryCommand.Execute(null);
+
+        Assert.Same(row, vm.HistoryEntry);
+        Assert.Equal("Lagemeldung", Assert.Single(row.Edits).PreviousText);
+    }
+
+    [Fact]
+    public void ShowHistoryCommand_is_disabled_for_a_never_edited_entry()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+
+        Assert.False(row.ShowHistoryCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void CloseHistory_clears_the_history_selection()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        row.BeginEditCommand.Execute(null);
+        vm.EditText = "Korrigiert";
+        vm.SaveEditCommand.Execute(null);
+        var edited = Assert.Single(vm.Entries, e => e.Text == "Korrigiert");
+
+        edited.ShowHistoryCommand.Execute(null);
+        Assert.NotNull(vm.HistoryEntry);
+
+        vm.CloseHistoryCommand.Execute(null);
+        Assert.Null(vm.HistoryEntry);
     }
 
     private static EtbViewModel NewVm()

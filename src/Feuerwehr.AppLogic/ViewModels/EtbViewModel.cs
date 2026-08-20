@@ -20,7 +20,8 @@ namespace Feuerwehr.AppLogic.ViewModels;
 /// </summary>
 public sealed class EtbEntryRow
 {
-    public EtbEntryRow(EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit)
+    public EtbEntryRow(
+        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
     {
         Id = entry.Id;
         Time = Formatting.Timestamp(entry.Timestamp);
@@ -34,6 +35,10 @@ public sealed class EtbEntryRow
         Edits = entry.Edits;
         IsEditable = entry.Direction != EtbDirection.System;
         BeginEditCommand = new RelayCommand(() => beginEdit(this), () => canEdit(this));
+        // Deliberately not gated on IsReadOnly/IsEditable like BeginEditCommand: a closed or
+        // remotely-joined-read-only incident must still let its history be read, since that is the
+        // one thing that makes an edit acceptable in the first place.
+        ShowHistoryCommand = new RelayCommand(() => showHistory(this), () => WasEdited);
     }
 
     public Guid Id { get; }
@@ -48,6 +53,7 @@ public sealed class EtbEntryRow
     public IReadOnlyList<EtbEntryEdit> Edits { get; }
     public bool IsEditable { get; }
     public ICommand BeginEditCommand { get; }
+    public ICommand ShowHistoryCommand { get; }
 }
 
 /// <summary>
@@ -66,6 +72,10 @@ public sealed partial class EtbViewModel : ObservableObject
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
     private readonly List<EtbEntryRow> _all = new();
+
+    // Id -> current row, kept in step with _all so Sync()'s edit-detection pass is O(1) per entry
+    // instead of a linear scan of _all for every journal entry.
+    private readonly Dictionary<Guid, EtbEntryRow> _byId = new();
 
     public EtbViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
     {
@@ -93,8 +103,9 @@ public sealed partial class EtbViewModel : ObservableObject
     ///
     /// A second pass handles the one way an already-rendered row's content can change without a new
     /// journal entry: an edit (this device's Save, or a remote device's edit arriving via Changed).
-    /// It rescans every entry and swaps in a replacement row wherever the edit count no longer
-    /// matches what's rendered -- O(n) per Sync() call, acceptable for a realistic ETB's size.
+    /// It walks every entry once, looking up its currently-rendered row by id (O(1) via _byId) and
+    /// swapping in a replacement wherever the edit count no longer matches -- O(n) total per
+    /// Sync() call, not O(n²), since Sync() runs on every incident change from every device.
     /// </summary>
     public void Sync()
     {
@@ -103,18 +114,19 @@ public sealed partial class EtbViewModel : ObservableObject
         {
             var row = ToRow(journal[i]);
             _all.Insert(0, row);
+            _byId[row.Id] = row;
             if (IsVisible(row))
                 Entries.Insert(0, row);
         }
 
         foreach (var entry in journal)
         {
-            var current = _all.FirstOrDefault(r => r.Id == entry.Id);
-            if (current is null || current.Edits.Count == entry.Edits.Count)
+            if (!_byId.TryGetValue(entry.Id, out var current) || current.Edits.Count == entry.Edits.Count)
                 continue;
 
             var updated = ToRow(entry);
             _all[_all.IndexOf(current)] = updated;
+            _byId[entry.Id] = updated;
             var entriesIndex = Entries.IndexOf(current);
             if (entriesIndex >= 0)
                 Entries[entriesIndex] = updated;
@@ -186,9 +198,6 @@ public sealed partial class EtbViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SaveEditCommand))]
     private string _editText = string.Empty;
 
-    [ObservableProperty]
-    private bool _showEditHistory;
-
     public bool IsEditing => EditingEntry is not null;
 
     private bool CanEdit(EtbEntryRow row) => !IsReadOnly && row.IsEditable;
@@ -197,7 +206,7 @@ public sealed partial class EtbViewModel : ObservableObject
     {
         EditingEntry = row;
         EditText = row.Text;
-        ShowEditHistory = false;
+        HistoryEntry = null; // editing and viewing history are separate panels; only one at a time
     }
 
     private bool CanSaveEdit => IsEditing && !string.IsNullOrWhiteSpace(EditText);
@@ -218,8 +227,20 @@ public sealed partial class EtbViewModel : ObservableObject
         EditText = string.Empty;
     }
 
-    [RelayCommand]
-    private void ToggleEditHistory() => ShowEditHistory = !ShowEditHistory;
+    // --- View an edited entry's history: available whenever WasEdited, independent of IsReadOnly
+    //     and of the edit panel above -- a closed incident must still let its history be read. ---
 
-    private EtbEntryRow ToRow(EtbEntry e) => new(e, BeginEdit, CanEdit);
+    [ObservableProperty]
+    private EtbEntryRow? _historyEntry;
+
+    private void ShowHistory(EtbEntryRow row)
+    {
+        HistoryEntry = row;
+        CancelEdit(); // editing and viewing history are separate panels; only one at a time
+    }
+
+    [RelayCommand]
+    private void CloseHistory() => HistoryEntry = null;
+
+    private EtbEntryRow ToRow(EtbEntry e) => new(e, BeginEdit, CanEdit, ShowHistory);
 }

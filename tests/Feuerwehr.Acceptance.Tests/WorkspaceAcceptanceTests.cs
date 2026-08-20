@@ -182,6 +182,12 @@ public class WorkspaceAcceptanceTests
 
         using (var after = window.CaptureRenderedFrame()!)
             after.Save(Path.Combine(dir, "etb-edit-after.png"));
+
+        // History viewing is decoupled from editing (security review, #73) -- capture it separately.
+        edited.ShowHistoryCommand.Execute(null);
+        Assert.NotNull(vm.Etb.HistoryEntry);
+        using (var history = window.CaptureRenderedFrame()!)
+            history.Save(Path.Combine(dir, "etb-edit-history.png"));
     }
 
     // System-generated entries (the automatic "Einsatz begonnen" line) are never editable —
