@@ -16,7 +16,7 @@ public sealed class IncidentRepository
         using var tx = cn.BeginTransaction();
 
         foreach (var table in new[]
-                 { "incident_meta", "checklist_items", "etb_entries",
+                 { "incident_meta", "checklist_items", "etb_entries", "etb_entry_edits",
                    "role_assignments", "force_units", "scba_trupps",
                    "scba_trupp_members", "scba_pressure_readings", "audit_events",
                    "incident_timers", "incident_files" })
@@ -58,6 +58,18 @@ public sealed class IncidentRepository
                     p("$dir", (int)e.Direction); p("$from", (object?)e.From ?? DBNull.Value);
                     p("$to", (object?)e.To ?? DBNull.Value); p("$txt", e.Text); p("$by", e.EnteredBy);
                 });
+
+            for (var j = 0; j < e.Edits.Count; j++)
+            {
+                var edit = e.Edits[j];
+                Run(cn, tx,
+                    "INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at) VALUES ($id,$eid,$o,$txt,$by,$at);",
+                    p =>
+                    {
+                        p("$id", Guid.NewGuid().ToString()); p("$eid", e.Id.ToString()); p("$o", j);
+                        p("$txt", edit.PreviousText); p("$by", edit.EditedBy); p("$at", edit.EditedAt.ToString(Iso));
+                    });
+            }
         }
 
         for (var i = 0; i < incident.Roles.Count; i++)
@@ -248,9 +260,21 @@ public sealed class IncidentRepository
             "SELECT id, text, is_done, note, is_mandatory FROM checklist_items WHERE kind = 1 ORDER BY ordinal;",
             r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3), r.GetInt32(4) != 0));
 
+        var editsByEntry = ReadAll(cn,
+            "SELECT entry_id, previous_text, edited_by, edited_at FROM etb_entry_edits ORDER BY ordinal;",
+            r => (EntryId: Guid.Parse(r.GetString(0)),
+                  Edit: new Domain.Etb.EtbEntryEdit(r.GetString(1), r.GetString(2), ParseDate(r.GetString(3)))))
+            .GroupBy(x => x.EntryId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Edit).ToList());
+
         var journal = ReadAll(cn, "SELECT id, timestamp, direction, from_party, to_party, text, entered_by FROM etb_entries ORDER BY ordinal;",
-            r => Domain.Etb.EtbEntry.Rehydrate(Guid.Parse(r.GetString(0)), ParseDate(r.GetString(1)),
-                (Domain.Etb.EtbDirection)r.GetInt32(2), r.GetString(5), r.GetString(6), Str(r, 3), Str(r, 4)));
+            r =>
+            {
+                var id = Guid.Parse(r.GetString(0));
+                return Domain.Etb.EtbEntry.Rehydrate(id, ParseDate(r.GetString(1)),
+                    (Domain.Etb.EtbDirection)r.GetInt32(2), r.GetString(5), r.GetString(6), Str(r, 3), Str(r, 4),
+                    editsByEntry.TryGetValue(id, out var eds) ? eds : null);
+            });
 
         var roles = ReadAll(cn, "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone FROM role_assignments ORDER BY ordinal;",
             r => new Domain.RoleAssignment(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),

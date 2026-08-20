@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:b="clr-namespace:Feuerwehr.App.Shared.Behaviors"
+             xmlns:etb="clr-namespace:Feuerwehr.Domain.Etb;assembly=Feuerwehr.Domain"
              x:Class="Feuerwehr.App.Shared.Views.EtbView"
              x:DataType="vm:EtbViewModel">
   <DockPanel>
@@ -31,9 +33,54 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBox Width="110" Watermark="Von" Text="{Binding NewFrom}" />
-        <TextBox Width="110" Watermark="An" Text="{Binding NewTo}" />
+        <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
+             a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
+             ComboBox, mirroring ForcesView's Brigade field. -->
+        <AutoCompleteBox Width="110" Watermark="Von" ItemsSource="{Binding CallSignOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+        <AutoCompleteBox Width="110" Watermark="An" ItemsSource="{Binding CallSignOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
         <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Edit panel: a small form below the grid, mirroring the input dock's visual language, shown
+         only while a row is being edited (not inline DataGrid cell editing). -->
+    <Border DockPanel.Dock="Bottom" x:Name="EditPanel" Margin="0,16,0,0"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14"
+            IsVisible="{Binding IsEditing}">
+      <StackPanel Spacing="10">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBox x:Name="EditTextBox" Width="420" Watermark="Eintrag" Text="{Binding EditText}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button x:Name="SaveEditButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveEditCommand}" />
+          <Button x:Name="CancelEditButton" Content="ABBRECHEN" Command="{Binding CancelEditCommand}" />
+          <Button x:Name="ToggleHistoryButton" Content="VERLAUF" Command="{Binding ToggleEditHistoryCommand}"
+                  IsVisible="{Binding EditingEntry.WasEdited}" />
+        </StackPanel>
+
+        <ItemsControl x:Name="EditHistoryList" ItemsSource="{Binding EditingEntry.Edits}"
+                      IsVisible="{Binding ShowEditHistory}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="etb:EtbEntryEdit">
+              <TextBlock Classes="mono" Foreground="{StaticResource TextMutedBrush}" Margin="0,2">
+                <TextBlock.Text>
+                  <MultiBinding StringFormat="{}{0}: „{1}“ ({2})">
+                    <Binding Path="EditedAt" />
+                    <Binding Path="PreviousText" />
+                    <Binding Path="EditedBy" />
+                  </MultiBinding>
+                </TextBlock.Text>
+              </TextBlock>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
     </Border>
 
@@ -45,8 +92,29 @@
           <DataGridTextColumn Header="RICHTUNG" Binding="{Binding Direction}" />
           <DataGridTextColumn Header="VON" Binding="{Binding From}" />
           <DataGridTextColumn Header="AN" Binding="{Binding To}" />
-          <DataGridTextColumn Header="EINTRAG" Binding="{Binding Text}" Width="*" />
+          <DataGridTemplateColumn Header="EINTRAG" Width="*">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:EtbEntryRow">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="6,4">
+                  <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                  <Border x:Name="EditedTag" Background="#241A08" BorderBrush="{StaticResource AmberBrush}"
+                          BorderThickness="1" CornerRadius="{StaticResource RadiusSm}" Padding="6,1"
+                          IsVisible="{Binding WasEdited}">
+                    <TextBlock Text="bearbeitet" FontSize="11" Foreground="{StaticResource AmberBrush}" />
+                  </Border>
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="ERFASST VON" Binding="{Binding EnteredBy}" />
+          <DataGridTemplateColumn Header="">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:EtbEntryRow">
+                <Button Content="BEARBEITEN" Margin="6,4" Command="{Binding BeginEditCommand}"
+                        IsVisible="{Binding IsEditable}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
         </DataGrid.Columns>
       </DataGrid>
     </Border>

@@ -302,6 +302,54 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Edit_journal_entry_replaces_text_and_records_the_prior_version()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung", from: "ILS");
+        clock.Now = T0.AddMinutes(5);
+        var editor = new SessionOperator("Schmidt");
+
+        var edited = incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert");
+
+        Assert.Equal("Lagemeldung korrigiert", edited.Text);
+        Assert.Equal(edited, incident.Journal.Single(e => e.Id == entry.Id));
+        var historyEntry = Assert.Single(edited.Edits);
+        Assert.Equal("Lagemeldung", historyEntry.PreviousText);
+        Assert.Equal("Schmidt", historyEntry.EditedBy);
+        Assert.Equal(T0.AddMinutes(5), historyEntry.EditedAt);
+    }
+
+    [Fact]
+    public void Edit_journal_entry_throws_on_a_System_entry()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.ResumeEditing(clock, op);
+        var systemEntry = incident.Journal.Single(e => e.Text == "Bearbeitung fortgesetzt");
+
+        Assert.Throws<InvalidOperationException>(
+            () => incident.EditJournalEntry(clock, op, systemEntry.Id, "Manipuliert"));
+    }
+
+    [Fact]
+    public void Edit_journal_entry_throws_when_entry_not_found()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        Assert.Throws<KeyNotFoundException>(
+            () => incident.EditJournalEntry(clock, op, Guid.NewGuid(), "Text"));
+    }
+
+    [Fact]
+    public void Edit_journal_entry_throws_when_incident_closed()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(
+            () => incident.EditJournalEntry(clock, op, entry.Id, "Korrigiert"));
+    }
+
+    [Fact]
     public void Resume_editing_logs_etb_entry()
     {
         var incident = NewIncident(out var clock, out var op);

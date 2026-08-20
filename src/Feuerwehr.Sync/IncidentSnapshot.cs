@@ -47,7 +47,10 @@ public sealed record EtbEntryDto(
     string Text,
     string EnteredBy,
     string? From,
-    string? To);
+    string? To,
+    IReadOnlyList<EtbEntryEditDto> Edits);
+
+public sealed record EtbEntryEditDto(string PreviousText, string EditedBy, DateTimeOffset EditedAt);
 
 public sealed record RoleAssignmentDto(
     Guid Id,

@@ -269,6 +269,32 @@ public sealed class Incident
         return entry;
     }
 
+    /// <summary>
+    /// Corrects a manually-typed ETB entry's text, preserving the prior wording under
+    /// <see cref="EtbEntry.Edits"/>. System-direction entries (Kräfte, Atemschutz,
+    /// Einsatz-Lebenszyklus) are never editable — they are the app's own record of what happened,
+    /// not something an operator wrote and could have mistyped. Any operator may edit any manual
+    /// entry, matching <see cref="UpdateForceUnit"/>'s "no per-field author restriction" precedent.
+    /// </summary>
+    public EtbEntry EditJournalEntry(IClock clock, SessionOperator op, Guid entryId, string text)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _journal.FindIndex(e => e.Id == entryId);
+        if (index < 0)
+            throw new KeyNotFoundException($"ETB-Eintrag {entryId} nicht gefunden.");
+
+        var existing = _journal[index];
+        if (existing.Direction == EtbDirection.System)
+            throw new InvalidOperationException("Systemeinträge können nicht bearbeitet werden.");
+
+        var edited = existing.WithEditedText(text, op, clock.Now);
+        _journal[index] = edited;
+        return edited;
+    }
+
     public RoleAssignment AssignRole(
         string role,
         string personName,

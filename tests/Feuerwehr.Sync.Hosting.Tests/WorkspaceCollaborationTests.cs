@@ -79,6 +79,29 @@ public class WorkspaceCollaborationTests
     }
 
     [Fact]
+    public async Task Client_workspace_reflects_a_journal_entry_edited_on_the_host()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var entry = hostSession.Incident.AddJournalEntry(clock, new SessionOperator("Host", "FFB 1"),
+            EtbDirection.Incoming, "Lage erkundet", "Leitstelle", "ELW");
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+        Assert.Contains(clientWs.Etb.Entries, e => e.Text == "Lage erkundet");
+
+        var change = NextChange(client);
+        hostSession.EditJournalEntry(entry.Id, "Lage erkundet, Rückzug angeordnet");
+        await change;
+
+        Assert.Contains(clientWs.Etb.Entries, e => e.Text == "Lage erkundet, Rückzug angeordnet");
+        Assert.DoesNotContain(clientWs.Etb.Entries, e => e.Text == "Lage erkundet");
+    }
+
+    [Fact]
     public async Task Host_closing_the_incident_flips_the_client_workspace_read_only()
     {
         var clock = new FixedClock();

@@ -31,6 +31,28 @@ public class RehydrationTests
     }
 
     [Fact]
+    public void EtbEntry_rehydrate_without_edits_arg_defaults_to_empty()
+    {
+        var entry = EtbEntry.Rehydrate(Guid.NewGuid(), T0, EtbDirection.Incoming, "Meldung", "Müller", "ILS", null);
+        Assert.Empty(entry.Edits);
+    }
+
+    [Fact]
+    public void EtbEntry_rehydrate_with_edits_preserves_history()
+    {
+        var edits = new[]
+        {
+            new EtbEntryEdit("Original", "Müller", T0),
+            new EtbEntryEdit("Zweite Fassung", "Schmidt", T0.AddMinutes(5)),
+        };
+
+        var entry = EtbEntry.Rehydrate(
+            Guid.NewGuid(), T0, EtbDirection.Incoming, "Dritte Fassung", "Müller", "ILS", null, edits);
+
+        Assert.Equal(edits, entry.Edits);
+    }
+
+    [Fact]
     public void Incident_rehydrate_restores_closed_incident_fully()
     {
         var id = Guid.NewGuid();

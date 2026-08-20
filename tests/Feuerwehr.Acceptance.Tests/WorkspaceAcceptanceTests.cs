@@ -10,6 +10,7 @@ using Feuerwehr.AppLogic;
 using Feuerwehr.AppLogic.Services;
 using Feuerwehr.AppLogic.ViewModels;
 using Feuerwehr.Domain;
+using Feuerwehr.Domain.Etb;
 using Feuerwehr.Domain.Time;
 using Feuerwehr.Persistence.MasterData;
 
@@ -138,6 +139,62 @@ public class WorkspaceAcceptanceTests
         Assert.Equal(2, session.Incident.Journal.Count);
         Assert.Equal("Lagemeldung erhalten", vm.Etb.Entries[0].Text);
         Assert.Equal("Einsatz begonnen", vm.Etb.Entries[1].Text);
+    }
+
+    // #73: editing an existing manual ETB entry shows a "bearbeitet" tag on the row and the edit
+    // panel below the grid. Doubles as the PR before/after screenshot capture.
+    [AvaloniaFact]
+    public void Editing_an_etb_entry_updates_the_row_and_shows_the_bearbeitet_tag()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung erhalten", from: "Leitstelle");
+        var view = new EtbView { DataContext = vm.Etb };
+        var window = new Window { Content = view, Width = 1000, Height = 700 };
+        window.Show();
+
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var before = window.CaptureRenderedFrame()!)
+            before.Save(Path.Combine(dir, "etb-edit-before.png"));
+
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung erhalten");
+        Assert.False(row.WasEdited);
+        row.BeginEditCommand.Execute(null);
+        Assert.True(vm.Etb.IsEditing);
+
+        using (var editing = window.CaptureRenderedFrame()!)
+            editing.Save(Path.Combine(dir, "etb-edit-panel.png"));
+
+        var editTextBox = view.GetControl<TextBox>("EditTextBox");
+        editTextBox.Focus();
+        // Replace the whole content: select-all then type, mirroring how a user would correct it.
+        editTextBox.SelectAll();
+        window.KeyTextInput("Lagemeldung korrigiert");
+        Assert.Equal("Lagemeldung korrigiert", vm.Etb.EditText);
+
+        var saveButton = view.GetControl<Button>("SaveEditButton");
+        saveButton.Command!.Execute(null);
+
+        Assert.False(vm.Etb.IsEditing);
+        var edited = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung korrigiert");
+        Assert.True(edited.WasEdited);
+        Assert.Equal("Lagemeldung erhalten", Assert.Single(edited.Edits).PreviousText);
+
+        using (var after = window.CaptureRenderedFrame()!)
+            after.Save(Path.Combine(dir, "etb-edit-after.png"));
+    }
+
+    // System-generated entries (the automatic "Einsatz begonnen" line) are never editable —
+    // BeginEditCommand must refuse them regardless of what the UI shows.
+    [AvaloniaFact]
+    public void System_entries_have_no_working_edit_affordance()
+    {
+        var vm = BuildWorkspace(out _);
+
+        var systemRow = Assert.Single(vm.Etb.Entries, e => e.Text == "Einsatz begonnen");
+
+        Assert.False(systemRow.IsEditable);
+        Assert.False(systemRow.BeginEditCommand.CanExecute(null));
     }
 
     [AvaloniaFact]

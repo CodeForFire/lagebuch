@@ -12,6 +12,7 @@ namespace Feuerwehr.Sync;
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(AddJournalEntryCommand), "addJournalEntry")]
+[JsonDerivedType(typeof(EditJournalEntryCommand), "editJournalEntry")]
 [JsonDerivedType(typeof(ToggleChecklistItemCommand), "toggleChecklistItem")]
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
 [JsonDerivedType(typeof(EndRoleAssignmentCommand), "endRoleAssignment")]
@@ -35,6 +36,8 @@ public sealed record OperatorDto(string Name, string? CallSign);
 
 public sealed record AddJournalEntryCommand(
     OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To) : SyncCommand;
+
+public sealed record EditJournalEntryCommand(OperatorDto Operator, Guid EntryId, string Text) : SyncCommand;
 
 public sealed record ToggleChecklistItemCommand(OperatorDto Operator, Guid ItemId) : SyncCommand;
 

@@ -288,6 +288,45 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void V11_file_gains_an_empty_etb_entry_edits_table_on_upgrade_to_v12()
+    {
+        // V12 adds etb_entry_edits (ETB entry edit history, #73). A v11 file must upgrade cleanly
+        // and simply gain the empty table -- its existing etb_entries rows are untouched.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (11);
+                CREATE TABLE etb_entries (
+                    id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, timestamp TEXT NOT NULL,
+                    direction INTEGER NOT NULL, from_party TEXT, to_party TEXT, text TEXT NOT NULL,
+                    entered_by TEXT NOT NULL);
+                INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by)
+                VALUES ('66666666-6666-6666-6666-666666666666', 0, '2026-06-22T09:00:00.0000000+02:00',
+                        2, NULL, NULL, 'Einsatz begonnen', 'Müller (FFB 12/1)');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Assert.Equal(11, Migrations.GetVersion(cn));
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var readEdits = cn.CreateCommand();
+            readEdits.CommandText = "SELECT count(*) FROM etb_entry_edits;";
+            Assert.Equal(0L, (long)readEdits.ExecuteScalar()!);
+
+            using var readEntries = cn.CreateCommand();
+            readEntries.CommandText = "SELECT text FROM etb_entries;";
+            Assert.Equal("Einsatz begonnen", (string)readEntries.ExecuteScalar()!);
+        }
+    }
+
+    [Fact]
     public void A_file_from_a_newer_version_is_refused_and_its_marker_left_alone()
     {
         // A file written by a build that is ahead of this one. Migrate has no migration to run --
