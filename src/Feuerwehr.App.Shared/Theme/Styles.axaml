@@ -124,6 +124,29 @@
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
+  <!-- Icon-only button: compact square, ghost background. Used for row actions (e.g. the ETB
+       grid) where a labelled button would not fit. Give each instance a ToolTip.Tip, since the
+       icon alone carries no text. -->
+  <Style Selector="Button.icon-btn">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.icon-btn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#1C2531" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.icon-btn PathIcon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Button.icon-btn:pointerover PathIcon">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+
   <!-- =========================================================
        INPUTS — TextBox / ComboBox / NumericUpDown
        ========================================================= -->

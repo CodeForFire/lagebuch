@@ -104,14 +104,7 @@
           <DataGridTemplateColumn Header="EINTRAG" Width="*">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:EtbEntryRow">
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="6,4">
-                  <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
-                  <Border x:Name="EditedTag" Background="#241A08" BorderBrush="{StaticResource AmberBrush}"
-                          BorderThickness="1" CornerRadius="{StaticResource RadiusSm}" Padding="6,1"
-                          IsVisible="{Binding WasEdited}">
-                    <TextBlock Text="bearbeitet" FontSize="11" Foreground="{StaticResource AmberBrush}" />
-                  </Border>
-                </StackPanel>
+                <TextBlock Text="{Binding Text}" VerticalAlignment="Center" Margin="6,4" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
@@ -119,13 +112,20 @@
           <DataGridTemplateColumn Header="">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:EtbEntryRow">
-                <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,4">
-                  <Button Content="BEARBEITEN" Command="{Binding BeginEditCommand}"
-                          IsVisible="{Binding IsEditable}" />
-                  <!-- Not gated on IsEditable/IsReadOnly like BEARBEITEN: history must stay
-                       readable even for a System entry's neighbours or a closed incident. -->
-                  <Button Content="VERLAUF" Command="{Binding ShowHistoryCommand}"
-                          IsVisible="{Binding WasEdited}" />
+                <StackPanel Orientation="Horizontal" Spacing="2" Margin="6,4">
+                  <Button Classes="icon-btn" Command="{Binding BeginEditCommand}"
+                          IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten">
+                    <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                  </Button>
+                  <!-- Not gated on IsEditable/IsReadOnly like the edit button: history must stay
+                       readable even for a System entry's neighbours or a closed incident. Its
+                       amber tint is the row's only "was edited" marker: it only shows up here,
+                       so a separate badge in the EINTRAG column would just repeat the same fact. -->
+                  <Button Classes="icon-btn" Command="{Binding ShowHistoryCommand}"
+                          IsVisible="{Binding WasEdited}" ToolTip.Tip="Verlauf (bearbeitet)">
+                    <PathIcon Foreground="{StaticResource AmberBrush}"
+                              Data="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.92 6.92 0 0 1-4.95-2.05l-1.41 1.41A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z" />
+                  </Button>
                 </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>

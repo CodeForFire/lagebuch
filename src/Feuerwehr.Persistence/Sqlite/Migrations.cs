@@ -377,7 +377,7 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_files", "display_name", "TEXT");
 
     // Preserves every prior version of a manually-edited ETB entry's text, plus who edited it and
-    // when -- the ETB itself only ever shows the current text plus a "bearbeitet" tag; the full
+    // when -- the ETB itself only ever shows the current text plus a Verlauf affordance; the full
     // history lives in this table (#73).
     private static void ApplyV12(SqliteConnection cn, SqliteTransaction tx)
     {
