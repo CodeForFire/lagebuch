@@ -62,7 +62,7 @@ public class FilesTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var tabs = Tabs(window);
-        tabs.SelectedIndex = 6; // DATEIEN
+        tabs.SelectedIndex = 5; // DATEIEN
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("DATEIEN", ((TabItem)tabs.SelectedItem!).Header);

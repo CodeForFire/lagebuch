@@ -246,21 +246,6 @@
               <ContentControl Content="{Binding ChecklistAufbau}" />
             </Border>
           </TabItem>
-          <TabItem>
-            <TabItem.Header>
-              <StackPanel x:DataType="vm:ChecklistViewModel" DataContext="{Binding ChecklistAbbau}"
-                          Orientation="Horizontal" Spacing="7">
-                <TextBlock Text="ABBAU" />
-                <Ellipse x:Name="AbbauCompleteDot" Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding AllMandatoryDone}" />
-                <Ellipse x:Name="AbbauIncompleteDot" Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding !AllMandatoryDone}" />
-              </StackPanel>
-            </TabItem.Header>
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding ChecklistAbbau}" />
-            </Border>
-          </TabItem>
           <TabItem Header="ETB">
             <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
               <ContentControl Content="{Binding Etb}" />
@@ -289,6 +274,21 @@
           <TabItem Header="LINKS">
             <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
               <ContentControl Content="{Binding Links}" />
+            </Border>
+          </TabItem>
+          <TabItem>
+            <TabItem.Header>
+              <StackPanel x:DataType="vm:ChecklistViewModel" DataContext="{Binding ChecklistAbbau}"
+                          Orientation="Horizontal" Spacing="7">
+                <TextBlock Text="ABBAU" />
+                <Ellipse x:Name="AbbauCompleteDot" Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding AllMandatoryDone}" />
+                <Ellipse x:Name="AbbauIncompleteDot" Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding !AllMandatoryDone}" />
+              </StackPanel>
+            </TabItem.Header>
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding ChecklistAbbau}" />
             </Border>
           </TabItem>
         </TabControl>

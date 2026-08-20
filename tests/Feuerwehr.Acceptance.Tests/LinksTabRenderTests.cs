@@ -56,7 +56,7 @@ public class LinksTabRenderTests
         var (window, vm) = ShowWorkspace();
 
         var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // LINKS
+        tabs.SelectedIndex = 6; // LINKS
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("LINKS", ((TabItem)tabs.SelectedItem!).Header);
