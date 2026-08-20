@@ -23,6 +23,9 @@ public sealed partial class LinksViewModel : ObservableObject
 
     public IReadOnlyList<Link> Links { get; }
 
+    [ObservableProperty]
+    private string? _errorMessage;
+
     /// <summary>
     /// Refuses anything but http(s) before it reaches the OS: on desktop, OpenUrlAsync ultimately
     /// runs Process.Start with UseShellExecute=true, which resolves arbitrary URI handlers and even
@@ -30,13 +33,26 @@ public sealed partial class LinksViewModel : ObservableObject
     /// just what the user themselves typed here.
     /// </summary>
     [RelayCommand]
-    private Task OpenAsync(Link link)
+    private async Task OpenAsync(Link link)
     {
+        ErrorMessage = null;
         var candidate = link.Url.Contains("://", StringComparison.Ordinal) ? link.Url : $"https://{link.Url}";
         if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-            return Task.CompletedTask;
+        {
+            ErrorMessage = $"„{link.Name}“ hat keine gültige http(s)-Adresse.";
+            return;
+        }
 
-        return _dialogs.OpenUrlAsync(uri.AbsoluteUri);
+        try
+        {
+            await _dialogs.OpenUrlAsync(uri.AbsoluteUri);
+        }
+        catch (Exception ex)
+        {
+            // No default browser/URL handler registered (a minimal OS install, or no app on
+            // Android able to resolve Intent.ActionView) throws out of the platform launcher.
+            ErrorMessage = $"„{link.Name}“ konnte nicht geöffnet werden: {ex.Message}";
+        }
     }
 }

@@ -158,9 +158,17 @@ public sealed class AndroidFileDialogService : IFileDialogService
 
     // Unlike OpenFileAsync, this is a remote http(s) URL, not a local file -- no FileProvider
     // involved, just hand it straight to whatever app the device has registered for the scheme.
+    // The http(s)-only check is enforced independently here too (not only by LinksViewModel, the
+    // one caller today): an unfiltered scheme handed to ActionView is a known Android
+    // intent-redirection surface (intent://, content://, custom app schemes), so this method's own
+    // contract ("an http(s) URL") must hold regardless of what a future caller passes in.
     public Task OpenUrlAsync(string url)
     {
-        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(url));
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            return Task.CompletedTask;
+
+        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(uri.AbsoluteUri));
         _activity.StartActivity(intent);
         return Task.CompletedTask;
     }
