@@ -43,10 +43,13 @@ public static class CommandApplier
                 incident.ToggleChecklistItem(clock, Operator(c.Operator), c.ItemId);
                 break;
             case AssignRoleCommand c:
-                incident.AssignRole(c.Role, c.PersonName, c.CallSign, c.From, c.To, c.Section, c.Phone);
+                incident.AssignRole(clock, Operator(c.Operator), c.Role, c.PersonName, c.CallSign, c.From, c.To, c.Section, c.Phone);
                 break;
-            case EndRoleAssignmentCommand c:
-                incident.EndRoleAssignment(c.AssignmentId, clock.Now);
+            case TransferRoleCommand c:
+                incident.TransferRole(clock, Operator(c.Operator), c.AssignmentId, c.NewPersonName, c.NewCallSign, c.NewPhone);
+                break;
+            case EditRolePhoneCommand c:
+                incident.EditRolePhone(clock, Operator(c.Operator), c.AssignmentId, c.Phone);
                 break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(clock, Operator(c.Operator), c.Brigade, c.PersonnelCount,

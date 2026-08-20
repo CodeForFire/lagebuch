@@ -33,7 +33,7 @@ public class SnapshotRoundTripTests
         var journalEntry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erstmeldung", from: "Leitstelle", to: "ELW");
         incident.EditJournalEntry(clock, op, journalEntry.Id, "Erstmeldung korrigiert");
         incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
-        incident.AssignRole("EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
+        incident.AssignRole(clock, op, "EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
 
         var force = incident.AddForceUnit(clock, op, "Aich", personnelCount: 9, callSign: "Aich 42/1",
             status: "Auf Anfahrt", notes: "erste Welle", scbaCount: 4);

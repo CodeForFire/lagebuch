@@ -35,7 +35,7 @@ public class CommandApplierTests
         var op = new OperatorDto("Client", "RUF 1");
 
         ApplyOverWire(new ToggleChecklistItemCommand(op, incident.ChecklistAufbau[0].Id), incident, clock);
-        ApplyOverWire(new AssignRoleCommand("EL", "Huber", "FFB 1", clock.Now, null, null, null), incident, clock);
+        ApplyOverWire(new AssignRoleCommand(op, "EL", "Huber", "FFB 1", clock.Now, null, null, null), incident, clock);
         ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", "Im Einsatz", null, 4), incident, clock);
         ApplyOverWire(new AddScbaTruppCommand("Angriffstrupp",
             new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },

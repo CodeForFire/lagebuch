@@ -37,7 +37,7 @@ public class IncidentRoundTripTests : IDisposable
         incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[1].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
-        incident.AssignRole("EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
+        incident.AssignRole(clock, op, "EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
             section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
         incident.AddForceUnit(clock, op, "FFB", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
             notes: "über DLK angefordert", scbaCount: 6);
@@ -59,21 +59,22 @@ public class IncidentRoundTripTests : IDisposable
         Assert.False(loaded.ChecklistAufbau[1].IsMandatory);
         Assert.True(Assert.Single(loaded.ChecklistAbbau).IsMandatory);
         // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the manual one
-        // follows it in chronological order, then the automatic entry for the recorded unit --
-        // which is also the proof that a generated entry survives the round trip.
+        // follows it in chronological order, then the automatic entries for the role assignment and
+        // the recorded unit -- which is also the proof that a generated entry survives the round trip.
         Assert.Equal(
             new[]
             {
                 "Einsatz begonnen",
                 "Meldung",
+                "Funktion EL zugewiesen: Müller",
                 "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 12, davon 6 AGT — Status: Im Einsatz",
             },
             loaded.Journal.Select(e => e.Text));
         // The direction rides along too: generated lines are System, the manual one keeps Incoming.
         Assert.Equal(
-            new[] { EtbDirection.System, EtbDirection.Incoming, EtbDirection.System },
+            new[] { EtbDirection.System, EtbDirection.Incoming, EtbDirection.System, EtbDirection.System },
             loaded.Journal.Select(e => e.Direction));
-        Assert.Equal("FFB 1/40/1", loaded.Journal[2].To);
+        Assert.Equal("FFB 1/40/1", loaded.Journal[3].To);
         Assert.Equal(clock.Now, loaded.Journal[1].Timestamp);
         Assert.Equal("Müller (FFB 12/1)", loaded.Journal[1].EnteredBy);
         Assert.Equal("EL", loaded.Roles[0].Role);

@@ -48,6 +48,9 @@ public sealed record RoleAssignment(
         return this with { To = to };
     }
 
+    /// <summary>Returns a copy with a corrected phone number, normalised the same way <see cref="Create"/> does.</summary>
+    public RoleAssignment WithPhone(string? phone) => this with { Phone = Trimmed(phone) };
+
     private static string? Trimmed(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
