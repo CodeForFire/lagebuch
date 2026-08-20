@@ -125,10 +125,13 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void AssignRole(string role, string personName, string? callSign = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null) =>
-        Mutate(() => Incident.AssignRole(role, personName, callSign, from, to, section, phone));
+        Mutate(() => Incident.AssignRole(_clock, RequireOperator(), role, personName, callSign, from, to, section, phone));
 
-    public void EndRoleAssignment(Guid assignmentId) =>
-        Mutate(() => Incident.EndRoleAssignment(assignmentId, _clock.Now));
+    public void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null) =>
+        Mutate(() => Incident.TransferRole(_clock, RequireOperator(), assignmentId, newPersonName, newCallSign, newPhone));
+
+    public void EditRolePhone(Guid assignmentId, string? phone) =>
+        Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
 
     public void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
         string? status = null, string? notes = null, int scbaCount = 0) =>

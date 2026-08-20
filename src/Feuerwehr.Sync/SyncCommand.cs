@@ -15,7 +15,8 @@ namespace Feuerwehr.Sync;
 [JsonDerivedType(typeof(EditJournalEntryCommand), "editJournalEntry")]
 [JsonDerivedType(typeof(ToggleChecklistItemCommand), "toggleChecklistItem")]
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
-[JsonDerivedType(typeof(EndRoleAssignmentCommand), "endRoleAssignment")]
+[JsonDerivedType(typeof(TransferRoleCommand), "transferRole")]
+[JsonDerivedType(typeof(EditRolePhoneCommand), "editRolePhone")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
 [JsonDerivedType(typeof(AddScbaTruppCommand), "addScbaTrupp")]
@@ -42,12 +43,15 @@ public sealed record EditJournalEntryCommand(OperatorDto Operator, Guid EntryId,
 public sealed record ToggleChecklistItemCommand(OperatorDto Operator, Guid ItemId) : SyncCommand;
 
 public sealed record AssignRoleCommand(
-    string Role, string PersonName, string? CallSign,
+    OperatorDto Operator, string Role, string PersonName, string? CallSign,
     DateTimeOffset? From, DateTimeOffset? To, string? Section, string? Phone) : SyncCommand;
 
 // No end-time on the wire: the host stamps it with its own (authoritative) clock, so devices with
-// slightly different clocks can't disagree on when a role ended.
-public sealed record EndRoleAssignmentCommand(Guid AssignmentId) : SyncCommand;
+// slightly different clocks can't disagree on when a handover happened.
+public sealed record TransferRoleCommand(
+    OperatorDto Operator, Guid AssignmentId, string NewPersonName, string? NewCallSign, string? NewPhone) : SyncCommand;
+
+public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentId, string? Phone) : SyncCommand;
 
 public sealed record AddForceUnitCommand(
     OperatorDto Operator, string Brigade, int PersonnelCount,

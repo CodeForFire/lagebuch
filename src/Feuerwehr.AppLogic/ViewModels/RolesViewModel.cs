@@ -11,27 +11,29 @@ namespace Feuerwehr.AppLogic.ViewModels;
 
 /// <summary>
 /// One row of the Funktionszuweisung grid. Unlike the other read-only row records this one is
-/// observable and carries a command, because an assignment can still be ended after it was
-/// created — the same shape <see cref="ScbaTruppRow"/> uses, with the action supplied as a
-/// callback so XAML binds a parameterless command.
+/// observable: the phone number is a live cell (mirroring <see cref="ForceRow"/>'s Status/Notes),
+/// and a running assignment carries a "Rolle übertragen" command supplied as a callback so XAML
+/// binds a parameterless command, the same shape <see cref="ScbaTruppRow"/> uses.
 /// </summary>
 public sealed partial class RoleAssignmentRow : ObservableObject
 {
-    private readonly Action<RoleAssignmentRow> _onEnd;
+    private readonly Action<RoleAssignmentRow> _onTransfer;
+    private readonly Action<RoleAssignmentRow, string?> _onPhoneEdited;
 
     public RoleAssignmentRow(Guid id, string role, string personName, string? section,
         string? callSign, string? phone, DateTimeOffset? from, DateTimeOffset? to,
-        bool isReadOnly, Action<RoleAssignmentRow> onEnd)
+        bool isReadOnly, Action<RoleAssignmentRow> onTransfer, Action<RoleAssignmentRow, string?> onPhoneEdited)
     {
         Id = id;
         Role = role;
         PersonName = personName;
         Section = section;
         CallSign = callSign;
-        Phone = phone;
         From = from;
         IsReadOnly = isReadOnly;
-        _onEnd = onEnd;
+        _onTransfer = onTransfer;
+        _onPhoneEdited = onPhoneEdited;
+        _phone = phone; // bypasses the setter below, so building the row doesn't push an edit
         To = to;
     }
 
@@ -40,14 +42,25 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     public string PersonName { get; }
     public string? Section { get; }
     public string? CallSign { get; }
-    public string? Phone { get; }
     public DateTimeOffset? From { get; }
     public bool IsReadOnly { get; }
 
     [ObservableProperty]
+    private string? _phone;
+
+    /// <summary>Writes the correction straight through. A closed or remotely read-only incident is
+    /// a historical record, so the push is skipped rather than throwing — mirrors ForceRow.Push().</summary>
+    partial void OnPhoneChanged(string? value)
+    {
+        if (IsReadOnly)
+            return;
+        _onPhoneEdited(this, value);
+    }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ToDisplay))]
     [NotifyPropertyChangedFor(nameof(IsRunning))]
-    [NotifyCanExecuteChangedFor(nameof(EndCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginTransferCommand))]
     private DateTimeOffset? _to;
 
     public string FromDisplay => From is { } f ? Formatting.Timestamp(f) : "—";
@@ -56,10 +69,10 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     /// <summary>True while the assignment is still active, i.e. has no Bis stamp yet.</summary>
     public bool IsRunning => To is null;
 
-    private bool CanEnd => !IsReadOnly && IsRunning;
+    private bool CanBeginTransfer => !IsReadOnly && IsRunning;
 
-    [RelayCommand(CanExecute = nameof(CanEnd))]
-    private void End() => _onEnd(this);
+    [RelayCommand(CanExecute = nameof(CanBeginTransfer))]
+    private void BeginTransfer() => _onTransfer(this);
 }
 
 public sealed partial class RolesViewModel : ObservableObject
@@ -68,6 +81,11 @@ public sealed partial class RolesViewModel : ObservableObject
     private readonly IClock _clock;
     private readonly Action _onChanged;
     private readonly IReadOnlyList<Person> _personnel;
+
+    // Every rendered row, regardless of the filter; Roles is the visible subset — mirrors
+    // EtbViewModel's _all/Entries split, so ShowAllRoles can rebuild Roles without re-reading the
+    // session.
+    private readonly List<RoleAssignmentRow> _all = new();
 
     public RolesViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
     {
@@ -79,17 +97,25 @@ public sealed partial class RolesViewModel : ObservableObject
         RoleOptions = masterData.Roles;
         CallSignOptions = masterData.RadioCallSigns;
         PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
-        Roles = new ObservableCollection<RoleAssignmentRow>(
-            session.Incident.Roles.Select(CreateRow));
+        Roles = new ObservableCollection<RoleAssignmentRow>();
+        RefreshRoles();
         _session.Changed += RefreshRoles;
     }
 
     // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
     private void RefreshRoles()
     {
+        _all.Clear();
+        _all.AddRange(_session.Incident.Roles.Select(CreateRow));
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
         Roles.Clear();
-        foreach (var r in _session.Incident.Roles)
-            Roles.Add(CreateRow(r));
+        foreach (var row in _all)
+            if (ShowAllRoles || row.IsRunning)
+                Roles.Add(row);
     }
 
     public bool IsReadOnly { get; }
@@ -103,6 +129,13 @@ public sealed partial class RolesViewModel : ObservableObject
     public IReadOnlyList<string> PersonOptions { get; }
 
     public ObservableCollection<RoleAssignmentRow> Roles { get; }
+
+    // Ended assignments are usually clutter once a handover happened, so they're hidden by
+    // default — "nur aktuell" — and can be revealed on demand.
+    [ObservableProperty]
+    private bool _showAllRoles;
+
+    partial void OnShowAllRolesChanged(bool value) => ApplyFilter();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddRoleCommand))]
@@ -121,21 +154,8 @@ public sealed partial class RolesViewModel : ObservableObject
     [ObservableProperty]
     private string? _newPhone;
 
-    /// <summary>
-    /// Fills in what the roster knows about the person just picked. Only ever fills a blank field:
-    /// a number typed by hand outranks the roster, which may be out of date.
-    /// </summary>
-    partial void OnNewPersonNameChanged(string value)
-    {
-        var person = _personnel.FirstOrDefault(
-            p => string.Equals(p.DisplayName, value, StringComparison.OrdinalIgnoreCase));
-        if (person is null)
-            return;
-        if (string.IsNullOrWhiteSpace(NewPhone))
-            NewPhone = person.Phone;
-        if (string.IsNullOrWhiteSpace(NewCallSign))
-            NewCallSign = person.CallSign;
-    }
+    partial void OnNewPersonNameChanged(string value) =>
+        PrefillFromRoster(value, () => NewPhone, v => NewPhone = v, () => NewCallSign, v => NewCallSign = v);
 
     private bool CanAddRole =>
         !IsReadOnly && !string.IsNullOrWhiteSpace(NewRole) && !string.IsNullOrWhiteSpace(NewPersonName);
@@ -156,12 +176,77 @@ public sealed partial class RolesViewModel : ObservableObject
         _onChanged();
     }
 
-    private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>
-        new(r.Id, r.Role, r.PersonName, r.Section, r.CallSign, r.Phone, r.From, r.To, IsReadOnly, EndAssignment);
+    // --- Rolle übertragen: a small panel below the grid, mirroring EtbViewModel's edit panel
+    //     rather than inline DataGrid cell editing — a handover needs its own person/call
+    //     sign/phone, not a single cell. Replaces the old standalone "beenden" action; an
+    //     assignment now only ends as part of a handover, or automatically when the incident closes. ---
 
-    private void EndAssignment(RoleAssignmentRow row)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTransferring))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmTransferCommand))]
+    private RoleAssignmentRow? _transferringRow;
+
+    public bool IsTransferring => TransferringRow is not null;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmTransferCommand))]
+    private string _transferPersonName = string.Empty;
+
+    [ObservableProperty]
+    private string? _transferCallSign;
+
+    [ObservableProperty]
+    private string? _transferPhone;
+
+    partial void OnTransferPersonNameChanged(string value) =>
+        PrefillFromRoster(value, () => TransferPhone, v => TransferPhone = v, () => TransferCallSign, v => TransferCallSign = v);
+
+    private void BeginTransfer(RoleAssignmentRow row)
     {
-        _session.EndRoleAssignment(row.Id); // Changed → RefreshRoles rebuilds the row with its end time
+        TransferringRow = row;
+        TransferPersonName = string.Empty;
+        TransferCallSign = null;
+        TransferPhone = null;
+    }
+
+    private bool CanConfirmTransfer => IsTransferring && !string.IsNullOrWhiteSpace(TransferPersonName);
+
+    [RelayCommand(CanExecute = nameof(CanConfirmTransfer))]
+    private void ConfirmTransfer()
+    {
+        _session.TransferRole(TransferringRow!.Id, TransferPersonName, TransferCallSign, TransferPhone); // Changed → RefreshRoles
+        TransferringRow = null;
+        _onChanged();
+    }
+
+    [RelayCommand]
+    private void CancelTransfer() => TransferringRow = null;
+
+    /// <summary>
+    /// Fills in what the roster knows about the person just picked, shared by the new-assignment
+    /// name box and the transfer panel's. Only ever fills a blank field: a number typed by hand
+    /// outranks the roster, which may be out of date.
+    /// </summary>
+    private void PrefillFromRoster(
+        string personName, Func<string?> getPhone, Action<string?> setPhone,
+        Func<string?> getCallSign, Action<string?> setCallSign)
+    {
+        var person = _personnel.FirstOrDefault(
+            p => string.Equals(p.DisplayName, personName, StringComparison.OrdinalIgnoreCase));
+        if (person is null)
+            return;
+        if (string.IsNullOrWhiteSpace(getPhone()))
+            setPhone(person.Phone);
+        if (string.IsNullOrWhiteSpace(getCallSign()))
+            setCallSign(person.CallSign);
+    }
+
+    private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>
+        new(r.Id, r.Role, r.PersonName, r.Section, r.CallSign, r.Phone, r.From, r.To, IsReadOnly, BeginTransfer, EditPhone);
+
+    private void EditPhone(RoleAssignmentRow row, string? phone)
+    {
+        _session.EditRolePhone(row.Id, phone); // Changed → RefreshRoles rebuilds the row
         _onChanged();
     }
 }

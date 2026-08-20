@@ -167,6 +167,12 @@ public sealed class Incident
         EnsureOpen();
         // Must precede the state flip — a closed incident rejects journal writes.
         AppendSystemEntry(clock, closedBy, "Einsatz abgeschlossen");
+        // A closed incident is a historical record: nobody hands over a role after the fact, so any
+        // still-running assignment is stamped closed right along with it, silently — same as a plain
+        // AssignRole/EndRoleAssignment, which don't log to the ETB either.
+        for (var i = 0; i < _roles.Count; i++)
+            if (_roles[i].To is null)
+                _roles[i] = _roles[i].EndedAt(clock.Now);
         State = IncidentState.Closed;
         ClosedAt = clock.Now;
         ClosedBy = closedBy.Display;
@@ -312,7 +318,15 @@ public sealed class Incident
         return edited;
     }
 
+    /// <summary>
+    /// Records a new assignment and logs it to the ETB. Mirrors <see cref="AddForceUnit"/> and
+    /// <see cref="TransferRole"/>: creating a new record is always a reportable event, so this logs
+    /// unconditionally — unlike <see cref="EditRolePhone"/>, there is no prior state to compare
+    /// against for a "did anything actually change" gate.
+    /// </summary>
     public RoleAssignment AssignRole(
+        IClock clock,
+        SessionOperator op,
         string role,
         string personName,
         string? callSign = null,
@@ -322,8 +336,12 @@ public sealed class Incident
         string? phone = null)
     {
         EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
         var assignment = RoleAssignment.Create(role, personName, callSign, from, to, section, phone);
         _roles.Add(assignment);
+        AppendSystemEntry(clock, op, $"Funktion {assignment.Role} zugewiesen: {assignment.PersonName}");
         return assignment;
     }
 
@@ -344,6 +362,64 @@ public sealed class Incident
         var ended = _roles[index].EndedAt(to);
         _roles[index] = ended;
         return ended;
+    }
+
+    /// <summary>
+    /// Ends a running assignment and starts a new one for the same role and section in one step —
+    /// a handover, not two independent edits. Unlike <see cref="AssignRole"/>/
+    /// <see cref="EndRoleAssignment"/> (which stay silent), a transfer always appends a System
+    /// entry: "wer hat wann welche Funktion übernommen" is exactly what the journal exists to answer.
+    /// </summary>
+    public RoleAssignment TransferRole(
+        IClock clock, SessionOperator op, Guid assignmentId,
+        string newPersonName, string? newCallSign, string? newPhone)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+            throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        if (_roles[index].To is not null)
+            throw new InvalidOperationException("Funktionszuweisung ist bereits beendet.");
+
+        var previous = _roles[index];
+        var ended = previous.EndedAt(clock.Now);
+        _roles[index] = ended;
+
+        var next = RoleAssignment.Create(
+            ended.Role, newPersonName, newCallSign, from: clock.Now, to: null,
+            section: ended.Section, phone: newPhone);
+        _roles.Add(next);
+
+        AppendSystemEntry(clock, op, $"Funktion {ended.Role} übergeben: {ended.PersonName} → {next.PersonName}");
+        return next;
+    }
+
+    /// <summary>
+    /// Corrects a role assignment's phone number. Mirrors <see cref="UpdateForceUnit"/>: only a real
+    /// change reaches the ETB, so re-saving the same (normalised) number is not a reportable event.
+    /// </summary>
+    public RoleAssignment EditRolePhone(IClock clock, SessionOperator op, Guid assignmentId, string? phone)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+            throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+
+        var previous = _roles[index];
+        var updated = previous.WithPhone(phone);
+        _roles[index] = updated;
+
+        if (!string.Equals(previous.Phone, updated.Phone, StringComparison.Ordinal))
+            AppendSystemEntry(clock, op,
+                $"Handynummer für {updated.Role} ({updated.PersonName}) geändert: {previous.Phone ?? "—"} → {updated.Phone ?? "—"}");
+
+        return updated;
     }
 
     /// <summary>

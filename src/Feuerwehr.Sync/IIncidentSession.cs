@@ -40,7 +40,12 @@ public interface IIncidentSession
     void ToggleChecklistItem(Guid itemId);
     void AssignRole(string role, string personName, string? callSign = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null);
-    void EndRoleAssignment(Guid assignmentId);
+
+    /// <summary>Ends a running assignment and starts a new one for the same role/section — a handover.</summary>
+    void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null);
+
+    /// <summary>Corrects a role assignment's phone number. Logs to the ETB only on a real change.</summary>
+    void EditRolePhone(Guid assignmentId, string? phone);
     void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
         string? status = null, string? notes = null, int scbaCount = 0);
     void UpdateForceUnit(Guid unitId, string? status, string? notes);

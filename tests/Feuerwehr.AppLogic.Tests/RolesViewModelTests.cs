@@ -92,8 +92,11 @@ public class RolesViewModelTests
         Assert.Equal("—", row.ToDisplay);
     }
 
+    // --- Rolle übertragen (issue #75): replaces the old standalone "beenden" action -- an
+    //     assignment now only ends as part of a handover, or automatically when the incident closes. ---
+
     [Fact]
-    public void Ending_an_assignment_stamps_bis_and_persists()
+    public void Transferring_a_role_ends_the_old_assignment_and_starts_a_new_one()
     {
         var changes = 0;
         var clock = new FixedClock(T0);
@@ -104,20 +107,32 @@ public class RolesViewModelTests
         changes = 0;
 
         var row = Assert.Single(vm.Roles);
-        clock.Now = T0.AddMinutes(45);
-        Assert.True(row.EndCommand.CanExecute(null));
-        row.EndCommand.Execute(null);
+        Assert.True(row.BeginTransferCommand.CanExecute(null));
+        row.BeginTransferCommand.Execute(null);
+        Assert.True(vm.IsTransferring);
 
-        // The collection is rebuilt from the aggregate on change, so re-read the row.
-        var ended = Assert.Single(vm.Roles);
+        clock.Now = T0.AddMinutes(45);
+        vm.TransferPersonName = "Schmidt";
+        Assert.True(vm.ConfirmTransferCommand.CanExecute(null));
+        vm.ConfirmTransferCommand.Execute(null);
+
+        Assert.False(vm.IsTransferring);
+        Assert.Equal(1, changes);
+
+        // "Nur aktuell" is the default filter -- the handed-over assignment drops out of view.
+        var current = Assert.Single(vm.Roles);
+        Assert.Equal("Schmidt", current.PersonName);
+        Assert.True(current.IsRunning);
+
+        vm.ShowAllRoles = true;
+        Assert.Equal(2, vm.Roles.Count);
+        var ended = vm.Roles.Single(r => r.PersonName == "Müller");
         Assert.Equal(T0.AddMinutes(45), ended.To);
         Assert.False(ended.IsRunning);
-        Assert.NotEqual("—", ended.ToDisplay);
-        Assert.Equal(1, changes);
     }
 
     [Fact]
-    public void An_ended_assignment_cannot_be_ended_again()
+    public void Cancelling_a_transfer_leaves_the_assignment_untouched()
     {
         var clock = new FixedClock(T0);
         var vm = NewVm(clock, Md());
@@ -126,27 +141,112 @@ public class RolesViewModelTests
         vm.AddRoleCommand.Execute(null);
 
         var row = Assert.Single(vm.Roles);
-        row.EndCommand.Execute(null);
+        row.BeginTransferCommand.Execute(null);
+        vm.TransferPersonName = "Schmidt";
 
-        // The button hides itself rather than silently overwriting the handover time.
-        Assert.False(Assert.Single(vm.Roles).EndCommand.CanExecute(null));
+        vm.CancelTransferCommand.Execute(null);
+
+        Assert.False(vm.IsTransferring);
+        var unchanged = Assert.Single(vm.Roles);
+        Assert.Equal("Müller", unchanged.PersonName);
+        Assert.True(unchanged.IsRunning);
     }
 
     [Fact]
-    public void ReadOnly_disables_ending_an_assignment()
+    public void An_ended_assignment_cannot_be_transferred_again()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md());
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        Assert.Single(vm.Roles).BeginTransferCommand.Execute(null);
+        vm.TransferPersonName = "Schmidt";
+        vm.ConfirmTransferCommand.Execute(null);
+
+        vm.ShowAllRoles = true;
+        var ended = vm.Roles.Single(r => r.PersonName == "Müller");
+        Assert.False(ended.BeginTransferCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ReadOnly_disables_transfer()
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
         var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
             "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        seed.Incident.AssignRole("EL", "Müller", from: T0);
+        seed.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", from: T0);
         seed.Save();
 
         var vm = new RolesViewModel(LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident"), clock, Md(), () => { });
 
         var row = Assert.Single(vm.Roles);
         Assert.True(row.IsRunning);
-        Assert.False(row.EndCommand.CanExecute(null));
+        Assert.False(row.BeginTransferCommand.CanExecute(null));
+    }
+
+    // --- Handynummer editieren (issue #75): a live cell, mirroring ForceRow's Status/Notes. ---
+
+    [Fact]
+    public void Editing_the_phone_number_inline_writes_through_and_notifies()
+    {
+        var changes = 0;
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new RolesViewModel(session, clock, Md(), () => changes++)
+        {
+            NewRole = "EL", NewPersonName = "Müller", NewPhone = "0171",
+        };
+        vm.AddRoleCommand.Execute(null);
+        changes = 0;
+
+        var row = Assert.Single(vm.Roles);
+        row.Phone = "0172";
+
+        Assert.Equal("0172", Assert.Single(session.Incident.Roles).Phone);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void ReadOnly_ignores_phone_edits()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        seed.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", phone: "0171", from: T0);
+        seed.Save();
+
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var vm = new RolesViewModel(session, clock, Md(), () => { });
+
+        Assert.Single(vm.Roles).Phone = "0172";
+
+        Assert.Equal("0171", Assert.Single(session.Incident.Roles).Phone);
+    }
+
+    // --- Filter: nur aktuell (default) vs alles (issue #75), mirrors EtbViewModel.HideSystemEntries. ---
+
+    [Fact]
+    public void ShowAllRoles_defaults_to_hiding_ended_assignments()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var ended = session.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", from: T0);
+        session.Incident.EndRoleAssignment(ended.Id, T0.AddMinutes(10));
+        session.Incident.AssignRole(clock, new SessionOperator("Müller"), "ZF", "Huber", from: T0);
+
+        var vm = new RolesViewModel(session, clock, Md(), () => { });
+
+        Assert.False(vm.ShowAllRoles);
+        var visible = Assert.Single(vm.Roles);
+        Assert.Equal("Huber", visible.PersonName);
+
+        vm.ShowAllRoles = true;
+        Assert.Equal(2, vm.Roles.Count);
     }
 
     // --- Personnel roster (issue #17) ---

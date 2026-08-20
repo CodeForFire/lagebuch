@@ -99,7 +99,7 @@ public class IncidentCloseTests
     {
         var incident = OpenIncident(out var clock, out var op);
         incident.Close(clock, op);
-        Assert.Throws<IncidentClosedException>(() => incident.AssignRole("EL", "Müller"));
+        Assert.Throws<IncidentClosedException>(() => incident.AssignRole(clock, op, "EL", "Müller"));
     }
 
     [Fact]

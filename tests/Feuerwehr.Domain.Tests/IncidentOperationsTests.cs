@@ -468,16 +468,16 @@ public class IncidentOperationsTests
     [Fact]
     public void Assign_role_appends()
     {
-        var incident = NewIncident(out _, out _);
-        incident.AssignRole("EL", "Müller", callSign: "FFB 12/1");
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", callSign: "FFB 12/1");
         Assert.Equal("EL", Assert.Single(incident.Roles).Role);
     }
 
     [Fact]
     public void Assign_role_records_section_and_phone()
     {
-        var incident = NewIncident(out _, out _);
-        incident.AssignRole("EL", "Müller", section: "  Abschnitt Nord  ", phone: " 01 71 / 1 23 45 67 ");
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", section: "  Abschnitt Nord  ", phone: " 01 71 / 1 23 45 67 ");
 
         var role = Assert.Single(incident.Roles);
         Assert.Equal("Abschnitt Nord", role.Section);
@@ -487,19 +487,34 @@ public class IncidentOperationsTests
     [Fact]
     public void Blank_section_and_phone_become_null_rather_than_empty()
     {
-        var incident = NewIncident(out _, out _);
-        incident.AssignRole("EL", "Müller", section: "   ", phone: "");
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", section: "   ", phone: "");
 
         var role = Assert.Single(incident.Roles);
         Assert.Null(role.Section);
         Assert.Null(role.Phone);
     }
 
+    // Mirrors AddForceUnit/TransferRole: creating a new role assignment is always a reportable
+    // event, so -- unlike EditRolePhone's "only on a real change" rule -- this logs unconditionally.
+    [Fact]
+    public void Assigning_a_role_logs_the_new_assignment()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var before = incident.Journal.Count;
+
+        incident.AssignRole(clock, op, "EL", "Müller");
+
+        Assert.Equal(before + 1, incident.Journal.Count);
+        Assert.Equal("Funktion EL zugewiesen: Müller", incident.Journal[^1].Text);
+        Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
+    }
+
     [Fact]
     public void Ending_a_role_assignment_stamps_bis_in_place()
     {
-        var incident = NewIncident(out var clock, out _);
-        var assigned = incident.AssignRole("EL", "Müller", from: clock.Now);
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", from: clock.Now);
 
         var ended = incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(30));
 
@@ -520,8 +535,8 @@ public class IncidentOperationsTests
     [Fact]
     public void Ending_an_already_ended_role_assignment_is_rejected()
     {
-        var incident = NewIncident(out var clock, out _);
-        var assigned = incident.AssignRole("EL", "Müller", from: clock.Now);
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", from: clock.Now);
         incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(30));
 
         // The Bis time records when a handover actually happened; pressing the button again must
@@ -534,12 +549,101 @@ public class IncidentOperationsTests
     [Fact]
     public void A_role_assignment_cannot_end_before_it_began()
     {
-        var incident = NewIncident(out var clock, out _);
-        var assigned = incident.AssignRole("EL", "Müller", from: clock.Now);
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", from: clock.Now);
 
         Assert.Throws<ArgumentException>(
             () => incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(-1)));
         Assert.Throws<ArgumentException>(
             () => RoleAssignment.Create("EL", "Müller", from: clock.Now, to: clock.Now.AddMinutes(-1)));
+    }
+
+    [Fact]
+    public void Closing_an_incident_ends_every_running_role_assignment()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var running = incident.AssignRole(clock, op, "EL", "Müller", from: clock.Now);
+        var alreadyEnded = incident.AssignRole(clock, op, "ZF", "Huber", from: clock.Now);
+        incident.EndRoleAssignment(alreadyEnded.Id, clock.Now.AddMinutes(10));
+
+        clock.Now = clock.Now.AddMinutes(30);
+        incident.Close(clock, op);
+
+        var closedRunning = incident.Roles.Single(r => r.Id == running.Id);
+        Assert.Equal(clock.Now, closedRunning.To);
+        // An assignment that was already ended before the close keeps its original Bis time.
+        var closedAlreadyEnded = incident.Roles.Single(r => r.Id == alreadyEnded.Id);
+        Assert.Equal(clock.Now.AddMinutes(-20), closedAlreadyEnded.To);
+    }
+
+    [Fact]
+    public void Transferring_a_role_ends_the_old_assignment_and_starts_a_new_one()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var original = incident.AssignRole(clock, op, "EL", "Müller", callSign: "FFB 12/1", from: clock.Now, section: "Abschnitt Nord");
+
+        clock.Now = clock.Now.AddMinutes(15);
+        var next = incident.TransferRole(clock, op, original.Id, "Schmidt", "FFB 12/2", "0171");
+
+        var ended = incident.Roles.Single(r => r.Id == original.Id);
+        Assert.Equal(clock.Now, ended.To);
+
+        Assert.Equal("EL", next.Role);
+        Assert.Equal("Schmidt", next.PersonName);
+        Assert.Equal("FFB 12/2", next.CallSign);
+        Assert.Equal("0171", next.Phone);
+        Assert.Equal("Abschnitt Nord", next.Section);
+        Assert.Equal(clock.Now, next.From);
+        Assert.Null(next.To);
+        Assert.Equal(2, incident.Roles.Count);
+
+        Assert.Equal("Funktion EL übergeben: Müller → Schmidt", incident.Journal[^1].Text);
+        Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
+    }
+
+    [Fact]
+    public void Transferring_an_unknown_role_assignment_is_rejected()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        Assert.Throws<ArgumentException>(
+            () => incident.TransferRole(clock, op, Guid.NewGuid(), "Schmidt", null, null));
+    }
+
+    [Fact]
+    public void Transferring_an_already_ended_role_assignment_is_rejected()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var original = incident.AssignRole(clock, op, "EL", "Müller", from: clock.Now);
+        incident.EndRoleAssignment(original.Id, clock.Now.AddMinutes(10));
+
+        Assert.Throws<InvalidOperationException>(
+            () => incident.TransferRole(clock, op, original.Id, "Schmidt", null, null));
+    }
+
+    [Fact]
+    public void Editing_a_role_phone_number_logs_the_change()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", phone: "0171");
+        var before = incident.Journal.Count;
+
+        var updated = incident.EditRolePhone(clock, op, assigned.Id, "0172");
+
+        Assert.Equal("0172", updated.Phone);
+        Assert.Equal(before + 1, incident.Journal.Count);
+        Assert.Equal("Handynummer für EL (Müller) geändert: 0171 → 0172", incident.Journal[^1].Text);
+        Assert.Equal(EtbDirection.System, incident.Journal[^1].Direction);
+    }
+
+    [Fact]
+    public void Resaving_the_same_role_phone_number_does_not_log_anything()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", phone: "0171");
+        var before = incident.Journal.Count;
+
+        incident.EditRolePhone(clock, op, assigned.Id, " 0171 ");
+
+        Assert.Equal(before, incident.Journal.Count);
     }
 }

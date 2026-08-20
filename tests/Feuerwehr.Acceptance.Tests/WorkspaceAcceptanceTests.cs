@@ -507,9 +507,59 @@ public class WorkspaceAcceptanceTests
 
         var row = Assert.Single(vm.Roles.Roles);
         Assert.True(row.IsRunning);
-        row.EndCommand.Execute(null);
-        // The roles grid rebuilds from the aggregate on change, so re-read the row.
-        Assert.False(Assert.Single(vm.Roles.Roles).IsRunning);
-        Assert.NotNull(Assert.Single(session.Incident.Roles).To);
+
+        // Handynummer is a live cell bound two-way to the row, mirroring ForcesView's Bemerkung
+        // column: setting it is exactly the edit the grid's TextBox performs on a keystroke.
+        row.Phone = "01 71 / 9 99 99 99";
+        Assert.Equal("01 71 / 9 99 99 99", Assert.Single(session.Incident.Roles).Phone);
+    }
+
+    // The Funktionen tab had no transfer/filter coverage at all before issue #75 replaced the
+    // standalone "beenden" button with a handover flow and a nur-aktuell filter.
+    [AvaloniaFact]
+    public void Transferring_a_role_via_the_ui_ends_the_old_row_and_hides_it_behind_the_filter()
+    {
+        var vm = BuildWorkspace(out var session);
+        // No explicit `from`: the session's own FixedClock is what TransferRole stamps the handover
+        // with, and this test doesn't have a handle on it -- an unstamped Von avoids a spurious
+        // "Bis vor Von" the wall clock would otherwise trigger.
+        session.AssignRole("EL", "Müller", callSign: "FFB 12/1", section: "Abschnitt Nord");
+        var view = new RolesView { DataContext = vm.Roles };
+        var window = new Window { Content = view, Width = 1200, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var before = window.CaptureRenderedFrame()!)
+            before.Save(Path.Combine(dir, "roles-transfer-before.png"));
+
+        var row = Assert.Single(vm.Roles.Roles);
+        Assert.True(row.BeginTransferCommand.CanExecute(null));
+        row.BeginTransferCommand.Execute(null);
+        Assert.True(vm.Roles.IsTransferring);
+
+        using (var panel = window.CaptureRenderedFrame()!)
+            panel.Save(Path.Combine(dir, "roles-transfer-panel.png"));
+
+        view.GetControl<AutoCompleteBox>("TransferPersonNameBox").Text = "Schmidt";
+        Assert.Equal("Schmidt", vm.Roles.TransferPersonName);
+
+        var confirmButton = view.GetControl<Button>("ConfirmTransferButton");
+        confirmButton.Command!.Execute(null);
+
+        Assert.False(vm.Roles.IsTransferring);
+        Assert.Equal(2, session.Incident.Roles.Count);
+        // "Nur aktuell" is the default filter: the handed-over assignment drops out of the grid.
+        var current = Assert.Single(vm.Roles.Roles);
+        Assert.Equal("Schmidt", current.PersonName);
+        Assert.True(current.IsRunning);
+
+        vm.Roles.ShowAllRoles = true;
+        Assert.Equal(2, vm.Roles.Roles.Count);
+        Assert.Contains(vm.Roles.Roles, r => r.PersonName == "Müller" && !r.IsRunning);
+
+        using (var after = window.CaptureRenderedFrame()!)
+            after.Save(Path.Combine(dir, "roles-transfer-after.png"));
     }
 }

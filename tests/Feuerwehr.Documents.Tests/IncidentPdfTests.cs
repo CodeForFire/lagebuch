@@ -30,10 +30,10 @@ public class IncidentPdfTests
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung erhalten", from: "ILS");
         // Exercise the widest Funktionszuweisung row: every one of the seven columns filled, so
         // the A4 portrait layout is proven not to overflow.
-        var assigned = incident.AssignRole("EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
             section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
         incident.EndRoleAssignment(assigned.Id, clock.Now.AddHours(1));
-        incident.AssignRole("ZF", "Schmidt");
+        incident.AssignRole(clock, op, "ZF", "Schmidt");
         incident.AddForceUnit(clock, op, "FFB Wache 1", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
             notes: "über Drehleiter angefordert", scbaCount: 6);
         incident.AddForceUnit(clock, op, "Emmering", 9, scbaCount: 4);
