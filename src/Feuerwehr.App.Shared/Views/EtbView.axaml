@@ -18,11 +18,6 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}">
-          <TextBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
         <ComboBox x:Name="DirectionBox" Width="130"
                   ItemsSource="{Binding DirectionOptions}"
                   SelectedValue="{Binding NewDirection}"
@@ -42,6 +37,11 @@
         <AutoCompleteBox Width="110" Watermark="An" ItemsSource="{Binding CallSignOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                          Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
         <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}" />
       </StackPanel>
     </Border>
