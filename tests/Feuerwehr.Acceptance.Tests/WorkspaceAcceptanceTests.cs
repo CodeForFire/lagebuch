@@ -19,7 +19,8 @@ namespace Feuerwehr.Acceptance.Tests;
 internal sealed class FakeStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _d = new();
-    public void Save(string path, Incident incident) => _d[path] = incident;
+    public int SaveCount { get; private set; }
+    public void Save(string path, Incident incident) { _d[path] = incident; SaveCount++; }
     public Incident Load(string path) => _d[path];
     public IncidentState? TryReadState(string path) => _d.TryGetValue(path, out var i) ? i.State : null;
     private readonly Dictionary<string, byte[]> _files = new();
@@ -231,6 +232,11 @@ public class WorkspaceAcceptanceTests
         nameBox.Focus();
         nameBox.SelectAll();
         window.KeyTextInput("Küchenbrand");
+
+        // The rename commits on blur, not per keystroke (#33) — leave the field the way an
+        // operator tabbing away would.
+        view.GetControl<Button>("AddFileButton").Focus();
+        Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Küchenbrand", filesVm.Files[0].DisplayName);
         Assert.Equal("Küchenbrand", session.Incident.Files.Single().DisplayName);

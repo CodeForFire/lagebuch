@@ -250,8 +250,8 @@ public class ForcesViewModelTests
     [Fact]
     public void Editing_only_the_bemerkung_adds_no_etb_entry()
     {
-        // The grid writes the Bemerkung through on every keystroke, so this is what keeps a typed
-        // note from burying the Einsatztagebuch.
+        // A Bemerkung edit is a label correction, not a reportable event, so it must never add a
+        // journal entry -- regardless of how many times Notes is set here.
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
             new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());

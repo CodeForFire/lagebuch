@@ -65,11 +65,15 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
+          <!-- Committing per keystroke rewrote the whole incident file on every character typed
+               (#33) and, since the row rebuilds on each commit, threw focus out of the box after
+               every character. UpdateSourceTrigger=LostFocus pushes once, when the operator
+               actually leaves the field. Mirrors RolesView's Handynummer fix. -->
           <DataGridTemplateColumn Header="BEMERKUNG" Width="*">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <TextBox Margin="6,4" Watermark="Bemerkung"
-                         Text="{Binding Notes}"
+                         Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                          IsEnabled="{Binding !IsReadOnly}" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
