@@ -36,6 +36,7 @@ public interface IIncidentSession
     event Action? Changed;
 
     void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
+    void EditJournalEntry(Guid entryId, string text);
     void ToggleChecklistItem(Guid itemId);
     void AssignRole(string role, string personName, string? callSign = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null);

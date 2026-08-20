@@ -106,4 +106,33 @@ public class CommandApplierTests
             ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", null),
                 EtbDirection.Internal, "zu spät", null, null), incident, clock));
     }
+
+    [Fact]
+    public void EditJournalEntryCommand_edits_the_entry_and_attributes_the_editor()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
+            EtbDirection.Incoming, "Lagemeldung", null, null), incident, clock);
+        var entry = incident.Journal.Last();
+
+        ApplyOverWire(new EditJournalEntryCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Korrigiert"),
+            incident, clock);
+
+        var edited = incident.Journal.Single(e => e.Id == entry.Id);
+        Assert.Equal("Korrigiert", edited.Text);
+        Assert.Equal("Editor (RUF 2)", Assert.Single(edited.Edits).EditedBy);
+    }
+
+    [Fact]
+    public void EditJournalEntryCommand_on_a_System_entry_throws()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var systemEntry = incident.Journal.Single(e => e.Direction == EtbDirection.System);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ApplyOverWire(new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert"),
+                incident, clock));
+    }
 }

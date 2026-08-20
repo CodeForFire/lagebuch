@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Feuerwehr.AppLogic.ViewModels;assembly=Feuerwehr.AppLogic"
+             xmlns:b="clr-namespace:Feuerwehr.App.Shared.Behaviors"
+             xmlns:etb="clr-namespace:Feuerwehr.Domain.Etb;assembly=Feuerwehr.Domain"
              x:Class="Feuerwehr.App.Shared.Views.EtbView"
              x:DataType="vm:EtbViewModel">
   <DockPanel>
@@ -16,11 +18,6 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}">
-          <TextBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
         <ComboBox x:Name="DirectionBox" Width="130"
                   ItemsSource="{Binding DirectionOptions}"
                   SelectedValue="{Binding NewDirection}"
@@ -31,9 +28,68 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBox Width="110" Watermark="Von" Text="{Binding NewFrom}" />
-        <TextBox Width="110" Watermark="An" Text="{Binding NewTo}" />
+        <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
+             a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
+             ComboBox, mirroring ForcesView's Brigade field. -->
+        <AutoCompleteBox Width="110" Watermark="Von" ItemsSource="{Binding CallSignOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+        <AutoCompleteBox Width="110" Watermark="An" ItemsSource="{Binding CallSignOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
         <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Edit panel: a small form below the grid, mirroring the input dock's visual language, shown
+         only while a row is being edited (not inline DataGrid cell editing). -->
+    <Border DockPanel.Dock="Bottom" x:Name="EditPanel" Margin="0,16,0,0"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14"
+            IsVisible="{Binding IsEditing}">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBox x:Name="EditTextBox" Width="420" Watermark="Eintrag" Text="{Binding EditText}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button x:Name="SaveEditButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveEditCommand}" />
+        <Button x:Name="CancelEditButton" Content="ABBRECHEN" Command="{Binding CancelEditCommand}" />
+      </StackPanel>
+    </Border>
+
+    <!-- History panel: read-only, available whenever the selected row has prior versions.
+         Deliberately independent of IsReadOnly and of the edit panel above, so a closed incident's
+         edit history is still reachable (a rewrite must stay auditable after the fact). -->
+    <Border DockPanel.Dock="Bottom" x:Name="HistoryPanel" Margin="0,16,0,0"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14"
+            IsVisible="{Binding HistoryEntry, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Text="Verlauf" Classes="overline" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="SCHLIESSEN" Command="{Binding CloseHistoryCommand}" />
+        </Grid>
+        <ItemsControl x:Name="HistoryList" ItemsSource="{Binding HistoryEntry.Edits}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="etb:EtbEntryEdit">
+              <TextBlock Classes="mono" Foreground="{StaticResource TextMutedBrush}" Margin="0,2">
+                <TextBlock.Text>
+                  <MultiBinding StringFormat="{}{0}: „{1}“ ({2})">
+                    <Binding Path="EditedAt" />
+                    <Binding Path="PreviousText" />
+                    <Binding Path="EditedBy" />
+                  </MultiBinding>
+                </TextBlock.Text>
+              </TextBlock>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
     </Border>
 
@@ -45,8 +101,35 @@
           <DataGridTextColumn Header="RICHTUNG" Binding="{Binding Direction}" />
           <DataGridTextColumn Header="VON" Binding="{Binding From}" />
           <DataGridTextColumn Header="AN" Binding="{Binding To}" />
-          <DataGridTextColumn Header="EINTRAG" Binding="{Binding Text}" Width="*" />
+          <DataGridTemplateColumn Header="EINTRAG" Width="*">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:EtbEntryRow">
+                <TextBlock Text="{Binding Text}" VerticalAlignment="Center" Margin="6,4" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="ERFASST VON" Binding="{Binding EnteredBy}" />
+          <DataGridTemplateColumn Header="">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:EtbEntryRow">
+                <StackPanel Orientation="Horizontal" Spacing="2" Margin="6,4">
+                  <Button Classes="icon-btn" Command="{Binding BeginEditCommand}"
+                          IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten">
+                    <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                  </Button>
+                  <!-- Not gated on IsEditable/IsReadOnly like the edit button: history must stay
+                       readable even for a System entry's neighbours or a closed incident. Its
+                       amber tint is the row's only "was edited" marker: it only shows up here,
+                       so a separate badge in the EINTRAG column would just repeat the same fact. -->
+                  <Button Classes="icon-btn" Command="{Binding ShowHistoryCommand}"
+                          IsVisible="{Binding WasEdited}" ToolTip.Tip="Verlauf (bearbeitet)">
+                    <PathIcon Foreground="{StaticResource AmberBrush}"
+                              Data="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.92 6.92 0 0 1-4.95-2.05l-1.41 1.41A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z" />
+                  </Button>
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
         </DataGrid.Columns>
       </DataGrid>
     </Border>

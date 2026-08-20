@@ -302,6 +302,104 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Add_journal_entry_rejects_an_undefined_direction()
+    {
+        // Direction rides the wire as a plain integer (a synced AddJournalEntryCommand), so a
+        // forged out-of-range value must not reach EtbEntry.Create (security review, #73).
+        var incident = NewIncident(out var clock, out var op);
+        Assert.Throws<ArgumentException>(
+            () => incident.AddJournalEntry(clock, op, (EtbDirection)99, "Gefälscht"));
+    }
+
+    [Fact]
+    public void Add_journal_entry_still_accepts_the_System_direction()
+    {
+        // ScbaViewModel's trupp-lifecycle logging legitimately calls this same method with
+        // EtbDirection.System (not just the private AppendSystemEntry helper) -- the undefined-value
+        // guard above must not reject a value this codebase already produces through it.
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.System, "Atemschutz-Trupp registriert");
+        Assert.Equal(EtbDirection.System, entry.Direction);
+    }
+
+    [Fact]
+    public void Edit_journal_entry_appends_a_system_trace_of_the_correction()
+    {
+        // A correction to the journal is itself a reportable event: without this trace, an edit
+        // would leave no sign in the grid or the PDF export that the original wording ever existed
+        // (security review, #73).
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        clock.Now = T0.AddMinutes(5);
+
+        incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung korrigiert");
+
+        var trace = Assert.Single(incident.Journal, e => e.Text.Contains("bearbeitet"));
+        Assert.Equal(EtbDirection.System, trace.Direction);
+        Assert.Equal(T0.AddMinutes(5), trace.Timestamp);
+    }
+
+    [Fact]
+    public void Editing_an_entry_with_its_own_unchanged_text_appends_no_system_trace()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        var before = incident.Journal.Count;
+
+        incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung");
+
+        Assert.Equal(before, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Edit_journal_entry_replaces_text_and_records_the_prior_version()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung", from: "ILS");
+        clock.Now = T0.AddMinutes(5);
+        var editor = new SessionOperator("Schmidt");
+
+        var edited = incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert");
+
+        Assert.Equal("Lagemeldung korrigiert", edited.Text);
+        Assert.Equal(edited, incident.Journal.Single(e => e.Id == entry.Id));
+        var historyEntry = Assert.Single(edited.Edits);
+        Assert.Equal("Lagemeldung", historyEntry.PreviousText);
+        Assert.Equal("Schmidt", historyEntry.EditedBy);
+        Assert.Equal(T0.AddMinutes(5), historyEntry.EditedAt);
+    }
+
+    [Fact]
+    public void Edit_journal_entry_throws_on_a_System_entry()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.ResumeEditing(clock, op);
+        var systemEntry = incident.Journal.Single(e => e.Text == "Bearbeitung fortgesetzt");
+
+        Assert.Throws<InvalidOperationException>(
+            () => incident.EditJournalEntry(clock, op, systemEntry.Id, "Manipuliert"));
+    }
+
+    [Fact]
+    public void Edit_journal_entry_throws_when_entry_not_found()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        Assert.Throws<KeyNotFoundException>(
+            () => incident.EditJournalEntry(clock, op, Guid.NewGuid(), "Text"));
+    }
+
+    [Fact]
+    public void Edit_journal_entry_throws_when_incident_closed()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(
+            () => incident.EditJournalEntry(clock, op, entry.Id, "Korrigiert"));
+    }
+
+    [Fact]
     public void Resume_editing_logs_etb_entry()
     {
         var incident = NewIncident(out var clock, out var op);

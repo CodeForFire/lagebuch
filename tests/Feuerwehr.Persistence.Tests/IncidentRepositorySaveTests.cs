@@ -40,6 +40,25 @@ public class IncidentRepositorySaveTests : IDisposable
     }
 
     [Fact]
+    public void Save_writes_one_etb_entry_edits_row_per_edit()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung");
+        incident.EditJournalEntry(clock, op, entry.Id, "Erste Korrektur");
+        incident.EditJournalEntry(clock, op, entry.Id, "Zweite Korrektur");
+
+        new IncidentRepository().Save(_path, incident);
+
+        using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT count(*) FROM etb_entry_edits WHERE entry_id = $id;";
+        cmd.Parameters.AddWithValue("$id", entry.Id.ToString());
+        Assert.Equal(2L, (long)cmd.ExecuteScalar()!);
+    }
+
+    [Fact]
     public void Legacy_ils_number_loads_as_the_incident_number()
     {
         var clock = new Clock();

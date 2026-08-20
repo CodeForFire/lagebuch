@@ -5,7 +5,7 @@ namespace Feuerwehr.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 11;
+    public const int CurrentVersion = 12;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -75,6 +75,10 @@ public static class Migrations
         if (version < 11)
         {
             ApplyV11(cn, tx);
+        }
+        if (version < 12)
+        {
+            ApplyV12(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -371,6 +375,23 @@ public static class Migrations
     // Nullable: existing rows predate the column, and Load falls back to file_name for those.
     private static void ApplyV11(SqliteConnection cn, SqliteTransaction tx) =>
         SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_files", "display_name", "TEXT");
+
+    // Preserves every prior version of a manually-edited ETB entry's text, plus who edited it and
+    // when -- the ETB itself only ever shows the current text plus a Verlauf affordance; the full
+    // history lives in this table (#73).
+    private static void ApplyV12(SqliteConnection cn, SqliteTransaction tx)
+    {
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS etb_entry_edits (
+                id TEXT PRIMARY KEY,
+                entry_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                previous_text TEXT NOT NULL,
+                edited_by TEXT NOT NULL,
+                edited_at TEXT NOT NULL
+            );
+            """);
+    }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

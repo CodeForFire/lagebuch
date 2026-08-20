@@ -114,6 +114,31 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void An_edited_etb_entry_and_its_history_survive_a_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var entry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung", from: "ILS");
+        clock.Now = clock.Now.AddMinutes(5);
+        var editor = new SessionOperator("Schmidt");
+        incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert");
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+        var loaded = repo.Load(_path);
+
+        var reloaded = loaded.Journal.Single(e => e.Id == entry.Id);
+        Assert.Equal("Lagemeldung korrigiert", reloaded.Text);
+        var historyEntry = Assert.Single(reloaded.Edits);
+        Assert.Equal("Lagemeldung", historyEntry.PreviousText);
+        Assert.Equal("Schmidt", historyEntry.EditedBy);
+        Assert.Equal(clock.Now, historyEntry.EditedAt);
+        // An entry with no edits still round-trips with an empty (not null) history.
+        Assert.Empty(loaded.Journal.Single(e => e.Text == "Einsatz begonnen").Edits);
+    }
+
+    [Fact]
     public void Closed_incident_round_trips_and_stays_closed()
     {
         var clock = new Clock();

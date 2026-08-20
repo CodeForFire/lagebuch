@@ -30,7 +30,8 @@ public class SnapshotRoundTripTests
         incident.SetKeyword("Brand 2 – Wohnhaus");
 
         clock.Now = clock.Now.AddMinutes(1);
-        incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erstmeldung", from: "Leitstelle", to: "ELW");
+        var journalEntry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erstmeldung", from: "Leitstelle", to: "ELW");
+        incident.EditJournalEntry(clock, op, journalEntry.Id, "Erstmeldung korrigiert");
         incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
         incident.AssignRole("EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
 
@@ -88,6 +89,9 @@ public class SnapshotRoundTripTests
         Assert.True(r.ChecklistAufbau[0].IsMandatory);
         Assert.Equal(original.ChecklistAbbau.Count, r.ChecklistAbbau.Count);
         Assert.Equal(original.Journal.Count, r.Journal.Count);
+        var editedEntry = r.Journal.Single(e => e.Text == "Erstmeldung korrigiert");
+        var history = Assert.Single(editedEntry.Edits);
+        Assert.Equal("Erstmeldung", history.PreviousText);
         Assert.Equal(9, r.Forces[0].PersonnelCount);
         Assert.Equal("Im Einsatz", r.Forces[0].Status);
 

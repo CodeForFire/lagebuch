@@ -10,6 +10,7 @@ public class CommandSerializationTests
     public static IEnumerable<object[]> AllCommands() => new SyncCommand[]
     {
         new AddJournalEntryCommand(Op, EtbDirection.Outgoing, "Text", "Von", "An"),
+        new EditJournalEntryCommand(Op, Guid.NewGuid(), "Korrigierter Text"),
         new ToggleChecklistItemCommand(Op, Guid.NewGuid()),
         new AssignRoleCommand("EL", "Huber", "FFB 1", DateTimeOffset.UnixEpoch, null, "Abschnitt", "0171"),
         new EndRoleAssignmentCommand(Guid.NewGuid()),

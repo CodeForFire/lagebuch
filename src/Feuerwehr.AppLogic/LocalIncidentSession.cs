@@ -118,6 +118,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         Mutate(() => Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to));
 
+    public void EditJournalEntry(Guid entryId, string text) =>
+        Mutate(() => Incident.EditJournalEntry(_clock, RequireOperator(), entryId, text));
+
     public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(_clock, RequireOperator(), itemId));
 
     public void AssignRole(string role, string personName, string? callSign = null,

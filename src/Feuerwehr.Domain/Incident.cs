@@ -264,9 +264,52 @@ public sealed class Incident
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
+        // Direction rides the wire as a plain integer (AddJournalEntryCommand.Direction), so a
+        // malformed value (e.g. a forged "direction": 99) must not reach EtbEntry.Create and get
+        // persisted by an out-of-range ordinal. Note this intentionally still allows System: several
+        // local call sites (ScbaViewModel's trupp-lifecycle logging) legitimately go through this
+        // same method with EtbDirection.System rather than the private AppendSystemEntry helper, so
+        // rejecting it here would break them, not just a synced command's ability to forge one.
+        if (!Enum.IsDefined(direction))
+            throw new ArgumentException("Ungültige Richtung für einen ETB-Eintrag.", nameof(direction));
         var entry = EtbEntry.Create(clock.Now, direction, text, op, from, to);
         _journal.Add(entry);
         return entry;
+    }
+
+    /// <summary>
+    /// Corrects a manually-typed ETB entry's text, preserving the prior wording under
+    /// <see cref="EtbEntry.Edits"/>. System-direction entries (Kräfte, Atemschutz,
+    /// Einsatz-Lebenszyklus) are never editable — they are the app's own record of what happened,
+    /// not something an operator wrote and could have mistyped. Any operator may edit any manual
+    /// entry, matching <see cref="UpdateForceUnit"/>'s "no per-field author restriction" precedent.
+    ///
+    /// Unlike a silent label correction (<see cref="RenameFile"/>), a correction to the journal
+    /// itself is a reportable event: it appends its own System line, the same trace every other
+    /// record-changing mutation on this aggregate leaves, so a rewrite is visible in the grid and
+    /// the PDF export even though the row itself now shows the corrected text.
+    /// </summary>
+    public EtbEntry EditJournalEntry(IClock clock, SessionOperator op, Guid entryId, string text)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _journal.FindIndex(e => e.Id == entryId);
+        if (index < 0)
+            throw new KeyNotFoundException($"ETB-Eintrag {entryId} nicht gefunden.");
+
+        var existing = _journal[index];
+        if (existing.Direction == EtbDirection.System)
+            throw new InvalidOperationException("Systemeinträge können nicht bearbeitet werden.");
+
+        var edited = existing.WithEditedText(text, op, clock.Now);
+        _journal[index] = edited;
+        // WithEditedText is a no-op (returns the same instance) when the text didn't actually
+        // change -- nothing to trace in that case.
+        if (edited.Edits.Count > existing.Edits.Count)
+            AppendSystemEntry(clock, op, $"ETB-Eintrag {existing.Timestamp:HH:mm} bearbeitet");
+        return edited;
     }
 
     public RoleAssignment AssignRole(

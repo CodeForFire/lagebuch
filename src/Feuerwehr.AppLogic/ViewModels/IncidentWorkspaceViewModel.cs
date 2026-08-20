@@ -211,7 +211,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     {
         ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
         ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
-        Etb = new EtbViewModel(_session, _clock, OnChanged);
+        Etb = new EtbViewModel(_session, _clock, _masterData, OnChanged);
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
 

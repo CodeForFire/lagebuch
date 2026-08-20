@@ -44,7 +44,16 @@ public static class EtbSection
                     table.Cell().Element(BodyCell).Text(Formatting.Direction(entry.Direction));
                     table.Cell().Element(BodyCell).Text(Formatting.OrDash(entry.From));
                     table.Cell().Element(BodyCell).Text(Formatting.OrDash(entry.To));
-                    table.Cell().Element(BodyCell).Text(entry.Text);
+                    // A corrected entry keeps its full edit history visible in the export, not just
+                    // the current text — the ETB is a legal-weight record, so a rewrite must stay
+                    // traceable in the artifact that leaves the app (#73).
+                    table.Cell().Element(BodyCell).Column(col =>
+                    {
+                        col.Item().Text(entry.Text);
+                        foreach (var edit in entry.Edits)
+                            col.Item().Text($"bearbeitet {Formatting.Timestamp(edit.EditedAt)} von {edit.EditedBy}, zuvor: „{edit.PreviousText}“")
+                                .FontSize(8).Italic().FontColor(Colors.Grey.Medium);
+                    });
                     table.Cell().Element(BodyCell).Text(entry.EnteredBy);
                 }
             });

@@ -45,6 +45,56 @@ public class IncidentHostTests
     }
 
     [Fact]
+    public async Task Host_applies_an_edit_journal_entry_command_and_broadcasts_it()
+    {
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var entry = session.Incident.AddJournalEntry(clock, new SessionOperator("Host", "FFB 1"),
+            EtbDirection.Incoming, "Lagemeldung", "Leitstelle", "ELW");
+
+        var command = new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), entry.Id, "Lagemeldung korrigiert");
+        var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+        var response = await http.PostAsync(SyncProtocol.CommandPath, content);
+        response.EnsureSuccessStatusCode();
+
+        var after = await GetSnapshotAsync(http);
+        var edited = Assert.Single(after.Journal, e => e.Id == entry.Id);
+        Assert.Equal("Lagemeldung korrigiert", edited.Text);
+        Assert.Equal("Client (RUF 1)", Assert.Single(edited.Edits).EditedBy);
+    }
+
+    [Fact]
+    public async Task Host_rejects_an_edit_against_an_unknown_entry_id_with_400_not_500()
+    {
+        // KeyNotFoundException (EditJournalEntry against a stale or forged id) must land in the
+        // same "reject cleanly" path as the other domain guards, not escape as an unhandled 500
+        // (security review, #73).
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
+            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var command = new EditJournalEntryCommand(new OperatorDto("Client", null), Guid.NewGuid(), "Text");
+        var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+        var response = await http.PostAsync(SyncProtocol.CommandPath, content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Host_rejects_a_command_against_a_closed_incident_with_400()
     {
         var clock = new FixedClock();
