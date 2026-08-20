@@ -48,6 +48,7 @@ public class MasterDataStoreTests : IDisposable
             ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
             ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbauschritt", true) },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") },
+            Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
         store.Save(_path, set);
@@ -60,6 +61,7 @@ public class MasterDataStoreTests : IDisposable
             reopened.ChecklistTemplateAufbau);
         Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplateAbbau);
         Assert.Contains(reopened.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
+        Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("Land 1", max.CallSign);
         Assert.Equal("01 71 / 1 23 45 67", max.Phone);
@@ -114,6 +116,25 @@ public class MasterDataStoreTests : IDisposable
         Assert.Contains(reopened.Streets, s => s.Name == "Neu Str." && s.District == "Aich");
         Assert.DoesNotContain(reopened.Streets, s => s.Name == "Alt Str.");
         Assert.Equal(2, reopened.Streets.Count);
+    }
+
+    [Fact]
+    public void Save_round_trips_an_added_and_a_removed_link()
+    {
+        var store = new MasterDataStore();
+        store.Save(_path, MasterDataSet.Empty with
+        {
+            Links = new[] { new Link("Alt Link", "https://old.example"), new Link("Wetterdienst", "https://dwd.de") },
+        });
+
+        var current = store.GetOrCreate(_path);
+        var edited = current with { Links = current.Links.Skip(1).Append(new Link("Neu Link", "https://new.example")).ToList() };
+        store.Save(_path, edited);
+
+        var reopened = store.GetOrCreate(_path);
+        Assert.Contains(reopened.Links, l => l.Name == "Neu Link" && l.Url == "https://new.example");
+        Assert.DoesNotContain(reopened.Links, l => l.Name == "Alt Link");
+        Assert.Equal(2, reopened.Links.Count);
     }
 
     [Fact]

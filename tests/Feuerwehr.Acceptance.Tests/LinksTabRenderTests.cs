@@ -10,11 +10,11 @@ using Feuerwehr.Domain;
 
 namespace Feuerwehr.Acceptance.Tests;
 
-// Issue #62: the new "Dateien" tab. Doubles as the PR before/after screenshot capture
-// (RENDER_OUT), same idiom as SharePanelRenderTests.
-public class FilesTabRenderTests
+// Issue #74: the new "Links" quick-access tab. Doubles as the PR before/after screenshot
+// capture (RENDER_OUT), same idiom as FilesTabRenderTests.
+public class LinksTabRenderTests
 {
-    private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace()
+    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
@@ -24,7 +24,7 @@ public class FilesTabRenderTests
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        return (window, vm, session);
+        return (window, vm);
     }
 
     private static void Capture(Window window, string name)
@@ -41,33 +41,27 @@ public class FilesTabRenderTests
         ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
 
     [AvaloniaFact]
-    public void Workspace_renders_eight_tabs_before_dateien_is_opened()
+    public void Workspace_renders_eight_tabs_before_links_is_opened()
     {
-        var (window, _, _) = ShowWorkspace();
+        var (window, _) = ShowWorkspace();
         var tabs = Tabs(window);
 
         Assert.Equal(8, tabs.Items.Count);
-        Capture(window, "files-before.png");
+        Capture(window, "links-before.png");
     }
 
     [AvaloniaFact]
-    public void Selecting_the_dateien_tab_shows_an_attached_file()
+    public void Selecting_the_links_tab_shows_the_seeded_links()
     {
-        var (window, vm, session) = ShowWorkspace();
-        var file = session.Incident.AddFile(new FixedClock(), session.Operator!, "einsatzstelle.jpg", "image/jpeg", 1_200_000);
-        // A renamed display name (independent of the original file name) is the point of the
-        // screenshot below — the editable Name field.
-        session.Incident.RenameFile(file.Id, "Küchenbrand, Erdgeschoss");
-        vm.Files.Sync();
-        Dispatcher.UIThread.RunJobs();
+        var (window, vm) = ShowWorkspace();
 
         var tabs = Tabs(window);
-        tabs.SelectedIndex = 6; // DATEIEN
+        tabs.SelectedIndex = 7; // LINKS
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("DATEIEN", ((TabItem)tabs.SelectedItem!).Header);
-        Assert.Single(vm.Files.Files);
-        Assert.Equal("Küchenbrand, Erdgeschoss", vm.Files.Files[0].DisplayName);
-        Capture(window, "files-after.png");
+        Assert.Equal("LINKS", ((TabItem)tabs.SelectedItem!).Header);
+        Assert.Equal(2, vm.Links.Links.Count);
+        Assert.Contains(vm.Links.Links, l => l.Name == "Wetterdienst" && l.Url == "https://dwd.de");
+        Capture(window, "links-after.png");
     }
 }

@@ -120,13 +120,32 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
 
     public Task OpenFileAsync(string path)
     {
-        // UseShellExecute launches the OS's registered default viewer on Windows/macOS; Linux has
-        // no such shell-execute concept in .NET, so xdg-open is the desktop-agnostic equivalent.
-        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-        else
-            Process.Start(new ProcessStartInfo("xdg-open", $"\"{path}\"") { UseShellExecute = false });
+        LaunchWithOsDefault(path);
         return Task.CompletedTask;
+    }
+
+    public Task OpenUrlAsync(string url)
+    {
+        // Belt-and-suspenders: LaunchWithOsDefault below is Process.Start with UseShellExecute=true,
+        // which resolves arbitrary URI handlers and even local executable paths, so this refuses
+        // anything but http(s) regardless of what a caller passes in.
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            return Task.CompletedTask;
+
+        LaunchWithOsDefault(uri.AbsoluteUri);
+        return Task.CompletedTask;
+    }
+
+    // UseShellExecute launches the OS's registered default handler on Windows/macOS, for a local
+    // path or a URL alike; Linux has no such shell-execute concept in .NET, so xdg-open is the
+    // desktop-agnostic equivalent, and it resolves URLs the same way it resolves file paths.
+    private static void LaunchWithOsDefault(string target)
+    {
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+        else
+            Process.Start(new ProcessStartInfo("xdg-open", $"\"{target}\"") { UseShellExecute = false });
     }
 
     // The user already chose the exact destination via the native save dialog above — there is

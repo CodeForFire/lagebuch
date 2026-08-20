@@ -31,6 +31,11 @@ public class MasterDataEditorRenderTests
                 new ChecklistTemplateItem("Kennleuchte ein, Blaulicht aus?", false),
             },
             ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Fahrzeug abgerüstet?", true) },
+            Links = new[]
+            {
+                new Link("Wetterdienst", "https://dwd.de"),
+                new Link("Kartendienst", "https://example.org/karte"),
+            },
             Personnel = new[]
             {
                 new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
@@ -56,7 +61,7 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
-        Assert.Equal(13, list.ItemCount);
+        Assert.Equal(14, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
@@ -93,5 +98,26 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.Save(Path.Combine(dir, "master-data-editor-checkliste-aufbau.png"));
+    }
+
+    [AvaloniaFact]
+    public void Links_section_renders_name_and_url_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Links");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var textBoxes = view.GetVisualDescendants().OfType<TextBox>()
+            .Where(t => t.Text is "Wetterdienst" or "https://dwd.de" or "Kartendienst" or "https://example.org/karte")
+            .ToList();
+        Assert.Equal(4, textBoxes.Count);
+
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.Save(Path.Combine(dir, "master-data-editor-links.png"));
     }
 }

@@ -148,6 +148,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public ForcesViewModel Forces { get; private set; } = null!;
     public ScbaViewModel Scba { get; private set; } = null!;
     public FilesViewModel Files { get; private set; } = null!;
+    public LinksViewModel Links { get; private set; } = null!;
     public ReminderViewModel? Reminder { get; private set; }
 
     public string StatusDisplay => Formatting.State(_session.Incident.State);
@@ -218,6 +219,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
         Files = new FilesViewModel(_session, _dialogs, OnChanged);
+        Links = new LinksViewModel(_masterData.Links, _dialogs);
 
         Reminder?.Dispose();
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
@@ -235,6 +237,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(Files));
+        OnPropertyChanged(nameof(Links));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
     }

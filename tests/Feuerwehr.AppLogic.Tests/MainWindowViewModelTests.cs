@@ -183,5 +183,6 @@ internal sealed class OpenPathDialogs : IFileDialogService
     public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+    public Task OpenUrlAsync(string url) => Task.CompletedTask;
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }

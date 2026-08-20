@@ -42,6 +42,11 @@ public sealed class MasterDataStore
             Run(cn, tx, "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
                 p => { p("$n", s.Name); p("$d", s.District); });
 
+        Run(cn, tx, "DELETE FROM md_links;", _ => { });
+        foreach (var l in set.Links)
+            Run(cn, tx, "INSERT INTO md_links (name, url) VALUES ($n,$u);",
+                p => { p("$n", l.Name); p("$u", l.Url); });
+
         Run(cn, tx, "DELETE FROM md_checklist_template;", _ => { });
         InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAufbau, kind: 0, ordinalOffset: 0);
         InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAbbau, kind: 1, ordinalOffset: set.ChecklistTemplateAufbau.Count);
@@ -109,6 +114,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_brigades (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_checklist_template (
                 ordinal INTEGER PRIMARY KEY,
                 text TEXT NOT NULL,
@@ -145,6 +151,7 @@ public sealed class MasterDataStore
             ReadColumn(cn, "SELECT value FROM md_brigades;"),
             ReadColumn(cn, "SELECT value FROM md_unit_status;"),
             ReadStreets(cn),
+            ReadLinks(cn),
             checklistAufbau,
             checklistAbbau,
             ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
@@ -218,6 +225,16 @@ public sealed class MasterDataStore
         using var r = cmd.ExecuteReader();
         var list = new List<Street>();
         while (r.Read()) list.Add(new Street(r.GetString(0), r.GetString(1)));
+        return list;
+    }
+
+    private static List<Link> ReadLinks(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT name, url FROM md_links;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<Link>();
+        while (r.Read()) list.Add(new Link(r.GetString(0), r.GetString(1)));
         return list;
     }
 
