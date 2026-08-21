@@ -30,6 +30,6 @@ public static class CompositionRoot
     {
         var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
-        return new MainWindowViewModel(home, editor);
+        return new MainWindowViewModel(home, editor, dialogs, appVersion);
     }
 }

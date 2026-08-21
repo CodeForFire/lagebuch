@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Feuerwehr.AppLogic.Services;
 
 namespace Feuerwehr.AppLogic.ViewModels;
 
@@ -9,12 +10,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private readonly HomeViewModel _home;
     private readonly MasterDataEditorViewModel _editor;
+    private readonly IFileDialogService _dialogs;
+    private readonly string _appVersion;
     private PendingAction _pending = PendingAction.None;
 
-    public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor)
+    public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor, IFileDialogService dialogs, string appVersion)
     {
         _home = home;
         _editor = editor;
+        _dialogs = dialogs;
+        _appVersion = appVersion;
         _home.WorkspaceOpened = ShowWorkspace;
         _currentView = home;
     }
@@ -37,6 +42,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
+
+    [ObservableProperty]
+    private AboutViewModel? _pendingAbout;
 
     // Every path that leaves the editor goes through here, so unsaved Stammdaten edits prompt first.
     // When the editor is not the current view, or has no unsaved changes, navigation is immediate.
@@ -105,6 +113,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand]
     private void GoHome() => NavigateAway(() => CurrentView = _home);
+
+    // The About overlay sits on top of whatever view is current and navigates nowhere, so it is
+    // deliberately not routed through NavigateAway — no discard prompt should block it.
+    [RelayCommand]
+    private void ShowAbout()
+    {
+        var about = new AboutViewModel(_dialogs, _appVersion);
+        about.Closed += (_, _) => PendingAbout = null;
+        PendingAbout = about;
+    }
 
     public void OpenRecent(string path) => NavigateAway(() => _home.OpenRecentCommand.Execute(path));
 }

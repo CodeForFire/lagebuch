@@ -36,10 +36,10 @@ public class MainWindowViewModelTests
     // parameterless new FixedClock() does not compile against it.
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
-    private static MainWindowViewModel New()
+    private static MainWindowViewModel New(IFileDialogService? dialogs = null)
     {
         var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()));
+        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), dialogs ?? new FakeDialogs(), "0.1.0");
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class MainWindowViewModelTests
         var clock = new FixedClock(T0);
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()));
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
         vm.RequestOpenFileCommand.Execute(null);
 
@@ -113,7 +113,7 @@ public class MainWindowViewModelTests
         var clock = new FixedClock(T0);
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()));
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
         vm.OpenRecent("/x.fwincident");
 
@@ -171,6 +171,46 @@ public class MainWindowViewModelTests
 
         Assert.Same(firstPrompt, editor.PendingConfirm); // still the same dialog, not a second one
         Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView); // navigation did not proceed
+    }
+
+    [Fact]
+    public void ShowAbout_shows_the_about_overlay_without_touching_navigation()
+    {
+        var dialogs = new FakeDialogs();
+        var vm = New(dialogs);
+
+        vm.ShowAboutCommand.Execute(null);
+
+        var about = Assert.IsType<AboutViewModel>(vm.PendingAbout);
+        Assert.Equal("0.1.0", about.Version);
+        Assert.Null(vm.PendingPrompt); // no operator prompt involved
+        Assert.IsType<HomeViewModel>(vm.CurrentView); // navigation unchanged
+    }
+
+    [Fact]
+    public async Task The_about_overlay_opens_links_through_the_shared_dialog_service()
+    {
+        var dialogs = new FakeDialogs();
+        var vm = New(dialogs);
+
+        vm.ShowAboutCommand.Execute(null);
+        var about = Assert.IsType<AboutViewModel>(vm.PendingAbout);
+
+        await about.OpenRepositoryCommand.ExecuteAsync(null);
+
+        Assert.Equal(about.RepositoryUrl, dialogs.LastOpenedUrl);
+    }
+
+    [Fact]
+    public void Closing_the_about_overlay_clears_it()
+    {
+        var vm = New();
+
+        vm.ShowAboutCommand.Execute(null);
+        Assert.NotNull(vm.PendingAbout);
+        vm.PendingAbout!.CloseCommand.Execute(null);
+
+        Assert.Null(vm.PendingAbout);
     }
 }
 
