@@ -94,7 +94,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
     /// Called by MainActivity's registered picker callback once the user selects a file (or
     /// cancels). Copies the content:// URI's bytes into app-private cache under its original
     /// display name (falling back to a generic one), preserving the extension both
-    /// <see cref="FilesViewModel"/>'s content-type inference and the sibling-folder attachment
+    /// <see cref="Feuerwehr.AppLogic.ViewModels.FilesViewModel"/>'s content-type inference and the sibling-folder attachment
     /// naming scheme rely on.
     /// </summary>
     public void CompleteAttachment(global::Android.Net.Uri? uri)
@@ -120,7 +120,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
         using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
         if (cursor is not null && cursor.MoveToFirst())
         {
-            var index = cursor.GetColumnIndex(Android.Provider.OpenableColumns.DisplayName);
+            var index = cursor.GetColumnIndex(global::Android.Provider.IOpenableColumns.DisplayName);
             if (index >= 0)
             {
                 var name = cursor.GetString(index);
@@ -168,7 +168,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
             return Task.CompletedTask;
 
-        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(uri.AbsoluteUri));
+        var intent = new Intent(Intent.ActionView, global::Android.Net.Uri.Parse(uri.AbsoluteUri));
         _activity.StartActivity(intent);
         return Task.CompletedTask;
     }

@@ -107,7 +107,9 @@ public class HomeViewModelTests
 
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
 
-        Assert.Equal("/einsaetze/2027", lastFolder.Saved);
+        // The stored folder is whatever Path.GetDirectoryName yields on this OS, so derive
+        // the expectation from the same input instead of hardcoding a separator flavor.
+        Assert.Equal(Path.GetDirectoryName(dialogs.ReturnPath), lastFolder.Saved);
     }
 
     [Fact]
