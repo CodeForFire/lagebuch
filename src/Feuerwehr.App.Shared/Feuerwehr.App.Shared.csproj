@@ -15,6 +15,7 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\Fonts\*.ttf" />
     <AvaloniaResource Include="Assets\icon-1024.png" />
+    <AvaloniaResource Include="Assets\codeforfire.png" />
   </ItemGroup>
 
   <ItemGroup>

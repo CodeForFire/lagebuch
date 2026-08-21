@@ -38,6 +38,9 @@
                     ToolTip.Tip="Mit einem Gerät verbinden, das einen Einsatz im Netzwerk freigegeben hat" />
             <Button x:Name="OpenFileButton" Content="ÖFFNEN" Command="{Binding RequestOpenFileCommand}" />
             <Button x:Name="NewIncidentButton" Classes="signal" Content="NEUER EINSATZ" Command="{Binding RequestNewIncidentCommand}" />
+            <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}" Margin="4,0" />
+            <Button x:Name="AboutButton" Classes="ghost" Content="ÜBER" Command="{Binding ShowAboutCommand}"
+                    ToolTip.Tip="Über Lagebuch — Version, Lizenz und Quellcode" />
           </StackPanel>
         </Grid>
       </Border>
@@ -46,5 +49,7 @@
     </DockPanel>
     <ContentControl Content="{Binding PendingPrompt}"
                     IsVisible="{Binding PendingPrompt, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <ContentControl Content="{Binding PendingAbout}"
+                    IsVisible="{Binding PendingAbout, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>
