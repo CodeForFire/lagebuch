@@ -8,6 +8,7 @@ obj/
 TestResults/
 coverage/
 *.trx
+artifacts/
 
 # Project-specific: never commit the legacy template or planning artifacts
 *.xltm
@@ -25,3 +26,6 @@ seed-source/
 
 # Local Claude Code state
 .claude/
+
+# Generated voice/audio drafts (filenames can carry voice-artist names)
+*.mp3
