@@ -8,7 +8,7 @@
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Lagebuch"
-           Manufacturer="Feuerwehr"
+           Manufacturer="CodeForFire"
            Version="$(Version)"
            UpgradeCode="a03eaa1b-3d77-4ff0-a60a-5abe27c27b18"
            Scope="perMachine"
@@ -40,10 +40,10 @@
       <Shortcut Id="LagebuchShortcut"
                 Name="Lagebuch"
                 Description="Einsatzdokumentation für die Feuerwehr"
-                Target="[INSTALLFOLDER]Feuerwehr.App.exe"
+                Target="[INSTALLFOLDER]LageBuch.App.exe"
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="LagebuchIcon" />
-      <RegistryValue Root="HKCU" Key="Software\Feuerwehr\Lagebuch"
+      <RegistryValue Root="HKCU" Key="Software\CodeForFire\Lagebuch"
                      Name="installed" Type="integer" Value="1" KeyPath="yes" />
     </Component>
   </Package>

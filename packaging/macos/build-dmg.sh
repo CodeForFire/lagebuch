@@ -19,7 +19,7 @@ install -d "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
 # --- payload ---------------------------------------------------------------------------------
 cp -R "$PUBLISH_DIR"/. "$APP_DIR/Contents/MacOS/"
-chmod +x "$APP_DIR/Contents/MacOS/Feuerwehr.App"
+chmod +x "$APP_DIR/Contents/MacOS/LageBuch.App"
 
 # --- icon: 1024 png -> multi-size .icns ------------------------------------------------------
 ICONSET="$STAGE/Lagebuch.iconset"
@@ -38,10 +38,10 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key>              <string>Lagebuch</string>
   <key>CFBundleDisplayName</key>       <string>Lagebuch</string>
-  <key>CFBundleIdentifier</key>        <string>de.feuerwehr.lagebuch</string>
+  <key>CFBundleIdentifier</key>        <string>de.codeforfire.lagebuch</string>
   <key>CFBundleVersion</key>           <string>$VERSION</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
-  <key>CFBundleExecutable</key>        <string>Feuerwehr.App</string>
+  <key>CFBundleExecutable</key>        <string>LageBuch.App</string>
   <key>CFBundleIconFile</key>          <string>Lagebuch</string>
   <key>CFBundlePackageType</key>       <string>APPL</string>
   <key>LSMinimumSystemVersion</key>    <string>11.0</string>

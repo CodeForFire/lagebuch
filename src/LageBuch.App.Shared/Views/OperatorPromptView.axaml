@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             x:Class="LageBuch.App.Shared.Views.OperatorPromptView"
+             x:DataType="vm:OperatorPromptViewModel">
+  <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
+    <Border Width="400" VerticalAlignment="Center" HorizontalAlignment="Center"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <!-- Accent header strip -->
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <StackPanel Margin="26,22,26,24" Spacing="6">
+          <TextBlock Text="DOKUMENTATION" Classes="overline" />
+          <TextBlock Text="Wer dokumentiert?" Classes="display" FontSize="22" Margin="0,0,0,8" />
+          <!-- Join flow only (§6): the host's Tailscale name or IP, entered alongside "who documents
+               here" so a joining device provides both in one prompt. -->
+          <StackPanel IsVisible="{Binding CollectsHost}" Spacing="3">
+            <TextBlock Text="GERÄT (TAILSCALE-NAME ODER IP)" Classes="overline" FontSize="10" Margin="0,4,0,3" />
+            <TextBox x:Name="HostBox" Watermark="z. B. elw-1 oder 100.x.y.z" Text="{Binding Host}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+            <!-- The 4-digit PIN the hosting device shows; required to join (#64). -->
+            <TextBlock Text="PIN" Classes="overline" FontSize="10" Margin="0,8,0,3" />
+            <TextBox x:Name="PinBox" Watermark="4-stellig" MaxLength="4" Text="{Binding Pin}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </StackPanel>
+          <TextBlock Text="NAME" Classes="overline" FontSize="10" Margin="0,4,0,3" />
+          <TextBox x:Name="OperatorNameBox" Watermark="z. B. Müller" Text="{Binding OperatorName}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" Margin="0,8,0,3" />
+          <!-- Call sign is a suggestion list, not a closed set: an operator's Funkrufname need
+               not be in the master list, so this is an AutoCompleteBox (Avalonia's ComboBox
+               cannot be made editable) mirroring RolesView's personnel-name field. -->
+          <AutoCompleteBox x:Name="CallSignBox" Watermark="optional"
+                           ItemsSource="{Binding CallSignOptions}"
+                           FilterMode="ContainsOrdinal"
+                           MinimumPrefixLength="0"
+                           Text="{Binding OperatorCallSign}"
+                           b:EnterSubmit.Command="{Binding ConfirmCommand}" />
+          <!-- The Einsatznummer is unknown at the start of most incidents and not worth blocking on
+               (#69), so the Stichwort (dispatch's short keyword, e.g. "B3P") is collected here
+               instead. The Einsatznummer itself can be added later, from the workspace header. -->
+          <StackPanel IsVisible="{Binding CollectsKeyword}" Spacing="3">
+            <TextBlock Text="STICHWORT" Classes="overline" FontSize="10" Margin="0,8,0,3" />
+            <TextBox x:Name="KeywordBox" Watermark="optional, z. B. B3P" Text="{Binding Keyword}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </StackPanel>
+          <Button x:Name="ConfirmButton" Classes="signal" Content="BESTÄTIGEN" Command="{Binding ConfirmCommand}"
+                  HorizontalAlignment="Right" Margin="0,16,0,0" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

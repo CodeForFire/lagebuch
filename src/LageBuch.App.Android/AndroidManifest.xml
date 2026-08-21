@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          android:versionCode="1" android:versionName="0.1.0"
+          package="de.codeforfire.lagebuch">
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
+    <application android:label="Lagebuch" android:icon="@drawable/icon" android:usesCleartextTraffic="false">
+        <provider android:name="androidx.core.content.FileProvider"
+                  android:authorities="de.codeforfire.lagebuch.fileprovider"
+                  android:exported="false"
+                  android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>
