@@ -1,43 +1,87 @@
 # Lagebuch
 
-Desktop application for fire-brigade incident documentation (Einsatzdokumentation).
-Replaces a legacy macro-enabled Excel template with a robust, offline, cross-platform
-.NET 8 + Avalonia application.
+[![CI](https://github.com/DeepDiver1975/lagebuch/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepDiver1975/lagebuch/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/DeepDiver1975/lagebuch)](../../releases)
+
+Offline-first incident documentation (**Einsatzdokumentation**) for fire brigades.
+Lagebuch ("log book") replaces the macro-enabled Excel templates many volunteer
+departments still fight with: one robust desktop application for the command
+vehicle (ELW), cross-platform and fully offline, with optional multi-device sync
+and PDF reports.
+
+Built with .NET 8 + Avalonia (desktop & Android), SQLite storage, SignalR sync
+and [QuestPDF](https://www.questpdf.com/) report generation.
+
+| | | |
+|---|---|---|
+| ![Home](docs/screenshots/home.png) | ![ETB](docs/screenshots/etb.png) | ![Checklisten](docs/screenshots/checkliste.png) |
+| ![Funktionen](docs/screenshots/funktionen.png) | ![Atemschutz](docs/screenshots/atemschutz.png) | ![Stammdaten](docs/screenshots/stammdaten-editor.png) |
+
+*All screenshots show fictional data.*
+
+## Features
+
+**Incident workspace** — one window per Einsatz, keyboard-first:
+
+- **Einsatzkopf** — Stichwort as the header hero, complete Bavarian-format
+  Einsatznummer (`B 1.2 <JJMMTT> <lfd.Nr.`), ILS number addable later
+- **ETB** (Einsatztagebuch) — manual entries with incoming/outgoing direction,
+  automatic lifecycle logging (open, close, reopen), later editing that keeps a
+  full history
+- **Kräfte** — units and crews with status and Bemerkung; Trupps are registered
+  as crews, not individuals
+- **Funktionen** — command roles (EL, Abschnitt, von/bis) with transfer support
+  and editable mobile numbers
+- **Atemschutzüberwachung** — SCBA teams with pressure-control interval,
+  max-duration countdown, two-stage ILS Rückmeldung reminder with spoken cues
+  and a Rückzugsalarm siren
+- **Checklisten** — Aufbau/Abbau checklists from your own master data, mandatory
+  items highlighted, completion logged to the ETB
+- **Dateien** — attach photos and PDFs to an incident; they are merged into the
+  exported report
+- **Links** — quick access to department bookmark links (weather, maps, ...)
+
+**Beyond a single window:**
+
+- **PDF export** — one-click QuestPDF incident report
+- **Multi-device sync** — host an incident on the ELW laptop and follow along
+  from other devices over LAN or Tailscale (SignalR); joining requires a share
+  PIN; Android is a join-only companion client
+- **Offline & durable** — each incident is a single self-contained
+  `.fwincident` SQLite file on disk; files written by a newer build are refused
+  with a clear message instead of crashing
 
 ## Status
 
-Under construction. See plans under `docs/` (note: design/plan artifacts are not committed).
+Early development, pre-1.0 — expect breaking changes between versions.
+The incident schema is versioned; Lagebuch refuses to open files written by a
+newer version rather than corrupting them.
 
 ## Install
 
-Pushing a version tag publishes a release under [Releases](../../releases) with an installer per
-platform:
+Grab an installer from [Releases](../../releases). Pushing a version tag builds
+and attaches one package per platform:
 
-```bash
-git tag v0.2.0 && git push origin v0.2.0
-```
+| Platform | File |
+|----------|------|
+| Windows | `lagebuch-<version>-x64.msi` |
+| Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` |
+| Android | `lagebuch-<version>.apk` |
+| macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
 
-| Platform | File | Built |
-|----------|------|-------|
-| Windows | `lagebuch-<version>-x64.msi` | on every tag |
-| Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` | on every tag |
-| Android | `lagebuch-<version>.apk` | on every tag |
-| macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` | on request |
-
-macOS runners bill Actions minutes at 10× on a private repo, so the `.dmg` is built on demand rather
-than on every tag: run the **Release** workflow manually (Actions → Release → *Run workflow*) with
-the release version, and the `.dmg` is attached to that release.
-
+All builds are self-contained — no .NET runtime needs to be installed separately.
 The packages are **not code-signed**, so the OS warns on first launch:
 
 - **Windows** — run the `.msi`; if SmartScreen appears, *More info → Run anyway*.
-- **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click the app → Open**
-  once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
+- **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click
+  the app → Open** once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
 - **Linux** — `sudo dpkg -i lagebuch_*.deb` (or `sudo apt install ./lagebuch_*.deb`).
-- **Android** — open the `.apk` from your file manager/browser; enable *install from unknown
-  sources* for that app once when prompted. The package is unsigned, same as the desktop builds.
+- **Android** — open the `.apk`; enable *install from unknown sources* for this
+  app once when prompted.
 
-All builds are self-contained; no .NET runtime needs to be installed separately.
+The macOS `.dmg` is built on demand rather than on every tag: run the **Release**
+workflow manually (*Actions → Release → Run workflow*) with the release version,
+and the `.dmg` is attached to that release.
 
 ## Build & Test
 
@@ -56,6 +100,14 @@ dotnet test
 
 ```bash
 dotnet run --project src/Feuerwehr.App/Feuerwehr.App.csproj
+```
+
+## Releasing (maintainers)
+
+Pushing a tag triggers the release workflow:
+
+```bash
+git tag v0.3.0 && git push origin v0.3.0
 ```
 
 ## Master data
@@ -94,12 +146,7 @@ Open **Stammdaten** and use the header buttons:
 The file is one JSON object; every top-level key is optional, so a file may hold
 the whole set, only the roster, or anything in between. See
 [`docs/master-data.example.json`](docs/master-data.example.json) for the full
-schema. The keys are the string lists `roles`, `status`, `unitStatus`,
-`equipment`, `districts`, `radioCallSigns`, `brigades`, `truppTypes`,
-`einsatzarten` and `checklistTemplate`; `streets` (`{ name, district }`); and `personnel`
-(`{ lastName, firstName, role?, callSign?, phone? }` — `lastName` is required,
-`firstName` may be `null`, and `role`/`callSign`/`phone` may each be `null` or
-omitted).
+schema.
 
 ### PII
 
@@ -111,3 +158,7 @@ are gitignored for exactly this reason; only the anonymised
 state: the name field on the Funktionen tab offers the roster as suggestions but
 always accepts free text, so off-roster and mutual-aid personnel can be entered
 either way.
+
+## License
+
+[MIT](LICENSE)
