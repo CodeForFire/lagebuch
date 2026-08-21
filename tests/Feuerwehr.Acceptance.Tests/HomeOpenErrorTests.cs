@@ -67,7 +67,7 @@ public class HomeOpenErrorTests
         {
             Directory.CreateDirectory(dir);
             using var frame = window.CaptureRenderedFrame()!;
-            frame.Save(Path.Combine(dir, renderTo));
+            frame.SavePng(Path.Combine(dir, renderTo));
         }
         return (window, vm);
     }

@@ -39,7 +39,7 @@ public class ScbaTabRenderTests
         {
             Directory.CreateDirectory(dir);
             using var frame = window.CaptureRenderedFrame()!;
-            frame.Save(Path.Combine(dir, "atemschutz.png"));
+            frame.SavePng(Path.Combine(dir, "atemschutz.png"));
         }
     }
 }

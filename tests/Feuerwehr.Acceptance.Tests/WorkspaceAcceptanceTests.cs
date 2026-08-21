@@ -156,7 +156,7 @@ public class WorkspaceAcceptanceTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
-            before.Save(Path.Combine(dir, "etb-edit-before.png"));
+            before.SavePng(Path.Combine(dir, "etb-edit-before.png"));
 
         var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung erhalten");
         Assert.False(row.WasEdited);
@@ -164,7 +164,7 @@ public class WorkspaceAcceptanceTests
         Assert.True(vm.Etb.IsEditing);
 
         using (var editing = window.CaptureRenderedFrame()!)
-            editing.Save(Path.Combine(dir, "etb-edit-panel.png"));
+            editing.SavePng(Path.Combine(dir, "etb-edit-panel.png"));
 
         var editTextBox = view.GetControl<TextBox>("EditTextBox");
         editTextBox.Focus();
@@ -182,13 +182,13 @@ public class WorkspaceAcceptanceTests
         Assert.Equal("Lagemeldung erhalten", Assert.Single(edited.Edits).PreviousText);
 
         using (var after = window.CaptureRenderedFrame()!)
-            after.Save(Path.Combine(dir, "etb-edit-after.png"));
+            after.SavePng(Path.Combine(dir, "etb-edit-after.png"));
 
         // History viewing is decoupled from editing (security review, #73) -- capture it separately.
         edited.ShowHistoryCommand.Execute(null);
         Assert.NotNull(vm.Etb.HistoryEntry);
         using (var history = window.CaptureRenderedFrame()!)
-            history.Save(Path.Combine(dir, "etb-edit-history.png"));
+            history.SavePng(Path.Combine(dir, "etb-edit-history.png"));
     }
 
     // System-generated entries (the automatic "Einsatz begonnen" line) are never editable —
@@ -317,7 +317,7 @@ public class WorkspaceAcceptanceTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
-            before.Save(Path.Combine(dir, "checkliste-aufbau-abbau-before.png"));
+            before.SavePng(Path.Combine(dir, "checkliste-aufbau-abbau-before.png"));
 
         vm.ChecklistAufbau.Items[0].IsDone = true;
 
@@ -325,7 +325,7 @@ public class WorkspaceAcceptanceTests
         Assert.False(incompleteDot.IsVisible);
 
         using (var after = window.CaptureRenderedFrame()!)
-            after.Save(Path.Combine(dir, "checkliste-aufbau-abbau-after.png"));
+            after.SavePng(Path.Combine(dir, "checkliste-aufbau-abbau-after.png"));
     }
 
     [AvaloniaFact]
@@ -475,7 +475,7 @@ public class WorkspaceAcceptanceTests
         // Open: the list itself is realized into an OverlayPopupHost, which is a sibling of the
         // ComboBox rather than a descendant — so the options have to be read through the popup.
         var popupHost = Assert.IsAssignableFrom<Control>(
-            box.GetVisualDescendants().OfType<Popup>().Single().Host);
+            window.GetVisualDescendants().OfType<OverlayPopupHost>().Single());
         var options = Text(popupHost);
 
         Assert.Equal(new[] { "Eingang", "Ausgang", "Intern" }, options);
@@ -538,7 +538,7 @@ public class WorkspaceAcceptanceTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
-            before.Save(Path.Combine(dir, "roles-transfer-before.png"));
+            before.SavePng(Path.Combine(dir, "roles-transfer-before.png"));
 
         var row = Assert.Single(vm.Roles.Roles);
         Assert.True(row.BeginTransferCommand.CanExecute(null));
@@ -546,7 +546,7 @@ public class WorkspaceAcceptanceTests
         Assert.True(vm.Roles.IsTransferring);
 
         using (var panel = window.CaptureRenderedFrame()!)
-            panel.Save(Path.Combine(dir, "roles-transfer-panel.png"));
+            panel.SavePng(Path.Combine(dir, "roles-transfer-panel.png"));
 
         view.GetControl<AutoCompleteBox>("TransferPersonNameBox").Text = "Schmidt";
         Assert.Equal("Schmidt", vm.Roles.TransferPersonName);
@@ -566,6 +566,6 @@ public class WorkspaceAcceptanceTests
         Assert.Contains(vm.Roles.Roles, r => r.PersonName == "Müller" && !r.IsRunning);
 
         using (var after = window.CaptureRenderedFrame()!)
-            after.Save(Path.Combine(dir, "roles-transfer-after.png"));
+            after.SavePng(Path.Combine(dir, "roles-transfer-after.png"));
     }
 }
