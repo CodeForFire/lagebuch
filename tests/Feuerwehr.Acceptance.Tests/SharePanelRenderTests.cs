@@ -41,7 +41,7 @@ public class SharePanelRenderTests
             return;
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.Save(Path.Combine(dir, name));
+        frame.SavePng(Path.Combine(dir, name));
     }
 
     private static TextBlock ShareStatus(Window window) =>

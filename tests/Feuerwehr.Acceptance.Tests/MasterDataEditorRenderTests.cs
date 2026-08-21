@@ -69,7 +69,7 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "master-data-editor.png");
         using var frame = window.CaptureRenderedFrame()!;
-        frame.Save(path);
+        frame.SavePng(path);
         Assert.True(new FileInfo(path).Length > 0);
     }
 
@@ -97,7 +97,7 @@ public class MasterDataEditorRenderTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.Save(Path.Combine(dir, "master-data-editor-checkliste-aufbau.png"));
+        frame.SavePng(Path.Combine(dir, "master-data-editor-checkliste-aufbau.png"));
     }
 
     [AvaloniaFact]
@@ -118,6 +118,6 @@ public class MasterDataEditorRenderTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.Save(Path.Combine(dir, "master-data-editor-links.png"));
+        frame.SavePng(Path.Combine(dir, "master-data-editor-links.png"));
     }
 }
