@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia.Headless.XUnit" Version="11.2.2" />
-    <PackageReference Include="Avalonia.Skia" Version="11.2.2" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.1" />
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
