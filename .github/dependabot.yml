@@ -6,8 +6,13 @@ updates:
     schedule:
       interval: weekly
 
-  # NuGet packages across the solution.
+  # NuGet packages across the solution. All Avalonia packages are grouped so
+  # they arrive as a single pull request (they must always move in lockstep).
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
+    groups:
+      avalonia:
+        patterns:
+          - "Avalonia*"
