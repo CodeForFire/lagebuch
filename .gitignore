@@ -22,3 +22,6 @@ seed-source/
 
 # Local SDD scratch / ledger
 .superpowers/
+
+# Local Claude Code state
+.claude/
