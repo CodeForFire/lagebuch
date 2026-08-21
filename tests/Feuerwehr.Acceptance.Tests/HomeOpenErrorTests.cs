@@ -31,9 +31,9 @@ public class HomeOpenErrorTests
     {
         private readonly List<string> _list = new()
         {
-            "/home/deepdiver/FFW/Einsatz-1234.fwincident",
-            "/home/deepdiver/FFW/Einsatz-6666.fwincident",
-            "/home/deepdiver/FFW/Einsatz5.fwincident",
+            "/home/operator/Einsaetze/Einsatz-1234.fwincident",
+            "/home/operator/Einsaetze/Einsatz-6666.fwincident",
+            "/home/operator/Einsaetze/Einsatz5.fwincident",
         };
         public IReadOnlyList<string> GetRecent() => _list;
         public void Add(string path) { }
@@ -55,7 +55,7 @@ public class HomeOpenErrorTests
         var vm = new HomeViewModel(new BrokenStore(), new Md(), new SeededRecent(),
             new FakeDialogs(), new FixedClock(), new ManualTicker(), new NoopAlarmService(), new NoopIncidentHostController(), "1.0.0");
         if (triggerError)
-            vm.OpenRecentCommand.Execute("/home/deepdiver/FFW/Einsatz-1234.fwincident");
+            vm.OpenRecentCommand.Execute("/home/operator/Einsaetze/Einsatz-1234.fwincident");
 
         var window = new Window { Content = new HomeView { DataContext = vm }, Width = 1100, Height = 820 };
         window.Show();
