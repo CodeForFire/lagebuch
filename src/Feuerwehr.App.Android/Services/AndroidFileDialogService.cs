@@ -120,7 +120,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
         using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
         if (cursor is not null && cursor.MoveToFirst())
         {
-            var index = cursor.GetColumnIndex(global::Android.Provider.OpenableColumns.DisplayName);
+            var index = cursor.GetColumnIndex(global::Android.Provider.IOpenableColumns.DisplayName);
             if (index >= 0)
             {
                 var name = cursor.GetString(index);
