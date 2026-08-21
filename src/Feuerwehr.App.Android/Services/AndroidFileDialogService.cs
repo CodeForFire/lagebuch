@@ -120,7 +120,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
         using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
         if (cursor is not null && cursor.MoveToFirst())
         {
-            var index = cursor.GetColumnIndex(Android.Provider.OpenableColumns.DisplayName);
+            var index = cursor.GetColumnIndex(global::Android.Provider.OpenableColumns.DisplayName);
             if (index >= 0)
             {
                 var name = cursor.GetString(index);
@@ -168,7 +168,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
             return Task.CompletedTask;
 
-        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(uri.AbsoluteUri));
+        var intent = new Intent(Intent.ActionView, global::Android.Net.Uri.Parse(uri.AbsoluteUri));
         _activity.StartActivity(intent);
         return Task.CompletedTask;
     }
