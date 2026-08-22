@@ -101,7 +101,7 @@ public class ForcesViewModelTests
 
         Assert.Equal(15, vm.TotalPersonnel);
         Assert.Equal(6, vm.TotalScba);
-        Assert.Equal(new[] { 4, 2 }, vm.Forces.Select(f => f.ScbaCount));
+        Assert.Equal(new[] { 4, 2 }, vm.Forces.Select(f => f.ScbaCount ?? 0));
     }
 
     [Fact]
@@ -133,9 +133,10 @@ public class ForcesViewModelTests
         vm.AddForceCommand.Execute(null);
 
         Assert.Equal("", vm.NewBrigade);
-        Assert.Equal(0, vm.NewOfficerCount);
-        Assert.Equal(0, vm.NewMannschaftCount);
-        Assert.Equal(0, vm.NewScbaCount);
+        // Empty means 0 -- the fields are nullable so the placeholder shows instead of a "0".
+        Assert.Null(vm.NewOfficerCount);
+        Assert.Null(vm.NewMannschaftCount);
+        Assert.Null(vm.NewScbaCount);
         Assert.Null(vm.NewStatus);
         Assert.Null(vm.NewNotes);
     }

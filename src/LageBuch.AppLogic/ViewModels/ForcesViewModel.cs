@@ -57,25 +57,30 @@ public sealed partial class ForceRow : ObservableObject
     /// <summary>The Verlauf affordance only makes sense once something was corrected.</summary>
     public bool HasHistory => Edits.Count > 0;
 
+    /// <summary>
+    /// Nullable so an empty edit field means 0 (e.g. all AGT withdrawn) and the placeholder shows
+    /// instead of a permanent "0". The view filters input to digits; null only ever comes from an
+    /// emptied field or a fresh form.
+    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TotalCount))]
     [NotifyPropertyChangedFor(nameof(StrengthText))]
-    private int _officerCount;
+    private int? _officerCount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TotalCount))]
     [NotifyPropertyChangedFor(nameof(StrengthText))]
-    private int _mannschaftCount;
+    private int? _mannschaftCount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StrengthText))]
-    private int _scbaCount;
+    private int? _scbaCount;
 
     /// <summary>Gesamtstärke — derived, never edited directly.</summary>
-    public int TotalCount => OfficerCount + MannschaftCount;
+    public int TotalCount => (OfficerCount ?? 0) + (MannschaftCount ?? 0);
 
     /// <summary>The issue #76 format: Führungskräfte/Mannschaft/Gesamt.</summary>
-    public string StrengthText => $"{OfficerCount}/{MannschaftCount}/{TotalCount}";
+    public string StrengthText => $"{OfficerCount ?? 0}/{MannschaftCount ?? 0}/{TotalCount}";
 
     /// <summary>
     /// Carried on the row rather than read off the parent: a DataGrid cell template binds against
@@ -106,12 +111,13 @@ public sealed partial class ForceRow : ObservableObject
         _onEdited(Status, Notes);
     }
 
-    /// <summary>Commits the current GF/Mann/AGT values as one correction (#76).</summary>
+    /// <summary>Commits the current GF/Mann/AGT values as one correction (#76). An emptied field
+    /// counts as 0 -- clearing AGT is how all Trupps get withdrawn.</summary>
     public void CommitStrength()
     {
         if (IsReadOnly)
             return;
-        _onStrengthEdited(OfficerCount, MannschaftCount, ScbaCount);
+        _onStrengthEdited(OfficerCount ?? 0, MannschaftCount ?? 0, ScbaCount ?? 0);
     }
 
     /// <summary>XAML entry point for the strength editor's Übernehmen button.</summary>
@@ -127,9 +133,9 @@ public sealed partial class ForceRow : ObservableObject
         Edits.Select((e, i) =>
         {
             var next = i + 1 < Edits.Count ? Edits[i + 1] : null;
-            int toOfficer = next?.PreviousOfficerCount ?? OfficerCount;
+            int toOfficer = next?.PreviousOfficerCount ?? (OfficerCount ?? 0);
             int toPerson = next?.PreviousPersonnelCount ?? TotalCount;
-            int toScba = next?.PreviousScbaCount ?? ScbaCount;
+            int toScba = next?.PreviousScbaCount ?? (ScbaCount ?? 0);
             return $"Stärke {e.PreviousOfficerCount}/{e.PreviousPersonnelCount - e.PreviousOfficerCount}/{e.PreviousPersonnelCount}"
                  + $" → {toOfficer}/{toPerson - toOfficer}/{toPerson}"
                  + $", davon AGT {e.PreviousScbaCount} → {toScba}"
@@ -207,17 +213,18 @@ public sealed partial class ForcesViewModel : ObservableObject
     [ObservableProperty]
     private string? _newCallSign;
 
+    /// <summary>Nullable: an empty field means 0 and keeps the placeholder visible.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    private int _newOfficerCount;
+    private int? _newOfficerCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    private int _newMannschaftCount;
+    private int? _newMannschaftCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    private int _newScbaCount;
+    private int? _newScbaCount;
 
     [ObservableProperty]
     private string? _newStatus;
@@ -254,21 +261,22 @@ public sealed partial class ForcesViewModel : ObservableObject
 
     private bool CanAddForce =>
         !IsReadOnly && !string.IsNullOrWhiteSpace(NewBrigade)
-        && NewOfficerCount >= 0 && NewMannschaftCount >= 0 && NewScbaCount >= 0
+        // Lifted comparisons: null >= 0 is false, so every operand coalesces first.
+        && (NewOfficerCount ?? 0) >= 0 && (NewMannschaftCount ?? 0) >= 0 && (NewScbaCount ?? 0) >= 0
         // Mirrors the domain rule, so an over-count disables the button instead of throwing on click.
-        && NewScbaCount <= NewOfficerCount + NewMannschaftCount;
+        && (NewScbaCount ?? 0) <= (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0);
 
     [RelayCommand(CanExecute = nameof(CanAddForce))]
     private void AddForce()
     {
         _session.AddForceUnit(
-            NewBrigade, NewOfficerCount + NewMannschaftCount, NewCallSign, NewStatus, NewNotes,
-            NewScbaCount, NewOfficerCount); // Changed → RefreshForces
+            NewBrigade, (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0), NewCallSign, NewStatus, NewNotes,
+            NewScbaCount ?? 0, NewOfficerCount ?? 0); // Changed → RefreshForces
         NewBrigade = string.Empty;
         NewCallSign = null;
-        NewOfficerCount = 0;
-        NewMannschaftCount = 0;
-        NewScbaCount = 0;
+        NewOfficerCount = null;
+        NewMannschaftCount = null;
+        NewScbaCount = null;
         NewStatus = null;
         NewNotes = null;
         _onChanged();

@@ -64,16 +64,19 @@
         </StackPanel>
         <StackPanel Spacing="2">
           <TextBlock Text="STÄRKE GF / MANN" Classes="overline" FontSize="10" />
+          <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
+               0 und lässt den Platzhalter stehen. -->
           <StackPanel Orientation="Horizontal" Spacing="4">
-            <NumericUpDown x:Name="OfficerBox" Width="70" Minimum="0" Watermark="GF"
-                           Value="{Binding NewOfficerCount}" />
-            <NumericUpDown x:Name="MannschaftBox" Width="70" Minimum="0" Watermark="Mann"
-                           Value="{Binding NewMannschaftCount}" />
+            <TextBox x:Name="OfficerBox" Width="70" Watermark="GF"
+                     Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
+            <TextBox x:Name="MannschaftBox" Width="70" Watermark="Mann"
+                     Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
           </StackPanel>
         </StackPanel>
         <StackPanel Spacing="2">
           <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" />
-          <NumericUpDown x:Name="ScbaBox" Width="90" Minimum="0" Value="{Binding NewScbaCount}" />
+          <TextBox x:Name="ScbaBox" Width="90" Watermark="AGT"
+                   Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
         </StackPanel>
         <StackPanel Spacing="2">
           <TextBlock Text="STATUS" Classes="overline" FontSize="10" />
@@ -106,19 +109,19 @@
                   <Button Content="✎" Padding="6,2" IsVisible="{Binding !IsReadOnly}">
                     <Button.Flyout>
                       <Flyout Placement="BottomEdgeAlignedLeft">
-                        <StackPanel Spacing="8" MinWidth="180">
+                          <StackPanel Spacing="8" MinWidth="180">
                           <TextBlock Text="Stärke korrigieren" Classes="overline" />
                           <StackPanel Spacing="2">
                             <TextBlock Text="FÜHRUNGSKRÄFTE (GF)" Classes="overline" FontSize="10" />
-                            <NumericUpDown Minimum="0" Value="{Binding OfficerCount}" />
+                            <TextBox Text="{Binding OfficerCount}" b:IntegerOnly.IsEnabled="True" />
                           </StackPanel>
                           <StackPanel Spacing="2">
                             <TextBlock Text="MANN" Classes="overline" FontSize="10" />
-                            <NumericUpDown Minimum="0" Value="{Binding MannschaftCount}" />
+                            <TextBox Text="{Binding MannschaftCount}" b:IntegerOnly.IsEnabled="True" />
                           </StackPanel>
                           <StackPanel Spacing="2">
                             <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" />
-                            <NumericUpDown Minimum="0" Value="{Binding ScbaCount}" />
+                            <TextBox Text="{Binding ScbaCount}" b:IntegerOnly.IsEnabled="True" />
                           </StackPanel>
                           <Button Classes="signal" Content="ÜBERNEHMEN"
                                   Command="{Binding ApplyStrengthEditCommand}" />

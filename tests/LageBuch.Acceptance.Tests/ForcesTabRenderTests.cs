@@ -65,7 +65,9 @@ public class ForcesTabRenderTests
 
         vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0];
         Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
-        Assert.Equal((1, 8, 0), (vm.Forces.NewOfficerCount, vm.Forces.NewMannschaftCount, vm.Forces.NewScbaCount));
+        Assert.Equal(1, vm.Forces.NewOfficerCount);
+        Assert.Equal(8, vm.Forces.NewMannschaftCount);
+        Assert.Equal(0, vm.Forces.NewScbaCount);
 
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
