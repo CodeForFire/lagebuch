@@ -132,6 +132,45 @@ public class MasterDataJsonTests
         Assert.Equal(original.Personnel, reparsed.Personnel);
     }
 
+    // #76: vehicles hang off their Wache with a seat count, so the Kräfte entry can offer the
+    // Funkrufname and a Stärke preset per selected Wache.
+    [Fact]
+    public void Parse_reads_vehicles_with_wache_callsign_and_seats()
+    {
+        var set = Parse("""
+            {
+              "vehicles": [
+                { "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 },
+                { "wache": "Aich", "callSign": "Aich 42/1", "seats": 6 }
+              ]
+            }
+            """);
+
+        Assert.Equal(
+            new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), new Vehicle("Aich", "Aich 42/1", 6) },
+            set.Vehicles);
+    }
+
+    [Fact]
+    public void A_file_without_vehicles_parses_as_an_empty_list()
+    {
+        var set = Parse("""{ "brigades": ["FFB Wache 1"] }""");
+        Assert.Empty(set.Vehicles);
+    }
+
+    [Fact]
+    public void Serialize_round_trips_vehicles()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+        };
+
+        var reparsed = Parse(MasterDataJson.Serialize(original));
+
+        Assert.Equal(original.Vehicles, reparsed.Vehicles);
+    }
+
     [Fact]
     public void Parse_reads_the_settings_object()
     {

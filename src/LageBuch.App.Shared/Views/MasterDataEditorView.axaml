@@ -196,6 +196,45 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Vehicles editor (#76): Wache + Funkrufname + Sitzplätze, reorderable.
+                   NumericUpDown has no watermark, so the seat field carries its unit label beside
+                   it — same convention as the Kräfte entry dock. -->
+              <DataTemplate x:DataType="vm:VehiclesSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VehicleRow">
+                          <Grid ColumnDefinitions="*,*,150,Auto,Auto,Auto" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Watermark="Wache" Text="{Binding Wache}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1" Watermark="Funkrufname" Text="{Binding CallSign}" Margin="0,0,6,0" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                              <NumericUpDown Width="90" Minimum="0" Maximum="99" Increment="1" FormatString="0"
+                                             Value="{Binding Seats}" VerticalAlignment="Center" />
+                              <TextBlock Text="Sitzplätze" Classes="secondary" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
+                                 DataContext, whose static type is object under compiled bindings, so a
+                                 compiled $parent cast path won't resolve. -->
+                            <Button Grid.Column="3" Content="▲" Margin="0,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="4" Content="▼" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="5" Content="✕" Margin="4,0,0,0"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Personnel editor -->
               <DataTemplate x:DataType="vm:PersonnelSection">
                 <DockPanel>

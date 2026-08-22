@@ -26,6 +26,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private ChecklistTemplateSection _checklistAufbau = null!, _checklistAbbau = null!;
     private LinksSection _links = null!;
     private PersonnelSection _personnel = null!;
+    private VehiclesSection _vehicles = null!;
     private SettingsSection _settings = null!;
 
     public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
@@ -85,6 +86,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Sections.Add(_checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty));
         Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
         Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
+        Sections.Add(_vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, MarkDirty));
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }
@@ -104,6 +106,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
         ChecklistTemplateAbbau = _checklistAbbau.ToValues(),
         Personnel = _personnel.ToPeople(),
+        Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),
         // Streets are not editable here; _original carries them through unchanged.
     };

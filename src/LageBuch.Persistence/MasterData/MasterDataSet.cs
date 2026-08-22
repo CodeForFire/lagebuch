@@ -63,6 +63,13 @@ public sealed record Person(string LastName, string FirstName, string? Role, str
     public string DisplayName => string.IsNullOrWhiteSpace(FirstName) ? LastName : $"{LastName}, {FirstName}";
 }
 
+/// <summary>
+/// One vehicle of a Wache (#76). The Wache reference is the brigade's name as spelled in the
+/// Brigades list (a free-text list, so no id exists to point at); the seat count feeds the
+/// Stärke preset when the vehicle is picked in the Kräfte entry.
+/// </summary>
+public sealed record Vehicle(string Wache, string CallSign, int Seats);
+
 public sealed record MasterDataSet(
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> Status,
@@ -81,6 +88,8 @@ public sealed record MasterDataSet(
     IReadOnlyList<Person> Personnel,
     // Einsatzart values (ABek Bayern) — the leading token of the complete Einsatznummer.
     IReadOnlyList<string> Einsatzarten,
+    // Vehicles per Wache with their seat count (#76).
+    IReadOnlyList<Vehicle> Vehicles,
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
     IncidentSettings Settings)
@@ -96,6 +105,7 @@ public sealed record MasterDataSet(
         Array.Empty<Link>(),
         Array.Empty<ChecklistTemplateItem>(), Array.Empty<ChecklistTemplateItem>(),
         Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>(),
+        Array.Empty<Vehicle>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -109,7 +119,8 @@ public sealed record MasterDataSet(
         && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
         && Streets.Count == 0 && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
         && TruppTypes.Count == 0
-        && Personnel.Count == 0 && Einsatzarten.Count == 0;
+        && Personnel.Count == 0 && Einsatzarten.Count == 0
+        && Vehicles.Count == 0;
 }
 
 /// <summary>
@@ -148,6 +159,16 @@ public static class MasterDataJson
 
         var (checklistAufbau, checklistAbbau) = ParseChecklistTemplate(root);
 
+        IReadOnlyList<Vehicle> vehicles =
+            root.TryGetProperty("vehicles", out var v) && v.ValueKind == JsonValueKind.Array
+                ? v.EnumerateArray()
+                    .Select(x => new Vehicle(
+                        x.GetProperty("wache").GetString()!,
+                        x.GetProperty("callSign").GetString()!,
+                        x.TryGetProperty("seats", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0))
+                    .ToList()
+                : Array.Empty<Vehicle>();
+
         return new MasterDataSet(
             Arr(root, "roles"),
             Arr(root, "status"),
@@ -163,6 +184,7 @@ public static class MasterDataJson
             Arr(root, "truppTypes"),
             ParsePersonnel(root),
             Arr(root, "einsatzarten"),
+            vehicles,
             ParseSettings(root));
     }
 
@@ -256,6 +278,7 @@ public static class MasterDataJson
             checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             streets = set.Streets.Select(s => new { name = s.Name, district = s.District }),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
+            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats }),
             personnel = set.Personnel.Select(p => new
             {
                 lastName = p.LastName,
