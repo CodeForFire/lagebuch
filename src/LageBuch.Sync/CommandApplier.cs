@@ -53,10 +53,14 @@ public static class CommandApplier
                 break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(clock, Operator(c.Operator), c.Brigade, c.PersonnelCount,
-                    c.CallSign, c.Status, c.Notes, c.ScbaCount);
+                    c.CallSign, c.Status, c.Notes, c.ScbaCount, c.OfficerCount);
                 break;
             case UpdateForceUnitCommand c:
                 incident.UpdateForceUnit(clock, Operator(c.Operator), c.UnitId, c.Status, c.Notes);
+                break;
+            case UpdateForceStrengthCommand c:
+                incident.UpdateForceStrength(clock, Operator(c.Operator), c.UnitId,
+                    c.OfficerCount, c.PersonnelCount, c.ScbaCount);
                 break;
             case AddScbaTruppCommand c:
                 incident.AddScbaTrupp(clock, c.Designation,

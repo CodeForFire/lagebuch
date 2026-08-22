@@ -47,8 +47,12 @@ public interface IIncidentSession
     /// <summary>Corrects a role assignment's phone number. Logs to the ETB only on a real change.</summary>
     void EditRolePhone(Guid assignmentId, string? phone);
     void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
-        string? status = null, string? notes = null, int scbaCount = 0);
+        string? status = null, string? notes = null, int scbaCount = 0, int officerCount = 0);
     void UpdateForceUnit(Guid unitId, string? status, string? notes);
+
+    /// <summary>Corrects a unit's Stärke (GF / Gesamt / davon AGT). Logs to the ETB and retains the
+    /// prior values on the unit — but only on a real change (#76).</summary>
+    void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount);
     void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
