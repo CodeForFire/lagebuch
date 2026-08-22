@@ -86,7 +86,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Sections.Add(_checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty));
         Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
         Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
-        Sections.Add(_vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, MarkDirty));
+        Sections.Add(_vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, MarkDirty));
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }

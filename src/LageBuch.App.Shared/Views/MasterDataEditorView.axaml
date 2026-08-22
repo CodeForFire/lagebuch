@@ -208,8 +208,16 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
                           <Grid ColumnDefinitions="*,*,150,Auto,Auto,Auto" Margin="0,0,0,6">
-                            <TextBox Grid.Column="0" Watermark="Wache" Text="{Binding Wache}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="1" Watermark="Funkrufname" Text="{Binding CallSign}" Margin="0,0,6,0" />
+                            <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
+                                 aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
+                            <AutoCompleteBox Grid.Column="0" Watermark="Wache"
+                                             ItemsSource="{Binding WacheOptions}"
+                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                             Text="{Binding Wache}" Margin="0,0,6,0" />
+                            <AutoCompleteBox Grid.Column="1" Watermark="Funkrufname"
+                                             ItemsSource="{Binding CallSignOptions}"
+                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                             Text="{Binding CallSign}" Margin="0,0,6,0" />
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
                               <NumericUpDown Width="90" Minimum="0" Maximum="99" Increment="1" FormatString="0"
                                              Value="{Binding Seats}" VerticalAlignment="Center" />

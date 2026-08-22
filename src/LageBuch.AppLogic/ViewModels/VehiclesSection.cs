@@ -12,20 +12,30 @@ namespace LageBuch.AppLogic.ViewModels;
 public sealed partial class VehiclesSection : EditorSection
 {
     private readonly Action _onChanged;
+    private readonly IReadOnlyList<string> _wacheOptions;
+    private readonly IReadOnlyList<string> _callSignOptions;
 
-    public VehiclesSection(string title, IEnumerable<Vehicle> vehicles, Action onChanged) : base(title)
+    public VehiclesSection(
+        string title, IEnumerable<Vehicle> vehicles,
+        IReadOnlyList<string> wacheOptions, IReadOnlyList<string> callSignOptions,
+        Action onChanged) : base(title)
     {
         _onChanged = onChanged;
+        _wacheOptions = wacheOptions;
+        _callSignOptions = callSignOptions;
         Rows = new ObservableCollection<VehicleRow>(
-            vehicles.Select(v => new VehicleRow(v.Wache, v.CallSign, v.Seats, onChanged)));
+            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats)));
     }
 
     public ObservableCollection<VehicleRow> Rows { get; }
 
+    private VehicleRow NewRow(string wache, string callSign, int seats) =>
+        new(wache, callSign, seats, _wacheOptions, _callSignOptions, _onChanged);
+
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(new VehicleRow(string.Empty, string.Empty, 0, _onChanged));
+        Rows.Add(NewRow(string.Empty, string.Empty, 0));
         _onChanged();
     }
 

@@ -89,6 +89,33 @@ public class MasterDataEditorViewModelTests
     private static SettingsSection Settings(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<SettingsSection>().Single();
 
+    private static VehiclesSection Vehicles(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<VehiclesSection>().Single();
+
+    [Fact]
+    public void Fahrzeuge_rows_suggest_brigades_and_callsigns_from_the_master_data()
+    {
+        // Dropdown-Vorschläge (#76): Wache aus den Wachen, Funkrufname aus den Funkrufnamen --
+        // Freitext bleibt trotzdem möglich (Fremdwehren), daher AutoCompleteBox im View.
+        var set = MasterDataSet.Empty with
+        {
+            Brigades = new[] { "FFB Wache 1", "Aich" },
+            RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
+            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+        };
+        var vm = Vm(new InMemoryProvider(set));
+        var section = Vehicles(vm);
+
+        var row = Assert.Single(section.Rows);
+        Assert.Equal(new[] { "FFB Wache 1", "Aich" }, row.WacheOptions);
+        Assert.Equal(new[] { "FFB 1/40/1", "Aich 42/1" }, row.CallSignOptions);
+
+        // A freshly added row carries the same suggestions.
+        section.AddCommand.Execute(null);
+        Assert.Equal(row.WacheOptions, section.Rows[1].WacheOptions);
+        Assert.Equal(row.CallSignOptions, section.Rows[1].CallSignOptions);
+    }
+
     [Fact]
     public void Loads_a_section_per_category_and_starts_clean()
     {
