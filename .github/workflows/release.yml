@@ -52,7 +52,7 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Publish
         run: >
-          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r win-x64 ${{ env.PUBLISH_FLAGS }}
+          dotnet publish src/LageBuch.App/LageBuch.App.csproj -r win-x64 ${{ env.PUBLISH_FLAGS }}
           -p:Version=${{ needs.version.outputs.version }} -o publish
       - name: Install WiX
         run: |
@@ -65,7 +65,7 @@ jobs:
           wix build packaging/windows/Lagebuch.wxs
           -d Version=${{ needs.version.outputs.version }}
           -d "PublishDir=${{ github.workspace }}\publish"
-          -d "IconFile=${{ github.workspace }}\src\Feuerwehr.App\Assets\icon.ico"
+          -d "IconFile=${{ github.workspace }}\src\LageBuch.App\Assets\icon.ico"
           -o "lagebuch-${{ needs.version.outputs.version }}-x64.msi"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -84,7 +84,7 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Publish
         run: >
-          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
+          dotnet publish src/LageBuch.App/LageBuch.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
           -p:Version=${{ needs.version.outputs.version }} -o publish
       - name: Build .deb
         run: |
@@ -92,7 +92,7 @@ jobs:
           packaging/linux/build-deb.sh \
             "${{ needs.version.outputs.version }}" \
             publish \
-            src/Feuerwehr.App.Shared/Assets/icon-1024.png \
+            src/LageBuch.App.Shared/Assets/icon-1024.png \
             dist
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -113,7 +113,7 @@ jobs:
         run: dotnet workload install android
       - name: Publish
         run: >
-          dotnet publish src/Feuerwehr.App.Android/Feuerwehr.App.Android.csproj -c Release
+          dotnet publish src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Release
           -p:AndroidPackageFormat=apk -p:ApplicationDisplayVersion=${{ needs.version.outputs.version }}
           -o publish-android
       - name: Locate and rename the APK
@@ -177,7 +177,7 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Publish
         run: >
-          dotnet publish src/Feuerwehr.App/Feuerwehr.App.csproj -r osx-arm64 ${{ env.PUBLISH_FLAGS }}
+          dotnet publish src/LageBuch.App/LageBuch.App.csproj -r osx-arm64 ${{ env.PUBLISH_FLAGS }}
           -p:Version=${{ needs.version.outputs.version }} -o publish
       - name: Build .dmg
         run: |
@@ -185,7 +185,7 @@ jobs:
           packaging/macos/build-dmg.sh \
             "${{ needs.version.outputs.version }}" \
             publish \
-            src/Feuerwehr.App.Shared/Assets/icon-1024.png \
+            src/LageBuch.App.Shared/Assets/icon-1024.png \
             dist
       # Always downloadable from the run; also attach to the matching release if one exists.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

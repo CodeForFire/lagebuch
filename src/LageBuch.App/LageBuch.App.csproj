@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <Product>Lagebuch</Product>
+    <AssemblyTitle>Lagebuch</AssemblyTitle>
+    <Company>LageBuch</Company>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- alarm.wav (looping siren) plus the spoken voice-*.wav cues. -->
+    <AvaloniaResource Include="Assets\*.wav" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LageBuch.App.Shared\LageBuch.App.Shared.csproj" />
+    <ProjectReference Include="..\LageBuch.AppLogic\LageBuch.AppLogic.csproj" />
+    <ProjectReference Include="..\LageBuch.Sync.Hosting\LageBuch.Sync.Hosting.csproj" />
+  </ItemGroup>
+
+</Project>

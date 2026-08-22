@@ -1,7 +1,7 @@
 # Lagebuch
 
-[![CI](https://github.com/DeepDiver1975/lagebuch/actions/workflows/ci.yml/badge.svg)](https://github.com/DeepDiver1975/lagebuch/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/DeepDiver1975/lagebuch)](../../releases)
+[![CI](https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/CodeForFire/lagebuch)](../../releases)
 
 Offline-first incident documentation (**Einsatzdokumentation**) for fire brigades.
 Lagebuch ("log book") replaces the macro-enabled Excel templates many volunteer
@@ -99,7 +99,7 @@ dotnet test
 ## Run
 
 ```bash
-dotnet run --project src/Feuerwehr.App/Feuerwehr.App.csproj
+dotnet run --project src/LageBuch.App/LageBuch.App.csproj
 ```
 
 ## Releasing (maintainers)

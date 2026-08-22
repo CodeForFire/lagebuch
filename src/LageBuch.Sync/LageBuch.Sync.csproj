@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Cross-platform sync layer: snapshot/command DTOs, the JSON mapper, the IIncidentSession
+       abstraction, and the remote client. The SignalR/HTTP *client* is cross-platform (builds for
+       the net8.0-android head too); only the Kestrel *server* is desktop-only, and it lives in the
+       separate LageBuch.Sync.Hosting project. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LageBuch.Domain\LageBuch.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

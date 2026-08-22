@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             x:Class="LageBuch.App.Shared.Views.ForcesView"
+             x:DataType="vm:ForcesViewModel">
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Center" />
+      <!-- Total strength readout, with the Atemschutz subset beside it -->
+      <Border Grid.Column="1" Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource RadiusMd}" Padding="18,8">
+        <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+          <TextBlock Text="GESAMTSTÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+          <TextBlock Classes="metric" FontSize="26" Foreground="{StaticResource SignalBrush}"
+                     Text="{Binding TotalPersonnel}" />
+          <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
+          <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+          <TextBlock x:Name="TotalScbaText" Classes="metric" FontSize="26"
+                     Foreground="{StaticResource SignalBrush}" Text="{Binding TotalScba}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- Input dock -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
+             must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. -->
+        <AutoCompleteBox x:Name="BrigadeBox" Width="160" Watermark="Feuerwehr"
+                         ItemsSource="{Binding BrigadeOptions}"
+                         FilterMode="ContainsOrdinal"
+                         MinimumPrefixLength="0"
+                         Text="{Binding NewBrigade}"
+                         b:EnterSubmit.Command="{Binding AddForceCommand}" />
+        <ComboBox Width="140" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+        <NumericUpDown x:Name="PersonnelBox" Width="110" Minimum="0" Value="{Binding NewPersonnelCount}" />
+        <NumericUpDown x:Name="ScbaBox" Width="110" Minimum="0" Value="{Binding NewScbaCount}" />
+        <ComboBox x:Name="StatusBox" Width="160" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
+        <TextBox x:Name="NotesBox" Width="180" Watermark="Bemerkung" Text="{Binding NewNotes}" />
+        <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}" />
+      </StackPanel>
+    </Border>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid x:Name="ForcesGrid" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
+          <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
+          <DataGridTextColumn Header="STÄRKE" Binding="{Binding PersonnelCount}" />
+          <DataGridTextColumn Header="AGT" Binding="{Binding ScbaCount}" />
+          <!-- Status and Bemerkung are live controls rather than printed text: both move while the
+               Einsatz runs, so they have to stay changeable after the row was added. Template
+               columns keep them one click away instead of behind DataGrid's edit mode. -->
+          <DataGridTemplateColumn Header="STATUS" Width="180">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <ComboBox Margin="6,4" HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding StatusOptions}"
+                          SelectedItem="{Binding Status}"
+                          IsEnabled="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <!-- Committing per keystroke rewrote the whole incident file on every character typed
+               (#33) and, since the row rebuilds on each commit, threw focus out of the box after
+               every character. UpdateSourceTrigger=LostFocus pushes once, when the operator
+               actually leaves the field. Mirrors RolesView's Handynummer fix. -->
+          <DataGridTemplateColumn Header="BEMERKUNG" Width="*">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <TextBox Margin="6,4" Watermark="Bemerkung"
+                         Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                         IsEnabled="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+  </DockPanel>
+</UserControl>

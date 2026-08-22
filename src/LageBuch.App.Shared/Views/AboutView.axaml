@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.AboutView"
+             x:DataType="vm:AboutViewModel">
+  <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
+    <Border Width="420" VerticalAlignment="Center" HorizontalAlignment="Center"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <!-- Accent header strip -->
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <StackPanel Margin="26,22,26,24" Spacing="10">
+          <TextBlock Text="ÜBER" Classes="overline" />
+
+          <!-- Brand block: same flame + tracked-caps wordmark pair as the header bar. -->
+          <StackPanel Orientation="Horizontal" Spacing="14" Margin="0,2,0,0">
+            <Image Source="avares://LageBuch.App.Shared/Assets/icon-1024.png"
+                   Width="56" Height="56" Stretch="Uniform" VerticalAlignment="Center" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+              <TextBlock Text="{Binding AppName}" FontFamily="{StaticResource DisplayFont}"
+                         FontSize="22" FontWeight="SemiBold" LetterSpacing="3"
+                         Foreground="{StaticResource TextPrimaryBrush}" />
+              <TextBlock Text="{Binding Descriptor}" Classes="secondary" />
+            </StackPanel>
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2,0,0">
+            <TextBlock Text="VERSION" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+            <TextBlock Classes="mono" Text="{Binding Version}" VerticalAlignment="Center" />
+          </StackPanel>
+
+          <Separator Margin="0,6,0,6" />
+
+          <!-- Publisher row: the CodeForFire mark links to the project repository. -->
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Border Width="30" Height="30" CornerRadius="6" ClipToBounds="True"
+                    VerticalAlignment="Center">
+              <Image Source="avares://LageBuch.App.Shared/Assets/codeforfire.png"
+                     Width="30" Height="30" Stretch="UniformToFill" />
+            </Border>
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <TextBlock Text="Ein Projekt von CodeForFire" Foreground="{StaticResource TextPrimaryBrush}" />
+              <Button x:Name="RepoLink" Classes="ghost" Padding="0" HorizontalAlignment="Left"
+                      Content="{Binding RepositoryUrl}" Command="{Binding OpenRepositoryCommand}" />
+            </StackPanel>
+          </StackPanel>
+
+          <StackPanel Spacing="1" Margin="0,4,0,0">
+            <TextBlock Text="{Binding LicenseLine}" Classes="secondary" />
+            <TextBlock Text="{Binding CopyrightLine}" Classes="secondary" />
+          </StackPanel>
+
+          <!-- Open failure banner: same shape as Links' ErrorBanner -->
+          <Border Background="#241608" Margin="0,4,0,0"
+                  BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Top" Margin="0,0,12,0" />
+              <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}"
+                         FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{StaticResource AmberBrush}" />
+            </Grid>
+          </Border>
+
+          <Button x:Name="CloseButton" Content="SCHLIESSEN" Command="{Binding CloseCommand}"
+                  HorizontalAlignment="Right" Margin="0,10,0,0" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

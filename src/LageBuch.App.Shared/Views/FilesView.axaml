@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.FilesView"
+             x:DataType="vm:FilesViewModel">
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <TextBlock Grid.Column="0" Text="DATEIEN" Classes="overline" VerticalAlignment="Center" />
+      <Button Grid.Column="1" x:Name="AddFileButton" Classes="signal" Content="DATEI HINZUFÜGEN"
+              Command="{Binding AddFileCommand}" IsVisible="{Binding !IsReadOnly}" />
+    </Grid>
+
+    <!-- Upload/open failure banner: same shape as Home's OpenErrorBanner -->
+    <Border DockPanel.Dock="Top" x:Name="ErrorBanner" Background="#241608" Margin="0,0,0,14"
+            BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="Auto,*">
+        <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Top" Margin="0,0,12,0" />
+        <TextBlock Grid.Column="1" x:Name="ErrorMessageText" Text="{Binding ErrorMessage}"
+                   FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{StaticResource AmberBrush}" />
+      </Grid>
+    </Border>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14">
+      <ScrollViewer>
+        <ItemsControl x:Name="FilesList" ItemsSource="{Binding Files}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:IncidentFileRow">
+              <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,10">
+                <!-- Committing per keystroke saved the whole incident file on every character
+                     typed (#33). UpdateSourceTrigger=LostFocus pushes once, when the operator
+                     actually leaves the field. Mirrors ForcesView's Bemerkung fix. -->
+                <TextBox Grid.Column="0" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Watermark="Name"
+                         BorderThickness="0" Background="Transparent" Padding="0"
+                         VerticalAlignment="Center" IsEnabled="{Binding !IsReadOnly}" />
+                <TextBlock Grid.Column="1" Classes="mono" Text="{Binding SizeDisplay}" Margin="10,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Classes="mono" Text="{Binding AddedAtDisplay}" Margin="10,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="3" Text="{Binding AddedBy}" Margin="10,0" VerticalAlignment="Center" />
+                <!-- ReflectionBinding: OpenFileCommand lives on the parent ItemsControl's
+                     DataContext (FilesViewModel), whose static type is object under compiled
+                     bindings, so a compiled $parent cast path won't resolve. -->
+                <Button Grid.Column="4" Content="ÖFFNEN"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenFileCommand}"
+                        CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</UserControl>

@@ -6,7 +6,7 @@
 store has no public upload API, so the flow is:
 
 1. Render the affected view(s) to PNG using the headless Skia harness in
-   `tests/Feuerwehr.Acceptance.Tests` (see `WorkspaceRenderHelper` +
+   `tests/LageBuch.Acceptance.Tests` (see `WorkspaceRenderHelper` +
    `Window.CaptureRenderedFrame()` — `UseHeadlessDrawing = false` so embedded
    fonts rasterize).
 2. Save the PNGs to a known path and give the user the file paths.

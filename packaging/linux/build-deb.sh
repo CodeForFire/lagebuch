@@ -19,12 +19,12 @@ trap 'rm -rf "$ROOT"' EXIT
 # so the binary is on PATH under a friendly name regardless of the publish output's filename.
 install -d "$ROOT/usr/lib/$PKG"
 cp -r "$PUBLISH_DIR"/. "$ROOT/usr/lib/$PKG/"
-chmod +x "$ROOT/usr/lib/$PKG/Feuerwehr.App"
+chmod +x "$ROOT/usr/lib/$PKG/LageBuch.App"
 
 install -d "$ROOT/usr/bin"
 cat > "$ROOT/usr/bin/$PKG" <<'LAUNCH'
 #!/bin/sh
-exec /usr/lib/lagebuch/Feuerwehr.App "$@"
+exec /usr/lib/lagebuch/LageBuch.App "$@"
 LAUNCH
 chmod +x "$ROOT/usr/bin/$PKG"
 
@@ -52,7 +52,7 @@ Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: amd64
-Maintainer: Feuerwehr <noreply@github.com>
+Maintainer: CodeForFire <noreply@github.com>
 Installed-Size: $SIZE_KB
 Description: Lagebuch — Einsatzdokumentation
  Digitales Einsatztagebuch und Lagedarstellung für die Feuerwehr.
