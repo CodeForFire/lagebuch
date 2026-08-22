@@ -206,6 +206,9 @@ public sealed class Incident
 
     public int TotalPersonnel => _forces.Sum(f => f.PersonnelCount);
 
+    /// <summary>Total Führungskräfte across all units (#76).</summary>
+    public int TotalOfficer => _forces.Sum(f => f.OfficerCount);
+
     /// <summary>Total Atemschutzgeräteträger across all units — how many Trupps can be formed.</summary>
     public int TotalScba => _forces.Sum(f => f.ScbaCount);
 

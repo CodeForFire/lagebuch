@@ -134,7 +134,7 @@ public class IncidentWorkspaceViewModelTests
         var before = vm.Etb.Entries.Count;
 
         vm.Forces.NewBrigade = "FFB Wache 1";
-        vm.Forces.NewPersonnelCount = 9;
+        vm.Forces.NewMannschaftCount = 9;
         vm.Forces.AddForceCommand.Execute(null);
 
         Assert.Equal(before + 1, vm.Etb.Entries.Count);
@@ -181,7 +181,7 @@ public class IncidentWorkspaceViewModelTests
         // triggers it without adding a journal entry.
         var vm = NewWorkspace(out _, out _);
         vm.Forces.NewBrigade = "FFB Wache 1";
-        vm.Forces.NewPersonnelCount = 9;
+        vm.Forces.NewMannschaftCount = 9;
         vm.Forces.AddForceCommand.Execute(null);
         var after = vm.Etb.Entries.Count;
 
