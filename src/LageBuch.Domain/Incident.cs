@@ -492,6 +492,42 @@ public sealed class Incident
     private static string Label(ForceUnit unit) =>
         unit.CallSign is null ? unit.Brigade : $"{unit.Brigade} ({unit.CallSign})";
 
+    /// <summary>
+    /// Corrects a unit's Stärke (Führungskraft / Gesamt / davon AGT) in place, keeping its identity
+    /// and position (#76). A real change is protokolliert twice, mirroring the ETB's own edit rule:
+    /// as a Systemmeldung in the journal (like a status transition, credited via
+    /// <see cref="UpdateForceUnit"/>'s from-call-sign convention) and as a retained prior value on
+    /// the unit itself (<see cref="ForceUnit.WithStrength"/>). An unchanged resubmission is neither.
+    /// </summary>
+    public ForceUnit UpdateForceStrength(
+        IClock clock, SessionOperator op, Guid unitId,
+        int officerCount, int personnelCount, int scbaCount)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+            throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+
+        var previous = _forces[index];
+        var updated = previous.WithStrength(officerCount, personnelCount, scbaCount, op, clock.Now);
+        if (ReferenceEquals(updated, previous))
+            return previous;
+
+        _forces[index] = updated;
+
+        // The AGT clause appears only when the AGT count itself moved — same economy as
+        // AddForceUnit's optional clauses.
+        var text = $"{Label(updated)}: Stärke {previous.StrengthText} → {updated.StrengthText}";
+        if (previous.ScbaCount != updated.ScbaCount)
+            text += $", davon AGT {previous.ScbaCount} → {updated.ScbaCount}";
+        AppendSystemEntry(clock, op, text, from: updated.CallSign);
+
+        return updated;
+    }
+
     private static string StatusChangeText(ForceUnit previous, ForceUnit updated) => updated.Status switch
     {
         null => $"{Label(updated)}: Status aufgehoben (vorher {previous.Status})",

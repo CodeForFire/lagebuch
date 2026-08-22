@@ -60,14 +60,69 @@ public sealed record ForceUnit(
 
     /// <summary>
     /// The two fields that move while the Einsatz runs: a unit goes from Alarmiert to Auf Anfahrt
-    /// to Im Einsatz, and the Bemerkung is where the Einsatzleiter notes why. Everything else --
-    /// which LageBuch, how many people, how many AGT -- is a fact about what was alarmed, so it
-    /// is deliberately not settable here; a wrong crew size means the row was entered wrong and
-    /// belongs to a correction path, not to routine status keeping.
+    /// to Im Einsatz, and the Bemerkung is where the Einsatzleiter notes why. The Stärke counts are
+    /// correctable through <see cref="WithStrength"/> — a deliberate #76 relaxation of the old
+    /// "counts never move" rule, paid for with a full audit trail on the unit.
     /// </summary>
     public ForceUnit WithStatusAndNotes(string? status, string? notes) => this with
     {
         Status = string.IsNullOrWhiteSpace(status) ? null : status.Trim(),
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
     };
+
+    public IReadOnlyList<ForceUnitStrengthEdit> Edits { get; private init; } =
+        Array.Empty<ForceUnitStrengthEdit>();
+
+    public static ForceUnit Rehydrate(
+        Guid id,
+        string brigade,
+        string? callSign,
+        int personnelCount,
+        int scbaCount,
+        string? status,
+        string? notes,
+        int officerCount,
+        IEnumerable<ForceUnitStrengthEdit>? edits = null)
+        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount)
+        {
+            Edits = (edits ?? Enumerable.Empty<ForceUnitStrengthEdit>()).ToList()
+        };
+
+    /// <summary>
+    /// Corrects the three Stärke-Zahlen (Führungskraft / Mannschaft via Gesamt / AGT), retaining
+    /// the prior values under <see cref="Edits"/> — same discipline as
+    /// <see cref="Etb.EtbEntry.WithEditedText"/>: an entered Stärke is part of the incident record,
+    /// so overwriting it silently is not an option. Resubmitting identical numbers returns this
+    /// instance as-is rather than growing <see cref="Edits"/>, so retries and no-op writes cannot
+    /// inflate the retained history. Validation mirrors <see cref="Create"/>.
+    /// </summary>
+    public ForceUnit WithStrength(
+        int officerCount, int personnelCount, int scbaCount,
+        SessionOperator editor, DateTimeOffset editedAt)
+    {
+        ArgumentNullException.ThrowIfNull(editor);
+        if (personnelCount < 0)
+            throw new ArgumentOutOfRangeException(nameof(personnelCount));
+        if (scbaCount < 0 || scbaCount > personnelCount)
+            throw new ArgumentOutOfRangeException(nameof(scbaCount),
+                "Atemschutzgeräteträger dürfen die Gesamtstärke nicht übersteigen.");
+        if (officerCount < 0 || officerCount > personnelCount)
+            throw new ArgumentOutOfRangeException(nameof(officerCount),
+                "Führungskräfte dürfen die Gesamtstärke nicht übersteigen.");
+
+        if (officerCount == OfficerCount && personnelCount == PersonnelCount && scbaCount == ScbaCount)
+            return this;
+
+        var edits = new List<ForceUnitStrengthEdit>(Edits)
+        {
+            new(OfficerCount, PersonnelCount, ScbaCount, editor.Display, editedAt)
+        };
+        return this with
+        {
+            OfficerCount = officerCount,
+            PersonnelCount = personnelCount,
+            ScbaCount = scbaCount,
+            Edits = edits,
+        };
+    }
 }
