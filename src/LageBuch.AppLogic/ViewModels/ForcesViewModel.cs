@@ -54,6 +54,9 @@ public sealed partial class ForceRow : ObservableObject
     /// <summary>Wert-Historie der Stärke (#76), für die Verlauf-Anzeige.</summary>
     public IReadOnlyList<Domain.ForceUnitStrengthEdit> Edits { get; }
 
+    /// <summary>The Verlauf affordance only makes sense once something was corrected.</summary>
+    public bool HasHistory => Edits.Count > 0;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TotalCount))]
     [NotifyPropertyChangedFor(nameof(StrengthText))]
@@ -110,6 +113,28 @@ public sealed partial class ForceRow : ObservableObject
             return;
         _onStrengthEdited(OfficerCount, MannschaftCount, ScbaCount);
     }
+
+    /// <summary>XAML entry point for the strength editor's Übernehmen button.</summary>
+    [RelayCommand]
+    private void ApplyStrengthEdit() => CommitStrength();
+
+    /// <summary>
+    /// One line pro Stärke-Änderung (#76): die vorherige Stärke und wohin sie sich bewegte. Die
+    /// Historie speichert nur Vorwerte, also ergibt sich der Zielwert jeder Zeile aus dem
+    /// Vorwert der nächsten Änderung -- die letzte läuft auf die aktuelle Stärke der Reihe.
+    /// </summary>
+    public IReadOnlyList<string> EditLines =>
+        Edits.Select((e, i) =>
+        {
+            var next = i + 1 < Edits.Count ? Edits[i + 1] : null;
+            int toOfficer = next?.PreviousOfficerCount ?? OfficerCount;
+            int toPerson = next?.PreviousPersonnelCount ?? TotalCount;
+            int toScba = next?.PreviousScbaCount ?? ScbaCount;
+            return $"Stärke {e.PreviousOfficerCount}/{e.PreviousPersonnelCount - e.PreviousOfficerCount}/{e.PreviousPersonnelCount}"
+                 + $" → {toOfficer}/{toPerson - toOfficer}/{toPerson}"
+                 + $", davon AGT {e.PreviousScbaCount} → {toScba}"
+                 + $" — {e.EditedBy}, {e.EditedAt.LocalDateTime:dd.MM. HH:mm}";
+        }).ToArray();
 }
 
 public sealed partial class ForcesViewModel : ObservableObject
