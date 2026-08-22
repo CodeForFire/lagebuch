@@ -35,7 +35,7 @@ public class IncidentPdfTests
         incident.EndRoleAssignment(assigned.Id, clock.Now.AddHours(1));
         incident.AssignRole(clock, op, "ZF", "Schmidt");
         incident.AddForceUnit(clock, op, "FFB Wache 1", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
-            notes: "über Drehleiter angefordert", scbaCount: 6);
+            notes: "über Drehleiter angefordert", scbaCount: 6, officerCount: 2);
         incident.AddForceUnit(clock, op, "Emmering", 9, scbaCount: 4);
         var trupp = incident.AddScbaTrupp(
             clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), callSign: "FFB 1/40/1");
