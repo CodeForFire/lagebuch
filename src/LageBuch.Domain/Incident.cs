@@ -435,18 +435,19 @@ public sealed class Incident
         string? callSign = null,
         string? status = null,
         string? notes = null,
-        int scbaCount = 0)
+        int scbaCount = 0,
+        int officerCount = 0)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount);
+        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount);
         _forces.Add(unit);
 
         // Optional clauses are omitted rather than printed empty, so a bare unit reads as
-        // "Einheit aufgenommen: Aich, Stärke 6" instead of trailing "davon 0 AGT — Status: ".
-        var text = $"Einheit aufgenommen: {Label(unit)}, Stärke {unit.PersonnelCount}";
+        // "Einheit aufgenommen: Aich, Stärke 0/6/6" instead of trailing "davon 0 AGT — Status: ".
+        var text = $"Einheit aufgenommen: {Label(unit)}, Stärke {unit.StrengthText}";
         if (unit.ScbaCount > 0)
             text += $", davon {unit.ScbaCount} AGT";
         if (unit.Status is not null)
