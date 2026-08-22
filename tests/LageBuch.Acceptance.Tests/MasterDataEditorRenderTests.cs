@@ -61,7 +61,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
-        Assert.Equal(14, list.ItemCount);
+        // 14 categories plus #76's Fahrzeuge.
+        Assert.Equal(15, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
@@ -119,5 +120,32 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, "master-data-editor-links.png"));
+    }
+
+    // #76: the Fahrzeuge section — Wache + Funkrufname + Sitzplätze per row.
+    [AvaloniaFact]
+    public void Fahrzeuge_section_renders_wache_callsign_and_seats_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
+        section.AddCommand.Execute(null);
+        section.Rows[0].Wache = "FFB Wache 1";
+        section.Rows[0].CallSign = "FFB 1/44/1";
+        section.Rows[0].Seats = 9;
+        vm.SelectedSection = section;
+
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Contains(view.GetVisualDescendants().OfType<TextBox>(), t => t.Text == "FFB 1/44/1");
+        Assert.Contains(view.GetVisualDescendants().OfType<NumericUpDown>(), n => n.Value == 9);
+        Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9) }, section.ToValues());
+
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Combine(dir, "master-data-editor-fahrzeuge.png"));
     }
 }

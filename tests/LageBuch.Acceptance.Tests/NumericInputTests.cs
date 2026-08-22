@@ -54,16 +54,16 @@ public class NumericInputTests
     public void A_fractional_personnel_entry_is_refused_and_the_previous_value_stands(string typed)
     {
         var (window, view, vm) = ShowForces();
-        var box = view.GetControl<NumericUpDown>("PersonnelBox");
+        var box = view.GetControl<NumericUpDown>("MannschaftBox");
 
         Type(window, view, box, "9");
-        Assert.Equal(9, vm.Forces.NewPersonnelCount);
+        Assert.Equal(9, vm.Forces.NewMannschaftCount);
 
         var inner = Type(window, view, box, typed);
 
         // Rejected outright -- the good value stands rather than being rounded or zeroed.
         Assert.Equal(9m, box.Value);
-        Assert.Equal(9, vm.Forces.NewPersonnelCount);
+        Assert.Equal(9, vm.Forces.NewMannschaftCount);
         Assert.Equal("9", inner.Text);
     }
 
@@ -87,11 +87,11 @@ public class NumericInputTests
     public void Whole_numbers_still_go_through_untouched()
     {
         var (window, view, vm) = ShowForces();
-        var box = view.GetControl<NumericUpDown>("PersonnelBox");
+        var box = view.GetControl<NumericUpDown>("MannschaftBox");
 
         var inner = Type(window, view, box, "12");
 
-        Assert.Equal(12, vm.Forces.NewPersonnelCount);
+        Assert.Equal(12, vm.Forces.NewMannschaftCount);
         Assert.Equal(12m, box.Value);
         Assert.Equal("12", inner.Text);
     }
@@ -104,7 +104,7 @@ public class NumericInputTests
         // undone by a new control that forgets to opt in.
         var (_, view, _) = ShowForces();
 
-        foreach (var name in new[] { "PersonnelBox", "ScbaBox" })
+        foreach (var name in new[] { "OfficerBox", "MannschaftBox", "ScbaBox" })
         {
             var box = view.GetControl<NumericUpDown>(name);
             Assert.Equal(System.Globalization.NumberStyles.Integer, box.ParsingNumberStyle);
@@ -147,11 +147,13 @@ public class ForcesGridEditingTests
     [AvaloniaFact]
     public void The_descriptive_columns_stay_read_only_text()
     {
-        // Which LageBuch, how many people, how many AGT are facts about what was alarmed.
+        // Which LageBuch, how many AGT are facts about what was alarmed; since #76 the Stärke
+        // column is a template (text plus the correction editor), so it is pinned separately.
         var (view, _) = ShowForces(out _);
 
-        foreach (var header in new[] { "FEUERWEHR", "FUNKRUFNAME", "STÄRKE", "AGT" })
+        foreach (var header in new[] { "FEUERWEHR", "FUNKRUFNAME", "AGT" })
             Assert.IsType<DataGridTextColumn>(Column(view, header));
+        Assert.IsType<DataGridTemplateColumn>(Column(view, "STÄRKE"));
     }
 
     [AvaloniaFact]
@@ -159,7 +161,7 @@ public class ForcesGridEditingTests
     {
         var (view, vm) = ShowForces(out var session);
         vm.Forces.NewBrigade = "FFB Wache 1";
-        vm.Forces.NewPersonnelCount = 9;
+        vm.Forces.NewMannschaftCount = 9;
         vm.Forces.NewStatus = "Alarmiert";
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
