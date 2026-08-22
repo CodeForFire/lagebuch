@@ -69,6 +69,54 @@ public class MigrationsTests : IDisposable
     }
 
     [Fact]
+    public void Migrate_adds_the_officer_count_column_and_the_force_unit_edits_table()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "SELECT (SELECT count(*) FROM pragma_table_info('force_units') WHERE name='officer_count') + " +
+            "       (SELECT count(*) FROM sqlite_master WHERE type='table' AND name='force_unit_edits');";
+        Assert.Equal(2L, (long)cmd.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void V12_force_units_upgrade_to_v13_with_officer_count_defaulting_to_zero()
+    {
+        // A database stamped at 12 carries force_units without officer_count and rows whose
+        // Gesamtstärke predates the GF split — after migrating they must read as 0/x/x.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (12);" +
+                """
+                CREATE TABLE force_units (
+                    id TEXT PRIMARY KEY,
+                    ordinal INTEGER NOT NULL,
+                    brigade TEXT NOT NULL,
+                    call_sign TEXT,
+                    personnel_count INTEGER NOT NULL,
+                    scba_count INTEGER NOT NULL DEFAULT 0,
+                    status TEXT,
+                    notes TEXT
+                );
+                INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count) VALUES ('u1', 0, 'Aich', NULL, 6, 2);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT officer_count FROM force_units WHERE id='u1';";
+        Assert.Equal(0L, (long)check.ExecuteScalar()!);
+    }
+
+    [Fact]
     public void V1_database_upgrades_to_v2_and_gains_scba_tables()
     {
         // Build a database stamped at version 1, before the SCBA tables existed.

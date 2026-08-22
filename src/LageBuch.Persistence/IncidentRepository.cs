@@ -92,14 +92,30 @@ public sealed class IncidentRepository
         {
             var f = incident.Forces[i];
             Run(cn, tx,
-                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n);",
+                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc);",
                 p =>
                 {
                     p("$id", f.Id.ToString()); p("$o", i); p("$b", f.Brigade);
                     p("$cs", (object?)f.CallSign ?? DBNull.Value); p("$pc", f.PersonnelCount);
                     p("$ac", f.ScbaCount);
                     p("$st", (object?)f.Status ?? DBNull.Value); p("$n", (object?)f.Notes ?? DBNull.Value);
+                    p("$oc", f.OfficerCount);
                 });
+
+            for (var j = 0; j < f.Edits.Count; j++)
+            {
+                var edit = f.Edits[j];
+                Run(cn, tx,
+                    "INSERT INTO force_unit_edits (id, unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at) " +
+                    "VALUES ($id,$uid,$o,$poc,$ppc,$psc,$by,$at);",
+                    p =>
+                    {
+                        p("$id", Guid.NewGuid().ToString()); p("$uid", f.Id.ToString()); p("$o", j);
+                        p("$poc", edit.PreviousOfficerCount); p("$ppc", edit.PreviousPersonnelCount);
+                        p("$psc", edit.PreviousScbaCount); p("$by", edit.EditedBy);
+                        p("$at", edit.EditedAt.ToString(Iso));
+                    });
+            }
         }
 
         for (var i = 0; i < incident.ScbaTrupps.Count; i++)
@@ -280,9 +296,17 @@ public sealed class IncidentRepository
             r => new Domain.RoleAssignment(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetString(2),
                 Str(r, 3), NullableDate(r, 4), NullableDate(r, 5), Str(r, 6), Str(r, 7)));
 
-        var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes FROM force_units ORDER BY ordinal;",
-            r => new Domain.ForceUnit(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3),
-                r.GetInt32(4), Str(r, 5), Str(r, 6)));
+        var strengthEditsByUnit = ReadAll(cn,
+            "SELECT unit_id, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at FROM force_unit_edits ORDER BY ordinal;",
+            r => (UnitId: Guid.Parse(r.GetString(0)),
+                  Edit: new Domain.ForceUnitStrengthEdit(r.GetInt32(1), r.GetInt32(2), r.GetInt32(3), r.GetString(4), ParseDate(r.GetString(5)))))
+            .GroupBy(x => x.UnitId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Edit).ToList());
+
+        var forces = ReadAll(cn, "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count FROM force_units ORDER BY ordinal;",
+            r => Domain.ForceUnit.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 2), r.GetInt32(3),
+                r.GetInt32(4), Str(r, 5), Str(r, 6), r.GetInt32(7),
+                strengthEditsByUnit.TryGetValue(Guid.Parse(r.GetString(0)), out var eds) ? eds : null));
 
         var membersByTrupp = ReadAll(cn,
             "SELECT trupp_id, role, name FROM scba_trupp_members ORDER BY ordinal;",

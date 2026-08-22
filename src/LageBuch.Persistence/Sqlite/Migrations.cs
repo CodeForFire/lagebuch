@@ -5,7 +5,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -79,6 +79,10 @@ public static class Migrations
         if (version < 12)
         {
             ApplyV12(cn, tx);
+        }
+        if (version < 13)
+        {
+            ApplyV13(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -387,6 +391,27 @@ public static class Migrations
                 entry_id TEXT NOT NULL,
                 ordinal INTEGER NOT NULL,
                 previous_text TEXT NOT NULL,
+                edited_by TEXT NOT NULL,
+                edited_at TEXT NOT NULL
+            );
+            """);
+    }
+
+    // Kräfte gain a Führungskräfte counter and corrigible Stärke (#76). officer_count is NOT NULL
+    // with default 0: rows written before the split genuinely have no recorded GF count, and 0/x/x
+    // keeps their Gesamtstärke exact. force_unit_edits retains every prior Stärke the same way
+    // etb_entry_edits (V12) retains prior ETB wording.
+    private static void ApplyV13(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "officer_count", "INTEGER NOT NULL DEFAULT 0");
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS force_unit_edits (
+                id TEXT PRIMARY KEY,
+                unit_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                previous_officer_count INTEGER NOT NULL,
+                previous_personnel_count INTEGER NOT NULL,
+                previous_scba_count INTEGER NOT NULL,
                 edited_by TEXT NOT NULL,
                 edited_at TEXT NOT NULL
             );

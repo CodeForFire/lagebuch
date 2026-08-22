@@ -37,10 +37,15 @@ public class IncidentRoundTripTests : IDisposable
         incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[1].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
+        var journalTime = clock.Now;
         incident.AssignRole(clock, op, "EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
             section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
+        var assignedAt = clock.Now;
         incident.AddForceUnit(clock, op, "FFB", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
-            notes: "über DLK angefordert", scbaCount: 6);
+            notes: "über DLK angefordert", scbaCount: 6, officerCount: 1);
+        clock.Now = clock.Now.AddMinutes(3);
+        incident.UpdateForceStrength(clock, op, incident.Forces[0].Id,
+            officerCount: 1, personnelCount: 14, scbaCount: 7);
 
         var repo = new IncidentRepository();
         repo.Save(_path, incident);
@@ -59,33 +64,44 @@ public class IncidentRoundTripTests : IDisposable
         Assert.False(loaded.ChecklistAufbau[1].IsMandatory);
         Assert.True(Assert.Single(loaded.ChecklistAbbau).IsMandatory);
         // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the manual one
-        // follows it in chronological order, then the automatic entries for the role assignment and
-        // the recorded unit -- which is also the proof that a generated entry survives the round trip.
+        // follows it in chronological order, then the automatic entries for the role assignment,
+        // the recorded unit and the strength correction -- which is also the proof that generated
+        // entries survive the round trip.
         Assert.Equal(
             new[]
             {
                 "Einsatz begonnen",
                 "Meldung",
                 "Funktion EL zugewiesen: Müller",
-                "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 12, davon 6 AGT — Status: Im Einsatz",
+                "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 1/11/12, davon 6 AGT — Status: Im Einsatz",
+                "FFB (FFB 1/40/1): Stärke 1/11/12 → 1/13/14, davon AGT 6 → 7",
             },
             loaded.Journal.Select(e => e.Text));
         // The direction rides along too: generated lines are System, the manual one keeps Incoming.
         Assert.Equal(
-            new[] { EtbDirection.System, EtbDirection.Incoming, EtbDirection.System, EtbDirection.System },
+            new[] { EtbDirection.System, EtbDirection.Incoming, EtbDirection.System, EtbDirection.System, EtbDirection.System },
             loaded.Journal.Select(e => e.Direction));
         Assert.Equal("FFB 1/40/1", loaded.Journal[3].To);
-        Assert.Equal(clock.Now, loaded.Journal[1].Timestamp);
+        Assert.Equal("FFB 1/40/1", loaded.Journal[4].From);
+        Assert.Equal(journalTime, loaded.Journal[1].Timestamp);
         Assert.Equal("Müller (FFB 12/1)", loaded.Journal[1].EnteredBy);
         Assert.Equal("EL", loaded.Roles[0].Role);
         Assert.Equal("Abschnitt Nord", loaded.Roles[0].Section);
         Assert.Equal("01 71 / 1 23 45 67", loaded.Roles[0].Phone);
-        Assert.Equal(clock.Now, loaded.Roles[0].From);
+        Assert.Equal(assignedAt, loaded.Roles[0].From);
         Assert.Null(loaded.Roles[0].To);
-        Assert.Equal(12, loaded.TotalPersonnel);
-        Assert.Equal(6, loaded.TotalScba);
-        Assert.Equal("Im Einsatz", loaded.Forces[0].Status);
-        Assert.Equal("über DLK angefordert", loaded.Forces[0].Notes);
+        // The strength was corrected after entry: the loaded unit carries the corrected numbers
+        // plus the retained prior state (#76).
+        Assert.Equal(14, loaded.TotalPersonnel);
+        Assert.Equal(7, loaded.TotalScba);
+        var force = loaded.Forces[0];
+        Assert.Equal("Im Einsatz", force.Status);
+        Assert.Equal("über DLK angefordert", force.Notes);
+        Assert.Equal((1, 14, 7), (force.OfficerCount, force.PersonnelCount, force.ScbaCount));
+        Assert.Equal("1/13/14", force.StrengthText);
+        var strengthEdit = Assert.Single(force.Edits);
+        Assert.Equal((1, 12, 6), (strengthEdit.PreviousOfficerCount, strengthEdit.PreviousPersonnelCount, strengthEdit.PreviousScbaCount));
+        Assert.Equal(op.Display, strengthEdit.EditedBy);
         Assert.Equal(incident.Audit.Count, loaded.Audit.Count);
     }
 
