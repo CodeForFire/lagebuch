@@ -159,6 +159,30 @@ public class ForcesViewModelTests
     }
 
     [Fact]
+    public void Vehicle_options_offer_each_call_sign_once_even_if_the_master_data_has_duplicates()
+    {
+        // Master data written before the uniqueness rule may still contain a duplicate call sign
+        // (#76 follow-up); the dropdown must not offer that vehicle twice.
+        var masterData = Md() with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 6),
+                new Vehicle("FFB Wache 1", "ffb 1/44/1", 6),
+            },
+        };
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, new FixedClock(T0), masterData, () => { });
+
+        vm.NewBrigade = "FFB Wache 1";
+
+        // The duplicate collapses; the first occurrence's spelling is kept.
+        Assert.Equal(new[] { "FFB 1/40/1", "ffb 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+    }
+
+    [Fact]
     public void Selecting_a_vehicle_prefills_the_call_sign_and_a_seat_derived_preset()
     {
         var vm = NewVm();

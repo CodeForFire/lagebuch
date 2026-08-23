@@ -20,6 +20,13 @@
                   IsVisible="{Binding FileError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding FileError}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
           </Border>
+          <!-- Fahrzeuge sind eindeutig (#76 follow-up): doppelte Funkrufnamen blockieren das
+               Speichern, die Meldung nennt die Konflikte. -->
+          <Border x:Name="VehicleConflictsBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding VehicleConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding VehicleConflicts}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
+          </Border>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
           <Button x:Name="ImportButton" Content="IMPORTIEREN" Command="{Binding ImportCommand}" />

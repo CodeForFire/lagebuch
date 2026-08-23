@@ -444,4 +444,77 @@ public class MasterDataEditorViewModelTests
 
         Assert.NotNull(vm.FileError);
     }
+
+    // Fahrzeuge sind eindeutig (#76 follow-up): der Funkrufname identifiziert das Fahrzeug, daher
+    // darf er nur einmal vorkommen -- unabhängig von der Wache. Doppelte blockieren das Speichern,
+    // statt still dedupliziert zu werden.
+    private static MasterDataSet SetWithVehicles(params Vehicle[] vehicles) => MasterDataSet.Empty with
+    {
+        Brigades = new[] { "FFB Wache 1", "Aich" },
+        Vehicles = vehicles,
+    };
+
+    [Fact]
+    public void A_duplicate_call_sign_blocks_saving_and_names_the_conflict()
+    {
+        var set = SetWithVehicles(
+            new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+            new Vehicle("Aich", "Aich 42/1", 6));
+        var vm = Vm(new InMemoryProvider(set));
+        var section = Vehicles(vm);
+
+        section.AddCommand.Execute(null);
+        section.Rows[2].Wache = "FFB Wache 1";
+        section.Rows[2].CallSign = "FFB 1/40/1"; // same call sign, different row
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.True(vm.HasVehicleConflicts);
+        Assert.Contains("FFB 1/40/1", vm.VehicleConflicts);
+    }
+
+    [Fact]
+    public void The_call_sign_is_unique_across_waches_and_case_insensitively()
+    {
+        var set = SetWithVehicles(
+            new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+            new Vehicle("Aich", "Aich 42/1", 6));
+        var vm = Vm(new InMemoryProvider(set));
+        var section = Vehicles(vm);
+
+        section.AddCommand.Execute(null);
+        section.Rows[2].Wache = "Aich"; // different Wache does not rescue the duplicate
+        section.Rows[2].CallSign = "ffb 1/40/1";
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Empty_call_signs_never_count_as_duplicates()
+    {
+        var set = SetWithVehicles(new Vehicle("FFB Wache 1", "", 9), new Vehicle("Aich", "  ", 6));
+        var vm = Vm(new InMemoryProvider(set));
+        var section = Vehicles(vm);
+        section.AddCommand.Execute(null); // third blank row
+
+        Assert.Null(vm.VehicleConflicts);
+        Assert.False(vm.HasVehicleConflicts);
+        Assert.True(vm.SaveCommand.CanExecute(null)); // dirty from the added row
+    }
+
+    [Fact]
+    public void Fixing_the_duplicate_re_enables_saving()
+    {
+        var set = SetWithVehicles(
+            new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+            new Vehicle("Aich", "FFB 1/40/1", 6));
+        var vm = Vm(new InMemoryProvider(set));
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.Contains("FFB 1/40/1", vm.VehicleConflicts);
+
+        Vehicles(vm).Rows[1].CallSign = "Aich 42/1";
+
+        Assert.Null(vm.VehicleConflicts);
+        Assert.True(vm.SaveCommand.CanExecute(null));
+    }
 }

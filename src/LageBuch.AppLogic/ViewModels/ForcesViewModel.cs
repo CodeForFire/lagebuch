@@ -258,8 +258,11 @@ public sealed partial class ForcesViewModel : ObservableObject
     partial void OnNewBrigadeChanged(string value)
     {
         var brigade = value.Trim();
+        // DistinctBy on the call sign: master data written before the uniqueness rule (#76
+        // follow-up) may still contain duplicates, and the dropdown must not offer a vehicle twice.
         VehicleOptions = _masterVehicles
             .Where(v => string.Equals(v.Wache, brigade, StringComparison.OrdinalIgnoreCase))
+            .DistinctBy(v => v.CallSign, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         SelectedVehicle = null;
     }
