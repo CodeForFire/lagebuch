@@ -89,6 +89,12 @@
         </StackPanel>
         <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den
+             Hinzufügen-Button (Freitext-Duplikat), und der Dropdown blendet Vergebene ohnehin aus. -->
+        <TextBlock x:Name="DuplicateHint" Text="Fahrzeug ist bereits aufgenommen"
+                   FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                   VerticalAlignment="Bottom" TextWrapping="Wrap" MaxWidth="150"
+                   IsVisible="{Binding IsDuplicateCallSign}" />
       </StackPanel>
     </Border>
 

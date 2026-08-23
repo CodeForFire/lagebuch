@@ -144,6 +144,74 @@ public class ForcesViewModelTests
     // --- Issue #76: Wache → Fahrzeug relation -----------------------------------------------
 
     [Fact]
+    public void Vehicle_options_hide_taken_call_signs_until_their_row_is_removed()
+    {
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        vm.NewBrigade = "FFB Wache 1";
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+
+        // Taking a vehicle removes it from the dropdown. (Adding clears the dock, so the brigade
+        // is typed again — the same gesture an operator performs for the next unit.)
+        vm.SelectedVehicle = vm.VehicleOptions[0];
+        vm.AddForceCommand.Execute(null);
+        vm.NewBrigade = "FFB Wache 1";
+        Assert.Equal(new[] { "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+
+        // Removing its row makes it available again — without touching the brigade field.
+        vm.Forces[0].RemoveCommand.Execute(null);
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+    }
+
+    [Fact]
+    public void A_typed_duplicate_call_sign_blocks_adding_with_a_hint()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => { })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewMannschaftCount = 6,
+            NewCallSign = "FFB 1/40/1",
+        };
+        vm.AddForceCommand.Execute(null);
+
+        // Free text can still name an already taken vehicle (e.g. no master data): trimmed and
+        // case-insensitively it is recognized and blocks HINZUFÜGEN instead of failing later.
+        vm.NewBrigade = "Aich";
+        vm.NewMannschaftCount = 6;
+        vm.NewCallSign = " ffb 1/40/1 ";
+        Assert.True(vm.IsDuplicateCallSign);
+        Assert.False(vm.AddForceCommand.CanExecute(null));
+
+        vm.NewCallSign = "Aich 42/1";
+        Assert.False(vm.IsDuplicateCallSign);
+        Assert.True(vm.AddForceCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Rows_without_a_call_sign_never_count_as_duplicates()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => { });
+        // Two units without any call sign must remain possible.
+        foreach (var mannschaft in new[] { 6, 9 })
+        {
+            vm.NewBrigade = "Emmering";
+            vm.NewMannschaftCount = mannschaft;
+            Assert.True(vm.AddForceCommand.CanExecute(null));
+            Assert.False(vm.IsDuplicateCallSign);
+            vm.AddForceCommand.Execute(null);
+        }
+
+        Assert.Equal(2, vm.Forces.Count);
+    }
+
+    [Fact]
     public void Vehicle_options_filter_by_the_typed_brigade()
     {
         var vm = NewVm();

@@ -135,4 +135,40 @@ public class ForcesTabRenderTests
 
         Capture(window, "forces-row-removed.png");
     }
+
+    [AvaloniaFact]
+    public void A_taken_vehicle_is_hidden_from_the_dropdown_and_a_typed_duplicate_is_blocked()
+    {
+        // Hosted directly (same idiom as ControlBorderConsistencyTests): the workspace shell's
+        // ViewLocator content does not materialize under the headless host, so the view is built
+        // against the same ForcesViewModel instance instead.
+        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
+            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
+            MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var view = new ForcesView { DataContext = vm.Forces };
+        var window = new Window { Content = view, Width = 1920, Height = 1032 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0]; // FFB 1/40/1
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        // The taken vehicle no longer appears in the dropdown for its brigade.
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        Assert.Equal(new[] { "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
+
+        // Free-typing the taken call sign blocks HINZUFÜGEN and shows the hint.
+        vm.Forces.NewMannschaftCount = 6;
+        vm.Forces.NewCallSign = "FFB 1/40/1";
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(vm.Forces.AddForceCommand.CanExecute(null));
+        var hint = view.GetControl<TextBlock>("DuplicateHint"); // the view owns the name scope
+        Assert.True(hint.IsVisible);
+
+        Capture(window, "forces-duplicate-blocked.png");
+    }
 }

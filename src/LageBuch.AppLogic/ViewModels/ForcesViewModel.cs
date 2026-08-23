@@ -194,6 +194,9 @@ public sealed partial class ForcesViewModel : ObservableObject
         TotalScba = _session.Incident.TotalScba;
         var total = TotalPersonnel;
         TotalStrengthText = $"{TotalOfficer}/{total - TotalOfficer}/{total}";
+        RefreshVehicleOptions(); // taken vehicles reappear once their row is gone
+        OnPropertyChanged(nameof(IsDuplicateCallSign));
+        AddForceCommand.NotifyCanExecuteChanged();
     }
 
     public bool IsReadOnly { get; }
@@ -248,23 +251,50 @@ public sealed partial class ForcesViewModel : ObservableObject
     [ObservableProperty]
     private string? _newNotes;
 
-    /// <summary>Fahrzeuge der Stammdaten, gefiltert auf die getippte Wache (#76).</summary>
-    [ObservableProperty]
-    private IReadOnlyList<Vehicle> _vehicleOptions = Array.Empty<Vehicle>();
-
     [ObservableProperty]
     private Vehicle? _selectedVehicle;
 
     partial void OnNewBrigadeChanged(string value)
     {
-        var brigade = value.Trim();
-        // DistinctBy on the call sign: master data written before the uniqueness rule (#76
-        // follow-up) may still contain duplicates, and the dropdown must not offer a vehicle twice.
+        RefreshVehicleOptions();
+        SelectedVehicle = null;
+    }
+
+    /// <summary>
+    /// Fahrzeuge der Stammdaten, gefiltert auf die getippte Wache (#76). Ein bereits aufgenommenes
+    /// Fahrzeug wird nicht noch einmal angeboten (#76 follow-up) — sein Funkrufname ist vergeben,
+    /// bis seine Zeile entfernt wird. DistinctBy schützt zusätzlich vor Duplikaten in Altdaten.
+    /// </summary>
+    [ObservableProperty]
+    private IReadOnlyList<Vehicle> _vehicleOptions = Array.Empty<Vehicle>();
+
+    private void RefreshVehicleOptions()
+    {
+        var brigade = NewBrigade.Trim();
+        var taken = Forces
+            .Select(r => r.CallSign?.Trim())
+            .Where(cs => !string.IsNullOrEmpty(cs))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         VehicleOptions = _masterVehicles
             .Where(v => string.Equals(v.Wache, brigade, StringComparison.OrdinalIgnoreCase))
             .DistinctBy(v => v.CallSign, StringComparer.OrdinalIgnoreCase)
+            .Where(v => !taken.Contains(v.CallSign.Trim()))
             .ToArray();
-        SelectedVehicle = null;
+    }
+
+    /// <summary>
+    /// Der Freitext im Funkrufname-Feld kann trotzdem einen vergebenen Namen treffen (etwa bei
+    /// Fremdwehren ohne Stammdaten) — dann sperrt das Flag HINZUFÜGEN, statt dass der Domain-Aufruf
+    /// später ins Leere läuft. Leere Rufnamen zählen nie als Duplikat.
+    /// </summary>
+    public bool IsDuplicateCallSign =>
+        !string.IsNullOrWhiteSpace(NewCallSign)
+        && Forces.Any(r => string.Equals(r.CallSign?.Trim(), NewCallSign!.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    partial void OnNewCallSignChanged(string? value)
+    {
+        OnPropertyChanged(nameof(IsDuplicateCallSign));
+        AddForceCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedVehicleChanged(Vehicle? value)
@@ -283,7 +313,9 @@ public sealed partial class ForcesViewModel : ObservableObject
         // Lifted comparisons: null >= 0 is false, so every operand coalesces first.
         && (NewOfficerCount ?? 0) >= 0 && (NewMannschaftCount ?? 0) >= 0 && (NewScbaCount ?? 0) >= 0
         // Mirrors the domain rule, so an over-count disables the button instead of throwing on click.
-        && (NewScbaCount ?? 0) <= (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0);
+        && (NewScbaCount ?? 0) <= (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0)
+        // Ein Fahrzeug ist einzig — sein Funkrufname darf nicht schon in der Liste stehen.
+        && !IsDuplicateCallSign;
 
     [RelayCommand(CanExecute = nameof(CanAddForce))]
     private void AddForce()
