@@ -6,8 +6,9 @@ contribution, from a typo fix to a new feature, is welcome.
 
 ## Development setup
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) — the exact
-  version is pinned via [`global.json`](global.json)
+- [.NET SDK](https://dotnet.microsoft.com/download/dotnet) — the exact SDK
+  version is pinned via [`global.json`](global.json) (currently 9.x); the app
+  projects themselves target `net8.0`
 - Android workload for the companion-app head (one-time, per machine):
 
   ```bash
