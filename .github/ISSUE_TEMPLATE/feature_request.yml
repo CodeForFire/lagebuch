@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest an idea or improvement for Lagebuch
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What are you trying to achieve during an Einsatz that Lagebuch currently does not support (or does badly)?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should happen instead? Keep it concrete.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches, workarounds, or how you handle this today (e.g. in the Excel template).
+  - type: checkboxes
+    id: context
+    attributes:
+      label: Context
+      options:
+        - label: I am using (or intend to use) Lagebuch operationally in a fire brigade
