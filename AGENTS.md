@@ -51,9 +51,3 @@ open a PR. Absolute rule, no exceptions.
 
 Never commit `docs/superpowers/` — local tooling artifacts only. If tracked,
 remove them and add to `.gitignore`.
-
-## Usage logging (Bedrock worklog)
-
-Only applies to kiteworks/ownCloud work outside `private/`; personal/private
-work is never booked. Use the `bedrock-worklog` skill when wrapping up;
-never write a worklog without showing numbers and getting approval first.
