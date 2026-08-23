@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in Lagebuch is broken or behaves unexpectedly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+        Please use **fictional data only** in screenshots and examples —
+        master data (personnel, phone numbers) must never be posted here.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Installer file name or tag from [Releases](../../releases), e.g. `v0.3.0`
+      placeholder: v0.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Android
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What exactly did you do? Include the incident state if relevant.
+      placeholder: |
+        1. Open an incident
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include error messages or log output if available.
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots / files
+      description: Attach screenshots (fictional data only!) or the affected `.fwincident` file if it helps and contains no real data.
