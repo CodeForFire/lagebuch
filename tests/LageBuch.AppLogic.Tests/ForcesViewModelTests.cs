@@ -227,6 +227,55 @@ public class ForcesViewModelTests
     }
 
     [Fact]
+    public void Removing_a_row_takes_the_unit_out_and_logs_the_removal()
+    {
+        var changes = 0;
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
+            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => changes++)
+        {
+            NewBrigade = "FFB Wache 1",
+            NewMannschaftCount = 6,
+            NewCallSign = "FFB 1/40/1",
+        };
+        vm.AddForceCommand.Execute(null);
+        vm.NewBrigade = "Aich";
+        vm.NewMannschaftCount = 9;
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(2, vm.Forces.Count);
+
+        var row = vm.Forces.Single(r => r.CallSign == "FFB 1/40/1");
+        row.RemoveCommand.Execute(null);
+
+        // The row is gone, the other stays, and the totals shrank accordingly.
+        var remaining = Assert.Single(vm.Forces);
+        Assert.Equal("Aich", remaining.Brigade);
+        Assert.Equal(9, vm.TotalPersonnel);
+        Assert.Equal(3, changes); // two adds + the removal
+        Assert.Contains("Einheit entfernt: FFB Wache 1 (FFB 1/40/1)", session.Incident.Journal[^1].Text);
+    }
+
+    [Fact]
+    public void Rows_of_a_readonly_incident_cannot_remove_themselves()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9);
+        seed.Close();
+
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var vm = new ForcesViewModel(ro, new FixedClock(T0), Md(), () => { });
+
+        var row = Assert.Single(vm.Forces);
+        Assert.False(row.RemoveCommand.CanExecute(null));
+        row.RemoveCommand.Execute(null); // inert, not throwing
+        Assert.Single(ro.Incident.Forces);
+    }
+
+    [Fact]
     public void A_noop_strength_resubmission_adds_neither_history_nor_etb_entry()
     {
         var clock = new FixedClock(T0);

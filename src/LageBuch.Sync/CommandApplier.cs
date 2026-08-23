@@ -62,6 +62,9 @@ public static class CommandApplier
                 incident.UpdateForceStrength(clock, Operator(c.Operator), c.UnitId,
                     c.OfficerCount, c.PersonnelCount, c.ScbaCount);
                 break;
+            case RemoveForceUnitCommand c:
+                incident.RemoveForceUnit(clock, Operator(c.Operator), c.UnitId);
+                break;
             case AddScbaTruppCommand c:
                 incident.AddScbaTrupp(clock, c.Designation,
                     c.Members.Select(m => new TruppMember(m.Role, m.Name)),

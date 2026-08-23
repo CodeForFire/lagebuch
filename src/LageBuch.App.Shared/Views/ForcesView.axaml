@@ -173,6 +173,18 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
+          <!-- Eine aufgenommene Einheit lässt sich wieder komplett zurücknehmen (#76 follow-up):
+               die Zeile samt Wert-Historie verschwindet, der ETB protokolliert die Entfernung.
+               Im abgeschlossenen Einsatz ist die Spalte leer. -->
+          <DataGridTemplateColumn Width="44">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <Button Content="✕" Padding="6,2" Margin="4,0"
+                        IsVisible="{Binding !IsReadOnly}"
+                        Command="{Binding RemoveCommand}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
         </DataGrid.Columns>
       </DataGrid>
     </Border>

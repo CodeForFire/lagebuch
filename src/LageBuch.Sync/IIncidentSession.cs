@@ -53,6 +53,10 @@ public interface IIncidentSession
     /// <summary>Corrects a unit's Stärke (GF / Gesamt / davon AGT). Logs to the ETB and retains the
     /// prior values on the unit — but only on a real change (#76).</summary>
     void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount);
+
+    /// <summary>Takes a unit back completely: row, Wert-Historie and totals go, the ETB records
+    /// the removal (#76 follow-up).</summary>
+    void RemoveForceUnit(Guid unitId);
     void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,

@@ -26,10 +26,12 @@ public sealed partial class ForceRow : ObservableObject
 {
     private readonly Action<string?, string?> _onEdited;
     private readonly Action<int, int, int> _onStrengthEdited;
+    private readonly Action _onRemoved;
 
     public ForceRow(
         Domain.ForceUnit unit, IReadOnlyList<string> statusOptions, bool isReadOnly,
-        Action<string?, string?> onEdited, Action<int, int, int> onStrengthEdited)
+        Action<string?, string?> onEdited, Action<int, int, int> onStrengthEdited,
+        Action onRemoved)
     {
         Id = unit.Id;
         Brigade = unit.Brigade;
@@ -38,6 +40,7 @@ public sealed partial class ForceRow : ObservableObject
         IsReadOnly = isReadOnly;
         _onEdited = onEdited;
         _onStrengthEdited = onStrengthEdited;
+        _onRemoved = onRemoved;
         Edits = unit.Edits;
         _officerCount = unit.OfficerCount;
         _mannschaftCount = unit.MannschaftCount;
@@ -123,6 +126,19 @@ public sealed partial class ForceRow : ObservableObject
     /// <summary>XAML entry point for the strength editor's Übernehmen button.</summary>
     [RelayCommand]
     private void ApplyStrengthEdit() => CommitStrength();
+
+    /// <summary>Takes the unit back completely (#76 follow-up). A closed Einsatz is a historical
+    /// record: inert rather than throwing, same rule as the strength setters. The body guard also
+    /// covers a programmatic Execute, which bypasses CanExecute.</summary>
+    [RelayCommand(CanExecute = nameof(CanRemove))]
+    private void Remove()
+    {
+        if (!CanRemove)
+            return;
+        _onRemoved();
+    }
+
+    private bool CanRemove => !IsReadOnly;
 
     /// <summary>
     /// One line pro Stärke-Änderung (#76): die vorherige Stärke und wohin sie sich bewegte. Die
@@ -292,6 +308,11 @@ public sealed partial class ForcesViewModel : ObservableObject
             (officer, mannschaft, scba) =>
             {
                 _session.UpdateForceStrength(f.Id, officer, officer + mannschaft, scba);
+                _onChanged();
+            },
+            () =>
+            {
+                _session.RemoveForceUnit(f.Id); // Changed → RefreshForces drops the row
                 _onChanged();
             });
 }

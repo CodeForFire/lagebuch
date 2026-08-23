@@ -318,4 +318,25 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(30, timer.RecurringIntervalMinutes);
         Assert.True(timer.IsRunning);
     }
+
+    [Fact]
+    public void A_removed_unit_and_its_edit_trail_do_not_survive_a_round_trip()
+    {
+        // The repository rewrites the incident wholesale on every save, so a unit removed from the
+        // domain simply is not re-inserted — this pins that its row and Wert-Historie really go.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddForceUnit(clock, op, "FFB Wache 1", 6, callSign: "FFB 1/40/1", scbaCount: 2, officerCount: 1);
+        incident.UpdateForceStrength(clock, op, incident.Forces[0].Id, officerCount: 1, personnelCount: 9, scbaCount: 4);
+
+        var repo = new IncidentRepository();
+        repo.Save(_path, incident);
+        incident.RemoveForceUnit(clock, op, incident.Forces[0].Id);
+        repo.Save(_path, incident);
+
+        var loaded = repo.Load(_path);
+        Assert.Empty(loaded.Forces);
+        Assert.Equal((0, 0), (loaded.TotalPersonnel, loaded.TotalScba));
+    }
 }

@@ -27,6 +27,27 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void Removing_a_unit_over_the_wire_takes_it_and_its_history_out()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", "RUF 1");
+        ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", null, null, 4, 1), incident, clock);
+        var unitId = incident.Forces[0].Id;
+        ApplyOverWire(new UpdateForceStrengthCommand(op, unitId, 2, 12, 6), incident, clock);
+        var before = incident.Journal.Count;
+
+        ApplyOverWire(new RemoveForceUnitCommand(op, unitId), incident, clock);
+
+        Assert.Empty(incident.Forces);
+        Assert.Equal((0, 0), (incident.TotalPersonnel, incident.TotalScba));
+        var entry = incident.Journal.Last();
+        Assert.Equal(before + 1, incident.Journal.Count);
+        Assert.Equal("Einheit entfernt: Aich (Aich 42/1)", entry.Text);
+        Assert.Equal("Client (RUF 1)", entry.EnteredBy);
+    }
+
+    [Fact]
     public void Applying_a_sequence_of_commands_converges_the_incident()
     {
         var clock = new FixedClock();

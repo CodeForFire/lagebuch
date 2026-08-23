@@ -20,6 +20,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
 [JsonDerivedType(typeof(UpdateForceStrengthCommand), "updateForceStrength")]
+[JsonDerivedType(typeof(RemoveForceUnitCommand), "removeForceUnit")]
 [JsonDerivedType(typeof(AddScbaTruppCommand), "addScbaTrupp")]
 [JsonDerivedType(typeof(StartScbaTruppCommand), "startScbaTrupp")]
 [JsonDerivedType(typeof(RecordScbaPressureCommand), "recordScbaPressure")]
@@ -65,6 +66,9 @@ public sealed record UpdateForceUnitCommand(
 
 public sealed record UpdateForceStrengthCommand(
     OperatorDto Operator, Guid UnitId, int OfficerCount, int PersonnelCount, int ScbaCount) : SyncCommand;
+
+public sealed record RemoveForceUnitCommand(
+    OperatorDto Operator, Guid UnitId) : SyncCommand;
 
 public sealed record AddScbaTruppCommand(
     string Designation, IReadOnlyList<TruppMemberDto> Members, string? CallSign, string? Task,

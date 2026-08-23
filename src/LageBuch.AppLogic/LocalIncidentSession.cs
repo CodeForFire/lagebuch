@@ -143,6 +143,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
         Mutate(() => Incident.UpdateForceStrength(_clock, RequireOperator(), unitId, officerCount, personnelCount, scbaCount));
 
+    public void RemoveForceUnit(Guid unitId) =>
+        Mutate(() => Incident.RemoveForceUnit(_clock, RequireOperator(), unitId));
+
     public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,

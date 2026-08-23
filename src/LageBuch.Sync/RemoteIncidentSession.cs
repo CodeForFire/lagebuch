@@ -171,6 +171,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
         Send(new UpdateForceStrengthCommand(Op(), unitId, officerCount, personnelCount, scbaCount));
 
+    public void RemoveForceUnit(Guid unitId) =>
+        Send(new RemoveForceUnitCommand(Op(), unitId));
+
     public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,

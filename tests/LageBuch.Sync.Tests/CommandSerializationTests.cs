@@ -90,4 +90,15 @@ public class CommandSerializationTests
         var json = SyncJson.Serialize<SyncCommand>(new UpdateForceStrengthCommand(Op, Guid.NewGuid(), 1, 9, 4));
         Assert.Contains("\"$type\":\"updateForceStrength\"", json);
     }
+
+    [Fact]
+    public void RemoveForceUnit_uses_the_removeForceUnit_discriminator_and_roundtrips()
+    {
+        var unitId = Guid.NewGuid();
+        var json = SyncJson.Serialize<SyncCommand>(new RemoveForceUnitCommand(Op, unitId));
+        Assert.Contains("\"$type\":\"removeForceUnit\"", json);
+
+        var command = Assert.IsType<RemoveForceUnitCommand>(SyncJson.Deserialize<SyncCommand>(json));
+        Assert.Equal(unitId, command.UnitId);
+    }
 }

@@ -105,4 +105,34 @@ public class ForcesTabRenderTests
 
         Capture(window, "forces-strength-verlauf.png");
     }
+
+    [AvaloniaFact]
+    public void A_row_can_be_removed_completely_and_the_etb_records_it()
+    {
+        var (window, vm) = ShowWorkspace();
+        Tabs(window).SelectedIndex = 2;
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewMannschaftCount = 6;
+        vm.Forces.AddForceCommand.Execute(null);
+        vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewMannschaftCount = 9;
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2, vm.Forces.Forces.Count);
+
+        // The ✕ column takes the unit back completely: row and totals shrink, the ETB logs it.
+        var row = vm.Forces.Forces.Single(r => r.Brigade == "FFB Wache 1");
+        Assert.True(row.RemoveCommand.CanExecute(null));
+        row.RemoveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var remaining = Assert.Single(vm.Forces.Forces);
+        Assert.Equal("Aich", remaining.Brigade);
+        Assert.Equal(9, vm.Forces.TotalPersonnel);
+
+        // The journal (and thus the ETB tab) names the removed unit.
+        Assert.Contains(vm.Etb.Entries, e => e.Text == "Einheit entfernt: FFB Wache 1");
+
+        Capture(window, "forces-row-removed.png");
+    }
 }

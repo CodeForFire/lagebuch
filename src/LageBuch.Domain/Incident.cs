@@ -538,6 +538,27 @@ public sealed class Incident
         _ => $"{Label(updated)}: Status {previous.Status} → {updated.Status}",
     };
 
+    /// <summary>
+    /// Takes a unit back completely (#76 follow-up): row, Wert-Historie and totals go with it, and
+    /// the ETB records the removal like any other reportable event. A closed Einsatz is a
+    /// historical record — EnsureOpen guards it; an unknown or already-removed id throws so a
+    /// replayed removal fails loudly instead of silently no-oping.
+    /// </summary>
+    public void RemoveForceUnit(IClock clock, SessionOperator op, Guid unitId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+            throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+
+        var unit = _forces[index];
+        _forces.RemoveAt(index);
+        AppendSystemEntry(clock, op, $"Einheit entfernt: {Label(unit)}", from: unit.CallSign);
+    }
+
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,
         string designation,
