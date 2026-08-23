@@ -68,6 +68,25 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Vehicles_round_trip_with_wache_callsign_and_seats()
+    {
+        var store = new MasterDataStore();
+        var set = MasterDataSet.Empty with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                new Vehicle("Aich", "Aich 42/1", 6),
+            },
+        };
+        store.Save(_path, set);
+
+        var reopened = store.GetOrCreate(_path);
+
+        Assert.Equal(set.Vehicles, reopened.Vehicles);
+    }
+
+    [Fact]
     public void Personnel_optional_fields_round_trip_as_null()
     {
         var store = new MasterDataStore();

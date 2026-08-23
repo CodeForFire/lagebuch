@@ -185,7 +185,7 @@ public class IncidentOperationsTests
         var entry = LastEntry(incident);
         Assert.Equal(Etb.EtbDirection.System, entry.Direction);
         Assert.Equal(
-            "Einheit aufgenommen: FFB Wache 1 (FFB 1/40/1), Stärke 9, davon 4 AGT — Status: Alarmiert",
+            "Einheit aufgenommen: FFB Wache 1 (FFB 1/40/1), Stärke 0/9/9, davon 4 AGT — Status: Alarmiert",
             entry.Text);
         // The Einsatzleitung alarms the unit, so the call sign is the recipient -- same split
         // ScbaViewModel uses for "bereitgestellt" versus "Druckkontrolle".
@@ -202,7 +202,7 @@ public class IncidentOperationsTests
 
         var entry = LastEntry(incident);
         // No call sign, no AGT, no status: none of them appear as empty decoration.
-        Assert.Equal("Einheit aufgenommen: Aich, Stärke 6", entry.Text);
+        Assert.Equal("Einheit aufgenommen: Aich, Stärke 0/6/6", entry.Text);
         Assert.Null(entry.To);
     }
 

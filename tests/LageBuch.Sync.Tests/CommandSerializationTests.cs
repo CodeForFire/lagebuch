@@ -16,7 +16,9 @@ public class CommandSerializationTests
         new TransferRoleCommand(Op, Guid.NewGuid(), "Schmidt", "FFB 12/2", "0172"),
         new EditRolePhoneCommand(Op, Guid.NewGuid(), "0173"),
         new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4),
+        new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4, 1),
         new UpdateForceUnitCommand(Op, Guid.NewGuid(), "Bereitstellung", null),
+        new UpdateForceStrengthCommand(Op, Guid.NewGuid(), 1, 9, 4),
         new AddScbaTruppCommand("Angriffstrupp",
             new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
             "AT-1", "Menschenrettung", 30, 60, 5),
@@ -63,5 +65,40 @@ public class CommandSerializationTests
         var back = Assert.IsType<AddFileCommand>(SyncJson.Deserialize<SyncCommand>(json));
 
         Assert.Equal(bytes, back.Bytes);
+    }
+
+    // A pre-#76 host or client sends addForceUnit without OfficerCount; the missing property must
+    // deserialize as "keine Führungskraft erfasst" (0) rather than fail the wire contract.
+    [Fact]
+    public void Legacy_addForceUnit_without_officerCount_deserializes_as_zero()
+    {
+        const string legacyJson = """
+            {"$type":"addForceUnit","operator":{"name":"Müller","callSign":"FFB 12/1"},
+             "brigade":"Aich","personnelCount":9,"callSign":"Aich 42/1","status":null,
+             "notes":null,"scbaCount":4}
+            """;
+
+        var command = Assert.IsType<AddForceUnitCommand>(SyncJson.Deserialize<SyncCommand>(legacyJson));
+
+        Assert.Equal(0, command.OfficerCount);
+        Assert.Equal(9, command.PersonnelCount);
+    }
+
+    [Fact]
+    public void UpdateForceStrength_uses_the_updateForceStrength_discriminator()
+    {
+        var json = SyncJson.Serialize<SyncCommand>(new UpdateForceStrengthCommand(Op, Guid.NewGuid(), 1, 9, 4));
+        Assert.Contains("\"$type\":\"updateForceStrength\"", json);
+    }
+
+    [Fact]
+    public void RemoveForceUnit_uses_the_removeForceUnit_discriminator_and_roundtrips()
+    {
+        var unitId = Guid.NewGuid();
+        var json = SyncJson.Serialize<SyncCommand>(new RemoveForceUnitCommand(Op, unitId));
+        Assert.Contains("\"$type\":\"removeForceUnit\"", json);
+
+        var command = Assert.IsType<RemoveForceUnitCommand>(SyncJson.Deserialize<SyncCommand>(json));
+        Assert.Equal(unitId, command.UnitId);
     }
 }

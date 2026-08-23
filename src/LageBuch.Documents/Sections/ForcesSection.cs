@@ -38,7 +38,8 @@ public static class ForcesSection
                     {
                         table.Cell().Element(Cells.Body).Text(unit.Brigade);
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.CallSign));
-                        table.Cell().Element(Cells.Body).Text(unit.PersonnelCount.ToString());
+                        // Stärke im 1/1/2-Format: Führungskräfte/Mannschaft/Gesamt (#76).
+                        table.Cell().Element(Cells.Body).Text(unit.StrengthText);
                         table.Cell().Element(Cells.Body).Text(unit.ScbaCount.ToString());
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.Status));
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.Notes));
@@ -53,7 +54,7 @@ public static class ForcesSection
             column.Item().PaddingTop(4).Text(t =>
             {
                 t.Span("Gesamtstärke: ").SemiBold();
-                t.Span(incident.TotalPersonnel.ToString());
+                t.Span($"{incident.TotalOfficer}/{incident.TotalPersonnel - incident.TotalOfficer}/{incident.TotalPersonnel}");
                 t.Span("   davon Atemschutzgeräteträger: ").SemiBold();
                 t.Span(incident.TotalScba.ToString());
             });

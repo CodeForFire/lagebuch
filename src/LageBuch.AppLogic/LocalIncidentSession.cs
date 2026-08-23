@@ -134,11 +134,17 @@ public sealed class LocalIncidentSession : IIncidentSession
         Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
 
     public void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
-        string? status = null, string? notes = null, int scbaCount = 0) =>
-        Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount));
+        string? status = null, string? notes = null, int scbaCount = 0, int officerCount = 0) =>
+        Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
         Mutate(() => Incident.UpdateForceUnit(_clock, RequireOperator(), unitId, status, notes));
+
+    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
+        Mutate(() => Incident.UpdateForceStrength(_clock, RequireOperator(), unitId, officerCount, personnelCount, scbaCount));
+
+    public void RemoveForceUnit(Guid unitId) =>
+        Mutate(() => Incident.RemoveForceUnit(_clock, RequireOperator(), unitId));
 
     public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,

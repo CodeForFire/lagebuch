@@ -61,7 +61,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
-        Assert.Equal(14, list.ItemCount);
+        // 14 categories plus #76's Fahrzeuge.
+        Assert.Equal(15, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
@@ -119,5 +120,40 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, "master-data-editor-links.png"));
+    }
+
+    // #76: the Fahrzeuge section — Wache + Funkrufname + Sitzplätze per row, Wache and
+    // Funkrufname as AutoCompleteBoxes fed from the master data (free text still allowed).
+    [AvaloniaFact]
+    public void Fahrzeuge_section_renders_wache_callsign_and_seats_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
+        section.AddCommand.Execute(null);
+        section.Rows[0].Wache = "FFB Wache 1";
+        section.Rows[0].CallSign = "FFB 1/44/1";
+        section.Rows[0].Seats = 9;
+        vm.SelectedSection = section;
+
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var boxes = view.GetVisualDescendants().OfType<AutoCompleteBox>().ToList();
+        // PlaceholderText: Watermark is obsolete in C# under Avalonia 12 (XAML keeps the old name).
+        Assert.Contains(boxes, b => b.Text == "FFB Wache 1" && b.PlaceholderText == "Wache");
+        Assert.Contains(boxes, b => b.Text == "FFB 1/44/1" && b.PlaceholderText == "Funkrufname");
+        // The suggestions come from the master data lists; free text stays possible.
+        var wacheBox = boxes.Single(b => b.PlaceholderText == "Wache");
+        Assert.Equal(new[] { "FFB Wache 1", "Aich", "Puch" }, wacheBox.ItemsSource);
+        Assert.Equal(new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" }, boxes.Single(b => b.PlaceholderText == "Funkrufname").ItemsSource);
+        Assert.Contains(view.GetVisualDescendants().OfType<NumericUpDown>(), n => n.Value == 9);
+        Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9) }, section.ToValues());
+
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Combine(dir, "master-data-editor-fahrzeuge-after.png"));
     }
 }

@@ -206,6 +206,9 @@ public sealed class Incident
 
     public int TotalPersonnel => _forces.Sum(f => f.PersonnelCount);
 
+    /// <summary>Total Führungskräfte across all units (#76).</summary>
+    public int TotalOfficer => _forces.Sum(f => f.OfficerCount);
+
     /// <summary>Total Atemschutzgeräteträger across all units — how many Trupps can be formed.</summary>
     public int TotalScba => _forces.Sum(f => f.ScbaCount);
 
@@ -435,18 +438,19 @@ public sealed class Incident
         string? callSign = null,
         string? status = null,
         string? notes = null,
-        int scbaCount = 0)
+        int scbaCount = 0,
+        int officerCount = 0)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount);
+        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount);
         _forces.Add(unit);
 
         // Optional clauses are omitted rather than printed empty, so a bare unit reads as
-        // "Einheit aufgenommen: Aich, Stärke 6" instead of trailing "davon 0 AGT — Status: ".
-        var text = $"Einheit aufgenommen: {Label(unit)}, Stärke {unit.PersonnelCount}";
+        // "Einheit aufgenommen: Aich, Stärke 0/6/6" instead of trailing "davon 0 AGT — Status: ".
+        var text = $"Einheit aufgenommen: {Label(unit)}, Stärke {unit.StrengthText}";
         if (unit.ScbaCount > 0)
             text += $", davon {unit.ScbaCount} AGT";
         if (unit.Status is not null)
@@ -491,12 +495,69 @@ public sealed class Incident
     private static string Label(ForceUnit unit) =>
         unit.CallSign is null ? unit.Brigade : $"{unit.Brigade} ({unit.CallSign})";
 
+    /// <summary>
+    /// Corrects a unit's Stärke (Führungskraft / Gesamt / davon AGT) in place, keeping its identity
+    /// and position (#76). A real change is protokolliert twice, mirroring the ETB's own edit rule:
+    /// as a Systemmeldung in the journal (like a status transition, credited via
+    /// <see cref="UpdateForceUnit"/>'s from-call-sign convention) and as a retained prior value on
+    /// the unit itself (<see cref="ForceUnit.WithStrength"/>). An unchanged resubmission is neither.
+    /// </summary>
+    public ForceUnit UpdateForceStrength(
+        IClock clock, SessionOperator op, Guid unitId,
+        int officerCount, int personnelCount, int scbaCount)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+            throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+
+        var previous = _forces[index];
+        var updated = previous.WithStrength(officerCount, personnelCount, scbaCount, op, clock.Now);
+        if (ReferenceEquals(updated, previous))
+            return previous;
+
+        _forces[index] = updated;
+
+        // The AGT clause appears only when the AGT count itself moved — same economy as
+        // AddForceUnit's optional clauses.
+        var text = $"{Label(updated)}: Stärke {previous.StrengthText} → {updated.StrengthText}";
+        if (previous.ScbaCount != updated.ScbaCount)
+            text += $", davon AGT {previous.ScbaCount} → {updated.ScbaCount}";
+        AppendSystemEntry(clock, op, text, from: updated.CallSign);
+
+        return updated;
+    }
+
     private static string StatusChangeText(ForceUnit previous, ForceUnit updated) => updated.Status switch
     {
         null => $"{Label(updated)}: Status aufgehoben (vorher {previous.Status})",
         _ when previous.Status is null => $"{Label(updated)}: Status {updated.Status}",
         _ => $"{Label(updated)}: Status {previous.Status} → {updated.Status}",
     };
+
+    /// <summary>
+    /// Takes a unit back completely (#76 follow-up): row, Wert-Historie and totals go with it, and
+    /// the ETB records the removal like any other reportable event. A closed Einsatz is a
+    /// historical record — EnsureOpen guards it; an unknown or already-removed id throws so a
+    /// replayed removal fails loudly instead of silently no-oping.
+    /// </summary>
+    public void RemoveForceUnit(IClock clock, SessionOperator op, Guid unitId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+            throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+
+        var unit = _forces[index];
+        _forces.RemoveAt(index);
+        AppendSystemEntry(clock, op, $"Einheit entfernt: {Label(unit)}", from: unit.CallSign);
+    }
 
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,

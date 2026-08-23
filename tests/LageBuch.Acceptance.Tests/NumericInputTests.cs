@@ -3,7 +3,6 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.ViewModels;
@@ -13,11 +12,11 @@ using LageBuch.AppLogic.Services;
 
 namespace LageBuch.Acceptance.Tests;
 
-// Every numeric input in this app is a count: Personen, Atemschutzgeräteträger, Minuten, bar.
-// None has a fractional meaning, and the controls must not pretend otherwise. Left at the
-// NumericUpDown defaults, typing "3.5" left the control showing 3,5 while the int-typed view-model
-// property rounded it to 4 -- the number on screen was not the number written into the Einsatz
-// record, and it rounded up, inventing a LageBuchmann in the Gesamtstärke.
+// Every numeric input about people (GF, Mann, AGT) is a plain TextBox with an IntegerOnly filter
+// since the #76 rework: a spinner next to every field was visual noise, and a permanent "0" kept
+// the placeholder from ever showing. The behavior swallows non-digit characters before they reach
+// the text -- typing and pasting both flow through TextInput. An emptied field means 0 at the
+// view-model level (nullable ints). Measurement inputs elsewhere (bar, Minuten) stay NumericUpDown.
 public class NumericInputTests
 {
     private static (Window Window, ForcesView View, IncidentWorkspaceViewModel Vm) ShowForces()
@@ -30,55 +29,51 @@ public class NumericInputTests
         return (window, view, vm);
     }
 
-    private static TextBox Type(Window window, ForcesView view, NumericUpDown control, string text)
+    private static TextBox Type(Window window, ForcesView view, TextBox box, string text)
     {
-        var inner = control.GetVisualDescendants().OfType<TextBox>().First();
-        inner.Focus();
-        inner.SelectAll();
+        box.Focus();
+        box.SelectAll();
         window.KeyTextInput(text);
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
 
-        // Tab away, as a user filling the row does. NumericUpDown reformats the text on lost
-        // focus, so this is the point at which what is shown must equal what is held.
+        // Tab away, as a user filling the row does.
         view.GetControl<TextBox>("NotesBox").Focus();
         Dispatcher.UIThread.RunJobs();
-        return inner;
+        return box;
     }
 
     [AvaloniaTheory]
     [InlineData("3.5")]
     [InlineData("3,5")]
-    [InlineData("0.9")]
     [InlineData("abc")]
-    public void A_fractional_personnel_entry_is_refused_and_the_previous_value_stands(string typed)
+    [InlineData("a3b5")]
+    public void A_non_digit_entry_is_refused_and_the_previous_value_stands(string typed)
     {
         var (window, view, vm) = ShowForces();
-        var box = view.GetControl<NumericUpDown>("PersonnelBox");
+        var box = view.GetControl<TextBox>("MannschaftBox");
 
         Type(window, view, box, "9");
-        Assert.Equal(9, vm.Forces.NewPersonnelCount);
+        Assert.Equal(9, vm.Forces.NewMannschaftCount);
 
         var inner = Type(window, view, box, typed);
 
-        // Rejected outright -- the good value stands rather than being rounded or zeroed.
-        Assert.Equal(9m, box.Value);
-        Assert.Equal(9, vm.Forces.NewPersonnelCount);
+        // Refused wholesale -- the good value stands rather than a mutilated "35".
+        Assert.Equal(9, vm.Forces.NewMannschaftCount);
         Assert.Equal("9", inner.Text);
     }
 
     [AvaloniaTheory]
     [InlineData("2.5")]
     [InlineData("2,5")]
-    public void A_fractional_agt_entry_is_refused(string typed)
+    public void A_non_digit_agt_entry_is_refused(string typed)
     {
         var (window, view, vm) = ShowForces();
-        var box = view.GetControl<NumericUpDown>("ScbaBox");
+        var box = view.GetControl<TextBox>("ScbaBox");
 
         Type(window, view, box, "4");
         var inner = Type(window, view, box, typed);
 
-        Assert.Equal(4m, box.Value);
         Assert.Equal(4, vm.Forces.NewScbaCount);
         Assert.Equal("4", inner.Text);
     }
@@ -87,28 +82,26 @@ public class NumericInputTests
     public void Whole_numbers_still_go_through_untouched()
     {
         var (window, view, vm) = ShowForces();
-        var box = view.GetControl<NumericUpDown>("PersonnelBox");
+        var box = view.GetControl<TextBox>("MannschaftBox");
 
         var inner = Type(window, view, box, "12");
 
-        Assert.Equal(12, vm.Forces.NewPersonnelCount);
-        Assert.Equal(12m, box.Value);
+        Assert.Equal(12, vm.Forces.NewMannschaftCount);
         Assert.Equal("12", inner.Text);
     }
 
     [AvaloniaFact]
-    public void The_integer_rule_is_a_theme_default_not_a_per_control_opt_in()
+    public void The_personnel_fields_are_textboxes_with_the_integer_filter_not_spinners()
     {
-        // Set once on the shared NumericUpDown style, so the Atemschutz inputs (bar, Minuten) and
-        // any input added later inherit it. Pinning that here stops the fix from being quietly
-        // undone by a new control that forgets to opt in.
+        // Pins the #76-rework affordance: GF/Mann/AGT are plain fields with IntegerOnly attached,
+        // so the placeholder stays visible while the value is unset.
         var (_, view, _) = ShowForces();
 
-        foreach (var name in new[] { "PersonnelBox", "ScbaBox" })
+        foreach (var name in new[] { "OfficerBox", "MannschaftBox", "ScbaBox" })
         {
-            var box = view.GetControl<NumericUpDown>(name);
-            Assert.Equal(System.Globalization.NumberStyles.Integer, box.ParsingNumberStyle);
-            Assert.Equal("0", box.FormatString);
+            var box = view.GetControl<TextBox>(name);
+            Assert.True(LageBuch.App.Shared.Behaviors.IntegerOnly.GetIsEnabled(box),
+                $"{name} must carry IntegerOnly.");
         }
     }
 }
@@ -147,11 +140,13 @@ public class ForcesGridEditingTests
     [AvaloniaFact]
     public void The_descriptive_columns_stay_read_only_text()
     {
-        // Which LageBuch, how many people, how many AGT are facts about what was alarmed.
+        // Which LageBuch, how many AGT are facts about what was alarmed; since #76 the Stärke
+        // column is a template (text plus the correction editor), so it is pinned separately.
         var (view, _) = ShowForces(out _);
 
-        foreach (var header in new[] { "FEUERWEHR", "FUNKRUFNAME", "STÄRKE", "AGT" })
+        foreach (var header in new[] { "FEUERWEHR", "FUNKRUFNAME", "AGT" })
             Assert.IsType<DataGridTextColumn>(Column(view, header));
+        Assert.IsType<DataGridTemplateColumn>(Column(view, "STÄRKE"));
     }
 
     [AvaloniaFact]
@@ -159,7 +154,7 @@ public class ForcesGridEditingTests
     {
         var (view, vm) = ShowForces(out var session);
         vm.Forces.NewBrigade = "FFB Wache 1";
-        vm.Forces.NewPersonnelCount = 9;
+        vm.Forces.NewMannschaftCount = 9;
         vm.Forces.NewStatus = "Alarmiert";
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();

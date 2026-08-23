@@ -1,19 +1,20 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.ForcesView"
              x:DataType="vm:ForcesViewModel">
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
       <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Center" />
-      <!-- Total strength readout, with the Atemschutz subset beside it -->
+      <!-- Total strength readout im 1/1/2-Format (#76), AGT-Anteil daneben -->
       <Border Grid.Column="1" Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" Padding="18,8">
         <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
           <TextBlock Text="GESAMTSTÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
-          <TextBlock Classes="metric" FontSize="26" Foreground="{StaticResource SignalBrush}"
-                     Text="{Binding TotalPersonnel}" />
+          <TextBlock x:Name="TotalStrengthText" Classes="metric" FontSize="26"
+                     Foreground="{StaticResource SignalBrush}" Text="{Binding TotalStrengthText}" />
           <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
           <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
           <TextBlock x:Name="TotalScbaText" Classes="metric" FontSize="26"
@@ -29,18 +30,71 @@
       <StackPanel Orientation="Horizontal" Spacing="8">
         <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
              must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. -->
-        <AutoCompleteBox x:Name="BrigadeBox" Width="160" Watermark="Feuerwehr"
-                         ItemsSource="{Binding BrigadeOptions}"
-                         FilterMode="ContainsOrdinal"
-                         MinimumPrefixLength="0"
-                         Text="{Binding NewBrigade}"
-                         b:EnterSubmit.Command="{Binding AddForceCommand}" />
-        <ComboBox Width="140" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
-        <NumericUpDown x:Name="PersonnelBox" Width="110" Minimum="0" Value="{Binding NewPersonnelCount}" />
-        <NumericUpDown x:Name="ScbaBox" Width="110" Minimum="0" Value="{Binding NewScbaCount}" />
-        <ComboBox x:Name="StatusBox" Width="160" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
-        <TextBox x:Name="NotesBox" Width="180" Watermark="Bemerkung" Text="{Binding NewNotes}" />
-        <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}" />
+        <StackPanel Spacing="2">
+          <TextBlock Text="FEUERWEHR / WACHE" Classes="overline" FontSize="10" />
+          <AutoCompleteBox x:Name="BrigadeBox" Width="160" Watermark="Feuerwehr"
+                           ItemsSource="{Binding BrigadeOptions}"
+                           FilterMode="ContainsOrdinal"
+                           MinimumPrefixLength="0"
+                           Text="{Binding NewBrigade}"
+                           b:EnterSubmit.Command="{Binding AddForceCommand}" />
+        </StackPanel>
+        <!-- Fahrzeuge aus den Stammdaten, gefiltert auf die Wache; wählt man eines, werden
+             Funkrufname und Stärke vorbelegt (#76). -->
+        <StackPanel Spacing="2">
+          <TextBlock Text="FAHRZEUG" Classes="overline" FontSize="10" />
+          <ComboBox x:Name="VehicleBox" Width="150"
+                    ItemsSource="{Binding VehicleOptions}"
+                    SelectedItem="{Binding SelectedVehicle}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="md:Vehicle">
+                <TextBlock Text="{Binding CallSign}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <!-- Freitext-fähig: Fahrzeuge, die nicht in den Stammdaten stehen (Fremdwehren). -->
+        <StackPanel Spacing="2">
+          <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
+          <AutoCompleteBox x:Name="CallSignBox" Width="140" Watermark="z. B. FFB 1/44/1"
+                           ItemsSource="{Binding CallSignOptions}"
+                           FilterMode="ContainsOrdinal"
+                           MinimumPrefixLength="0"
+                           Text="{Binding NewCallSign}" />
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="STÄRKE GF / MANN" Classes="overline" FontSize="10" />
+          <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
+               0 und lässt den Platzhalter stehen. -->
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBox x:Name="OfficerBox" Width="70" Watermark="GF"
+                     Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
+            <TextBox x:Name="MannschaftBox" Width="70" Watermark="Mann"
+                     Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" />
+          <TextBox x:Name="ScbaBox" Width="90" Watermark="AGT"
+                   Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="STATUS" Classes="overline" FontSize="10" />
+          <ComboBox x:Name="StatusBox" Width="140" MinHeight="32"
+                    ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
+        </StackPanel>
+        <StackPanel Spacing="2">
+          <TextBlock Text="BEMERKUNG" Classes="overline" FontSize="10" />
+          <TextBox x:Name="NotesBox" Width="170" Watermark="Bemerkung" Text="{Binding NewNotes}" />
+        </StackPanel>
+        <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
+                VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den
+             Hinzufügen-Button (Freitext-Duplikat), und der Dropdown blendet Vergebene ohnehin aus. -->
+        <TextBlock x:Name="DuplicateHint" Text="Fahrzeug ist bereits aufgenommen"
+                   FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                   VerticalAlignment="Bottom" TextWrapping="Wrap" MaxWidth="150"
+                   IsVisible="{Binding IsDuplicateCallSign}" />
       </StackPanel>
     </Border>
 
@@ -50,12 +104,59 @@
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
-          <DataGridTextColumn Header="STÄRKE" Binding="{Binding PersonnelCount}" />
+          <!-- Stärke im 1/1/2-Format; die Zahlen bleiben nach dem Eintrag korrigierbar (#76),
+               gebündelt in einem Editor, damit eine Korrektur ein Protokolleintrag bleibt.
+               Verlauf zeigt die Wert-Historie der Einheit. -->
+          <DataGridTemplateColumn Header="STÄRKE" Width="190">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,4" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding StrengthText}" VerticalAlignment="Center" />
+                  <Button Content="✎" Padding="6,2" IsVisible="{Binding !IsReadOnly}">
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft">
+                          <StackPanel Spacing="8" MinWidth="180">
+                          <TextBlock Text="Stärke korrigieren" Classes="overline" />
+                          <StackPanel Spacing="2">
+                            <TextBlock Text="FÜHRUNGSKRÄFTE (GF)" Classes="overline" FontSize="10" />
+                            <TextBox Text="{Binding OfficerCount}" b:IntegerOnly.IsEnabled="True" />
+                          </StackPanel>
+                          <StackPanel Spacing="2">
+                            <TextBlock Text="MANN" Classes="overline" FontSize="10" />
+                            <TextBox Text="{Binding MannschaftCount}" b:IntegerOnly.IsEnabled="True" />
+                          </StackPanel>
+                          <StackPanel Spacing="2">
+                            <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" />
+                            <TextBox Text="{Binding ScbaCount}" b:IntegerOnly.IsEnabled="True" />
+                          </StackPanel>
+                          <Button Classes="signal" Content="ÜBERNEHMEN"
+                                  Command="{Binding ApplyStrengthEditCommand}" />
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                  <Button Content="Verlauf" Padding="6,2" IsVisible="{Binding HasHistory}">
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft">
+                        <ItemsControl ItemsSource="{Binding EditLines}" Margin="4">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <TextBlock Text="{Binding}" Margin="0,2" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="AGT" Binding="{Binding ScbaCount}" />
           <!-- Status and Bemerkung are live controls rather than printed text: both move while the
                Einsatz runs, so they have to stay changeable after the row was added. Template
                columns keep them one click away instead of behind DataGrid's edit mode. -->
-          <DataGridTemplateColumn Header="STATUS" Width="180">
+          <DataGridTemplateColumn Header="STATUS" Width="170">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <ComboBox Margin="6,4" HorizontalAlignment="Stretch"
@@ -75,6 +176,18 @@
                 <TextBox Margin="6,4" Watermark="Bemerkung"
                          Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                          IsEnabled="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <!-- Eine aufgenommene Einheit lässt sich wieder komplett zurücknehmen (#76 follow-up):
+               die Zeile samt Wert-Historie verschwindet, der ETB protokolliert die Entfernung.
+               Im abgeschlossenen Einsatz ist die Spalte leer. -->
+          <DataGridTemplateColumn Width="44">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:ForceRow">
+                <Button Content="✕" Padding="6,2" Margin="4,0"
+                        IsVisible="{Binding !IsReadOnly}"
+                        Command="{Binding RemoveCommand}" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>

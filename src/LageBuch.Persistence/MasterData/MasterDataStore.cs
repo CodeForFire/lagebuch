@@ -47,6 +47,11 @@ public sealed class MasterDataStore
             Run(cn, tx, "INSERT INTO md_links (name, url) VALUES ($n,$u);",
                 p => { p("$n", l.Name); p("$u", l.Url); });
 
+        Run(cn, tx, "DELETE FROM md_vehicles;", _ => { });
+        foreach (var v in set.Vehicles)
+            Run(cn, tx, "INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ($w,$c,$s);",
+                p => { p("$w", v.Wache); p("$c", v.CallSign); p("$s", v.Seats); });
+
         Run(cn, tx, "DELETE FROM md_checklist_template;", _ => { });
         InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAufbau, kind: 0, ordinalOffset: 0);
         InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAbbau, kind: 1, ordinalOffset: set.ChecklistTemplateAufbau.Count);
@@ -115,6 +120,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS md_checklist_template (
                 ordinal INTEGER PRIMARY KEY,
                 text TEXT NOT NULL,
@@ -157,6 +163,7 @@ public sealed class MasterDataStore
             ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
             ReadPersonnel(cn),
             ReadColumn(cn, "SELECT value FROM md_einsatzarten;"),
+            ReadVehicles(cn),
             ReadSettings(cn));
     }
 
@@ -235,6 +242,16 @@ public sealed class MasterDataStore
         using var r = cmd.ExecuteReader();
         var list = new List<Link>();
         while (r.Read()) list.Add(new Link(r.GetString(0), r.GetString(1)));
+        return list;
+    }
+
+    private static List<Vehicle> ReadVehicles(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT wache, call_sign, seats FROM md_vehicles;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<Vehicle>();
+        while (r.Read()) list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2)));
         return list;
     }
 

@@ -38,6 +38,8 @@ public class SnapshotRoundTripTests
         var force = incident.AddForceUnit(clock, op, "Aich", personnelCount: 9, callSign: "Aich 42/1",
             status: "Auf Anfahrt", notes: "erste Welle", scbaCount: 4);
         incident.UpdateForceUnit(clock, op, force.Id, "Im Einsatz", "eingetroffen");
+        clock.Now = clock.Now.AddMinutes(1);
+        incident.UpdateForceStrength(clock, op, force.Id, officerCount: 1, personnelCount: 9, scbaCount: 4);
 
         var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"),
             callSign: "AT-1", task: "Menschenrettung");
@@ -94,6 +96,11 @@ public class SnapshotRoundTripTests
         Assert.Equal("Erstmeldung", history.PreviousText);
         Assert.Equal(9, r.Forces[0].PersonnelCount);
         Assert.Equal("Im Einsatz", r.Forces[0].Status);
+        // #76: officer count and the strength edit history survive the snapshot.
+        Assert.Equal(1, r.Forces[0].OfficerCount);
+        var strengthEdit = Assert.Single(r.Forces[0].Edits);
+        Assert.Equal((0, 9, 4), (strengthEdit.PreviousOfficerCount, strengthEdit.PreviousPersonnelCount, strengthEdit.PreviousScbaCount));
+        Assert.Equal("Müller (FFB 12/1)", strengthEdit.EditedBy);
 
         var trupp = Assert.Single(r.ScbaTrupps);
         Assert.Equal(2, trupp.Members.Count);

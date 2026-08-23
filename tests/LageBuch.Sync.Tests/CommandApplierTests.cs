@@ -27,6 +27,27 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void Removing_a_unit_over_the_wire_takes_it_and_its_history_out()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", "RUF 1");
+        ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", null, null, 4, 1), incident, clock);
+        var unitId = incident.Forces[0].Id;
+        ApplyOverWire(new UpdateForceStrengthCommand(op, unitId, 2, 12, 6), incident, clock);
+        var before = incident.Journal.Count;
+
+        ApplyOverWire(new RemoveForceUnitCommand(op, unitId), incident, clock);
+
+        Assert.Empty(incident.Forces);
+        Assert.Equal((0, 0), (incident.TotalPersonnel, incident.TotalScba));
+        var entry = incident.Journal.Last();
+        Assert.Equal(before + 1, incident.Journal.Count);
+        Assert.Equal("Einheit entfernt: Aich (Aich 42/1)", entry.Text);
+        Assert.Equal("Client (RUF 1)", entry.EnteredBy);
+    }
+
+    [Fact]
     public void Applying_a_sequence_of_commands_converges_the_incident()
     {
         var clock = new FixedClock();
@@ -36,7 +57,8 @@ public class CommandApplierTests
 
         ApplyOverWire(new ToggleChecklistItemCommand(op, incident.ChecklistAufbau[0].Id), incident, clock);
         ApplyOverWire(new AssignRoleCommand(op, "EL", "Huber", "FFB 1", clock.Now, null, null, null), incident, clock);
-        ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", "Im Einsatz", null, 4), incident, clock);
+        ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", "Im Einsatz", null, 4, 1), incident, clock);
+        ApplyOverWire(new UpdateForceStrengthCommand(op, incident.Forces[0].Id, 2, 12, 6), incident, clock);
         ApplyOverWire(new AddScbaTruppCommand("Angriffstrupp",
             new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
             "AT-1", null, 30, 60, 5), incident, clock);
@@ -44,7 +66,11 @@ public class CommandApplierTests
 
         Assert.True(incident.ChecklistAufbau[0].IsDone);
         Assert.Single(incident.Roles);
-        Assert.Equal(9, incident.TotalPersonnel);
+        Assert.Equal(12, incident.TotalPersonnel);
+        // The strength correction arrived over the wire with officer count and edit trail intact.
+        var corrected = incident.Forces[0];
+        Assert.Equal((2, 12, 6, 1), (corrected.OfficerCount, corrected.PersonnelCount, corrected.ScbaCount,
+            incident.Journal.Count(e => e.Text.Contains('→'))));
         var trupp = Assert.Single(incident.ScbaTrupps);
         Assert.Equal(300, trupp.StartPressure);
     }

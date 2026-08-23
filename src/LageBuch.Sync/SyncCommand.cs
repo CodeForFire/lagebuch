@@ -19,6 +19,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(EditRolePhoneCommand), "editRolePhone")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
+[JsonDerivedType(typeof(UpdateForceStrengthCommand), "updateForceStrength")]
+[JsonDerivedType(typeof(RemoveForceUnitCommand), "removeForceUnit")]
 [JsonDerivedType(typeof(AddScbaTruppCommand), "addScbaTrupp")]
 [JsonDerivedType(typeof(StartScbaTruppCommand), "startScbaTrupp")]
 [JsonDerivedType(typeof(RecordScbaPressureCommand), "recordScbaPressure")]
@@ -53,12 +55,20 @@ public sealed record TransferRoleCommand(
 
 public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentId, string? Phone) : SyncCommand;
 
+// OfficerCount defaults to 0 so a pre-#76 payload (no such property on the wire) deserializes
+// as "keine Führungskraft erfasst" instead of failing the contract.
 public sealed record AddForceUnitCommand(
     OperatorDto Operator, string Brigade, int PersonnelCount,
-    string? CallSign, string? Status, string? Notes, int ScbaCount) : SyncCommand;
+    string? CallSign, string? Status, string? Notes, int ScbaCount, int OfficerCount = 0) : SyncCommand;
 
 public sealed record UpdateForceUnitCommand(
     OperatorDto Operator, Guid UnitId, string? Status, string? Notes) : SyncCommand;
+
+public sealed record UpdateForceStrengthCommand(
+    OperatorDto Operator, Guid UnitId, int OfficerCount, int PersonnelCount, int ScbaCount) : SyncCommand;
+
+public sealed record RemoveForceUnitCommand(
+    OperatorDto Operator, Guid UnitId) : SyncCommand;
 
 public sealed record AddScbaTruppCommand(
     string Designation, IReadOnlyList<TruppMemberDto> Members, string? CallSign, string? Task,

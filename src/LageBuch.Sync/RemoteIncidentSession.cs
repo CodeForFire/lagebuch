@@ -162,11 +162,17 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Send(new EditRolePhoneCommand(Op(), assignmentId, phone));
 
     public void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
-        string? status = null, string? notes = null, int scbaCount = 0) =>
-        Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount));
+        string? status = null, string? notes = null, int scbaCount = 0, int officerCount = 0) =>
+        Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
         Send(new UpdateForceUnitCommand(Op(), unitId, status, notes));
+
+    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
+        Send(new UpdateForceStrengthCommand(Op(), unitId, officerCount, personnelCount, scbaCount));
+
+    public void RemoveForceUnit(Guid unitId) =>
+        Send(new RemoveForceUnitCommand(Op(), unitId));
 
     public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,

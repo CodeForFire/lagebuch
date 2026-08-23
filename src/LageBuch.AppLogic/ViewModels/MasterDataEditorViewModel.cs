@@ -26,6 +26,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private ChecklistTemplateSection _checklistAufbau = null!, _checklistAbbau = null!;
     private LinksSection _links = null!;
     private PersonnelSection _personnel = null!;
+    private VehiclesSection _vehicles = null!;
     private SettingsSection _settings = null!;
 
     public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
@@ -51,6 +52,17 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     [ObservableProperty]
     private string? _fileError;
 
+    /// <summary>
+    /// Fahrzeuge sind eindeutig (#76 follow-up): der Funkrufname identifiziert das Fahrzeug und darf
+    /// nur einmal vorkommen — unabhängig von der Wache, getrimmt und ohne Groß-/Kleinschreibung.
+    /// Doppelte benennt diese Meldung und blockiert das Speichern, statt sie still zu deduplizieren.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string? _vehicleConflicts;
+
+    public bool HasVehicleConflicts => VehicleConflicts is not null;
+
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
 
@@ -62,6 +74,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         _originalIsEmpty = _original.IsEmpty;
         FileError = null;
         PopulateSections(_original);
+        RefreshVehicleConflicts();
         IsDirty = false;
         ImportCommand.NotifyCanExecuteChanged();
     }
@@ -85,8 +98,29 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Sections.Add(_checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty));
         Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
         Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
+        Sections.Add(_vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged));
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
+    }
+
+    private void OnVehiclesChanged()
+    {
+        IsDirty = true;
+        RefreshVehicleConflicts();
+    }
+
+    /// <summary>Recomputes the Funkrufnamen conflict list from the current rows.</summary>
+    private void RefreshVehicleConflicts()
+    {
+        var duplicates = _vehicles.ToValues()
+            .Where(v => !string.IsNullOrWhiteSpace(v.CallSign))
+            .GroupBy(v => v.CallSign.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToArray();
+        VehicleConflicts = duplicates.Length == 0
+            ? null
+            : $"Doppelte Funkrufnamen: {string.Join(", ", duplicates)}";
     }
 
     private MasterDataSet BuildSet() => _original with
@@ -104,16 +138,21 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
         ChecklistTemplateAbbau = _checklistAbbau.ToValues(),
         Personnel = _personnel.ToPeople(),
+        Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),
         // Streets are not editable here; _original carries them through unchanged.
     };
 
-    [RelayCommand(CanExecute = nameof(IsDirty))]
+    [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
         _provider.Save(BuildSet());
         Load(); // reflect normalization (trim/dedupe, name-sorted personnel) and clear dirty
     }
+
+    // Dirty alone is not enough: a duplicate Funkrufname must be resolved before the set can be
+    // written (#76 follow-up).
+    private bool CanSave => IsDirty && !HasVehicleConflicts;
 
     [RelayCommand(CanExecute = nameof(IsDirty))]
     private void Discard() => Load();
