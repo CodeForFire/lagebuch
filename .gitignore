@@ -29,3 +29,6 @@ seed-source/
 
 # Generated voice/audio drafts (filenames can carry voice-artist names)
 *.mp3
+
+# git worktrees (superpowers isolation)
+.worktrees/
