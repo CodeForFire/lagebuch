@@ -5,7 +5,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
 
   # NuGet packages across the solution. All Avalonia packages are grouped so
   # they arrive as a single pull request (they must always move in lockstep).
@@ -13,7 +13,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
     groups:
       avalonia:
         patterns:
