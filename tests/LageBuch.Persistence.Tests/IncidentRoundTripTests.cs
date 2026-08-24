@@ -1,5 +1,6 @@
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Domain;
@@ -46,6 +47,11 @@ public class IncidentRoundTripTests : IDisposable
         clock.Now = clock.Now.AddMinutes(3);
         incident.UpdateForceStrength(clock, op, incident.Forces[0].Id,
             officerCount: 1, personnelCount: 14, scbaCount: 7);
+        clock.Now = clock.Now.AddMinutes(2);
+        incident.AddTask(clock, op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
+        var taskDueAt = clock.Now.AddMinutes(5);
+        incident.AddTask(clock, op, "Nachfordern", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        incident.SetTaskCompleted(incident.Tasks[1].Id, true, clock, op);
 
         var repo = new IncidentRepository();
         repo.Save(_path, incident);
@@ -103,6 +109,13 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal((1, 12, 6), (strengthEdit.PreviousOfficerCount, strengthEdit.PreviousPersonnelCount, strengthEdit.PreviousScbaCount));
         Assert.Equal(op.Display, strengthEdit.EditedBy);
         Assert.Equal(incident.Audit.Count, loaded.Audit.Count);
+        Assert.Equal(2, loaded.Tasks.Count);
+        Assert.Equal("Tür sichern", loaded.Tasks[0].Text);
+        Assert.Equal("FFB 1/44/1", loaded.Tasks[0].Assignee);
+        Assert.Equal(taskDueAt, loaded.Tasks[0].DueAt);
+        Assert.False(loaded.Tasks[0].IsCompleted);
+        Assert.True(loaded.Tasks[1].IsCompleted);
+        Assert.NotNull(loaded.Tasks[1].CompletedAt);
     }
 
     [Fact]
@@ -338,5 +351,31 @@ public class IncidentRoundTripTests : IDisposable
         var loaded = repo.Load(_path);
         Assert.Empty(loaded.Forces);
         Assert.Equal((0, 0), (loaded.TotalPersonnel, loaded.TotalScba));
+    }
+
+    [Fact]
+    public void V13_file_gains_an_empty_tasks_table_and_still_loads()
+    {
+        // Build a current (V14) file, then roll the marker back and drop the new table to simulate
+        // a file written by the previous app version.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op, "Brand");
+        incident.AddTask(clock, op, "Alt", null, TaskImportance.Medium, TaskUrgency.Medium, 15);
+        new IncidentRepository().Save(_path, incident);
+
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "UPDATE schema_version SET version = 13; DROP TABLE IF EXISTS incident_tasks;";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        var loaded = new IncidentRepository().Load(_path);
+
+        Assert.Empty(loaded.Tasks);           // old file has no tasks — loads cleanly, migrates to V14
+        Assert.Equal("Brand", loaded.Keyword);
     }
 }
