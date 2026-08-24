@@ -97,9 +97,25 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
 
     partial void OnFilterChanged(TaskFilterKind value) => Sync(); // rebuild the visible subset
 
-    public bool IsOpenFilter => Filter == TaskFilterKind.Open;
-    public bool IsDoneFilter => Filter == TaskFilterKind.Done;
-    public bool IsAllFilter => Filter == TaskFilterKind.All;
+    // TwoWay radio bindings: checking writes through to Filter; writing false (a binding engine
+    // syncing the unchecked radios) must be a no-op, never flip the filter.
+    public bool IsOpenFilter
+    {
+        get => Filter == TaskFilterKind.Open;
+        set { if (value) Filter = TaskFilterKind.Open; }
+    }
+
+    public bool IsDoneFilter
+    {
+        get => Filter == TaskFilterKind.Done;
+        set { if (value) Filter = TaskFilterKind.Done; }
+    }
+
+    public bool IsAllFilter
+    {
+        get => Filter == TaskFilterKind.All;
+        set { if (value) Filter = TaskFilterKind.All; }
+    }
 
     [RelayCommand]
     private void ShowOpen() => Filter = TaskFilterKind.Open;
@@ -228,6 +244,11 @@ public sealed partial class TaskRow : ObservableObject
         IsImportanceMedium = task.Importance == TaskImportance.Medium;
         IsImportanceLow = task.Importance == TaskImportance.Low;
         _isDone = task.IsCompleted;
+        // German short stamp for completed rows; Sync() recreates the row on completion, so a
+        // static snapshot is enough. Empty while open — the view hides the label then.
+        CompletedDisplay = task.CompletedAt is { } completedAt
+            ? $"ERLEDIGT · {completedAt:HH:mm}"
+            : string.Empty;
         RemainingDisplay = ComputeRemaining(task, now);
         IsOverdue = ComputeIsOverdue(task, now);
     }
@@ -245,6 +266,9 @@ public sealed partial class TaskRow : ObservableObject
     public bool IsImportanceMedium { get; }
     public bool IsImportanceLow { get; }
     public bool IsReadOnly { get; }
+
+    /// <summary>"ERLEDIGT · HH:mm" once done, empty while open (completion time from the task).</summary>
+    public string CompletedDisplay { get; }
 
     [ObservableProperty]
     private bool _isDone;

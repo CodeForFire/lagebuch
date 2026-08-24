@@ -215,6 +215,40 @@ public class TasksViewModelTests
         Assert.False(vm.AddTaskCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void Completed_rows_carry_an_erledigt_stamp_open_rows_none()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        var vm = NewVm(session, clock);
+        vm.Filter = TaskFilterKind.All; // the toggle survives Sync only while done rows stay visible
+
+        Assert.Equal(string.Empty, vm.Rows.Single().CompletedDisplay); // open: no stamp
+
+        vm.Rows.Single().IsDone = true;
+        var done = vm.Rows.Single(); // recreated by the write-back's Sync
+
+        Assert.True(done.IsDone);
+        Assert.StartsWith("ERLEDIGT ·", done.CompletedDisplay);
+    }
+
+    [Fact]
+    public void Radio_bools_write_through_to_the_filter_and_false_is_a_noop()
+    {
+        var (session, clock, _) = NewSession();
+        var vm = NewVm(session, clock);
+
+        Assert.True(vm.IsOpenFilter);   // default OFFEN
+
+        vm.IsDoneFilter = true;         // TwoWay radio binding write
+        Assert.True(vm.IsDoneFilter);
+        Assert.False(vm.IsOpenFilter);
+        Assert.Equal(TaskFilterKind.Done, vm.Filter);
+
+        vm.IsOpenFilter = false;        // binding engines may write back unchanged values
+        Assert.Equal(TaskFilterKind.Done, vm.Filter); // ... that must not flip the filter
+    }
+
     private static TasksViewModel NewVm(LocalIncidentSession session, FixedClock clock,
         FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
         new(session, clock, ticker ?? new FakeTicker(), alarm ?? new FakeAlarmService(),
