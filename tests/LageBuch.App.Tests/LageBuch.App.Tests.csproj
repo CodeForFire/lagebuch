@@ -10,10 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="10.0.1" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <!-- 4.x adapter still runs xunit v2 tests; kept ahead of the root-managed 2.5.3. -->
+    <PackageReference Include="xunit.runner.visualstudio" VersionOverride="4.0.0" />
   </ItemGroup>
 
   <ItemGroup>

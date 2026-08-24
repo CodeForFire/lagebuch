@@ -1,0 +1,12 @@
+<Project>
+  <!-- xunit.v3 test stack: newer toolchain than the xunit v2 projects. Nearest-wins
+       rules apply, so import the root definitions first. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props, $(MSBuildThisFileDirectory)..))" />
+
+  <ItemGroup>
+    <PackageVersion Update="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageVersion Update="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Update="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+  </ItemGroup>
+</Project>
