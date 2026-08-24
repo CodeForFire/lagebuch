@@ -56,7 +56,8 @@ public class IncidentTimerTests
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(), Array.Empty<AuditEvent>(),
             new[] { new IncidentTimerState("ils-reminder", T0, 15, 30, true) },
-            Array.Empty<Files.IncidentFile>());
+            Array.Empty<Files.IncidentFile>(),
+            Array.Empty<Tasks.IncidentTask>());
 
         Assert.Equal("ils-reminder", Assert.Single(incident.Timers).Key);
     }
