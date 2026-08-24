@@ -35,7 +35,10 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
-    private readonly IDisposable _subscription;
+    // Null on a read-only workspace: rows are static history there and the due alarm is gated off
+    // anyway, so holding a live ticker subscription would only keep the clock ticking for nothing
+    // (ScbaViewModel precedent — keeps Closing_workspace_drops_reminder at zero subscribers).
+    private readonly IDisposable? _subscription;
     private readonly HashSet<Guid> _dueAnnounced = new();
 
     public TasksViewModel(
@@ -54,7 +57,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
             .Distinct()
             .ToArray();
         Rows = new ObservableCollection<TaskRow>();
-        _subscription = ticker.Subscribe(OnTick);
+        _subscription = IsReadOnly ? null : ticker.Subscribe(OnTick);
         _session.Changed += Sync;
         Sync();
     }
@@ -210,7 +213,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        _subscription.Dispose();
+        _subscription?.Dispose();
         _session.Changed -= Sync;
     }
 }

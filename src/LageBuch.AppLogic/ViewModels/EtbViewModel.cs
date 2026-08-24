@@ -21,7 +21,8 @@ namespace LageBuch.AppLogic.ViewModels;
 public sealed class EtbEntryRow
 {
     public EtbEntryRow(
-        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
+        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory,
+        Action<EtbEntryRow>? createTask = null)
     {
         Id = entry.Id;
         Time = Formatting.Timestamp(entry.Timestamp);
@@ -39,6 +40,10 @@ public sealed class EtbEntryRow
         // remotely-joined-read-only incident must still let its history be read, since that is the
         // one thing that makes an edit acceptable in the first place.
         ShowHistoryCommand = new RelayCommand(() => showHistory(this), () => WasEdited);
+        // Not gated on IsEditable either — creating a task FROM a system line is legitimate (e.g. a
+        // Rückzugsalarm line becoming a follow-up task). Read-only gating comes from the workspace
+        // hiding the column content (rows rebuilt on transitions).
+        CreateTaskCommand = createTask is null ? null : new RelayCommand(() => createTask(this));
     }
 
     public Guid Id { get; }
@@ -54,6 +59,7 @@ public sealed class EtbEntryRow
     public bool IsEditable { get; }
     public ICommand BeginEditCommand { get; }
     public ICommand ShowHistoryCommand { get; }
+    public ICommand? CreateTaskCommand { get; }
 }
 
 /// <summary>
@@ -68,6 +74,9 @@ public sealed partial class EtbViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
+    // Opens the create-task overlay pre-filled with an entry's text (#88); null where the host
+    // offers no task feature, which leaves every row's CreateTaskCommand null too.
+    private readonly Action<string>? _createTaskFromEntry;
 
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
@@ -77,11 +86,13 @@ public sealed partial class EtbViewModel : ObservableObject
     // instead of a linear scan of _all for every journal entry.
     private readonly Dictionary<Guid, EtbEntryRow> _byId = new();
 
-    public EtbViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
+    public EtbViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged,
+        Action<string>? createTaskFromEntry = null)
     {
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
+        _createTaskFromEntry = createTaskFromEntry;
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
         Entries = new ObservableCollection<EtbEntryRow>();
@@ -242,5 +253,6 @@ public sealed partial class EtbViewModel : ObservableObject
     [RelayCommand]
     private void CloseHistory() => HistoryEntry = null;
 
-    private EtbEntryRow ToRow(EtbEntry e) => new(e, BeginEdit, CanEdit, ShowHistory);
+    private EtbEntryRow ToRow(EtbEntry e) =>
+        new(e, BeginEdit, CanEdit, ShowHistory, entry => _createTaskFromEntry?.Invoke(entry.Text));
 }
