@@ -114,7 +114,7 @@ public sealed record IncidentFileDto(
     Guid Id, string FileName, string DisplayName, string ContentType, long SizeBytes, DateTimeOffset AddedAt, string AddedBy);
 
 // Mirrors Domain.IncidentTask (#88); importance/urgency ride as the domain enums directly (the
-// wire serializes them as ordinals), matching how EtbEntryDto carries EtbDirection.
+// wire serializes them as name strings), matching how EtbEntryDto carries EtbDirection.
 public sealed record TaskDto(
     Guid Id,
     string Text,
