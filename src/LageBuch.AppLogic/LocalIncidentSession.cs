@@ -5,6 +5,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Time;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Sync;
 
@@ -145,6 +146,12 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void RemoveForceUnit(Guid unitId) =>
         Mutate(() => Incident.RemoveForceUnit(_clock, RequireOperator(), unitId));
+
+    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
+        Mutate(() => Incident.AddTask(_clock, RequireOperator(), text, assignee, importance, urgency, timerMinutes));
+
+    public void SetTaskCompleted(Guid taskId, bool isDone) =>
+        Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));
 
     public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,

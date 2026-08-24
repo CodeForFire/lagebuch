@@ -5,6 +5,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -173,6 +174,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void RemoveForceUnit(Guid unitId) =>
         Send(new RemoveForceUnitCommand(Op(), unitId));
+
+    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
+        Send(new AddTaskCommand(Op(), text, assignee ?? string.Empty, importance, urgency, timerMinutes));
+
+    public void SetTaskCompleted(Guid taskId, bool isDone) =>
+        Send(new SetTaskCompletedCommand(Op(), taskId, isDone));
 
     public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,

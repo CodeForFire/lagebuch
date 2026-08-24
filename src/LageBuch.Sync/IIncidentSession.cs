@@ -1,6 +1,7 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Sync;
@@ -57,6 +58,13 @@ public interface IIncidentSession
     /// <summary>Takes a unit back completely: row, Wert-Historie and totals go, the ETB records
     /// the removal (#76 follow-up).</summary>
     void RemoveForceUnit(Guid unitId);
+
+    /// <summary>Records a task (#88). The timer's minutes land as DueAt relative to the owning
+    /// device's/host's clock — never sent as an absolute time over the wire.</summary>
+    void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes);
+
+    /// <summary>Stamps/clears a task's completion (#88).</summary>
+    void SetTaskCompleted(Guid taskId, bool isDone);
     void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
