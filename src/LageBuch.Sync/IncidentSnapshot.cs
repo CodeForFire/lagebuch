@@ -1,6 +1,7 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
 
@@ -29,7 +30,8 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<ScbaTruppDto> ScbaTrupps,
     IReadOnlyList<AuditEventDto> Audit,
     IReadOnlyList<TimerDto> Timers,
-    IReadOnlyList<IncidentFileDto> Files);
+    IReadOnlyList<IncidentFileDto> Files,
+    IReadOnlyList<TaskDto> Tasks);
 
 public sealed record TimerDto(
     string Key,
@@ -110,3 +112,17 @@ public sealed record AuditEventDto(DateTimeOffset At, string Action, string By);
 /// </summary>
 public sealed record IncidentFileDto(
     Guid Id, string FileName, string DisplayName, string ContentType, long SizeBytes, DateTimeOffset AddedAt, string AddedBy);
+
+// Mirrors Domain.IncidentTask (#88); importance/urgency ride as the domain enums directly (the
+// wire serializes them as ordinals), matching how EtbEntryDto carries EtbDirection.
+public sealed record TaskDto(
+    Guid Id,
+    string Text,
+    string Assignee,
+    TaskImportance Importance,
+    TaskUrgency Urgency,
+    string CreatedBy,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset DueAt,
+    DateTimeOffset? CompletedAt,
+    string? CompletedBy);
