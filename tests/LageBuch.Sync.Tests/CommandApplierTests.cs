@@ -1,6 +1,7 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync.Tests;
 
@@ -160,5 +161,36 @@ public class CommandApplierTests
         Assert.Throws<InvalidOperationException>(() =>
             ApplyOverWire(new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert"),
                 incident, clock));
+    }
+
+    [Fact]
+    public void AddTask_is_due_relative_to_the_host_clock_and_attributed_to_the_sender()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        ApplyOverWire(new AddTaskCommand(new OperatorDto("Client", "RUF 1"), "Tür sichern", "FFB 1/44/1",
+            TaskImportance.High, TaskUrgency.Medium, 10), incident, clock);
+
+        var task = Assert.Single(incident.Tasks);
+        Assert.Equal("Tür sichern", task.Text);
+        Assert.Equal(clock.Now.AddMinutes(10), task.DueAt);      // host clock is authoritative
+        Assert.Equal("Client (RUF 1)", task.CreatedBy);          // sender attribution, not the host's
+    }
+
+    [Fact]
+    public void SetTaskCompleted_toggles_completion_with_host_time()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", null);
+        ApplyOverWire(new AddTaskCommand(op, "X", "", TaskImportance.Low, TaskUrgency.Low, 5), incident, clock);
+        var taskId = incident.Tasks[0].Id;
+
+        clock.Now = clock.Now.AddMinutes(1);
+        ApplyOverWire(new SetTaskCompletedCommand(op, taskId, true), incident, clock);
+
+        Assert.True(incident.Tasks[0].IsCompleted);
+        Assert.Equal("Client", incident.Tasks[0].CompletedBy);
     }
 }
