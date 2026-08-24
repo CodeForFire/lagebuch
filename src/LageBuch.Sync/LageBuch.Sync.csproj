@@ -5,7 +5,7 @@
        the net8.0-android head too); only the Kestrel *server* is desktop-only, and it lives in the
        separate LageBuch.Sync.Hosting project. -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
   </ItemGroup>
 
   <ItemGroup>

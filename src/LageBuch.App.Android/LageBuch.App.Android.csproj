@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-android</TargetFramework>
+    <!-- Explicit API level: bare net8.0-android normalizes to android1.0, which
+         Avalonia.Android/Xamarin.AndroidX (net8.0-android34.0) reject with NU1202. -->
+    <TargetFramework>net8.0-android34.0</TargetFramework>
     <!-- Without OutputType=Exe a net8.0-android project builds as a library (.aar); the app head
          must be Exe so publish packages a launchable .apk. -->
     <OutputType>Exe</OutputType>
@@ -18,10 +20,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia.Android" Version="11.2.2" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.2" />
-    <PackageReference Include="Xamarin.AndroidX.Core" Version="1.15.0.1" />
-    <PackageReference Include="Xamarin.AndroidX.Activity" Version="1.9.3.1" />
+    <PackageReference Include="Avalonia.Android" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="Xamarin.AndroidX.Core" />
+    <PackageReference Include="Xamarin.AndroidX.Activity" />
   </ItemGroup>
 
   <ItemGroup>

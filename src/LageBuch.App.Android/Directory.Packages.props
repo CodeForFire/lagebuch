@@ -1,0 +1,14 @@
+<Project>
+  <!-- Android head still on the Avalonia 11.x line; the rest of the solution is on
+       12.1.1 (see root Directory.Packages.props). Align this file together with the
+       root when the next Avalonia lockstep upgrade lands. Nearest-wins rules apply,
+       so import the root definitions first. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props, $(MSBuildThisFileDirectory)..))" />
+
+  <ItemGroup>
+    <PackageVersion Include="Avalonia.Android" Version="11.2.2" />
+    <PackageVersion Update="Avalonia.Fonts.Inter" Version="11.2.2" />
+    <PackageVersion Include="Xamarin.AndroidX.Activity" Version="1.9.3.1" />
+    <PackageVersion Include="Xamarin.AndroidX.Core" Version="1.15.0.1" />
+  </ItemGroup>
+</Project>
