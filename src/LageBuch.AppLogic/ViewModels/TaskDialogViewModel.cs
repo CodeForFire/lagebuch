@@ -64,7 +64,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     public IReadOnlyList<UrgencyOption> UrgencyOptions { get; }
 
     private bool CanSave =>
-        !string.IsNullOrWhiteSpace(Text) && TimerMinutes is > 0;
+        !_session.IsReadOnly && !string.IsNullOrWhiteSpace(Text) && TimerMinutes is > 0;
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()

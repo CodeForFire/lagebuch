@@ -94,4 +94,21 @@ public class TaskDialogViewModelTests
         dialog.Text = "Jetzt ja";
         Assert.True(dialog.SaveCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void Save_canExecute_is_gated_on_a_readonly_session()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+
+        var dialog = new TaskDialogViewModel(ro, MasterData(), "Nachtrag", () => { });
+
+        Assert.False(dialog.SaveCommand.CanExecute(null));
+        Assert.False(dialog.SaveAndCreateAnotherCommand.CanExecute(null));
+        dialog.Text = "Jetzt erst recht"; // text alone must not re-enable on a closed Einsatz
+        Assert.False(dialog.SaveCommand.CanExecute(null));
+    }
 }
