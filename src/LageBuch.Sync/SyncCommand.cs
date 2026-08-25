@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
@@ -35,6 +36,13 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(RenameFileCommand), "renameFile")]
 [JsonDerivedType(typeof(AddTaskCommand), "addTask")]
 [JsonDerivedType(typeof(SetTaskCompletedCommand), "setTaskCompleted")]
+[JsonDerivedType(typeof(AddCoBuildingCommand), "addCoBuilding")]
+[JsonDerivedType(typeof(UpdateCoBuildingStructureCommand), "updateCoBuildingStructure")]
+[JsonDerivedType(typeof(RemoveCoBuildingCommand), "removeCoBuilding")]
+[JsonDerivedType(typeof(RecordCoValueCommand), "recordCoValue")]
+[JsonDerivedType(typeof(SetDwellingStatusCommand), "setDwellingStatus")]
+[JsonDerivedType(typeof(UpdateDwellingDetailsCommand), "updateDwellingDetails")]
+[JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -108,3 +116,26 @@ public sealed record AddTaskCommand(
     TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes) : SyncCommand;
 
 public sealed record SetTaskCompletedCommand(OperatorDto Operator, Guid TaskId, bool IsDone) : SyncCommand;
+
+public sealed record AddCoBuildingCommand(
+    OperatorDto Operator, string Name, int FloorCount, int ApartmentsPerFloor) : SyncCommand;
+
+public sealed record UpdateCoBuildingStructureCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorCount, int ApartmentsPerFloor) : SyncCommand;
+
+public sealed record RemoveCoBuildingCommand(
+    OperatorDto Operator, Guid BuildingId) : SyncCommand;
+
+public sealed record RecordCoValueCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int ApartmentNumber, int? CoValue) : SyncCommand;
+
+public sealed record SetDwellingStatusCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int ApartmentNumber, DwellingStatus Status) : SyncCommand;
+
+// No operator (silent)
+public sealed record UpdateDwellingDetailsCommand(
+    Guid BuildingId, int FloorOrdinal, int ApartmentNumber, string? ResidentName, bool? KeyAvailable) : SyncCommand;
+
+// No operator (silent)
+public sealed record SetFloorDescriptionCommand(
+    Guid BuildingId, int FloorOrdinal, string? Description) : SyncCommand;

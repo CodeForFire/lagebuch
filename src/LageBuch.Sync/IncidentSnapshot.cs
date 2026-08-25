@@ -1,5 +1,6 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
@@ -31,7 +32,9 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<AuditEventDto> Audit,
     IReadOnlyList<TimerDto> Timers,
     IReadOnlyList<IncidentFileDto> Files,
-    IReadOnlyList<TaskDto> Tasks);
+    IReadOnlyList<TaskDto> Tasks,
+    IReadOnlyList<BuildingDto> Buildings,
+    IReadOnlyList<DwellingDto> Dwellings);
 
 public sealed record TimerDto(
     string Key,
@@ -126,3 +129,11 @@ public sealed record TaskDto(
     DateTimeOffset DueAt,
     DateTimeOffset? CompletedAt,
     string? CompletedBy);
+
+public sealed record BuildingDto(
+    Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,
+    Dictionary<string, string?> FloorDescriptions, int Ordinal);
+
+public sealed record DwellingDto(
+    Guid Id, Guid BuildingId, int FloorOrdinal, int ApartmentNumber,
+    string? ResidentName, DwellingStatus Status, bool? KeyAvailable, int? CoValue);
