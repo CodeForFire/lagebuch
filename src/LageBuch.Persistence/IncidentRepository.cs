@@ -393,7 +393,8 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers, files, tasks);
+            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers, files, tasks,
+            Array.Empty<Domain.CoMeasurement.Building>(), Array.Empty<Domain.CoMeasurement.Dwelling>());
     }
 
     private static DateTimeOffset ParseDate(string s) =>

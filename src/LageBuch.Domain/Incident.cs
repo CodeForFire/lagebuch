@@ -1,4 +1,5 @@
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
@@ -21,6 +22,8 @@ public sealed class Incident
     private readonly List<IncidentTimerState> _timers = new();
     private readonly List<IncidentFile> _files = new();
     private readonly List<IncidentTask> _tasks = new();
+    private readonly List<Building> _buildings = new();
+    private readonly List<Dwelling> _dwellings = new();
 
     private Incident() { }
 
@@ -54,8 +57,26 @@ public sealed class Incident
     /// view layer — the aggregate keeps insertion order, like every other list here.</summary>
     public IReadOnlyList<IncidentTask> Tasks => _tasks;
 
+    public IReadOnlyList<Building> Buildings => _buildings;
+    public IReadOnlyList<Dwelling> Dwellings => _dwellings;
+
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
+
+    private static string FloorLabel(int ordinal) =>
+        ordinal == 0 ? "EG" : $"{ordinal}. OG";
+
+    private Building FindBuilding(Guid buildingId) =>
+        _buildings.FirstOrDefault(b => b.Id == buildingId)
+            ?? throw new KeyNotFoundException($"Haus {buildingId} nicht gefunden.");
+
+    private Dwelling FindDwelling(Guid buildingId, int floorOrdinal, int apartmentNumber) =>
+        _dwellings.FirstOrDefault(d =>
+            d.BuildingId == buildingId &&
+            d.FloorOrdinal == floorOrdinal &&
+            d.ApartmentNumber == apartmentNumber)
+            ?? throw new KeyNotFoundException(
+                $"Wohnung nicht gefunden: {buildingId}, {FloorLabel(floorOrdinal)}, Whg. {apartmentNumber}");
 
     public static Incident Start(
         IClock clock,
@@ -101,7 +122,9 @@ public sealed class Incident
         IEnumerable<AuditEvent> audit,
         IEnumerable<IncidentTimerState> timers,
         IEnumerable<IncidentFile> files,
-        IEnumerable<IncidentTask> tasks)
+        IEnumerable<IncidentTask> tasks,
+        IEnumerable<Building> buildings,
+        IEnumerable<Dwelling> dwellings)
     {
         var incident = new Incident
         {
@@ -126,6 +149,8 @@ public sealed class Incident
         incident._timers.AddRange(timers);
         incident._files.AddRange(files);
         incident._tasks.AddRange(tasks);
+        incident._buildings.AddRange(buildings);
+        incident._dwellings.AddRange(dwellings);
         return incident;
     }
 
@@ -698,4 +723,122 @@ public sealed class Incident
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId)
             ?? throw new KeyNotFoundException($"Atemschutz-Trupp {truppId} not found.");
+
+    public void AddCoBuilding(IClock clock, SessionOperator op, string name, int floorCount, int apartmentsPerFloor)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var ordinal = _buildings.Count;
+        var building = Building.Create(name, floorCount, apartmentsPerFloor, ordinal);
+        _buildings.Add(building);
+
+        for (var floor = 0; floor <= floorCount; floor++)
+            for (var apt = 1; apt <= apartmentsPerFloor; apt++)
+                _dwellings.Add(Dwelling.Create(building.Id, floor, apt));
+
+        AppendSystemEntry(clock, op,
+            $"CO-Messprotokoll eröffnet: {building.Name} (EG–{FloorLabel(floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss)");
+    }
+
+    public void UpdateCoBuildingStructure(IClock clock, SessionOperator op, Guid buildingId, int floorCount, int apartmentsPerFloor)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var building = FindBuilding(buildingId);
+        var oldFloorCount = building.FloorCount;
+        var oldApts = building.ApartmentsPerFloor;
+
+        var updated = building.WithStructure(floorCount, apartmentsPerFloor);
+        var index = _buildings.IndexOf(building);
+        _buildings[index] = updated;
+
+        // Remove dwellings outside the new structure
+        var removed = _dwellings.RemoveAll(d =>
+            d.BuildingId == buildingId &&
+            (d.FloorOrdinal > floorCount || d.ApartmentNumber > apartmentsPerFloor));
+
+        var text = $"CO-Struktur geändert: {building.Name} jetzt EG–{FloorLabel(floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss";
+        if (removed > 0)
+            text += $", {removed} Wohnungen entfernt";
+
+        AppendSystemEntry(clock, op, text);
+    }
+
+    public void RemoveCoBuilding(IClock clock, SessionOperator op, Guid buildingId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var building = FindBuilding(buildingId);
+        _buildings.Remove(building);
+        _dwellings.RemoveAll(d => d.BuildingId == buildingId);
+
+        AppendSystemEntry(clock, op, $"CO-Messprotokoll entfernt: {building.Name}");
+    }
+
+    public void RecordCoValue(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        if (coValue is < 0)
+            throw new ArgumentOutOfRangeException(nameof(coValue), "CO-Messwert darf nicht negativ sein.");
+
+        var building = FindBuilding(buildingId);
+        var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
+
+        if (dwelling.CoValue == coValue)
+            return;
+
+        var index = _dwellings.IndexOf(dwelling);
+        _dwellings[index] = dwelling.WithCoValue(coValue);
+
+        var location = CoMeasurementLabels.DwellingLocation(building, floorOrdinal, apartmentNumber);
+        var text = coValue is { } v
+            ? $"CO-Messung {location}: {v} ppm"
+            : $"CO-Messung {location}: Messwert gelöscht";
+        AppendSystemEntry(clock, op, text);
+    }
+
+    public void SetDwellingStatus(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var building = FindBuilding(buildingId);
+        var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
+
+        if (dwelling.Status == status)
+            return;
+
+        var index = _dwellings.IndexOf(dwelling);
+        _dwellings[index] = dwelling.WithStatus(status);
+
+        var location = CoMeasurementLabels.DwellingLocation(building, floorOrdinal, apartmentNumber);
+        AppendSystemEntry(clock, op, $"Whg.-Status {location}: {CoMeasurementLabels.StatusText(status)}");
+    }
+
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable)
+    {
+        EnsureOpen();
+        var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
+        var index = _dwellings.IndexOf(dwelling);
+        _dwellings[index] = dwelling.WithDetails(residentName, keyAvailable);
+    }
+
+    public void SetFloorDescription(Guid buildingId, int ordinal, string? description)
+    {
+        EnsureOpen();
+        var building = FindBuilding(buildingId);
+        var updated = building.WithFloorDescription(ordinal, description);
+        var index = _buildings.IndexOf(building);
+        _buildings[index] = updated;
+    }
 }

@@ -78,7 +78,8 @@ public class IncidentTaskAggregateTests
             seed.Id, seed.StartedAt, seed.State, seed.IncidentNumber, seed.Keyword, seed.Street,
             seed.District, seed.Status, seed.ClosedAt, seed.ClosedBy,
             seed.ChecklistAufbau, seed.ChecklistAbbau, seed.Journal, seed.Roles, seed.Forces,
-            seed.ScbaTrupps, seed.Audit, seed.Timers, seed.Files, seed.Tasks);
+            seed.ScbaTrupps, seed.Audit, seed.Timers, seed.Files, seed.Tasks,
+            seed.Buildings, seed.Dwellings);
 
         Assert.Equal(2, restored.Tasks.Count);
         Assert.Equal("Offen", restored.Tasks[0].Text);

@@ -35,4 +35,14 @@ public sealed record Dwelling
             KeyAvailable = keyAvailable,
             CoValue = coValue
         };
+
+    public Dwelling WithCoValue(int? coValue) => this with { CoValue = coValue };
+
+    public Dwelling WithStatus(DwellingStatus status) => this with { Status = status };
+
+    public Dwelling WithDetails(string? residentName, bool? keyAvailable) => this with
+    {
+        ResidentName = string.IsNullOrWhiteSpace(residentName) ? null : residentName.Trim(),
+        KeyAvailable = keyAvailable
+    };
 }

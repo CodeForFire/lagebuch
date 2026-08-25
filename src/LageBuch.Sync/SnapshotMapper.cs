@@ -73,7 +73,9 @@ public static class SnapshotMapper
             snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)),
             snapshot.Files.Select(f => IncidentFile.Rehydrate(f.Id, f.FileName, f.DisplayName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)),
             snapshot.Tasks.Select(t => IncidentTask.Rehydrate(t.Id, t.CreatedAt, t.Text, t.Assignee,
-                t.Importance, t.Urgency, t.CreatedBy, t.DueAt, t.CompletedAt, t.CompletedBy)));
+                t.Importance, t.Urgency, t.CreatedBy, t.DueAt, t.CompletedAt, t.CompletedBy)),
+            Enumerable.Empty<Domain.CoMeasurement.Building>(),
+            Enumerable.Empty<Domain.CoMeasurement.Dwelling>());
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

@@ -120,4 +120,134 @@ public class CoMeasurementTests
         var updated = building.WithFloorDescription(3, "");
         Assert.False(updated.FloorDescriptions.ContainsKey(3));
     }
+
+    [Fact]
+    public void Incident_AddCoBuilding_CreatesBuildingAndDwellings()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+
+        Assert.Single(incident.Buildings);
+        Assert.Equal("Haus A", incident.Buildings[0].Name);
+        Assert.Equal(9, incident.Dwellings.Count);
+        Assert.All(incident.Dwellings, d => Assert.Equal(DwellingStatus.NotSearched, d.Status));
+    }
+
+    [Fact]
+    public void Incident_AddCoBuilding_LogsToETB()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+
+        incident.AddCoBuilding(clock, op, "Haus A", 8, 10);
+
+        var entry = incident.Journal.Last();
+        Assert.Contains("CO-Messprotokoll eröffnet", entry.Text);
+        Assert.Contains("Haus A", entry.Text);
+    }
+
+    [Fact]
+    public void Incident_RecordCoValue_OnlyLogsOnRealChange()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var journalCountBefore = incident.Journal.Count;
+
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
+        Assert.Equal(journalCountBefore + 1, incident.Journal.Count);
+
+        // Same value - no new entry
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
+        Assert.Equal(journalCountBefore + 1, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Incident_RecordCoValue_NegativeValue_Throws()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, -1));
+    }
+
+    [Fact]
+    public void Incident_SetDwellingStatus_OnlyLogsOnRealChange()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var journalCountBefore = incident.Journal.Count;
+
+        incident.SetDwellingStatus(clock, op, incident.Buildings[0].Id, 0, 1, DwellingStatus.Searched);
+        Assert.Equal(journalCountBefore + 1, incident.Journal.Count);
+
+        // Same status - no new entry
+        incident.SetDwellingStatus(clock, op, incident.Buildings[0].Id, 0, 1, DwellingStatus.Searched);
+        Assert.Equal(journalCountBefore + 1, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Incident_UpdateCoBuildingStructure_RemovesDwellings()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 4, 5); // 5 floors * 5 apts = 25
+
+        incident.UpdateCoBuildingStructure(clock, op, incident.Buildings[0].Id, 2, 3);
+
+        Assert.Equal(2, incident.Buildings[0].FloorCount);
+        Assert.Equal(3, incident.Buildings[0].ApartmentsPerFloor);
+        Assert.Equal(9, incident.Dwellings.Count); // 3 floors * 3 apts
+    }
+
+    [Fact]
+    public void Incident_RemoveCoBuilding_RemovesAllDwellings()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+
+        incident.RemoveCoBuilding(clock, op, incident.Buildings[0].Id);
+
+        Assert.Empty(incident.Buildings);
+        Assert.Empty(incident.Dwellings);
+    }
+
+    [Fact]
+    public void Incident_EnsureOpen_ThrowsOnClosed()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(() =>
+            incident.AddCoBuilding(clock, op, "Haus A", 2, 3));
+    }
+
+    [Fact]
+    public void Incident_SetDwellingDetails_DoesNotLogToETB()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var journalCountBefore = incident.Journal.Count;
+
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, "Müller", true);
+
+        Assert.Equal(journalCountBefore, incident.Journal.Count);
+    }
 }
