@@ -5,7 +5,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 14;
+    public const int CurrentVersion = 15;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -87,6 +87,10 @@ public static class Migrations
         if (version < 14)
         {
             ApplyV14(cn, tx);
+        }
+        if (version < 15)
+        {
+            ApplyV15(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -440,6 +444,32 @@ public static class Migrations
                 due_at TEXT NOT NULL,
                 completed_at TEXT,
                 completed_by TEXT
+            );
+            """);
+    }
+
+    private static void ApplyV15(SqliteConnection cn, SqliteTransaction tx)
+    {
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS co_buildings (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                floor_count INTEGER NOT NULL,
+                apartments_per_floor INTEGER NOT NULL,
+                floor_descriptions TEXT NOT NULL DEFAULT '{}',
+                ordinal INTEGER NOT NULL
+            );
+            """);
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS co_dwellings (
+                id TEXT PRIMARY KEY,
+                building_id TEXT NOT NULL,
+                floor_ordinal INTEGER NOT NULL,
+                apartment_number INTEGER NOT NULL,
+                resident_name TEXT,
+                status INTEGER NOT NULL,
+                key_available INTEGER,
+                co_value INTEGER
             );
             """);
     }
