@@ -1,9 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Explicit API level: bare net8.0-android normalizes to android1.0, which
-         Avalonia.Android/Xamarin.AndroidX (net8.0-android34.0) reject with NU1202. -->
-    <TargetFramework>net8.0-android34.0</TargetFramework>
+    <TargetFramework>net9.0-android</TargetFramework>
     <!-- Without OutputType=Exe a net8.0-android project builds as a library (.aar); the app head
          must be Exe so publish packages a launchable .apk. -->
     <OutputType>Exe</OutputType>
