@@ -1,0 +1,131 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             x:Class="LageBuch.App.Shared.Views.TasksView"
+             x:DataType="vm:TasksViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.prio-high">
+      <Setter Property="Foreground" Value="#FF3D2E" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.prio-medium">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <Style Selector="TextBlock.prio-low">
+      <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock.due">
+      <Setter Property="Foreground" Value="#FF3D2E" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </UserControl.Styles>
+  <DockPanel>
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <TextBlock Grid.Column="0" Text="AUFGABEN" Classes="overline" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+        <RadioButton x:Name="TaskFilterOpen" GroupName="taskFilter" Content="OFFEN"
+                     IsChecked="{Binding IsOpenFilter, Mode=TwoWay}" Margin="0,0,4,0" />
+        <RadioButton x:Name="TaskFilterDone" GroupName="taskFilter" Content="ERLEDIGT"
+                     IsChecked="{Binding IsDoneFilter, Mode=TwoWay}" Margin="0,0,4,0" />
+        <RadioButton x:Name="TaskFilterAll" GroupName="taskFilter" Content="ALLE"
+                     IsChecked="{Binding IsAllFilter, Mode=TwoWay}" />
+      </StackPanel>
+    </Grid>
+
+    <!-- Input dock -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <ComboBox Width="110" ItemsSource="{Binding ImportanceOptions}"
+                  SelectedValue="{Binding NewImportance}" SelectedValueBinding="{Binding Value}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:ImportanceOption">
+              <TextBlock Text="{Binding Label}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <ComboBox Width="130" ItemsSource="{Binding UrgencyOptions}"
+                  SelectedValue="{Binding NewUrgency}" SelectedValueBinding="{Binding Value}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:UrgencyOption">
+              <TextBlock Text="{Binding Label}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <AutoCompleteBox Width="140" Watermark="Zugeteilt" ItemsSource="{Binding AssigneeOptions}"
+                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                         Text="{Binding NewAssignee}" b:EnterSubmit.Command="{Binding AddTaskCommand}" />
+        <TextBox Width="70" Watermark="MIN" Text="{Binding NewTimerMinutes}"
+                 b:IntegerOnly.IsEnabled="True">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <TextBox x:Name="TaskNewTextBox" Width="320" Watermark="Aufgabe" Text="{Binding NewText}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button x:Name="TaskAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}" />
+      </StackPanel>
+    </Border>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid x:Name="TasksGrid" ItemsSource="{Binding Rows}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTemplateColumn Width="36">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <CheckBox IsChecked="{Binding IsDone}" IsEnabled="{Binding !IsReadOnly}"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="WICHTIG" Width="90">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding ImportanceLabel}"
+                           Classes.prio-high="{Binding IsImportanceHigh}"
+                           Classes.prio-medium="{Binding IsImportanceMedium}"
+                           Classes.prio-low="{Binding IsImportanceLow}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="DRINGL." Width="90">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding UrgencyLabel}"
+                           Classes.prio-high="{Binding IsUrgencyHigh}"
+                           Classes.prio-medium="{Binding IsUrgencyMedium}"
+                           Classes.prio-low="{Binding IsUrgencyLow}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="TIMER" Width="110">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding RemainingDisplay}"
+                           Classes.due="{Binding IsOverdue}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTextColumn Header="ZUGETEILT" Binding="{Binding Assignee}" />
+          <DataGridTemplateColumn Header="AUFGABE" Width="*">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <StackPanel Orientation="Vertical" Margin="6,4" Spacing="1">
+                  <TextBlock Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding CreatedDisplay}" Classes="overline" FontSize="9"
+                             Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+  </DockPanel>
+</UserControl>
