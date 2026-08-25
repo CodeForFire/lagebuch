@@ -2,6 +2,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Time;
@@ -203,6 +204,27 @@ public sealed class LocalIncidentSession : IIncidentSession
     }
 
     public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));
+
+    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor) =>
+        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor));
+
+    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor) =>
+        Mutate(() => Incident.UpdateCoBuildingStructure(_clock, RequireOperator(), buildingId, floorCount, apartmentsPerFloor));
+
+    public void RemoveCoBuilding(Guid buildingId) =>
+        Mutate(() => Incident.RemoveCoBuilding(_clock, RequireOperator(), buildingId));
+
+    public void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue) =>
+        Mutate(() => Incident.RecordCoValue(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, coValue));
+
+    public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
+        Mutate(() => Incident.SetDwellingStatus(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, status));
+
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable) =>
+        Mutate(() => Incident.SetDwellingDetails(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable));
+
+    public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
+        Mutate(() => Incident.SetFloorDescription(buildingId, floorOrdinal, description));
 
     public void Close()
     {
