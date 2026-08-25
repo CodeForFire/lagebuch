@@ -70,6 +70,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
 
+    // The create-task overlay behind an ETB row's button (#88); null while no dialog is open.
+    [ObservableProperty]
+    private TaskDialogViewModel? _pendingTaskDialog;
+
     // The Stichwort, captured once at creation (#69) and never edited afterward -- unlike the
     // Einsatznummer below, which the header lets you add/edit later.
     public string? KeywordDisplay { get; private set; }
@@ -149,6 +153,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public ScbaViewModel Scba { get; private set; } = null!;
     public FilesViewModel Files { get; private set; } = null!;
     public LinksViewModel Links { get; private set; } = null!;
+    public TasksViewModel Tasks { get; private set; } = null!;
     public ReminderViewModel? Reminder { get; private set; }
 
     public string StatusDisplay => Formatting.State(_session.Incident.State);
@@ -211,7 +216,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     {
         ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
         ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
-        Etb = new EtbViewModel(_session, _clock, _masterData, OnChanged);
+        Etb = new EtbViewModel(_session, _clock, _masterData, OnChanged,
+            text => OpenTaskDialog(text));
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
 
@@ -220,6 +226,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
         Files = new FilesViewModel(_session, _dialogs, OnChanged);
         Links = new LinksViewModel(_masterData.Links, _dialogs);
+
+        Tasks?.Dispose();
+        Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
 
         Reminder?.Dispose();
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
@@ -238,6 +247,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(Files));
         OnPropertyChanged(nameof(Links));
+        OnPropertyChanged(nameof(Tasks));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
     }
@@ -259,6 +269,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         // Clear the overlay on either outcome; PerformClose has already run on confirm.
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
+    }
+
+    /// <summary>Opens the create-task overlay pre-filled from an ETB entry's text (#88).</summary>
+    private void OpenTaskDialog(string text)
+    {
+        var dialog = new TaskDialogViewModel(_session, _masterData, text, OnChanged);
+        // Clear the overlay on either outcome; Save has already added the task on confirm.
+        dialog.Closed += (_, _) => PendingTaskDialog = null;
+        PendingTaskDialog = dialog;
     }
 
     private void PerformClose()

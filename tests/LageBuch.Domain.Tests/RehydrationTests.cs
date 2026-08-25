@@ -70,7 +70,8 @@ public class RehydrationTests
             Array.Empty<Atemschutz.AtemschutzTrupp>(),
             new[] { new AuditEvent(T0, "opened", "Müller") },
             Array.Empty<Time.IncidentTimerState>(),
-            Array.Empty<Files.IncidentFile>());
+            Array.Empty<Files.IncidentFile>(),
+            Array.Empty<Tasks.IncidentTask>());
 
         Assert.Equal(id, incident.Id);
         Assert.Equal(IncidentState.Closed, incident.State);
@@ -101,7 +102,8 @@ public class RehydrationTests
             Array.Empty<RoleAssignment>(), Array.Empty<ForceUnit>(),
             Array.Empty<Atemschutz.AtemschutzTrupp>(), Array.Empty<AuditEvent>(),
             Array.Empty<Time.IncidentTimerState>(),
-            new[] { Files.IncidentFile.Rehydrate(fileId, "bericht.pdf", "bericht.pdf", "application/pdf", 4096, T0, "Müller") });
+            new[] { Files.IncidentFile.Rehydrate(fileId, "bericht.pdf", "bericht.pdf", "application/pdf", 4096, T0, "Müller") },
+            Array.Empty<Tasks.IncidentTask>());
 
         var file = Assert.Single(incident.Files);
         Assert.Equal(fileId, file.Id);
@@ -119,7 +121,8 @@ public class RehydrationTests
             Array.Empty<Atemschutz.AtemschutzTrupp>(),
             Array.Empty<AuditEvent>(),
             Array.Empty<Time.IncidentTimerState>(),
-            Array.Empty<Files.IncidentFile>());
+            Array.Empty<Files.IncidentFile>(),
+            Array.Empty<Tasks.IncidentTask>());
         Assert.Throws<IncidentClosedException>(() => incident.SetStatus("x"));
     }
 }

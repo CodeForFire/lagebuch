@@ -68,6 +68,9 @@ public sealed partial class EtbViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
+    // Opens the create-task overlay pre-filled with an entry's text (#88); null where the host
+    // offers no task feature, which disables the "add & create task" dock button too.
+    private readonly Action<string>? _createTaskFromEntry;
 
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
@@ -77,11 +80,13 @@ public sealed partial class EtbViewModel : ObservableObject
     // instead of a linear scan of _all for every journal entry.
     private readonly Dictionary<Guid, EtbEntryRow> _byId = new();
 
-    public EtbViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
+    public EtbViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged,
+        Action<string>? createTaskFromEntry = null)
     {
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
+        _createTaskFromEntry = createTaskFromEntry;
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
         Entries = new ObservableCollection<EtbEntryRow>();
@@ -165,6 +170,7 @@ public sealed partial class EtbViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddEntryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AddEntryAndCreateTaskCommand))]
     private string _newText = string.Empty;
 
     [ObservableProperty]
@@ -186,6 +192,18 @@ public sealed partial class EtbViewModel : ObservableObject
         NewFrom = null;
         NewTo = null;
         _onChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAddEntry))]
+    private void AddEntryAndCreateTask()
+    {
+        _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo);
+        var text = NewText;
+        NewText = string.Empty;
+        NewFrom = null;
+        NewTo = null;
+        _onChanged();
+        _createTaskFromEntry?.Invoke(text);
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
@@ -242,5 +260,6 @@ public sealed partial class EtbViewModel : ObservableObject
     [RelayCommand]
     private void CloseHistory() => HistoryEntry = null;
 
-    private EtbEntryRow ToRow(EtbEntry e) => new(e, BeginEdit, CanEdit, ShowHistory);
+    private EtbEntryRow ToRow(EtbEntry e) =>
+        new(e, BeginEdit, CanEdit, ShowHistory);
 }

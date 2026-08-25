@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync;
 
@@ -32,6 +33,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(CloseIncidentCommand), "close")]
 [JsonDerivedType(typeof(AddFileCommand), "addFile")]
 [JsonDerivedType(typeof(RenameFileCommand), "renameFile")]
+[JsonDerivedType(typeof(AddTaskCommand), "addTask")]
+[JsonDerivedType(typeof(SetTaskCompletedCommand), "setTaskCompleted")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -97,3 +100,11 @@ public sealed record AddFileCommand(OperatorDto Operator, string FileName, strin
 // No operator on the wire: renaming is a silent label correction (no ETB entry), unlike every
 // attributed command above.
 public sealed record RenameFileCommand(Guid FileId, string? DisplayName) : SyncCommand;
+
+// TimerMinutes travels instead of an absolute DueAt: the host stamps the anchor with its own
+// authoritative clock on apply, like every timestamped command.
+public sealed record AddTaskCommand(
+    OperatorDto Operator, string Text, string Assignee,
+    TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes) : SyncCommand;
+
+public sealed record SetTaskCompletedCommand(OperatorDto Operator, Guid TaskId, bool IsDone) : SyncCommand;

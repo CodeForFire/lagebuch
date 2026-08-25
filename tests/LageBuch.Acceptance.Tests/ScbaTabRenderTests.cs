@@ -26,7 +26,7 @@ public class ScbaTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var tabs = ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-        tabs.SelectedIndex = 4; // ATEMSCHUTZ
+        tabs.SelectedIndex = 5; // ATEMSCHUTZ
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("ATEMSCHUTZ", ((TabItem)tabs.SelectedItem!).Header);

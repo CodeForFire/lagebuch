@@ -1,6 +1,7 @@
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 
@@ -19,6 +20,7 @@ public sealed class Incident
     private readonly List<AuditEvent> _audit = new();
     private readonly List<IncidentTimerState> _timers = new();
     private readonly List<IncidentFile> _files = new();
+    private readonly List<IncidentTask> _tasks = new();
 
     private Incident() { }
 
@@ -47,6 +49,10 @@ public sealed class Incident
     public IReadOnlyList<IncidentTimerState> Timers => _timers;
 
     public IReadOnlyList<IncidentFile> Files => _files;
+
+    /// <summary>Operational to-dos (#88), in creation order. Sorting for display lives in the
+    /// view layer — the aggregate keeps insertion order, like every other list here.</summary>
+    public IReadOnlyList<IncidentTask> Tasks => _tasks;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -94,7 +100,8 @@ public sealed class Incident
         IEnumerable<AtemschutzTrupp> scbaTrupps,
         IEnumerable<AuditEvent> audit,
         IEnumerable<IncidentTimerState> timers,
-        IEnumerable<IncidentFile> files)
+        IEnumerable<IncidentFile> files,
+        IEnumerable<IncidentTask> tasks)
     {
         var incident = new Incident
         {
@@ -118,6 +125,7 @@ public sealed class Incident
         incident._audit.AddRange(audit);
         incident._timers.AddRange(timers);
         incident._files.AddRange(files);
+        incident._tasks.AddRange(tasks);
         return incident;
     }
 
@@ -636,6 +644,55 @@ public sealed class Incident
         var renamed = _files[index].WithDisplayName(displayName);
         _files[index] = renamed;
         return renamed;
+    }
+
+    /// <summary>
+    /// Records a task (#88). Deliberately silent — unlike <see cref="AddForceUnit"/>, no ETB
+    /// system line: tasks are work management, not the operational log, and a task spawned from
+    /// an ETB entry would just duplicate that entry. The PDF export reports tasks instead.
+    /// Importance/Urgency ride the wire as integers, so out-of-range values are rejected here the
+    /// same way <see cref="AddJournalEntry"/> rejects malformed directions.
+    /// </summary>
+    public IncidentTask AddTask(
+        IClock clock,
+        SessionOperator op,
+        string text,
+        string? assignee,
+        TaskImportance importance,
+        TaskUrgency urgency,
+        int timerMinutes)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        if (!Enum.IsDefined(importance))
+            throw new ArgumentException("Unbekannte Wichtigkeit.", nameof(importance));
+        if (!Enum.IsDefined(urgency))
+            throw new ArgumentException("Unbekannte Dringlichkeit.", nameof(urgency));
+
+        var task = IncidentTask.Create(clock.Now, text, assignee, importance, urgency, timerMinutes, op);
+        _tasks.Add(task);
+        return task;
+    }
+
+    /// <summary>
+    /// Stamps or clears a task's completion. Un-checking restores the open state but never touches
+    /// <see cref="IncidentTask.DueAt"/> — the original timer stands, so a stale task shows as
+    /// overdue again immediately. Unknown ids throw so a replayed command fails loudly.
+    /// </summary>
+    public IncidentTask SetTaskCompleted(Guid taskId, bool isDone, IClock clock, SessionOperator op)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _tasks.FindIndex(t => t.Id == taskId);
+        if (index < 0)
+            throw new KeyNotFoundException($"Aufgabe {taskId} nicht gefunden.");
+
+        var updated = _tasks[index].WithCompletion(isDone, op, clock.Now);
+        _tasks[index] = updated;
+        return updated;
     }
 
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>

@@ -43,6 +43,8 @@
           </TextBox.KeyBindings>
         </TextBox>
         <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}" />
+        <Button x:Name="EtbAddAndTaskButton" Classes="ghost" Content="HINZUFÜGEN &amp; AUFGABE"
+                Command="{Binding AddEntryAndCreateTaskCommand}" />
       </StackPanel>
     </Border>
 

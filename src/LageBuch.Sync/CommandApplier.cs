@@ -101,6 +101,13 @@ public static class CommandApplier
             case RenameFileCommand c:
                 incident.RenameFile(c.FileId, c.DisplayName);
                 break;
+            case AddTaskCommand c:
+                incident.AddTask(clock, Operator(c.Operator), c.Text, c.Assignee,
+                    c.Importance, c.Urgency, c.TimerMinutes);
+                break;
+            case SetTaskCompletedCommand c:
+                incident.SetTaskCompleted(c.TaskId, c.IsDone, clock, Operator(c.Operator));
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(command),
                     $"Unbekannter Befehl: {command.GetType().Name}");

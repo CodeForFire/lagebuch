@@ -3,6 +3,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -119,6 +120,37 @@ public class WorkspaceCollaborationTests
         await change;
 
         Assert.True(clientWs.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task Tasks_converge_between_host_and_client()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(),
+            TestHost.DefaultPin, port);
+
+        // Host creates -> client sees it appear with a host-clock due time.
+        var change = NextChange(client);
+        hostSession.AddTask("Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
+        await change;
+
+        var task = Assert.Single(client.Incident.Tasks);
+        Assert.Equal("Tür sichern", task.Text);
+        Assert.Equal(clock.Now.AddMinutes(5), task.DueAt);
+
+        // Client completes -> the host's own aggregate flips too, attributed to the client device.
+        var roundTrip = NextChange(client);
+        client.SetTaskCompleted(task.Id, true);
+        await roundTrip;
+
+        var done = Assert.Single(hostSession.Incident.Tasks);
+        Assert.True(done.IsCompleted);
+        Assert.Equal("Client (RUF 1)", done.CompletedBy);
     }
 
     [Fact]

@@ -5,7 +5,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -83,6 +83,10 @@ public static class Migrations
         if (version < 13)
         {
             ApplyV13(cn, tx);
+        }
+        if (version < 14)
+        {
+            ApplyV14(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -414,6 +418,28 @@ public static class Migrations
                 previous_scba_count INTEGER NOT NULL,
                 edited_by TEXT NOT NULL,
                 edited_at TEXT NOT NULL
+            );
+            """);
+    }
+
+    // Aufgabenliste (#88): one row per task, ordered by ordinal. due_at carries the timer target
+    // computed at creation so it survives reopen/crash like every other incident fact; live
+    // countdown/overdue display is recomputed from now, exactly like the SCBA timers.
+    private static void ApplyV14(SqliteConnection cn, SqliteTransaction tx)
+    {
+        Exec(cn, tx, """
+            CREATE TABLE IF NOT EXISTS incident_tasks (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                assignee TEXT NOT NULL,
+                importance INTEGER NOT NULL,
+                urgency INTEGER NOT NULL,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                due_at TEXT NOT NULL,
+                completed_at TEXT,
+                completed_by TEXT
             );
             """);
     }

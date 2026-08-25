@@ -1,6 +1,7 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 
@@ -52,6 +53,12 @@ public class SnapshotRoundTripTests
 
         var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
         incident.RenameFile(file.Id, "Küchenbrand");
+
+        incident.AddTask(clock, op, "Offen bleiben", "Land 1", TaskImportance.High, TaskUrgency.High,
+            timerMinutes: 5);
+        var doneTask = incident.AddTask(clock, op, "Fertig", null, TaskImportance.Medium, TaskUrgency.Low,
+            timerMinutes: 30);
+        incident.SetTaskCompleted(doneTask.Id, true, clock, op);
 
         clock.Now = clock.Now.AddMinutes(1);
         incident.Close(clock, op);
@@ -129,6 +136,27 @@ public class SnapshotRoundTripTests
         // Not `Contains("bytes")` -- that's a false positive on "sizeBytes". The DTO simply has no
         // "bytes" property to serialize (unlike AddFileCommand, which does).
         Assert.DoesNotContain("\"bytes\":", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Tasks_round_trip_through_the_snapshot()
+    {
+        var clock = new FixedClock(); // the file's internal FixedClock (SnapshotRoundTripTests.cs)
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddTask(clock, op, "Offen bleiben", "Land 1", TaskImportance.High, TaskUrgency.High, 5);
+        incident.AddTask(clock, op, "Fertig", null, TaskImportance.Medium, TaskUrgency.Low, 30);
+        incident.SetTaskCompleted(incident.Tasks[1].Id, true, clock, op);
+
+        var snapshot = SnapshotMapper.ToSnapshot(incident);
+        var restored = SnapshotMapper.FromSnapshot(snapshot);
+
+        Assert.Equal(2, restored.Tasks.Count);
+        Assert.Equal(restored.Tasks[0].Id, incident.Tasks[0].Id);
+        Assert.Equal(restored.Tasks[0].DueAt, incident.Tasks[0].DueAt);
+        Assert.Equal("Offen bleiben", restored.Tasks[0].Text);
+        Assert.True(restored.Tasks[1].IsCompleted);
+        Assert.Equal(incident.Tasks[1].CompletedAt, restored.Tasks[1].CompletedAt);
     }
 
     [Fact]

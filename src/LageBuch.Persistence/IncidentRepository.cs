@@ -19,7 +19,7 @@ public sealed class IncidentRepository
                  { "incident_meta", "checklist_items", "etb_entries", "etb_entry_edits",
                    "role_assignments", "force_units", "scba_trupps",
                    "scba_trupp_members", "scba_pressure_readings", "audit_events",
-                   "incident_timers", "incident_files" })
+                   "incident_timers", "incident_files", "incident_tasks" })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
         }
@@ -194,6 +194,22 @@ public sealed class IncidentRepository
                 });
         }
 
+        for (var i = 0; i < incident.Tasks.Count; i++)
+        {
+            var t = incident.Tasks[i];
+            Run(cn, tx,
+                "INSERT INTO incident_tasks (id, ordinal, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by) " +
+                "VALUES ($id,$o,$txt,$asg,$imp,$urg,$by,$cat,$due,$coat,$coby);",
+                p =>
+                {
+                    p("$id", t.Id.ToString()); p("$o", i); p("$txt", t.Text); p("$asg", t.Assignee);
+                    p("$imp", (int)t.Importance); p("$urg", (int)t.Urgency);
+                    p("$by", t.CreatedBy); p("$cat", t.CreatedAt.ToString(Iso)); p("$due", t.DueAt.ToString(Iso));
+                    p("$coat", (object?)t.CompletedAt?.ToString(Iso) ?? DBNull.Value);
+                    p("$coby", (object?)t.CompletedBy ?? DBNull.Value);
+                });
+        }
+
         tx.Commit();
     }
 
@@ -351,6 +367,13 @@ public sealed class IncidentRepository
             r => Domain.Files.IncidentFile.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 6) ?? r.GetString(1),
                 r.GetString(2), r.GetInt64(3), ParseDate(r.GetString(4)), r.GetString(5)));
 
+        var tasks = ReadAll(cn,
+            "SELECT id, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by FROM incident_tasks ORDER BY ordinal;",
+            r => Domain.Tasks.IncidentTask.Rehydrate(Guid.Parse(r.GetString(0)), ParseDate(r.GetString(6)),
+                r.GetString(1), r.GetString(2), (Domain.Tasks.TaskImportance)r.GetInt32(3),
+                (Domain.Tasks.TaskUrgency)r.GetInt32(4), r.GetString(5), ParseDate(r.GetString(7)),
+                NullableDate(r, 8), Str(r, 9)));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -370,7 +393,7 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers, files);
+            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers, files, tasks);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

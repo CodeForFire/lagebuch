@@ -1,5 +1,6 @@
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Sync.Tests;
 
@@ -33,6 +34,10 @@ public class CommandSerializationTests
         new AddFileCommand(Op, "brand.jpg", "image/jpeg", new byte[] { 1, 2, 3, 4 }),
         new RenameFileCommand(Guid.NewGuid(), "Küchenbrand"),
         new RenameFileCommand(Guid.NewGuid(), null),
+        new AddTaskCommand(Op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium, 10),
+        new AddTaskCommand(Op, "Nachfordern", "", TaskImportance.Low, TaskUrgency.Low, 30),
+        new SetTaskCompletedCommand(Op, Guid.NewGuid(), true),
+        new SetTaskCompletedCommand(Op, Guid.NewGuid(), false),
     }.Select(c => new object[] { c });
 
     [Theory]

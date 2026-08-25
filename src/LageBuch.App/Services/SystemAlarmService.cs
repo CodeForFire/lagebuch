@@ -27,6 +27,9 @@ public sealed class SystemAlarmService : IAlarmService
         new Dictionary<AlarmSound, string>
         {
             [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-ils.wav",
+            // Generic tone (already bundled) — a task falling due is frequent enough that a spoken
+            // sentence would be more noise than signal.
+            [AlarmSound.TaskDue] = "alarm.wav",
         };
 
     private readonly byte[]? _wav;

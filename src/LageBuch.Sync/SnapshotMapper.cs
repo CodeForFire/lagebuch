@@ -2,6 +2,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 
@@ -40,7 +41,9 @@ public static class SnapshotMapper
             incident.ScbaTrupps.Select(ToDto).ToList(),
             incident.Audit.Select(a => new AuditEventDto(a.At, a.Action, a.By)).ToList(),
             incident.Timers.Select(t => new TimerDto(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)).ToList(),
-            incident.Files.Select(f => new IncidentFileDto(f.Id, f.FileName, f.DisplayName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)).ToList());
+            incident.Files.Select(f => new IncidentFileDto(f.Id, f.FileName, f.DisplayName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)).ToList(),
+            incident.Tasks.Select(t => new TaskDto(t.Id, t.Text, t.Assignee, t.Importance, t.Urgency,
+                t.CreatedBy, t.CreatedAt, t.DueAt, t.CompletedAt, t.CompletedBy)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -68,7 +71,9 @@ public static class SnapshotMapper
             snapshot.ScbaTrupps.Select(FromDto),
             snapshot.Audit.Select(a => new AuditEvent(a.At, a.Action, a.By)),
             snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)),
-            snapshot.Files.Select(f => IncidentFile.Rehydrate(f.Id, f.FileName, f.DisplayName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)));
+            snapshot.Files.Select(f => IncidentFile.Rehydrate(f.Id, f.FileName, f.DisplayName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)),
+            snapshot.Tasks.Select(t => IncidentTask.Rehydrate(t.Id, t.CreatedAt, t.Text, t.Assignee,
+                t.Importance, t.Urgency, t.CreatedBy, t.DueAt, t.CompletedAt, t.CompletedBy)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

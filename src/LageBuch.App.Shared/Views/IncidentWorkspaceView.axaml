@@ -251,6 +251,11 @@
               <ContentControl Content="{Binding Etb}" />
             </Border>
           </TabItem>
+          <TabItem Header="AUFGABEN">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Tasks}" />
+            </Border>
+          </TabItem>
           <TabItem Header="FUNKTIONEN">
             <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
               <ContentControl Content="{Binding Roles}" />
@@ -302,5 +307,9 @@
     <!-- Confirmation overlay (e.g. closing the incident) -->
     <ContentControl Content="{Binding PendingConfirm}"
                     IsVisible="{Binding PendingConfirm, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Create-task overlay (from ETB rows, #88) -->
+    <ContentControl Content="{Binding PendingTaskDialog}"
+                    IsVisible="{Binding PendingTaskDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
   </Panel>
 </UserControl>

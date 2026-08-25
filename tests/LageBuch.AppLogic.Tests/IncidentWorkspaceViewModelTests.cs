@@ -568,4 +568,16 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.Null(vm.Reminder);
     }
+
+    [Fact]
+    public void Etb_add_and_create_task_opens_prefilled_task_dialog()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.Etb.NewText = "Meldung an ILS";
+        vm.Etb.AddEntryAndCreateTaskCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingTaskDialog);
+        Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
+        Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
+    }
 }
