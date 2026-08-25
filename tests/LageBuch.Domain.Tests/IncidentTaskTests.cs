@@ -30,12 +30,11 @@ public class IncidentTaskTests
     }
 
     [Fact]
-    public void Create_rejects_blank_text_overlong_text_and_nonpositive_timer()
+    public void Create_rejects_blank_text_overlong_text_and_negative_timer()
     {
         Assert.Throws<ArgumentException>(() => IncidentTask.Create(T0, " ", null, 0, 0, 5, Op));
         Assert.Throws<ArgumentException>(
             () => IncidentTask.Create(T0, new string('x', IncidentTask.MaxTextLength + 1), null, 0, 0, 5, Op));
-        Assert.Throws<ArgumentException>(() => IncidentTask.Create(T0, "X", null, 0, 0, 0, Op));
         Assert.Throws<ArgumentException>(() => IncidentTask.Create(T0, "X", null, 0, 0, -5, Op));
         Assert.Throws<ArgumentNullException>(() => IncidentTask.Create(T0, "X", null, 0, 0, 5, null!));
     }
@@ -46,6 +45,13 @@ public class IncidentTaskTests
         Assert.Equal(5, IncidentTask.DefaultTimerMinutes(TaskUrgency.High));
         Assert.Equal(15, IncidentTask.DefaultTimerMinutes(TaskUrgency.Medium));
         Assert.Equal(30, IncidentTask.DefaultTimerMinutes(TaskUrgency.Low));
+    }
+
+    [Fact]
+    public void Create_with_zero_timer_sets_DueAt_to_MaxValue()
+    {
+        var task = IncidentTask.Create(T0, "X", null, TaskImportance.Low, TaskUrgency.Low, 0, Op);
+        Assert.Equal(DateTimeOffset.MaxValue, task.DueAt);
     }
 
     [Fact]

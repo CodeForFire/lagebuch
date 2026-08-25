@@ -21,8 +21,7 @@ namespace LageBuch.AppLogic.ViewModels;
 public sealed class EtbEntryRow
 {
     public EtbEntryRow(
-        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory,
-        Action<EtbEntryRow>? createTask = null)
+        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
     {
         Id = entry.Id;
         Time = Formatting.Timestamp(entry.Timestamp);
@@ -40,10 +39,6 @@ public sealed class EtbEntryRow
         // remotely-joined-read-only incident must still let its history be read, since that is the
         // one thing that makes an edit acceptable in the first place.
         ShowHistoryCommand = new RelayCommand(() => showHistory(this), () => WasEdited);
-        // Not gated on IsEditable either — creating a task FROM a system line is legitimate (e.g. a
-        // Rückzugsalarm line becoming a follow-up task). Read-only gating comes from the workspace
-        // hiding the column content (rows rebuilt on transitions).
-        CreateTaskCommand = createTask is null ? null : new RelayCommand(() => createTask(this));
     }
 
     public Guid Id { get; }
@@ -59,7 +54,6 @@ public sealed class EtbEntryRow
     public bool IsEditable { get; }
     public ICommand BeginEditCommand { get; }
     public ICommand ShowHistoryCommand { get; }
-    public ICommand? CreateTaskCommand { get; }
 }
 
 /// <summary>
@@ -75,7 +69,7 @@ public sealed partial class EtbViewModel : ObservableObject
     private readonly IClock _clock;
     private readonly Action _onChanged;
     // Opens the create-task overlay pre-filled with an entry's text (#88); null where the host
-    // offers no task feature, which leaves every row's CreateTaskCommand null too.
+    // offers no task feature, which disables the "add & create task" dock button too.
     private readonly Action<string>? _createTaskFromEntry;
 
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
@@ -176,6 +170,7 @@ public sealed partial class EtbViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddEntryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AddEntryAndCreateTaskCommand))]
     private string _newText = string.Empty;
 
     [ObservableProperty]
@@ -197,6 +192,18 @@ public sealed partial class EtbViewModel : ObservableObject
         NewFrom = null;
         NewTo = null;
         _onChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAddEntry))]
+    private void AddEntryAndCreateTask()
+    {
+        _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo);
+        var text = NewText;
+        NewText = string.Empty;
+        NewFrom = null;
+        NewTo = null;
+        _onChanged();
+        _createTaskFromEntry?.Invoke(text);
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
@@ -254,5 +261,5 @@ public sealed partial class EtbViewModel : ObservableObject
     private void CloseHistory() => HistoryEntry = null;
 
     private EtbEntryRow ToRow(EtbEntry e) =>
-        new(e, BeginEdit, CanEdit, ShowHistory, entry => _createTaskFromEntry?.Invoke(entry.Text));
+        new(e, BeginEdit, CanEdit, ShowHistory);
 }

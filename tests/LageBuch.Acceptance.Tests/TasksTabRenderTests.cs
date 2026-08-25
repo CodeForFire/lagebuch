@@ -7,7 +7,6 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
-using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Acceptance.Tests;
@@ -74,12 +73,10 @@ public class TasksTabRenderTests
 
         Capture(window, "aufgaben-tab.png");
 
-        // Dialog capture for the PR: open from an ETB row.
-        // Add a journal entry so vm.Etb.Entries has at least one item with CreateTaskCommand.
-        session.AddJournalEntry(EtbDirection.Incoming, "Feuer im 2. OG", "ILS");
-        vm.Etb.Sync();
-        Dispatcher.UIThread.RunJobs();
-        vm.Etb.Entries[0].CreateTaskCommand!.Execute(null);
+        // Dialog capture for the PR: add ETB entry and open task dialog in one step.
+        vm.Etb.NewText = "Feuer im 2. OG";
+        vm.Etb.NewFrom = "ILS";
+        vm.Etb.AddEntryAndCreateTaskCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Assert.NotNull(vm.PendingTaskDialog);
         Capture(window, "aufgaben-dialog.png");

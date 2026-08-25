@@ -161,7 +161,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         NewTimerMinutes = IncidentTask.DefaultTimerMinutes(value);
 
     private bool CanAddTask =>
-        !IsReadOnly && !string.IsNullOrWhiteSpace(NewText) && NewTimerMinutes is > 0;
+        !IsReadOnly && !string.IsNullOrWhiteSpace(NewText) && NewTimerMinutes is >= 0;
 
     [RelayCommand(CanExecute = nameof(CanAddTask))]
     private void AddTask()
@@ -304,11 +304,13 @@ public sealed partial class TaskRow : ObservableObject
     }
 
     private static bool ComputeIsOverdue(IncidentTask task, DateTimeOffset now) =>
-        !task.IsCompleted && task.DueAt <= now;
+        !task.IsCompleted && task.DueAt != DateTimeOffset.MaxValue && task.DueAt <= now;
 
     private static string ComputeRemaining(IncidentTask task, DateTimeOffset now)
     {
         if (task.IsCompleted)
+            return "–";
+        if (task.DueAt == DateTimeOffset.MaxValue)
             return "–";
         if (task.DueAt <= now)
             return "FÄLLIG";

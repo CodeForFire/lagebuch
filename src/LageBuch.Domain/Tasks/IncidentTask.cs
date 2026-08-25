@@ -58,8 +58,8 @@ public sealed record IncidentTask
             throw new ArgumentException("Aufgabe darf nicht leer sein.", nameof(text));
         if (text.Length > MaxTextLength)
             throw new ArgumentException($"Aufgabe ist länger als das Limit von {MaxTextLength} Zeichen.", nameof(text));
-        if (timerMinutes < 1)
-            throw new ArgumentException("Der Timer muss mindestens 1 Minute betragen.", nameof(timerMinutes));
+        if (timerMinutes < 0)
+            throw new ArgumentException("Der Timer darf nicht negativ sein.", nameof(timerMinutes));
         ArgumentNullException.ThrowIfNull(@operator);
 
         return new IncidentTask
@@ -71,7 +71,7 @@ public sealed record IncidentTask
             Urgency = urgency,
             CreatedBy = @operator.Display,
             CreatedAt = createdAt,
-            DueAt = createdAt.AddMinutes(timerMinutes),
+            DueAt = timerMinutes == 0 ? DateTimeOffset.MaxValue : createdAt.AddMinutes(timerMinutes),
         };
     }
 

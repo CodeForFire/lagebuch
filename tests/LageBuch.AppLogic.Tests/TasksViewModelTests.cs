@@ -64,7 +64,7 @@ public class TasksViewModelTests
     }
 
     [Fact]
-    public void AddTask_canExecute_requires_text_and_positive_minutes()
+    public void AddTask_canExecute_requires_text_and_nonnegative_minutes()
     {
         var (session, clock, _) = NewSession();
         var vm = NewVm(session, clock);
@@ -73,7 +73,9 @@ public class TasksViewModelTests
         vm.NewText = "X";
         Assert.True(vm.AddTaskCommand.CanExecute(null));
         vm.NewTimerMinutes = 0;
-        Assert.False(vm.AddTaskCommand.CanExecute(null));
+        Assert.True(vm.AddTaskCommand.CanExecute(null)); // timer=0 is allowed (no due date)
+        vm.NewTimerMinutes = -1;
+        Assert.False(vm.AddTaskCommand.CanExecute(null)); // negative is rejected
     }
 
     [Fact]
@@ -198,6 +200,24 @@ public class TasksViewModelTests
 
         Assert.False(vm.Rows.Single().IsOverdue);
         Assert.Equal("–", vm.Rows.Single().RemainingDisplay);
+    }
+
+    [Fact]
+    public void Task_without_timer_shows_dash_and_is_never_overdue()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 0);
+        var vm = NewVm(session, clock);
+        vm.Filter = TaskFilterKind.All;
+
+        Assert.Equal("–", vm.Rows.Single().RemainingDisplay);
+        Assert.False(vm.Rows.Single().IsOverdue);
+
+        clock.Now = T0.AddMinutes(999);
+        vm.Rows.Single().RefreshClock(clock.Now);
+
+        Assert.Equal("–", vm.Rows.Single().RemainingDisplay);
+        Assert.False(vm.Rows.Single().IsOverdue);
     }
 
     [Fact]
