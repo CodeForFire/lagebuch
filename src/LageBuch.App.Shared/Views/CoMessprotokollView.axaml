@@ -159,7 +159,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ApartmentColumnViewModel">
-                <TextBox Text="{Binding Label}" MinWidth="136" FontSize="11" FontWeight="SemiBold"
+                <TextBox Text="{Binding Label}" Width="136" FontSize="11" FontWeight="SemiBold"
                          HorizontalContentAlignment="Center" Padding="4,2"
                          Background="Transparent" BorderThickness="0,0,0,1"
                          BorderBrush="{StaticResource HairlineBrush}"
