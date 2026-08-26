@@ -271,6 +271,11 @@
               <ContentControl Content="{Binding Scba}" />
             </Border>
           </TabItem>
+          <TabItem Header="CO-MESSUNG">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding CoMessprotokoll}" />
+            </Border>
+          </TabItem>
           <TabItem Header="DATEIEN">
             <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
               <ContentControl Content="{Binding Files}" />

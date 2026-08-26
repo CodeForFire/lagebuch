@@ -1,0 +1,95 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
+             xmlns:dom="clr-namespace:LageBuch.Domain.CoMeasurement;assembly=LageBuch.Domain"
+             x:Class="LageBuch.App.Shared.Views.CoMessprotokollView"
+             x:DataType="vm:CoMessprotokollViewModel">
+  <DockPanel>
+    <!-- Header: Building selector + actions -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,14">
+      <ComboBox Grid.Column="0" ItemsSource="{Binding BuildingOptions}"
+                SelectedItem="{Binding SelectedBuilding}"
+                PlaceholderText="Haus auswählen..."
+                IsEnabled="{Binding !IsReadOnly}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="dom:Building">
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <Button Grid.Column="1" Content="HAUS HINZUFÜGEN"
+              Command="{Binding AddBuildingCommand}"
+              IsEnabled="{Binding !IsReadOnly}"
+              Margin="8,0,0,0" />
+      <Button Grid.Column="2" Content="STRUKTUR ÄNDERN"
+              Command="{Binding ModifyStructureCommand}"
+              IsEnabled="{Binding !IsReadOnly}"
+              Margin="8,0,0,0" />
+      <Button Grid.Column="3" Content="HAUS ENTFERNEN"
+              Command="{Binding RemoveBuildingCommand}"
+              IsEnabled="{Binding !IsReadOnly}"
+              Margin="8,0,0,0" />
+    </Grid>
+
+    <!-- Matrix -->
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+      <ItemsControl ItemsSource="{Binding MatrixRows}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:FloorRowViewModel">
+            <Grid ColumnDefinitions="80,Auto,*">
+              <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
+                         VerticalAlignment="Center" Margin="0,0,8,0" />
+              <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="4" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:DwellingCellViewModel">
+                    <Button Background="Transparent" BorderThickness="0" Padding="0"
+                            Command="{Binding OpenEditorCommand}">
+                      <Border Width="80" Height="60" CornerRadius="4"
+                              Background="{Binding StatusBrush}">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                          <TextBlock Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center" />
+                          <TextBlock Text="{Binding CoDisplay}" FontSize="12" FontWeight="SemiBold"
+                                     HorizontalAlignment="Center"
+                                     Foreground="{Binding StatusBrush, Converter={x:Static conv:StatusToForegroundValueConverter.Instance}}" />
+                        </StackPanel>
+                      </Border>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Grid.Column="2" Text="{Binding Description}"
+                         VerticalAlignment="Center" Margin="8,0,0,0"
+                         Width="200" TextWrapping="Wrap" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Color legend -->
+    <Border DockPanel.Dock="Bottom" Margin="0,14,0,0" Padding="8"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Border Background="#FFC000" Width="16" Height="16" CornerRadius="2" />
+          <TextBlock Text="Noch nicht abgesucht" FontSize="11" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Border Background="#92D050" Width="16" Height="16" CornerRadius="2" />
+          <TextBlock Text="Abgesucht – keine Personen" FontSize="11" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Border Background="#FF0000" Width="16" Height="16" CornerRadius="2" />
+          <TextBlock Text="Person(en) betroffen" FontSize="11" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </DockPanel>
+</UserControl>
