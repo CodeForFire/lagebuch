@@ -163,7 +163,7 @@
                      Border#PART_BorderElement directly and ignoring the plain BorderBrush/
                      BorderThickness set below; override those exact states locally so the header
                      stays a quiet underline throughout instead of popping a box while editing. -->
-                <TextBox Text="{Binding Label}" Width="136" FontSize="11" FontWeight="SemiBold"
+                <TextBox Text="{Binding Label}" Width="148" FontSize="11" FontWeight="SemiBold"
                          HorizontalContentAlignment="Center" Padding="4,2"
                          Background="Transparent" BorderThickness="0,0,0,1"
                          BorderBrush="{StaticResource HairlineBrush}"
@@ -209,7 +209,7 @@
                         <!-- Door-mark card: dark tile, colored accent stripe + a slash/X/circled-X
                              glyph mirror the spray-marked search convention crews already read on
                              scene, instead of a solid traffic-light fill. -->
-                        <Border MinWidth="136" CornerRadius="6"
+                        <Border Width="148" CornerRadius="6"
                                 BorderBrush="{Binding StatusBrush}" BorderThickness="1"
                                 Background="{StaticResource SurfaceRaisedBrush}"
                                 ClipToBounds="True">
