@@ -1,5 +1,6 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
@@ -192,5 +193,50 @@ public class CommandApplierTests
 
         Assert.True(incident.Tasks[0].IsCompleted);
         Assert.Equal("Client", incident.Tasks[0].CompletedBy);
+    }
+
+    [Fact]
+    public void Apply_AddCoBuilding_CreatesBuildingAndDwellings()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var cmd = new AddCoBuildingCommand(new OperatorDto("Test", null), "Haus A", 2, 3);
+
+        ApplyOverWire(cmd, incident, clock);
+
+        Assert.Single(incident.Buildings);
+        Assert.Equal(9, incident.Dwellings.Count);
+    }
+
+    [Fact]
+    public void Apply_RecordCoValue_SetsValue()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        incident.AddCoBuilding(clock, new SessionOperator("Test", null), "Haus A", 2, 3);
+        var buildingId = incident.Buildings[0].Id;
+
+        var cmd = new RecordCoValueCommand(new OperatorDto("Test", null), buildingId, 0, 1, 45);
+        ApplyOverWire(cmd, incident, clock);
+
+        var dwelling = incident.Dwellings.First(d =>
+            d.BuildingId == buildingId && d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(45, dwelling.CoValue);
+    }
+
+    [Fact]
+    public void Apply_SetDwellingStatus_SetsStatus()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        incident.AddCoBuilding(clock, new SessionOperator("Test", null), "Haus A", 2, 3);
+        var buildingId = incident.Buildings[0].Id;
+
+        var cmd = new SetDwellingStatusCommand(new OperatorDto("Test", null), buildingId, 0, 1, DwellingStatus.Searched);
+        ApplyOverWire(cmd, incident, clock);
+
+        var dwelling = incident.Dwellings.First(d =>
+            d.BuildingId == buildingId && d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(DwellingStatus.Searched, dwelling.Status);
     }
 }
