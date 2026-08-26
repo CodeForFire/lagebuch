@@ -94,6 +94,31 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     private void OpenEditor() => _onOpenEditor(BuildingId, FloorOrdinal, ApartmentNumber);
 }
 
+public sealed partial class ApartmentColumnViewModel : ObservableObject
+{
+    private readonly Action<int, string?> _onLabelChanged;
+
+    public ApartmentColumnViewModel(int apartmentNumber, string label, bool isReadOnly, Action<int, string?> onLabelChanged)
+    {
+        ApartmentNumber = apartmentNumber;
+        IsReadOnly = isReadOnly;
+        _label = label;
+        _onLabelChanged = onLabelChanged;
+    }
+
+    public int ApartmentNumber { get; }
+    public bool IsReadOnly { get; }
+
+    [ObservableProperty]
+    private string _label;
+
+    partial void OnLabelChanged(string value)
+    {
+        if (!IsReadOnly)
+            _onLabelChanged(ApartmentNumber, value);
+    }
+}
+
 public sealed partial class FloorRowViewModel : ObservableObject
 {
     public FloorRowViewModel(int ordinal, string label, IReadOnlyList<DwellingCellViewModel> cells, string? description)
@@ -140,7 +165,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     private ObservableCollection<FloorRowViewModel> _matrixRows = new();
 
     [ObservableProperty]
-    private IReadOnlyList<string> _apartmentLabels = Array.Empty<string>();
+    private IReadOnlyList<ApartmentColumnViewModel> _apartmentColumns = Array.Empty<ApartmentColumnViewModel>();
 
     [ObservableProperty]
     private DwellingCellViewModel? _selectedCell;
@@ -174,13 +199,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
         MatrixRows.Clear();
         if (SelectedBuilding is null)
         {
-            ApartmentLabels = Array.Empty<string>();
+            ApartmentColumns = Array.Empty<ApartmentColumnViewModel>();
             return;
         }
 
         var building = SelectedBuilding;
-        ApartmentLabels = Enumerable.Range(1, building.ApartmentsPerFloor)
-            .Select(CoMeasurementLabels.ApartmentLabel)
+        ApartmentColumns = Enumerable.Range(1, building.ApartmentsPerFloor)
+            .Select(apt => new ApartmentColumnViewModel(
+                apt, CoMeasurementLabels.ApartmentLabel(building, apt), IsReadOnly, OnApartmentLabelChanged))
             .ToArray();
 
         for (var floor = building.FloorCount; floor >= 0; floor--)
@@ -212,6 +238,13 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     private void OnCoValueChanged(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue)
     {
         _session.RecordCoValue(buildingId, floorOrdinal, apartmentNumber, coValue);
+        _onChanged();
+    }
+
+    private void OnApartmentLabelChanged(int apartmentNumber, string? label)
+    {
+        if (SelectedBuilding is null) return;
+        _session.SetApartmentLabel(SelectedBuilding.Id, apartmentNumber, label);
         _onChanged();
     }
 

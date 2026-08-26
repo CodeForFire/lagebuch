@@ -199,13 +199,14 @@ public sealed class IncidentRepository
         {
             var b = incident.Buildings[i];
             var descriptionsJson = System.Text.Json.JsonSerializer.Serialize(b.FloorDescriptions);
+            var apartmentLabelsJson = System.Text.Json.JsonSerializer.Serialize(b.ApartmentLabels);
             Run(cn, tx,
-                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal) VALUES ($id,$name,$fc,$apf,$fd,$o);",
+                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels) VALUES ($id,$name,$fc,$apf,$fd,$o,$al);",
                 p =>
                 {
                     p("$id", b.Id.ToString()); p("$name", b.Name);
                     p("$fc", b.FloorCount); p("$apf", b.ApartmentsPerFloor);
-                    p("$fd", descriptionsJson); p("$o", i);
+                    p("$fd", descriptionsJson); p("$o", i); p("$al", apartmentLabelsJson);
                 });
         }
 
@@ -399,7 +400,7 @@ public sealed class IncidentRepository
                 r.GetString(2), r.GetInt64(3), ParseDate(r.GetString(4)), r.GetString(5)));
 
         var buildings = ReadAll(cn,
-            "SELECT id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal FROM co_buildings ORDER BY ordinal;",
+            "SELECT id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels FROM co_buildings ORDER BY ordinal;",
             r =>
             {
                 var fdJson = r.GetString(4);
@@ -408,8 +409,15 @@ public sealed class IncidentRepository
                 var fdDict = fd.ToDictionary(
                     kv => int.Parse(kv.Key),
                     kv => kv.Value);
+                // apartment_labels is null on rows written before this column existed.
+                var alJson = Str(r, 6);
+                var alDict = alJson is null
+                    ? new Dictionary<int, string?>()
+                    : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(alJson)
+                        ?? new Dictionary<string, string?>())
+                        .ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
                 return Domain.CoMeasurement.Building.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1),
-                    r.GetInt32(2), r.GetInt32(3), fdDict, r.GetInt32(5));
+                    r.GetInt32(2), r.GetInt32(3), fdDict, r.GetInt32(5), alDict);
             });
 
         var dwellings = ReadAll(cn,

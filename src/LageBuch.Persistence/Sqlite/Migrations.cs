@@ -5,7 +5,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 15;
+    public const int CurrentVersion = 16;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -91,6 +91,10 @@ public static class Migrations
         if (version < 15)
         {
             ApplyV15(cn, tx);
+        }
+        if (version < 16)
+        {
+            ApplyV16(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -472,6 +476,13 @@ public static class Migrations
                 co_value INTEGER
             );
             """);
+    }
+
+    private static void ApplyV16(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Custom column headers (e.g. "Links/Mitte/Rechts") alongside the existing floor
+        // descriptions. Nullable-safe default so existing buildings just read back with no overrides.
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_buildings", "apartment_labels", "TEXT NOT NULL DEFAULT '{}'");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

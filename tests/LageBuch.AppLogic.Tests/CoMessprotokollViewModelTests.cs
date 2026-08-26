@@ -27,7 +27,7 @@ public class CoMessprotokollViewModelTests
         Assert.Single(vm.BuildingOptions);
         Assert.Equal("Haus A", vm.BuildingOptions[0].Name);
         Assert.Equal(3, vm.MatrixRows.Count); // 2 OG + EG
-        Assert.Equal(3, vm.ApartmentLabels.Count);
+        Assert.Equal(3, vm.ApartmentColumns.Count);
     }
 
     [Fact]

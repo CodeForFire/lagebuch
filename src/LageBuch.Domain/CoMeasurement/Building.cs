@@ -8,6 +8,8 @@ public sealed record Building
     public int ApartmentsPerFloor { get; private init; }
     public IReadOnlyDictionary<int, string?> FloorDescriptions { get; private init; } =
         new Dictionary<int, string?>();
+    public IReadOnlyDictionary<int, string?> ApartmentLabels { get; private init; } =
+        new Dictionary<int, string?>();
     public int Ordinal { get; private init; }
 
     private Building() { }
@@ -33,7 +35,8 @@ public sealed record Building
 
     public static Building Rehydrate(
         Guid id, string name, int floorCount, int apartmentsPerFloor,
-        IReadOnlyDictionary<int, string?> floorDescriptions, int ordinal)
+        IReadOnlyDictionary<int, string?> floorDescriptions, int ordinal,
+        IReadOnlyDictionary<int, string?>? apartmentLabels = null)
         => new()
         {
             Id = id,
@@ -41,6 +44,7 @@ public sealed record Building
             FloorCount = floorCount,
             ApartmentsPerFloor = apartmentsPerFloor,
             FloorDescriptions = floorDescriptions,
+            ApartmentLabels = apartmentLabels ?? new Dictionary<int, string?>(),
             Ordinal = ordinal
         };
 
@@ -61,5 +65,15 @@ public sealed record Building
         else
             dict[ordinal] = description.Trim();
         return this with { FloorDescriptions = dict };
+    }
+
+    public Building WithApartmentLabel(int apartmentNumber, string? label)
+    {
+        var dict = new Dictionary<int, string?>(ApartmentLabels.ToDictionary(kv => kv.Key, kv => kv.Value));
+        if (string.IsNullOrWhiteSpace(label))
+            dict.Remove(apartmentNumber);
+        else
+            dict[apartmentNumber] = label.Trim();
+        return this with { ApartmentLabels = dict };
     }
 }

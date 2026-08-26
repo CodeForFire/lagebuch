@@ -43,6 +43,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetDwellingStatusCommand), "setDwellingStatus")]
 [JsonDerivedType(typeof(UpdateDwellingDetailsCommand), "updateDwellingDetails")]
 [JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
+[JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -139,3 +140,7 @@ public sealed record UpdateDwellingDetailsCommand(
 // No operator (silent)
 public sealed record SetFloorDescriptionCommand(
     Guid BuildingId, int FloorOrdinal, string? Description) : SyncCommand;
+
+// No operator (silent)
+public sealed record SetApartmentLabelCommand(
+    Guid BuildingId, int ApartmentNumber, string? Label) : SyncCommand;

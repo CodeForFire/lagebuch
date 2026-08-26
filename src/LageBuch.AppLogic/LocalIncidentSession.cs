@@ -226,6 +226,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
         Mutate(() => Incident.SetFloorDescription(buildingId, floorOrdinal, description));
 
+    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
+        Mutate(() => Incident.SetApartmentLabel(buildingId, apartmentNumber, label));
+
     public void Close()
     {
         if (IsReadOnly)

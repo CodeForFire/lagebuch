@@ -48,7 +48,8 @@ public static class SnapshotMapper
             incident.Buildings.Select(b => new BuildingDto(
                 b.Id, b.Name, b.FloorCount, b.ApartmentsPerFloor,
                 b.FloorDescriptions.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
-                b.Ordinal)).ToList(),
+                b.Ordinal,
+                b.ApartmentLabels.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value))).ToList(),
             incident.Dwellings.Select(d => new DwellingDto(
                 d.Id, d.BuildingId, d.FloorOrdinal, d.ApartmentNumber,
                 d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)).ToList());
@@ -87,7 +88,10 @@ public static class SnapshotMapper
                 b.FloorDescriptions.ToDictionary(
                     kv => int.Parse(kv.Key),
                     kv => kv.Value),
-                b.Ordinal)),
+                b.Ordinal,
+                b.ApartmentLabels?.ToDictionary(
+                    kv => int.Parse(kv.Key),
+                    kv => kv.Value))),
             snapshot.Dwellings.Select(d => Dwelling.Rehydrate(
                 d.Id, d.BuildingId, d.FloorOrdinal, d.ApartmentNumber,
                 d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)));

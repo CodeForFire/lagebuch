@@ -132,7 +132,8 @@ public sealed record TaskDto(
 
 public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,
-    Dictionary<string, string?> FloorDescriptions, int Ordinal);
+    Dictionary<string, string?> FloorDescriptions, int Ordinal,
+    Dictionary<string, string?>? ApartmentLabels = null);
 
 public sealed record DwellingDto(
     Guid Id, Guid BuildingId, int FloorOrdinal, int ApartmentNumber,

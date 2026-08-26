@@ -129,6 +129,9 @@ public static class CommandApplier
             case SetFloorDescriptionCommand c:
                 incident.SetFloorDescription(c.BuildingId, c.FloorOrdinal, c.Description);
                 break;
+            case SetApartmentLabelCommand c:
+                incident.SetApartmentLabel(c.BuildingId, c.ApartmentNumber, c.Label);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(command),
                     $"Unbekannter Befehl: {command.GetType().Name}");

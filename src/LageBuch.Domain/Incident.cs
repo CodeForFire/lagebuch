@@ -841,4 +841,13 @@ public sealed class Incident
         var index = _buildings.IndexOf(building);
         _buildings[index] = updated;
     }
+
+    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label)
+    {
+        EnsureOpen();
+        var building = FindBuilding(buildingId);
+        var updated = building.WithApartmentLabel(apartmentNumber, label);
+        var index = _buildings.IndexOf(building);
+        _buildings[index] = updated;
+    }
 }

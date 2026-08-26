@@ -84,50 +84,64 @@
                IsVisible="{Binding !HasBuildings}"
                Margin="0,20,0,0" HorizontalAlignment="Center" />
 
-    <!-- Dwelling Editor (below grid) -->
-    <Border DockPanel.Dock="Bottom"
-            IsEnabled="{Binding !IsReadOnly}"
+    <!-- Editor Sidebar (right) -->
+    <Border DockPanel.Dock="Right"
             IsVisible="{Binding IsEditorOpen}"
             Background="#0F141D"
             BorderBrush="{StaticResource HairlineBrush}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource RadiusMd}"
-            Padding="14" Margin="0,0,0,14">
-      <StackPanel Spacing="8">
-        <TextBlock Text="WOHNUNG BEARBEITEN" Classes="overline" />
-        
+            BorderThickness="1,0,0,0"
+            Width="320"
+            Padding="16"
+            IsEnabled="{Binding !IsReadOnly}">
+      <StackPanel Spacing="12">
+        <!-- Header with close button -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Text="WOHNUNG BEARBEITEN" Classes="overline"
+                     VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="&#x2715;"
+                  Command="{Binding CloseEditorCommand}"
+                  Background="Transparent" BorderThickness="0"
+                  FontSize="14" Padding="4" />
+        </Grid>
+
         <!-- Status buttons -->
         <TextBlock Text="STATUS" Classes="overline" FontSize="10" />
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <StackPanel Spacing="8">
           <Button Background="#FFC000" Content="Noch nicht abgesucht"
+                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
                   Command="{Binding SetEditorStatusNotSearchedCommand}" />
           <Button Background="#92D050" Content="Abgesucht – keine Personen"
+                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
                   Command="{Binding SetEditorStatusSearchedCommand}" />
           <Button Background="#FF0000" Content="Person(en) betroffen"
+                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
                   Command="{Binding SetEditorStatusAffectedCommand}" />
         </StackPanel>
-        
+
         <!-- CO Value -->
         <StackPanel Spacing="2">
           <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
           <NumericUpDown Minimum="0" Maximum="9999" Value="{Binding SelectedCell.CoValue}"
                          FormatString="0" PlaceholderText="Kein Messwert" />
         </StackPanel>
-        
+
         <!-- Resident Name -->
         <StackPanel Spacing="2">
           <TextBlock Text="NAME DER BEWOHNER" Classes="overline" FontSize="10" />
           <TextBox Text="{Binding SelectedCell.ResidentName}" PlaceholderText="Optional" />
         </StackPanel>
-        
+
         <!-- Key Available -->
         <StackPanel Orientation="Horizontal" Spacing="8">
           <TextBlock Text="SCHLÜSSEL VORHANDEN" Classes="overline" FontSize="10" />
           <CheckBox IsChecked="{Binding SelectedCell.KeyAvailable}" />
         </StackPanel>
-        
-        <!-- Close button -->
-        <Button Content="FERTIG" Command="{Binding CloseEditorCommand}" />
+
+        <!-- Action buttons -->
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="ABBRECHEN" Command="{Binding CloseEditorCommand}" />
+          <Button Classes="signal" Content="FERTIG" Command="{Binding ConfirmEditorCommand}" />
+        </StackPanel>
       </StackPanel>
     </Border>
 
@@ -135,63 +149,71 @@
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                   IsVisible="{Binding HasBuildings}">
       <StackPanel>
-        <!-- Column headers -->
+        <!-- Column headers (editable) -->
         <StackPanel Orientation="Horizontal" Spacing="4" Margin="88,0,0,4">
-          <ItemsControl ItemsSource="{Binding ApartmentLabels}">
+          <ItemsControl ItemsSource="{Binding ApartmentColumns}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="4" />
+                <UniformGrid Rows="1" ColumnSpacing="4" />
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="x:String">
-                <Border MinWidth="140">
-                  <TextBlock Text="{Binding}" FontSize="10" FontWeight="SemiBold"
-                             HorizontalAlignment="Center" />
-                </Border>
+              <DataTemplate x:DataType="vm:ApartmentColumnViewModel">
+                <TextBox Text="{Binding Label}" MinWidth="120" FontSize="11" FontWeight="SemiBold"
+                         HorizontalContentAlignment="Center" Padding="4,2"
+                         Background="Transparent" BorderThickness="0,0,0,1"
+                         BorderBrush="{StaticResource HairlineBrush}"
+                         IsEnabled="{Binding !IsReadOnly}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </StackPanel>
         <ItemsControl ItemsSource="{Binding MatrixRows}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:FloorRowViewModel">
-            <Grid ColumnDefinitions="80,Auto,*">
-              <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
-                         VerticalAlignment="Center" Margin="0,0,8,0" />
-              <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" Spacing="4" />
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:DwellingCellViewModel">
-                    <Button Background="Transparent" BorderThickness="0" Padding="0"
-                            Command="{Binding OpenEditorCommand}">
-                      <Border MinWidth="140" CornerRadius="4"
-                              Background="{Binding StatusBrush}">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="1">
-                          <TextBlock Text="{Binding CoDisplay}" FontSize="11" FontWeight="SemiBold"
-                                     HorizontalAlignment="Center"
-                                     Foreground="{Binding StatusBrush, Converter={x:Static conv:StatusToForegroundValueConverter.Instance}}" />
-                          <TextBlock Text="{Binding ResidentName}" FontSize="9" HorizontalAlignment="Center"
-                                     TextTrimming="CharacterEllipsis" MaxWidth="90"
-                                     Foreground="{Binding StatusBrush, Converter={x:Static conv:StatusToForegroundValueConverter.Instance}}" />
-                          <TextBlock Text="{Binding KeyDisplay}" FontSize="10" HorizontalAlignment="Center"
-                                     Foreground="{Binding StatusBrush, Converter={x:Static conv:StatusToForegroundValueConverter.Instance}}" />
-                        </StackPanel>
-                      </Border>
-                    </Button>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Grid.Column="2" Text="{Binding Description}"
-                         VerticalAlignment="Center" Margin="8,0,0,0"
-                         Width="200" TextWrapping="Wrap" />
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="4" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FloorRowViewModel">
+              <Grid ColumnDefinitions="80,Auto,*">
+                <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
+                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Rows="1" ColumnSpacing="4" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DwellingCellViewModel">
+                      <Button Background="Transparent" BorderThickness="0" Padding="0" Height="NaN"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                              Command="{Binding OpenEditorCommand}">
+                        <Border MinWidth="120" CornerRadius="4"
+                                BorderBrush="#0B0E13" BorderThickness="2"
+                                Background="{Binding StatusBrush}">
+                          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="{Binding CoDisplay}" FontSize="13" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{Binding StatusBrush, Converter={x:Static conv:StatusToForegroundValueConverter.Instance}}" />
+                            <TextBlock Text="{Binding ResidentName}" FontSize="11" HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="100"
+                                       Foreground="{Binding StatusBrush, Converter={x:Static conv:StatusToForegroundValueConverter.Instance}}" />
+                            <TextBlock Text="{Binding KeyDisplay}" FontSize="11" HorizontalAlignment="Center"
+                                       Foreground="{Binding StatusBrush, Converter={x:Static conv:StatusToForegroundValueConverter.Instance}}" />
+                          </StackPanel>
+                        </Border>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Grid.Column="2" Text="{Binding Description}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"
+                           Width="200" TextWrapping="Wrap" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
         </ItemsControl>
       </StackPanel>
     </ScrollViewer>

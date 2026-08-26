@@ -43,7 +43,7 @@ public static class CoMessprotokollSection
                     {
                         header.Cell().Element(Cells.Header).Text("Geschoss");
                         for (var apt = 1; apt <= building.ApartmentsPerFloor; apt++)
-                            header.Cell().Element(Cells.Header).Text(CoMeasurementLabels.ApartmentLabel(apt));
+                            header.Cell().Element(Cells.Header).Text(CoMeasurementLabels.ApartmentLabel(building, apt));
                         header.Cell().Element(Cells.Header).Text("Lage");
                     });
 
