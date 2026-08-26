@@ -74,4 +74,19 @@ public class CoMessprotokollViewModelTests
         cell.CoValue = 45;
         Assert.Equal("45 ppm", cell.CoDisplay);
     }
+
+    [Fact]
+    public void ViewModel_EmptyState_NoBuildings()
+    {
+        var op = new SessionOperator("Test", null);
+        var store = new FakeStore();
+        var session = LocalIncidentSession.StartNew(store, Clock, op, Path.GetTempFileName(),
+            Enumerable.Empty<(string, bool)>(), Enumerable.Empty<(string, bool)>());
+        var vm = new CoMessprotokollViewModel(session, Clock, () => { });
+
+        Assert.False(vm.HasBuildings);
+        Assert.False(vm.CanModify);
+        Assert.Empty(vm.BuildingOptions);
+        Assert.Empty(vm.MatrixRows);
+    }
 }

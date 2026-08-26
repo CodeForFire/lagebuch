@@ -237,6 +237,8 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     private void Mutate(Action apply)
     {
+        if (IsReadOnly)
+            throw new InvalidOperationException("Der Einsatz ist bereits abgeschlossen.");
         apply();
         Save();
         Changed?.Invoke();

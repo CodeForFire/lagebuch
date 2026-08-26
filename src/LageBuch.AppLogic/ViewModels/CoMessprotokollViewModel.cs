@@ -59,6 +59,13 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 
     public string Label => CoMeasurementLabels.ApartmentLabel(ApartmentNumber);
 
+    public string KeyDisplay => KeyAvailable switch
+    {
+        true => "\uD83D\uDD11",
+        false => "\u2716",
+        _ => ""
+    };
+
     private static string GetStatusBrush(DwellingStatus status) => status switch
     {
         DwellingStatus.NotSearched => "#FFC000",
@@ -80,6 +87,8 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         if (!IsReadOnly)
             _onCoValueChanged(BuildingId, FloorOrdinal, ApartmentNumber, value);
     }
+
+    partial void OnKeyAvailableChanged(bool? value) => OnPropertyChanged(nameof(KeyDisplay));
 
     [RelayCommand]
     private void OpenEditor() => _onOpenEditor(BuildingId, FloorOrdinal, ApartmentNumber);
@@ -113,11 +122,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
         _clock = clock;
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
-        _session.Changed += Refresh;
         Refresh();
     }
 
     public bool IsReadOnly { get; }
+
+    public bool HasBuildings => BuildingOptions.Count > 0;
+
+    public bool CanModify => !IsReadOnly && HasBuildings;
 
     public ObservableCollection<Building> BuildingOptions { get; } = new();
 
@@ -147,9 +159,15 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
 
         BuildMatrix();
         OnPropertyChanged(nameof(IsReadOnly));
+        OnPropertyChanged(nameof(HasBuildings));
+        OnPropertyChanged(nameof(CanModify));
     }
 
-    partial void OnSelectedBuildingChanged(Building? value) => BuildMatrix();
+    partial void OnSelectedBuildingChanged(Building? value)
+    {
+        BuildMatrix();
+        OnPropertyChanged(nameof(CanRemoveBuilding));
+    }
 
     private void BuildMatrix()
     {
@@ -231,42 +249,11 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
         NewBuildingApartments = 10;
         IsAddBuildingDialogOpen = false;
         _onChanged();
+        Refresh();
     }
 
     [RelayCommand]
     private void CancelAddBuilding() => IsAddBuildingDialogOpen = false;
-
-    [RelayCommand(CanExecute = nameof(CanModifyStructure))]
-    private void ModifyStructure()
-    {
-        if (SelectedBuilding is null) return;
-        NewStructureFloors = SelectedBuilding.FloorCount;
-        NewStructureApartments = SelectedBuilding.ApartmentsPerFloor;
-        IsModifyStructureDialogOpen = true;
-    }
-
-    private bool CanModifyStructure => !IsReadOnly && SelectedBuilding is not null;
-
-    [ObservableProperty]
-    private bool _isModifyStructureDialogOpen;
-
-    [ObservableProperty]
-    private int _newStructureFloors;
-
-    [ObservableProperty]
-    private int _newStructureApartments;
-
-    [RelayCommand]
-    private void ConfirmModifyStructure()
-    {
-        if (SelectedBuilding is null) return;
-        _session.UpdateCoBuildingStructure(SelectedBuilding.Id, NewStructureFloors, NewStructureApartments);
-        IsModifyStructureDialogOpen = false;
-        _onChanged();
-    }
-
-    [RelayCommand]
-    private void CancelModifyStructure() => IsModifyStructureDialogOpen = false;
 
     [RelayCommand(CanExecute = nameof(CanRemoveBuilding))]
     private void RemoveBuilding()
@@ -287,15 +274,29 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
         _session.RemoveCoBuilding(SelectedBuilding.Id);
         IsRemoveBuildingConfirmOpen = false;
         _onChanged();
+        Refresh();
     }
 
     [RelayCommand]
     private void CancelRemoveBuilding() => IsRemoveBuildingConfirmOpen = false;
 
     [RelayCommand]
-    private void CloseEditor() => IsEditorOpen = false;
+    private void CloseEditor()
+    {
+        PersistSelectedCellDetails();
+        IsEditorOpen = false;
+    }
+
 
     [RelayCommand]
+    private void SetEditorStatusNotSearched() => SetEditorStatus(DwellingStatus.NotSearched);
+
+    [RelayCommand]
+    private void SetEditorStatusSearched() => SetEditorStatus(DwellingStatus.Searched);
+
+    [RelayCommand]
+    private void SetEditorStatusAffected() => SetEditorStatus(DwellingStatus.Affected);
+
     private void SetEditorStatus(DwellingStatus status)
     {
         if (SelectedCell is null) return;
@@ -305,7 +306,16 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     [RelayCommand]
     private void ConfirmEditor()
     {
+        PersistSelectedCellDetails();
         IsEditorOpen = false;
         SelectedCell = null;
     }
+
+    private void PersistSelectedCellDetails()
+    {
+        if (SelectedCell is null) return;
+        _session.SetDwellingDetails(SelectedCell.BuildingId, SelectedCell.FloorOrdinal,
+            SelectedCell.ApartmentNumber, SelectedCell.ResidentName, SelectedCell.KeyAvailable);
+    }
+
 }
