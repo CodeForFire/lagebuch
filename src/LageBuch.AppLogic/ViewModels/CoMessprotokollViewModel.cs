@@ -66,6 +66,17 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         _ => ""
     };
 
+    // Mirrors the spray-marked "X-code" convention search teams already use on doors: a single
+    // slash means the search is under way, a complete X means it's cleared, and a circled X flags
+    // a find. Shape carries the same meaning as StatusBrush's color, redundantly, on purpose.
+    public string StatusGlyph => Status switch
+    {
+        DwellingStatus.NotSearched => "\u2571",
+        DwellingStatus.Searched => "\u2715",
+        DwellingStatus.Affected => "\u2297",
+        _ => "\u2571"
+    };
+
     private static string GetStatusBrush(DwellingStatus status) => status switch
     {
         DwellingStatus.NotSearched => "#FFC000",
@@ -77,6 +88,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     partial void OnStatusChanged(DwellingStatus value)
     {
         StatusBrush = GetStatusBrush(value);
+        OnPropertyChanged(nameof(StatusGlyph));
         if (!IsReadOnly)
             _onStatusChanged(BuildingId, FloorOrdinal, ApartmentNumber, value);
     }
