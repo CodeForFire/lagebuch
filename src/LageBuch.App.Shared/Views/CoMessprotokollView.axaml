@@ -159,11 +159,27 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ApartmentColumnViewModel">
+                <!-- FluentTheme swaps in its own full-box chrome on focus/pointer-over, styling
+                     Border#PART_BorderElement directly and ignoring the plain BorderBrush/
+                     BorderThickness set below; override those exact states locally so the header
+                     stays a quiet underline throughout instead of popping a box while editing. -->
                 <TextBox Text="{Binding Label}" Width="136" FontSize="11" FontWeight="SemiBold"
                          HorizontalContentAlignment="Center" Padding="4,2"
                          Background="Transparent" BorderThickness="0,0,0,1"
                          BorderBrush="{StaticResource HairlineBrush}"
-                         IsEnabled="{Binding !IsReadOnly}" />
+                         IsEnabled="{Binding !IsReadOnly}">
+                  <TextBox.Styles>
+                    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+                      <Setter Property="Background" Value="Transparent" />
+                      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+                      <Setter Property="BorderThickness" Value="0,0,0,1" />
+                    </Style>
+                    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+                      <Setter Property="Background" Value="Transparent" />
+                      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+                    </Style>
+                  </TextBox.Styles>
+                </TextBox>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
