@@ -20,20 +20,20 @@
         <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
              enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
              make editable) — mirrors PersonNameBox below. -->
-        <AutoCompleteBox x:Name="RoleBox" Width="120" Watermark="Funktion"
+        <AutoCompleteBox x:Name="RoleBox" Width="120" PlaceholderText="Funktion"
                          ItemsSource="{Binding RoleOptions}"
                          FilterMode="ContainsOrdinal"
                          MinimumPrefixLength="0"
                          Text="{Binding NewRole}" />
-        <AutoCompleteBox x:Name="PersonNameBox" Width="200" Watermark="Name"
+        <AutoCompleteBox x:Name="PersonNameBox" Width="200" PlaceholderText="Name"
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal"
                          MinimumPrefixLength="0"
                          Text="{Binding NewPersonName}"
                          b:EnterSubmit.Command="{Binding AddRoleCommand}" />
-        <TextBox x:Name="SectionBox" Width="130" Watermark="Abschnitt" Text="{Binding NewSection}" />
+        <TextBox x:Name="SectionBox" Width="130" PlaceholderText="Abschnitt" Text="{Binding NewSection}" />
         <ComboBox Width="150" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
-        <TextBox x:Name="PhoneBox" Width="150" Watermark="Handynummer" Text="{Binding NewPhone}" />
+        <TextBox x:Name="PhoneBox" Width="150" PlaceholderText="Handynummer" Text="{Binding NewPhone}" />
         <Button Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}" />
       </StackPanel>
     </Border>
@@ -55,14 +55,14 @@
           </TextBlock.Text>
         </TextBlock>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <AutoCompleteBox x:Name="TransferPersonNameBox" Width="200" Watermark="Name"
+          <AutoCompleteBox x:Name="TransferPersonNameBox" Width="200" PlaceholderText="Name"
                            ItemsSource="{Binding PersonOptions}"
                            FilterMode="ContainsOrdinal"
                            MinimumPrefixLength="0"
                            Text="{Binding TransferPersonName}"
                            b:EnterSubmit.Command="{Binding ConfirmTransferCommand}" />
           <ComboBox x:Name="TransferCallSignBox" Width="150" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding TransferCallSign}" />
-          <TextBox x:Name="TransferPhoneBox" Width="150" Watermark="Handynummer" Text="{Binding TransferPhone}" />
+          <TextBox x:Name="TransferPhoneBox" Width="150" PlaceholderText="Handynummer" Text="{Binding TransferPhone}" />
           <Button x:Name="ConfirmTransferButton" Classes="signal" Content="ÜBERTRAGEN" Command="{Binding ConfirmTransferCommand}" />
           <Button x:Name="CancelTransferButton" Content="ABBRECHEN" Command="{Binding CancelTransferCommand}" />
         </StackPanel>
@@ -87,7 +87,7 @@
           <DataGridTemplateColumn Header="HANDYNUMMER" Width="170">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:RoleAssignmentRow">
-                <TextBox Margin="6,4" Watermark="Handynummer"
+                <TextBox Margin="6,4" PlaceholderText="Handynummer"
                          Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                          IsEnabled="{Binding !IsReadOnly}" />
               </DataTemplate>
