@@ -159,6 +159,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
         _clock = clock;
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
+        _session.Changed += Refresh;
         Refresh();
     }
 

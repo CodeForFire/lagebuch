@@ -46,7 +46,7 @@ public class LinksTabRenderTests
         var (window, _) = ShowWorkspace();
         var tabs = Tabs(window);
 
-        Assert.Equal(9, tabs.Items.Count);
+        Assert.Equal(10, tabs.Items.Count);
         Capture(window, "links-before.png");
     }
 
@@ -56,7 +56,7 @@ public class LinksTabRenderTests
         var (window, vm) = ShowWorkspace();
 
         var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // LINKS
+        tabs.SelectedIndex = 8; // LINKS
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("LINKS", ((TabItem)tabs.SelectedItem!).Header);

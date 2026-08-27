@@ -46,7 +46,7 @@ public class FilesTabRenderTests
         var (window, _, _) = ShowWorkspace();
         var tabs = Tabs(window);
 
-        Assert.Equal(9, tabs.Items.Count);
+        Assert.Equal(10, tabs.Items.Count);
         Capture(window, "files-before.png");
     }
 
@@ -62,7 +62,7 @@ public class FilesTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var tabs = Tabs(window);
-        tabs.SelectedIndex = 6; // DATEIEN
+        tabs.SelectedIndex = 7; // DATEIEN
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("DATEIEN", ((TabItem)tabs.SelectedItem!).Header);
