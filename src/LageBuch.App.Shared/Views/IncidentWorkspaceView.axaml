@@ -41,7 +41,7 @@
 
               <StackPanel x:Name="IncidentNumberEditRow" Orientation="Horizontal" Spacing="6"
                           VerticalAlignment="Center" IsVisible="{Binding ShowEinsatznummerEdit}">
-                <TextBox x:Name="IncidentNumberEditBox" Width="220" Watermark="z. B. B 1.2 260715 123"
+                <TextBox x:Name="IncidentNumberEditBox" Width="220" PlaceholderText="z. B. B 1.2 260715 123"
                          Text="{Binding IncidentNumberEditInput}">
                   <TextBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding ConfirmIncidentNumberCommand}" />

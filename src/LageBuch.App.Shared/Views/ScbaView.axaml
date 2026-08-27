@@ -41,17 +41,17 @@
                   SelectedItem="{Binding NewDesignation}" />
         <!-- One box per position rather than a single free-text field: a Trupp is two people
              (three in CSA), and the third box only appears when the type calls for it. -->
-        <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170" Watermark="Truppführer"
+        <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170" PlaceholderText="Truppführer"
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                          Text="{Binding NewTruppfuehrer}"
                          b:EnterSubmit.Command="{Binding AddTruppCommand}" />
-        <AutoCompleteBox x:Name="TruppmannBox" Width="170" Watermark="Truppmann"
+        <AutoCompleteBox x:Name="TruppmannBox" Width="170" PlaceholderText="Truppmann"
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                          Text="{Binding NewTruppmann}"
                          b:EnterSubmit.Command="{Binding AddTruppCommand}" />
-        <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170" Watermark="2. Truppmann (CSA)"
+        <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170" PlaceholderText="2. Truppmann (CSA)"
                          IsVisible="{Binding RequiresThirdMember}"
                          ItemsSource="{Binding PersonOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"

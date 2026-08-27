@@ -181,8 +181,8 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LinkRow">
                           <Grid ColumnDefinitions="*,*,Auto,Auto,Auto" Margin="0,0,0,6">
-                            <TextBox Grid.Column="0" Watermark="Name" Text="{Binding Name}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="1" Watermark="URL" Text="{Binding Url}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="0" PlaceholderText="Name" Text="{Binding Name}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1" PlaceholderText="URL" Text="{Binding Url}" Margin="0,0,6,0" />
                             <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
@@ -217,11 +217,11 @@
                           <Grid ColumnDefinitions="*,*,150,Auto,Auto,Auto" Margin="0,0,0,6">
                             <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                  aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
-                            <AutoCompleteBox Grid.Column="0" Watermark="Wache"
+                            <AutoCompleteBox Grid.Column="0" PlaceholderText="Wache"
                                              ItemsSource="{Binding WacheOptions}"
                                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                              Text="{Binding Wache}" Margin="0,0,6,0" />
-                            <AutoCompleteBox Grid.Column="1" Watermark="Funkrufname"
+                            <AutoCompleteBox Grid.Column="1" PlaceholderText="Funkrufname"
                                              ItemsSource="{Binding CallSignOptions}"
                                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                              Text="{Binding CallSign}" Margin="0,0,6,0" />
@@ -260,11 +260,11 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PersonRow">
                           <Grid ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
-                            <TextBox Grid.Column="0" Watermark="Nachname" Text="{Binding LastName}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="1" Watermark="Vorname" Text="{Binding FirstName}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="2" Watermark="Rolle" Text="{Binding Role}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="3" Watermark="Rufname" Text="{Binding CallSign}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="4" Watermark="Telefon" Text="{Binding Phone}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="0" PlaceholderText="Nachname" Text="{Binding LastName}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1" PlaceholderText="Vorname" Text="{Binding FirstName}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="2" PlaceholderText="Rolle" Text="{Binding Role}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="3" PlaceholderText="Rufname" Text="{Binding CallSign}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="4" PlaceholderText="Telefon" Text="{Binding Phone}" Margin="0,0,6,0" />
                             <Button Grid.Column="5" Content="✕"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}" />

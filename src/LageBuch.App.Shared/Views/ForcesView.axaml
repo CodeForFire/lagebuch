@@ -32,7 +32,7 @@
              must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. -->
         <StackPanel Spacing="2">
           <TextBlock Text="FEUERWEHR / WACHE" Classes="overline" FontSize="10" />
-          <AutoCompleteBox x:Name="BrigadeBox" Width="160" Watermark="Feuerwehr"
+          <AutoCompleteBox x:Name="BrigadeBox" Width="160" PlaceholderText="Feuerwehr"
                            ItemsSource="{Binding BrigadeOptions}"
                            FilterMode="ContainsOrdinal"
                            MinimumPrefixLength="0"
@@ -56,7 +56,7 @@
         <!-- Freitext-fähig: Fahrzeuge, die nicht in den Stammdaten stehen (Fremdwehren). -->
         <StackPanel Spacing="2">
           <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
-          <AutoCompleteBox x:Name="CallSignBox" Width="140" Watermark="z. B. FFB 1/44/1"
+          <AutoCompleteBox x:Name="CallSignBox" Width="140" PlaceholderText="z. B. FFB 1/44/1"
                            ItemsSource="{Binding CallSignOptions}"
                            FilterMode="ContainsOrdinal"
                            MinimumPrefixLength="0"
@@ -67,15 +67,15 @@
           <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
                0 und lässt den Platzhalter stehen. -->
           <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBox x:Name="OfficerBox" Width="70" Watermark="GF"
+            <TextBox x:Name="OfficerBox" Width="70" PlaceholderText="GF"
                      Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
-            <TextBox x:Name="MannschaftBox" Width="70" Watermark="Mann"
+            <TextBox x:Name="MannschaftBox" Width="70" PlaceholderText="Mann"
                      Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
           </StackPanel>
         </StackPanel>
         <StackPanel Spacing="2">
           <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" />
-          <TextBox x:Name="ScbaBox" Width="90" Watermark="AGT"
+          <TextBox x:Name="ScbaBox" Width="90" PlaceholderText="AGT"
                    Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
         </StackPanel>
         <StackPanel Spacing="2">
@@ -85,7 +85,7 @@
         </StackPanel>
         <StackPanel Spacing="2">
           <TextBlock Text="BEMERKUNG" Classes="overline" FontSize="10" />
-          <TextBox x:Name="NotesBox" Width="170" Watermark="Bemerkung" Text="{Binding NewNotes}" />
+          <TextBox x:Name="NotesBox" Width="170" PlaceholderText="Bemerkung" Text="{Binding NewNotes}" />
         </StackPanel>
         <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
@@ -173,7 +173,7 @@
           <DataGridTemplateColumn Header="BEMERKUNG" Width="*">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
-                <TextBox Margin="6,4" Watermark="Bemerkung"
+                <TextBox Margin="6,4" PlaceholderText="Bemerkung"
                          Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                          IsEnabled="{Binding !IsReadOnly}" />
               </DataTemplate>

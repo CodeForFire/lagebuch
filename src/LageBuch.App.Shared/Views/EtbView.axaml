@@ -31,13 +31,13 @@
         <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
              a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
              ComboBox, mirroring ForcesView's Brigade field. -->
-        <AutoCompleteBox Width="110" Watermark="Von" ItemsSource="{Binding CallSignOptions}"
+        <AutoCompleteBox Width="110" PlaceholderText="Von" ItemsSource="{Binding CallSignOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                          Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
-        <AutoCompleteBox Width="110" Watermark="An" ItemsSource="{Binding CallSignOptions}"
+        <AutoCompleteBox Width="110" PlaceholderText="An" ItemsSource="{Binding CallSignOptions}"
                          FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                          Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
-        <TextBox x:Name="EtbTextBox" Width="320" Watermark="Eintrag" Text="{Binding NewText}">
+        <TextBox x:Name="EtbTextBox" Width="320" PlaceholderText="Eintrag" Text="{Binding NewText}">
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
           </TextBox.KeyBindings>
@@ -55,7 +55,7 @@
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBox x:Name="EditTextBox" Width="420" Watermark="Eintrag" Text="{Binding EditText}">
+        <TextBox x:Name="EditTextBox" Width="420" PlaceholderText="Eintrag" Text="{Binding EditText}">
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
           </TextBox.KeyBindings>
