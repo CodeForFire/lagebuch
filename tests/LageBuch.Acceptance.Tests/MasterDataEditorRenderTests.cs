@@ -142,12 +142,14 @@ public class MasterDataEditorRenderTests
 
         var boxes = view.GetVisualDescendants().OfType<AutoCompleteBox>().ToList();
         // PlaceholderText: Watermark is obsolete in C# under Avalonia 12 (XAML keeps the old name).
-        Assert.Contains(boxes, b => b.Text == "FFB Wache 1" && b.PlaceholderText == "Wache");
-        Assert.Contains(boxes, b => b.Text == "FFB 1/44/1" && b.PlaceholderText == "Funkrufname");
+        // #137: placeholders now show anonymized examples instead of restating the label.
+        Assert.Contains(boxes, b => b.Text == "FFB Wache 1" && b.PlaceholderText == AnonymizedExampleData.BrigadePlaceholder);
+        Assert.Contains(boxes, b => b.Text == "FFB 1/44/1" && b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder);
         // The suggestions come from the master data lists; free text stays possible.
-        var wacheBox = boxes.Single(b => b.PlaceholderText == "Wache");
+        var wacheBox = boxes.Single(b => b.PlaceholderText == AnonymizedExampleData.BrigadePlaceholder);
         Assert.Equal(new[] { "FFB Wache 1", "Aich", "Puch" }, wacheBox.ItemsSource);
-        Assert.Equal(new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" }, boxes.Single(b => b.PlaceholderText == "Funkrufname").ItemsSource);
+        Assert.Equal(new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
+            boxes.Single(b => b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder).ItemsSource);
         Assert.Contains(view.GetVisualDescendants().OfType<NumericUpDown>(), n => n.Value == 9);
         Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9) }, section.ToValues());
 

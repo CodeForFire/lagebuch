@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.ScbaView"
              x:DataType="vm:ScbaViewModel">
@@ -37,35 +38,58 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <WrapPanel x:Name="RegistrationDock" Orientation="Horizontal">
-        <ComboBox Width="150" PlaceholderText="Trupp" ItemsSource="{Binding TruppTypeOptions}"
-                  SelectedItem="{Binding NewDesignation}" />
+        <HeaderedContentControl Classes="field" Header="TRUPP">
+          <ComboBox Width="150" ItemsSource="{Binding TruppTypeOptions}"
+                    SelectedItem="{Binding NewDesignation}" />
+        </HeaderedContentControl>
         <!-- One box per position rather than a single free-text field: a Trupp is two people
-             (three in CSA), and the third box only appears when the type calls for it. -->
-        <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170" PlaceholderText="Truppführer"
-                         ItemsSource="{Binding PersonOptions}"
-                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Text="{Binding NewTruppfuehrer}"
-                         b:EnterSubmit.Command="{Binding AddTruppCommand}" />
-        <AutoCompleteBox x:Name="TruppmannBox" Width="170" PlaceholderText="Truppmann"
-                         ItemsSource="{Binding PersonOptions}"
-                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Text="{Binding NewTruppmann}"
-                         b:EnterSubmit.Command="{Binding AddTruppCommand}" />
-        <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170" PlaceholderText="2. Truppmann (CSA)"
-                         IsVisible="{Binding RequiresThirdMember}"
-                         ItemsSource="{Binding PersonOptions}"
-                         FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                         Text="{Binding NewZweiterTruppmann}"
-                         b:EnterSubmit.Command="{Binding AddTruppCommand}" />
-        <ComboBox Width="140" PlaceholderText="Funkrufname" ItemsSource="{Binding CallSignOptions}"
-                  SelectedItem="{Binding NewCallSign}" />
-        <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"
-                       FormatString="0" />
-        <TextBlock Text="Min. max." Classes="secondary" VerticalAlignment="Center" />
-        <NumericUpDown Width="100" Minimum="1" Maximum="60" Value="{Binding NewControlIntervalMinutes}"
-                       FormatString="0" />
-        <TextBlock Text="Min. Abfrage" Classes="secondary" VerticalAlignment="Center" />
-        <Button Classes="signal" Content="BEREITSTELLEN" Command="{Binding AddTruppCommand}" />
+             (three in CSA), and the third box only appears when the type calls for it. Crew names
+             use the ad-hoc "whoever is entering data right now" persona, not the Stammdaten roster
+             persona (#137). -->
+        <HeaderedContentControl Classes="field" Header="TRUPPFÜHRER">
+          <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
+                           ItemsSource="{Binding PersonOptions}"
+                           FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                           Text="{Binding NewTruppfuehrer}"
+                           b:EnterSubmit.Command="{Binding AddTruppCommand}" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="TRUPPMANN">
+          <AutoCompleteBox x:Name="TruppmannBox" Width="170"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderAlt}"
+                           ItemsSource="{Binding PersonOptions}"
+                           FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                           Text="{Binding NewTruppmann}"
+                           b:EnterSubmit.Command="{Binding AddTruppCommand}" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="2. TRUPPMANN (CSA)" IsVisible="{Binding RequiresThirdMember}">
+          <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderThird}"
+                           ItemsSource="{Binding PersonOptions}"
+                           FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                           Text="{Binding NewZweiterTruppmann}"
+                           b:EnterSubmit.Command="{Binding AddTruppCommand}" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+          <ComboBox Width="140" ItemsSource="{Binding CallSignOptions}"
+                    SelectedItem="{Binding NewCallSign}" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="EINSATZZEIT">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"
+                           FormatString="0" />
+            <TextBlock Text="Min. max." Classes="secondary" VerticalAlignment="Center" />
+          </StackPanel>
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="ABFRAGE-INTERVALL">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <NumericUpDown Width="100" Minimum="1" Maximum="60" Value="{Binding NewControlIntervalMinutes}"
+                           FormatString="0" />
+            <TextBlock Text="Min. Abfrage" Classes="secondary" VerticalAlignment="Center" />
+          </StackPanel>
+        </HeaderedContentControl>
+        <Button Classes="signal" Content="BEREITSTELLEN" Command="{Binding AddTruppCommand}"
+                VerticalAlignment="Bottom" Margin="0,0,0,1" />
       </WrapPanel>
     </Border>
 

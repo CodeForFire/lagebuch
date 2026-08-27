@@ -19,7 +19,7 @@ public class ForcesTabRenderTests
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
             Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
             MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
@@ -31,15 +31,14 @@ public class ForcesTabRenderTests
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
-        Brigades = new[] { "FFB Wache 1", "Aich" },
+        Brigades = new[] { AnonymizedExampleData.Brigade, AnonymizedExampleData.SecondBrigade },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
-        RadioCallSigns = new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" },
-        Vehicles = new[]
+        RadioCallSigns = new[]
         {
-            new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
-            new Vehicle("FFB Wache 1", "FFB 1/44/1", 6),
-            new Vehicle("Aich", "Aich 42/1", 6),
+            AnonymizedExampleData.CallSign, AnonymizedExampleData.SecondCallSign,
+            AnonymizedExampleData.OtherBrigadeCallSign,
         },
+        Vehicles = AnonymizedExampleData.Vehicles,
     };
 
     private static TabControl Tabs(Window window) =>
@@ -57,7 +56,7 @@ public class ForcesTabRenderTests
     public void Vehicle_selection_presets_the_dock_and_the_row_shows_1_1_2_strength()
     {
         var (window, vm) = ShowWorkspace();
-        Tabs(window).SelectedIndex = 2; // KRÄFTE
+        Tabs(window).SelectedIndex = 4; // KRÄFTE
         Dispatcher.UIThread.RunJobs();
 
         vm.Forces.NewBrigade = "FFB Wache 1";
@@ -84,7 +83,7 @@ public class ForcesTabRenderTests
     public void A_strength_correction_is_committed_as_one_edit_and_exposes_the_verlauf()
     {
         var (window, vm) = ShowWorkspace();
-        Tabs(window).SelectedIndex = 2;
+        Tabs(window).SelectedIndex = 4; // KRÄFTE
         vm.Forces.NewBrigade = "Aich";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
@@ -110,7 +109,7 @@ public class ForcesTabRenderTests
     public void A_row_can_be_removed_completely_and_the_etb_records_it()
     {
         var (window, vm) = ShowWorkspace();
-        Tabs(window).SelectedIndex = 2;
+        Tabs(window).SelectedIndex = 4; // KRÄFTE
         vm.Forces.NewBrigade = "FFB Wache 1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
@@ -143,7 +142,7 @@ public class ForcesTabRenderTests
         // ViewLocator content does not materialize under the headless host, so the view is built
         // against the same ForcesViewModel instance instead.
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
             Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
             MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());

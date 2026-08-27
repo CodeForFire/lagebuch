@@ -1,11 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.FilesView"
              x:DataType="vm:FilesViewModel">
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" Text="DATEIEN" Classes="overline" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="0" Text="DATEIEN" Classes="overline" VerticalAlignment="Top" />
       <Button Grid.Column="1" x:Name="AddFileButton" Classes="signal" Content="DATEI HINZUFÜGEN"
               Command="{Binding AddFileCommand}" IsVisible="{Binding !IsReadOnly}" />
     </Grid>
@@ -24,15 +25,40 @@
 
     <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14">
-      <ScrollViewer>
+      <StackPanel Grid.IsSharedSizeScope="True">
+        <!-- Column headers: the rename box below has no other visible label (#137). Columns share
+             a SharedSizeGroup with the row template below so headers line up with their data even
+             though each row sizes its Auto columns to its own content. -->
+        <Grid Margin="0,0,0,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
+          <TextBlock Grid.Column="1" Text="GRÖSSE" Classes="overline" FontSize="10" Margin="10,0" />
+          <TextBlock Grid.Column="2" Text="HINZUGEFÜGT" Classes="overline" FontSize="10" Margin="10,0" />
+          <TextBlock Grid.Column="3" Text="VON" Classes="overline" FontSize="10" Margin="10,0" />
+        </Grid>
+        <ScrollViewer>
         <ItemsControl x:Name="FilesList" ItemsSource="{Binding Files}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IncidentFileRow">
-              <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,10">
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+                </Grid.ColumnDefinitions>
                 <!-- Committing per keystroke saved the whole incident file on every character
                      typed (#33). UpdateSourceTrigger=LostFocus pushes once, when the operator
                      actually leaves the field. Mirrors ForcesView's Bemerkung fix. -->
-                <TextBox Grid.Column="0" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" PlaceholderText="Name"
+                <TextBox Grid.Column="0" Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                         PlaceholderText="{x:Static md:AnonymizedExampleData.FileNamePlaceholder}"
                          BorderThickness="0" Background="Transparent" Padding="0"
                          VerticalAlignment="Center" IsEnabled="{Binding !IsReadOnly}" />
                 <TextBlock Grid.Column="1" Classes="mono" Text="{Binding SizeDisplay}" Margin="10,0"
@@ -50,7 +76,8 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-      </ScrollViewer>
+        </ScrollViewer>
+      </StackPanel>
     </Border>
   </DockPanel>
 </UserControl>

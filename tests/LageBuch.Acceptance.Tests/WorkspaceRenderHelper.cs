@@ -35,16 +35,13 @@ internal static class WorkspaceRenderHelper
             new ChecklistTemplateItem("Fahrzeug abgerüstet und einsatzbereit?", true),
         },
         TruppTypes = new[] { "Angriffstrupp", "Sicherheitstrupp", "CSA-Trupp" },
-        Brigades = new[] { "FFB Wache 1", "FFB Wache 2", "Aich", "Puch", "Emmering" },
+        Brigades = AnonymizedExampleData.Brigades,
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
-        RadioCallSigns = new[] { "FFB 1/40/1", "FFB 1/23/1", "Aich 42/1", "Land 1" },
-        Links = new[] { new Link("Wetterdienst", "https://dwd.de"), new Link("Kartendienst", "https://example.org/karte") },
-        // Fictional roster: the real personnel.json is gitignored, so tests supply their own.
-        Personnel = new[]
-        {
-            new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
-            new Person("Musterfrau", "Erika", "GF", null, "01 71 / 7 65 43 21"),
-        },
+        RadioCallSigns = AnonymizedExampleData.RadioCallSigns,
+        Links = AnonymizedExampleData.Links,
+        // Fictional roster: the real personnel.json is gitignored, so tests supply their own
+        // (#137: same anonymized fixture the app's own placeholders are built from).
+        Personnel = AnonymizedExampleData.Personnel,
     };
 
     public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars(
@@ -63,7 +60,8 @@ internal static class WorkspaceRenderHelper
         // Keyword + Einsatznummer both set: the common post-#69 shape once ILS has called back --
         // Stichwort as the header hero, the Einsatznummer as the secondary chip beside it.
         var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", checklistAufbau, checklistAbbau,
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
+            checklistAufbau, checklistAbbau,
             new IncidentNumber("B 1.2 260715 123"), keyword: "B3P");
         var ticker = new ManualTicker();
         var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(),
@@ -73,8 +71,8 @@ internal static class WorkspaceRenderHelper
         //   1) ILS reminder running, 2) SCBA pressure-control due, 3) Rückzugsalarm active.
         // The ILS reminder auto-starts with the incident (no manual start).
         vm.Scba.NewDesignation = "Angriffstrupp";
-        vm.Scba.NewTruppfuehrer = "Müller";
-        vm.Scba.NewTruppmann = "Schmidt";
+        vm.Scba.NewTruppfuehrer = AnonymizedExampleData.OperatorSurname;
+        vm.Scba.NewTruppmann = AnonymizedExampleData.OperatorSurnameAlt;
         vm.Scba.AddTruppCommand.Execute(null);
         var row = vm.Scba.Trupps[^1];
         row.PressureInput = 300;
