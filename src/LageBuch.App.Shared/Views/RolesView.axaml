@@ -43,8 +43,15 @@
                    PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
                    Text="{Binding NewSection}" />
         </HeaderedContentControl>
+        <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
+             enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). -->
         <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
-          <ComboBox Width="150" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding NewCallSign}" />
+          <AutoCompleteBox Width="150"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                           ItemsSource="{Binding CallSignOptions}"
+                           FilterMode="ContainsOrdinal"
+                           MinimumPrefixLength="0"
+                           Text="{Binding NewCallSign}" />
         </HeaderedContentControl>
         <HeaderedContentControl Classes="field" Header="HANDYNUMMER">
           <TextBox x:Name="PhoneBox" Width="150"
@@ -83,7 +90,12 @@
                              b:EnterSubmit.Command="{Binding ConfirmTransferCommand}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
-            <ComboBox x:Name="TransferCallSignBox" Width="150" ItemsSource="{Binding CallSignOptions}" SelectedItem="{Binding TransferCallSign}" />
+            <AutoCompleteBox x:Name="TransferCallSignBox" Width="150"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding TransferCallSign}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="HANDYNUMMER">
             <TextBox x:Name="TransferPhoneBox" Width="150"
