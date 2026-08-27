@@ -114,7 +114,7 @@ public class ReminderViewModelTests
     }
 
     [Fact]
-    public void Becoming_due_plays_the_spoken_cue_once_per_cycle()
+    public void Becoming_due_plays_the_spoken_cue_immediately()
     {
         var (session, clock) = NewSession();
         var ticker = new FakeTicker();
@@ -123,7 +123,6 @@ public class ReminderViewModelTests
 
         clock.Now = T0.AddMinutes(15);
         ticker.Fire();
-        ticker.Fire(); // still due — must not re-announce within the same cycle
 
         Assert.Equal(new[] { AlarmSound.IlsReminderDue }, alarm.Played);
 
@@ -133,6 +132,35 @@ public class ReminderViewModelTests
         ticker.Fire();
 
         Assert.Equal(new[] { AlarmSound.IlsReminderDue, AlarmSound.IlsReminderDue }, alarm.Played);
+    }
+
+    [Fact]
+    public void Unacknowledged_reminder_repeats_the_spoken_cue_every_60_seconds()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = new ReminderViewModel(session, clock, ticker, alarm, () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        // Still due, but less than 60s since the last announcement — no repeat yet.
+        clock.Now = T0.AddMinutes(15).AddSeconds(30);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        // 60s since the last announcement — repeats.
+        clock.Now = T0.AddMinutes(15).AddSeconds(60);
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
+
+        // Acknowledging stops the repeat until the next cycle falls due.
+        vm.AcknowledgeCommand.Execute(null);
+        clock.Now = T0.AddMinutes(15).AddSeconds(90);
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
     }
 
     [Fact]
