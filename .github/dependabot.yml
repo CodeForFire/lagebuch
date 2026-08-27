@@ -18,3 +18,10 @@ updates:
       avalonia:
         patterns:
           - "Avalonia*"
+    # xunit.v3 4.0.0 removes the TestIntrospectionHelper.GetTestCaseDetails()
+    # overload that Avalonia.Headless.XUnit 12.1.1 still calls, breaking all
+    # acceptance tests (AvaloniaUI/Avalonia#22072). Drop this ignore once
+    # Avalonia ships a compatible package.
+    ignore:
+      - dependency-name: "xunit.v3"
+        update-types: ["version-update:semver-major"]
