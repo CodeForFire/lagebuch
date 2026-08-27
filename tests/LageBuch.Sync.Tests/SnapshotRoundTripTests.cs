@@ -176,4 +176,24 @@ public class SnapshotRoundTripTests
         Assert.Equal(30, timer.RecurringIntervalMinutes);
         Assert.True(timer.IsRunning);
     }
+
+    [Fact]
+    public void SnapshotRoundTrip_BuildingsAndDwellings()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Test", null);
+        var original = Incident.Start(clock, op);
+        original.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        original.RecordCoValue(clock, op, original.Buildings[0].Id, 0, 1, 45);
+
+        var snapshot = SnapshotMapper.ToSnapshot(original);
+        var restored = SnapshotMapper.FromSnapshot(snapshot);
+
+        Assert.Single(restored.Buildings);
+        Assert.Equal("Haus A", restored.Buildings[0].Name);
+        Assert.Equal(9, restored.Dwellings.Count);
+        var dwelling = restored.Dwellings.First(d =>
+            d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(45, dwelling.CoValue);
+    }
 }

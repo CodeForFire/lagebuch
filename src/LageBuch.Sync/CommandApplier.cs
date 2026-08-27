@@ -108,6 +108,30 @@ public static class CommandApplier
             case SetTaskCompletedCommand c:
                 incident.SetTaskCompleted(c.TaskId, c.IsDone, clock, Operator(c.Operator));
                 break;
+            case AddCoBuildingCommand c:
+                incident.AddCoBuilding(clock, Operator(c.Operator), c.Name, c.FloorCount, c.ApartmentsPerFloor);
+                break;
+            case UpdateCoBuildingStructureCommand c:
+                incident.UpdateCoBuildingStructure(clock, Operator(c.Operator), c.BuildingId, c.FloorCount, c.ApartmentsPerFloor);
+                break;
+            case RemoveCoBuildingCommand c:
+                incident.RemoveCoBuilding(clock, Operator(c.Operator), c.BuildingId);
+                break;
+            case RecordCoValueCommand c:
+                incident.RecordCoValue(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.CoValue);
+                break;
+            case SetDwellingStatusCommand c:
+                incident.SetDwellingStatus(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.Status);
+                break;
+            case UpdateDwellingDetailsCommand c:
+                incident.SetDwellingDetails(c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.ResidentName, c.KeyAvailable);
+                break;
+            case SetFloorDescriptionCommand c:
+                incident.SetFloorDescription(c.BuildingId, c.FloorOrdinal, c.Description);
+                break;
+            case SetApartmentLabelCommand c:
+                incident.SetApartmentLabel(c.BuildingId, c.ApartmentNumber, c.Label);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(command),
                     $"Unbekannter Befehl: {command.GetType().Name}");

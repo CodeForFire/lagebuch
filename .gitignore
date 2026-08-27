@@ -24,8 +24,9 @@ seed-source/
 # Local SDD scratch / ledger
 .superpowers/
 
-# Local Claude Code state
+# Local AI agent state
 .claude/
+.opencode/
 
 # Generated voice/audio drafts (filenames can carry voice-artist names)
 *.mp3

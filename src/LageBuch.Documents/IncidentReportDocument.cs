@@ -52,6 +52,7 @@ public sealed class IncidentReportDocument : IDocument
                 column.Item().Element(c => ForcesSection.Compose(c, _incident));
                 column.Item().Element(c => TasksSection.Compose(c, _incident));
                 column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
+                column.Item().Element(c => CoMessprotokollSection.Compose(c, _incident));
                 column.Item().Element(c => FilesSection.Compose(c, _incident.Files, _imageBytesById));
             });
 

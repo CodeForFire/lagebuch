@@ -145,6 +145,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [RelayCommand]
     private void CancelEditIncidentNumber() => IsEditingIncidentNumber = false;
 
+    public CoMessprotokollViewModel CoMessprotokoll { get; private set; } = null!;
     public ChecklistViewModel ChecklistAufbau { get; private set; } = null!;
     public ChecklistViewModel ChecklistAbbau { get; private set; } = null!;
     public EtbViewModel Etb { get; private set; } = null!;
@@ -227,6 +228,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Files = new FilesViewModel(_session, _dialogs, OnChanged);
         Links = new LinksViewModel(_masterData.Links, _dialogs);
 
+        CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
+
         Tasks?.Dispose();
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
 
@@ -245,6 +248,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(Scba));
+        OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
         OnPropertyChanged(nameof(Links));
         OnPropertyChanged(nameof(Tasks));

@@ -1,0 +1,252 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
+             xmlns:dom="clr-namespace:LageBuch.Domain.CoMeasurement;assembly=LageBuch.Domain"
+             x:Class="LageBuch.App.Shared.Views.CoMessprotokollView"
+             x:DataType="vm:CoMessprotokollViewModel">
+  <DockPanel>
+    <!-- Header: Building selector + actions -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,14">
+      <ComboBox Grid.Column="0" ItemsSource="{Binding BuildingOptions}"
+                SelectedItem="{Binding SelectedBuilding}"
+                PlaceholderText="Haus auswählen..."
+                IsEnabled="{Binding CanModify}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="dom:Building">
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <Button Grid.Column="1" Content="HAUS HINZUFÜGEN"
+              Command="{Binding AddBuildingCommand}"
+              IsEnabled="{Binding !IsReadOnly}"
+              Margin="8,0,0,0" />
+      <Button Grid.Column="2" Content="HAUS ENTFERNEN"
+              Command="{Binding RemoveBuildingCommand}"
+              IsEnabled="{Binding CanModify}"
+              Margin="8,0,0,0" />
+    </Grid>
+
+    <!-- Add Building Dialog -->
+    <Border DockPanel.Dock="Top" 
+            IsVisible="{Binding IsAddBuildingDialogOpen}"
+            Background="#0F141D" 
+            BorderBrush="{StaticResource HairlineBrush}" 
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" 
+            Padding="14" Margin="0,0,0,14">
+      <StackPanel Spacing="8">
+        <TextBlock Text="NEUES HAUS HINZUFÜGEN" Classes="overline" />
+        <StackPanel Spacing="2">
+          <TextBlock Text="BEZEICHNUNG" Classes="overline" FontSize="10" />
+          <TextBox Text="{Binding NewBuildingName}" PlaceholderText="z. B. Haus A" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <StackPanel Spacing="2">
+            <TextBlock Text="GESCHOOSSE" Classes="overline" FontSize="10" />
+            <NumericUpDown Minimum="1" Maximum="50" Value="{Binding NewBuildingFloors}" FormatString="0" />
+          </StackPanel>
+          <StackPanel Spacing="2">
+            <TextBlock Text="WOHNUNGEN/GESCHOSS" Classes="overline" FontSize="10" />
+            <NumericUpDown Minimum="1" Maximum="30" Value="{Binding NewBuildingApartments}" FormatString="0" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding ConfirmAddBuildingCommand}" />
+          <Button Content="ABBRECHEN" Command="{Binding CancelAddBuildingCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Remove Building Confirmation -->
+    <Border DockPanel.Dock="Top" 
+            IsVisible="{Binding IsRemoveBuildingConfirmOpen}"
+            Background="#0F141D" 
+            BorderBrush="{StaticResource HairlineBrush}" 
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" 
+            Padding="14" Margin="0,0,0,14">
+      <StackPanel Spacing="8">
+        <TextBlock Text="HAUS ENTFERNEN" Classes="overline" />
+        <TextBlock Text="Möchten Sie das ausgewählte Haus wirklich entfernen? Alle zugehörigen Wohnungen werden ebenfalls gelöscht." TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Classes="signal" Content="ENTFERNEN" Command="{Binding ConfirmRemoveBuildingCommand}" />
+          <Button Content="ABBRECHEN" Command="{Binding CancelRemoveBuildingCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Empty state -->
+    <TextBlock DockPanel.Dock="Top"
+               Text="Keine Häuser erfasst. Klicken Sie auf 'HAUS HINZUFÜGEN' um zu beginnen."
+               Foreground="{StaticResource TextMutedBrush}"
+               IsVisible="{Binding !HasBuildings}"
+               Margin="0,20,0,0" HorizontalAlignment="Center" />
+
+    <!-- Editor Sidebar (right) -->
+    <Border DockPanel.Dock="Right"
+            IsVisible="{Binding IsEditorOpen}"
+            Background="#0F141D"
+            BorderBrush="{StaticResource HairlineBrush}"
+            BorderThickness="1,0,0,0"
+            Width="320"
+            Padding="16"
+            IsEnabled="{Binding !IsReadOnly}">
+      <StackPanel Spacing="12">
+        <!-- Header with close button -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Text="WOHNUNG BEARBEITEN" Classes="overline"
+                     VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="&#x2715;"
+                  Command="{Binding CloseEditorCommand}"
+                  Background="Transparent" BorderThickness="0"
+                  FontSize="14" Padding="4" />
+        </Grid>
+
+        <!-- Status buttons -->
+        <TextBlock Text="STATUS" Classes="overline" FontSize="10" />
+        <StackPanel Spacing="8">
+          <Button Background="#FFC000" Content="Noch nicht abgesucht"
+                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                  Command="{Binding SetEditorStatusNotSearchedCommand}" />
+          <Button Background="#92D050" Content="Abgesucht – keine Personen"
+                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                  Command="{Binding SetEditorStatusSearchedCommand}" />
+          <Button Background="#FF0000" Content="Person(en) betroffen"
+                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                  Command="{Binding SetEditorStatusAffectedCommand}" />
+        </StackPanel>
+
+        <!-- CO Value -->
+        <StackPanel Spacing="2">
+          <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
+          <NumericUpDown Minimum="0" Maximum="9999" Value="{Binding SelectedCell.CoValue}"
+                         FormatString="0" PlaceholderText="Kein Messwert" />
+        </StackPanel>
+
+        <!-- Resident Name -->
+        <StackPanel Spacing="2">
+          <TextBlock Text="NAME DER BEWOHNER" Classes="overline" FontSize="10" />
+          <TextBox Text="{Binding SelectedCell.ResidentName}" PlaceholderText="Optional" />
+        </StackPanel>
+
+        <!-- Key Available -->
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="SCHLÜSSEL VORHANDEN" Classes="overline" FontSize="10" />
+          <CheckBox IsChecked="{Binding SelectedCell.KeyAvailable}" />
+        </StackPanel>
+
+        <!-- Action buttons -->
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="ABBRECHEN" Command="{Binding CloseEditorCommand}" />
+          <Button Classes="signal" Content="FERTIG" Command="{Binding ConfirmEditorCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Matrix -->
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                  IsVisible="{Binding HasBuildings}">
+      <StackPanel>
+        <!-- Column headers (editable) -->
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="88,0,0,4">
+          <ItemsControl ItemsSource="{Binding ApartmentColumns}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Rows="1" ColumnSpacing="4" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ApartmentColumnViewModel">
+                <!-- FluentTheme swaps in its own full-box chrome on focus/pointer-over, styling
+                     Border#PART_BorderElement directly and ignoring the plain BorderBrush/
+                     BorderThickness set below; override those exact states locally so the header
+                     stays a quiet underline throughout instead of popping a box while editing. -->
+                <TextBox Text="{Binding Label}" Width="148" FontSize="11" FontWeight="SemiBold"
+                         HorizontalContentAlignment="Center" Padding="4,2"
+                         Background="Transparent" BorderThickness="0,0,0,1"
+                         BorderBrush="{StaticResource HairlineBrush}"
+                         IsEnabled="{Binding !IsReadOnly}">
+                  <TextBox.Styles>
+                    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+                      <Setter Property="Background" Value="Transparent" />
+                      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+                      <Setter Property="BorderThickness" Value="0,0,0,1" />
+                    </Style>
+                    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+                      <Setter Property="Background" Value="Transparent" />
+                      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+                    </Style>
+                  </TextBox.Styles>
+                </TextBox>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding MatrixRows}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="4" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FloorRowViewModel">
+              <Grid ColumnDefinitions="80,Auto,*">
+                <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
+                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Rows="1" ColumnSpacing="4" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DwellingCellViewModel">
+                      <Button Background="Transparent" BorderThickness="0" Padding="0" Height="NaN"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                              Command="{Binding OpenEditorCommand}">
+                        <!-- Door-mark card: dark tile, colored accent stripe + a slash/X/circled-X
+                             glyph mirror the spray-marked search convention crews already read on
+                             scene, instead of a solid traffic-light fill. -->
+                        <Border Width="148" CornerRadius="6"
+                                BorderBrush="{Binding StatusBrush}" BorderThickness="1"
+                                Background="{StaticResource SurfaceRaisedBrush}"
+                                ClipToBounds="True">
+                          <Grid ColumnDefinitions="4,*">
+                            <Border Grid.Column="0" Background="{Binding StatusBrush}" />
+                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                                  Margin="8,6">
+                              <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{Binding StatusGlyph}" FontFamily="{StaticResource MonoFont}"
+                                           FontWeight="Bold" FontSize="13"
+                                           Foreground="{Binding StatusBrush}" />
+                                <TextBlock Text="{Binding CoDisplay}" FontFamily="{StaticResource MonoFont}"
+                                           FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis" />
+                              </StackPanel>
+                              <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="11"
+                                         Margin="6,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
+                              <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                         Text="{Binding ResidentName}" FontSize="10"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         TextTrimming="CharacterEllipsis" MaxWidth="112" />
+                            </Grid>
+                          </Grid>
+                        </Border>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Grid.Column="2" Text="{Binding Description}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"
+                           Width="200" TextWrapping="Wrap" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+
+  </DockPanel>
+</UserControl>

@@ -1,5 +1,6 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
@@ -102,4 +103,13 @@ public interface IIncidentSession
     /// <summary>Corrects a file's display label. Silent — no ETB entry, matching UpdateForceUnit's
     /// Bemerkung field. Null/blank resets the label back to the file's original name.</summary>
     void RenameFile(Guid fileId, string? displayName);
+
+    void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor);
+    void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor);
+    void RemoveCoBuilding(Guid buildingId);
+    void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue);
+    void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status);
+    void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable);
+    void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description);
+    void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label);
 }

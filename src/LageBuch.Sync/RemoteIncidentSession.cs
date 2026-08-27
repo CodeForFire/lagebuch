@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
@@ -257,6 +258,30 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         : Path.Combine(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
 
     public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
+
+    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor) =>
+        Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor));
+
+    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor) =>
+        Send(new UpdateCoBuildingStructureCommand(Op(), buildingId, floorCount, apartmentsPerFloor));
+
+    public void RemoveCoBuilding(Guid buildingId) =>
+        Send(new RemoveCoBuildingCommand(Op(), buildingId));
+
+    public void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue) =>
+        Send(new RecordCoValueCommand(Op(), buildingId, floorOrdinal, apartmentNumber, coValue));
+
+    public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
+        Send(new SetDwellingStatusCommand(Op(), buildingId, floorOrdinal, apartmentNumber, status));
+
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable) =>
+        Send(new UpdateDwellingDetailsCommand(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable));
+
+    public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
+        Send(new SetFloorDescriptionCommand(buildingId, floorOrdinal, description));
+
+    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
+        Send(new SetApartmentLabelCommand(buildingId, apartmentNumber, label));
 
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 

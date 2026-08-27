@@ -114,7 +114,7 @@ public class WorkspaceAcceptanceTests
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(9, tabs.Items.Count);
+        Assert.Equal(10, tabs.Items.Count);
     }
 
     [AvaloniaFact]

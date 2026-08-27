@@ -1,5 +1,6 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
@@ -43,7 +44,15 @@ public static class SnapshotMapper
             incident.Timers.Select(t => new TimerDto(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)).ToList(),
             incident.Files.Select(f => new IncidentFileDto(f.Id, f.FileName, f.DisplayName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)).ToList(),
             incident.Tasks.Select(t => new TaskDto(t.Id, t.Text, t.Assignee, t.Importance, t.Urgency,
-                t.CreatedBy, t.CreatedAt, t.DueAt, t.CompletedAt, t.CompletedBy)).ToList());
+                t.CreatedBy, t.CreatedAt, t.DueAt, t.CompletedAt, t.CompletedBy)).ToList(),
+            incident.Buildings.Select(b => new BuildingDto(
+                b.Id, b.Name, b.FloorCount, b.ApartmentsPerFloor,
+                b.FloorDescriptions.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
+                b.Ordinal,
+                b.ApartmentLabels.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value))).ToList(),
+            incident.Dwellings.Select(d => new DwellingDto(
+                d.Id, d.BuildingId, d.FloorOrdinal, d.ApartmentNumber,
+                d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -73,7 +82,19 @@ public static class SnapshotMapper
             snapshot.Timers.Select(t => new IncidentTimerState(t.Key, t.CycleAnchor, t.IntervalMinutes, t.RecurringIntervalMinutes, t.IsRunning)),
             snapshot.Files.Select(f => IncidentFile.Rehydrate(f.Id, f.FileName, f.DisplayName, f.ContentType, f.SizeBytes, f.AddedAt, f.AddedBy)),
             snapshot.Tasks.Select(t => IncidentTask.Rehydrate(t.Id, t.CreatedAt, t.Text, t.Assignee,
-                t.Importance, t.Urgency, t.CreatedBy, t.DueAt, t.CompletedAt, t.CompletedBy)));
+                t.Importance, t.Urgency, t.CreatedBy, t.DueAt, t.CompletedAt, t.CompletedBy)),
+            snapshot.Buildings.Select(b => Building.Rehydrate(
+                b.Id, b.Name, b.FloorCount, b.ApartmentsPerFloor,
+                b.FloorDescriptions.ToDictionary(
+                    kv => int.Parse(kv.Key),
+                    kv => kv.Value),
+                b.Ordinal,
+                b.ApartmentLabels?.ToDictionary(
+                    kv => int.Parse(kv.Key),
+                    kv => kv.Value))),
+            snapshot.Dwellings.Select(d => Dwelling.Rehydrate(
+                d.Id, d.BuildingId, d.FloorOrdinal, d.ApartmentNumber,
+                d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

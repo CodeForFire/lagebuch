@@ -19,7 +19,8 @@ public sealed class IncidentRepository
                  { "incident_meta", "checklist_items", "etb_entries", "etb_entry_edits",
                    "role_assignments", "force_units", "scba_trupps",
                    "scba_trupp_members", "scba_pressure_readings", "audit_events",
-                   "incident_timers", "incident_files", "incident_tasks" })
+                   "incident_timers", "incident_files", "incident_tasks",
+                   "co_buildings", "co_dwellings" })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
         }
@@ -191,6 +192,37 @@ public sealed class IncidentRepository
                     p("$id", f.Id.ToString()); p("$o", i); p("$fn", f.FileName);
                     p("$ct", f.ContentType); p("$sz", f.SizeBytes);
                     p("$at", f.AddedAt.ToString(Iso)); p("$by", f.AddedBy); p("$dn", f.DisplayName);
+                });
+        }
+
+        for (var i = 0; i < incident.Buildings.Count; i++)
+        {
+            var b = incident.Buildings[i];
+            var descriptionsJson = System.Text.Json.JsonSerializer.Serialize(b.FloorDescriptions);
+            var apartmentLabelsJson = System.Text.Json.JsonSerializer.Serialize(b.ApartmentLabels);
+            Run(cn, tx,
+                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels) VALUES ($id,$name,$fc,$apf,$fd,$o,$al);",
+                p =>
+                {
+                    p("$id", b.Id.ToString()); p("$name", b.Name);
+                    p("$fc", b.FloorCount); p("$apf", b.ApartmentsPerFloor);
+                    p("$fd", descriptionsJson); p("$o", i); p("$al", apartmentLabelsJson);
+                });
+        }
+
+        for (var i = 0; i < incident.Dwellings.Count; i++)
+        {
+            var d = incident.Dwellings[i];
+            Run(cn, tx,
+                "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$cv);",
+                p =>
+                {
+                    p("$id", d.Id.ToString()); p("$bid", d.BuildingId.ToString());
+                    p("$fo", d.FloorOrdinal); p("$an", d.ApartmentNumber);
+                    p("$rn", (object?)d.ResidentName ?? DBNull.Value);
+                    p("$st", (int)d.Status);
+                    p("$kv", d.KeyAvailable is { } k ? (object)(k ? 1 : 0) : DBNull.Value);
+                    p("$cv", (object?)d.CoValue ?? DBNull.Value);
                 });
         }
 
@@ -367,6 +399,37 @@ public sealed class IncidentRepository
             r => Domain.Files.IncidentFile.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), Str(r, 6) ?? r.GetString(1),
                 r.GetString(2), r.GetInt64(3), ParseDate(r.GetString(4)), r.GetString(5)));
 
+        var buildings = ReadAll(cn,
+            "SELECT id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels FROM co_buildings ORDER BY ordinal;",
+            r =>
+            {
+                var fdJson = r.GetString(4);
+                var fd = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(fdJson)
+                         ?? new Dictionary<string, string?>();
+                var fdDict = fd.ToDictionary(
+                    kv => int.Parse(kv.Key),
+                    kv => kv.Value);
+                // apartment_labels is null on rows written before this column existed.
+                var alJson = Str(r, 6);
+                var alDict = alJson is null
+                    ? new Dictionary<int, string?>()
+                    : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(alJson)
+                        ?? new Dictionary<string, string?>())
+                        .ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
+                return Domain.CoMeasurement.Building.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1),
+                    r.GetInt32(2), r.GetInt32(3), fdDict, r.GetInt32(5), alDict);
+            });
+
+        var dwellings = ReadAll(cn,
+            "SELECT id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value FROM co_dwellings ORDER BY floor_ordinal, apartment_number;",
+            r => Domain.CoMeasurement.Dwelling.Rehydrate(
+                Guid.Parse(r.GetString(0)), Guid.Parse(r.GetString(1)),
+                r.GetInt32(2), r.GetInt32(3),
+                Str(r, 4),
+                (Domain.CoMeasurement.DwellingStatus)r.GetInt32(5),
+                r.IsDBNull(6) ? null : r.GetInt32(6) == 1,
+                NullableInt(r, 7)));
+
         var tasks = ReadAll(cn,
             "SELECT id, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by FROM incident_tasks ORDER BY ordinal;",
             r => Domain.Tasks.IncidentTask.Rehydrate(Guid.Parse(r.GetString(0)), ParseDate(r.GetString(6)),
@@ -393,7 +456,8 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers, files, tasks);
+            checklistAufbau, checklistAbbau, journal, roles, forces, scbaTrupps, audit, timers, files, tasks,
+            buildings, dwellings);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

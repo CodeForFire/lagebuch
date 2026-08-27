@@ -10,11 +10,9 @@ using LageBuch.Domain;
 
 namespace LageBuch.Acceptance.Tests;
 
-// Issue #74: the new "Links" quick-access tab. Doubles as the PR before/after screenshot
-// capture (RENDER_OUT), same idiom as FilesTabRenderTests.
-public class LinksTabRenderTests
+public class CoMessprotokollRenderTests
 {
-    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
+    private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace()
     {
         var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
@@ -24,7 +22,7 @@ public class LinksTabRenderTests
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        return (window, vm);
+        return (window, vm, session);
     }
 
     private static void Capture(Window window, string name)
@@ -41,27 +39,32 @@ public class LinksTabRenderTests
         ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
 
     [AvaloniaFact]
-    public void Workspace_renders_eight_tabs_before_links_is_opened()
+    public void CoMessprotokoll_Tab_Renders()
     {
-        var (window, _) = ShowWorkspace();
-        var tabs = Tabs(window);
+        var (window, vm, session) = ShowWorkspace();
 
-        Assert.Equal(10, tabs.Items.Count);
-        Capture(window, "links-before.png");
-    }
-
-    [AvaloniaFact]
-    public void Selecting_the_links_tab_shows_the_seeded_links()
-    {
-        var (window, vm) = ShowWorkspace();
-
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 8; // LINKS
+        session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
+        session.AddCoBuilding("Mehrfamilienhaus B", 2, 3);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("LINKS", ((TabItem)tabs.SelectedItem!).Header);
-        Assert.Equal(2, vm.Links.Links.Count);
-        Assert.Contains(vm.Links.Links, l => l.Name == "Wetterdienst" && l.Url == "https://dwd.de");
-        Capture(window, "links-after.png");
+        var buildingA = session.Incident.Buildings[0];
+        session.RecordCoValue(buildingA.Id, 2, 1, 45);
+        session.SetDwellingStatus(buildingA.Id, 2, 1, Domain.CoMeasurement.DwellingStatus.Affected);
+        session.RecordCoValue(buildingA.Id, 2, 2, 120);
+        session.SetDwellingStatus(buildingA.Id, 2, 2, Domain.CoMeasurement.DwellingStatus.Searched);
+        session.RecordCoValue(buildingA.Id, 1, 1, 8);
+        session.SetDwellingStatus(buildingA.Id, 1, 1, Domain.CoMeasurement.DwellingStatus.Searched);
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 6; // CO-MESSUNG
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("CO-MESSUNG", ((TabItem)tabs.SelectedItem!).Header);
+        Assert.Equal(2, vm.CoMessprotokoll.BuildingOptions.Count);
+        Assert.NotNull(vm.CoMessprotokoll.SelectedBuilding);
+        Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);
+
+        Capture(window, "co-messung.png");
     }
 }
