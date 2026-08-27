@@ -70,6 +70,106 @@ public sealed record Person(string LastName, string FirstName, string? Role, str
 /// </summary>
 public sealed record Vehicle(string Wache, string CallSign, int Seats);
 
+/// <summary>
+/// The single source of truth for fictional example data shown in input-field placeholders
+/// (#137) and used to build test/screenshot fixtures. Real personnel and call-sign data must
+/// never be compiled into the app (see the privacy note on <see cref="Person"/>), so every value
+/// here is invented, following the classic German "Mustermann/Musterfrau" placeholder-name
+/// convention already used ad hoc across the test suite. Centralizing it means a placeholder and
+/// the fixture that renders it for a PR screenshot can never drift apart.
+/// </summary>
+public static class AnonymizedExampleData
+{
+    // Roster (Stammdaten) persona.
+    public const string PersonLastName = "Mustermann";
+    public const string PersonFirstName = "Max";
+    public const string PersonLastNameAlt = "Musterfrau";
+    public const string PersonFirstNameAlt = "Erika";
+    public const string PhoneNumber = "01 71 / 1 23 45 67";
+    public const string PhoneNumberAlt = "01 71 / 7 65 43 21";
+
+    // Ad-hoc persona: whoever is entering data right now (operator, Truppführer/-mann).
+    // Deliberately a different fictional surname from the roster persona above, so a screenshot
+    // never shows the same invented person as both "the roster entry" and "today's operator".
+    public const string OperatorSurname = "Müller";
+    public const string OperatorSurnameAlt = "Schmidt";
+    public const string OperatorSurnameThird = "Wagner";
+    // First name for the full-name example (OperatorPromptView's NAME field). Deliberately not
+    // "Thomas" — that would read as a real contributor's actual name rather than a placeholder.
+    public const string OperatorFirstName = "Jens";
+
+    // Callsigns / brigades.
+    public const string CallSign = "FFB 1/40/1";
+    public const string SecondCallSign = "FFB 1/44/1";
+    public const string OtherBrigadeCallSign = "Aich 42/1";
+    public const string Brigade = "FFB Wache 1";
+    public const string SecondBrigade = "Aich";
+
+    // Misc categorical examples used by non-Kräfte views.
+    public const string BuildingName = "Haus A";
+    public const string FileName = "Lageplan.pdf";
+    public const string RoleExample = "GF";
+    public const string SectionExample = "Abschnitt 1";
+    public const string TimerMinutesExample = "30";
+    public const string LinkName = "Wetterdienst";
+    public const string LinkUrl = "https://dwd.de";
+
+    // Derived placeholder strings. Compile-time const concatenation, so the "z. B." prefix and
+    // the underlying value can never drift apart from one another.
+    public const string CallSignPlaceholder = "z. B. " + CallSign;
+    public const string SecondCallSignPlaceholder = "z. B. " + SecondCallSign;
+    public const string BrigadePlaceholder = "z. B. " + Brigade;
+    public const string PersonLastNamePlaceholder = "z. B. " + PersonLastName;
+    public const string PersonFirstNamePlaceholder = "z. B. " + PersonFirstName;
+    public const string PersonDisplayNamePlaceholder = "z. B. " + PersonLastName + ", " + PersonFirstName;
+    public const string PhoneNumberPlaceholder = "z. B. " + PhoneNumber;
+    public const string OperatorNamePlaceholder = "z. B. " + OperatorSurname;
+    public const string OperatorNamePlaceholderAlt = "z. B. " + OperatorSurnameAlt;
+    public const string OperatorNamePlaceholderThird = "z. B. " + OperatorSurnameThird;
+    // Full-name form, for the one field that asks for a proper name rather than a short crew/
+    // assignee entry (OperatorPromptView's NAME field).
+    public const string OperatorFullNamePlaceholder = "z. B. " + OperatorSurname + ", " + OperatorFirstName;
+    public const string BuildingNamePlaceholder = "z. B. " + BuildingName;
+    public const string FileNamePlaceholder = "z. B. " + FileName;
+    public const string RolePlaceholder = "z. B. " + RoleExample;
+    public const string SectionPlaceholder = "z. B. " + SectionExample;
+    public const string TimerMinutesPlaceholder = "z. B. " + TimerMinutesExample;
+    public const string LinkNamePlaceholder = "z. B. " + LinkName;
+    public const string LinkUrlPlaceholder = "z. B. " + LinkUrl;
+
+    // A field that is genuinely optional reuses this idiom rather than inventing a second
+    // convention for the same idea (see OperatorPromptView's KeywordBox).
+    public const string OptionalCallSignPlaceholder = "optional, z. B. " + CallSign;
+
+    // Ready-built collections for fixtures that need a fuller MasterDataSet (render/PR-screenshot
+    // tests). Built from the same constants above so a single-value placeholder and a list-based
+    // fixture never show contradictory example data.
+    public static readonly IReadOnlyList<string> Brigades =
+        new[] { Brigade, "FFB Wache 2", SecondBrigade, "Puch", "Emmering" };
+
+    public static readonly IReadOnlyList<string> RadioCallSigns =
+        new[] { CallSign, "FFB 1/23/1", OtherBrigadeCallSign, "Land 1" };
+
+    public static readonly IReadOnlyList<Vehicle> Vehicles = new[]
+    {
+        new Vehicle(Brigade, CallSign, 9),
+        new Vehicle(Brigade, SecondCallSign, 6),
+        new Vehicle(SecondBrigade, OtherBrigadeCallSign, 6),
+    };
+
+    public static readonly IReadOnlyList<Person> Personnel = new[]
+    {
+        new Person(PersonLastName, PersonFirstName, "ZF", "Land 1", PhoneNumber),
+        new Person(PersonLastNameAlt, PersonFirstNameAlt, "GF", null, PhoneNumberAlt),
+    };
+
+    public static readonly IReadOnlyList<Link> Links = new[]
+    {
+        new Link(LinkName, LinkUrl),
+        new Link("Kartendienst", "https://example.org/karte"),
+    };
+}
+
 public sealed record MasterDataSet(
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> Status,

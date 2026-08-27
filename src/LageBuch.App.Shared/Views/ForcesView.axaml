@@ -7,7 +7,7 @@
              x:DataType="vm:ForcesViewModel">
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Top" />
       <!-- Total strength readout im 1/1/2-Format (#76), AGT-Anteil daneben -->
       <Border Grid.Column="1" Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" Padding="18,8">
@@ -30,19 +30,18 @@
       <StackPanel Orientation="Horizontal" Spacing="8">
         <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
              must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. -->
-        <StackPanel Spacing="2">
-          <TextBlock Text="FEUERWEHR / WACHE" Classes="overline" FontSize="10" />
-          <AutoCompleteBox x:Name="BrigadeBox" Width="160" PlaceholderText="Feuerwehr"
+        <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE">
+          <AutoCompleteBox x:Name="BrigadeBox" Width="160"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
                            ItemsSource="{Binding BrigadeOptions}"
                            FilterMode="ContainsOrdinal"
                            MinimumPrefixLength="0"
                            Text="{Binding NewBrigade}"
                            b:EnterSubmit.Command="{Binding AddForceCommand}" />
-        </StackPanel>
+        </HeaderedContentControl>
         <!-- Fahrzeuge aus den Stammdaten, gefiltert auf die Wache; wählt man eines, werden
              Funkrufname und Stärke vorbelegt (#76). -->
-        <StackPanel Spacing="2">
-          <TextBlock Text="FAHRZEUG" Classes="overline" FontSize="10" />
+        <HeaderedContentControl Classes="field" Header="FAHRZEUG">
           <ComboBox x:Name="VehicleBox" Width="150"
                     ItemsSource="{Binding VehicleOptions}"
                     SelectedItem="{Binding SelectedVehicle}">
@@ -52,41 +51,39 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
-        </StackPanel>
+        </HeaderedContentControl>
         <!-- Freitext-fähig: Fahrzeuge, die nicht in den Stammdaten stehen (Fremdwehren). -->
-        <StackPanel Spacing="2">
-          <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
-          <AutoCompleteBox x:Name="CallSignBox" Width="140" PlaceholderText="z. B. FFB 1/44/1"
+        <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+          <AutoCompleteBox x:Name="CallSignBox" Width="140"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                            ItemsSource="{Binding CallSignOptions}"
                            FilterMode="ContainsOrdinal"
                            MinimumPrefixLength="0"
                            Text="{Binding NewCallSign}" />
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="STÄRKE GF / MANN" Classes="overline" FontSize="10" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="STÄRKE GF / MANN">
           <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
-               0 und lässt den Platzhalter stehen. -->
+               0 und lässt den Platzhalter stehen. Kein Beispiel-Platzhalter: das Label sagt bereits,
+               was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden. -->
           <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBox x:Name="OfficerBox" Width="70" PlaceholderText="GF"
+            <TextBox x:Name="OfficerBox" Width="70"
                      Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
-            <TextBox x:Name="MannschaftBox" Width="70" PlaceholderText="Mann"
+            <TextBox x:Name="MannschaftBox" Width="70"
                      Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
           </StackPanel>
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" />
-          <TextBox x:Name="ScbaBox" Width="90" PlaceholderText="AGT"
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="DAVON AGT">
+          <TextBox x:Name="ScbaBox" Width="90"
                    Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="STATUS" Classes="overline" FontSize="10" />
-          <ComboBox x:Name="StatusBox" Width="140" MinHeight="32"
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="STATUS">
+          <ComboBox x:Name="StatusBox" Width="140"
                     ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="BEMERKUNG" Classes="overline" FontSize="10" />
-          <TextBox x:Name="NotesBox" Width="170" PlaceholderText="Bemerkung" Text="{Binding NewNotes}" />
-        </StackPanel>
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="BEMERKUNG">
+          <!-- Freitext: kein Platzhalter, siehe #137 -->
+          <TextBox x:Name="NotesBox" Width="170" Text="{Binding NewNotes}" />
+        </HeaderedContentControl>
         <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
         <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den
@@ -117,18 +114,15 @@
                       <Flyout Placement="BottomEdgeAlignedLeft">
                           <StackPanel Spacing="8" MinWidth="180">
                           <TextBlock Text="Stärke korrigieren" Classes="overline" />
-                          <StackPanel Spacing="2">
-                            <TextBlock Text="FÜHRUNGSKRÄFTE (GF)" Classes="overline" FontSize="10" />
+                          <HeaderedContentControl Classes="field" Header="FÜHRUNGSKRÄFTE (GF)">
                             <TextBox Text="{Binding OfficerCount}" b:IntegerOnly.IsEnabled="True" />
-                          </StackPanel>
-                          <StackPanel Spacing="2">
-                            <TextBlock Text="MANN" Classes="overline" FontSize="10" />
+                          </HeaderedContentControl>
+                          <HeaderedContentControl Classes="field" Header="MANN">
                             <TextBox Text="{Binding MannschaftCount}" b:IntegerOnly.IsEnabled="True" />
-                          </StackPanel>
-                          <StackPanel Spacing="2">
-                            <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" />
+                          </HeaderedContentControl>
+                          <HeaderedContentControl Classes="field" Header="DAVON AGT">
                             <TextBox Text="{Binding ScbaCount}" b:IntegerOnly.IsEnabled="True" />
-                          </StackPanel>
+                          </HeaderedContentControl>
                           <Button Classes="signal" Content="ÜBERNEHMEN"
                                   Command="{Binding ApplyStrengthEditCommand}" />
                         </StackPanel>
@@ -173,7 +167,8 @@
           <DataGridTemplateColumn Header="BEMERKUNG" Width="*">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
-                <TextBox Margin="6,4" PlaceholderText="Bemerkung"
+                <!-- Freitext: kein Platzhalter, siehe #137; die Spaltenüberschrift ist das Label. -->
+                <TextBox Margin="6,4"
                          Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                          IsEnabled="{Binding !IsReadOnly}" />
               </DataTemplate>

@@ -250,6 +250,21 @@
     <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
   </Style>
 
+  <!-- Labeled field wrapper (#137): caption above an arbitrary input control. Styling the
+       built-in HeaderedContentControl rather than a bespoke control means a field can't be added
+       without a Header showing up somewhere in the tree — an empty label slot is visually obvious
+       in review, unlike a bare input silently missing its TextBlock sibling. -->
+  <Style Selector="HeaderedContentControl.field">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="2">
+          <TextBlock Classes="overline" FontSize="10" Text="{TemplateBinding Header}" />
+          <ContentPresenter Content="{TemplateBinding Content}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
   <!-- =========================================================
        CHECKBOX
        ========================================================= -->

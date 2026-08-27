@@ -1,17 +1,10 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.TaskDialogView"
              x:DataType="vm:TaskDialogViewModel">
-  <UserControl.Styles>
-    <Style Selector="TextBlock.cellLabel">
-      <Setter Property="FontSize" Value="10.5" />
-      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-      <Setter Property="Margin" Value="0,0,6,0" />
-    </Style>
-  </UserControl.Styles>
   <Border Background="#B3070A10" Padding="40">
     <Border x:Name="TaskDialogCard" Width="480" VerticalAlignment="Center" HorizontalAlignment="Center"
             Background="{StaticResource SurfaceRaisedBrush}"
@@ -23,39 +16,37 @@
                 CornerRadius="12,12,0,0" />
         <StackPanel Margin="26,22,26,24" Spacing="12">
           <TextBlock Text="TASK ERSTELLEN" Classes="display" FontSize="20" />
-          <StackPanel Spacing="2">
-            <TextBlock Text="Aufgabe" Classes="cellLabel" />
+          <HeaderedContentControl Classes="field" Header="AUFGABE">
+            <!-- Freitext: kein Platzhalter, siehe #137 -->
             <TextBox x:Name="TaskDialogText" Text="{Binding Text}" AcceptsReturn="False" />
-          </StackPanel>
+          </HeaderedContentControl>
           <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="12">
-            <StackPanel Grid.Column="0" Spacing="2">
-              <TextBlock Text="Wichtigkeit" Classes="cellLabel" />
+            <HeaderedContentControl Grid.Column="0" Classes="field" Header="WICHTIGKEIT">
               <ComboBox Width="100" ItemsSource="{Binding ImportanceOptions}"
                         SelectedValue="{Binding Importance}" SelectedValueBinding="{Binding Value}">
                 <ComboBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:ImportanceOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-            </StackPanel>
-            <StackPanel Grid.Column="1" Spacing="2">
-              <TextBlock Text="Dringlichkeit" Classes="cellLabel" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Grid.Column="1" Classes="field" Header="DRINGLICHKEIT">
               <ComboBox Width="110" ItemsSource="{Binding UrgencyOptions}"
                         SelectedValue="{Binding Urgency}" SelectedValueBinding="{Binding Value}">
                 <ComboBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:UrgencyOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-            </StackPanel>
-            <StackPanel Grid.Column="2" Spacing="2">
-              <TextBlock Text="Timer (min)" Classes="cellLabel" />
-              <TextBox Width="60" Text="{Binding TimerMinutes}" b:IntegerOnly.IsEnabled="True" />
-            </StackPanel>
-            <StackPanel Grid.Column="3" Spacing="2">
-              <TextBlock Text="Zugeteilt" Classes="cellLabel" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Grid.Column="2" Classes="field" Header="TIMER (MIN)">
+              <TextBox Width="60" Text="{Binding TimerMinutes}" b:IntegerOnly.IsEnabled="True"
+                       PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Grid.Column="3" Classes="field" Header="ZUGETEILT">
               <AutoCompleteBox ItemsSource="{Binding AssigneeOptions}"
+                               PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                Text="{Binding Assignee}" />
-            </StackPanel>
+            </HeaderedContentControl>
           </Grid>
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="TaskDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.MasterDataEditorView"
              x:DataType="vm:MasterDataEditorViewModel">
   <Panel>
@@ -176,13 +177,22 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- Column headers (#137): each row is unlabeled otherwise. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,Auto,Auto,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="URL" Classes="overline" FontSize="10" />
+                  </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LinkRow">
                           <Grid ColumnDefinitions="*,*,Auto,Auto,Auto" Margin="0,0,0,6">
-                            <TextBox Grid.Column="0" PlaceholderText="Name" Text="{Binding Name}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="1" PlaceholderText="URL" Text="{Binding Url}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="0"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.LinkNamePlaceholder}"
+                                     Text="{Binding Name}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.LinkUrlPlaceholder}"
+                                     Text="{Binding Url}" Margin="0,0,6,0" />
                             <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
@@ -210,6 +220,12 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- Column headers (#137): each row is unlabeled otherwise. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,Auto,Auto,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="2" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
+                  </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
@@ -217,11 +233,13 @@
                           <Grid ColumnDefinitions="*,*,150,Auto,Auto,Auto" Margin="0,0,0,6">
                             <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                  aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
-                            <AutoCompleteBox Grid.Column="0" PlaceholderText="Wache"
+                            <AutoCompleteBox Grid.Column="0"
+                                             PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
                                              ItemsSource="{Binding WacheOptions}"
                                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                              Text="{Binding Wache}" Margin="0,0,6,0" />
-                            <AutoCompleteBox Grid.Column="1" PlaceholderText="Funkrufname"
+                            <AutoCompleteBox Grid.Column="1"
+                                             PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                                              ItemsSource="{Binding CallSignOptions}"
                                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                              Text="{Binding CallSign}" Margin="0,0,6,0" />
@@ -255,16 +273,34 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ PERSON"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- Column headers (#137): each row is unlabeled otherwise. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="NACHNAME" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="VORNAME" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="2" Text="ROLLE" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="3" Text="RUFNAME" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="4" Text="TELEFON" Classes="overline" FontSize="10" />
+                  </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PersonRow">
                           <Grid ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
-                            <TextBox Grid.Column="0" PlaceholderText="Nachname" Text="{Binding LastName}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="1" PlaceholderText="Vorname" Text="{Binding FirstName}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="2" PlaceholderText="Rolle" Text="{Binding Role}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="3" PlaceholderText="Rufname" Text="{Binding CallSign}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="4" PlaceholderText="Telefon" Text="{Binding Phone}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="0"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.PersonLastNamePlaceholder}"
+                                     Text="{Binding LastName}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="1"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.PersonFirstNamePlaceholder}"
+                                     Text="{Binding FirstName}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="2"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
+                                     Text="{Binding Role}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="3"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                     Text="{Binding CallSign}" Margin="0,0,6,0" />
+                            <TextBox Grid.Column="4"
+                                     PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                                     Text="{Binding Phone}" Margin="0,0,6,0" />
                             <Button Grid.Column="5" Content="✕"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}" />

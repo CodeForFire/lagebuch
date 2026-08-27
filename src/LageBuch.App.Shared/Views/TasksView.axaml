@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.TasksView"
              x:DataType="vm:TasksViewModel">
@@ -19,16 +20,10 @@
       <Setter Property="Foreground" Value="#FF3D2E" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="TextBlock.cellLabel">
-      <Setter Property="FontSize" Value="10.5" />
-      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-      <Setter Property="Margin" Value="0,0,6,0" />
-    </Style>
   </UserControl.Styles>
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" Text="AUFGABEN" Classes="overline" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="0" Text="AUFGABEN" Classes="overline" VerticalAlignment="Top" />
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
         <RadioButton x:Name="TaskFilterOpen" GroupName="taskFilter" Content="OFFEN"
                      IsChecked="{Binding IsOpenFilter, Mode=TwoWay}" Margin="0,0,4,0" />
@@ -44,8 +39,7 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="12">
-        <StackPanel Spacing="2">
-          <TextBlock Text="Wichtigkeit" Classes="cellLabel" />
+        <HeaderedContentControl Classes="field" Header="WICHTIGKEIT">
           <ComboBox Width="110" ItemsSource="{Binding ImportanceOptions}"
                     SelectedValue="{Binding NewImportance}" SelectedValueBinding="{Binding Value}">
             <ComboBox.ItemTemplate>
@@ -54,9 +48,8 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="Dringlichkeit" Classes="cellLabel" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="DRINGLICHKEIT">
           <ComboBox Width="130" ItemsSource="{Binding UrgencyOptions}"
                     SelectedValue="{Binding NewUrgency}" SelectedValueBinding="{Binding Value}">
             <ComboBox.ItemTemplate>
@@ -65,33 +58,31 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="Zugeteilt" Classes="cellLabel" />
-          <AutoCompleteBox Width="140" ItemsSource="{Binding AssigneeOptions}"
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="ZUGETEILT">
+          <AutoCompleteBox Width="150" ItemsSource="{Binding AssigneeOptions}"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                            FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                            Text="{Binding NewAssignee}" b:EnterSubmit.Command="{Binding AddTaskCommand}" />
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="Timer (min)" Classes="cellLabel" />
-          <TextBox Width="70" Text="{Binding NewTimerMinutes}" b:IntegerOnly.IsEnabled="True">
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="TIMER (MIN)">
+          <TextBox Width="70" Text="{Binding NewTimerMinutes}" b:IntegerOnly.IsEnabled="True"
+                   PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
             </TextBox.KeyBindings>
           </TextBox>
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text="Aufgabe" Classes="cellLabel" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="AUFGABE">
+          <!-- Freitext: kein Platzhalter, siehe #137 -->
           <TextBox x:Name="TaskNewTextBox" Width="320" Text="{Binding NewText}">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
             </TextBox.KeyBindings>
           </TextBox>
-        </StackPanel>
-        <StackPanel Spacing="2">
-          <TextBlock Text=" " Classes="cellLabel" />
-          <Button x:Name="TaskAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}" />
-        </StackPanel>
+        </HeaderedContentControl>
+        <Button x:Name="TaskAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}"
+                VerticalAlignment="Bottom" Margin="0,0,0,1" />
       </StackPanel>
     </Border>
 
