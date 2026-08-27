@@ -28,9 +28,11 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     // close+reopen or a crash instead of restarting a fresh cycle.
     private const string TimerKey = "ils-reminder";
 
-    // The spoken cue fires once when a cycle falls due; this guards against re-announcing it on
-    // every subsequent tick until the next Acknowledge opens a fresh cycle.
-    private bool _dueAnnounced;
+    // The spoken cue repeats while a cycle sits unacknowledged, so it stays insistent instead of
+    // being said once and forgotten; this tracks when it last played so OnTick only re-plays once
+    // RepeatInterval has passed, and Acknowledge clears it to announce immediately on the next cycle.
+    private static readonly TimeSpan RepeatInterval = TimeSpan.FromSeconds(60);
+    private DateTimeOffset? _lastAnnouncedAt;
 
     public ReminderViewModel(
         IIncidentSession session, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged,
@@ -77,11 +79,13 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 
     private void OnTick()
     {
-        // Announce the moment the cycle crosses due, exactly once per cycle.
-        if (_timer.IsDue(_clock.Now) && !_dueAnnounced)
+        // Announce the moment the cycle crosses due, then keep repeating on RepeatInterval until
+        // acknowledged, so the reminder stays insistent instead of being said once and forgotten.
+        if (_timer.IsDue(_clock.Now) &&
+            (_lastAnnouncedAt is null || _clock.Now - _lastAnnouncedAt >= RepeatInterval))
         {
             _alarm.Play(AlarmSound.IlsReminderDue);
-            _dueAnnounced = true;
+            _lastAnnouncedAt = _clock.Now;
         }
 
         OnPropertyChanged(nameof(RemainingDisplay));
@@ -95,7 +99,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private void Acknowledge()
     {
         _timer.Acknowledge(_clock);
-        _dueAnnounced = false;
+        _lastAnnouncedAt = null;
         PersistTimer(); // durable anchor for the new (recurring) cycle
         // "Von" is us — the logged-in operator's call sign (e.g. the ELW's Funkrufname).
         _session.AddJournalEntry(
