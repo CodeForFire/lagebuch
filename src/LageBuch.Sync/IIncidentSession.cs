@@ -66,6 +66,12 @@ public interface IIncidentSession
 
     /// <summary>Stamps/clears a task's completion (#88).</summary>
     void SetTaskCompleted(Guid taskId, bool isDone);
+
+    /// <summary>Plans one Förderstrecke-Leitung (#150, Plan A). Silent — no ETB line, no attribution,
+    /// exactly like tasks. Length/elevation ride the wire as plan inputs; the host computes the number
+    /// and every derived figure.</summary>
+    void AddWasserfoerderungLeitung(string? uebergabestelle, string? ansprechpartner, double lengthMeters, double elevationRiseMeters);
+    void RemoveWasserfoerderungLeitung(Guid leitungId);
     void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
         int? truppNumber = null,
         string? callSign = null,

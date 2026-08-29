@@ -41,12 +41,12 @@ public class FilesTabRenderTests
         ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
 
     [AvaloniaFact]
-    public void Workspace_renders_eight_tabs_before_dateien_is_opened()
+    public void Workspace_renders_all_tabs_before_dateien_is_opened()
     {
         var (window, _, _) = ShowWorkspace();
         var tabs = Tabs(window);
 
-        Assert.Equal(10, tabs.Items.Count);
+        Assert.Equal(11, tabs.Items.Count);
         Capture(window, "files-before.png");
     }
 

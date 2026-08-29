@@ -154,6 +154,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));
 
+    public void AddWasserfoerderungLeitung(string? uebergabestelle, string? ansprechpartner, double lengthMeters, double elevationRiseMeters) =>
+        Mutate(() => Incident.AddWasserfoerderungLeitung(uebergabestelle, ansprechpartner, lengthMeters, elevationRiseMeters));
+
+    public void RemoveWasserfoerderungLeitung(Guid leitungId) =>
+        Mutate(() => Incident.RemoveWasserfoerderungLeitung(leitungId));
+
     public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
         int? truppNumber = null,
         string? callSign = null,

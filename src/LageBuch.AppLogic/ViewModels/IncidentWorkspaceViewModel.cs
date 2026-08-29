@@ -156,6 +156,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public LinksViewModel Links { get; private set; } = null!;
     public TasksViewModel Tasks { get; private set; } = null!;
     public ReminderViewModel? Reminder { get; private set; }
+    public WasserfoerderungViewModel Wasserfoerderung { get; private set; } = null!;
 
     public string StatusDisplay => Formatting.State(_session.Incident.State);
 
@@ -233,6 +234,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Tasks?.Dispose();
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
 
+        Wasserfoerderung?.Dispose();
+        Wasserfoerderung = new WasserfoerderungViewModel(_session, OnChanged);
+
         Reminder?.Dispose();
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.
@@ -252,6 +256,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Files));
         OnPropertyChanged(nameof(Links));
         OnPropertyChanged(nameof(Tasks));
+        OnPropertyChanged(nameof(Wasserfoerderung));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
     }

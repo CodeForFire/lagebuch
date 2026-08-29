@@ -44,10 +44,10 @@ public class TasksTabRenderTests
         ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
 
     [AvaloniaFact]
-    public void Workspace_now_nine_tabs_with_aufgaben_third()
+    public void Workspace_renders_all_tabs_with_aufgaben_third()
     {
         var (window, _, _, _, _) = ShowWorkspace();
-        Assert.Equal(10, Tabs(window).Items.Count());
+        Assert.Equal(11, Tabs(window).Items.Count());
         var aufgabenTab = (TabItem)Tabs(window).Items.ElementAt(2)!;
         Assert.Equal("AUFGABEN", (string)aufgabenTab.Header!);
     }

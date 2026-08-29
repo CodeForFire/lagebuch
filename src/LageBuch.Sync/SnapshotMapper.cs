@@ -6,6 +6,7 @@ using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync;
 
@@ -52,7 +53,11 @@ public static class SnapshotMapper
                 b.ApartmentLabels.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value))).ToList(),
             incident.Dwellings.Select(d => new DwellingDto(
                 d.Id, d.BuildingId, d.FloorOrdinal, d.ApartmentNumber,
-                d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)).ToList());
+                d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)).ToList(),
+            incident.Wasserfoerderung.Select(w => new WasserfoerderungLeitungDto(
+                w.Id, w.Number, w.Uebergabestelle, w.Ansprechpartner, w.FlowLMin, w.FeedPressureBar,
+                w.LengthMeters, w.ElevationRiseMeters, w.HoseCount, w.ReserveHoseCount,
+                w.PumpCount, w.ReservePumpCount, w.PumpPositionsMeters)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -94,7 +99,11 @@ public static class SnapshotMapper
                     kv => kv.Value))),
             snapshot.Dwellings.Select(d => Dwelling.Rehydrate(
                 d.Id, d.BuildingId, d.FloorOrdinal, d.ApartmentNumber,
-                d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)));
+                d.ResidentName, d.Status, d.KeyAvailable, d.CoValue)),
+            snapshot.Wasserfoerderung.Select(w => WasserfoerderungLeitung.Rehydrate(
+                w.Id, w.Number, w.Uebergabestelle, w.Ansprechpartner, w.FlowLMin, w.FeedPressureBar,
+                w.LengthMeters, w.ElevationRiseMeters, w.HoseCount, w.ReserveHoseCount,
+                w.PumpCount, w.ReservePumpCount, w.PumpPositionsMeters)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

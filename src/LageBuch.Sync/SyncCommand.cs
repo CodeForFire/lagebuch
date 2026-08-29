@@ -45,6 +45,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(UpdateDwellingDetailsCommand), "updateDwellingDetails")]
 [JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
 [JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
+[JsonDerivedType(typeof(AddWasserfoerderungLeitungCommand), "addWasserfoerderungLeitung")]
+[JsonDerivedType(typeof(RemoveWasserfoerderungLeitungCommand), "removeWasserfoerderungLeitung")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -153,3 +155,10 @@ public sealed record SetFloorDescriptionCommand(
 // No operator (silent)
 public sealed record SetApartmentLabelCommand(
     Guid BuildingId, int ApartmentNumber, string? Label) : SyncCommand;
+
+// No operator: plan lines are silent (no ETB line, no audit), so the wire carries just the plan
+// inputs — the host computes Number and every derived figure with its own planner.
+public sealed record AddWasserfoerderungLeitungCommand(
+    string? Uebergabestelle, string? Ansprechpartner, double LengthMeters, double ElevationRiseMeters) : SyncCommand;
+
+public sealed record RemoveWasserfoerderungLeitungCommand(Guid LeitungId) : SyncCommand;

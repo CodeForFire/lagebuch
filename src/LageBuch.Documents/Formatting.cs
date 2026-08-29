@@ -43,4 +43,6 @@ public static class Formatting
         TaskUrgency.Medium => "Mittel",
         _ => "Niedrig",
     };
+
+    public static string Meters(double meters) => $"{meters:0.###} m";
 }

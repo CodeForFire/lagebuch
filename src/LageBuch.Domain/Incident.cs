@@ -4,6 +4,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
+using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Domain;
@@ -24,6 +25,7 @@ public sealed class Incident
     private readonly List<IncidentTask> _tasks = new();
     private readonly List<Building> _buildings = new();
     private readonly List<Dwelling> _dwellings = new();
+    private readonly List<WasserfoerderungLeitung> _wasserfoerderung = new();
 
     private Incident() { }
 
@@ -59,6 +61,9 @@ public sealed class Incident
 
     public IReadOnlyList<Building> Buildings => _buildings;
     public IReadOnlyList<Dwelling> Dwellings => _dwellings;
+
+    /// <summary>Planned Wasserförderungs-Leitungen (#150), in creation order (Ltg 1, Ltg 2, …).</summary>
+    public IReadOnlyList<WasserfoerderungLeitung> Wasserfoerderung => _wasserfoerderung;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -124,7 +129,8 @@ public sealed class Incident
         IEnumerable<IncidentFile> files,
         IEnumerable<IncidentTask> tasks,
         IEnumerable<Building> buildings,
-        IEnumerable<Dwelling> dwellings)
+        IEnumerable<Dwelling> dwellings,
+        IEnumerable<WasserfoerderungLeitung>? wasserfoerderung = null)
     {
         var incident = new Incident
         {
@@ -151,6 +157,8 @@ public sealed class Incident
         incident._tasks.AddRange(tasks);
         incident._buildings.AddRange(buildings);
         incident._dwellings.AddRange(dwellings);
+        if (wasserfoerderung is not null)
+            incident._wasserfoerderung.AddRange(wasserfoerderung);
         return incident;
     }
 
@@ -738,6 +746,35 @@ public sealed class Incident
         var updated = _tasks[index].WithCompletion(isDone, op, clock.Now);
         _tasks[index] = updated;
         return updated;
+    }
+
+    /// <summary>
+    /// Plans and records one Förderstrecke-Leitung (#150). The pump/pressure figures are computed
+    /// by <see cref="FörderstreckePlanner"/> at creation and stored on the Leitung — the PDF and
+    /// remote clients never recompute. Silently planned (no ETB line), like tasks.
+    /// </summary>
+    public WasserfoerderungLeitung AddWasserfoerderungLeitung(
+        string? uebergabestelle, string? ansprechpartner, double lengthM, double riseM)
+    {
+        EnsureOpen();
+        var leitung = WasserfoerderungLeitung.Create(
+            number: _wasserfoerderung.Count + 1,
+            uebergabestelle: uebergabestelle,
+            ansprechpartner: ansprechpartner,
+            lengthM: lengthM,
+            riseM: riseM);
+        _wasserfoerderung.Add(leitung);
+        return leitung;
+    }
+
+    /// <summary>Removes the planned Leitung. Unknown ids throw so a replayed command fails loudly.</summary>
+    public void RemoveWasserfoerderungLeitung(Guid leitungId)
+    {
+        EnsureOpen();
+        var index = _wasserfoerderung.FindIndex(l => l.Id == leitungId);
+        if (index < 0)
+            throw new KeyNotFoundException($"Wasserförderungsleitung {leitungId} nicht gefunden.");
+        _wasserfoerderung.RemoveAt(index);
     }
 
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>

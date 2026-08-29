@@ -239,4 +239,36 @@ public class CommandApplierTests
             d.BuildingId == buildingId && d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
         Assert.Equal(DwellingStatus.Searched, dwelling.Status);
     }
+
+    [Fact]
+    public void AddWasserfoerderungLeitung_over_the_wire_plans_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var cmd = new AddWasserfoerderungLeitungCommand("TLF 20/8", "FFB 1/44/1", 2000, 100);
+
+        ApplyOverWire(cmd, incident, clock);
+
+        var leitung = Assert.Single(incident.Wasserfoerderung);
+        Assert.Equal(1, leitung.Number);
+        Assert.Equal("TLF 20/8", leitung.Uebergabestelle);
+        Assert.Equal(2000, leitung.LengthMeters);
+        Assert.Equal(100, leitung.ElevationRiseMeters);
+        Assert.Equal(4, leitung.PumpCount);
+        // The host (defaults) computes the derived figures — not the sending client.
+        Assert.Equal(800, leitung.FlowLMin);
+    }
+
+    [Fact]
+    public void RemoveWasserfoerderungLeitung_over_the_wire_takes_the_line_off()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        incident.AddWasserfoerderungLeitung("TLF 20/8", "FFB 1/44/1", 2000, 100);
+        var id = incident.Wasserfoerderung[0].Id;
+
+        ApplyOverWire(new RemoveWasserfoerderungLeitungCommand(id), incident, clock);
+
+        Assert.Empty(incident.Wasserfoerderung);
+    }
 }
