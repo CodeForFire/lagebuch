@@ -162,6 +162,11 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     private readonly Action _onChanged;
     private readonly IDisposable? _subscription;
     private readonly HashSet<Guid> _alarmLogged = new();
+
+    // Druckabfrage due-crossings that have already sounded. Unlike _alarmLogged (a one-way state
+    // that only ever grows until the Trupp returns), control-due toggles on and off every Abfrage-
+    // Intervall, so an id is removed once no longer due, letting the next crossing sound again.
+    private readonly HashSet<Guid> _controlDueAnnounced = new();
     private readonly IncidentSettings _settings;
 
     // True once the user has hand-edited the Einsatzzeit; after that a Trupp-type switch must not
@@ -559,8 +564,30 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         RefreshHeader();
         var tripped = LogNewAlarms();
         UpdateAlarm(tripped);
+        AnnounceControlDue();
         if (tripped)
             _onChanged();
+    }
+
+    /// <summary>Plays a cue once per Druckabfrage due-crossing per Trupp. Unlike <see cref="LogNewAlarms"/>
+    /// this is local feedback, not a journal write, so it runs on joined clients too (not gated on
+    /// IsRemote) — only a closed/read-only workspace stays silent.</summary>
+    private void AnnounceControlDue()
+    {
+        if (IsReadOnly)
+            return;
+        foreach (var trupp in _session.Incident.ScbaTrupps)
+        {
+            if ((trupp.IsActive || trupp.IsWithdrawing) && trupp.IsControlDue(_clock.Now))
+            {
+                if (_controlDueAnnounced.Add(trupp.Id))
+                    _alarm.Play(AlarmSound.ScbaControlDue);
+            }
+            else
+            {
+                _controlDueAnnounced.Remove(trupp.Id);
+            }
+        }
     }
 
     /// <summary>Appends one ETB entry per Trupp that has newly entered the alarm state.

@@ -11,6 +11,9 @@ public enum AlarmSound
 
     /// <summary>"Aufgabe fällig" — a task's timer expired while still open (#88).</summary>
     TaskDue,
+
+    /// <summary>"Druckabfrage fällig" — a Trupp's pressure-control interval has elapsed (#78).</summary>
+    ScbaControlDue,
 }
 
 /// <summary>

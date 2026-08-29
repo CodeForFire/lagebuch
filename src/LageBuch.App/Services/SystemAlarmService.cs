@@ -31,6 +31,8 @@ internal sealed class SystemAlarmService : IAlarmService
             // Generic tone (already bundled) — a task falling due is frequent enough that a spoken
             // sentence would be more noise than signal.
             [AlarmSound.TaskDue] = "alarm.wav",
+            // Same reasoning as TaskDue: a Druckabfrage recurs every few minutes per Trupp.
+            [AlarmSound.ScbaControlDue] = "alarm.wav",
         };
 
     private readonly byte[]? _wav;

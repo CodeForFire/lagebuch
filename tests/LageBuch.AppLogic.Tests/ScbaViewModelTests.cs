@@ -1,3 +1,4 @@
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain;
@@ -333,6 +334,103 @@ public class ScbaViewModelTests
         ticker.Fire();              // second trupp now past its limit (T0+40) → re-arm
 
         Assert.True(alarm.IsSounding);
+    }
+
+    // --- Druckabfrage audio cue (issue #78 follow-up) ---
+
+    [Fact]
+    public void Control_due_plays_the_cue_once_and_not_again_while_still_due()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewControlIntervalMinutes = 5;
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(6); // past the 5-minute control interval
+        ticker.Fire();
+        ticker.Fire(); // must not sound a second time for the same due-crossing
+
+        Assert.Single(alarm.Played);
+        Assert.Equal(AlarmSound.ScbaControlDue, alarm.Played[0]);
+    }
+
+    [Fact]
+    public void Recording_pressure_silences_the_cue_until_the_next_interval()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewControlIntervalMinutes = 5;
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        // A recorded reading re-anchors the next control interval, silencing the due state.
+        row.PressureInput = 250;
+        row.RecordPressureCommand.Execute(null);
+        ticker.Fire();
+        Assert.Single(alarm.Played); // still just the one from before
+
+        clock.Now = T0.AddMinutes(12); // past the next 5-minute interval from the reading
+        ticker.Fire();
+
+        Assert.Equal(2, alarm.Played.Count);
+        Assert.All(alarm.Played, s => Assert.Equal(AlarmSound.ScbaControlDue, s));
+    }
+
+    [Fact]
+    public void Readonly_session_never_plays_the_control_due_cue()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seedVm = Vm(clock, seed);
+        seedVm.NewControlIntervalMinutes = 5;
+        var seedRow = Register(seedVm);
+        seedRow.StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(6);
+        seed.Close();
+
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        _ = Vm(clock, ro, ticker: ticker, alarm: alarm);
+        ticker.Fire();
+
+        Assert.Empty(alarm.Played);
+    }
+
+    [Fact]
+    public void Two_trupps_due_at_different_times_each_sound_their_own_cue()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+
+        vm.NewControlIntervalMinutes = 5;
+        var first = Register(vm);
+        first.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(2);
+        vm.NewControlIntervalMinutes = 5;
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        second.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(6); // first trupp's interval elapsed, second's has not
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = T0.AddMinutes(8); // second trupp's interval (registered/started 2 min later) now elapsed
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
     }
 
     [Fact]
