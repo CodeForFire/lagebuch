@@ -345,6 +345,35 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void V17_file_gains_an_empty_wass_leitungen_table_on_upgrade_to_v18()
+    {
+        // V18 adds wass_leitungen (#150 Plan A). A v17 file must upgrade cleanly and simply gain
+        // the empty table -- its existing rows are untouched.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (17);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Assert.Equal(17, Migrations.GetVersion(cn));
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var read = cn.CreateCommand();
+            read.CommandText = "SELECT count(*) FROM wass_leitungen;";
+            Assert.Equal(0L, (long)read.ExecuteScalar()!);
+        }
+    }
+
+    [Fact]
     public void A_file_from_a_newer_version_is_refused_and_its_marker_left_alone()
     {
         // A file written by a build that is ahead of this one. Migrate has no migration to run --

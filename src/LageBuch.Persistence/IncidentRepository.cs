@@ -23,7 +23,7 @@ public sealed class IncidentRepository
                     "role_assignments", "force_units", "scba_trupps",
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
-                    "co_buildings", "co_dwellings",
+                    "co_buildings", "co_dwellings", "wass_leitungen",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -329,6 +329,33 @@ public sealed class IncidentRepository
                 });
         }
 
+        for (var i = 0; i < incident.Wasserfoerderung.Count; i++)
+        {
+            var w = incident.Wasserfoerderung[i];
+            var positionsJson = System.Text.Json.JsonSerializer.Serialize(w.PumpPositionsMeters);
+            Run(
+                cn,
+                tx,
+                "INSERT INTO wass_leitungen (id, ordinal, number, uebergabestelle, ansprechpartner, flow_lmin, feed_pressure_bar, length_m, elevation_rise_m, hose_count, reserve_hose_count, pump_count, reserve_pump_count, pump_positions) " + "VALUES ($id,$o,$num,$ueb,$ap,$flow,$feed,$len,$rise,$hc,$rch,$pc,$rpc,$pos);",
+                p =>
+                {
+                    p("$id", w.Id.ToString());
+                    p("$o", i);
+                    p("$num", w.Number);
+                    p("$ueb", (object?)w.Uebergabestelle ?? DBNull.Value);
+                    p("$ap", (object?)w.Ansprechpartner ?? DBNull.Value);
+                    p("$flow", w.FlowLMin);
+                    p("$feed", w.FeedPressureBar);
+                    p("$len", w.LengthMeters);
+                    p("$rise", w.ElevationRiseMeters);
+                    p("$hc", w.HoseCount);
+                    p("$rch", w.ReserveHoseCount);
+                    p("$pc", w.PumpCount);
+                    p("$rpc", w.ReservePumpCount);
+                    p("$pos", positionsJson);
+                });
+        }
+
         tx.Commit();
     }
 
@@ -613,6 +640,24 @@ public sealed class IncidentRepository
                 NullableDate(r, 8),
                 Str(r, 9)));
 
+        var wasserfoerderung = ReadAll(
+            cn,
+            "SELECT id, number, uebergabestelle, ansprechpartner, flow_lmin, feed_pressure_bar, length_m, elevation_rise_m, hose_count, reserve_hose_count, pump_count, reserve_pump_count, pump_positions FROM wass_leitungen ORDER BY ordinal;",
+            r => Domain.Wasserfoerderung.WasserfoerderungLeitung.Rehydrate(
+                Guid.Parse(r.GetString(0)),
+                r.GetInt32(1),
+                Str(r, 2),
+                Str(r, 3),
+                r.GetInt32(4),
+                r.GetDouble(5),
+                r.GetDouble(6),
+                r.GetDouble(7),
+                r.GetInt32(8),
+                r.GetInt32(9),
+                r.GetInt32(10),
+                r.GetInt32(11),
+                System.Text.Json.JsonSerializer.Deserialize<IReadOnlyList<double>>(r.GetString(12)) ?? Array.Empty<double>()));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -643,7 +688,8 @@ public sealed class IncidentRepository
             files,
             tasks,
             buildings,
-            dwellings);
+            dwellings,
+            wasserfoerderung);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

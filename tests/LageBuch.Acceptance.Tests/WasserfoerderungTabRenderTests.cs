@@ -10,23 +10,24 @@ using LageBuch.Domain;
 
 namespace LageBuch.Acceptance.Tests;
 
-// Issue #62: the new "Dateien" tab. Doubles as the PR before/after screenshot capture
-// (RENDER_OUT), same idiom as SharePanelRenderTests.
-public class FilesTabRenderTests
+// Issue #150 (Plan A): the new WASSERFÖRDERUNG tab. Doubles as the PR screenshot capture
+// (RENDER_OUT), same idiom as TasksTabRenderTests/ForcesTabRenderTests.
+public class WasserfoerderungTabRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace()
     {
+        var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(
             new FakeStore(),
-            new FixedClock(),
+            clock,
             new SessionOperator("Müller", "FFB 12/1"),
             "/x.fwincident",
-            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new IncidentWorkspaceViewModel(
             session,
-            new FixedClock(),
-            new NoopTicker(),
+            clock,
+            new ManualTicker(),
             WorkspaceRenderHelper.MasterData(),
             new FakeDialogs(),
             new NoopAlarmService(),
@@ -54,34 +55,22 @@ public class FilesTabRenderTests
         ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
 
     [AvaloniaFact]
-    public void Workspace_renders_all_tabs_before_dateien_is_opened()
-    {
-        var (window, _, _) = ShowWorkspace();
-        var tabs = Tabs(window);
-
-        Assert.Equal(11, tabs.Items.Count);
-        Capture(window, "files-before.png");
-    }
-
-    [AvaloniaFact]
-    public void Selecting_the_dateien_tab_shows_an_attached_file()
+    public void Wasserfoerderung_tab_renders_empty_then_planned_streets()
     {
         var (window, vm, session) = ShowWorkspace();
-        var file = session.Incident.AddFile(new FixedClock(), session.Operator!, "einsatzstelle.jpg", "image/jpeg", 1_200_000);
 
-        // A renamed display name (independent of the original file name) is the point of the
-        // screenshot below — the editable Name field.
-        session.Incident.RenameFile(file.Id, "Küchenbrand, Erdgeschoss");
-        vm.Files.Sync();
+        Tabs(window).SelectedIndex = 9; // WASSERFÖRDERUNG
+        Dispatcher.UIThread.RunJobs();
+        Assert.Empty(vm.Wasserfoerderung.Rows);
+        Capture(window, "wasserfoerderung-before.png");
+
+        session.AddWasserfoerderungLeitung("TLF 20/8", "FFB 1/44/1", 2000, 100);
+        session.AddWasserfoerderungLeitung(null, null, 400, 0);
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // DATEIEN
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.Equal("DATEIEN", ((TabItem)tabs.SelectedItem!).Header);
-        Assert.Single(vm.Files.Files);
-        Assert.Equal("Küchenbrand, Erdgeschoss", vm.Files.Files[0].DisplayName);
-        Capture(window, "files-after.png");
+        Assert.Equal(2, vm.Wasserfoerderung.Rows.Count);
+        Assert.Equal("Ltg 1", vm.Wasserfoerderung.Rows[0].NumberDisplay);
+        Assert.Equal(4, session.Incident.Wasserfoerderung[0].PumpCount);
+        Capture(window, "wasserfoerderung-after.png");
     }
 }

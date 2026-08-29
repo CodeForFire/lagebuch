@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.WasserfoerderungView"
+             x:DataType="vm:WasserfoerderungViewModel">
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,4">
+      <TextBlock Text="WASSERFÖRDERUNG" Classes="overline" />
+      <TextBlock Text="Förderstrecken planen — B-800, B-Schlauch 20 m, 8 bar Speisedruck, 1,5 bar Pumpeneingang."
+                 Classes="hint" Foreground="{StaticResource TextSecondaryBrush}" />
+    </StackPanel>
+
+    <!-- Input dock -->
+    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <StackPanel Orientation="Vertical" Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <HeaderedContentControl Classes="field" Header="ÜBERGABESTELLE">
+            <TextBox Width="150" Text="{Binding NewUebergabestelle}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="ANSPRECHPARTNER">
+            <TextBox Width="150" Text="{Binding NewAnsprechpartner}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="LÄNGE (M)">
+            <TextBox Width="110" Text="{Binding NewLengthMeters}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding AddLeitungCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="HÖHENUNTERSCHIED (M)">
+            <TextBox Width="110" Text="{Binding NewElevationRiseMeters}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding AddLeitungCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </HeaderedContentControl>
+          <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddLeitungCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        </StackPanel>
+        <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF3D2E" Classes="hint"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DataGrid x:Name="WasserfoerderungGrid" ItemsSource="{Binding Rows}" IsReadOnly="{Binding IsReadOnly}"
+                CanUserSortColumns="False">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="LEITUNG" Binding="{Binding NumberDisplay}" IsReadOnly="True" />
+          <DataGridTextColumn Header="ÜBERGABESTELLE" Binding="{Binding UebergabestelleDisplay}" Width="*"
+                              IsReadOnly="True" />
+          <DataGridTextColumn Header="ANSPRECHPARTNER" Binding="{Binding AnsprechpartnerDisplay}" Width="*"
+                              IsReadOnly="True" />
+          <DataGridTextColumn Header="B-LÄNGEN" Binding="{Binding BLengthsDisplay}" IsReadOnly="True" />
+          <DataGridTextColumn Header="LÄNGE" Binding="{Binding LengthDisplay}" IsReadOnly="True" />
+          <DataGridTextColumn Header="HÖHENUNTERSCHIED" Binding="{Binding RiseDisplay}" IsReadOnly="True" />
+          <DataGridTextColumn Header="PUMPEN" Binding="{Binding PumpDisplay}" IsReadOnly="True" />
+          <DataGridTextColumn Header="RESERVE PUMPEN" Binding="{Binding ReservePumpDisplay}" IsReadOnly="True" />
+          <DataGridTextColumn Header="RESERVE B-LÄNGEN" Binding="{Binding ReserveHoseDisplay}" IsReadOnly="True" />
+          <DataGridTextColumn Header="FÖRDERUNG" Binding="{Binding ResultDisplay}" IsReadOnly="True" />
+          <DataGridTemplateColumn Header="" Width="60" IsReadOnly="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:WasserfoerderungLeitungRow">
+                <Button Content="✕" Padding="6,2" Margin="4,0" VerticalAlignment="Center"
+                        Command="{Binding RemoveCommand}" IsVisible="{Binding !IsReadOnly}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+  </DockPanel>
+</UserControl>

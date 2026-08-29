@@ -228,6 +228,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));
 
+    public void AddWasserfoerderungLeitung(string? uebergabestelle, string? ansprechpartner, double lengthMeters, double elevationRiseMeters) =>
+        Send(new AddWasserfoerderungLeitungCommand(uebergabestelle, ansprechpartner, lengthMeters, elevationRiseMeters));
+
+    public void RemoveWasserfoerderungLeitung(Guid leitungId) =>
+        Send(new RemoveWasserfoerderungLeitungCommand(leitungId));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

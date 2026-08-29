@@ -34,7 +34,8 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<IncidentFileDto> Files,
     IReadOnlyList<TaskDto> Tasks,
     IReadOnlyList<BuildingDto> Buildings,
-    IReadOnlyList<DwellingDto> Dwellings);
+    IReadOnlyList<DwellingDto> Dwellings,
+    IReadOnlyList<WasserfoerderungLeitungDto> Wasserfoerderung);
 
 public sealed record TimerDto(
     string Key,
@@ -140,3 +141,18 @@ public sealed record BuildingDto(
 public sealed record DwellingDto(
     Guid Id, Guid BuildingId, int FloorOrdinal, int ApartmentNumber,
     string? ResidentName, DwellingStatus Status, bool? KeyAvailable, int? CoValue);
+
+public sealed record WasserfoerderungLeitungDto(
+    Guid Id,
+    int Number,
+    string? Uebergabestelle,
+    string? Ansprechpartner,
+    int FlowLMin,
+    double FeedPressureBar,
+    double LengthMeters,
+    double ElevationRiseMeters,
+    int HoseCount,
+    int ReserveHoseCount,
+    int PumpCount,
+    int ReservePumpCount,
+    IReadOnlyList<double> PumpPositionsMeters);

@@ -307,6 +307,11 @@
               <ContentControl Content="{Binding Links}" />
             </Border>
           </TabItem>
+          <TabItem Header="WASSERFÖRDERUNG">
+            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <ContentControl Content="{Binding Wasserfoerderung}" />
+            </Border>
+          </TabItem>
           <TabItem>
             <TabItem.Header>
               <StackPanel x:DataType="vm:ChecklistViewModel" DataContext="{Binding ChecklistAbbau}"

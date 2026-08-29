@@ -162,6 +162,12 @@ public static class CommandApplier
             case SetApartmentLabelCommand c:
                 incident.SetApartmentLabel(c.BuildingId, c.ApartmentNumber, c.Label);
                 break;
+            case AddWasserfoerderungLeitungCommand c:
+                incident.AddWasserfoerderungLeitung(c.Uebergabestelle, c.Ansprechpartner, c.LengthMeters, c.ElevationRiseMeters);
+                break;
+            case RemoveWasserfoerderungLeitungCommand c:
+                incident.RemoveWasserfoerderungLeitung(c.LeitungId);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(command),

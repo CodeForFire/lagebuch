@@ -55,6 +55,9 @@ public class CommandSerializationTests
         new AddTaskCommand(Op, "Nachfordern", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), true),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), false),
+        new AddWasserfoerderungLeitungCommand("TLF 20/8", "FFB 1/44/1", 2000, 100),
+        new AddWasserfoerderungLeitungCommand(null, null, 400, 0),
+        new RemoveWasserfoerderungLeitungCommand(Guid.NewGuid()),
     }.Select(c => new object[] { c });
 
     [Theory]
