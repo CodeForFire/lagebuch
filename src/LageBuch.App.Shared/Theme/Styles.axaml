@@ -248,6 +248,9 @@
     <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <!-- Spinner arrows are fiddly for counts up to a few hundred (Druck, Minuten); typing the
+         value directly is the primary interaction everywhere in this app. -->
+    <Setter Property="ShowButtonSpinner" Value="False" />
   </Style>
 
   <!-- Labeled field wrapper (#137): caption above an arbitrary input control. Styling the

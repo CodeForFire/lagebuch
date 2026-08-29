@@ -22,10 +22,14 @@ public class CommandSerializationTests
         new UpdateForceStrengthCommand(Op, Guid.NewGuid(), 1, 9, 4),
         new AddScbaTruppCommand("Angriffstrupp",
             new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
-            "AT-1", "Menschenrettung", 30, 60, 5),
-        new StartScbaTruppCommand(Guid.NewGuid(), 300),
+            "AT-1", "Menschenrettung", 30, 60, 5, EntryPressure: 300),
+        new AddScbaTruppCommand("Angriffstrupp",
+            new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
+            "AT-1", "Menschenrettung", 30, 60, 5, EntryPressure: 300, TruppNumber: 3),
+        new StartScbaTruppCommand(Guid.NewGuid()),
         new RecordScbaPressureCommand(Guid.NewGuid(), 250),
-        new MarkScbaReturnedCommand(Guid.NewGuid()),
+        new WithdrawScbaTruppCommand(Guid.NewGuid()),
+        new MarkScbaRemovedCommand(Guid.NewGuid()),
         new SetIncidentNumberCommand("B 1.2 260812 001"),
         new SetKeywordCommand("Brand 2"),
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),
@@ -87,6 +91,24 @@ public class CommandSerializationTests
 
         Assert.Equal(0, command.OfficerCount);
         Assert.Equal(9, command.PersonnelCount);
+    }
+
+    // TruppNumber is optional on the wire so the host's auto-assign path (Incident.NextFreeScbaTruppNumber)
+    // stays reachable from a client that never sent one.
+    [Fact]
+    public void AddScbaTrupp_without_truppNumber_deserializes_as_null()
+    {
+        const string json = """
+            {"$type":"addScbaTrupp","designation":"Angriffstrupp",
+             "members":[{"role":"Truppfuehrer","name":"Müller"}],
+             "callSign":"AT-1","task":null,"maxDurationMinutes":30,"returnPressureBar":60,
+             "pressureControlIntervalMinutes":5,"entryPressure":300}
+            """;
+
+        var command = Assert.IsType<AddScbaTruppCommand>(SyncJson.Deserialize<SyncCommand>(json));
+
+        Assert.Null(command.TruppNumber);
+        Assert.Equal(300, command.EntryPressure);
     }
 
     [Fact]

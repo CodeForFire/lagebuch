@@ -23,25 +23,29 @@ public sealed partial class ScbaTruppRow : ObservableObject
     private readonly AtemschutzTrupp _trupp;
     private readonly IClock _clock;
     private readonly bool _isReadOnly;
-    private readonly Action<int> _onStart;
+    private readonly Action _onStart;
     private readonly Action<int> _onRecordPressure;
-    private readonly Action _onMarkReturned;
+    private readonly Action _onWithdraw;
+    private readonly Action _onMarkRemoved;
 
     public ScbaTruppRow(
         AtemschutzTrupp trupp, IClock clock, bool isReadOnly,
-        Action<int> onStart, Action<int> onRecordPressure, Action onMarkReturned)
+        Action onStart, Action<int> onRecordPressure, Action onWithdraw, Action onMarkRemoved)
     {
         _trupp = trupp;
         _clock = clock;
         _isReadOnly = isReadOnly;
         _onStart = onStart;
         _onRecordPressure = onRecordPressure;
-        _onMarkReturned = onMarkReturned;
+        _onWithdraw = onWithdraw;
+        _onMarkRemoved = onMarkRemoved;
         _pressureInput = trupp.LatestPressure ?? 300;
     }
 
     public Guid Id => _trupp.Id;
+    public int TruppNumber => _trupp.TruppNumber;
     public string Designation => _trupp.Designation;
+    public string DisplayName => _trupp.DisplayName;
     public string Members => _trupp.MembersDisplay;
 
     /// <summary>
@@ -60,6 +64,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     public bool IsWaiting => _trupp.IsWaiting;
     public bool IsActive => _trupp.IsActive;
+    public bool IsWithdrawing => _trupp.IsWithdrawing;
     public bool IsReturned => _trupp.IsReturned;
     public bool IsAlarm => _trupp.IsAlarm(_clock.Now);
     public bool IsControlDue => _trupp.IsControlDue(_clock.Now);
@@ -73,7 +78,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
     {
         get
         {
-            if (!_trupp.IsActive)
+            if (!(_trupp.IsActive || _trupp.IsWithdrawing))
                 return "—";
             var remaining = _trupp.Remaining(_clock.Now);
             return remaining <= TimeSpan.Zero ? "überzogen" : Clock(remaining);
@@ -84,7 +89,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
     {
         get
         {
-            if (!_trupp.IsActive)
+            if (!(_trupp.IsActive || _trupp.IsWithdrawing))
                 return "—";
             var remaining = _trupp.ControlRemaining(_clock.Now);
             return remaining <= TimeSpan.Zero ? "fällig" : Clock(remaining);
@@ -93,35 +98,42 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     public string StatusDisplay => _trupp switch
     {
-        { IsReturned: true } => "Zurück",
+        { IsReturned: true } => "Abgenommen",
         { IsWaiting: true } => "Bereitgestellt",
         _ when IsAlarm => "ALARM",
+        { IsWithdrawing: true } => "Rückzug",
         _ when IsControlDue => "Druckabfrage",
-        _ => "Unter PA"
+        _ => "Im Einsatz"
     };
 
     [ObservableProperty]
     private int _pressureInput;
 
-    private bool CanStart => !_isReadOnly && _trupp.IsWaiting && PressureInput > 0;
+    private bool CanStart => !_isReadOnly && _trupp.IsWaiting;
 
     [RelayCommand(CanExecute = nameof(CanStart))]
-    private void Start() => _onStart(PressureInput);
+    private void Start() => _onStart();
 
-    private bool CanRecordPressure => !_isReadOnly && _trupp.IsActive;
+    private bool CanRecordPressure => !_isReadOnly && (_trupp.IsActive || _trupp.IsWithdrawing);
 
     [RelayCommand(CanExecute = nameof(CanRecordPressure))]
     private void RecordPressure() => _onRecordPressure(PressureInput);
 
-    private bool CanMarkReturned => !_isReadOnly && _trupp.IsActive;
+    private bool CanWithdraw => !_isReadOnly && _trupp.IsActive;
 
-    [RelayCommand(CanExecute = nameof(CanMarkReturned))]
-    private void MarkReturned() => _onMarkReturned();
+    [RelayCommand(CanExecute = nameof(CanWithdraw))]
+    private void Withdraw() => _onWithdraw();
+
+    private bool CanMarkRemoved => !_isReadOnly && _trupp.IsWithdrawing;
+
+    [RelayCommand(CanExecute = nameof(CanMarkRemoved))]
+    private void MarkRemoved() => _onMarkRemoved();
 
     public void Refresh()
     {
         OnPropertyChanged(nameof(IsWaiting));
         OnPropertyChanged(nameof(IsActive));
+        OnPropertyChanged(nameof(IsWithdrawing));
         OnPropertyChanged(nameof(IsReturned));
         OnPropertyChanged(nameof(IsAlarm));
         OnPropertyChanged(nameof(IsControlDue));
@@ -133,7 +145,8 @@ public sealed partial class ScbaTruppRow : ObservableObject
         OnPropertyChanged(nameof(StatusDisplay));
         StartCommand.NotifyCanExecuteChanged();
         RecordPressureCommand.NotifyCanExecuteChanged();
-        MarkReturnedCommand.NotifyCanExecuteChanged();
+        WithdrawCommand.NotifyCanExecuteChanged();
+        MarkRemovedCommand.NotifyCanExecuteChanged();
     }
 
     private static string Clock(TimeSpan span) => $"{(int)span.TotalMinutes:00}:{span.Seconds:00}";
@@ -153,6 +166,15 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     // overwrite it. Programmatic sets (default application, form reset) are fenced by _applyingDefault
     // so they do not count as a user edit.
     private bool _maxDurationUserEdited;
+
+    // Same idea for the Abfrage-Intervall, which otherwise defaults to a third of the Einsatzzeit
+    // (#78) -- a hand-typed interval must survive a later Einsatzzeit change.
+    private bool _controlIntervalUserEdited;
+
+    // Same idea for the Truppnummer, which otherwise auto-suggests the next free number: a hand
+    // edit must not be clobbered when another device's registration refreshes this device's rows.
+    private bool _truppNumberUserEdited;
+
     private bool _applyingDefault;
 
     public ScbaViewModel(IIncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
@@ -166,17 +188,21 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         // Direct field writes so no OnChanged fires and the fields do not read as user-edited.
         _newMaxDurationMinutes = _settings.AgtMaxDurationMinutes;
         _newReturnPressureBar = _settings.ReturnPressureBar;
-        _newControlIntervalMinutes = _settings.PressureControlIntervalMinutes;
+        _newEntryPressure = 300;
+        _newTruppNumber = session.Incident.NextFreeScbaTruppNumber();
         IsReadOnly = session.IsReadOnly;
         TruppTypeOptions = masterData.TruppTypes;
         CallSignOptions = masterData.RadioCallSigns;
         PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
         Trupps = new ObservableCollection<ScbaTruppRow>(session.Incident.ScbaTrupps.Select(CreateRow));
         _session.Changed += RefreshTrupps;
+        // The property setter path (below) is what marks an interval as user-edited, so the
+        // initial derivation from _newMaxDurationMinutes must go through it once here too.
+        ApplyDefaultControlInterval();
 
         // Suppress re-logging alarms for trupps already alarming when the incident is reopened.
         foreach (var t in session.Incident.ScbaTrupps)
-            if (t.IsActive && t.IsAlarm(_clock.Now))
+            if ((t.IsActive || t.IsWithdrawing) && t.IsAlarm(_clock.Now))
                 _alarmLogged.Add(t.Id);
 
         // A closed incident is historical: no live ticking, no auto-logging (it cannot mutate).
@@ -225,6 +251,14 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     private string? _newCallSign;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    private int _newTruppNumber;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    private int _newEntryPressure;
+
+    [ObservableProperty]
     private int _newMaxDurationMinutes;
 
     [ObservableProperty]
@@ -233,10 +267,26 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private int _newControlIntervalMinutes;
 
+    partial void OnNewTruppNumberChanged(int value)
+    {
+        if (!_applyingDefault)
+            _truppNumberUserEdited = true;
+    }
+
     partial void OnNewMaxDurationMinutesChanged(int value)
     {
         if (!_applyingDefault)
             _maxDurationUserEdited = true;
+        // The Abfrage-Intervall tracks the Einsatzzeit (a third of it) unless separately overridden,
+        // whether this change came from the user or from ApplyDefaultMaxDuration below.
+        if (!_controlIntervalUserEdited)
+            ApplyDefaultControlInterval();
+    }
+
+    partial void OnNewControlIntervalMinutesChanged(int value)
+    {
+        if (!_applyingDefault)
+            _controlIntervalUserEdited = true;
     }
 
     // Switching the Trupp type re-suggests its Einsatzzeit (CSA is shorter, LPA is longer than an
@@ -256,14 +306,33 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             : AtemschutzTrupp.IsLpaTrupp(NewDesignation) ? _settings.LpaMaxDurationMinutes
             : _settings.AgtMaxDurationMinutes;
         _applyingDefault = previous;
+        // Called explicitly rather than left to OnNewMaxDurationMinutesChanged's cascade: the
+        // generated property setter is a no-op when the value doesn't actually change (e.g. the
+        // AGT default reapplied on form reset), which would otherwise leave a stale user-edited
+        // Abfrage-Intervall in place.
+        if (!_controlIntervalUserEdited)
+            ApplyDefaultControlInterval();
+    }
+
+    // Abfrage-Intervall defaults to a third of the Einsatzzeit -- frequent enough to catch a fast
+    // drop while not paging the operator every minute. At least 1 so a very short Einsatzzeit
+    // never derives a zero/negative interval.
+    private void ApplyDefaultControlInterval()
+    {
+        var previous = _applyingDefault;
+        _applyingDefault = true;
+        NewControlIntervalMinutes = Math.Max(1, NewMaxDurationMinutes / 3);
+        _applyingDefault = previous;
     }
 
     // ----- Header reminder: the most urgent next pressure-control across all active trupps -----
 
-    public bool HasControlReminder => !IsReadOnly && Trupps.Any(r => r.IsActive);
+    // A Rückzug crew is still under air and still needs pressure checks, so the header reminder
+    // and Rückzugsalarm both stay live through Rückzug, not just Im Einsatz.
+    public bool HasControlReminder => !IsReadOnly && Trupps.Any(r => r.IsActive || r.IsWithdrawing);
 
     private ScbaTruppRow? MostUrgentActive =>
-        Trupps.Where(r => r.IsActive)
+        Trupps.Where(r => r.IsActive || r.IsWithdrawing)
               .OrderBy(r => _session.Incident.ScbaTrupps.First(t => t.Id == r.Id).ControlRemaining(_clock.Now))
               .FirstOrDefault();
 
@@ -277,15 +346,15 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             if (urgent is null)
                 return "—";
             return IsAnyControlDue
-                ? $"Druckabfrage fällig: {urgent.Designation}"
-                : $"Nächste Druckabfrage: {urgent.Designation} in {urgent.ControlRemainingDisplay}";
+                ? $"Druckabfrage fällig: {urgent.DisplayName}"
+                : $"Nächste Druckabfrage: {urgent.DisplayName} in {urgent.ControlRemainingDisplay}";
         }
     }
 
     // ----- Rückzugsalarm: a trupp has hit its time limit or return pressure (life-safety) -----
 
     private IEnumerable<AtemschutzTrupp> AlarmingTrupps =>
-        _session.Incident.ScbaTrupps.Where(t => t.IsActive && t.IsAlarm(_clock.Now));
+        _session.Incident.ScbaTrupps.Where(t => (t.IsActive || t.IsWithdrawing) && t.IsAlarm(_clock.Now));
 
     public bool IsAnyAlarm => AlarmingTrupps.Any();
 
@@ -296,7 +365,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             var trupps = AlarmingTrupps.ToList();
             if (trupps.Count == 0)
                 return "—";
-            var first = $"RÜCKZUGSALARM {trupps[0].Designation}: {AlarmReason(trupps[0])}";
+            var first = $"RÜCKZUGSALARM {trupps[0].DisplayName}: {AlarmReason(trupps[0])}";
             return trupps.Count == 1 ? first : $"{first}  (+{trupps.Count - 1})";
         }
     }
@@ -343,7 +412,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         && !string.IsNullOrWhiteSpace(NewTruppfuehrer) && !string.IsNullOrWhiteSpace(NewTruppmann)
         // Mirrors the domain cardinality rule so an incomplete CSA-Trupp disables the button
         // rather than throwing on click.
-        && (!RequiresThirdMember || !string.IsNullOrWhiteSpace(NewZweiterTruppmann));
+        && (!RequiresThirdMember || !string.IsNullOrWhiteSpace(NewZweiterTruppmann))
+        && NewTruppNumber > 0 && NewEntryPressure > 0;
 
     private IReadOnlyList<TruppMember> BuildCrew() =>
         TruppMember.Crew(NewTruppfuehrer, NewTruppmann, RequiresThirdMember ? NewZweiterTruppmann : null);
@@ -357,75 +427,97 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         var membersDisplay = string.Join(" / ", crew.Select(m => m.Name));
         var designation = NewDesignation;
         var callSign = NewCallSign;
-        _session.AddScbaTrupp(designation, crew, callSign,
+        var truppNumber = NewTruppNumber;
+        var entryPressure = NewEntryPressure;
+        var displayName = AtemschutzTrupp.FormatDisplayName(truppNumber, designation);
+        _session.AddScbaTrupp(designation, crew, entryPressure, truppNumber, callSign,
             task: null, maxDurationMinutes: NewMaxDurationMinutes, returnPressureBar: NewReturnPressureBar,
             pressureControlIntervalMinutes: NewControlIntervalMinutes);
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Atemschutztrupp {designation} bereitgestellt: {membersDisplay}",
-            from: null, to: callSign);
+            $"{displayName} bereitgestellt: {membersDisplay}, Einstiegsdruck {entryPressure} bar",
+            from: callSign, to: null);
 
         _maxDurationUserEdited = false;
+        _controlIntervalUserEdited = false;
         NewDesignation = string.Empty;
         NewTruppfuehrer = string.Empty;
         NewTruppmann = string.Empty;
         NewZweiterTruppmann = string.Empty;
         NewCallSign = null;
+        NewEntryPressure = 300;
         NewReturnPressureBar = _settings.ReturnPressureBar;
-        NewControlIntervalMinutes = _settings.PressureControlIntervalMinutes;
-        ApplyDefaultMaxDuration(); // empty designation => AGT default
+        // Guarded like RefreshTrupps' own re-suggestion below: this sets up the *next* Trupp's
+        // auto-suggested number and must not itself read back as a user edit.
+        _truppNumberUserEdited = false;
+        var previousApplyingDefault = _applyingDefault;
+        _applyingDefault = true;
+        NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber();
+        _applyingDefault = previousApplyingDefault;
+        ApplyDefaultMaxDuration(); // empty designation => AGT default; also re-derives the interval
         RefreshHeader();
         _onChanged();
     }
 
     private ScbaTruppRow CreateRow(AtemschutzTrupp trupp) =>
         new(trupp, _clock, IsReadOnly,
-            pressure => Start(trupp.Id, pressure),
+            () => Start(trupp.Id),
             bar => RecordPressure(trupp.Id, bar),
-            () => MarkReturned(trupp.Id));
+            () => Withdraw(trupp.Id),
+            () => MarkRemoved(trupp.Id));
 
-    // Designation/call-sign for the ETB line are read from the current snapshot before mutating
-    // (they don't change on start/pressure/return) — so this works whether the trupp lives in a
-    // local aggregate or a host snapshot.
-    private (string Designation, string? CallSign) TruppLabel(Guid truppId)
+    // Display name/call-sign for the ETB line are read from the current snapshot before mutating
+    // (they don't change once registered) — so this works whether the trupp lives in a local
+    // aggregate or a host snapshot.
+    private (string DisplayName, string? CallSign) TruppLabel(Guid truppId)
     {
         var trupp = _session.Incident.ScbaTrupps.First(t => t.Id == truppId);
-        return (trupp.Designation, trupp.CallSign);
+        return (trupp.DisplayName, trupp.CallSign);
     }
 
-    private void Start(Guid truppId, int startPressure)
+    private void Start(Guid truppId)
     {
-        var (designation, callSign) = TruppLabel(truppId);
-        _session.StartScbaTrupp(truppId, startPressure);
+        var (displayName, callSign) = TruppLabel(truppId);
+        _session.StartScbaTrupp(truppId);
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Atemschutztrupp {designation} unter PA: Einstiegsdruck {startPressure} bar",
-            from: null, to: callSign);
+            $"{displayName} im Einsatz", from: callSign, to: null);
         RefreshHeader();
         _onChanged();
     }
 
     private void RecordPressure(Guid truppId, int bar)
     {
-        var (designation, callSign) = TruppLabel(truppId);
+        var (displayName, callSign) = TruppLabel(truppId);
         _session.RecordScbaPressure(truppId, bar);
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Druckkontrolle Atemschutz {designation}: {bar} bar", from: callSign, to: null);
+            $"Druckkontrolle {displayName}: {bar} bar", from: callSign, to: null);
         var tripped = LogNewAlarms(); // a low reading may immediately trip the Rückzugsdruck alarm
         UpdateAlarm(tripped);
         RefreshHeader();
         _onChanged();
     }
 
-    private void MarkReturned(Guid truppId)
+    private void Withdraw(Guid truppId)
     {
-        var (designation, callSign) = TruppLabel(truppId);
-        _session.MarkScbaReturned(truppId);
+        var (displayName, callSign) = TruppLabel(truppId);
+        _session.WithdrawScbaTrupp(truppId);
         _session.AddJournalEntry(
             EtbDirection.System,
-            $"Atemschutztrupp {designation} zurück", from: callSign, to: null);
-        UpdateAlarm(newAlarmTripped: false); // a returned trupp may clear the last alarm
+            $"{displayName} Rückzug", from: callSign, to: null);
+        RefreshHeader();
+        _onChanged();
+    }
+
+    private void MarkRemoved(Guid truppId)
+    {
+        var (displayName, callSign) = TruppLabel(truppId);
+        _session.MarkScbaRemoved(truppId);
+        _session.AddJournalEntry(
+            EtbDirection.System,
+            $"{displayName} abgenommen", from: callSign, to: null);
+        UpdateAlarm(newAlarmTripped: false); // a removed trupp may clear the last alarm
         RefreshHeader();
         _onChanged();
     }
@@ -436,6 +528,15 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         Trupps.Clear();
         foreach (var trupp in _session.Incident.ScbaTrupps)
             Trupps.Add(CreateRow(trupp));
+        // Another device may have just taken the suggested number -- re-suggest, but never
+        // clobber a number this device's operator already hand-typed into the form.
+        if (!_truppNumberUserEdited)
+        {
+            var previous = _applyingDefault;
+            _applyingDefault = true;
+            NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber();
+            _applyingDefault = previous;
+        }
         RefreshHeader();
     }
 
@@ -467,12 +568,12 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         var logged = false;
         foreach (var trupp in _session.Incident.ScbaTrupps)
         {
-            if (!trupp.IsActive || !trupp.IsAlarm(_clock.Now) || !_alarmLogged.Add(trupp.Id))
+            if (!(trupp.IsActive || trupp.IsWithdrawing) || !trupp.IsAlarm(_clock.Now) || !_alarmLogged.Add(trupp.Id))
                 continue;
             var reason = AlarmReason(trupp);
             _session.AddJournalEntry(
                 EtbDirection.System,
-                $"Rückzugsalarm Atemschutz {trupp.Designation}: {reason}", from: null, to: trupp.CallSign);
+                $"Rückzugsalarm {trupp.DisplayName}: {reason}", from: null, to: trupp.CallSign);
             logged = true;
         }
         return logged;

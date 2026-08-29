@@ -66,14 +66,17 @@ public interface IIncidentSession
 
     /// <summary>Stamps/clears a task's completion (#88).</summary>
     void SetTaskCompleted(Guid taskId, bool isDone);
-    void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
+    void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
+        int? truppNumber = null,
+        string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes);
-    void StartScbaTrupp(Guid truppId, int startPressure);
+    void StartScbaTrupp(Guid truppId);
     void RecordScbaPressure(Guid truppId, int bar);
-    void MarkScbaReturned(Guid truppId);
+    void WithdrawScbaTrupp(Guid truppId);
+    void MarkScbaRemoved(Guid truppId);
     void SetIncidentNumber(IncidentNumber? number);
     void SetKeyword(string? keyword);
     void SetAddress(string? street, string? district);

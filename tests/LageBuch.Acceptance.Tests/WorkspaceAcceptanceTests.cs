@@ -445,7 +445,6 @@ public class WorkspaceAcceptanceTests
         vm.Scba.NewTruppmann = "Schmidt";
         vm.Scba.AddTruppCommand.Execute(null);
         var row = vm.Scba.Trupps[^1];
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
         Assert.True(vm.Scba.HasControlReminder);

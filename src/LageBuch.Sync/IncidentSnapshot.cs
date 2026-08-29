@@ -93,13 +93,15 @@ public sealed record PressureReadingDto(DateTimeOffset Time, int Bar);
 
 public sealed record ScbaTruppDto(
     Guid Id,
+    int TruppNumber,
     DateTimeOffset RegisteredAt,
     DateTimeOffset? StartTime,
+    DateTimeOffset? WithdrawTime,
     string Designation,
     IReadOnlyList<TruppMemberDto> Members,
     string? CallSign,
     string? Task,
-    int? StartPressure,
+    int? EntryPressure,
     int MaxDurationMinutes,
     int ReturnPressureBar,
     int PressureControlIntervalMinutes,

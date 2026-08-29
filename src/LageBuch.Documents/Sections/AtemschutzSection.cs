@@ -28,6 +28,7 @@ public static class AtemschutzSection
                     columns.RelativeColumn(3); // Mannschaft
                     columns.RelativeColumn(2); // Funkrufname
                     columns.ConstantColumn(75); // Einstieg
+                    columns.ConstantColumn(75); // Rückzug
                     columns.ConstantColumn(75); // Ausstieg
                     columns.ConstantColumn(60); // Einstiegsdruck
                     columns.ConstantColumn(60); // letzter Druck
@@ -36,18 +37,19 @@ public static class AtemschutzSection
                 table.Header(header =>
                 {
                     foreach (var title in new[]
-                             { "Trupp", "Mannschaft", "Funkrufname", "Start", "Ende", "Druck Start", "Druck akt." })
+                             { "Trupp", "Mannschaft", "Funkrufname", "Start", "Rückzug", "Ende", "Druck Start", "Druck akt." })
                         header.Cell().Element(Cells.Header).Text(title).SemiBold();
                 });
 
                 foreach (var trupp in incident.ScbaTrupps)
                 {
-                    table.Cell().Element(Cells.Body).Text(trupp.Designation);
+                    table.Cell().Element(Cells.Body).Text(trupp.DisplayName);
                     table.Cell().Element(Cells.Body).Text(trupp.MembersDisplay);
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(trupp.CallSign));
                     table.Cell().Element(Cells.Body).Text(trupp.StartTime is { } s ? Formatting.Timestamp(s) : "—");
+                    table.Cell().Element(Cells.Body).Text(trupp.WithdrawTime is { } w ? Formatting.Timestamp(w) : "—");
                     table.Cell().Element(Cells.Body).Text(trupp.ExitTime is { } e ? Formatting.Timestamp(e) : "—");
-                    table.Cell().Element(Cells.Body).Text(trupp.StartPressure is { } sp ? $"{sp} bar" : "—");
+                    table.Cell().Element(Cells.Body).Text(trupp.EntryPressure is { } ep ? $"{ep} bar" : "—");
                     table.Cell().Element(Cells.Body).Text(trupp.LatestPressure is { } lp ? $"{lp} bar" : "—");
                 }
             });

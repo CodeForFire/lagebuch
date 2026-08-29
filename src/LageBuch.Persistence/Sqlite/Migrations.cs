@@ -5,7 +5,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 16;
+    public const int CurrentVersion = 17;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -95,6 +95,10 @@ public static class Migrations
         if (version < 16)
         {
             ApplyV16(cn, tx);
+        }
+        if (version < 17)
+        {
+            ApplyV17(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -483,6 +487,56 @@ public static class Migrations
         // Custom column headers (e.g. "Links/Mitte/Rechts") alongside the existing floor
         // descriptions. Nullable-safe default so existing buildings just read back with no overrides.
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_buildings", "apartment_labels", "TEXT NOT NULL DEFAULT '{}'");
+    }
+
+    private static void ApplyV17(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Truppnummer (auto-assigned, user-editable) and the new Rückzug stage between "im
+        // Einsatz" and "abgenommen" (#78). start_pressure is renamed to entry_pressure because
+        // it is now captured at Bereitstellen rather than at Start -- a rebuild, like V3/V6,
+        // rather than RENAME COLUMN, for portability across SQLite versions.
+        // Guards against a rebuild that already happened: a file created fresh (Save always runs
+        // the full V1..CurrentVersion chain) already has entry_pressure/trupp_number, so a caller
+        // that rolls only the version marker back (as the forward-compat tests do) must not blow
+        // up trying to rebuild from a start_pressure column that is already gone.
+        if (!SchemaHelpers.TableExists(cn, tx, "scba_trupps") ||
+            !SchemaHelpers.ColumnExists(cn, tx, "scba_trupps", "start_pressure"))
+            return;
+
+        Exec(cn, tx, """
+            CREATE TABLE scba_trupps_v17 (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                trupp_number INTEGER NOT NULL,
+                designation TEXT NOT NULL,
+                call_sign TEXT,
+                task TEXT,
+                registered_at TEXT NOT NULL,
+                start_time TEXT,
+                entry_pressure INTEGER,
+                withdraw_time TEXT,
+                max_duration_minutes INTEGER NOT NULL,
+                return_pressure_bar INTEGER NOT NULL,
+                pressure_control_interval_minutes INTEGER NOT NULL,
+                exit_time TEXT
+            );
+            """);
+        // Backfill trupp_number from the existing registration-order "ordinal" (+1, since ordinal
+        // is 0-based) so pre-existing rows get stable, unique, sequential numbers instead of all
+        // colliding on the same value -- a fresh Incident.AddScbaTrupp rejects a duplicate the
+        // moment one more Trupp is added to an old file.
+        Exec(cn, tx, """
+            INSERT INTO scba_trupps_v17
+                (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time,
+                 entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar,
+                 pressure_control_interval_minutes, exit_time)
+            SELECT id, ordinal, ordinal + 1, designation, call_sign, task, registered_at, start_time,
+                   start_pressure, NULL, max_duration_minutes, return_pressure_bar,
+                   pressure_control_interval_minutes, exit_time
+            FROM scba_trupps;
+            """);
+        Exec(cn, tx, "DROP TABLE scba_trupps;");
+        Exec(cn, tx, "ALTER TABLE scba_trupps_v17 RENAME TO scba_trupps;");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

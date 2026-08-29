@@ -1,10 +1,11 @@
 namespace LageBuch.Domain.Atemschutz;
 
 /// <summary>
-/// A breathing-apparatus (SCBA) team under monitoring. Lifecycle: <b>registered</b> (announced
-/// but not yet under air) → <b>active</b> (clock running from <see cref="StartTime"/>) →
-/// <b>returned</b> (<see cref="ExitTime"/> set). Registration does not start the clock, because a
-/// standby/second Trupp may wait minutes before it actually starts consuming air.
+/// A breathing-apparatus (SCBA) team under monitoring. Lifecycle: <b>registered</b>/Bereitgestellt
+/// (announced but not yet under air) → <b>active</b>/Im Einsatz (clock running from
+/// <see cref="StartTime"/>) → <b>withdrawing</b>/Rückzug (<see cref="WithdrawTime"/> set) →
+/// <b>removed</b>/Abgenommen (<see cref="ExitTime"/> set). Registration does not start the clock,
+/// because a standby/second Trupp may wait minutes before it actually starts consuming air.
 ///
 /// Live countdown/alarm values are pure functions of a supplied <c>now</c>, anchored on
 /// <see cref="StartTime"/>, so nothing time-derived is stored — reopening an incident resumes an
@@ -57,7 +58,17 @@ public sealed class AtemschutzTrupp
     private AtemschutzTrupp() { }
 
     public Guid Id { get; private init; }
+    public int TruppNumber { get; private init; }
     public string Designation { get; private init; } = string.Empty;
+
+    /// <summary>"Trupp {N} ({Designation})" — the display form used in the grid, ETB text, the
+    /// PDF export and the header timer banners. Kept here as the single source of truth so the
+    /// number and the type name are never composed differently in two places.</summary>
+    public string DisplayName => FormatDisplayName(TruppNumber, Designation);
+
+    /// <summary>Same formatting as <see cref="DisplayName"/>, usable before an instance exists —
+    /// e.g. to compose the registration ETB line from form inputs, before the mutation commits.</summary>
+    public static string FormatDisplayName(int truppNumber, string designation) => $"Trupp {truppNumber} ({designation})";
 
     /// <summary>
     /// The crew, in position order. Always <see cref="StandardMemberCount"/> people, or
@@ -80,12 +91,18 @@ public sealed class AtemschutzTrupp
     /// <summary>When the Trupp went under air. Null while still on standby.</summary>
     public DateTimeOffset? StartTime { get; private set; }
 
-    /// <summary>Cylinder pressure recorded the moment the Trupp went under air. Null until started.</summary>
-    public int? StartPressure { get; private set; }
+    /// <summary>Cylinder pressure recorded at Bereitstellen, before the Trupp goes under air.
+    /// Null only for a legacy row registered before this field existed.</summary>
+    public int? EntryPressure { get; private set; }
 
     public int MaxDurationMinutes { get; private init; }
     public int ReturnPressureBar { get; private init; }
     public int PressureControlIntervalMinutes { get; private init; }
+
+    /// <summary>When the Trupp began its Rückzug. Null before withdrawing, and while still waiting/active.</summary>
+    public DateTimeOffset? WithdrawTime { get; private set; }
+
+    /// <summary>When the Trupp was abgenommen (mask off, monitoring finished).</summary>
     public DateTimeOffset? ExitTime { get; private set; }
 
     public IReadOnlyList<PressureReading> PressureReadings => _readings;
@@ -94,6 +111,8 @@ public sealed class AtemschutzTrupp
         DateTimeOffset registeredAt,
         string designation,
         IEnumerable<TruppMember> members,
+        int entryPressure,
+        int truppNumber,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = DefaultMaxDurationMinutes,
@@ -105,6 +124,9 @@ public sealed class AtemschutzTrupp
             throw new ArgumentException("Trupp-Bezeichnung darf nicht leer sein.", nameof(designation));
         var crew = members.ToList();
         ValidateCrew(designation, crew);
+        ValidatePressure(entryPressure, nameof(entryPressure));
+        if (entryPressure <= 0)
+            throw new ArgumentOutOfRangeException(nameof(entryPressure), "Einstiegsdruck muss größer als 0 sein.");
         ValidatePressure(returnPressureBar, nameof(returnPressureBar));
         if (maxDurationMinutes <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxDurationMinutes));
@@ -114,8 +136,10 @@ public sealed class AtemschutzTrupp
         var trupp = new AtemschutzTrupp
         {
             Id = Guid.NewGuid(),
+            TruppNumber = truppNumber,
             RegisteredAt = registeredAt,
             Designation = designation.Trim(),
+            EntryPressure = entryPressure,
             CallSign = string.IsNullOrWhiteSpace(callSign) ? null : callSign.Trim(),
             Task = string.IsNullOrWhiteSpace(task) ? null : task.Trim(),
             MaxDurationMinutes = maxDurationMinutes,
@@ -156,13 +180,15 @@ public sealed class AtemschutzTrupp
 
     public static AtemschutzTrupp Rehydrate(
         Guid id,
+        int truppNumber,
         DateTimeOffset registeredAt,
         DateTimeOffset? startTime,
+        DateTimeOffset? withdrawTime,
         string designation,
         IEnumerable<TruppMember> members,
         string? callSign,
         string? task,
-        int? startPressure,
+        int? entryPressure,
         int maxDurationMinutes,
         int returnPressureBar,
         int pressureControlIntervalMinutes,
@@ -172,12 +198,14 @@ public sealed class AtemschutzTrupp
         var trupp = new AtemschutzTrupp
         {
             Id = id,
+            TruppNumber = truppNumber,
             RegisteredAt = registeredAt,
             StartTime = startTime,
+            WithdrawTime = withdrawTime,
             Designation = designation,
             CallSign = callSign,
             Task = task,
-            StartPressure = startPressure,
+            EntryPressure = entryPressure,
             MaxDurationMinutes = maxDurationMinutes,
             ReturnPressureBar = returnPressureBar,
             PressureControlIntervalMinutes = pressureControlIntervalMinutes,
@@ -191,32 +219,38 @@ public sealed class AtemschutzTrupp
         return trupp;
     }
 
-    /// <summary>Sends the Trupp under air: starts the clock and records the starting pressure.</summary>
-    public void Start(DateTimeOffset time, int startPressure)
+    /// <summary>Sends the Trupp under air: starts the clock. The entry pressure was already
+    /// recorded at <see cref="Register"/> time.</summary>
+    public void Start(DateTimeOffset time)
     {
         if (HasStarted)
             throw new InvalidOperationException("Trupp ist bereits unter Atemschutz.");
-        ValidatePressure(startPressure, nameof(startPressure));
-        if (startPressure <= 0)
-            throw new ArgumentOutOfRangeException(nameof(startPressure), "Einstiegsdruck muss größer als 0 sein.");
         StartTime = time;
-        StartPressure = startPressure;
     }
 
     public void RecordPressure(DateTimeOffset time, int bar)
     {
-        if (!IsActive)
+        if (!(IsActive || IsWithdrawing))
             throw new InvalidOperationException("Druckkontrolle nur für einen Trupp unter Atemschutz möglich.");
         ValidatePressure(bar, nameof(bar));
         _readings.Add(new PressureReading(time, bar));
     }
 
-    public void MarkReturned(DateTimeOffset time)
+    /// <summary>Begins the Trupp's Rückzug — still under air, on the way out.</summary>
+    public void Withdraw(DateTimeOffset time)
     {
-        if (!HasStarted)
-            throw new InvalidOperationException("Trupp ist noch nicht unter Atemschutz.");
+        if (!IsActive)
+            throw new InvalidOperationException("Rückzug nur für einen Trupp im Einsatz möglich.");
+        WithdrawTime = time;
+    }
+
+    /// <summary>Marks the Trupp abgenommen (mask off) — reachable only after Rückzug.</summary>
+    public void MarkRemoved(DateTimeOffset time)
+    {
+        if (WithdrawTime is null)
+            throw new InvalidOperationException("Trupp muss zuerst den Rückzug antreten.");
         if (ExitTime is not null)
-            throw new InvalidOperationException("Trupp ist bereits zurück.");
+            throw new InvalidOperationException("Trupp ist bereits abgenommen.");
         ExitTime = time;
     }
 
@@ -225,13 +259,17 @@ public sealed class AtemschutzTrupp
     /// <summary>Registered but not yet under air.</summary>
     public bool IsWaiting => StartTime is null && ExitTime is null;
 
-    /// <summary>Under air right now (started and not yet returned).</summary>
-    public bool IsActive => StartTime is not null && ExitTime is null;
+    /// <summary>Im Einsatz: under air, not yet withdrawing.</summary>
+    public bool IsActive => StartTime is not null && WithdrawTime is null && ExitTime is null;
 
+    /// <summary>Rückzug: still under air, on the way back.</summary>
+    public bool IsWithdrawing => WithdrawTime is not null && ExitTime is null;
+
+    /// <summary>Abgenommen: monitoring finished.</summary>
     public bool IsReturned => ExitTime is not null;
 
-    /// <summary>Most recent measured pressure, or the start pressure if none recorded yet; null before start.</summary>
-    public int? LatestPressure => _readings.Count > 0 ? _readings[^1].Bar : StartPressure;
+    /// <summary>Most recent measured pressure, or the entry pressure if none recorded yet; null for a legacy row with neither.</summary>
+    public int? LatestPressure => _readings.Count > 0 ? _readings[^1].Bar : EntryPressure;
 
     public DateTimeOffset? DueAt =>
         StartTime is { } start ? start + TimeSpan.FromMinutes(MaxDurationMinutes) : null;
@@ -247,9 +285,12 @@ public sealed class AtemschutzTrupp
     public TimeSpan Remaining(DateTimeOffset now) =>
         DueAt is { } due ? due - now : TimeSpan.Zero;
 
-    public bool IsTimeAlarm(DateTimeOffset now) => IsActive && DueAt is { } due && now >= due;
+    // Alarms and pressure-control reminders stay live through Rückzug: a withdrawing crew is
+    // still consuming air and still needs monitoring, and Rückzug/Abgenommen are separate manual
+    // steps the operator takes independently of the alarm banner.
+    public bool IsTimeAlarm(DateTimeOffset now) => (IsActive || IsWithdrawing) && DueAt is { } due && now >= due;
 
-    public bool IsPressureAlarm => IsActive && LatestPressure is { } p && p <= ReturnPressureBar;
+    public bool IsPressureAlarm => (IsActive || IsWithdrawing) && LatestPressure is { } p && p <= ReturnPressureBar;
 
     public bool IsAlarm(DateTimeOffset now) => IsTimeAlarm(now) || IsPressureAlarm;
 
@@ -264,7 +305,7 @@ public sealed class AtemschutzTrupp
         NextControlDueAt is { } due ? due - now : TimeSpan.Zero;
 
     public bool IsControlDue(DateTimeOffset now) =>
-        IsActive && NextControlDueAt is { } due && now >= due;
+        (IsActive || IsWithdrawing) && NextControlDueAt is { } due && now >= due;
 
     private static void ValidatePressure(int bar, string paramName)
     {

@@ -75,7 +75,6 @@ internal static class WorkspaceRenderHelper
         vm.Scba.NewTruppmann = AnonymizedExampleData.OperatorSurnameAlt;
         vm.Scba.AddTruppCommand.Execute(null);
         var row = vm.Scba.Trupps[^1];
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
         // Advance past the 30-min max duration so the trupp is in Rückzugsalarm.

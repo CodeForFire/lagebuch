@@ -38,9 +38,24 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <WrapPanel x:Name="RegistrationDock" Orientation="Horizontal">
-        <HeaderedContentControl Classes="field" Header="TRUPP">
+        <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
+             enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). This is the
+             vehicle/unit the Trupp rides with, hence leading the form (#78). -->
+        <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+          <AutoCompleteBox Width="140"
+                           PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                           ItemsSource="{Binding CallSignOptions}"
+                           FilterMode="ContainsOrdinal"
+                           MinimumPrefixLength="0"
+                           Text="{Binding NewCallSign}" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="TRUPP-ART">
           <ComboBox Width="150" ItemsSource="{Binding TruppTypeOptions}"
                     SelectedItem="{Binding NewDesignation}" />
+        </HeaderedContentControl>
+        <HeaderedContentControl Classes="field" Header="TRUPPNUMMER">
+          <NumericUpDown Width="90" Minimum="1" Maximum="99" Value="{Binding NewTruppNumber}"
+                         FormatString="0" />
         </HeaderedContentControl>
         <!-- One box per position rather than a single free-text field: a Trupp is two people
              (three in CSA), and the third box only appears when the type calls for it. Crew names
@@ -70,15 +85,12 @@
                            Text="{Binding NewZweiterTruppmann}"
                            b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         </HeaderedContentControl>
-        <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
-             enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). -->
-        <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
-          <AutoCompleteBox Width="140"
-                           PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                           ItemsSource="{Binding CallSignOptions}"
-                           FilterMode="ContainsOrdinal"
-                           MinimumPrefixLength="0"
-                           Text="{Binding NewCallSign}" />
+        <HeaderedContentControl Classes="field" Header="EINSTIEGSDRUCK">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <NumericUpDown Width="100" Minimum="1" Maximum="400" Value="{Binding NewEntryPressure}"
+                           FormatString="0" />
+            <TextBlock Text="bar" Classes="secondary" VerticalAlignment="Center" />
+          </StackPanel>
         </HeaderedContentControl>
         <HeaderedContentControl Classes="field" Header="EINSATZZEIT">
           <StackPanel Orientation="Horizontal" Spacing="6">
@@ -116,7 +128,7 @@
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <StackPanel VerticalAlignment="Center" Margin="12,6">
-                  <TextBlock Text="{Binding Designation}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
                   <TextBlock Text="{Binding CallSign}" Classes="mono" FontSize="11.5"
                              IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}"
                              TextTrimming="CharacterEllipsis" />
@@ -192,15 +204,20 @@
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,4" VerticalAlignment="Center">
-                  <!-- Pressure entry: used both as start pressure and for ongoing Druckkontrolle. -->
+                  <!-- Einstiegsdruck is captured at Bereitstellen now, so this is purely the
+                       Druckkontrolle input while under air (Im Einsatz or Rückzug). -->
                   <NumericUpDown Width="104" Minimum="0" Maximum="400" Value="{Binding PressureInput}"
                                  FormatString="0" IsEnabled="{Binding !IsReturned}" />
-                  <Button Classes="signal" Content="UNTER PA" Command="{Binding StartCommand}"
+                  <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}"
                           IsVisible="{Binding IsWaiting}" />
                   <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
                           IsVisible="{Binding IsActive}" />
-                  <Button Classes="signal" Content="ZURÜCK" Command="{Binding MarkReturnedCommand}"
+                  <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}"
                           IsVisible="{Binding IsActive}" />
+                  <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                          IsVisible="{Binding IsWithdrawing}" />
+                  <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}"
+                          IsVisible="{Binding IsWithdrawing}" />
                 </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
