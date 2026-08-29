@@ -263,7 +263,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanClose))]
     private void CloseIncident()
     {
-        var activeTrupps = _session.Incident.ScbaTrupps.Count(t => t.IsActive);
+        var activeTrupps = _session.Incident.ScbaTrupps.Count(t => t.IsActive || t.IsWithdrawing);
         var message = activeTrupps > 0
             ? $"ACHTUNG: {activeTrupps} Atemschutztrupp(s) noch unter PA. " +
               "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?"

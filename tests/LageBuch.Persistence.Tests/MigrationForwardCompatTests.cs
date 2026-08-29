@@ -111,13 +111,15 @@ public class MigrationForwardCompatTests : IDisposable
 
             using var read = cn.CreateCommand();
             read.CommandText =
-                "SELECT registered_at, start_time, start_pressure, pressure_control_interval_minutes FROM scba_trupps;";
+                "SELECT registered_at, start_time, entry_pressure, pressure_control_interval_minutes, trupp_number FROM scba_trupps;";
             using var r = read.ExecuteReader();
             Assert.True(r.Read());
             // An existing V2 trupp was already under air: start == entry, pressure preserved.
             Assert.Equal(r.GetString(0), r.GetString(1));
             Assert.Equal(300, r.GetInt32(2));
             Assert.Equal(AtemschutzTrupp.DefaultPressureControlIntervalMinutes, r.GetInt32(3));
+            // #78: the V17 rebuild backfills trupp_number from the pre-existing registration ordinal.
+            Assert.Equal(1, r.GetInt32(4));
         }
     }
 
@@ -402,7 +404,7 @@ public class MigrationForwardCompatTests : IDisposable
 
         using var read = cn.CreateCommand();
         read.CommandText =
-            "SELECT designation, call_sign, start_pressure, max_duration_minutes, pressure_control_interval_minutes FROM scba_trupps;";
+            "SELECT designation, call_sign, entry_pressure, max_duration_minutes, pressure_control_interval_minutes, trupp_number FROM scba_trupps;";
         using var r = read.ExecuteReader();
         Assert.True(r.Read());
         Assert.Equal("Angriffstrupp", r.GetString(0));
@@ -410,6 +412,8 @@ public class MigrationForwardCompatTests : IDisposable
         Assert.Equal(300, r.GetInt32(2));
         Assert.Equal(30, r.GetInt32(3));
         Assert.Equal(5, r.GetInt32(4));
+        // #78: the V17 rebuild backfills trupp_number from the pre-existing registration ordinal.
+        Assert.Equal(1, r.GetInt32(5));
     }
 
     private void WriteV5TruppWithMembers(string members)

@@ -592,10 +592,18 @@ public sealed class Incident
         AppendSystemEntry(clock, op, $"Einheit entfernt: {Label(unit)}", from: unit.CallSign);
     }
 
+    /// <summary>The smallest positive Truppnummer not already assigned to an active-or-historical
+    /// Trupp in this incident. Pure query — used to suggest a default on the registration form
+    /// without committing to it.</summary>
+    public int NextFreeScbaTruppNumber() =>
+        Enumerable.Range(1, _scbaTrupps.Count + 1).First(n => _scbaTrupps.All(t => t.TruppNumber != n));
+
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,
         string designation,
         IEnumerable<TruppMember> members,
+        int entryPressure,
+        int? truppNumber = null,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
@@ -604,19 +612,22 @@ public sealed class Incident
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
+        var number = truppNumber ?? NextFreeScbaTruppNumber();
+        if (_scbaTrupps.Any(t => t.TruppNumber == number))
+            throw new ArgumentException($"Truppnummer {number} ist bereits vergeben.", nameof(truppNumber));
         var trupp = AtemschutzTrupp.Register(
-            clock.Now, designation, members, callSign, task,
+            clock.Now, designation, members, entryPressure, number, callSign, task,
             maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes);
         _scbaTrupps.Add(trupp);
         return trupp;
     }
 
-    public AtemschutzTrupp StartScbaTrupp(IClock clock, Guid truppId, int startPressure)
+    public AtemschutzTrupp StartScbaTrupp(IClock clock, Guid truppId)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         var trupp = FindScbaTrupp(truppId);
-        trupp.Start(clock.Now, startPressure);
+        trupp.Start(clock.Now);
         return trupp;
     }
 
@@ -629,12 +640,21 @@ public sealed class Incident
         return trupp;
     }
 
-    public AtemschutzTrupp MarkScbaReturned(IClock clock, Guid truppId)
+    public AtemschutzTrupp WithdrawScbaTrupp(IClock clock, Guid truppId)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         var trupp = FindScbaTrupp(truppId);
-        trupp.MarkReturned(clock.Now);
+        trupp.Withdraw(clock.Now);
+        return trupp;
+    }
+
+    public AtemschutzTrupp MarkScbaRemoved(IClock clock, Guid truppId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        var trupp = FindScbaTrupp(truppId);
+        trupp.MarkRemoved(clock.Now);
         return trupp;
     }
 

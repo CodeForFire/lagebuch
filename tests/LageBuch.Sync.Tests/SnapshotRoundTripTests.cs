@@ -43,13 +43,15 @@ public class SnapshotRoundTripTests
         incident.UpdateForceStrength(clock, op, force.Id, officerCount: 1, personnelCount: 9, scbaCount: 4);
 
         var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"),
-            callSign: "AT-1", task: "Menschenrettung");
+            entryPressure: 300, callSign: "AT-1", task: "Menschenrettung");
         clock.Now = clock.Now.AddMinutes(2);
-        incident.StartScbaTrupp(clock, trupp.Id, startPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.RecordScbaPressure(clock, trupp.Id, bar: 250);
         clock.Now = clock.Now.AddMinutes(3);
-        incident.MarkScbaReturned(clock, trupp.Id);
+        incident.WithdrawScbaTrupp(clock, trupp.Id);
+        clock.Now = clock.Now.AddMinutes(1);
+        incident.MarkScbaRemoved(clock, trupp.Id);
 
         var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
         incident.RenameFile(file.Id, "Küchenbrand");
@@ -110,8 +112,10 @@ public class SnapshotRoundTripTests
         Assert.Equal("Müller (FFB 12/1)", strengthEdit.EditedBy);
 
         var trupp = Assert.Single(r.ScbaTrupps);
+        Assert.Equal(1, trupp.TruppNumber);
         Assert.Equal(2, trupp.Members.Count);
-        Assert.Equal(300, trupp.StartPressure);
+        Assert.Equal(300, trupp.EntryPressure);
+        Assert.NotNull(trupp.WithdrawTime);
         Assert.NotNull(trupp.ExitTime);
         Assert.Contains(trupp.PressureReadings, p => p.Bar == 250);
         Assert.NotEmpty(r.Audit);

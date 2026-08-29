@@ -195,29 +195,33 @@ public class IncidentRoundTripTests : IDisposable
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op);
 
-        // Active trupp: registered, started under air, two pressure readings.
+        // Active trupp (Im Einsatz): registered, started under air, two pressure readings.
         var active = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"),
-            callSign: "FFB 1/40/1", maxDurationMinutes: 30, returnPressureBar: 60,
+            entryPressure: 300, callSign: "FFB 1/40/1", maxDurationMinutes: 30, returnPressureBar: 60,
             pressureControlIntervalMinutes: 5);
         clock.Now = clock.Now.AddMinutes(3);
-        incident.StartScbaTrupp(clock, active.Id, 300);
+        incident.StartScbaTrupp(clock, active.Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.RecordScbaPressure(clock, active.Id, 240);
         clock.Now = clock.Now.AddMinutes(5);
         incident.RecordScbaPressure(clock, active.Id, 180);
 
-        // Returned trupp: started then came back.
-        var returned = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Mayr"));
-        incident.StartScbaTrupp(clock, returned.Id, 280);
+        // Removed trupp (abgenommen): started, withdrew, then removed.
+        var removed = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Mayr"),
+            entryPressure: 280);
+        incident.StartScbaTrupp(clock, removed.Id);
         clock.Now = clock.Now.AddMinutes(8);
-        incident.MarkScbaReturned(clock, returned.Id);
+        incident.WithdrawScbaTrupp(clock, removed.Id);
+        clock.Now = clock.Now.AddMinutes(2);
+        incident.MarkScbaRemoved(clock, removed.Id);
 
         // CSA trupp: three people, to prove the crew size round-trips rather than being assumed.
         incident.AddScbaTrupp(clock, AtemschutzTrupp.ChemicalTruppDesignation,
-            TruppMember.Crew("Berger", "Frank", "Lang"));
+            TruppMember.Crew("Berger", "Frank", "Lang"), entryPressure: 300);
 
         // Waiting trupp: registered only, never started.
-        var waiting = incident.AddScbaTrupp(clock, "Wassertrupp", TruppMember.Crew("Bauer", "Klein"));
+        var waiting = incident.AddScbaTrupp(clock, "Wassertrupp", TruppMember.Crew("Bauer", "Klein"),
+            entryPressure: 300);
         var waitingId = waiting.Id;
 
         var repo = new IncidentRepository();
@@ -228,6 +232,7 @@ public class IncidentRoundTripTests : IDisposable
 
         var loadedActive = loaded.ScbaTrupps[0];
         Assert.Equal("Angriffstrupp", loadedActive.Designation);
+        Assert.Equal(1, loadedActive.TruppNumber);
         // Crew survives as addressable members in position order, not as a re-parsed string.
         Assert.Equal(new[] { TruppRole.Truppfuehrer, TruppRole.Truppmann },
             loadedActive.Members.Select(m => m.Role));
@@ -235,27 +240,31 @@ public class IncidentRoundTripTests : IDisposable
 
         var loadedCsa = loaded.ScbaTrupps[2];
         Assert.Equal(AtemschutzTrupp.ChemicalTruppDesignation, loadedCsa.Designation);
+        Assert.Equal(3, loadedCsa.TruppNumber);
         Assert.Equal(3, loadedCsa.Members.Count);
         Assert.Equal("Berger / Frank / Lang", loadedCsa.MembersDisplay);
         Assert.Equal("FFB 1/40/1", loadedActive.CallSign);
         Assert.Equal(active.StartTime, loadedActive.StartTime);
-        Assert.Equal(300, loadedActive.StartPressure);
+        Assert.Equal(300, loadedActive.EntryPressure);
         Assert.Equal(30, loadedActive.MaxDurationMinutes);
         Assert.Equal(60, loadedActive.ReturnPressureBar);
         Assert.Equal(5, loadedActive.PressureControlIntervalMinutes);
         Assert.Equal(2, loadedActive.PressureReadings.Count);
         Assert.Equal(180, loadedActive.LatestPressure);
         Assert.True(loadedActive.IsActive);
+        Assert.Equal("Trupp 1 (Angriffstrupp)", loadedActive.DisplayName);
 
-        var loadedReturned = loaded.ScbaTrupps[1];
-        Assert.True(loadedReturned.IsReturned);
-        Assert.Equal(returned.ExitTime, loadedReturned.ExitTime);
+        var loadedRemoved = loaded.ScbaTrupps[1];
+        Assert.True(loadedRemoved.IsReturned);
+        Assert.Equal(removed.WithdrawTime, loadedRemoved.WithdrawTime);
+        Assert.Equal(removed.ExitTime, loadedRemoved.ExitTime);
 
         var loadedWaiting = loaded.ScbaTrupps[3];
         Assert.Equal(waitingId, loadedWaiting.Id);
+        Assert.Equal(4, loadedWaiting.TruppNumber);
         Assert.True(loadedWaiting.IsWaiting);
         Assert.Null(loadedWaiting.StartTime);
-        Assert.Null(loadedWaiting.StartPressure);
+        Assert.Equal(300, loadedWaiting.EntryPressure);
     }
 
     [Fact]

@@ -182,18 +182,22 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));
 
-    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
+    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
+        int? truppNumber = null,
+        string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
         Send(new AddScbaTruppCommand(designation,
             members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
-            callSign, task, maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes));
+            callSign, task, maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes,
+            entryPressure, truppNumber));
 
-    public void StartScbaTrupp(Guid truppId, int startPressure) => Send(new StartScbaTruppCommand(truppId, startPressure));
+    public void StartScbaTrupp(Guid truppId) => Send(new StartScbaTruppCommand(truppId));
     public void RecordScbaPressure(Guid truppId, int bar) => Send(new RecordScbaPressureCommand(truppId, bar));
-    public void MarkScbaReturned(Guid truppId) => Send(new MarkScbaReturnedCommand(truppId));
+    public void WithdrawScbaTrupp(Guid truppId) => Send(new WithdrawScbaTruppCommand(truppId));
+    public void MarkScbaRemoved(Guid truppId) => Send(new MarkScbaRemovedCommand(truppId));
     public void SetIncidentNumber(IncidentNumber? number) => Send(new SetIncidentNumberCommand(number?.Value));
     public void SetKeyword(string? keyword) => Send(new SetKeywordCommand(keyword));
     public void SetAddress(string? street, string? district) => Send(new SetAddressCommand(street, district));

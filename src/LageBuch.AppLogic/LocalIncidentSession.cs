@@ -154,22 +154,27 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));
 
-    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, string? callSign = null,
+    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
+        int? truppNumber = null,
+        string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
-        Mutate(() => Incident.AddScbaTrupp(_clock, designation, members, callSign, task,
+        Mutate(() => Incident.AddScbaTrupp(_clock, designation, members, entryPressure, truppNumber, callSign, task,
             maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes));
 
-    public void StartScbaTrupp(Guid truppId, int startPressure) =>
-        Mutate(() => Incident.StartScbaTrupp(_clock, truppId, startPressure));
+    public void StartScbaTrupp(Guid truppId) =>
+        Mutate(() => Incident.StartScbaTrupp(_clock, truppId));
 
     public void RecordScbaPressure(Guid truppId, int bar) =>
         Mutate(() => Incident.RecordScbaPressure(_clock, truppId, bar));
 
-    public void MarkScbaReturned(Guid truppId) =>
-        Mutate(() => Incident.MarkScbaReturned(_clock, truppId));
+    public void WithdrawScbaTrupp(Guid truppId) =>
+        Mutate(() => Incident.WithdrawScbaTrupp(_clock, truppId));
+
+    public void MarkScbaRemoved(Guid truppId) =>
+        Mutate(() => Incident.MarkScbaRemoved(_clock, truppId));
 
     public void SetIncidentNumber(IncidentNumber? number) => Mutate(() => Incident.SetIncidentNumber(number));
     public void SetKeyword(string? keyword) => Mutate(() => Incident.SetKeyword(keyword));

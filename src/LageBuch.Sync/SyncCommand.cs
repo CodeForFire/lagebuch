@@ -26,7 +26,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AddScbaTruppCommand), "addScbaTrupp")]
 [JsonDerivedType(typeof(StartScbaTruppCommand), "startScbaTrupp")]
 [JsonDerivedType(typeof(RecordScbaPressureCommand), "recordScbaPressure")]
-[JsonDerivedType(typeof(MarkScbaReturnedCommand), "markScbaReturned")]
+[JsonDerivedType(typeof(WithdrawScbaTruppCommand), "withdrawScbaTrupp")]
+[JsonDerivedType(typeof(MarkScbaRemovedCommand), "markScbaRemoved")]
 [JsonDerivedType(typeof(SetIncidentNumberCommand), "setIncidentNumber")]
 [JsonDerivedType(typeof(SetKeywordCommand), "setKeyword")]
 [JsonDerivedType(typeof(SetAddressCommand), "setAddress")]
@@ -82,15 +83,23 @@ public sealed record UpdateForceStrengthCommand(
 public sealed record RemoveForceUnitCommand(
     OperatorDto Operator, Guid UnitId) : SyncCommand;
 
+// EntryPressure is required -- #78 moves pressure capture to registration time, so a client on
+// this version always sends one. TruppNumber stays optional/nullable so the host's auto-assign
+// path (Incident.NextFreeScbaTruppNumber) is reachable even when the caller doesn't supply one.
 public sealed record AddScbaTruppCommand(
     string Designation, IReadOnlyList<TruppMemberDto> Members, string? CallSign, string? Task,
-    int MaxDurationMinutes, int ReturnPressureBar, int PressureControlIntervalMinutes) : SyncCommand;
+    int MaxDurationMinutes, int ReturnPressureBar, int PressureControlIntervalMinutes,
+    int EntryPressure, int? TruppNumber = null) : SyncCommand;
 
-public sealed record StartScbaTruppCommand(Guid TruppId, int StartPressure) : SyncCommand;
+public sealed record StartScbaTruppCommand(Guid TruppId) : SyncCommand;
 
 public sealed record RecordScbaPressureCommand(Guid TruppId, int Bar) : SyncCommand;
 
-public sealed record MarkScbaReturnedCommand(Guid TruppId) : SyncCommand;
+/// <summary>Rückzug — the Trupp begins its withdrawal, still under air.</summary>
+public sealed record WithdrawScbaTruppCommand(Guid TruppId) : SyncCommand;
+
+/// <summary>Abgenommen — replaces the old "markScbaReturned"/Zurück command (#78).</summary>
+public sealed record MarkScbaRemovedCommand(Guid TruppId) : SyncCommand;
 
 public sealed record SetIncidentNumberCommand(string? IncidentNumber) : SyncCommand;
 

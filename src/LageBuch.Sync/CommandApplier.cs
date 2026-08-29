@@ -67,17 +67,20 @@ public static class CommandApplier
                 break;
             case AddScbaTruppCommand c:
                 incident.AddScbaTrupp(clock, c.Designation,
-                    c.Members.Select(m => new TruppMember(m.Role, m.Name)),
+                    c.Members.Select(m => new TruppMember(m.Role, m.Name)), c.EntryPressure, c.TruppNumber,
                     c.CallSign, c.Task, c.MaxDurationMinutes, c.ReturnPressureBar, c.PressureControlIntervalMinutes);
                 break;
             case StartScbaTruppCommand c:
-                incident.StartScbaTrupp(clock, c.TruppId, c.StartPressure);
+                incident.StartScbaTrupp(clock, c.TruppId);
                 break;
             case RecordScbaPressureCommand c:
                 incident.RecordScbaPressure(clock, c.TruppId, c.Bar);
                 break;
-            case MarkScbaReturnedCommand c:
-                incident.MarkScbaReturned(clock, c.TruppId);
+            case WithdrawScbaTruppCommand c:
+                incident.WithdrawScbaTrupp(clock, c.TruppId);
+                break;
+            case MarkScbaRemovedCommand c:
+                incident.MarkScbaRemoved(clock, c.TruppId);
                 break;
             case SetIncidentNumberCommand c:
                 incident.SetIncidentNumber(c.IncidentNumber is { } n ? new IncidentNumber(n) : null);

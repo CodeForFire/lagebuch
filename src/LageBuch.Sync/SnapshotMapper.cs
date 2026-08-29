@@ -99,13 +99,15 @@ public static class SnapshotMapper
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(
         t.Id,
+        t.TruppNumber,
         t.RegisteredAt,
         t.StartTime,
+        t.WithdrawTime,
         t.Designation,
         t.Members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
         t.CallSign,
         t.Task,
-        t.StartPressure,
+        t.EntryPressure,
         t.MaxDurationMinutes,
         t.ReturnPressureBar,
         t.PressureControlIntervalMinutes,
@@ -114,13 +116,15 @@ public static class SnapshotMapper
 
     private static AtemschutzTrupp FromDto(ScbaTruppDto d) => AtemschutzTrupp.Rehydrate(
         d.Id,
+        d.TruppNumber,
         d.RegisteredAt,
         d.StartTime,
+        d.WithdrawTime,
         d.Designation,
         d.Members.Select(m => new TruppMember(m.Role, m.Name)),
         d.CallSign,
         d.Task,
-        d.StartPressure,
+        d.EntryPressure,
         d.MaxDurationMinutes,
         d.ReturnPressureBar,
         d.PressureControlIntervalMinutes,

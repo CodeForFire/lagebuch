@@ -38,9 +38,10 @@ public class IncidentPdfTests
             notes: "über Drehleiter angefordert", scbaCount: 6, officerCount: 2);
         incident.AddForceUnit(clock, op, "Emmering", 9, scbaCount: 4);
         var trupp = incident.AddScbaTrupp(
-            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), callSign: "FFB 1/40/1");
-        incident.StartScbaTrupp(clock, trupp.Id, 300);
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300, callSign: "FFB 1/40/1");
+        incident.StartScbaTrupp(clock, trupp.Id);
         incident.RecordScbaPressure(clock, trupp.Id, 220);
+        incident.WithdrawScbaTrupp(clock, trupp.Id);
         return incident;
     }
 

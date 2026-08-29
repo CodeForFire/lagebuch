@@ -63,7 +63,21 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void Start_sends_trupp_under_air_with_pressure_and_logs_etb()
+    public void AddTrupp_disabled_when_entry_pressure_is_not_positive()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        vm.NewDesignation = "Angriffstrupp";
+        vm.NewTruppfuehrer = "Müller";
+        vm.NewTruppmann = "Schmidt";
+        Assert.True(vm.AddTruppCommand.CanExecute(null)); // default entry pressure is positive
+
+        vm.NewEntryPressure = 0;
+        Assert.False(vm.AddTruppCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Start_sends_trupp_under_air_and_logs_etb()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -74,14 +88,13 @@ public class ScbaViewModelTests
         Assert.True(row.StartCommand.CanExecute(null));
 
         clock.Now = T0.AddMinutes(6);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
         Assert.True(row.IsActive);
         Assert.False(row.IsWaiting);
         Assert.False(row.StartCommand.CanExecute(null));
         Assert.True(row.RecordPressureCommand.CanExecute(null));
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("unter PA") && e.Text.Contains("300 bar"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("im Einsatz"));
     }
 
     [Fact]
@@ -91,7 +104,6 @@ public class ScbaViewModelTests
         var session = NewSession(clock);
         var vm = Vm(clock, session);
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
         row.PressureInput = 45;
@@ -113,7 +125,6 @@ public class ScbaViewModelTests
 
         vm.NewControlIntervalMinutes = 5;
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
         Assert.True(vm.HasControlReminder);
@@ -130,7 +141,6 @@ public class ScbaViewModelTests
         var vm = Vm(clock, session, ticker: ticker);
         vm.NewControlIntervalMinutes = 5;
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(6); // past the 5-minute control interval
@@ -151,7 +161,6 @@ public class ScbaViewModelTests
         var vm = Vm(clock, session, () => changes++, ticker);
         vm.NewMaxDurationMinutes = 30;
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
         var baseline = changes;
 
@@ -165,22 +174,34 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void MarkReturned_logs_entry_and_stops_clock()
+    public void Withdraw_then_MarkRemoved_logs_entries_and_stops_the_clock()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
         var vm = Vm(clock, session);
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
+        Assert.True(row.WithdrawCommand.CanExecute(null));
+        Assert.False(row.MarkRemovedCommand.CanExecute(null)); // abgenommen not reachable before Rückzug
+
+        clock.Now = T0.AddMinutes(10);
+        row.WithdrawCommand.Execute(null);
+
+        Assert.True(row.IsWithdrawing);
+        Assert.False(row.IsActive);
+        Assert.Equal("Rückzug", row.StatusDisplay);
+        Assert.False(row.WithdrawCommand.CanExecute(null));
+        Assert.True(row.MarkRemovedCommand.CanExecute(null));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Rückzug"));
+
         clock.Now = T0.AddMinutes(12);
-        row.MarkReturnedCommand.Execute(null);
+        row.MarkRemovedCommand.Execute(null);
 
         Assert.True(row.IsReturned);
         Assert.Equal("—", row.RemainingDisplay);
         Assert.False(vm.HasControlReminder);
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("zurück"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("abgenommen"));
     }
 
     [Fact]
@@ -223,7 +244,6 @@ public class ScbaViewModelTests
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
         vm.NewMaxDurationMinutes = 30;
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
 
         Assert.False(vm.IsAnyAlarm);
@@ -235,6 +255,7 @@ public class ScbaViewModelTests
         Assert.True(vm.IsAnyAlarm);
         Assert.True(alarm.IsSounding);
         Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay);
+        Assert.Contains("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay);
         Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
     }
 
@@ -247,7 +268,6 @@ public class ScbaViewModelTests
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
         vm.NewMaxDurationMinutes = 30;
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
@@ -263,7 +283,7 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void Returning_the_alarming_trupp_clears_banner_and_stops_alarm()
+    public void Alarm_and_control_reminder_persist_through_Rueckzug_and_clear_on_Abgenommen()
     {
         var clock = new FixedClock(T0);
         var ticker = new FakeTicker();
@@ -271,13 +291,16 @@ public class ScbaViewModelTests
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
         vm.NewMaxDurationMinutes = 30;
         var row = Register(vm);
-        row.PressureInput = 300;
         row.StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
         Assert.True(alarm.IsSounding);
 
-        row.MarkReturnedCommand.Execute(null);
+        // Rückzug alone does not silence the alarm -- the crew is still consuming air.
+        row.WithdrawCommand.Execute(null);
+        Assert.True(vm.IsAnyAlarm);
+
+        row.MarkRemovedCommand.Execute(null);
 
         Assert.False(vm.IsAnyAlarm);
         Assert.False(alarm.IsSounding);
@@ -293,14 +316,12 @@ public class ScbaViewModelTests
 
         vm.NewMaxDurationMinutes = 30;
         var first = Register(vm);
-        first.PressureInput = 300;
         first.StartCommand.Execute(null);
 
         // Second trupp goes under air 10 minutes later, so its limit falls after the first's.
         clock.Now = T0.AddMinutes(10);
         vm.NewMaxDurationMinutes = 30;
         var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
-        second.PressureInput = 300;
         second.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(31);
@@ -378,7 +399,7 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void Registering_a_trupp_logs_the_full_crew_to_the_etb()
+    public void Registering_a_trupp_logs_the_full_crew_and_entry_pressure_to_the_etb()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -387,7 +408,7 @@ public class ScbaViewModelTests
         Register(vm, AtemschutzTrupp.ChemicalTruppDesignation, "Müller", "Schmidt", "Huber");
 
         Assert.Contains(session.Incident.Journal,
-            e => e.Text == "Atemschutztrupp CSA-Trupp bereitgestellt: Müller / Schmidt / Huber");
+            e => e.Text == "Trupp 1 (CSA-Trupp) bereitgestellt: Müller / Schmidt / Huber, Einstiegsdruck 300 bar");
     }
 
     [Fact]
@@ -412,6 +433,98 @@ public class ScbaViewModelTests
         Assert.Equal("", vm.NewZweiterTruppmann);
     }
 
+    // --- Truppnummer and Einstiegsdruck on the registration form (issue #78) ---
+
+    [Fact]
+    public void NewTruppNumber_defaults_to_the_next_free_number_and_advances_after_registering()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+
+        Assert.Equal(1, vm.NewTruppNumber);
+        var first = Register(vm);
+        Assert.Equal(1, first.TruppNumber);
+
+        Assert.Equal(2, vm.NewTruppNumber);
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        Assert.Equal(2, second.TruppNumber);
+    }
+
+    [Fact]
+    public void A_hand_edited_truppNumber_is_not_clobbered_by_another_devices_registration()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+
+        vm.NewTruppNumber = 9; // operator overrides the suggested number
+
+        // Another device (or this one, via a different code path) registers a Trupp, which fires
+        // session.Changed and would normally re-suggest -- but the hand edit must survive.
+        session.AddScbaTrupp("Wassertrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
+
+        Assert.Equal(9, vm.NewTruppNumber);
+    }
+
+    [Fact]
+    public void The_grid_row_and_alarm_banner_use_the_TruppNumber_display_format()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        vm.NewTruppNumber = 5;
+
+        var row = Register(vm);
+
+        Assert.Equal(5, row.TruppNumber);
+        Assert.Equal("Trupp 5 (Angriffstrupp)", row.DisplayName);
+    }
+
+    // --- Abfrage-Intervall defaults to a third of Einsatzzeit (issue #78) ---
+
+    [Fact]
+    public void NewControlIntervalMinutes_defaults_to_a_third_of_the_einsatzzeit()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings); // AGT default 35 minutes
+
+        Assert.Equal(11, vm.NewControlIntervalMinutes); // 35 / 3, truncated
+    }
+
+    [Fact]
+    public void Switching_trupp_type_re_derives_the_control_interval_with_the_einsatzzeit()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation; // CSA default 22 minutes
+        Assert.Equal(22, vm.NewMaxDurationMinutes);
+        Assert.Equal(7, vm.NewControlIntervalMinutes); // 22 / 3, truncated
+    }
+
+    [Fact]
+    public void A_hand_edited_control_interval_survives_an_einsatzzeit_change()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        vm.NewControlIntervalMinutes = 4; // operator overrides
+        vm.NewMaxDurationMinutes = 45;    // and separately changes the Einsatzzeit
+
+        Assert.Equal(4, vm.NewControlIntervalMinutes); // not overwritten
+    }
+
+    [Fact]
+    public void Registering_resets_the_control_interval_override()
+    {
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+        vm.NewControlIntervalMinutes = 4; // user override before adding
+
+        Register(vm); // adds an Angriffstrupp, then resets the form
+
+        Assert.Equal(11, vm.NewControlIntervalMinutes); // back to AGT-Einsatzzeit / 3
+    }
+
     // Distinct values so a swapped mapping is caught; nothing here matches a compiled-in default.
     private static readonly IncidentSettings CustomSettings = new(
         IlsReminderIntervalMinutes: 15, IlsReminderFollowUpIntervalMinutes: 30,
@@ -429,7 +542,6 @@ public class ScbaViewModelTests
         var vm = VmWith(clock, NewSession(clock), CustomSettings);
 
         Assert.Equal(35, vm.NewMaxDurationMinutes);   // no designation yet => AGT default
-        Assert.Equal(7, vm.NewControlIntervalMinutes);
         Assert.Equal(55, vm.NewReturnPressureBar);
     }
 

@@ -123,15 +123,16 @@ public sealed class IncidentRepository
         {
             var t = incident.ScbaTrupps[i];
             Run(cn, tx,
-                "INSERT INTO scba_trupps (id, ordinal, designation, call_sign, task, registered_at, start_time, start_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time) " +
-                "VALUES ($id,$o,$des,$cs,$task,$reg,$start,$sp,$max,$ret,$interval,$exit);",
+                "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time) " +
+                "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit);",
                 p =>
                 {
-                    p("$id", t.Id.ToString()); p("$o", i); p("$des", t.Designation);
+                    p("$id", t.Id.ToString()); p("$o", i); p("$num", t.TruppNumber); p("$des", t.Designation);
                     p("$cs", (object?)t.CallSign ?? DBNull.Value); p("$task", (object?)t.Task ?? DBNull.Value);
                     p("$reg", t.RegisteredAt.ToString(Iso));
                     p("$start", (object?)t.StartTime?.ToString(Iso) ?? DBNull.Value);
-                    p("$sp", (object?)t.StartPressure ?? DBNull.Value);
+                    p("$ep", (object?)t.EntryPressure ?? DBNull.Value);
+                    p("$wd", (object?)t.WithdrawTime?.ToString(Iso) ?? DBNull.Value);
                     p("$max", t.MaxDurationMinutes); p("$ret", t.ReturnPressureBar);
                     p("$interval", t.PressureControlIntervalMinutes);
                     p("$exit", (object?)t.ExitTime?.ToString(Iso) ?? DBNull.Value);
@@ -372,15 +373,15 @@ public sealed class IncidentRepository
             .ToDictionary(g => g.Key, g => g.Select(x => x.Reading).ToList());
 
         var scbaTrupps = ReadAll(cn,
-            "SELECT id, designation, call_sign, task, registered_at, start_time, start_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time FROM scba_trupps ORDER BY ordinal;",
+            "SELECT id, trupp_number, designation, call_sign, task, registered_at, start_time, withdraw_time, entry_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time FROM scba_trupps ORDER BY ordinal;",
             r =>
             {
                 var id = Guid.Parse(r.GetString(0));
                 return Domain.Atemschutz.AtemschutzTrupp.Rehydrate(
-                    id, ParseDate(r.GetString(4)), NullableDate(r, 5), r.GetString(1),
+                    id, r.GetInt32(1), ParseDate(r.GetString(5)), NullableDate(r, 6), NullableDate(r, 7), r.GetString(2),
                     membersByTrupp.TryGetValue(id, out var ms) ? ms : Enumerable.Empty<Domain.Atemschutz.TruppMember>(),
-                    Str(r, 2), Str(r, 3), NullableInt(r, 6), r.GetInt32(7), r.GetInt32(8), r.GetInt32(9),
-                    NullableDate(r, 10),
+                    Str(r, 3), Str(r, 4), NullableInt(r, 8), r.GetInt32(9), r.GetInt32(10), r.GetInt32(11),
+                    NullableDate(r, 12),
                     readingsByTrupp.TryGetValue(id, out var rs) ? rs : Enumerable.Empty<Domain.Atemschutz.PressureReading>());
             });
 

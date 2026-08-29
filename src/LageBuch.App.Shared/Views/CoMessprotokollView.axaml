@@ -121,7 +121,7 @@
         <StackPanel Spacing="2">
           <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
           <NumericUpDown Minimum="0" Maximum="9999" Value="{Binding SelectedCell.CoValue}"
-                         FormatString="0" PlaceholderText="Kein Messwert" ShowButtonSpinner="False" />
+                         FormatString="0" PlaceholderText="Kein Messwert" />
         </StackPanel>
 
         <!-- Resident Name -->

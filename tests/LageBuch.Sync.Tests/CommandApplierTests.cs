@@ -63,8 +63,8 @@ public class CommandApplierTests
         ApplyOverWire(new UpdateForceStrengthCommand(op, incident.Forces[0].Id, 2, 12, 6), incident, clock);
         ApplyOverWire(new AddScbaTruppCommand("Angriffstrupp",
             new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
-            "AT-1", null, 30, 60, 5), incident, clock);
-        ApplyOverWire(new StartScbaTruppCommand(incident.ScbaTrupps.Last().Id, 300), incident, clock);
+            "AT-1", null, 30, 60, 5, EntryPressure: 300), incident, clock);
+        ApplyOverWire(new StartScbaTruppCommand(incident.ScbaTrupps.Last().Id), incident, clock);
 
         Assert.True(incident.ChecklistAufbau[0].IsDone);
         Assert.Single(incident.Roles);
@@ -74,7 +74,7 @@ public class CommandApplierTests
         Assert.Equal((2, 12, 6, 1), (corrected.OfficerCount, corrected.PersonnelCount, corrected.ScbaCount,
             incident.Journal.Count(e => e.Text.Contains('→'))));
         var trupp = Assert.Single(incident.ScbaTrupps);
-        Assert.Equal(300, trupp.StartPressure);
+        Assert.Equal(300, trupp.EntryPressure);
     }
 
     [Fact]
