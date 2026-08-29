@@ -167,21 +167,26 @@
                   BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
                   CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
                   IsVisible="{Binding Scba.HasControlReminder}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
-                        DataContext="{Binding Scba}">
-              <TextBlock Text="⏱" FontSize="15" VerticalAlignment="Center"
-                         Foreground="{StaticResource AmberBrush}" />
-              <TextBlock Text="ATEMSCHUTZ" Classes="overline" FontSize="10"
+            <!-- Auto,*,Auto (mirrors DisconnectedBanner/ScbaAlarmBar): the icon and label are
+                 fixed-width, but the Trupp text is unbounded ("Trupp {N} ({Designation})" since
+                 #78) and must wrap within the remaining space rather than run off a narrow
+                 viewport, since a hard cutoff can hide the countdown ("in 04:32") a safety
+                 banner depends on. -->
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" DataContext="{Binding Scba}">
+              <TextBlock Grid.Column="0" Text="⏱" FontSize="15" VerticalAlignment="Center"
+                         Margin="0,0,12,0" Foreground="{StaticResource AmberBrush}" />
+              <TextBlock Grid.Column="1" Text="ATEMSCHUTZ" Classes="overline" FontSize="10"
+                         Margin="0,0,12,0" Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" x:Name="ScbaControlText" Text="{Binding NextControlDisplay}"
+                         FontWeight="SemiBold" TextWrapping="Wrap"
                          Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-              <TextBlock x:Name="ScbaControlText" Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
-                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-              <Border Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
-                      Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E"
+              <Border Grid.Column="3" Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
+                      Padding="10,4" Margin="12,0,0,0" BoxShadow="0 0 16 -2 #99FF3D2E"
                       IsVisible="{Binding IsAnyControlDue}">
                 <TextBlock Text="DRUCKABFRAGE!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
                            LetterSpacing="1.5" Foreground="#FFFFFF" VerticalAlignment="Center" />
               </Border>
-            </StackPanel>
+            </Grid>
           </Border>
 
           <!-- Atemschutz Rückzugsalarm: unmissable red banner + audible alarm (life-safety) -->
@@ -190,13 +195,17 @@
                   CornerRadius="{StaticResource RadiusSm}" Padding="16,12"
                   BoxShadow="0 0 22 -2 #CCFF3D2E"
                   IsVisible="{Binding Scba.IsAnyAlarm}">
+            <!-- TextWrapping is required, not just the star column: a NoWrap TextBlock clips
+                 silently at its arranged bounds with no ellipsis, hiding part of a life-safety
+                 message rather than visibly overflowing (same underlying issue as ScbaControlBar
+                 above, worse here because the truncation is invisible). -->
             <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Scba}">
               <TextBlock Grid.Column="0" Text="🚨" FontSize="20" VerticalAlignment="Center" Margin="0,0,12,0" />
-              <TextBlock Grid.Column="1" Text="{Binding AlarmDisplay}"
+              <TextBlock Grid.Column="1" Text="{Binding AlarmDisplay}" TextWrapping="Wrap"
                          FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
                          LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center" />
               <Button Grid.Column="2" Content="ALARM QUITTIEREN" Command="{Binding AcknowledgeAlarmCommand}"
-                      VerticalAlignment="Center" />
+                      VerticalAlignment="Center" Margin="12,0,0,0" />
             </Grid>
           </Border>
         </StackPanel>
