@@ -9,12 +9,7 @@ namespace LageBuch.AppLogic.Tests;
 // audible output fired without real audio.
 internal sealed class FakeAlarmService : IAlarmService
 {
-    public int StartCount { get; private set; }
-    public int StopCount { get; private set; }
-    public bool IsSounding { get; private set; }
     public List<AlarmSound> Played { get; } = new();
-    public void Start() { StartCount++; IsSounding = true; }
-    public void Stop() { StopCount++; IsSounding = false; }
     public void Play(AlarmSound sound) => Played.Add(sound);
 }
 
