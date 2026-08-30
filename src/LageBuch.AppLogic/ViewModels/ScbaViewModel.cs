@@ -162,6 +162,20 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     private readonly Action _onChanged;
     private readonly IDisposable? _subscription;
     private readonly HashSet<Guid> _alarmLogged = new();
+
+    // Druckabfrage due-crossings that have already sounded. Unlike _alarmLogged (a one-way state
+    // that only ever grows until the Trupp returns), control-due toggles on and off every Abfrage-
+    // Intervall, so an id is removed once no longer due, letting the next crossing sound again.
+    private readonly HashSet<Guid> _controlDueAnnounced = new();
+
+    // Rückzugsalarm speaks instead of sounding a looping siren (#81), repeating on this cadence
+    // while unacknowledged so it stays insistent -- mirrors ReminderViewModel's ILS cue exactly,
+    // just at 15s instead of 60s given the life-safety stakes. Reset to null by AcknowledgeAlarm
+    // (so the next cycle announces immediately) and by a newly-tripped alarm (so a second Trupp
+    // alarming after an ack is heard right away rather than waiting out the window).
+    private static readonly TimeSpan RetreatRepeatInterval = TimeSpan.FromSeconds(15);
+    private DateTimeOffset? _lastAlarmAnnouncedAt;
+
     private readonly IncidentSettings _settings;
 
     // True once the user has hand-edited the Einsatzzeit; after that a Trupp-type switch must not
@@ -383,8 +397,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanAcknowledgeAlarm))]
     private void AcknowledgeAlarm()
     {
-        // Silence the sound; the visual banner stays until the trupp is back.
-        _alarm.Stop();
+        // Silences the repeat cadence; the visual banner stays until the trupp is back.
+        _lastAlarmAnnouncedAt = null;
         IsAlarmAcknowledged = true;
     }
 
@@ -392,18 +406,23 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         ? "Einsatzzeit erreicht"
         : $"Rückzugsdruck erreicht ({trupp.LatestPressure} bar)";
 
-    /// <summary>Sounds or silences the audible alarm from current state, and keeps the banner
-    /// bindings fresh. A newly-alarming trupp re-arms the sound even after an earlier ack.</summary>
+    /// <summary>Speaks the Rückzugsalarm cue on its repeat cadence while unacknowledged (#81), and
+    /// keeps the banner bindings fresh. A newly-alarming trupp re-arms the cue even after an
+    /// earlier ack.</summary>
     private void UpdateAlarm(bool newAlarmTripped)
     {
         if (newAlarmTripped)
             IsAlarmAcknowledged = false;
 
-        if (IsAnyAlarm && !IsAlarmAcknowledged)
-            _alarm.Start();
+        if (IsAnyAlarm && !IsAlarmAcknowledged &&
+            (_lastAlarmAnnouncedAt is null || _clock.Now - _lastAlarmAnnouncedAt >= RetreatRepeatInterval))
+        {
+            _alarm.Play(AlarmSound.RetreatAlarm);
+            _lastAlarmAnnouncedAt = _clock.Now;
+        }
         else if (!IsAnyAlarm)
         {
-            _alarm.Stop();
+            _lastAlarmAnnouncedAt = null;
             IsAlarmAcknowledged = false;
         }
 
@@ -559,8 +578,30 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         RefreshHeader();
         var tripped = LogNewAlarms();
         UpdateAlarm(tripped);
+        AnnounceControlDue();
         if (tripped)
             _onChanged();
+    }
+
+    /// <summary>Plays a cue once per Druckabfrage due-crossing per Trupp. Unlike <see cref="LogNewAlarms"/>
+    /// this is local feedback, not a journal write, so it runs on joined clients too (not gated on
+    /// IsRemote) — only a closed/read-only workspace stays silent.</summary>
+    private void AnnounceControlDue()
+    {
+        if (IsReadOnly)
+            return;
+        foreach (var trupp in _session.Incident.ScbaTrupps)
+        {
+            if ((trupp.IsActive || trupp.IsWithdrawing) && trupp.IsControlDue(_clock.Now))
+            {
+                if (_controlDueAnnounced.Add(trupp.Id))
+                    _alarm.Play(AlarmSound.PressureCheckDue);
+            }
+            else
+            {
+                _controlDueAnnounced.Remove(trupp.Id);
+            }
+        }
     }
 
     /// <summary>Appends one ETB entry per Trupp that has newly entered the alarm state.
@@ -587,7 +628,6 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _session.Changed -= RefreshTrupps;
-        _alarm.Stop();
         _subscription?.Dispose();
     }
 }

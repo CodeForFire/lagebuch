@@ -9,7 +9,5 @@ namespace LageBuch.App.Android.Services;
 /// </summary>
 public sealed class AndroidAlarmService : IAlarmService
 {
-    public void Start() { }
-    public void Stop() { }
     public void Play(AlarmSound sound) { }
 }

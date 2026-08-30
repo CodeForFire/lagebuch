@@ -11,21 +11,22 @@ public enum AlarmSound
 
     /// <summary>"Aufgabe fällig" — a task's timer expired while still open (#88).</summary>
     TaskDue,
+
+    /// <summary>"Druckabfrage fällig" — a Trupp's pressure-control interval has elapsed (#78, #81).</summary>
+    PressureCheckDue,
+
+    /// <summary>"Rückzugsalarm" — a Trupp has hit its time limit or return pressure (#81),
+    /// repeated until acknowledged.</summary>
+    RetreatAlarm,
 }
 
 /// <summary>
-/// Sounds audible cues. <see cref="Start"/>/<see cref="Stop"/> drive the looping life-safety tone
-/// (the Atemschutz Rückzugsalarm) and are idempotent so callers can drive them straight from state
-/// on every tick. <see cref="Play"/> is a fire-and-forget one-shot spoken announcement.
+/// Sounds audible cues. <see cref="Play"/> is a fire-and-forget one-shot spoken announcement;
+/// a caller that needs an insistent, repeating cue (e.g. the Atemschutz Rückzugsalarm) calls it
+/// again on its own cadence rather than this service looping anything on its own (#81).
 /// </summary>
 public interface IAlarmService
 {
-    /// <summary>Begins (or continues) the looping alarm. Safe to call when already sounding.</summary>
-    void Start();
-
-    /// <summary>Silences the looping alarm. Safe to call when already silent.</summary>
-    void Stop();
-
     /// <summary>Plays a spoken cue once. Fire-and-forget; safe to call from the UI thread.</summary>
     void Play(AlarmSound sound);
 }

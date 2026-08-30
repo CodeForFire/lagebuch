@@ -1,3 +1,4 @@
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain;
@@ -243,43 +244,70 @@ public class ScbaViewModelTests
         var alarm = new FakeAlarmService();
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
         vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
         var row = Register(vm);
         row.StartCommand.Execute(null);
 
         Assert.False(vm.IsAnyAlarm);
-        Assert.False(alarm.IsSounding);
+        Assert.Empty(alarm.Played);
 
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
 
         Assert.True(vm.IsAnyAlarm);
-        Assert.True(alarm.IsSounding);
+        Assert.Contains(AlarmSound.RetreatAlarm, alarm.Played);
         Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay);
         Assert.Contains("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay);
         Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
     }
 
     [Fact]
-    public void Acknowledging_alarm_silences_sound_but_keeps_banner()
+    public void Acknowledging_alarm_silences_the_repeat_but_keeps_banner()
     {
         var clock = new FixedClock(T0);
         var ticker = new FakeTicker();
         var alarm = new FakeAlarmService();
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
         vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
         var row = Register(vm);
         row.StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
+        Assert.Single(alarm.Played);
 
         vm.AcknowledgeAlarmCommand.Execute(null);
 
-        Assert.False(alarm.IsSounding); // sound stopped
-        Assert.True(vm.IsAnyAlarm);     // but banner remains while the alarm condition persists
+        Assert.True(vm.IsAnyAlarm); // banner remains while the alarm condition persists
 
-        // A further tick with the alarm acknowledged must not re-arm the sound.
+        // A further tick with the alarm acknowledged must not re-announce.
         ticker.Fire();
-        Assert.False(alarm.IsSounding);
+        Assert.Single(alarm.Played);
+    }
+
+    [Fact]
+    public void Repeat_cadence_is_fifteen_seconds_while_unacknowledged()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(30);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = T0.AddMinutes(30).AddSeconds(10); // still inside the 15s window
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = T0.AddMinutes(30).AddSeconds(16); // past the 15s window
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
     }
 
     [Fact]
@@ -290,24 +318,29 @@ public class ScbaViewModelTests
         var alarm = new FakeAlarmService();
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
         vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
         var row = Register(vm);
         row.StartCommand.Execute(null);
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
-        Assert.True(alarm.IsSounding);
+        Assert.Single(alarm.Played);
 
         // Rückzug alone does not silence the alarm -- the crew is still consuming air.
         row.WithdrawCommand.Execute(null);
         Assert.True(vm.IsAnyAlarm);
 
+        var countBeforeRemoval = alarm.Played.Count;
         row.MarkRemovedCommand.Execute(null);
 
         Assert.False(vm.IsAnyAlarm);
-        Assert.False(alarm.IsSounding);
+        Assert.Equal(countBeforeRemoval, alarm.Played.Count); // returning does not itself announce
+
+        ticker.Fire();
+        Assert.Equal(countBeforeRemoval, alarm.Played.Count); // and no further ticks announce once cleared
     }
 
     [Fact]
-    public void A_second_trupp_newly_alarming_re_arms_the_sound_after_ack()
+    public void A_second_trupp_newly_alarming_re_announces_after_ack()
     {
         var clock = new FixedClock(T0);
         var ticker = new FakeTicker();
@@ -315,36 +348,156 @@ public class ScbaViewModelTests
         var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
 
         vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
         var first = Register(vm);
         first.StartCommand.Execute(null);
 
         // Second trupp goes under air 10 minutes later, so its limit falls after the first's.
         clock.Now = T0.AddMinutes(10);
         vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999;
         var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
         second.StartCommand.Execute(null);
 
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();              // first trupp alarms (limit at T0+30)
+        Assert.Single(alarm.Played);
         vm.AcknowledgeAlarmCommand.Execute(null);
-        Assert.False(alarm.IsSounding);
 
         clock.Now = T0.AddMinutes(41);
-        ticker.Fire();              // second trupp now past its limit (T0+40) → re-arm
+        ticker.Fire();              // second trupp now past its limit (T0+40) → re-announce
 
-        Assert.True(alarm.IsSounding);
+        Assert.Equal(2, alarm.Played.Count);
+        Assert.All(alarm.Played, s => Assert.Equal(AlarmSound.RetreatAlarm, s));
     }
 
     [Fact]
-    public void Dispose_stops_the_alarm()
+    public void A_new_trupp_alarming_after_ack_reannounces_immediately_not_after_the_full_window()
     {
         var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
         var alarm = new FakeAlarmService();
-        var vm = Vm(clock, NewSession(clock), alarm: alarm);
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
 
-        vm.Dispose();
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        var first = Register(vm);
+        first.StartCommand.Execute(null); // starts at T0, alarms at T0+30:00
 
-        Assert.True(alarm.StopCount >= 1);
+        // Second trupp starts 5s later than the first, same 30-minute duration, so it crosses its
+        // own threshold at T0+30:05 -- 5s after the first's ack, well inside the 15s repeat window.
+        clock.Now = T0.AddSeconds(5);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999;
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        second.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(30);
+        ticker.Fire(); // first trupp alarms
+        Assert.Single(alarm.Played);
+        vm.AcknowledgeAlarmCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(30).AddSeconds(5); // second trupp's own crossing, 5s after ack
+        ticker.Fire();
+
+        Assert.Equal(2, alarm.Played.Count); // announced immediately, not after waiting out 15s
+    }
+
+    // --- Druckabfrage audio cue (issue #78 follow-up) ---
+
+    [Fact]
+    public void Control_due_plays_the_cue_once_and_not_again_while_still_due()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewControlIntervalMinutes = 5;
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(6); // past the 5-minute control interval
+        ticker.Fire();
+        ticker.Fire(); // must not sound a second time for the same due-crossing
+
+        Assert.Single(alarm.Played);
+        Assert.Equal(AlarmSound.PressureCheckDue, alarm.Played[0]);
+    }
+
+    [Fact]
+    public void Recording_pressure_silences_the_cue_until_the_next_interval()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewControlIntervalMinutes = 5;
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        // A recorded reading re-anchors the next control interval, silencing the due state.
+        row.PressureInput = 250;
+        row.RecordPressureCommand.Execute(null);
+        ticker.Fire();
+        Assert.Single(alarm.Played); // still just the one from before
+
+        clock.Now = T0.AddMinutes(12); // past the next 5-minute interval from the reading
+        ticker.Fire();
+
+        Assert.Equal(2, alarm.Played.Count);
+        Assert.All(alarm.Played, s => Assert.Equal(AlarmSound.PressureCheckDue, s));
+    }
+
+    [Fact]
+    public void Readonly_session_never_plays_the_control_due_cue()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seedVm = Vm(clock, seed);
+        seedVm.NewControlIntervalMinutes = 5;
+        var seedRow = Register(seedVm);
+        seedRow.StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(6);
+        seed.Close();
+
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        _ = Vm(clock, ro, ticker: ticker, alarm: alarm);
+        ticker.Fire();
+
+        Assert.Empty(alarm.Played);
+    }
+
+    [Fact]
+    public void Two_trupps_due_at_different_times_each_sound_their_own_cue()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+
+        vm.NewControlIntervalMinutes = 5;
+        var first = Register(vm);
+        first.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(2);
+        vm.NewControlIntervalMinutes = 5;
+        var second = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        second.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(6); // first trupp's interval elapsed, second's has not
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = T0.AddMinutes(8); // second trupp's interval (registered/started 2 min later) now elapsed
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
     }
 
     // --- Crew entry (issue #15) ---

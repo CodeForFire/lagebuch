@@ -7,21 +7,18 @@ using LageBuch.AppLogic.Services;
 namespace LageBuch.App.Services;
 
 /// <summary>
-/// Audio for the desktop deployment. The looping life-safety alarm (<see cref="Start"/>/
-/// <see cref="Stop"/>) uses winmm's PlaySound on Windows and is a no-op elsewhere, unchanged.
-/// The one-shot spoken cues (<see cref="Play"/>) work on Windows, macOS and Linux: winmm in-memory
-/// on Windows, and <c>afplay</c>/<c>aplay</c> on macOS/Linux fed a WAV extracted to a temp file.
-/// Every path degrades to a silent no-op when the asset or the player is missing, so a build with
-/// no voice clip yet — or a host without the CLI player — simply stays quiet rather than crashing.
+/// Audio for the desktop deployment. One-shot spoken cues (<see cref="Play"/>) work on Windows,
+/// macOS and Linux: winmm in-memory on Windows, and <c>afplay</c>/<c>aplay</c> on macOS/Linux fed
+/// a WAV extracted to a temp file. Every path degrades to a silent no-op when the asset or the
+/// player is missing, so a build with no voice clip yet — or a host without the CLI player —
+/// simply stays quiet rather than crashing.
 /// </summary>
 internal sealed class SystemAlarmService : IAlarmService
 {
-    private const uint SndAsync = 0x0001;   // play asynchronously
     private const uint SndNodefault = 0x0002; // no default beep if it fails
     private const uint SndMemory = 0x0004;  // pszSound points to in-memory WAV
-    private const uint SndLoop = 0x0008;    // loop until the next PlaySound call
-
-    private static readonly Uri AlarmAsset = new("avares://LageBuch.App/Assets/alarm.wav");
+    // No SND_ASYNC: playback must block the queue's worker thread until the clip finishes,
+    // so cues play one after another instead of overlapping (see SerialAudioQueue).
 
     // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent.
     private static readonly IReadOnlyDictionary<AlarmSound, string> VoiceAssets =
@@ -31,39 +28,20 @@ internal sealed class SystemAlarmService : IAlarmService
             // Generic tone (already bundled) — a task falling due is frequent enough that a spoken
             // sentence would be more noise than signal.
             [AlarmSound.TaskDue] = "alarm.wav",
+            [AlarmSound.PressureCheckDue] = "voice-druckabfrage.wav",
+            [AlarmSound.RetreatAlarm] = "voice-rueckzugsalarm.wav",
         };
 
-    private readonly byte[]? _wav;
     private readonly Dictionary<AlarmSound, byte[]> _voiceBytes = new();
     private readonly Dictionary<AlarmSound, string> _voiceTempFiles = new();
-    private bool _sounding;
+    private readonly SerialAudioQueue _queue = new();
 
     public SystemAlarmService()
     {
-        // Load the looping alarm WAV once. Only needed on Windows; skip the work elsewhere.
-        if (OperatingSystem.IsWindows())
-            _wav = TryLoad(AlarmAsset);
-
         // Preload the voice clips (all platforms). Absent files are simply skipped.
         foreach (var (sound, file) in VoiceAssets)
             if (TryLoad(new Uri($"avares://LageBuch.App/Assets/{file}")) is { } bytes)
                 _voiceBytes[sound] = bytes;
-    }
-
-    public void Start()
-    {
-        if (_sounding || _wav is null || !OperatingSystem.IsWindows())
-            return;
-        PlaySound(_wav, IntPtr.Zero, SndAsync | SndMemory | SndLoop | SndNodefault);
-        _sounding = true;
-    }
-
-    public void Stop()
-    {
-        if (!_sounding || !OperatingSystem.IsWindows())
-            return;
-        PlaySound(null, IntPtr.Zero, 0); // null sound stops any current playback
-        _sounding = false;
     }
 
     [SuppressMessage("Design", "CA1031",
@@ -73,10 +51,15 @@ internal sealed class SystemAlarmService : IAlarmService
         if (!_voiceBytes.TryGetValue(sound, out var bytes))
             return; // no clip bundled for this cue yet
 
+        _queue.Enqueue(() => PlayBlocking(sound, bytes));
+    }
+
+    // Runs on the SerialAudioQueue's worker thread; blocks until the clip finishes playing.
+    private void PlayBlocking(AlarmSound sound, byte[] bytes)
+    {
         if (OperatingSystem.IsWindows())
         {
-            // One-shot (no SndLoop). Deliberately distinct from Start's looping playback.
-            PlaySound(bytes, IntPtr.Zero, SndAsync | SndMemory | SndNodefault);
+            PlaySound(bytes, IntPtr.Zero, SndMemory | SndNodefault);
             return;
         }
 
@@ -87,11 +70,12 @@ internal sealed class SystemAlarmService : IAlarmService
         var player = OperatingSystem.IsMacOS() ? "afplay" : "aplay";
         try
         {
-            Process.Start(new ProcessStartInfo(player, $"\"{path}\"")
+            using var process = Process.Start(new ProcessStartInfo(player, $"\"{path}\"")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
+            process?.WaitForExit();
         }
         catch
         {
