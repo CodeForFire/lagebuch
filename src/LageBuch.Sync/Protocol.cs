@@ -33,15 +33,35 @@ public sealed record VersionInfo(string Version);
 /// Thrown when the host rejects the join because the supplied share PIN is wrong or missing (§ #64).
 /// Surfaced to the joining user on the same banner as <see cref="VersionMismatchException"/>.
 /// </summary>
-public sealed class PinRejectedException() : Exception("Falsche PIN.");
+public sealed class PinRejectedException : Exception
+{
+    public PinRejectedException() : this("Falsche PIN.") { }
+
+    public PinRejectedException(string message) : base(message) { }
+
+    public PinRejectedException(string message, Exception innerException) : base(message, innerException) { }
+}
 
 /// <summary>
 /// Thrown when a joining client's app version differs from the host's. Mixed versions across a
 /// volunteer-run, un-auto-updated fleet are a realistic scenario to guard against explicitly (§7).
 /// </summary>
-public sealed class VersionMismatchException(string localVersion, string hostVersion)
-    : Exception($"Version stimmt nicht überein: dieses Gerät {localVersion}, Host {hostVersion}.")
+public sealed class VersionMismatchException : Exception
 {
-    public string LocalVersion { get; } = localVersion;
-    public string HostVersion { get; } = hostVersion;
+    public VersionMismatchException(string localVersion, string hostVersion)
+        : base($"Version stimmt nicht überein: dieses Gerät {localVersion}, Host {hostVersion}.")
+    {
+        LocalVersion = localVersion;
+        HostVersion = hostVersion;
+    }
+
+    public VersionMismatchException() : this("unbekannt", "unbekannt") { }
+
+    public VersionMismatchException(string message) : base(message) { }
+
+    public VersionMismatchException(string message, Exception innerException) : base(message, innerException) { }
+
+    public string LocalVersion { get; } = string.Empty;
+
+    public string HostVersion { get; } = string.Empty;
 }

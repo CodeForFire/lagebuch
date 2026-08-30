@@ -30,18 +30,15 @@ public sealed record ForceUnit(
     {
         if (string.IsNullOrWhiteSpace(brigade))
             throw new ArgumentException("Feuerwehr darf nicht leer sein.", nameof(brigade));
-        if (personnelCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(personnelCount));
-        if (scbaCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(scbaCount));
+        ArgumentOutOfRangeException.ThrowIfNegative(personnelCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(scbaCount);
         // Atemschutzgeräteträger are a subset of the crew, so they can never outnumber it. Worth
         // enforcing rather than merely displaying: this count is what tells the Einsatzleiter how
         // many Trupps can actually be formed.
         if (scbaCount > personnelCount)
             throw new ArgumentOutOfRangeException(nameof(scbaCount),
                 "Atemschutzgeräteträger dürfen die Gesamtstärke nicht übersteigen.");
-        if (officerCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(officerCount));
+        ArgumentOutOfRangeException.ThrowIfNegative(officerCount);
         // Führungskräfte are likewise a subset of the crew (#76).
         if (officerCount > personnelCount)
             throw new ArgumentOutOfRangeException(nameof(officerCount),
@@ -101,8 +98,7 @@ public sealed record ForceUnit(
         SessionOperator editor, DateTimeOffset editedAt)
     {
         ArgumentNullException.ThrowIfNull(editor);
-        if (personnelCount < 0)
-            throw new ArgumentOutOfRangeException(nameof(personnelCount));
+        ArgumentOutOfRangeException.ThrowIfNegative(personnelCount);
         if (scbaCount < 0 || scbaCount > personnelCount)
             throw new ArgumentOutOfRangeException(nameof(scbaCount),
                 "Atemschutzgeräteträger dürfen die Gesamtstärke nicht übersteigen.");

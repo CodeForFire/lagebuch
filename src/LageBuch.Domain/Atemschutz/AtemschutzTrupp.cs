@@ -128,10 +128,8 @@ public sealed class AtemschutzTrupp
         if (entryPressure <= 0)
             throw new ArgumentOutOfRangeException(nameof(entryPressure), "Einstiegsdruck muss größer als 0 sein.");
         ValidatePressure(returnPressureBar, nameof(returnPressureBar));
-        if (maxDurationMinutes <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxDurationMinutes));
-        if (pressureControlIntervalMinutes <= 0)
-            throw new ArgumentOutOfRangeException(nameof(pressureControlIntervalMinutes));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxDurationMinutes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pressureControlIntervalMinutes);
 
         var trupp = new AtemschutzTrupp
         {
