@@ -100,7 +100,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         {
             // The PIN gates every endpoint, so the first request already reflects it: a 401 means the
             // PIN is wrong/missing — reported as such before the version compare (auth precedes content).
-            var versionResponse = await http.GetAsync(SyncProtocol.VersionPath, ct);
+            var versionResponse = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute), ct);
             if (versionResponse.StatusCode == HttpStatusCode.Unauthorized)
                 throw new PinRejectedException();
             versionResponse.EnsureSuccessStatusCode();
@@ -110,7 +110,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 throw new VersionMismatchException(localVersion, hostVersion);
 
             var initial = SnapshotMapper.FromSnapshot(
-                SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(SyncProtocol.SnapshotPath, ct)));
+                SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct)));
 
             var hub = new HubConnectionBuilder()
                 .WithUrl(new Uri(baseUri, SyncProtocol.HubPath), o =>
@@ -238,7 +238,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         HttpResponseMessage response;
         try
         {
-            response = await _http.GetAsync(SyncProtocol.FilesPath(fileId));
+            response = await _http.GetAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute));
         }
         catch (HttpRequestException)
         {
@@ -298,7 +298,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public async Task SendAsync(SyncCommand command, CancellationToken ct = default)
     {
         using var content = new StringContent(SyncJson.Serialize(command), Encoding.UTF8, "application/json");
-        var response = await _http.PostAsync(SyncProtocol.CommandPath, content, ct);
+        var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -315,7 +315,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     });
 
     private async Task ResyncAsync() =>
-        OnSnapshot(SyncJson.Deserialize<IncidentSnapshot>(await _http.GetStringAsync(SyncProtocol.SnapshotPath)));
+        OnSnapshot(SyncJson.Deserialize<IncidentSnapshot>(await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))));
 
     public async ValueTask DisposeAsync()
     {
