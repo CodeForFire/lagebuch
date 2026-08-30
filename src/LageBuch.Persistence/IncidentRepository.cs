@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using LageBuch.Domain;
 using LageBuch.Persistence.Sqlite;
@@ -268,6 +269,8 @@ public sealed class IncidentRepository
     /// `state` lives in the base schema's <c>incident_meta</c>, so this works across schema versions;
     /// any failure (missing, corrupt, locked, too new) returns null so the overview degrades quietly.
     /// </summary>
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Try-read: missing, corrupt, locked or too-new reads all degrade to null (see comment).")]
     public IncidentState? TryReadState(string path)
     {
         if (!File.Exists(path))
@@ -472,6 +475,8 @@ public sealed class IncidentRepository
     private static DateTimeOffset? NullableDate(SqliteDataReader r, int i) =>
         r.IsDBNull(i) ? null : ParseDate(r.GetString(i));
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static object?[] ReadRow(SqliteConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
@@ -484,6 +489,8 @@ public sealed class IncidentRepository
         return values;
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static List<T> ReadAll<T>(SqliteConnection cn, string sql, Func<SqliteDataReader, T> map)
     {
         using var cmd = cn.CreateCommand();
@@ -494,6 +501,8 @@ public sealed class IncidentRepository
         return list;
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static void Run(SqliteConnection cn, SqliteTransaction tx, string sql, Action<Action<string, object>> bind)
     {
         using var cmd = cn.CreateCommand();
@@ -503,6 +512,8 @@ public sealed class IncidentRepository
         cmd.ExecuteNonQuery();
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static void Exec(SqliteConnection cn, SqliteTransaction tx, string sql)
     {
         using var cmd = cn.CreateCommand();

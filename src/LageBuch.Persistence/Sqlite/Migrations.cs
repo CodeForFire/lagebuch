@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using LageBuch.Domain.Atemschutz;
 using Microsoft.Data.Sqlite;
@@ -552,6 +553,8 @@ public static class Migrations
         cmd.ExecuteNonQuery();
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL is migration DDL/data built from compile-time constants; values use bound parameters.")]
     private static void Exec(SqliteConnection cn, SqliteTransaction tx, string sql)
     {
         using var cmd = cn.CreateCommand();

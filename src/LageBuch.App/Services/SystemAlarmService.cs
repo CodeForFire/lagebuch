@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Avalonia.Platform;
 using LageBuch.AppLogic.Services;
@@ -65,6 +66,8 @@ public sealed class SystemAlarmService : IAlarmService
         _sounding = false;
     }
 
+    [SuppressMessage("Design", "CA1031",
+        Justification = "A missing player binary must stay silent (see comment); a failed alarm never crashes the app.")]
     public void Play(AlarmSound sound)
     {
         if (!_voiceBytes.TryGetValue(sound, out var bytes))
@@ -97,6 +100,8 @@ public sealed class SystemAlarmService : IAlarmService
     }
 
     // afplay/aplay need a file path, so materialize the embedded WAV to a temp file once and cache it.
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Best-effort temp cache: a failure falls back to silent alarm.")]
     private string? TempFileFor(AlarmSound sound, byte[] bytes)
     {
         if (_voiceTempFiles.TryGetValue(sound, out var cached))
@@ -114,6 +119,8 @@ public sealed class SystemAlarmService : IAlarmService
         }
     }
 
+    [SuppressMessage("Design", "CA1031",
+        Justification = "A missing bundled asset must stay silent (see comment).")]
     private static byte[]? TryLoad(Uri asset)
     {
         try

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -33,6 +34,8 @@ public sealed partial class LinksViewModel : ObservableObject
     /// just what the user themselves typed here.
     /// </summary>
     [RelayCommand]
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Deliberately broad: any launcher failure surfaces in the view instead of crashing it.")]
     private async Task OpenAsync(Link link)
     {
         ErrorMessage = null;

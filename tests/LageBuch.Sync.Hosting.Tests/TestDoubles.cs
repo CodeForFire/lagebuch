@@ -118,11 +118,14 @@ internal sealed class SingleThreadUiDispatcher : IUiDispatcher, IDisposable
     public Task<T> InvokeAsync<T>(Func<T> func)
     {
         var tcs = new TaskCompletionSource<T>();
+        // CA1031: exceptions are captured here, not swallowed — delivered to the await-er via the TCS.
+#pragma warning disable CA1031
         _queue.Add(() =>
         {
             try { tcs.SetResult(func()); }
             catch (Exception ex) { tcs.SetException(ex); }
         });
+#pragma warning restore CA1031
         return tcs.Task;
     }
 

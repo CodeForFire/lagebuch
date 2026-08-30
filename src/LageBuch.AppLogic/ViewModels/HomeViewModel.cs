@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net.Sockets;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -134,6 +135,8 @@ public sealed partial class HomeViewModel : ObservableObject
     /// user which file and why, and leave the app standing. Letting any of them escape kills the
     /// process, which during an Einsatz is the worst possible outcome.
     /// </summary>
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Deliberately broad: heterogeneous open failures all get the same user-facing answer.")]
     private void TryOpen(string path)
     {
         try

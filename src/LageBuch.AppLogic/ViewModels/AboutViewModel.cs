@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -41,6 +42,8 @@ public sealed partial class AboutViewModel : ObservableObject
     private void Close() => Closed?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Deliberately broad: any launcher failure surfaces in the dialog instead of crashing it.")]
     private async Task OpenRepositoryAsync()
     {
         ErrorMessage = null;

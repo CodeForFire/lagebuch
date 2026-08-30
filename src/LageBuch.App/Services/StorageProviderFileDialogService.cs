@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using LageBuch.AppLogic.Services;
@@ -37,6 +38,8 @@ public sealed class StorageProviderFileDialogService : IFileDialogService
 
     // A missing/moved/inaccessible folder just means no start-location hint — the OS picker falls
     // back to wherever it last remembered, exactly like today's behavior with no hint at all.
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Missing/moved/inaccessible folder means no start hint, by design (see comment).")]
     private static async Task<IStorageFolder?> ResolveStartLocation(TopLevel top, string? folder)
     {
         if (string.IsNullOrWhiteSpace(folder))

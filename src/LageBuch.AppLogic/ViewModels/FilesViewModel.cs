@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -96,6 +97,8 @@ public sealed partial class FilesViewModel : ObservableObject
     private bool CanAddFile => !IsReadOnly && !IsUploading;
 
     [RelayCommand(CanExecute = nameof(CanAddFile))]
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Domain guards, IO and network failures are heterogeneous; all surface as one error line.")]
     private async Task AddFileAsync()
     {
         var path = await _dialogs.PickAttachmentAsync();
