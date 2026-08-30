@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
@@ -113,6 +114,7 @@ public sealed record CloseIncidentCommand(OperatorDto Operator) : SyncCommand;
 
 // Bytes ride this one-shot upload command (System.Text.Json base64-encodes byte[] automatically),
 // but never the broadcast snapshot that follows every command — see IncidentSnapshot/IncidentFileDto.
+[SuppressMessage("Performance", "CA1819", Justification = "byte[] is the wire representation System.Text.Json base64-encodes; a read-only wrapper would need a custom converter.")]
 public sealed record AddFileCommand(OperatorDto Operator, string FileName, string ContentType, byte[] Bytes) : SyncCommand;
 
 // No operator on the wire: renaming is a silent label correction (no ETB entry), unlike every

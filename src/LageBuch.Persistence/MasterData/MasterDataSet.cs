@@ -231,6 +231,12 @@ public sealed record MasterDataSet(
 /// </summary>
 public static class MasterDataJson
 {
+    private static readonly JsonSerializerOptions ExportOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     public static MasterDataSet Parse(Stream json)
     {
         using var doc = JsonDocument.Parse(json);
@@ -400,10 +406,6 @@ public static class MasterDataJson
             },
         };
 
-        return JsonSerializer.Serialize(model, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        });
+        return JsonSerializer.Serialize(model, ExportOptions);
     }
 }

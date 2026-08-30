@@ -29,9 +29,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // away (IncidentWorkspaceViewModel.GoHomeRequested). LeaveAsync is a no-op for a local session.
     private void ShowWorkspace(IncidentWorkspaceViewModel ws)
     {
-        ws.GoHomeRequested = () =>
+        ws.GoHomeRequested = async () =>
         {
-            _ = ws.LeaveAsync();
+            await ws.LeaveAsync();
             CurrentView = _home;
         };
         CurrentView = ws;

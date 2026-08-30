@@ -5,7 +5,7 @@ namespace LageBuch.AppLogic.Services;
 
 public sealed class IncidentStore : IIncidentStore
 {
-    private readonly IIncidentFileStore _fileStore = new IncidentFileStore();
+private readonly IncidentFileStore _fileStore = new IncidentFileStore();
 
     public void Save(string path, Incident incident) => IncidentRepository.Save(path, incident);
 

@@ -154,13 +154,13 @@ public sealed partial class FilesViewModel : ObservableObject
 
     // Mirrors IncidentFile.AllowedContentTypes' extensions — the picker already restricts choice to
     // these, this just maps the chosen local path back to the MIME type the domain expects.
-    private static string ContentTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    private static string ContentTypeFor(string path) => Path.GetExtension(path).ToUpperInvariant() switch
     {
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".png" => "image/png",
-        ".gif" => "image/gif",
-        ".webp" => "image/webp",
-        ".pdf" => "application/pdf",
+        ".JPG" or ".JPEG" => "image/jpeg",
+        ".PNG" => "image/png",
+        ".GIF" => "image/gif",
+        ".WEBP" => "image/webp",
+        ".PDF" => "application/pdf",
         _ => "application/octet-stream"
     };
 }
