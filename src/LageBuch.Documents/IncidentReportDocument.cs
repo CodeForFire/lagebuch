@@ -30,11 +30,11 @@ public sealed class IncidentReportDocument : IDocument
 
     public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
 
-    public void Compose(IDocumentContainer document)
+    public void Compose(IDocumentContainer container)
     {
         PdfLicense.Ensure();
 
-        document.Page(page =>
+        container.Page(page =>
         {
             page.Size(PageSizes.A4);
             page.Margin(1.5f, Unit.Centimetre);

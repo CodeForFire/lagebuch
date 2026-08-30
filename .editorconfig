@@ -10,6 +10,11 @@ csharp_style_namespace_declarations = file_scoped:warning
 # CA2007 (missing ConfigureAwait) is not actionable here — suppress app-wide.
 dotnet_diagnostic.CA2007.severity = none
 
+# CA1716 is a cross-language (VB/C# interop) naming rule with no value for this C#-only app:
+# interface members Get/Stop/Operator and parameters set/to are idiomatic here, and the
+# LageBuch.App.Shared namespace root cannot be sanely renamed. Suppress app-wide.
+dotnet_diagnostic.CA1716.severity = none
+
 [tests/**/*.cs]
 # xUnit method names with underscores are idiomatic.
 dotnet_diagnostic.CA1707.severity = none

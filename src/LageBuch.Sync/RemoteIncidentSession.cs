@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
@@ -39,6 +40,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public bool IsRemote => true;
 
     /// <summary>Raised after the cached incident is replaced by a host broadcast (or a resync).</summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
     public event Action? Changed;
 
     /// <summary>
@@ -46,15 +48,18 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// disable input and show "Verbindung getrennt — verbinde neu…". A successful retry raises
     /// <see cref="Reconnected"/>; giving up raises <see cref="Ended"/>.
     /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
     public event Action? Disconnected;
 
     /// <summary>Raised after a reconnect + full resync — the UI can re-enable input.</summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
     public event Action? Reconnected;
 
     /// <summary>
     /// Raised when the connection is gone for good — reconnect attempts were exhausted or the host
     /// stopped sharing. The UI returns to Home (§7); nothing further arrives on this session.
     /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
     public event Action? Ended;
 
     private RemoteIncidentSession(HttpClient http, HubConnection hub, IUiDispatcher ui, SessionOperator op, Incident initial, string? cacheRoot)

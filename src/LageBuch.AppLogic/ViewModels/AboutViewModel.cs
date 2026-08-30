@@ -28,6 +28,7 @@ public sealed partial class AboutViewModel : ObservableObject
     [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string Descriptor => "Einsatzdokumentation";
     public string Version { get; }
+[SuppressMessage("Design", "CA1056", Justification = "RepositoryUrl is a display/launch string handed to IFileDialogService.OpenUrlAsync; System.Uri would add parse/validation behavior with no benefit here.")]
     [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string RepositoryUrl => RepoUrl;
 

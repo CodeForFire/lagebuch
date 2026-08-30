@@ -4,6 +4,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LageBuch.Sync;
 
@@ -35,6 +36,7 @@ public interface IIncidentSession
     bool IsRemote { get; }
 
     /// <summary>Raised after the incident state changes (a local mutation, or a host broadcast).</summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; Action matches the pervasive Action event convention (GoHomeRequested etc.).")]
     event Action? Changed;
 
     void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
