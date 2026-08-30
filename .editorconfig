@@ -5,3 +5,21 @@ indent_style = space
 indent_size = 4
 dotnet_diagnostic.IDE0005.severity = warning
 csharp_style_namespace_declarations = file_scoped:warning
+
+# Desktop Avalonia app: awaited continuations must keep the UI Dispatcher context, so
+# CA2007 (missing ConfigureAwait) is not actionable here — suppress app-wide.
+dotnet_diagnostic.CA2007.severity = none
+
+[tests/**/*.cs]
+# xUnit method names with underscores are idiomatic.
+dotnet_diagnostic.CA1707.severity = none
+
+# Perf/impl-noise rules — they add churn to test code without catching real bugs.
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA1063.severity = none
+dotnet_diagnostic.CA1816.severity = none
+dotnet_diagnostic.CA1826.severity = none
+dotnet_diagnostic.CA2008.severity = none
+dotnet_diagnostic.CA1829.severity = none
+dotnet_diagnostic.CA2213.severity = none
