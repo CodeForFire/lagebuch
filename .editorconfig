@@ -3,6 +3,7 @@ root = true
 [*.cs]
 indent_style = space
 indent_size = 4
+end_of_line = lf
 dotnet_diagnostic.IDE0005.severity = warning
 csharp_style_namespace_declarations = file_scoped:warning
 
@@ -38,3 +39,83 @@ dotnet_diagnostic.CA2213.severity = none
 dotnet_diagnostic.CA1308.severity = none
 dotnet_diagnostic.CA2000.severity = none
 dotnet_diagnostic.CA2213.severity = none
+
+# StyleCop.Analyzers: curated for this codebase. Rules disabled below either
+# conflict with an established convention or don't fit a project that doesn't
+# mandate XML documentation (CS1591 is already suppressed above). Everything
+# else keeps StyleCop's shipped default severity, which becomes a build error
+# via TreatWarningsAsErrors.
+
+# SA1101: this. prefix required on every member access - fights the _camelCase
+# private-field convention already used throughout (see below).
+dotnet_diagnostic.SA1101.severity = none
+
+# SA1201/SA1202/SA1204: member-kind/access/static ordering. No code-fix
+# support exists for any of these - every violation needs manual reordering.
+# The codebase organizes members by domain/lifecycle grouping (e.g. a
+# registration factory next to the validation it calls) rather than by kind
+# or access level, and there's no functional benefit to forcing the churn.
+dotnet_diagnostic.SA1201.severity = none
+dotnet_diagnostic.SA1202.severity = none
+dotnet_diagnostic.SA1204.severity = none
+
+# SA1402: one type per file. Several files (SyncCommand.cs, IncidentSnapshot.cs,
+# MasterDataSet.cs, ...) deliberately group a closed set of small related
+# record types together (a DU-style command/DTO set) so the whole set reads
+# in one place - splitting each into its own file would scatter that and add
+# dozens of one-line files for no benefit.
+dotnet_diagnostic.SA1402.severity = none
+
+# SA1312: local variables must begin with a lower-case letter. Its walker doesn't recognize
+# `using var _ = ...` / `await using var _ = ...` as the discard idiom it is - the test suite
+# uses this pattern throughout for scope-based disposal without a named variable.
+dotnet_diagnostic.SA1312.severity = none
+
+# SA1309: private fields must not begin with an underscore - the whole
+# codebase already uses _camelCase for private fields.
+dotnet_diagnostic.SA1309.severity = none
+
+# SA1600-SA1649: "documentation rules" family (elements/parameters/return
+# values/generic type params must be documented, file headers, etc.).
+# Documentation is optional here, not mandated - keep SA1649
+# (FileNameMustMatchTypeName) enabled, it's an unrelated naming check.
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1601.severity = none
+dotnet_diagnostic.SA1602.severity = none
+dotnet_diagnostic.SA1604.severity = none
+dotnet_diagnostic.SA1605.severity = none
+dotnet_diagnostic.SA1606.severity = none
+dotnet_diagnostic.SA1607.severity = none
+dotnet_diagnostic.SA1608.severity = none
+dotnet_diagnostic.SA1609.severity = none
+dotnet_diagnostic.SA1610.severity = none
+dotnet_diagnostic.SA1611.severity = none
+dotnet_diagnostic.SA1612.severity = none
+dotnet_diagnostic.SA1613.severity = none
+dotnet_diagnostic.SA1614.severity = none
+dotnet_diagnostic.SA1615.severity = none
+dotnet_diagnostic.SA1616.severity = none
+dotnet_diagnostic.SA1617.severity = none
+dotnet_diagnostic.SA1618.severity = none
+dotnet_diagnostic.SA1619.severity = none
+dotnet_diagnostic.SA1620.severity = none
+dotnet_diagnostic.SA1621.severity = none
+dotnet_diagnostic.SA1622.severity = none
+dotnet_diagnostic.SA1623.severity = none
+dotnet_diagnostic.SA1624.severity = none
+dotnet_diagnostic.SA1625.severity = none
+dotnet_diagnostic.SA1627.severity = none
+dotnet_diagnostic.SA1629.severity = none
+dotnet_diagnostic.SA1633.severity = none
+dotnet_diagnostic.SA1634.severity = none
+dotnet_diagnostic.SA1635.severity = none
+dotnet_diagnostic.SA1636.severity = none
+dotnet_diagnostic.SA1637.severity = none
+dotnet_diagnostic.SA1638.severity = none
+dotnet_diagnostic.SA1639.severity = none
+dotnet_diagnostic.SA1640.severity = none
+dotnet_diagnostic.SA1641.severity = none
+dotnet_diagnostic.SA1642.severity = none
+dotnet_diagnostic.SA1643.severity = none
+dotnet_diagnostic.SA1648.severity = none
+
