@@ -44,22 +44,6 @@ internal sealed class SystemAlarmService : IAlarmService
                 _voiceBytes[sound] = bytes;
     }
 
-    public void Start()
-    {
-        if (_sounding || _wav is null || !OperatingSystem.IsWindows())
-            return;
-        PlaySound(_wav, IntPtr.Zero, SndAsync | SndMemory | SndLoop | SndNodefault);
-        _sounding = true;
-    }
-
-    public void Stop()
-    {
-        if (!_sounding || !OperatingSystem.IsWindows())
-            return;
-        PlaySound(null, IntPtr.Zero, 0); // null sound stops any current playback
-        _sounding = false;
-    }
-
     [SuppressMessage("Design", "CA1031",
         Justification = "A missing player binary must stay silent (see comment); a failed alarm never crashes the app.")]
     public void Play(AlarmSound sound)
