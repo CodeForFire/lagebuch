@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -70,7 +71,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
     public bool IsAlarm => _trupp.IsAlarm(_clock.Now);
     public bool IsControlDue => _trupp.IsControlDue(_clock.Now);
 
-    public string StartTimeDisplay => _trupp.StartTime is { } s ? s.ToString("HH:mm") : "—";
+    public string StartTimeDisplay => _trupp.StartTime is { } s ? s.ToString("HH:mm", CultureInfo.InvariantCulture) : "—";
     public string? PressureDisplay => _trupp.LatestPressure is { } p ? $"{p} bar" : null;
 
     public string ElapsedDisplay => _trupp.HasStarted ? Clock(_trupp.Elapsed(_clock.Now)) : "—";

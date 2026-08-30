@@ -1,3 +1,4 @@
+using System.Globalization;
 using LageBuch.Domain;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -277,7 +278,7 @@ public sealed class IncidentRepository
             using var cmd = cn.CreateCommand();
             cmd.CommandText = "SELECT state FROM incident_meta LIMIT 1;";
             var raw = cmd.ExecuteScalar();
-            return raw is null ? null : (IncidentState)Convert.ToInt32(raw);
+            return raw is null ? null : (IncidentState)Convert.ToInt32(raw, CultureInfo.InvariantCulture);
         }
         catch
         {
@@ -308,7 +309,7 @@ public sealed class IncidentRepository
         {
             cmd.CommandText = "SELECT state FROM incident_meta LIMIT 1;";
             var raw = cmd.ExecuteScalar() ?? throw new InvalidOperationException("No incident in file.");
-            state = (IncidentState)Convert.ToInt32(raw);
+            state = (IncidentState)Convert.ToInt32(raw, CultureInfo.InvariantCulture);
         }
 
         using var cn = state == IncidentState.Closed
@@ -408,7 +409,7 @@ public sealed class IncidentRepository
                 var fd = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(fdJson)
                          ?? new Dictionary<string, string?>();
                 var fdDict = fd.ToDictionary(
-                    kv => int.Parse(kv.Key),
+                    kv => int.Parse(kv.Key, CultureInfo.InvariantCulture),
                     kv => kv.Value);
                 // apartment_labels is null on rows written before this column existed.
                 var alJson = Str(r, 6);
@@ -416,7 +417,7 @@ public sealed class IncidentRepository
                     ? new Dictionary<int, string?>()
                     : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(alJson)
                         ?? new Dictionary<string, string?>())
-                        .ToDictionary(kv => int.Parse(kv.Key), kv => kv.Value);
+                        .ToDictionary(kv => int.Parse(kv.Key, CultureInfo.InvariantCulture), kv => kv.Value);
                 return Domain.CoMeasurement.Building.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1),
                     r.GetInt32(2), r.GetInt32(3), fdDict, r.GetInt32(5), alDict);
             });
@@ -449,7 +450,7 @@ public sealed class IncidentRepository
         return Incident.Rehydrate(
             Guid.Parse((string)meta[0]!),
             ParseDate((string)meta[1]!),
-            (IncidentState)Convert.ToInt32(meta[2]),
+            (IncidentState)Convert.ToInt32(meta[2], CultureInfo.InvariantCulture),
             incidentNumber,
             meta[5] as string,
             meta[6] as string,

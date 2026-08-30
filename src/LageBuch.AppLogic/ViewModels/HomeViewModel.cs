@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Net.Sockets;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -81,7 +82,7 @@ public sealed partial class HomeViewModel : ObservableObject
         // Date + time + Stichwort, e.g. "20260819-2217-B3P.fwincident" -- the Einsatznummer is
         // unknown at creation (#69) and no longer part of the filename; it can be added later from
         // the workspace header. No Stichwort at all just leaves the timestamp alone.
-        var timestamp = _clock.Now.ToString("yyyyMMdd-HHmm");
+        var timestamp = _clock.Now.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
         var stem = string.IsNullOrWhiteSpace(request.Keyword)
             ? timestamp
             : $"{timestamp}-{StripInvalidFileNameChars(request.Keyword.Trim())}";
