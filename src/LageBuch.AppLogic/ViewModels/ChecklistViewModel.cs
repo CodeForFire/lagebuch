@@ -12,6 +12,7 @@ public sealed partial class ChecklistViewModel : ObservableObject
 
     public ChecklistViewModel(IIncidentSession session, ChecklistKind kind, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _kind = kind;
         IsReadOnly = session.IsReadOnly;

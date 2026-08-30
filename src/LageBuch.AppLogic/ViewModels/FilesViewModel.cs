@@ -65,6 +65,7 @@ public sealed partial class FilesViewModel : ObservableObject
 
     public FilesViewModel(IIncidentSession session, IFileDialogService dialogs, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _dialogs = dialogs;
         _onChanged = onChanged;

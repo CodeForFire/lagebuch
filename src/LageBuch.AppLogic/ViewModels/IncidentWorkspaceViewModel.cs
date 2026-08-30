@@ -25,6 +25,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
     {
+        ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _local = session as LocalIncidentSession;
         _clock = clock;

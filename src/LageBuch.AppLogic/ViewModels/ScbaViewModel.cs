@@ -32,6 +32,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         AtemschutzTrupp trupp, IClock clock, bool isReadOnly,
         Action onStart, Action<int> onRecordPressure, Action onWithdraw, Action onMarkRemoved)
     {
+        ArgumentNullException.ThrowIfNull(trupp);
         _trupp = trupp;
         _clock = clock;
         _isReadOnly = isReadOnly;
@@ -179,6 +180,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     public ScbaViewModel(IIncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(masterData);
+        ArgumentNullException.ThrowIfNull(ticker);
         _session = session;
         _clock = clock;
         _alarm = alarm;

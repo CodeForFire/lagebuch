@@ -363,6 +363,7 @@ public static class MasterDataJson
     /// </summary>
     public static string Serialize(MasterDataSet set)
     {
+        ArgumentNullException.ThrowIfNull(set);
         var model = new
         {
             roles = set.Roles,

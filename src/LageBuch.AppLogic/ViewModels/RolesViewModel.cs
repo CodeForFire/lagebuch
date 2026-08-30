@@ -89,6 +89,8 @@ public sealed partial class RolesViewModel : ObservableObject
 
     public RolesViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;

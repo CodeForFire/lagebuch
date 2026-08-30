@@ -19,11 +19,17 @@ public static class IntegerOnly
     public static readonly AttachedProperty<bool> IsEnabledProperty =
         AvaloniaProperty.RegisterAttached<TextBox, bool>("IsEnabled", typeof(IntegerOnly));
 
-    public static void SetIsEnabled(TextBox target, bool value) =>
+    public static void SetIsEnabled(TextBox target, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(target);
         target.SetValue(IsEnabledProperty, value);
+    }
 
-    public static bool GetIsEnabled(TextBox target) =>
-        target.GetValue(IsEnabledProperty);
+    public static bool GetIsEnabled(TextBox target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.GetValue(IsEnabledProperty);
+    }
 
     static IntegerOnly()
     {

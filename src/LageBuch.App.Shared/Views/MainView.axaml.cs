@@ -14,6 +14,7 @@ public partial class MainView : UserControl
     /// </summary>
     public void AttachViewModel(MainWindowViewModel viewModel)
     {
+        ArgumentNullException.ThrowIfNull(viewModel);
         DataContext = viewModel;
         viewModel.PropertyChanged += (_, e) =>
         {

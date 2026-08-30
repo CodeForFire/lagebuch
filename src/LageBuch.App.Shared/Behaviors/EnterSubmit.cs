@@ -21,11 +21,17 @@ public static class EnterSubmit
     public static readonly AttachedProperty<ICommand?> CommandProperty =
         AvaloniaProperty.RegisterAttached<AutoCompleteBox, ICommand?>("Command", typeof(EnterSubmit));
 
-    public static void SetCommand(AutoCompleteBox target, ICommand? value) =>
+    public static void SetCommand(AutoCompleteBox target, ICommand? value)
+    {
+        ArgumentNullException.ThrowIfNull(target);
         target.SetValue(CommandProperty, value);
+    }
 
-    public static ICommand? GetCommand(AutoCompleteBox target) =>
-        target.GetValue(CommandProperty);
+    public static ICommand? GetCommand(AutoCompleteBox target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.GetValue(CommandProperty);
+    }
 
     static EnterSubmit()
     {

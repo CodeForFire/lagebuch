@@ -9,6 +9,7 @@ public static class Migrations
 
     public static int GetVersion(SqliteConnection cn)
     {
+        ArgumentNullException.ThrowIfNull(cn);
         using (var create = cn.CreateCommand())
         {
             create.CommandText = "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);";
@@ -22,6 +23,7 @@ public static class Migrations
 
     public static void Migrate(SqliteConnection cn)
     {
+        ArgumentNullException.ThrowIfNull(cn);
         var version = GetVersion(cn);
 
         // Refuse a file from the future rather than treating "no migration applies" as "already

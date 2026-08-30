@@ -215,6 +215,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // rejection (over the size cap, unsupported type, closed incident, or a network failure here).
     public async Task AddFileAsync(string fileName, string contentType, byte[] bytes)
     {
+        ArgumentNullException.ThrowIfNull(bytes);
         if (bytes.LongLength > IncidentFile.MaxSizeBytes)
             throw new ArgumentException(
                 $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.", nameof(bytes));

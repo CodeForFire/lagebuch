@@ -38,6 +38,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         IIncidentSession session, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged,
         int firstIntervalMinutes, int recurringIntervalMinutes)
     {
+        ArgumentNullException.ThrowIfNull(ticker);
         _session = session;
         _clock = clock;
         _alarm = alarm;

@@ -23,6 +23,7 @@ public sealed class MasterDataStore
     /// </summary>
     public void Save(string path, MasterDataSet set)
     {
+        ArgumentNullException.ThrowIfNull(set);
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
         EnsureSchema(cn);
         using var tx = cn.BeginTransaction();

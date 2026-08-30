@@ -45,6 +45,9 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         IIncidentSession session, IClock clock, ITicker ticker, IAlarmService alarm,
         MasterDataSet masterData, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(ticker);
+        ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _clock = clock;
         _alarm = alarm;
@@ -231,6 +234,7 @@ public sealed partial class TaskRow : ObservableObject
 
     public TaskRow(IIncidentSession session, IncidentTask task, bool isReadOnly, DateTimeOffset now, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(task);
         _session = session;
         _id = task.Id;
         _onChanged = onChanged;

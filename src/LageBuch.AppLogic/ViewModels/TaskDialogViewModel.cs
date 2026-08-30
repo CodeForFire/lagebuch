@@ -21,6 +21,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     public TaskDialogViewModel(
         IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _onChanged = onChanged;
         Text = prefilledText;
