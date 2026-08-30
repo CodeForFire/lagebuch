@@ -4,7 +4,7 @@ using LageBuch.Domain.Time;
 
 namespace LageBuch.Domain.Tests;
 
-public sealed class FixedClock : IClock
+internal sealed class FixedClock : IClock
 {
     public FixedClock(DateTimeOffset now) => Now = now;
     public DateTimeOffset Now { get; set; }

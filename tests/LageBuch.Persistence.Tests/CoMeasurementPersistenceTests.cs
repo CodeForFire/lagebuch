@@ -37,10 +37,10 @@ public class CoMeasurementPersistenceTests : IDisposable
     public void SaveLoad_RoundTrip_BuildingsAndDwellings()
     {
         var original = CreateIncidentWithBuilding();
-        var repo = new IncidentRepository();
-        repo.Save(_path, original);
 
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, original);
+
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Single(loaded.Buildings);
         Assert.Equal("Haus A", loaded.Buildings[0].Name);
@@ -69,10 +69,9 @@ public class CoMeasurementPersistenceTests : IDisposable
         var incident = Incident.Start(clock, op);
         incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
 
-        var loaded = repo.Load(_path);
+        var loaded = IncidentRepository.Load(_path);
 
         var dwelling = loaded.Dwellings[0];
         Assert.Null(dwelling.CoValue);

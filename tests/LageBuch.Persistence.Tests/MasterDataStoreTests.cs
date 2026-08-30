@@ -18,22 +18,22 @@ public class MasterDataStoreTests : IDisposable
     {
         // The app ships with no seed, so a brand-new masterdata.db comes back empty -- populated
         // only by Save (the editor's Import), never by a compiled-in default.
-        var set = new MasterDataStore().GetOrCreate(_path);
+        var set = MasterDataStore.GetOrCreate(_path);
         Assert.True(set.IsEmpty);
     }
 
     [Fact]
     public void GetOrCreate_is_idempotent_and_never_seeds()
     {
-        var store = new MasterDataStore();
-        Assert.True(store.GetOrCreate(_path).IsEmpty);
-        Assert.True(store.GetOrCreate(_path).IsEmpty); // still empty on a second open
+
+        Assert.True(MasterDataStore.GetOrCreate(_path).IsEmpty);
+        Assert.True(MasterDataStore.GetOrCreate(_path).IsEmpty); // still empty on a second open
     }
 
     [Fact]
     public void Save_then_GetOrCreate_round_trips_every_category_including_personnel()
     {
-        var store = new MasterDataStore();
+
         var set = MasterDataSet.Empty with
         {
             Roles = new[] { "EL", "ZF" },
@@ -51,9 +51,9 @@ public class MasterDataStoreTests : IDisposable
             Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
-        store.Save(_path, set);
+        MasterDataStore.Save(_path, set);
 
-        var reopened = store.GetOrCreate(_path);
+        var reopened = MasterDataStore.GetOrCreate(_path);
         Assert.Equal(new[] { "EL", "ZF" }, reopened.Roles);
         Assert.Equal(new[] { "B", "THL" }, reopened.Einsatzarten);
         Assert.Equal(
@@ -70,7 +70,7 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Vehicles_round_trip_with_wache_callsign_and_seats()
     {
-        var store = new MasterDataStore();
+
         var set = MasterDataSet.Empty with
         {
             Vehicles = new[]
@@ -79,9 +79,9 @@ public class MasterDataStoreTests : IDisposable
                 new Vehicle("Aich", "Aich 42/1", 6),
             },
         };
-        store.Save(_path, set);
+        MasterDataStore.Save(_path, set);
 
-        var reopened = store.GetOrCreate(_path);
+        var reopened = MasterDataStore.GetOrCreate(_path);
 
         Assert.Equal(set.Vehicles, reopened.Vehicles);
     }
@@ -89,13 +89,13 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Personnel_optional_fields_round_trip_as_null()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Personnel = new[] { new Person("Musterfrau", "Erika", null, null, null) },
         });
 
-        var erika = store.GetOrCreate(_path).Personnel.Single();
+        var erika = MasterDataStore.GetOrCreate(_path).Personnel.Single();
         Assert.Null(erika.Role);
         Assert.Null(erika.CallSign);
         Assert.Null(erika.Phone);
@@ -104,8 +104,8 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Personnel_come_back_name_sorted()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Personnel = new[]
             {
@@ -114,24 +114,24 @@ public class MasterDataStoreTests : IDisposable
             },
         });
 
-        var names = store.GetOrCreate(_path).Personnel.Select(p => p.LastName).ToList();
+        var names = MasterDataStore.GetOrCreate(_path).Personnel.Select(p => p.LastName).ToList();
         Assert.Equal(new[] { "Amsel", "Zieger" }, names);
     }
 
     [Fact]
     public void Save_round_trips_an_added_and_a_removed_street()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Streets = new[] { new Street("Alt Str.", "FFB"), new Street("Bahnhofstr.", "FFB") },
         });
 
-        var current = store.GetOrCreate(_path);
+        var current = MasterDataStore.GetOrCreate(_path);
         var edited = current with { Streets = current.Streets.Skip(1).Append(new Street("Neu Str.", "Aich")).ToList() };
-        store.Save(_path, edited);
+        MasterDataStore.Save(_path, edited);
 
-        var reopened = store.GetOrCreate(_path);
+        var reopened = MasterDataStore.GetOrCreate(_path);
         Assert.Contains(reopened.Streets, s => s.Name == "Neu Str." && s.District == "Aich");
         Assert.DoesNotContain(reopened.Streets, s => s.Name == "Alt Str.");
         Assert.Equal(2, reopened.Streets.Count);
@@ -140,17 +140,17 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_round_trips_an_added_and_a_removed_link()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Links = new[] { new Link("Alt Link", "https://old.example"), new Link("Wetterdienst", "https://dwd.de") },
         });
 
-        var current = store.GetOrCreate(_path);
+        var current = MasterDataStore.GetOrCreate(_path);
         var edited = current with { Links = current.Links.Skip(1).Append(new Link("Neu Link", "https://new.example")).ToList() };
-        store.Save(_path, edited);
+        MasterDataStore.Save(_path, edited);
 
-        var reopened = store.GetOrCreate(_path);
+        var reopened = MasterDataStore.GetOrCreate(_path);
         Assert.Contains(reopened.Links, l => l.Name == "Neu Link" && l.Url == "https://new.example");
         Assert.DoesNotContain(reopened.Links, l => l.Name == "Alt Link");
         Assert.Equal(2, reopened.Links.Count);
@@ -159,15 +159,15 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_round_trips_a_checklist_reorder_and_delete()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             ChecklistTemplateAufbau = Items("A", "B", "C"),
         });
 
-        store.Save(_path, MasterDataSet.Empty with { ChecklistTemplateAufbau = Items("C", "A") });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { ChecklistTemplateAufbau = Items("C", "A") });
 
-        Assert.Equal(Items("C", "A"), store.GetOrCreate(_path).ChecklistTemplateAufbau);
+        Assert.Equal(Items("C", "A"), MasterDataStore.GetOrCreate(_path).ChecklistTemplateAufbau);
 
         static IReadOnlyList<ChecklistTemplateItem> Items(params string[] texts) =>
             texts.Select(t => new ChecklistTemplateItem(t, false)).ToList();
@@ -176,14 +176,14 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_round_trips_aufbau_and_abbau_independently_with_mandatory_flags()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Fahrzeug prüfen", true) },
             ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Material zählen", false) },
         });
 
-        var reopened = store.GetOrCreate(_path);
+        var reopened = MasterDataStore.GetOrCreate(_path);
         Assert.Equal(new ChecklistTemplateItem("Fahrzeug prüfen", true), Assert.Single(reopened.ChecklistTemplateAufbau));
         Assert.Equal(new ChecklistTemplateItem("Material zählen", false), Assert.Single(reopened.ChecklistTemplateAbbau));
     }
@@ -205,7 +205,7 @@ public class MasterDataStoreTests : IDisposable
         }
         SqliteConnection.ClearAllPools();
 
-        var set = new MasterDataStore().GetOrCreate(_path);
+        var set = MasterDataStore.GetOrCreate(_path);
 
         Assert.Equal(new ChecklistTemplateItem("Altes Item", false), Assert.Single(set.ChecklistTemplateAufbau));
         Assert.Empty(set.ChecklistTemplateAbbau);
@@ -214,12 +214,12 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void A_value_deleted_through_Save_stays_deleted()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with { Roles = new[] { "EL", "ZF" } });
 
-        store.Save(_path, MasterDataSet.Empty with { Roles = new[] { "ZF" } });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { "EL", "ZF" } });
 
-        Assert.DoesNotContain("EL", store.GetOrCreate(_path).Roles);
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { "ZF" } });
+
+        Assert.DoesNotContain("EL", MasterDataStore.GetOrCreate(_path).Roles);
     }
 
     [Fact]
@@ -229,24 +229,24 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void A_fresh_database_reads_the_default_settings()
     {
-        var set = new MasterDataStore().GetOrCreate(_path);
+        var set = MasterDataStore.GetOrCreate(_path);
         Assert.Equal(IncidentSettings.Defaults, set.Settings);
     }
 
     [Fact]
     public void Save_then_GetOrCreate_round_trips_settings()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
 
-        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 4, 55), store.GetOrCreate(_path).Settings);
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
+
+        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 4, 55), MasterDataStore.GetOrCreate(_path).Settings);
     }
 
     [Fact]
     public void A_missing_setting_key_falls_back_to_its_default()
     {
-        var store = new MasterDataStore();
-        store.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
+
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
 
         // Simulate a store written before a setting existed: drop one row, which read must backfill.
         using (var cn = new SqliteConnection($"Data Source={_path}"))
@@ -258,7 +258,7 @@ public class MasterDataStoreTests : IDisposable
         }
         SqliteConnection.ClearAllPools();
 
-        var settings = store.GetOrCreate(_path).Settings;
+        var settings = MasterDataStore.GetOrCreate(_path).Settings;
         Assert.Equal(IncidentSettings.Defaults.ReturnPressureBar, settings.ReturnPressureBar);
         Assert.Equal(12, settings.IlsReminderIntervalMinutes); // the other keys are untouched
     }

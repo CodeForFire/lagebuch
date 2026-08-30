@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace LageBuch.Documents.Tests;
 
-public static class PdfAssert
+internal static class PdfAssert
 {
     private static readonly byte[] PdfHeader = { 0x25, 0x50, 0x44, 0x46, 0x2D }; // "%PDF-"
 

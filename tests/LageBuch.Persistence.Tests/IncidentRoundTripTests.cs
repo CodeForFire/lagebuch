@@ -53,9 +53,8 @@ public class IncidentRoundTripTests : IDisposable
         incident.AddTask(clock, op, "Nachfordern", null, TaskImportance.Low, TaskUrgency.Low, 30);
         incident.SetTaskCompleted(incident.Tasks[1].Id, true, clock, op);
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(incident.Id, loaded.Id);
         Assert.Equal(IncidentState.Open, loaded.State);
@@ -130,9 +129,8 @@ public class IncidentRoundTripTests : IDisposable
 
         incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", "Innenangriff");
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
 
         var reloaded = Assert.Single(loaded.Forces);
         Assert.Equal("Im Einsatz", reloaded.Status);
@@ -154,9 +152,8 @@ public class IncidentRoundTripTests : IDisposable
         var editor = new SessionOperator("Schmidt");
         incident.EditJournalEntry(clock, editor, entry.Id, "Lagemeldung korrigiert");
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
 
         var reloaded = loaded.Journal.Single(e => e.Id == entry.Id);
         Assert.Equal("Lagemeldung korrigiert", reloaded.Text);
@@ -178,9 +175,8 @@ public class IncidentRoundTripTests : IDisposable
         clock.Now = clock.Now.AddHours(2);
         incident.Close(clock, op);
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(IncidentState.Closed, loaded.State);
         Assert.Equal(incident.ClosedAt, loaded.ClosedAt);
@@ -224,9 +220,8 @@ public class IncidentRoundTripTests : IDisposable
             entryPressure: 300);
         var waitingId = waiting.Id;
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(4, loaded.ScbaTrupps.Count);
 
@@ -278,9 +273,8 @@ public class IncidentRoundTripTests : IDisposable
         clock.Now = clock.Now.AddMinutes(1);
         incident.AddFile(clock, op, "bericht.pdf", "application/pdf", 4096);
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal(2, loaded.Files.Count);
         Assert.Equal("brand.jpg", loaded.Files[0].FileName);
@@ -305,8 +299,8 @@ public class IncidentRoundTripTests : IDisposable
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op);
         incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
+
+        IncidentRepository.Save(_path, incident);
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
         using (var cmd = cn.CreateCommand())
@@ -316,7 +310,7 @@ public class IncidentRoundTripTests : IDisposable
         }
         SqliteConnection.ClearAllPools();
 
-        var loaded = repo.Load(_path);
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal("brand.jpg", Assert.Single(loaded.Files).DisplayName);
     }
@@ -329,9 +323,8 @@ public class IncidentRoundTripTests : IDisposable
         var incident = Incident.Start(clock, op);
         incident.UpsertTimer("ils-reminder", clock.Now, intervalMinutes: 15, recurringIntervalMinutes: 30, isRunning: true);
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        var loaded = repo.Load(_path);
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
 
         var timer = loaded.FindTimer("ils-reminder");
         Assert.NotNull(timer);
@@ -352,12 +345,11 @@ public class IncidentRoundTripTests : IDisposable
         incident.AddForceUnit(clock, op, "FFB Wache 1", 6, callSign: "FFB 1/40/1", scbaCount: 2, officerCount: 1);
         incident.UpdateForceStrength(clock, op, incident.Forces[0].Id, officerCount: 1, personnelCount: 9, scbaCount: 4);
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
         incident.RemoveForceUnit(clock, op, incident.Forces[0].Id);
-        repo.Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
 
-        var loaded = repo.Load(_path);
+        var loaded = IncidentRepository.Load(_path);
         Assert.Empty(loaded.Forces);
         Assert.Equal((0, 0), (loaded.TotalPersonnel, loaded.TotalScba));
     }
@@ -371,7 +363,7 @@ public class IncidentRoundTripTests : IDisposable
         var op = new SessionOperator("Müller");
         var incident = Incident.Start(clock, op, "Brand");
         incident.AddTask(clock, op, "Alt", null, TaskImportance.Medium, TaskUrgency.Medium, 15);
-        new IncidentRepository().Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
 
         using (var cn = new SqliteConnection($"Data Source={_path}"))
         {
@@ -382,7 +374,7 @@ public class IncidentRoundTripTests : IDisposable
         }
         SqliteConnection.ClearAllPools();
 
-        var loaded = new IncidentRepository().Load(_path);
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Empty(loaded.Tasks);           // old file has no tasks — loads cleanly, migrates to V14
         Assert.Equal("Brand", loaded.Keyword);

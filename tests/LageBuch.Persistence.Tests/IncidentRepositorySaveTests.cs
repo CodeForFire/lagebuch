@@ -27,7 +27,7 @@ public class IncidentRepositorySaveTests : IDisposable
         incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
 
-        new IncidentRepository().Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
 
         using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
         using var cmd = cn.CreateCommand();
@@ -49,7 +49,7 @@ public class IncidentRepositorySaveTests : IDisposable
         incident.EditJournalEntry(clock, op, entry.Id, "Erste Korrektur");
         incident.EditJournalEntry(clock, op, entry.Id, "Zweite Korrektur");
 
-        new IncidentRepository().Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
 
         using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
         using var cmd = cn.CreateCommand();
@@ -62,8 +62,8 @@ public class IncidentRepositorySaveTests : IDisposable
     public void Legacy_ils_number_loads_as_the_incident_number()
     {
         var clock = new Clock();
-        var repo = new IncidentRepository();
-        repo.Save(_path, Incident.Start(clock, new SessionOperator("Müller")));
+
+        IncidentRepository.Save(_path, Incident.Start(clock, new SessionOperator("Müller")));
 
         // Simulate a file written before the unification: the number lived in ils_number and
         // incident_number was empty.
@@ -75,7 +75,7 @@ public class IncidentRepositorySaveTests : IDisposable
         }
         SqliteConnection.ClearAllPools();
 
-        Assert.Equal("4711", repo.Load(_path).IncidentNumber!.Value);
+        Assert.Equal("4711", IncidentRepository.Load(_path).IncidentNumber!.Value);
     }
 
     [Fact]
@@ -84,9 +84,9 @@ public class IncidentRepositorySaveTests : IDisposable
         var clock = new Clock();
         var op = new SessionOperator("Müller");
         var incident = Incident.Start(clock, op);
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
-        repo.Save(_path, incident);
+
+        IncidentRepository.Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
 
         using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
         using var cmd = cn.CreateCommand();

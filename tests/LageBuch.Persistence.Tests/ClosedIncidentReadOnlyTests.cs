@@ -22,7 +22,7 @@ public class ClosedIncidentReadOnlyTests : IDisposable
         var op = new SessionOperator("Müller");
         var incident = Incident.Start(clock, op);
         incident.Close(clock, op);
-        new IncidentRepository().Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class ClosedIncidentReadOnlyTests : IDisposable
     public void Load_of_closed_incident_returns_readonly_domain_state()
     {
         SaveClosedIncident();
-        var loaded = new IncidentRepository().Load(_path);
+        var loaded = IncidentRepository.Load(_path);
         Assert.Equal(IncidentState.Closed, loaded.State);
         Assert.Throws<IncidentClosedException>(
             () => loaded.AddForceUnit(new Clock(), new Domain.SessionOperator("Müller"), "FFB", 1));

@@ -30,4 +30,8 @@
     <ProjectReference Include="..\LageBuch.Sync.Hosting\LageBuch.Sync.Hosting.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="LageBuch.App.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -20,7 +20,7 @@ public class IncidentRepositoryLoadTests : IDisposable
     {
         Assert.False(File.Exists(_path));
 
-        var ex = Assert.Throws<FileNotFoundException>(() => new IncidentRepository().Load(_path));
+        var ex = Assert.Throws<FileNotFoundException>(() => IncidentRepository.Load(_path));
 
         // The path rides on FileName, not in the message: the Home banner already prefixes the
         // filename, so repeating it there reads as a stutter.
@@ -35,7 +35,7 @@ public class IncidentRepositoryLoadTests : IDisposable
         // Picking the wrong file in the open dialog must not damage whatever was picked.
         File.WriteAllText(_path, "nicht wirklich eine Einsatzdatei");
 
-        Assert.ThrowsAny<Exception>(() => new IncidentRepository().Load(_path));
+        Assert.ThrowsAny<Exception>(() => IncidentRepository.Load(_path));
 
         Assert.Equal("nicht wirklich eine Einsatzdatei", File.ReadAllText(_path));
 

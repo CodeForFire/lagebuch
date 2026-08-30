@@ -49,8 +49,7 @@ public class MigrationForwardCompatTests : IDisposable
         var incident = Domain.Incident.Start(clock, op, "Brand");
         incident.AddForceUnit(clock, op, "FFB", 12);
 
-        var repo = new IncidentRepository();
-        repo.Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
         using (var cmd = cn.CreateCommand())
@@ -63,7 +62,7 @@ public class MigrationForwardCompatTests : IDisposable
         SqliteConnection.ClearAllPools();
 
         // Act + Assert: opening the old file must upgrade it in place, not throw.
-        var loaded = repo.Load(_path);
+        var loaded = IncidentRepository.Load(_path);
 
         Assert.Equal("Brand", loaded.Keyword);
         Assert.Equal(12, loaded.TotalPersonnel);

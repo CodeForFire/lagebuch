@@ -10,7 +10,7 @@ public sealed class IncidentRepository
 {
     private const string Iso = "O";
 
-    public void Save(string path, Incident incident)
+    public static void Save(string path, Incident incident)
     {
         ArgumentNullException.ThrowIfNull(incident);
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
@@ -269,9 +269,9 @@ public sealed class IncidentRepository
     /// `state` lives in the base schema's <c>incident_meta</c>, so this works across schema versions;
     /// any failure (missing, corrupt, locked, too new) returns null so the overview degrades quietly.
     /// </summary>
-    [SuppressMessage("Design", "CA1031",
+[SuppressMessage("Design", "CA1031",
         Justification = "Try-read: missing, corrupt, locked or too-new reads all degrade to null (see comment).")]
-    public IncidentState? TryReadState(string path)
+    public static IncidentState? TryReadState(string path)
     {
         if (!File.Exists(path))
             return null;
@@ -289,7 +289,7 @@ public sealed class IncidentRepository
         }
     }
 
-    public Incident Load(string path)
+    public static Incident Load(string path)
     {
         // Check before opening: SQLite would otherwise report a missing file as a bare "unable to
         // open database file", and the caller cannot tell that apart from a corrupt one.

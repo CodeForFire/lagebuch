@@ -6,7 +6,7 @@ using LageBuch.AppLogic.Services;
 
 namespace LageBuch.App.Services;
 
-public sealed class StorageProviderFileDialogService : IFileDialogService
+internal sealed class StorageProviderFileDialogService : IFileDialogService
 {
     private static readonly FilePickerFileType Incident =
         new("Einsatzdokumentation") { Patterns = new[] { "*.fwincident" } };
