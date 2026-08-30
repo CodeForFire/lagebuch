@@ -469,7 +469,7 @@ public class MasterDataEditorViewModelTests
 
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.True(vm.HasVehicleConflicts);
-        Assert.Contains("FFB 1/40/1", vm.VehicleConflicts);
+        Assert.Contains("FFB 1/40/1", vm.VehicleConflicts, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -510,7 +510,7 @@ public class MasterDataEditorViewModelTests
         var vm = Vm(new InMemoryProvider(set));
 
         Assert.False(vm.SaveCommand.CanExecute(null));
-        Assert.Contains("FFB 1/40/1", vm.VehicleConflicts);
+        Assert.Contains("FFB 1/40/1", vm.VehicleConflicts, StringComparison.Ordinal);
 
         Vehicles(vm).Rows[1].CallSign = "Aich 42/1";
 

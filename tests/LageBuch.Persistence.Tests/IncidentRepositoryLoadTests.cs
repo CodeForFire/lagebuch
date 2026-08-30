@@ -25,7 +25,7 @@ public class IncidentRepositoryLoadTests : IDisposable
         // The path rides on FileName, not in the message: the Home banner already prefixes the
         // filename, so repeating it there reads as a stutter.
         Assert.Equal(_path, ex.FileName);
-        Assert.DoesNotContain(Path.GetFileName(_path), ex.Message);
+        Assert.DoesNotContain(Path.GetFileName(_path), ex.Message, StringComparison.Ordinal);
         Assert.False(File.Exists(_path));
     }
 

@@ -48,7 +48,7 @@ public class ScbaViewModelTests
         Assert.True(row.IsWaiting);
         Assert.False(row.IsActive);
         Assert.Equal("Bereitgestellt", row.StatusDisplay);
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("bereitgestellt"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("bereitgestellt", StringComparison.Ordinal));
         Assert.Equal(1, changes);
     }
 
@@ -95,7 +95,7 @@ public class ScbaViewModelTests
         Assert.False(row.IsWaiting);
         Assert.False(row.StartCommand.CanExecute(null));
         Assert.True(row.RecordPressureCommand.CanExecute(null));
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("im Einsatz"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("im Einsatz", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -111,8 +111,8 @@ public class ScbaViewModelTests
         row.RecordPressureCommand.Execute(null);
 
         Assert.True(row.IsAlarm);
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Druckkontrolle") && e.Text.Contains("45 bar"));
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Rückzugsalarm"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Druckkontrolle", StringComparison.Ordinal) && e.Text.Contains("45 bar", StringComparison.Ordinal));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Rückzugsalarm", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class ScbaViewModelTests
 
         Assert.True(vm.HasControlReminder);
         Assert.False(vm.IsAnyControlDue);
-        Assert.Contains("Nächste Druckabfrage", vm.NextControlDisplay);
+        Assert.Contains("Nächste Druckabfrage", vm.NextControlDisplay, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class ScbaViewModelTests
 
         Assert.True(row.IsControlDue);
         Assert.True(vm.IsAnyControlDue);
-        Assert.Contains("fällig", vm.NextControlDisplay);
+        Assert.Contains("fällig", vm.NextControlDisplay, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public class ScbaViewModelTests
         ticker.Fire();
         ticker.Fire(); // must not log a second alarm for the same trupp
 
-        var alarms = session.Incident.Journal.Where(e => e.Text.Contains("Rückzugsalarm")).ToList();
+        var alarms = session.Incident.Journal.Where(e => e.Text.Contains("Rückzugsalarm", StringComparison.Ordinal)).ToList();
         Assert.Single(alarms);
         Assert.Equal(baseline + 1, changes);
     }
@@ -194,7 +194,7 @@ public class ScbaViewModelTests
         Assert.Equal("Rückzug", row.StatusDisplay);
         Assert.False(row.WithdrawCommand.CanExecute(null));
         Assert.True(row.MarkRemovedCommand.CanExecute(null));
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Rückzug"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("Rückzug", StringComparison.Ordinal));
 
         clock.Now = T0.AddMinutes(12);
         row.MarkRemovedCommand.Execute(null);
@@ -202,7 +202,7 @@ public class ScbaViewModelTests
         Assert.True(row.IsReturned);
         Assert.Equal("—", row.RemainingDisplay);
         Assert.False(vm.HasControlReminder);
-        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("abgenommen"));
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("abgenommen", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -256,8 +256,8 @@ public class ScbaViewModelTests
 
         Assert.True(vm.IsAnyAlarm);
         Assert.Contains(AlarmSound.RetreatAlarm, alarm.Played);
-        Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay);
-        Assert.Contains("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay);
+        Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay, StringComparison.Ordinal);
+        Assert.Contains("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay, StringComparison.Ordinal);
         Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
     }
 

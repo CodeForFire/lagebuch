@@ -45,7 +45,7 @@ public class SharePanelRenderTests
     }
 
     private static TextBlock ShareStatus(Window window) =>
-        window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text != null && t.Text.StartsWith("Erreichbar unter"));
+        window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text != null && t.Text.StartsWith("Erreichbar unter", StringComparison.Ordinal));
 
     [AvaloniaFact]
     public void Before_sharing_the_button_invites_sharing_and_no_status_is_shown()
@@ -55,7 +55,7 @@ public class SharePanelRenderTests
         Assert.Equal("IM NETZWERK FREIGEBEN", vm.ShareButtonText);
         Assert.Null(vm.ShareStatus);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(),
-            t => t.Text != null && t.Text.StartsWith("Erreichbar unter"));
+            t => t.Text != null && t.Text.StartsWith("Erreichbar unter", StringComparison.Ordinal));
         Capture(window, "share-before.png");
     }
 
@@ -68,9 +68,9 @@ public class SharePanelRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("FREIGABE BEENDEN", vm.ShareButtonText);
-        Assert.Contains("localhost:5859", ShareStatus(window).Text!);
+        Assert.Contains("localhost:5859", ShareStatus(window).Text!, StringComparison.Ordinal);
         Assert.Equal("1234", vm.SharePin);
-        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text != null && t.Text.Contains("1234"));
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text != null && t.Text.Contains("1234", StringComparison.Ordinal));
         Capture(window, "share-after.png");
     }
 

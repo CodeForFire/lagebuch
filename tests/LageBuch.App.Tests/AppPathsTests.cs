@@ -14,7 +14,7 @@ public class AppPathsTests : IDisposable
     {
         var dir = AppPaths.GetAppDataDir(_base);
         Assert.True(Directory.Exists(dir));
-        Assert.EndsWith("Lagebuch", dir.TrimEnd(Path.DirectorySeparatorChar));
+        Assert.EndsWith("Lagebuch", dir.TrimEnd(Path.DirectorySeparatorChar), StringComparison.Ordinal);
     }
 
     [Fact]
