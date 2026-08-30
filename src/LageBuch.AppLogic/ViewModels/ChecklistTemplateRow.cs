@@ -14,9 +14,12 @@ public sealed partial class ChecklistTemplateRow : ObservableObject
         _isMandatory = isMandatory;
     }
 
-    [ObservableProperty] private string _text;
-    [ObservableProperty] private bool _isMandatory;
+    [ObservableProperty]
+    private string _text;
+    [ObservableProperty]
+    private bool _isMandatory;
 
     partial void OnTextChanged(string value) => _onChanged();
+
     partial void OnIsMandatoryChanged(bool value) => _onChanged();
 }

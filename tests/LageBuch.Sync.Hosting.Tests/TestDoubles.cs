@@ -8,16 +8,27 @@ using LageBuch.Domain;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
 
+// SA1649 (file name must match first type name) doesn't fit here: this is a deliberate grab-bag
+// of small unrelated test doubles (no single type is "the" TestDoubles type), the same grouping
+// convention SA1402 is already disabled repo-wide for.
+#pragma warning disable SA1649
+
 namespace LageBuch.Sync.Hosting.Tests;
 
 internal sealed class InMemoryStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _byPath = new();
+
     public void Save(string path, Incident incident) => _byPath[path] = incident;
+
     public Incident Load(string path) => _byPath[path];
+
     public IncidentState? TryReadState(string path) => _byPath.TryGetValue(path, out var i) ? i.State : null;
+
     private readonly Dictionary<string, byte[]> _files = new();
+
     public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+
     public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
 }
 
@@ -30,41 +41,69 @@ internal sealed class FixedClock : IClock
 internal sealed class NoTicker : ITicker
 {
     public IDisposable Subscribe(Action onTick) => new Sub();
-    private sealed class Sub : IDisposable { public void Dispose() { } }
+
+    private sealed class Sub : IDisposable
+    {
+        public void Dispose()
+        {
+        }
+    }
 }
 
 internal sealed class NoAlarm : IAlarmService
 {
     [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
-    public void Start() { }
+    public void Start()
+    {
+    }
+
     [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
-    public void Stop() { }
-    public void Play(AlarmSound sound) { }
+    public void Stop()
+    {
+    }
+
+    public void Play(AlarmSound sound)
+    {
+    }
 }
 
 internal sealed class NoDialogs : IFileDialogService
 {
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>(null);
+
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
 internal sealed class EmptyMasterData : IMasterDataProvider
 {
     public MasterDataSet Get() => MasterDataSet.Empty;
-    public void Save(MasterDataSet set) { }
+
+    public void Save(MasterDataSet set)
+    {
+    }
 }
 
 internal sealed class NoRecentFiles : IRecentFilesStore
 {
     public IReadOnlyList<string> GetRecent() => Array.Empty<string>();
-    public void Add(string path) { }
+
+    public void Add(string path)
+    {
+    }
 }
 
 internal static class TestHost
@@ -81,8 +120,11 @@ internal static class TestHost
         return port;
     }
 
-    public static async Task<(IncidentHost host, int port)> StartAsync(
-        LocalIncidentSession session, IClock clock, string version = "1.0.0", IUiDispatcher? ui = null,
+    public static async Task<(IncidentHost Host, int Port)> StartAsync(
+        LocalIncidentSession session,
+        IClock clock,
+        string version = "1.0.0",
+        IUiDispatcher? ui = null,
         string pin = DefaultPin)
     {
         var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher(), pin);
@@ -108,8 +150,11 @@ internal sealed class SingleThreadUiDispatcher : IUiDispatcher, IDisposable
         _thread = new Thread(() =>
         {
             foreach (var work in _queue.GetConsumingEnumerable())
+            {
                 work();
-        }) { IsBackground = true, Name = "test-ui-thread" };
+            }
+        })
+        { IsBackground = true, Name = "test-ui-thread" };
         _thread.Start();
     }
 
@@ -121,12 +166,19 @@ internal sealed class SingleThreadUiDispatcher : IUiDispatcher, IDisposable
     public Task<T> InvokeAsync<T>(Func<T> func)
     {
         var tcs = new TaskCompletionSource<T>();
+
         // CA1031: exceptions are captured here, not swallowed — delivered to the await-er via the TCS.
 #pragma warning disable CA1031
         _queue.Add(() =>
         {
-            try { tcs.SetResult(func()); }
-            catch (Exception ex) { tcs.SetException(ex); }
+            try
+            {
+                tcs.SetResult(func());
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
         });
 #pragma warning restore CA1031
         return tcs.Task;

@@ -14,6 +14,7 @@ namespace LageBuch.Documents.Sections;
 public static class FilesSection
 {
     private static readonly string[] HeaderTitles = ["Name", "Hinzugefügt von", "Datum"];
+
     public static void Compose(IContainer container, IReadOnlyList<IncidentFile> files, IReadOnlyDictionary<Guid, byte[]> imageBytesById)
     {
         container.Column(column =>
@@ -39,7 +40,9 @@ public static class FilesSection
                 table.Header(header =>
                 {
                     foreach (var title in HeaderTitles)
+                    {
                         header.Cell().Element(Cells.Header).Text(title).SemiBold();
+                    }
                 });
 
                 foreach (var file in files)
@@ -53,7 +56,10 @@ public static class FilesSection
             foreach (var file in files)
             {
                 if (!imageBytesById.TryGetValue(file.Id, out var bytes))
+                {
                     continue;
+                }
+
                 column.Item().PaddingTop(6).Text(file.DisplayName).SemiBold().FontSize(9);
                 column.Item().MaxHeight(400).Image(bytes).FitArea();
             }

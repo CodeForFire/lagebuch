@@ -5,31 +5,6 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
-internal sealed class FakeMasterData : IMasterDataProvider
-{
-    public MasterDataSet Get() => MasterDataSet.Empty with
-    {
-        Roles = new[] { "EL" },
-        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
-        TruppTypes = new[] { "Angriffstrupp" },
-    };
-    public void Save(MasterDataSet set) { }
-}
-
-internal sealed class FakeRecent : IRecentFilesStore
-{
-    private readonly List<string> _list = new();
-    public IReadOnlyList<string> GetRecent() => _list;
-    public void Add(string path) { _list.Remove(path); _list.Insert(0, path); }
-}
-
-internal sealed class FakeLastSaveFolderStore : ILastSaveFolderStore
-{
-    public string? Saved { get; set; }
-    public string? GetLastFolder() => Saved;
-    public void SetLastFolder(string folder) => Saved = folder;
-}
-
 public class HomeViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
@@ -74,8 +49,16 @@ public class HomeViewModelTests
     public void NewIncident_without_keyword_falls_back_to_a_timestamp_only_filename()
     {
         var dialogs = new CapturingSaveDialogs();
-        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
-            new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new HomeViewModel(
+            new FakeStore(),
+            new FakeMasterData(),
+            new FakeRecent(),
+            dialogs,
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0");
 
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
 
@@ -87,8 +70,16 @@ public class HomeViewModelTests
     {
         var dialogs = new CapturingSaveDialogs();
         var lastFolder = new FakeLastSaveFolderStore { Saved = "/einsaetze/2026" };
-        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
-            new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0",
+        var vm = new HomeViewModel(
+            new FakeStore(),
+            new FakeMasterData(),
+            new FakeRecent(),
+            dialogs,
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0",
             lastSaveFolder: lastFolder);
 
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
@@ -101,8 +92,16 @@ public class HomeViewModelTests
     {
         var dialogs = new CapturingSaveDialogs { ReturnPath = "/einsaetze/2027/20260622-0900-B3P.fwincident" };
         var lastFolder = new FakeLastSaveFolderStore();
-        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs,
-            new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0",
+        var vm = new HomeViewModel(
+            new FakeStore(),
+            new FakeMasterData(),
+            new FakeRecent(),
+            dialogs,
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0",
             lastSaveFolder: lastFolder);
 
         vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
@@ -236,8 +235,16 @@ public class HomeViewModelTests
     {
         // A recent entry that has since been moved, truncated, or written by a newer build. The
         // Home screen has to survive it: an Einsatz is exactly the moment not to lose the app.
-        var vm = new HomeViewModel(new ThrowingStore("Datei kaputt."), new FakeMasterData(), new FakeRecent(),
-            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new HomeViewModel(
+            new ThrowingStore("Datei kaputt."),
+            new FakeMasterData(),
+            new FakeRecent(),
+            new FakeDialogs(),
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0");
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -252,8 +259,16 @@ public class HomeViewModelTests
     [Fact]
     public void OpenFile_of_an_unreadable_file_reports_instead_of_crashing()
     {
-        var vm = new HomeViewModel(new ThrowingStore("Datei kaputt."), new FakeMasterData(), new FakeRecent(),
-            new OpenReturningDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new HomeViewModel(
+            new ThrowingStore("Datei kaputt."),
+            new FakeMasterData(),
+            new FakeRecent(),
+            new OpenReturningDialogs(),
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0");
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -269,8 +284,16 @@ public class HomeViewModelTests
         // The path never became a usable Einsatz, so promoting it to "zuletzt verwendet" would
         // just hand the user a button that fails again.
         var recent = new FakeRecent();
-        var vm = new HomeViewModel(new ThrowingStore("kaputt"), new FakeMasterData(), recent,
-            new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new HomeViewModel(
+            new ThrowingStore("kaputt"),
+            new FakeMasterData(),
+            recent,
+            new FakeDialogs(),
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0");
 
         vm.OpenRecentCommand.Execute("/gone.fwincident");
 
@@ -309,17 +332,61 @@ public class HomeViewModelTests
     }
 }
 
+internal sealed class FakeMasterData : IMasterDataProvider
+{
+    public MasterDataSet Get() => MasterDataSet.Empty with
+    {
+        Roles = new[] { "EL" },
+        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
+        TruppTypes = new[] { "Angriffstrupp" },
+    };
+
+    public void Save(MasterDataSet set)
+    {
+    }
+}
+
+internal sealed class FakeRecent : IRecentFilesStore
+{
+    private readonly List<string> _list = new();
+
+    public IReadOnlyList<string> GetRecent() => _list;
+
+    public void Add(string path)
+    {
+        _list.Remove(path);
+        _list.Insert(0, path);
+    }
+}
+
+internal sealed class FakeLastSaveFolderStore : ILastSaveFolderStore
+{
+    public string? Saved { get; set; }
+
+    public string? GetLastFolder() => Saved;
+
+    public void SetLastFolder(string folder) => Saved = folder;
+}
+
 // PickOpenAsync that returns a real path (the base FakeDialogs returns null).
 internal sealed class OpenReturningDialogs : IFileDialogService
 {
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
+
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -327,21 +394,32 @@ internal sealed class OpenReturningDialogs : IFileDialogService
 internal sealed class CapturingSaveDialogs : IFileDialogService
 {
     public string? LastSuggestedName { get; private set; }
+
     public string? LastInitialFolder { get; private set; }
+
     public string ReturnPath { get; set; } = "/x.fwincident";
+
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
     {
         LastSuggestedName = suggestedFileName;
         LastInitialFolder = initialFolder;
         return Task.FromResult<string?>(ReturnPath);
     }
+
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -349,11 +427,21 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
 internal sealed class ThrowingStore : IIncidentStore
 {
     private readonly string _message;
+
     public ThrowingStore(string message) => _message = message;
-    public void Save(string path, Incident incident) { }
+
+    public void Save(string path, Incident incident)
+    {
+    }
+
     public Incident Load(string path) => throw new InvalidOperationException(_message);
+
     public IncidentState? TryReadState(string path) => null;
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) { }
+
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes)
+    {
+    }
+
     public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
 }
 
@@ -361,11 +449,18 @@ internal sealed class ThrowingStore : IIncidentStore
 internal sealed class SelectivelyThrowingStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _saved = new();
+
     public void Save(string path, Incident incident) => _saved[path] = incident;
+
     public Incident Load(string path) =>
         _saved.TryGetValue(path, out var i) ? i : throw new InvalidOperationException("Datei kaputt.");
+
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) { }
+
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes)
+    {
+    }
+
     public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
 }
 
@@ -373,12 +468,25 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
 internal sealed class CountingStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _saved = new();
+
     public int LoadCount { get; private set; }
+
     public void ResetLoadCount() => LoadCount = 0;
+
     public void Save(string path, Incident incident) => _saved[path] = incident;
-    public Incident Load(string path) { LoadCount++; return _saved[path]; }
+
+    public Incident Load(string path)
+    {
+        LoadCount++;
+        return _saved[path];
+    }
+
     // A passive peek, not a load — must not count against the load-once guard.
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) { }
+
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes)
+    {
+    }
+
     public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
 }

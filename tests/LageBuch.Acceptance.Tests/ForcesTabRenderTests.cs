@@ -18,11 +18,21 @@ public class ForcesTabRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
-            MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -141,11 +151,21 @@ public class ForcesTabRenderTests
         // Hosted directly (same idiom as ControlBorderConsistencyTests): the workspace shell's
         // ViewLocator content does not materialize under the headless host, so the view is built
         // against the same ForcesViewModel instance instead.
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
-            MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
         var view = new ForcesView { DataContext = vm.Forces };
         var window = new Window { Content = view, Width = 1920, Height = 1032 };
         window.Show();

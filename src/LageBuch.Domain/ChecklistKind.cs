@@ -4,5 +4,5 @@ namespace LageBuch.Domain;
 public enum ChecklistKind
 {
     Aufbau,
-    Abbau
+    Abbau,
 }

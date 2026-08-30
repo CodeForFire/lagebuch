@@ -6,15 +6,24 @@ public sealed record EtbEntry
     // via WithEditedText, each retained edit) can grow the journal's storage and wire footprint.
     public const int MaxTextLength = 4000;
 
-    private EtbEntry() { }
+    private EtbEntry()
+    {
+    }
 
     public Guid Id { get; private init; }
+
     public DateTimeOffset Timestamp { get; private init; }
+
     public EtbDirection Direction { get; private init; }
+
     public string? From { get; private init; }
+
     public string? To { get; private init; }
+
     public string Text { get; private init; } = string.Empty;
+
     public string EnteredBy { get; private init; } = string.Empty;
+
     public IReadOnlyList<EtbEntryEdit> Edits { get; private init; } = Array.Empty<EtbEntryEdit>();
 
     public static EtbEntry Create(
@@ -26,9 +35,15 @@ public sealed record EtbEntry
         string? to = null)
     {
         if (string.IsNullOrWhiteSpace(text))
+        {
             throw new ArgumentException("ETB-Eintrag darf nicht leer sein.", nameof(text));
+        }
+
         if (text.Length > MaxTextLength)
+        {
             throw new ArgumentException($"ETB-Eintrag ist länger als das Limit von {MaxTextLength} Zeichen.", nameof(text));
+        }
+
         ArgumentNullException.ThrowIfNull(@operator);
 
         return new EtbEntry
@@ -39,7 +54,7 @@ public sealed record EtbEntry
             Text = text.Trim(),
             From = string.IsNullOrWhiteSpace(from) ? null : from.Trim(),
             To = string.IsNullOrWhiteSpace(to) ? null : to.Trim(),
-            EnteredBy = @operator.Display
+            EnteredBy = @operator.Display,
         };
     }
 
@@ -61,7 +76,7 @@ public sealed record EtbEntry
             EnteredBy = enteredBy,
             From = from,
             To = to,
-            Edits = (edits ?? Enumerable.Empty<EtbEntryEdit>()).ToList()
+            Edits = (edits ?? Enumerable.Empty<EtbEntryEdit>()).ToList(),
         };
 
     /// <summary>
@@ -78,14 +93,22 @@ public sealed record EtbEntry
     public EtbEntry WithEditedText(string newText, SessionOperator editor, DateTimeOffset editedAt)
     {
         if (string.IsNullOrWhiteSpace(newText))
+        {
             throw new ArgumentException("ETB-Eintrag darf nicht leer sein.", nameof(newText));
+        }
+
         if (newText.Length > MaxTextLength)
+        {
             throw new ArgumentException($"ETB-Eintrag ist länger als das Limit von {MaxTextLength} Zeichen.", nameof(newText));
+        }
+
         ArgumentNullException.ThrowIfNull(editor);
 
         var trimmed = newText.Trim();
         if (trimmed == Text)
+        {
             return this;
+        }
 
         var edits = new List<EtbEntryEdit>(Edits) { new(Text, editor.Display, editedAt) };
         return this with { Text = trimmed, Edits = edits };

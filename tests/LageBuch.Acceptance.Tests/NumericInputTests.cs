@@ -5,10 +5,9 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
-
-using LageBuch.AppLogic.Services;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -100,7 +99,8 @@ public class NumericInputTests
         foreach (var name in new[] { "OfficerBox", "MannschaftBox", "ScbaBox" })
         {
             var box = view.GetControl<TextBox>(name);
-            Assert.True(LageBuch.App.Shared.Behaviors.IntegerOnly.GetIsEnabled(box),
+            Assert.True(
+                LageBuch.App.Shared.Behaviors.IntegerOnly.GetIsEnabled(box),
                 $"{name} must carry IntegerOnly.");
         }
     }
@@ -114,10 +114,21 @@ public class ForcesGridEditingTests
 {
     private static (ForcesView View, IncidentWorkspaceViewModel Vm) ShowForces(out LocalIncidentSession session)
     {
-        session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
-            WorkspaceRenderHelper.MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            WorkspaceRenderHelper.MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
         var view = new ForcesView { DataContext = vm.Forces };
         var window = new Window { Content = view, Width = 1200, Height = 700 };
         window.Show();
@@ -145,7 +156,10 @@ public class ForcesGridEditingTests
         var (view, _) = ShowForces(out _);
 
         foreach (var header in new[] { "FEUERWEHR", "FUNKRUFNAME", "AGT" })
+        {
             Assert.IsType<DataGridTextColumn>(Column(view, header));
+        }
+
         Assert.IsType<DataGridTemplateColumn>(Column(view, "STÄRKE"));
     }
 

@@ -23,7 +23,9 @@ public partial class MainView : UserControl
                 prompt.PropertyChanged += (_, pe) =>
                 {
                     if (pe.PropertyName == nameof(OperatorPromptViewModel.Result) && prompt.Result is not null)
+                    {
                         viewModel.ConfirmOperatorCommand.Execute(null);
+                    }
                 };
                 prompt.Cancelled += (_, _) => viewModel.CancelOperatorCommand.Execute(null);
             }

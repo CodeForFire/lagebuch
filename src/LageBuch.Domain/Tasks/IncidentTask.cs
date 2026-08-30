@@ -30,17 +30,28 @@ public sealed record IncidentTask
     // (same rationale as EtbEntry.MaxTextLength).
     public const int MaxTextLength = 1000;
 
-    private IncidentTask() { }
+    private IncidentTask()
+    {
+    }
 
     public Guid Id { get; private init; }
+
     public string Text { get; private init; } = string.Empty;
+
     public string Assignee { get; private init; } = string.Empty;
+
     public TaskImportance Importance { get; private init; }
+
     public TaskUrgency Urgency { get; private init; }
+
     public string CreatedBy { get; private init; } = string.Empty;
+
     public DateTimeOffset CreatedAt { get; private init; }
+
     public DateTimeOffset DueAt { get; private init; }
+
     public DateTimeOffset? CompletedAt { get; private init; }
+
     public string? CompletedBy { get; private init; }
 
     public bool IsCompleted => CompletedAt is not null;
@@ -55,11 +66,20 @@ public sealed record IncidentTask
         SessionOperator @operator)
     {
         if (string.IsNullOrWhiteSpace(text))
+        {
             throw new ArgumentException("Aufgabe darf nicht leer sein.", nameof(text));
+        }
+
         if (text.Length > MaxTextLength)
+        {
             throw new ArgumentException($"Aufgabe ist länger als das Limit von {MaxTextLength} Zeichen.", nameof(text));
+        }
+
         if (timerMinutes < 0)
+        {
             throw new ArgumentException("Der Timer darf nicht negativ sein.", nameof(timerMinutes));
+        }
+
         ArgumentNullException.ThrowIfNull(@operator);
 
         return new IncidentTask

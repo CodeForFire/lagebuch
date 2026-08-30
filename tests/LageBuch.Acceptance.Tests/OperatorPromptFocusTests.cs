@@ -4,11 +4,10 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
-
-using LageBuch.AppLogic.Services;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -24,8 +23,13 @@ public class OperatorPromptFocusTests
     {
         var store = new FakeStore();
         var clock = new FixedClock();
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident", new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
@@ -50,7 +54,8 @@ public class OperatorPromptFocusTests
             .Single(t => t.Name == "OperatorNameBox");
         var focused = window.FocusManager?.GetFocusedElement();
 
-        Assert.True(nameBox.IsFocused,
+        Assert.True(
+            nameBox.IsFocused,
             $"NAME box not focused. FocusManager focused element = {focused?.GetType().Name ?? "null"}.");
     }
 }

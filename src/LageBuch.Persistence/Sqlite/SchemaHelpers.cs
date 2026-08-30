@@ -12,13 +12,18 @@ namespace LageBuch.Persistence.Sqlite;
 /// </summary>
 internal static class SchemaHelpers
 {
-    [SuppressMessage("Security", "CA2100",
+    [SuppressMessage(
+        "Security",
+        "CA2100",
         Justification = "Audited: identifiers are compile-time schema constants from call sites; values use bound parameters.")]
     public static void AddColumnIfMissing(
         SqliteConnection cn, SqliteTransaction? tx, string table, string column, string type)
     {
         if (!TableExists(cn, tx, table) || ColumnExists(cn, tx, table, column))
+        {
             return;
+        }
+
         using var cmd = cn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type};";
@@ -34,7 +39,9 @@ internal static class SchemaHelpers
         return (long)cmd.ExecuteScalar()! > 0;
     }
 
-    [SuppressMessage("Security", "CA2100",
+    [SuppressMessage(
+        "Security",
+        "CA2100",
         Justification = "Audited: identifiers are compile-time schema constants from call sites; values use bound parameters.")]
     public static bool ColumnExists(SqliteConnection cn, SqliteTransaction? tx, string table, string column)
     {

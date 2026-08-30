@@ -8,7 +8,10 @@ public class JsonRecentFilesStoreTests : IDisposable
 
     public void Dispose()
     {
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     [Fact]
@@ -45,7 +48,9 @@ public class JsonRecentFilesStoreTests : IDisposable
     {
         var store = new JsonRecentFilesStore(_path);
         for (var i = 0; i < 15; i++)
+        {
             store.Add($"/file{i}.fwincident");
+        }
 
         var recent = store.GetRecent();
         Assert.Equal(10, recent.Count);

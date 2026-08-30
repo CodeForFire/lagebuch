@@ -18,11 +18,20 @@ public sealed class UnsupportedSchemaVersionException : Exception
         SupportedVersion = supportedVersion;
     }
 
-    public UnsupportedSchemaVersionException() : this(0, 0) { }
+    public UnsupportedSchemaVersionException()
+        : this(0, 0)
+    {
+    }
 
-    public UnsupportedSchemaVersionException(string message) : base(message) { }
+    public UnsupportedSchemaVersionException(string message)
+        : base(message)
+    {
+    }
 
-    public UnsupportedSchemaVersionException(string message, Exception innerException) : base(message, innerException) { }
+    public UnsupportedSchemaVersionException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 
     public int FileVersion { get; }
 

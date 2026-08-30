@@ -7,11 +7,6 @@ using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Sync.Tests;
 
-internal sealed class FixedClock : IClock
-{
-    public DateTimeOffset Now { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.FromHours(2));
-}
-
 public class SnapshotRoundTripTests
 {
     // Builds an incident that touches every collection the snapshot carries: checklist (toggled),
@@ -36,14 +31,26 @@ public class SnapshotRoundTripTests
         incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
         incident.AssignRole(clock, op, "EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
 
-        var force = incident.AddForceUnit(clock, op, "Aich", personnelCount: 9, callSign: "Aich 42/1",
-            status: "Auf Anfahrt", notes: "erste Welle", scbaCount: 4);
+        var force = incident.AddForceUnit(
+            clock,
+            op,
+            "Aich",
+            personnelCount: 9,
+            callSign: "Aich 42/1",
+            status: "Auf Anfahrt",
+            notes: "erste Welle",
+            scbaCount: 4);
         incident.UpdateForceUnit(clock, op, force.Id, "Im Einsatz", "eingetroffen");
         clock.Now = clock.Now.AddMinutes(1);
         incident.UpdateForceStrength(clock, op, force.Id, officerCount: 1, personnelCount: 9, scbaCount: 4);
 
-        var trupp = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"),
-            entryPressure: 300, callSign: "AT-1", task: "Menschenrettung");
+        var trupp = incident.AddScbaTrupp(
+            clock,
+            "Angriffstrupp",
+            TruppMember.Crew("Müller", "Schmidt"),
+            entryPressure: 300,
+            callSign: "AT-1",
+            task: "Menschenrettung");
         clock.Now = clock.Now.AddMinutes(2);
         incident.StartScbaTrupp(clock, trupp.Id);
         clock.Now = clock.Now.AddMinutes(5);
@@ -56,9 +63,21 @@ public class SnapshotRoundTripTests
         var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 2048);
         incident.RenameFile(file.Id, "Küchenbrand");
 
-        incident.AddTask(clock, op, "Offen bleiben", "Land 1", TaskImportance.High, TaskUrgency.High,
+        incident.AddTask(
+            clock,
+            op,
+            "Offen bleiben",
+            "Land 1",
+            TaskImportance.High,
+            TaskUrgency.High,
             timerMinutes: 5);
-        var doneTask = incident.AddTask(clock, op, "Fertig", null, TaskImportance.Medium, TaskUrgency.Low,
+        var doneTask = incident.AddTask(
+            clock,
+            op,
+            "Fertig",
+            null,
+            TaskImportance.Medium,
+            TaskUrgency.Low,
             timerMinutes: 30);
         incident.SetTaskCompleted(doneTask.Id, true, clock, op);
 
@@ -105,6 +124,7 @@ public class SnapshotRoundTripTests
         Assert.Equal("Erstmeldung", history.PreviousText);
         Assert.Equal(9, r.Forces[0].PersonnelCount);
         Assert.Equal("Im Einsatz", r.Forces[0].Status);
+
         // #76: officer count and the strength edit history survive the snapshot.
         Assert.Equal(1, r.Forces[0].OfficerCount);
         var strengthEdit = Assert.Single(r.Forces[0].Edits);
@@ -137,6 +157,7 @@ public class SnapshotRoundTripTests
         var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident));
 
         Assert.Contains("\"fileName\":\"brand.jpg\"", json, StringComparison.Ordinal);
+
         // Not `Contains("bytes")` -- that's a false positive on "sizeBytes". The DTO simply has no
         // "bytes" property to serialize (unlike AddFileCommand, which does).
         Assert.DoesNotContain("\"bytes\":", json, StringComparison.OrdinalIgnoreCase);
@@ -200,4 +221,9 @@ public class SnapshotRoundTripTests
             d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
         Assert.Equal(45, dwelling.CoValue);
     }
+}
+
+internal sealed class FixedClock : IClock
+{
+    public DateTimeOffset Now { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.FromHours(2));
 }

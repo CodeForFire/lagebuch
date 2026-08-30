@@ -2,16 +2,19 @@ namespace LageBuch.Domain;
 
 public sealed record SessionOperator
 {
-    public SessionOperator(string Name, string? CallSign = null)
+    public SessionOperator(string name, string? callSign = null)
     {
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Operator name must not be blank.", nameof(Name));
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Operator name must not be blank.", nameof(name));
+        }
 
-        this.Name = Name.Trim();
-        this.CallSign = string.IsNullOrWhiteSpace(CallSign) ? null : CallSign.Trim();
+        this.Name = name.Trim();
+        this.CallSign = string.IsNullOrWhiteSpace(callSign) ? null : callSign.Trim();
     }
 
     public string Name { get; }
+
     public string? CallSign { get; }
 
     public string Display => CallSign is null ? Name : $"{Name} ({CallSign})";

@@ -16,9 +16,12 @@ public sealed partial class VehiclesSection : EditorSection
     private readonly IReadOnlyList<string> _callSignOptions;
 
     public VehiclesSection(
-        string title, IEnumerable<Vehicle> vehicles,
-        IReadOnlyList<string> wacheOptions, IReadOnlyList<string> callSignOptions,
-        Action onChanged) : base(title)
+        string title,
+        IEnumerable<Vehicle> vehicles,
+        IReadOnlyList<string> wacheOptions,
+        IReadOnlyList<string> callSignOptions,
+        Action onChanged)
+        : base(title)
     {
         _onChanged = onChanged;
         _wacheOptions = wacheOptions;
@@ -42,7 +45,10 @@ public sealed partial class VehiclesSection : EditorSection
     [RelayCommand]
     private void Remove(VehicleRow row)
     {
-        if (Rows.Remove(row)) _onChanged();
+        if (Rows.Remove(row))
+        {
+            _onChanged();
+        }
     }
 
     /// <summary>Rows with a non-blank Wache and Funkrufname; trimmed, seats as entered.</summary>
@@ -53,8 +59,12 @@ public sealed partial class VehiclesSection : EditorSection
         {
             var wache = row.Wache?.Trim() ?? string.Empty;
             var callSign = row.CallSign?.Trim() ?? string.Empty;
-            if (wache.Length > 0 && callSign.Length > 0) result.Add(new Vehicle(wache, callSign, row.Seats));
+            if (wache.Length > 0 && callSign.Length > 0)
+            {
+                result.Add(new Vehicle(wache, callSign, row.Seats));
+            }
         }
+
         return result;
     }
 }

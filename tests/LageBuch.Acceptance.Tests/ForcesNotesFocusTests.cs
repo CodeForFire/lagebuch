@@ -24,9 +24,13 @@ public class ForcesNotesFocusTests
     private static ForcesViewModel BuildForcesVm(out LocalIncidentSession session, out FakeStore store)
     {
         store = new FakeStore();
-        session = LocalIncidentSession.StartNew(store, new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.AddForceUnit("FFB Wache 1", 9, null, "Alarmiert", "erste Meldung");
         return new ForcesViewModel(session, new FixedClock(), Md(), () => { });
     }
@@ -51,7 +55,8 @@ public class ForcesNotesFocusTests
             Dispatcher.UIThread.RunJobs();
 
             var focused = window.FocusManager?.GetFocusedElement();
-            Assert.True(notesBox.IsFocused,
+            Assert.True(
+                notesBox.IsFocused,
                 $"Bemerkung box lost focus after typing '{ch}'. FocusManager focused element = {focused?.GetType().Name ?? "null"}.");
         }
 
@@ -86,6 +91,7 @@ public class ForcesNotesFocusTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Alarm", session.Incident.Forces[0].Notes);
+
         // Five keystrokes committed as one edit -> exactly one save, not one per keystroke.
         Assert.Equal(saveCountBefore + 1, store.SaveCount);
     }

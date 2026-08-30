@@ -6,7 +6,10 @@ public class AppPathsTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_base)) Directory.Delete(_base, recursive: true);
+        if (Directory.Exists(_base))
+        {
+            Directory.Delete(_base, recursive: true);
+        }
     }
 
     [Fact]

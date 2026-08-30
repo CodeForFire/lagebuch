@@ -22,9 +22,13 @@ public class RolesPhoneFocusTests
 
     private static RolesViewModel BuildRolesVm(out LocalIncidentSession session)
     {
-        session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.AssignRole("EL", "Müller", phone: "0171");
         return new RolesViewModel(session, new FixedClock(), Md(), () => { });
     }
@@ -49,7 +53,8 @@ public class RolesPhoneFocusTests
             Dispatcher.UIThread.RunJobs();
 
             var focused = window.FocusManager?.GetFocusedElement();
-            Assert.True(phoneBox.IsFocused,
+            Assert.True(
+                phoneBox.IsFocused,
                 $"Phone box lost focus after typing '{ch}'. FocusManager focused element = {focused?.GetType().Name ?? "null"}.");
         }
 
@@ -81,6 +86,7 @@ public class RolesPhoneFocusTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("0172", Assert.Single(session.Incident.Roles).Phone);
+
         // One committed edit -> exactly one ETB line, not one per keystroke.
         Assert.Equal(journalCountBefore + 1, session.Incident.Journal.Count);
     }

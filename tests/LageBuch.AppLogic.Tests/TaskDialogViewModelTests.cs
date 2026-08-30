@@ -12,9 +12,13 @@ public class TaskDialogViewModelTests
     private static (LocalIncidentSession Session, FixedClock Clock) NewSession()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         return (session, clock);
     }
 
@@ -28,7 +32,10 @@ public class TaskDialogViewModelTests
     {
         var (session, _) = NewSession();
         var closed = false;
-        var dialog = new TaskDialogViewModel(session, MasterData(), "Lage erkundet — Mensch lebend aufgefunden",
+        var dialog = new TaskDialogViewModel(
+            session,
+            MasterData(),
+            "Lage erkundet — Mensch lebend aufgefunden",
             () => { });
         dialog.Closed += (_, _) => closed = true;
 
@@ -100,8 +107,13 @@ public class TaskDialogViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
 
         var dialog = new TaskDialogViewModel(ro, MasterData(), "Nachtrag", () => { });

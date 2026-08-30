@@ -14,6 +14,7 @@ namespace LageBuch.AppLogic.ViewModels;
 public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 {
     private readonly IIncidentSession _session;
+
     // The concrete local session, or null on a joined client. Guards the two capabilities that only
     // exist on the device that owns the .fwincident file: PDF export and resuming a read-only file.
     private readonly LocalIncidentSession? _local;
@@ -36,8 +37,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _alarm = alarm;
         _hostController = hostController;
         IsReadOnly = session.IsReadOnly;
+
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
+
         // The Stichwort is creation-time-only (unlike the Einsatznummer above, it has no write-back
         // path), so a plain property seeded once is enough -- no ObservableProperty needed.
         KeywordDisplay = _session.Incident.Keyword;
@@ -137,6 +140,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     {
         var number = new IncidentNumber(IncidentNumberEditInput.Trim());
         _session.SetIncidentNumber(number);
+
         // A local session applies this immediately in-process; a remote/joined session only
         // reflects it once the host's broadcast round-trips (OnRemoteLifecycle) -- updating here
         // too is harmless, it just gets overwritten with the same value shortly after.
@@ -148,15 +152,25 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private void CancelEditIncidentNumber() => IsEditingIncidentNumber = false;
 
     public CoMessprotokollViewModel CoMessprotokoll { get; private set; } = null!;
+
     public ChecklistViewModel ChecklistAufbau { get; private set; } = null!;
+
     public ChecklistViewModel ChecklistAbbau { get; private set; } = null!;
+
     public EtbViewModel Etb { get; private set; } = null!;
+
     public RolesViewModel Roles { get; private set; } = null!;
+
     public ForcesViewModel Forces { get; private set; } = null!;
+
     public ScbaViewModel Scba { get; private set; } = null!;
+
     public FilesViewModel Files { get; private set; } = null!;
+
     public LinksViewModel Links { get; private set; } = null!;
+
     public TasksViewModel Tasks { get; private set; } = null!;
+
     public ReminderViewModel? Reminder { get; private set; }
 
     public string StatusDisplay => Formatting.State(_session.Incident.State);
@@ -169,7 +183,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     // ===== Joined-client connection state (#52 §7). Always "connected" locally; on a remote session
     // it tracks the SignalR link so the view can grey out input while reconnecting. =====
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsInputEnabled))]
     private bool _isConnected = true;
@@ -190,7 +203,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public async ValueTask LeaveAsync()
     {
         if (_session is IAsyncDisposable disposable)
+        {
             await disposable.DisposeAsync();
+        }
     }
 
     // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
@@ -219,7 +234,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     {
         ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
         ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
-        Etb = new EtbViewModel(_session, _clock, _masterData, OnChanged,
+        Etb = new EtbViewModel(
+            _session,
+            _clock,
+            _masterData,
+            OnChanged,
             text => OpenTaskDialog(text));
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
@@ -236,11 +255,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
 
         Reminder?.Dispose();
+
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.
         Reminder = _session.IsReadOnly || _session.IsRemote
             ? null
-            : new ReminderViewModel(_session, _clock, _ticker, _alarm, OnChanged,
+            : new ReminderViewModel(
+                _session,
+                _clock,
+                _ticker,
+                _alarm,
+                OnChanged,
                 _masterData.Settings.IlsReminderIntervalMinutes,
                 _masterData.Settings.IlsReminderFollowUpIntervalMinutes);
 
@@ -272,6 +297,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             : "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?";
         var dialog = new ConfirmDialogViewModel(
             "Einsatz abschließen?", message, "ABSCHLIESSEN", PerformClose);
+
         // Clear the overlay on either outcome; PerformClose has already run on confirm.
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
@@ -281,6 +307,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private void OpenTaskDialog(string text)
     {
         var dialog = new TaskDialogViewModel(_session, _masterData, text, OnChanged);
+
         // Clear the overlay on either outcome; Save has already added the task on confirm.
         dialog.Closed += (_, _) => PendingTaskDialog = null;
         PendingTaskDialog = dialog;
@@ -309,7 +336,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         var op = PendingPrompt?.Result;
         PendingPrompt = null;
         if (op is null)
+        {
             return;
+        }
+
         _local!.ContinueEditing(op); // CanContinueEditing guarantees _local is not null
         IsReadOnly = false; // notifies CanContinueEditing + both commands
         LastSavedAt = _clock.Now;
@@ -328,7 +358,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         var suggested = (_session.Incident.IncidentNumber?.Value ?? "Einsatz") + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
+        {
             return;
+        }
+
         await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync());
         await _dialogs.ShareFileAsync(path, "application/pdf");
     }
@@ -354,14 +387,19 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public string ShareButtonText => IsSharing ? "FREIGABE BEENDEN" : "IM NETZWERK FREIGEBEN";
 
     [RelayCommand]
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "Host start can fail in several ways (port in use etc.); surfaces in the status line.")]
     private async Task ToggleSharing()
     {
         // Hosting exposes the local .fwincident, so it needs the concrete local session. The toggle is
         // only shown when CanHost (a hostable platform with a local session), so _local is non-null here.
         if (_local is null)
+        {
             return;
+        }
+
         if (IsSharing)
         {
             await _hostController.StopAsync();
@@ -370,6 +408,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             SharePin = null;
             return;
         }
+
         try
         {
             // Binds every interface (loopback + LAN + tailnet). Can still fail — most likely the
@@ -382,6 +421,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             ShareStatus = $"Freigabe fehlgeschlagen: {ex.Message}";
             return;
         }
+
         IsSharing = true;
         ShareStatus = _hostController.ShareHint;
         SharePin = _hostController.SharePin;

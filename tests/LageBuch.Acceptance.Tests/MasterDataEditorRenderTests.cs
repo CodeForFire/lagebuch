@@ -3,10 +3,10 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Persistence.MasterData;
-using LageBuch.App.Shared.Views;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -42,13 +42,19 @@ public class MasterDataEditorRenderTests
                 new Person("Musterfrau", "Erika", "GF", null, "01 71 / 7 65 43 21"),
             },
         };
-        public void Save(MasterDataSet set) { }
+
+        public void Save(MasterDataSet set)
+        {
+        }
     }
 
     private sealed class NoFiles : IMasterDataFileService
     {
         public MasterDataSet Read(string path) => MasterDataSet.Empty;
-        public void Write(string path, MasterDataSet set) { }
+
+        public void Write(string path, MasterDataSet set)
+        {
+        }
     }
 
     [AvaloniaFact]
@@ -61,6 +67,7 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
+
         // 14 categories plus #76's Fahrzeuge.
         Assert.Equal(15, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -141,14 +148,17 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var boxes = view.GetVisualDescendants().OfType<AutoCompleteBox>().ToList();
+
         // PlaceholderText: Watermark is obsolete in C# under Avalonia 12 (XAML keeps the old name).
         // #137: placeholders now show anonymized examples instead of restating the label.
         Assert.Contains(boxes, b => b.Text == "FFB Wache 1" && b.PlaceholderText == AnonymizedExampleData.BrigadePlaceholder);
         Assert.Contains(boxes, b => b.Text == "FFB 1/44/1" && b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder);
+
         // The suggestions come from the master data lists; free text stays possible.
         var wacheBox = boxes.Single(b => b.PlaceholderText == AnonymizedExampleData.BrigadePlaceholder);
         Assert.Equal(new[] { "FFB Wache 1", "Aich", "Puch" }, wacheBox.ItemsSource);
-        Assert.Equal(new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
+        Assert.Equal(
+            new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
             boxes.Single(b => b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder).ItemsSource);
         Assert.Contains(view.GetVisualDescendants().OfType<NumericUpDown>(), n => n.Value == 9);
         Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9) }, section.ToValues());

@@ -17,11 +17,21 @@ public class RolesTabRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(),
-            MasterData(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();

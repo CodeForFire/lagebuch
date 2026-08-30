@@ -1,10 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
-using System.Diagnostics.CodeAnalysis;
 
 namespace LageBuch.Sync;
 
@@ -40,18 +40,35 @@ public interface IIncidentSession
     event Action? Changed;
 
     void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
+
     void EditJournalEntry(Guid entryId, string text);
+
     void ToggleChecklistItem(Guid itemId);
-    void AssignRole(string role, string personName, string? callSign = null,
-        DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null);
+
+    void AssignRole(
+        string role,
+        string personName,
+        string? callSign = null,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? section = null,
+        string? phone = null);
 
     /// <summary>Ends a running assignment and starts a new one for the same role/section — a handover.</summary>
     void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null);
 
     /// <summary>Corrects a role assignment's phone number. Logs to the ETB only on a real change.</summary>
     void EditRolePhone(Guid assignmentId, string? phone);
-    void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
-        string? status = null, string? notes = null, int scbaCount = 0, int officerCount = 0);
+
+    void AddForceUnit(
+        string brigade,
+        int personnelCount,
+        string? callSign = null,
+        string? status = null,
+        string? notes = null,
+        int scbaCount = 0,
+        int officerCount = 0);
+
     void UpdateForceUnit(Guid unitId, string? status, string? notes);
 
     /// <summary>Corrects a unit's Stärke (GF / Gesamt / davon AGT). Logs to the ETB and retains the
@@ -68,20 +85,32 @@ public interface IIncidentSession
 
     /// <summary>Stamps/clears a task's completion (#88).</summary>
     void SetTaskCompleted(Guid taskId, bool isDone);
-    void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
+
+    void AddScbaTrupp(
+        string designation,
+        IEnumerable<TruppMember> members,
+        int entryPressure,
         int? truppNumber = null,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes);
+
     void StartScbaTrupp(Guid truppId);
+
     void RecordScbaPressure(Guid truppId, int bar);
+
     void WithdrawScbaTrupp(Guid truppId);
+
     void MarkScbaRemoved(Guid truppId);
+
     void SetIncidentNumber(IncidentNumber? number);
+
     void SetKeyword(string? keyword);
+
     void SetAddress(string? street, string? district);
+
     void SetStatus(string? status);
 
     /// <summary>
@@ -110,11 +139,18 @@ public interface IIncidentSession
     void RenameFile(Guid fileId, string? displayName);
 
     void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor);
+
     void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor);
+
     void RemoveCoBuilding(Guid buildingId);
+
     void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue);
+
     void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status);
+
     void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable);
+
     void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description);
+
     void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label);
 }

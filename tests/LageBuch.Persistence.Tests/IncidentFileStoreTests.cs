@@ -11,7 +11,10 @@ public class IncidentFileStoreTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_dir)) Directory.Delete(_dir, recursive: true);
+        if (Directory.Exists(_dir))
+        {
+            Directory.Delete(_dir, recursive: true);
+        }
     }
 
     [Fact]

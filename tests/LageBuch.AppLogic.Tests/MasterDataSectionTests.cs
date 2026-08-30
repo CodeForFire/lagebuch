@@ -23,7 +23,7 @@ public class MasterDataSectionTests
     [Fact]
     public void ToValues_trims_drops_blanks_and_dedupes_keeping_first()
     {
-        var s = new EditableListSection("Rollen", new[] { " EL ", "EL", "", "ZF" }, () => { });
+        var s = new EditableListSection("Rollen", new[] { " EL ", "EL", string.Empty, "ZF" }, () => { });
         Assert.Equal(new[] { "EL", "ZF" }, s.ToValues());
     }
 
@@ -59,8 +59,10 @@ public class MasterDataSectionTests
     public void Personnel_add_edit_and_normalize()
     {
         var changes = 0;
-        var s = new PersonnelSection("Personal",
-            new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") }, () => changes++);
+        var s = new PersonnelSection(
+            "Personal",
+            new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
+            () => changes++);
 
         s.AddCommand.Execute(null);
         var row = s.Rows[^1];

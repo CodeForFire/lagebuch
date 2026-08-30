@@ -12,8 +12,12 @@ public sealed partial class VehicleRow : ObservableObject
     private readonly Action _onChanged;
 
     public VehicleRow(
-        string wache, string callSign, int seats,
-        IReadOnlyList<string> wacheOptions, IReadOnlyList<string> callSignOptions, Action onChanged)
+        string wache,
+        string callSign,
+        int seats,
+        IReadOnlyList<string> wacheOptions,
+        IReadOnlyList<string> callSignOptions,
+        Action onChanged)
     {
         _onChanged = onChanged;
         _wache = wache;
@@ -29,11 +33,16 @@ public sealed partial class VehicleRow : ObservableObject
     /// <summary>Suggestions from the Stammdaten "Funkrufnamen" list.</summary>
     public IReadOnlyList<string> CallSignOptions { get; }
 
-    [ObservableProperty] private string _wache;
-    [ObservableProperty] private string _callSign;
-    [ObservableProperty] private int _seats;
+    [ObservableProperty]
+    private string _wache;
+    [ObservableProperty]
+    private string _callSign;
+    [ObservableProperty]
+    private int _seats;
 
     partial void OnWacheChanged(string value) => _onChanged();
+
     partial void OnCallSignChanged(string value) => _onChanged();
+
     partial void OnSeatsChanged(int value) => _onChanged();
 }

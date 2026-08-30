@@ -7,7 +7,8 @@ namespace LageBuch.Documents.Sections;
 
 public static class TasksSection
 {
-    private static readonly string[] HeaderTitles = ["", "Wichtig", "Dringlich", "Fällig", "Zugeteilt", "Aufgabe", "Erledigt"];
+    private static readonly string[] HeaderTitles = [string.Empty, "Wichtig", "Dringlich", "Fällig", "Zugeteilt", "Aufgabe", "Erledigt"];
+
     public static void Compose(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -43,7 +44,9 @@ public static class TasksSection
                 table.Header(header =>
                 {
                     foreach (var title in HeaderTitles)
+                    {
                         header.Cell().Element(HeaderCell).Text(title).SemiBold();
+                    }
                 });
 
                 foreach (var task in sorted)
@@ -56,8 +59,10 @@ public static class TasksSection
                     {
                         col.Item().Text(overdue ? "FÄLLIG" : Formatting.Timestamp(task.DueAt));
                         if (overdue)
+                        {
                             col.Item().Text($"fällig {Formatting.Timestamp(task.DueAt)}")
                                 .FontSize(8).Italic().FontColor(Colors.Grey.Medium);
+                        }
                     });
                     table.Cell().Element(BodyCell).Text(Formatting.OrDash(task.Assignee));
                     table.Cell().Element(BodyCell).Column(col =>

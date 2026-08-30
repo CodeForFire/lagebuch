@@ -8,8 +8,13 @@ public class LocalSessionTaskTests
     private static readonly DateTimeOffset T0 = new(2026, 8, 24, 9, 0, 0, TimeSpan.FromHours(2));
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
 
     [Fact]
     public void AddTask_applies_saves_and_raises_changed()

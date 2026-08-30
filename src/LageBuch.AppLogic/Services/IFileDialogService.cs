@@ -10,9 +10,13 @@ public interface IFileDialogService
     /// ignore it.
     /// </summary>
     Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null);
+
     Task<string?> PickOpenAsync();
+
     Task<string?> PickExportPdfAsync(string suggestedFileName);
+
     Task<string?> PickImportJsonAsync();
+
     Task<string?> PickExportJsonAsync(string suggestedFileName);
 
     /// <summary>

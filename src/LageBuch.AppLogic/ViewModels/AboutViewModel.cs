@@ -25,16 +25,20 @@ public sealed partial class AboutViewModel : ObservableObject
 
     [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string AppName => "Lagebuch";
+
     [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string Descriptor => "Einsatzdokumentation";
+
     public string Version { get; }
-[SuppressMessage("Design", "CA1056", Justification = "RepositoryUrl is a display/launch string handed to IFileDialogService.OpenUrlAsync; System.Uri would add parse/validation behavior with no benefit here.")]
+
+    [SuppressMessage("Design", "CA1056", Justification = "RepositoryUrl is a display/launch string handed to IFileDialogService.OpenUrlAsync; System.Uri would add parse/validation behavior with no benefit here.")]
     [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string RepositoryUrl => RepoUrl;
 
     // Kept in sync with the LICENSE file in the repo root.
     [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string LicenseLine => "Veröffentlicht unter der MIT-Lizenz.";
+
     [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string CopyrightLine => "Copyright © 2026 Thomas Müller";
 
@@ -48,7 +52,9 @@ public sealed partial class AboutViewModel : ObservableObject
     private void Close() => Closed?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "Deliberately broad: any launcher failure surfaces in the dialog instead of crashing it.")]
     private async Task OpenRepositoryAsync()
     {

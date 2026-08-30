@@ -52,23 +52,44 @@ public static class CommandApplier
                 incident.EditRolePhone(clock, Operator(c.Operator), c.AssignmentId, c.Phone);
                 break;
             case AddForceUnitCommand c:
-                incident.AddForceUnit(clock, Operator(c.Operator), c.Brigade, c.PersonnelCount,
-                    c.CallSign, c.Status, c.Notes, c.ScbaCount, c.OfficerCount);
+                incident.AddForceUnit(
+                    clock,
+                    Operator(c.Operator),
+                    c.Brigade,
+                    c.PersonnelCount,
+                    c.CallSign,
+                    c.Status,
+                    c.Notes,
+                    c.ScbaCount,
+                    c.OfficerCount);
                 break;
             case UpdateForceUnitCommand c:
                 incident.UpdateForceUnit(clock, Operator(c.Operator), c.UnitId, c.Status, c.Notes);
                 break;
             case UpdateForceStrengthCommand c:
-                incident.UpdateForceStrength(clock, Operator(c.Operator), c.UnitId,
-                    c.OfficerCount, c.PersonnelCount, c.ScbaCount);
+                incident.UpdateForceStrength(
+                    clock,
+                    Operator(c.Operator),
+                    c.UnitId,
+                    c.OfficerCount,
+                    c.PersonnelCount,
+                    c.ScbaCount);
                 break;
             case RemoveForceUnitCommand c:
                 incident.RemoveForceUnit(clock, Operator(c.Operator), c.UnitId);
                 break;
             case AddScbaTruppCommand c:
-                incident.AddScbaTrupp(clock, c.Designation,
-                    c.Members.Select(m => new TruppMember(m.Role, m.Name)), c.EntryPressure, c.TruppNumber,
-                    c.CallSign, c.Task, c.MaxDurationMinutes, c.ReturnPressureBar, c.PressureControlIntervalMinutes);
+                incident.AddScbaTrupp(
+                    clock,
+                    c.Designation,
+                    c.Members.Select(m => new TruppMember(m.Role, m.Name)),
+                    c.EntryPressure,
+                    c.TruppNumber,
+                    c.CallSign,
+                    c.Task,
+                    c.MaxDurationMinutes,
+                    c.ReturnPressureBar,
+                    c.PressureControlIntervalMinutes);
                 break;
             case StartScbaTruppCommand c:
                 incident.StartScbaTrupp(clock, c.TruppId);
@@ -105,8 +126,14 @@ public static class CommandApplier
                 incident.RenameFile(c.FileId, c.DisplayName);
                 break;
             case AddTaskCommand c:
-                incident.AddTask(clock, Operator(c.Operator), c.Text, c.Assignee,
-                    c.Importance, c.Urgency, c.TimerMinutes);
+                incident.AddTask(
+                    clock,
+                    Operator(c.Operator),
+                    c.Text,
+                    c.Assignee,
+                    c.Importance,
+                    c.Urgency,
+                    c.TimerMinutes);
                 break;
             case SetTaskCompletedCommand c:
                 incident.SetTaskCompleted(c.TaskId, c.IsDone, clock, Operator(c.Operator));
@@ -136,7 +163,8 @@ public static class CommandApplier
                 incident.SetApartmentLabel(c.BuildingId, c.ApartmentNumber, c.Label);
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(command),
+                throw new ArgumentOutOfRangeException(
+                    nameof(command),
                     $"Unbekannter Befehl: {command.GetType().Name}");
         }
     }

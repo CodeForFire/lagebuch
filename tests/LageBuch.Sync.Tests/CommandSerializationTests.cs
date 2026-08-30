@@ -20,12 +20,25 @@ public class CommandSerializationTests
         new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4, 1),
         new UpdateForceUnitCommand(Op, Guid.NewGuid(), "Bereitstellung", null),
         new UpdateForceStrengthCommand(Op, Guid.NewGuid(), 1, 9, 4),
-        new AddScbaTruppCommand("Angriffstrupp",
+        new AddScbaTruppCommand(
+            "Angriffstrupp",
             new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
-            "AT-1", "Menschenrettung", 30, 60, 5, EntryPressure: 300),
-        new AddScbaTruppCommand("Angriffstrupp",
+            "AT-1",
+            "Menschenrettung",
+            30,
+            60,
+            5,
+            EntryPressure: 300),
+        new AddScbaTruppCommand(
+            "Angriffstrupp",
             new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
-            "AT-1", "Menschenrettung", 30, 60, 5, EntryPressure: 300, TruppNumber: 3),
+            "AT-1",
+            "Menschenrettung",
+            30,
+            60,
+            5,
+            EntryPressure: 300,
+            TruppNumber: 3),
         new StartScbaTruppCommand(Guid.NewGuid()),
         new RecordScbaPressureCommand(Guid.NewGuid(), 250),
         new WithdrawScbaTruppCommand(Guid.NewGuid()),
@@ -39,7 +52,7 @@ public class CommandSerializationTests
         new RenameFileCommand(Guid.NewGuid(), "Küchenbrand"),
         new RenameFileCommand(Guid.NewGuid(), null),
         new AddTaskCommand(Op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium, 10),
-        new AddTaskCommand(Op, "Nachfordern", "", TaskImportance.Low, TaskUrgency.Low, 30),
+        new AddTaskCommand(Op, "Nachfordern", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), true),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), false),
     }.Select(c => new object[] { c });
@@ -49,12 +62,14 @@ public class CommandSerializationTests
     public void Command_round_trips_through_the_polymorphic_base(SyncCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
+
         // Serialize as the base type so the $type discriminator is written; deserialize back as the
         // base and confirm the concrete type and every field survived.
         var json = SyncJson.Serialize(command);
         var back = SyncJson.Deserialize<SyncCommand>(json);
 
         Assert.Equal(command.GetType(), back.GetType());
+
         // Re-serialize (records with list members lack structural equality, so compare the wire form).
         Assert.Equal(json, SyncJson.Serialize(back));
     }

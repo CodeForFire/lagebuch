@@ -16,30 +16,6 @@ dotnet_diagnostic.CA2007.severity = none
 # LageBuch.App.Shared namespace root cannot be sanely renamed. Suppress app-wide.
 dotnet_diagnostic.CA1716.severity = none
 
-[tests/**/*.cs]
-# xUnit method names with underscores are idiomatic.
-dotnet_diagnostic.CA1707.severity = none
-
-# Perf/impl-noise rules — they add churn to test code without catching real bugs.
-dotnet_diagnostic.CA1861.severity = none
-dotnet_diagnostic.CA2000.severity = none
-dotnet_diagnostic.CA1063.severity = none
-dotnet_diagnostic.CA1816.severity = none
-dotnet_diagnostic.CA1826.severity = none
-dotnet_diagnostic.CA2008.severity = none
-dotnet_diagnostic.CA1829.severity = none
-dotnet_diagnostic.CA2213.severity = none
-
-[{src/LageBuch.App.Android/*.cs,src/LageBuch.App.Android/**/*.cs}]
-# Java-managed objects (Intent, Java.IO.File, ActivityResultLauncher, ActivityResultContracts.*)
-# have their lifetime owned by the Android runtime: they must survive past the C# call that hands
-# them to the platform (StartActivity / RegisterForActivityResult), so "dispose" here would break
-# the OS callbacks. MimeTypeOf likewise deliberately produces lowercase MIME values, which
-# Intent.SetDataAndType expects — ToUpperInvariant (CA1308) would violate that contract.
-dotnet_diagnostic.CA1308.severity = none
-dotnet_diagnostic.CA2000.severity = none
-dotnet_diagnostic.CA2213.severity = none
-
 # StyleCop.Analyzers: curated for this codebase. Rules disabled below either
 # conflict with an established convention or don't fit a project that doesn't
 # mandate XML documentation (CS1591 is already suppressed above). Everything
@@ -119,3 +95,26 @@ dotnet_diagnostic.SA1642.severity = none
 dotnet_diagnostic.SA1643.severity = none
 dotnet_diagnostic.SA1648.severity = none
 
+[tests/**/*.cs]
+# xUnit method names with underscores are idiomatic.
+dotnet_diagnostic.CA1707.severity = none
+
+# Perf/impl-noise rules — they add churn to test code without catching real bugs.
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA1063.severity = none
+dotnet_diagnostic.CA1816.severity = none
+dotnet_diagnostic.CA1826.severity = none
+dotnet_diagnostic.CA2008.severity = none
+dotnet_diagnostic.CA1829.severity = none
+dotnet_diagnostic.CA2213.severity = none
+
+[{src/LageBuch.App.Android/*.cs,src/LageBuch.App.Android/**/*.cs}]
+# Java-managed objects (Intent, Java.IO.File, ActivityResultLauncher, ActivityResultContracts.*)
+# have their lifetime owned by the Android runtime: they must survive past the C# call that hands
+# them to the platform (StartActivity / RegisterForActivityResult), so "dispose" here would break
+# the OS callbacks. MimeTypeOf likewise deliberately produces lowercase MIME values, which
+# Intent.SetDataAndType expects — ToUpperInvariant (CA1308) would violate that contract.
+dotnet_diagnostic.CA1308.severity = none
+dotnet_diagnostic.CA2000.severity = none
+dotnet_diagnostic.CA2213.severity = none

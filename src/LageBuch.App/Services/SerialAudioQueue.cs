@@ -12,7 +12,9 @@ namespace LageBuch.App.Services;
 /// audio player process that never exits), the queue moves on to the next item anyway so one
 /// stuck cue can't permanently silence later ones.
 /// </summary>
-[SuppressMessage("Design", "CA1001",
+[SuppressMessage(
+    "Design",
+    "CA1001",
     Justification = "App-lifetime singleton: its worker thread drains until process shutdown, so the owning BlockingCollection is intentionally never disposed.")]
 internal sealed class SerialAudioQueue
 {
@@ -29,7 +31,9 @@ internal sealed class SerialAudioQueue
     /// <summary>Queues <paramref name="play"/> to run after everything already queued.</summary>
     public void Enqueue(Action play) => _queue.Add(play);
 
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "A misbehaving or hanging cue must not stop the worker from serving the next one (the per-item timeout has already elapsed).")]
     private void Run()
     {

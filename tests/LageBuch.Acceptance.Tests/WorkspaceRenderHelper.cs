@@ -7,14 +7,6 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-internal sealed class ManualTicker : ITicker
-{
-    private readonly List<Action> _subs = new();
-    public IDisposable Subscribe(Action onTick) { _subs.Add(onTick); return new Sub(); }
-    public void Pulse() { foreach (var s in _subs.ToArray()) s(); }
-    private sealed class Sub : IDisposable { public void Dispose() { } }
-}
-
 internal static class WorkspaceRenderHelper
 {
     public static MasterDataSet MasterData() => Md();
@@ -39,6 +31,7 @@ internal static class WorkspaceRenderHelper
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
         RadioCallSigns = AnonymizedExampleData.RadioCallSigns,
         Links = AnonymizedExampleData.Links,
+
         // Fictional roster: the real personnel.json is gitignored, so tests supply their own
         // (#137: same anonymized fixture the app's own placeholders are built from).
         Personnel = AnonymizedExampleData.Personnel,
@@ -57,15 +50,27 @@ internal static class WorkspaceRenderHelper
             ("Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?", false),
         };
         var checklistAbbau = new[] { ("Fahrzeug abgerüstet und einsatzbereit?", true) };
+
         // Keyword + Einsatznummer both set: the common post-#69 shape once ILS has called back --
         // Stichwort as the header hero, the Einsatznummer as the secondary chip beside it.
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
-            checklistAufbau, checklistAbbau,
-            new IncidentNumber("B 1.2 260715 123"), keyword: "B3P");
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            checklistAufbau,
+            checklistAbbau,
+            new IncidentNumber("B 1.2 260715 123"),
+            keyword: "B3P");
         var ticker = new ManualTicker();
-        var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(),
-            new FakeDialogs(), new NoopAlarmService(), host ?? new NoopIncidentHostController());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            ticker,
+            Md(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            host ?? new NoopIncidentHostController());
 
         // Drive the three header bars into their visible states (like the reported screenshot):
         //   1) ILS reminder running, 2) SCBA pressure-control due, 3) Rückzugsalarm active.
@@ -86,5 +91,31 @@ internal static class WorkspaceRenderHelper
         vm.Reminder!.AcknowledgeCommand.Execute(null);
 
         return vm;
+    }
+}
+
+internal sealed class ManualTicker : ITicker
+{
+    private readonly List<Action> _subs = new();
+
+    public IDisposable Subscribe(Action onTick)
+    {
+        _subs.Add(onTick);
+        return new Sub();
+    }
+
+    public void Pulse()
+    {
+        foreach (var s in _subs.ToArray())
+        {
+            s();
+        }
+    }
+
+    private sealed class Sub : IDisposable
+    {
+        public void Dispose()
+        {
+        }
     }
 }

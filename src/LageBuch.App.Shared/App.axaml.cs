@@ -1,9 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.ViewModels;
-using System.Diagnostics.CodeAnalysis;
 
 namespace LageBuch.App.Shared;
 
@@ -35,6 +35,7 @@ public partial class App : Application
             mainView.AttachViewModel(CreateMainViewModel!());
             singleView.MainView = mainView;
         }
+
         base.OnFrameworkInitializationCompleted();
     }
 }

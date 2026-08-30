@@ -7,6 +7,7 @@ using LageBuch.App.Android.Services;
 using LageBuch.App.Shared;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Time;
+
 // Inside the LageBuch.App.Android namespace the bare name "App" binds to the LageBuch.App
 // namespace, not LageBuch.App.Shared.App — alias it so the shared Application type is reachable.
 using SharedApp = LageBuch.App.Shared.App;
@@ -35,6 +36,7 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
         _importLauncher = RegisterForActivityResult(
             new ActivityResultContracts.GetContent(),
             new ImportCallback(uri => _dialogs?.CompleteImport(uri)));
+
         // OpenDocument (rather than GetContent) accepts multiple MIME types on Launch, needed
         // since an attachment can be any of several image types or a PDF.
         _attachmentLauncher = RegisterForActivityResult(
@@ -48,7 +50,9 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
     private sealed class ImportCallback : Java.Lang.Object, IActivityResultCallback
     {
         private readonly Action<global::Android.Net.Uri?> _onResult;
+
         public ImportCallback(Action<global::Android.Net.Uri?> onResult) => _onResult = onResult;
+
         public void OnActivityResult(Java.Lang.Object? result) => _onResult(result as global::Android.Net.Uri);
     }
 

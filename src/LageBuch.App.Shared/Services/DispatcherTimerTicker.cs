@@ -19,21 +19,28 @@ public sealed class DispatcherTimerTicker : ITicker
     {
         _subscribers.Add(onTick);
         if (!_timer.IsEnabled)
+        {
             _timer.Start();
+        }
+
         return new Subscription(this, onTick);
     }
 
     private void Notify()
     {
         foreach (var s in _subscribers.ToArray())
+        {
             s();
+        }
     }
 
     private void Unsubscribe(Action onTick)
     {
         _subscribers.Remove(onTick);
         if (_subscribers.Count == 0)
+        {
             _timer.Stop();
+        }
     }
 
     private sealed class Subscription : IDisposable
@@ -41,10 +48,20 @@ public sealed class DispatcherTimerTicker : ITicker
         private readonly DispatcherTimerTicker _owner;
         private readonly Action _onTick;
         private bool _disposed;
-        public Subscription(DispatcherTimerTicker owner, Action onTick) { _owner = owner; _onTick = onTick; }
+
+        public Subscription(DispatcherTimerTicker owner, Action onTick)
+        {
+            _owner = owner;
+            _onTick = onTick;
+        }
+
         public void Dispose()
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
             _owner.Unsubscribe(_onTick);
         }

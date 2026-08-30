@@ -9,6 +9,7 @@ public partial class ConfirmDialogView : UserControl
     public ConfirmDialogView()
     {
         InitializeComponent();
+
         // Default focus on Cancel so a stray Enter doesn't blindly confirm a destructive action.
         AttachedToVisualTree += (_, _) => CancelButton.Focus();
     }
@@ -17,7 +18,10 @@ public partial class ConfirmDialogView : UserControl
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not ConfirmDialogViewModel vm)
+        {
             return;
+        }
+
         if (e.Key == Key.Escape)
         {
             vm.CancelCommand.Execute(null);

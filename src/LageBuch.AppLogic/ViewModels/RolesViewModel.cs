@@ -20,9 +20,18 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     private readonly Action<RoleAssignmentRow> _onTransfer;
     private readonly Action<RoleAssignmentRow, string?> _onPhoneEdited;
 
-    public RoleAssignmentRow(Guid id, string role, string personName, string? section,
-        string? callSign, string? phone, DateTimeOffset? from, DateTimeOffset? to,
-        bool isReadOnly, Action<RoleAssignmentRow> onTransfer, Action<RoleAssignmentRow, string?> onPhoneEdited)
+    public RoleAssignmentRow(
+        Guid id,
+        string role,
+        string personName,
+        string? section,
+        string? callSign,
+        string? phone,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        bool isReadOnly,
+        Action<RoleAssignmentRow> onTransfer,
+        Action<RoleAssignmentRow, string?> onPhoneEdited)
     {
         Id = id;
         Role = role;
@@ -38,11 +47,17 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     }
 
     public Guid Id { get; }
+
     public string Role { get; }
+
     public string PersonName { get; }
+
     public string? Section { get; }
+
     public string? CallSign { get; }
+
     public DateTimeOffset? From { get; }
+
     public bool IsReadOnly { get; }
 
     [ObservableProperty]
@@ -64,6 +79,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     private DateTimeOffset? _to;
 
     public string FromDisplay => From is { } f ? Formatting.Timestamp(f) : "—";
+
     public string ToDisplay => To is { } t ? Formatting.Timestamp(t) : "—";
 
     /// <summary>True while the assignment is still active, i.e. has no Bis stamp yet.</summary>
@@ -116,12 +132,18 @@ public sealed partial class RolesViewModel : ObservableObject
     {
         Roles.Clear();
         foreach (var row in _all)
+        {
             if (ShowAllRoles || row.IsRunning)
+            {
                 Roles.Add(row);
+            }
+        }
     }
 
     public bool IsReadOnly { get; }
+
     public IReadOnlyList<string> RoleOptions { get; }
+
     public IReadOnlyList<string> CallSignOptions { get; }
 
     /// <summary>
@@ -168,8 +190,13 @@ public sealed partial class RolesViewModel : ObservableObject
         // Von is stamped rather than typed: an assignment is recorded at the moment it happens,
         // and every other time in this application comes from the injected clock the same way.
         _session.AssignRole(
-            NewRole, NewPersonName, NewCallSign, from: _clock.Now, to: null,
-            section: NewSection, phone: NewPhone); // Changed → RefreshRoles renders the row
+            NewRole,
+            NewPersonName,
+            NewCallSign,
+            from: _clock.Now,
+            to: null,
+            section: NewSection,
+            phone: NewPhone); // Changed → RefreshRoles renders the row
         NewRole = string.Empty;
         NewPersonName = string.Empty;
         NewSection = null;
@@ -182,7 +209,6 @@ public sealed partial class RolesViewModel : ObservableObject
     //     rather than inline DataGrid cell editing — a handover needs its own person/call
     //     sign/phone, not a single cell. Replaces the old standalone "beenden" action; an
     //     assignment now only ends as part of a handover, or automatically when the incident closes. ---
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsTransferring))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmTransferCommand))]
@@ -230,17 +256,28 @@ public sealed partial class RolesViewModel : ObservableObject
     /// outranks the roster, which may be out of date.
     /// </summary>
     private void PrefillFromRoster(
-        string personName, Func<string?> getPhone, Action<string?> setPhone,
-        Func<string?> getCallSign, Action<string?> setCallSign)
+        string personName,
+        Func<string?> getPhone,
+        Action<string?> setPhone,
+        Func<string?> getCallSign,
+        Action<string?> setCallSign)
     {
         var person = _personnel.FirstOrDefault(
             p => string.Equals(p.DisplayName, personName, StringComparison.OrdinalIgnoreCase));
         if (person is null)
+        {
             return;
+        }
+
         if (string.IsNullOrWhiteSpace(getPhone()))
+        {
             setPhone(person.Phone);
+        }
+
         if (string.IsNullOrWhiteSpace(getCallSign()))
+        {
             setCallSign(person.CallSign);
+        }
     }
 
     private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>

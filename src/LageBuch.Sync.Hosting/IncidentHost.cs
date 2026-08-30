@@ -43,14 +43,18 @@ public sealed class IncidentHost : IAsyncDisposable
     public async Task StartAsync(IPAddress bindAddress, int port = SyncProtocol.Port)
     {
         if (_app is not null)
+        {
             return;
+        }
 
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls($"http://{bindAddress}:{port}");
+
         // Keep the hub's JSON aligned with SyncJson: enums as strings, web (camelCase) naming.
         builder.Services.AddSignalR().AddJsonProtocol(o =>
             o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
         // Bind the polymorphic SyncCommand body with the same enum-as-string contract as the client.
         builder.Services.ConfigureHttpJsonOptions(o =>
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -68,6 +72,7 @@ public sealed class IncidentHost : IAsyncDisposable
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
+
             await next();
         });
 
@@ -93,6 +98,7 @@ public sealed class IncidentHost : IAsyncDisposable
             return await _ui.InvokeAsync(() =>
             {
                 CommandApplier.Apply(command, _session.Incident, _clock, _session.SaveFileBytes);
+
                 // Persist + raise the session's Changed, which refreshes the host's own UI and, through
                 // OnSessionChanged, broadcasts the new snapshot to every client — the same path a host
                 // edit takes (§5), so a client's contribution appears live on the host too.
@@ -118,7 +124,10 @@ public sealed class IncidentHost : IAsyncDisposable
     {
         var bytes = await _session.GetFileBytesAsync(id);
         if (bytes is null)
+        {
             return Results.NotFound();
+        }
+
         var file = _session.Incident.Files.FirstOrDefault(f => f.Id == id);
         return Results.Bytes(bytes, file?.ContentType ?? "application/octet-stream", fileDownloadName: file?.FileName);
     }

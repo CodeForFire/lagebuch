@@ -1,8 +1,8 @@
+using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
-using LageBuch.Domain;
 using QuestPDF.Fluent;
 
 namespace LageBuch.Documents.Tests;
@@ -28,14 +28,30 @@ public class IncidentPdfTests
         incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung erhalten", from: "ILS");
+
         // Exercise the widest Funktionszuweisung row: every one of the seven columns filled, so
         // the A4 portrait layout is proven not to overflow.
-        var assigned = incident.AssignRole(clock, op, "EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
-            section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
+        var assigned = incident.AssignRole(
+            clock,
+            op,
+            "EL",
+            "Müller",
+            callSign: "FFB 12/1",
+            from: clock.Now,
+            section: "Abschnitt Nord",
+            phone: "01 71 / 1 23 45 67");
         incident.EndRoleAssignment(assigned.Id, clock.Now.AddHours(1));
         incident.AssignRole(clock, op, "ZF", "Schmidt");
-        incident.AddForceUnit(clock, op, "FFB Wache 1", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
-            notes: "über Drehleiter angefordert", scbaCount: 6, officerCount: 2);
+        incident.AddForceUnit(
+            clock,
+            op,
+            "FFB Wache 1",
+            12,
+            callSign: "FFB 1/40/1",
+            status: "Im Einsatz",
+            notes: "über Drehleiter angefordert",
+            scbaCount: 6,
+            officerCount: 2);
         incident.AddForceUnit(clock, op, "Emmering", 9, scbaCount: 4);
         var trupp = incident.AddScbaTrupp(
             clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300, callSign: "FFB 1/40/1");
@@ -103,9 +119,11 @@ public class IncidentPdfTests
         var withImage = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]> { [file.Id] = TinyJpeg });
 
         PdfAssert.IsPdf(withImage);
+
         // Embedding a real image adds real bytes to the stream — a cheap, dependency-free proxy for
         // "the section actually rendered something" without parsing PDF content streams.
-        Assert.True(withImage.Length > withoutImage.Length,
+        Assert.True(
+            withImage.Length > withoutImage.Length,
             $"Expected embedding the image to grow the PDF (without={withoutImage.Length}, with={withImage.Length}).");
     }
 
@@ -126,9 +144,11 @@ public class IncidentPdfTests
         var withFile = IncidentPdf.Generate(incident);
 
         PdfAssert.IsPdf(withFile);
+
         // A PDF attachment's pages are appended separately and carry no caption of their own — the
         // table row is the only place its (renamed) label shows up anywhere in the report.
-        Assert.True(withFile.Length > withoutFile.Length,
+        Assert.True(
+            withFile.Length > withoutFile.Length,
             $"Expected the file table to grow the PDF even without embedded bytes (without={withoutFile.Length}, with={withFile.Length}).");
     }
 

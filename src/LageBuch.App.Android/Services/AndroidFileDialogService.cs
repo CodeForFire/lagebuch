@@ -30,6 +30,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             var ext = System.IO.Path.GetExtension(suggestedFileName);
             path = System.IO.Path.Combine(dir, $"{stem} ({count++}){ext}");
         }
+
         return Task.FromResult<string?>(path);
     }
 
@@ -65,16 +66,23 @@ public sealed class AndroidFileDialogService : IFileDialogService
         var pending = _pendingImport;
         _pendingImport = null;
         if (pending is null)
+        {
             return;
+        }
+
         if (uri is null)
         {
             pending.SetResult(null);
             return;
         }
+
         var destPath = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), "import.json");
         using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
         using (var output = System.IO.File.Create(destPath))
+        {
             input.CopyTo(output);
+        }
+
         pending.SetResult(destPath);
     }
 
@@ -102,16 +110,23 @@ public sealed class AndroidFileDialogService : IFileDialogService
         var pending = _pendingAttachment;
         _pendingAttachment = null;
         if (pending is null)
+        {
             return;
+        }
+
         if (uri is null)
         {
             pending.SetResult(null);
             return;
         }
+
         var destPath = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), DisplayNameOf(uri));
         using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
         using (var output = System.IO.File.Create(destPath))
+        {
             input.CopyTo(output);
+        }
+
         pending.SetResult(destPath);
     }
 
@@ -125,9 +140,12 @@ public sealed class AndroidFileDialogService : IFileDialogService
             {
                 var name = cursor.GetString(index);
                 if (!string.IsNullOrWhiteSpace(name))
+                {
                     return name;
+                }
             }
         }
+
         return "anhang";
     }
 
@@ -166,7 +184,9 @@ public sealed class AndroidFileDialogService : IFileDialogService
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
             return Task.CompletedTask;
+        }
 
         var intent = new Intent(Intent.ActionView, global::Android.Net.Uri.Parse(uri.AbsoluteUri));
         _activity.StartActivity(intent);
@@ -180,6 +200,6 @@ public sealed class AndroidFileDialogService : IFileDialogService
         ".gif" => "image/gif",
         ".webp" => "image/webp",
         ".pdf" => "application/pdf",
-        _ => "*/*"
+        _ => "*/*",
     };
 }

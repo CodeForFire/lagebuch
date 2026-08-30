@@ -21,12 +21,14 @@ public sealed partial class ChecklistViewModel : ObservableObject
                 session, kind, item.Id, item.Text, item.IsDone, item.Note, item.IsMandatory, IsReadOnly, onChanged))
             .ToList();
         _allMandatoryDone = ComputeAllMandatoryDone();
+
         // Recomputed after every change to this incident (local toggle, or a remote broadcast),
         // mirroring ScbaViewModel.UpdateAlarm — this is what the AUFBAU/ABBAU tab header dot binds to.
         session.Changed += Recompute;
     }
 
     public bool IsReadOnly { get; }
+
     public IReadOnlyList<ChecklistItemViewModel> Items { get; }
 
     [ObservableProperty]
@@ -50,8 +52,15 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     private bool _suppressWriteback;
 
     public ChecklistItemViewModel(
-        IIncidentSession session, ChecklistKind kind, Guid id, string text, bool isDone, string? note,
-        bool isMandatory, bool isReadOnly, Action onChanged)
+        IIncidentSession session,
+        ChecklistKind kind,
+        Guid id,
+        string text,
+        bool isDone,
+        string? note,
+        bool isMandatory,
+        bool isReadOnly,
+        Action onChanged)
     {
         _session = session;
         _kind = kind;
@@ -62,6 +71,7 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
         _isDone = isDone;
         _note = note;
         IsReadOnly = isReadOnly;
+
         // Reflect toggles made elsewhere (another tab, or another device once joined).
         _session.Changed += SyncFromIncident;
     }
@@ -70,7 +80,10 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     {
         var item = ChecklistViewModel.ItemsFor(_session.Incident, _kind).FirstOrDefault(c => c.Id == _id);
         if (item is null)
+        {
             return;
+        }
+
         _suppressWriteback = true; // this is a state pull, not a user toggle — don't write it back
         IsDone = item.IsDone;
         Note = item.Note;
@@ -78,7 +91,9 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
     }
 
     public string Text { get; }
+
     public bool IsMandatory { get; }
+
     public bool IsReadOnly { get; }
 
     [ObservableProperty]

@@ -1,9 +1,9 @@
+using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
-using LageBuch.Domain;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -12,12 +12,19 @@ namespace LageBuch.Persistence.Tests;
 public class IncidentRoundTripTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"rt-{Guid.NewGuid():N}.fwincident");
-    private sealed class Clock : IClock { public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2)); }
+
+    private sealed class Clock : IClock
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+    }
 
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     [Fact]
@@ -29,6 +36,7 @@ public class IncidentRoundTripTests : IDisposable
         incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.SetAddress("Hauptstr. 12", "FFB");
         incident.SetStatus("aufgenommen");
+
         // Item 0 stays mandatory-and-unchecked deliberately: toggling it would complete Aufbau and
         // fire an extra ETB system entry, which this test isn't about — that's covered in
         // IncidentOperationsTests. Toggling the optional item still proves IsDone round-trips.
@@ -39,14 +47,34 @@ public class IncidentRoundTripTests : IDisposable
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
         var journalTime = clock.Now;
-        incident.AssignRole(clock, op, "EL", "Müller", callSign: "FFB 12/1", from: clock.Now,
-            section: "Abschnitt Nord", phone: "01 71 / 1 23 45 67");
+        incident.AssignRole(
+            clock,
+            op,
+            "EL",
+            "Müller",
+            callSign: "FFB 12/1",
+            from: clock.Now,
+            section: "Abschnitt Nord",
+            phone: "01 71 / 1 23 45 67");
         var assignedAt = clock.Now;
-        incident.AddForceUnit(clock, op, "FFB", 12, callSign: "FFB 1/40/1", status: "Im Einsatz",
-            notes: "über DLK angefordert", scbaCount: 6, officerCount: 1);
+        incident.AddForceUnit(
+            clock,
+            op,
+            "FFB",
+            12,
+            callSign: "FFB 1/40/1",
+            status: "Im Einsatz",
+            notes: "über DLK angefordert",
+            scbaCount: 6,
+            officerCount: 1);
         clock.Now = clock.Now.AddMinutes(3);
-        incident.UpdateForceStrength(clock, op, incident.Forces[0].Id,
-            officerCount: 1, personnelCount: 14, scbaCount: 7);
+        incident.UpdateForceStrength(
+            clock,
+            op,
+            incident.Forces[0].Id,
+            officerCount: 1,
+            personnelCount: 14,
+            scbaCount: 7);
         clock.Now = clock.Now.AddMinutes(2);
         incident.AddTask(clock, op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
         var taskDueAt = clock.Now.AddMinutes(5);
@@ -68,6 +96,7 @@ public class IncidentRoundTripTests : IDisposable
         Assert.True(loaded.ChecklistAufbau[1].IsDone);
         Assert.False(loaded.ChecklistAufbau[1].IsMandatory);
         Assert.True(Assert.Single(loaded.ChecklistAbbau).IsMandatory);
+
         // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the manual one
         // follows it in chronological order, then the automatic entries for the role assignment,
         // the recorded unit and the strength correction -- which is also the proof that generated
@@ -82,6 +111,7 @@ public class IncidentRoundTripTests : IDisposable
                 "FFB (FFB 1/40/1): Stärke 1/11/12 → 1/13/14, davon AGT 6 → 7",
             },
             loaded.Journal.Select(e => e.Text));
+
         // The direction rides along too: generated lines are System, the manual one keeps Incoming.
         Assert.Equal(
             new[] { EtbDirection.System, EtbDirection.Incoming, EtbDirection.System, EtbDirection.System, EtbDirection.System },
@@ -95,6 +125,7 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("01 71 / 1 23 45 67", loaded.Roles[0].Phone);
         Assert.Equal(assignedAt, loaded.Roles[0].From);
         Assert.Null(loaded.Roles[0].To);
+
         // The strength was corrected after entry: the loaded unit carries the corrected numbers
         // plus the retained prior state (#76).
         Assert.Equal(14, loaded.TotalPersonnel);
@@ -135,6 +166,7 @@ public class IncidentRoundTripTests : IDisposable
         var reloaded = Assert.Single(loaded.Forces);
         Assert.Equal("Im Einsatz", reloaded.Status);
         Assert.Equal("Innenangriff", reloaded.Notes);
+
         // Identity and the descriptive fields ride along unchanged.
         Assert.Equal(unit.Id, reloaded.Id);
         Assert.Equal(9, reloaded.PersonnelCount);
@@ -161,6 +193,7 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("Lagemeldung", historyEntry.PreviousText);
         Assert.Equal("Schmidt", historyEntry.EditedBy);
         Assert.Equal(clock.Now, historyEntry.EditedAt);
+
         // An entry with no edits still round-trips with an empty (not null) history.
         Assert.Empty(loaded.Journal.Single(e => e.Text == "Einsatz begonnen").Edits);
     }
@@ -192,8 +225,14 @@ public class IncidentRoundTripTests : IDisposable
         var incident = Incident.Start(clock, op);
 
         // Active trupp (Im Einsatz): registered, started under air, two pressure readings.
-        var active = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"),
-            entryPressure: 300, callSign: "FFB 1/40/1", maxDurationMinutes: 30, returnPressureBar: 60,
+        var active = incident.AddScbaTrupp(
+            clock,
+            "Angriffstrupp",
+            TruppMember.Crew("Müller", "Schmidt"),
+            entryPressure: 300,
+            callSign: "FFB 1/40/1",
+            maxDurationMinutes: 30,
+            returnPressureBar: 60,
             pressureControlIntervalMinutes: 5);
         clock.Now = clock.Now.AddMinutes(3);
         incident.StartScbaTrupp(clock, active.Id);
@@ -203,7 +242,10 @@ public class IncidentRoundTripTests : IDisposable
         incident.RecordScbaPressure(clock, active.Id, 180);
 
         // Removed trupp (abgenommen): started, withdrew, then removed.
-        var removed = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Mayr"),
+        var removed = incident.AddScbaTrupp(
+            clock,
+            "Sicherheitstrupp",
+            TruppMember.Crew("Huber", "Mayr"),
             entryPressure: 280);
         incident.StartScbaTrupp(clock, removed.Id);
         clock.Now = clock.Now.AddMinutes(8);
@@ -212,11 +254,17 @@ public class IncidentRoundTripTests : IDisposable
         incident.MarkScbaRemoved(clock, removed.Id);
 
         // CSA trupp: three people, to prove the crew size round-trips rather than being assumed.
-        incident.AddScbaTrupp(clock, AtemschutzTrupp.ChemicalTruppDesignation,
-            TruppMember.Crew("Berger", "Frank", "Lang"), entryPressure: 300);
+        incident.AddScbaTrupp(
+            clock,
+            AtemschutzTrupp.ChemicalTruppDesignation,
+            TruppMember.Crew("Berger", "Frank", "Lang"),
+            entryPressure: 300);
 
         // Waiting trupp: registered only, never started.
-        var waiting = incident.AddScbaTrupp(clock, "Wassertrupp", TruppMember.Crew("Bauer", "Klein"),
+        var waiting = incident.AddScbaTrupp(
+            clock,
+            "Wassertrupp",
+            TruppMember.Crew("Bauer", "Klein"),
             entryPressure: 300);
         var waitingId = waiting.Id;
 
@@ -228,8 +276,10 @@ public class IncidentRoundTripTests : IDisposable
         var loadedActive = loaded.ScbaTrupps[0];
         Assert.Equal("Angriffstrupp", loadedActive.Designation);
         Assert.Equal(1, loadedActive.TruppNumber);
+
         // Crew survives as addressable members in position order, not as a re-parsed string.
-        Assert.Equal(new[] { TruppRole.Truppfuehrer, TruppRole.Truppmann },
+        Assert.Equal(
+            new[] { TruppRole.Truppfuehrer, TruppRole.Truppmann },
             loadedActive.Members.Select(m => m.Role));
         Assert.Equal(new[] { "Müller", "Schmidt" }, loadedActive.Members.Select(m => m.Name));
 
@@ -282,8 +332,10 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("image/jpeg", loaded.Files[0].ContentType);
         Assert.Equal(2048, loaded.Files[0].SizeBytes);
         Assert.Equal("bericht.pdf", loaded.Files[1].FileName);
+
         // Never renamed -- display name still defaults to the original file name.
         Assert.Equal("bericht.pdf", loaded.Files[1].DisplayName);
+
         // The auto ETB entries land alongside the manual ones, same as every other module.
         Assert.Contains("Datei hinzugefügt: brand.jpg", loaded.Journal.Select(e => e.Text));
         Assert.Contains("Datei hinzugefügt: bericht.pdf", loaded.Journal.Select(e => e.Text));
@@ -308,6 +360,7 @@ public class IncidentRoundTripTests : IDisposable
             cmd.CommandText = "UPDATE incident_files SET display_name = NULL;";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         var loaded = IncidentRepository.Load(_path);
@@ -372,6 +425,7 @@ public class IncidentRoundTripTests : IDisposable
             cmd.CommandText = "UPDATE schema_version SET version = 13; DROP TABLE IF EXISTS incident_tasks;";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         var loaded = IncidentRepository.Load(_path);

@@ -37,14 +37,18 @@ public static class IntegerOnly
         {
             box.RemoveHandler(InputElement.TextInputEvent, OnTextInput);
             if (e.NewValue is true)
+            {
                 // Tunneling: must see the input before the TextBox inserts it.
                 box.AddHandler(InputElement.TextInputEvent, OnTextInput, RoutingStrategies.Tunnel);
+            }
         });
     }
 
     private static void OnTextInput(object? sender, TextInputEventArgs e)
     {
         if (sender is TextBox && e.Text is not null && !e.Text.All(char.IsAsciiDigit))
+        {
             e.Handled = true;
+        }
     }
 }

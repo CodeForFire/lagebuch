@@ -10,5 +10,6 @@ namespace LageBuch.AppLogic.Services;
 public interface IMasterDataFileService
 {
     MasterDataSet Read(string path);
+
     void Write(string path, MasterDataSet set);
 }

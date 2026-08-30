@@ -28,9 +28,14 @@ public interface IIncidentHostController
 public sealed class NoopIncidentHostController : IIncidentHostController
 {
     public bool CanHost => false;
+
     public bool IsHosting => false;
+
     public string? ShareHint => null;
+
     public string? SharePin => null;
+
     public Task StartAsync(LocalIncidentSession session) => Task.CompletedTask;
+
     public Task StopAsync() => Task.CompletedTask;
 }

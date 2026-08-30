@@ -5,31 +5,6 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
-// NoFiles/OpenPathDialogs/MvFakeMasterData are specific to these tests and either don't exist, or
-// aren't data-compatible, elsewhere in this project (see Task 5's "Interfaces" note). FakeStore,
-// FakeRecent, FakeDialogs, FixedClock, FakeTicker, FakeAlarmService are reused from
-// IncidentSessionTests.cs / HomeViewModelTests.cs / IncidentWorkspaceViewModelTests.cs /
-// ReminderViewModelTests.cs — all internal and already visible project-wide in this assembly.
-internal sealed class NoFiles : IMasterDataFileService
-{
-    public MasterDataSet Read(string path) => MasterDataSet.Empty;
-    public void Write(string path, MasterDataSet set) { }
-}
-
-// Distinctly named because HomeViewModelTests.cs's own FakeMasterData doesn't set RadioCallSigns,
-// which RequestNewIncident_prompt_offers_the_master_data_call_signs below asserts on.
-internal sealed class MvFakeMasterData : IMasterDataProvider
-{
-    public MasterDataSet Get() => MasterDataSet.Empty with
-    {
-        Roles = new[] { "EL" },
-        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
-        TruppTypes = new[] { "Angriffstrupp" },
-        RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
-    };
-    public void Save(MasterDataSet set) { }
-}
-
 public class MainWindowViewModelTests
 {
     // FixedClock here (from IncidentSessionTests.cs) requires an explicit timestamp — the original
@@ -214,15 +189,54 @@ public class MainWindowViewModelTests
     }
 }
 
+// NoFiles/OpenPathDialogs/MvFakeMasterData are specific to these tests and either don't exist, or
+// aren't data-compatible, elsewhere in this project (see Task 5's "Interfaces" note). FakeStore,
+// FakeRecent, FakeDialogs, FixedClock, FakeTicker, FakeAlarmService are reused from
+// IncidentSessionTests.cs / HomeViewModelTests.cs / IncidentWorkspaceViewModelTests.cs /
+// ReminderViewModelTests.cs — all internal and already visible project-wide in this assembly.
+internal sealed class NoFiles : IMasterDataFileService
+{
+    public MasterDataSet Read(string path) => MasterDataSet.Empty;
+
+    public void Write(string path, MasterDataSet set)
+    {
+    }
+}
+
+// Distinctly named because HomeViewModelTests.cs's own FakeMasterData doesn't set RadioCallSigns,
+// which RequestNewIncident_prompt_offers_the_master_data_call_signs below asserts on.
+internal sealed class MvFakeMasterData : IMasterDataProvider
+{
+    public MasterDataSet Get() => MasterDataSet.Empty with
+    {
+        Roles = new[] { "EL" },
+        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
+        TruppTypes = new[] { "Angriffstrupp" },
+        RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
+    };
+
+    public void Save(MasterDataSet set)
+    {
+    }
+}
+
 internal sealed class OpenPathDialogs : IFileDialogService
 {
     public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
+
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }

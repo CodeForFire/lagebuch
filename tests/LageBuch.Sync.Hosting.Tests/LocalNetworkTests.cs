@@ -12,6 +12,7 @@ public class LocalNetworkTests
 
         Assert.NotNull(address);
         Assert.Equal(AddressFamily.InterNetwork, address.AddressFamily);
+
         // Whatever the machine has, the result is dialable: either loopback (nothing else up) or a
         // routable/private interface address — never 0.0.0.0, which is a bind target, not a dial target.
         Assert.NotEqual(IPAddress.Any, address);

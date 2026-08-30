@@ -12,7 +12,9 @@ internal static class PdfAssert
         Assert.NotNull(bytes);
         Assert.True(bytes.Length > 100, $"PDF unexpectedly small: {bytes.Length} bytes.");
         for (var i = 0; i < PdfHeader.Length; i++)
+        {
             Assert.Equal(PdfHeader[i], bytes[i]);
+        }
     }
 
     /// <summary>

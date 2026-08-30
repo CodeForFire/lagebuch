@@ -23,14 +23,17 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
     private readonly string _appVersion;
+
     // Marshals a joined client's host broadcasts onto the UI thread (see IUiDispatcher). Production
     // wires the real dispatcher via CompositionRoot; the immediate default keeps the many non-join
     // HomeViewModel tests (which never open a RemoteIncidentSession) construction-noise free.
     private readonly IUiDispatcher _uiDispatcher;
+
     // Where the last new-incident save landed, so the next one opens the picker there instead of
     // wherever the OS last remembered. Null when not supplied (e.g. most tests) -- every use site
     // is null-guarded, so the feature is simply inert rather than required.
     private readonly ILastSaveFolderStore? _lastSaveFolder;
+
     // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
@@ -59,6 +62,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // Passive peek: never migrates or mutates the file. A moved, corrupt, or too-new file just
     // shows no marker (TryReadState returns null) rather than blocking the overview.
     private bool IsClosed(string path) => _store.TryReadState(path) == IncidentState.Closed;
+
     public Action<IncidentWorkspaceViewModel>? WorkspaceOpened { get; set; }
 
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
@@ -90,16 +94,26 @@ public sealed partial class HomeViewModel : ObservableObject
         var suggestedName = $"{stem}.fwincident";
         var path = await _dialogs.PickSaveAsync(suggestedName, _lastSaveFolder?.GetLastFolder());
         if (string.IsNullOrWhiteSpace(path))
+        {
             return;
+        }
+
         // Remember where this landed so the next new incident's picker opens there too.
         if (Path.GetDirectoryName(path) is { Length: > 0 } dir)
+        {
             _lastSaveFolder?.SetLastFolder(dir);
+        }
+
         var md = _masterData.Get();
         var session = LocalIncidentSession.StartNew(
-            _store, _clock, request.Operator, path,
+            _store,
+            _clock,
+            request.Operator,
+            path,
             md.ChecklistTemplateAufbau.Select(i => (i.Text, i.IsMandatory)),
             md.ChecklistTemplateAbbau.Select(i => (i.Text, i.IsMandatory)),
-            incidentNumber: null, keyword: request.Keyword);
+            incidentNumber: null,
+            keyword: request.Keyword);
         OpenWorkspace(session, path, md);
     }
 
@@ -122,7 +136,10 @@ public sealed partial class HomeViewModel : ObservableObject
     {
         var path = await _dialogs.PickOpenAsync();
         if (string.IsNullOrWhiteSpace(path))
+        {
             return;
+        }
+
         TryOpen(path);
     }
 
@@ -135,7 +152,9 @@ public sealed partial class HomeViewModel : ObservableObject
     /// user which file and why, and leave the app standing. Letting any of them escape kills the
     /// process, which during an Einsatz is the worst possible outcome.
     /// </summary>
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "Deliberately broad: heterogeneous open failures all get the same user-facing answer.")]
     private void TryOpen(string path)
     {
@@ -156,7 +175,10 @@ public sealed partial class HomeViewModel : ObservableObject
         _recent.Add(path);
         var existing = RecentFiles.FirstOrDefault(f => f.Path == path);
         if (existing is not null)
+        {
             RecentFiles.Remove(existing);
+        }
+
         InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
         var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController);
         WorkspaceOpened?.Invoke(workspace);
@@ -177,7 +199,6 @@ public sealed partial class HomeViewModel : ObservableObject
     }
 
     // ===== Multi-device join (#52 §4/§6): connect to another device's hosted incident as a thin client. =====
-
     [RelayCommand]
     private async Task JoinDeviceAsync(JoinRequest request)
     {
@@ -215,7 +236,10 @@ public sealed partial class HomeViewModel : ObservableObject
         var trimmed = address.Trim();
         var colon = trimmed.LastIndexOf(':');
         if (colon > 0 && int.TryParse(trimmed[(colon + 1)..], out var port))
+        {
             return (trimmed[..colon], port);
+        }
+
         return (trimmed, SyncProtocol.Port);
     }
 

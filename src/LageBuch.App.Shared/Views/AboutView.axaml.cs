@@ -10,6 +10,7 @@ public partial class AboutView : UserControl
     public AboutView()
     {
         InitializeComponent();
+
         // Default focus on Close so a stray Enter just dismisses the dialog. Posted rather than
         // called inline: realized as an overlay, the subtree is not yet laid out at
         // AttachedToVisualTree time, so a synchronous Focus() is dropped (see OperatorPromptView).

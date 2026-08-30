@@ -15,8 +15,13 @@ public class IncidentHostTests
     public async Task Host_serves_version_and_snapshot_and_applies_a_posted_command()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { ("Punkt A", false) }, Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            new[] { ("Punkt A", false) },
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -33,8 +38,12 @@ public class IncidentHostTests
         Assert.DoesNotContain(before.Journal, e => e.Text == "Von der Einsatzstelle");
 
         // A client posts a command; the host applies it with the client's operator and the host clock.
-        var command = new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
-            EtbDirection.Incoming, "Von der Einsatzstelle", "Leitstelle", "ELW");
+        var command = new AddJournalEntryCommand(
+            new OperatorDto("Client", "RUF 1"),
+            EtbDirection.Incoming,
+            "Von der Einsatzstelle",
+            "Leitstelle",
+            "ELW");
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
         var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         response.EnsureSuccessStatusCode();
@@ -48,8 +57,13 @@ public class IncidentHostTests
     public async Task Host_applies_an_edit_journal_entry_command_and_broadcasts_it()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -57,8 +71,13 @@ public class IncidentHostTests
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
-        var entry = session.Incident.AddJournalEntry(clock, new SessionOperator("Host", "FFB 1"),
-            EtbDirection.Incoming, "Lagemeldung", "Leitstelle", "ELW");
+        var entry = session.Incident.AddJournalEntry(
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            EtbDirection.Incoming,
+            "Lagemeldung",
+            "Leitstelle",
+            "ELW");
 
         var command = new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), entry.Id, "Lagemeldung korrigiert");
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
@@ -78,8 +97,13 @@ public class IncidentHostTests
         // same "reject cleanly" path as the other domain guards, not escape as an unhandled 500
         // (security review, #73).
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -98,8 +122,13 @@ public class IncidentHostTests
     public async Task Host_rejects_a_command_against_a_closed_incident_with_400()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Close();
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
@@ -107,8 +136,12 @@ public class IncidentHostTests
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
-        var command = new AddJournalEntryCommand(new OperatorDto("Client", null),
-            EtbDirection.Internal, "zu spät", null, null);
+        var command = new AddJournalEntryCommand(
+            new OperatorDto("Client", null),
+            EtbDirection.Internal,
+            "zu spät",
+            null,
+            null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
 
         var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
@@ -116,26 +149,37 @@ public class IncidentHostTests
     }
 
     [Theory]
-    [InlineData(null)]      // no PIN header at all
-    [InlineData("9999")]    // wrong PIN
+    [InlineData(null)] // no PIN header at all
+    [InlineData("9999")] // wrong PIN
     public async Task Host_rejects_every_endpoint_and_the_hub_without_the_right_pin(string? pin)
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
         if (pin is not null)
+        {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
+        }
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute))).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))).StatusCode);
 
-        var command = new AddJournalEntryCommand(new OperatorDto("Client", null),
-            EtbDirection.Internal, "x", null, null);
+        var command = new AddJournalEntryCommand(
+            new OperatorDto("Client", null),
+            EtbDirection.Internal,
+            "x",
+            null,
+            null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content)).StatusCode);
 
@@ -148,8 +192,13 @@ public class IncidentHostTests
     public async Task Client_uploads_a_file_and_can_pull_its_bytes_back()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -184,8 +233,13 @@ public class IncidentHostTests
     public async Task GetFile_returns_404_for_an_unknown_id()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -202,8 +256,13 @@ public class IncidentHostTests
     public async Task GetFile_requires_the_pin_like_every_other_route()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -219,8 +278,13 @@ public class IncidentHostTests
     public async Task Host_accepts_the_hub_negotiate_with_the_right_pin()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);

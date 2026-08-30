@@ -7,8 +7,13 @@ namespace LageBuch.Sync.Hosting.Tests;
 public class RemoteClientTests
 {
     private static LocalIncidentSession HostSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { ("Punkt A", false) }, Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            new[] { ("Punkt A", false) },
+            Array.Empty<(string, bool)>());
 
     // Completes when the session next raises Changed (times out so a broken broadcast fails fast).
     private static Task NextChange(RemoteIncidentSession session, TimeSpan? timeout = null)
@@ -17,7 +22,12 @@ public class RemoteClientTests
         void Handler() => tcs.TrySetResult();
         session.Changed += Handler;
         return tcs.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(5))
-            .ContinueWith(t => { session.Changed -= Handler; t.GetAwaiter().GetResult(); },
+            .ContinueWith(
+                t =>
+                {
+                    session.Changed -= Handler;
+                    t.GetAwaiter().GetResult();
+                },
                 TaskContinuationOptions.ExecuteSynchronously);
     }
 
@@ -29,11 +39,20 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            TestHost.DefaultPin,
+            port);
 
         var change = NextChange(client);
-        await client.SendAsync(new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
-            EtbDirection.Incoming, "Von der Einsatzstelle", "Leitstelle", "ELW"));
+        await client.SendAsync(new AddJournalEntryCommand(
+            new OperatorDto("Client", "RUF 1"),
+            EtbDirection.Incoming,
+            "Von der Einsatzstelle",
+            "Leitstelle",
+            "ELW"));
         await change;
 
         var entry = Assert.Single(client.Incident.Journal, e => e.Text == "Von der Einsatzstelle");
@@ -157,7 +176,12 @@ public class RemoteClientTests
             var fileId = Assert.Single(uploader.Incident.Files).Id;
 
             await using var puller = await RemoteIncidentSession.ConnectAsync(
-                "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port,
+                "127.0.0.1",
+                new SessionOperator("B"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                TestHost.DefaultPin,
+                port,
                 cacheRoot: cacheRoot);
             await puller.GetFileBytesAsync(fileId);
 
@@ -167,7 +191,10 @@ public class RemoteClientTests
         }
         finally
         {
-            if (Directory.Exists(cacheRoot)) Directory.Delete(cacheRoot, recursive: true);
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
+            }
         }
     }
 

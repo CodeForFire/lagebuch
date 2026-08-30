@@ -28,7 +28,9 @@ public static class ChecklistSection
     private static void ComposeList(QuestPDF.Fluent.ColumnDescriptor column, string title, IReadOnlyList<ChecklistItem> items)
     {
         if (items.Count == 0)
+        {
             return;
+        }
 
         column.Item().Text(title).FontSize(11).SemiBold();
 
@@ -40,10 +42,15 @@ public static class ChecklistSection
                 row.RelativeItem().Text(t =>
                 {
                     if (item.IsMandatory)
+                    {
                         t.Span("Pflicht: ").SemiBold().FontColor(Colors.Red.Darken1);
+                    }
+
                     t.Span(item.Text);
                     if (!string.IsNullOrWhiteSpace(item.Note))
+                    {
                         t.Span($"  ({item.Note})").FontColor(Colors.Grey.Darken1);
+                    }
                 });
             });
         }

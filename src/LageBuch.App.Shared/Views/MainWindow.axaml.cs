@@ -7,6 +7,7 @@ public partial class MainWindow : Window
 {
     public MainWindow() => InitializeComponent();
 
-    public MainWindow(MainWindowViewModel viewModel) : this() =>
+    public MainWindow(MainWindowViewModel viewModel)
+        : this() =>
         ((MainView)Content!).AttachViewModel(viewModel);
 }

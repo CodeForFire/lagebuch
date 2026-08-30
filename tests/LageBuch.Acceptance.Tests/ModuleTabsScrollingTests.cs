@@ -55,16 +55,20 @@ public class ModuleTabsScrollingTests
             .Select(t => t.TranslatePoint(new Point(0, 0), tabs)!.Value.X)
             .Distinct()
             .ToArray();
-        Assert.True(columns.Length == 1,
+        var columnsMessage =
             $"nav rail wrapped into {columns.Length} columns at x=" +
             string.Join(", ", columns.Select(c => c.ToString("F0", CultureInfo.InvariantCulture))) +
-            " -- it must overflow into a scrollbar instead.");
+            " -- it must overflow into a scrollbar instead.";
+        Assert.True(
+            columns.Length == 1,
+            columnsMessage);
 
         // The overflow lands in a ScrollViewer, not silent clipping.
         var strip = tabs.GetVisualDescendants().OfType<ItemsPresenter>()
             .First(p => p.Name == "PART_ItemsPresenter");
         var scroll = strip.GetVisualAncestors().OfType<ScrollViewer>().First();
-        Assert.True(scroll.Extent.Height > scroll.Viewport.Height,
+        Assert.True(
+            scroll.Extent.Height > scroll.Viewport.Height,
             $"rail is {scroll.Extent.Height:F0}px tall in a {scroll.Viewport.Height:F0}px viewport -- no overflow to scroll.");
     }
 }

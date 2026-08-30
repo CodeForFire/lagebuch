@@ -8,8 +8,6 @@ using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Domain;
 
-public sealed record AuditEvent(DateTimeOffset At, string Action, string By);
-
 public sealed class Incident
 {
     private readonly List<ChecklistItem> _checklistAufbau = new();
@@ -25,27 +23,42 @@ public sealed class Incident
     private readonly List<Building> _buildings = new();
     private readonly List<Dwelling> _dwellings = new();
 
-    private Incident() { }
+    private Incident()
+    {
+    }
 
     public Guid Id { get; private init; }
+
     public DateTimeOffset StartedAt { get; private init; }
+
     public IncidentState State { get; private set; }
 
     public IncidentNumber? IncidentNumber { get; private set; }
+
     public string? Keyword { get; private set; }
+
     public string? Street { get; private set; }
+
     public string? District { get; private set; }
+
     public string? Status { get; private set; }
 
     public DateTimeOffset? ClosedAt { get; private set; }
+
     public string? ClosedBy { get; private set; }
 
     public IReadOnlyList<ChecklistItem> ChecklistAufbau => _checklistAufbau;
+
     public IReadOnlyList<ChecklistItem> ChecklistAbbau => _checklistAbbau;
+
     public IReadOnlyList<EtbEntry> Journal => _journal;
+
     public IReadOnlyList<RoleAssignment> Roles => _roles;
+
     public IReadOnlyList<ForceUnit> Forces => _forces;
+
     public IReadOnlyList<AtemschutzTrupp> ScbaTrupps => _scbaTrupps;
+
     public IReadOnlyList<AuditEvent> Audit => _audit;
 
     /// <summary>Persisted incident-level timers, keyed by <see cref="IncidentTimerState.Key"/>.</summary>
@@ -58,6 +71,7 @@ public sealed class Incident
     public IReadOnlyList<IncidentTask> Tasks => _tasks;
 
     public IReadOnlyList<Building> Buildings => _buildings;
+
     public IReadOnlyList<Dwelling> Dwellings => _dwellings;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
@@ -93,12 +107,13 @@ public sealed class Incident
             StartedAt = clock.Now,
             State = IncidentState.Open,
             Keyword = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim(),
-            IncidentNumber = incidentNumber
+            IncidentNumber = incidentNumber,
         };
         incident._audit.Add(new AuditEvent(clock.Now, "opened", openedBy.Display));
-        incident.AppendSystemEntry(clock, openedBy, incidentNumber is null
+        var openedText = incidentNumber is null
             ? "Einsatz begonnen"
-            : $"Einsatz begonnen (Einsatznummer {incidentNumber.Value})");
+            : $"Einsatz begonnen (Einsatznummer {incidentNumber.Value})";
+        incident.AppendSystemEntry(clock, openedBy, openedText);
         return incident;
     }
 
@@ -137,7 +152,7 @@ public sealed class Incident
             District = district,
             Status = status,
             ClosedAt = closedAt,
-            ClosedBy = closedBy
+            ClosedBy = closedBy,
         };
         incident._checklistAufbau.AddRange(checklistAufbau);
         incident._checklistAbbau.AddRange(checklistAbbau);
@@ -164,7 +179,10 @@ public sealed class Incident
     {
         EnsureOpen();
         if (string.IsNullOrWhiteSpace(key))
+        {
             throw new ArgumentException("Timer key must not be blank.", nameof(key));
+        }
+
         _timers.RemoveAll(t => t.Key == key);
         _timers.Add(new IncidentTimerState(key.Trim(), cycleAnchor, intervalMinutes, recurringIntervalMinutes, isRunning));
     }
@@ -172,7 +190,9 @@ public sealed class Incident
     private void EnsureOpen()
     {
         if (State == IncidentState.Closed)
+        {
             throw new IncidentClosedException();
+        }
     }
 
     // Appends an automatic (system-generated) entry straight to the journal, deliberately
@@ -198,14 +218,21 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(closedBy);
         EnsureOpen();
+
         // Must precede the state flip — a closed incident rejects journal writes.
         AppendSystemEntry(clock, closedBy, "Einsatz abgeschlossen");
+
         // A closed incident is a historical record: nobody hands over a role after the fact, so any
         // still-running assignment is stamped closed right along with it, silently — same as a plain
         // AssignRole/EndRoleAssignment, which don't log to the ETB either.
         for (var i = 0; i < _roles.Count; i++)
+        {
             if (_roles[i].To is null)
+            {
                 _roles[i] = _roles[i].EndedAt(clock.Now);
+            }
+        }
+
         State = IncidentState.Closed;
         ClosedAt = clock.Now;
         ClosedBy = closedBy.Display;
@@ -278,7 +305,9 @@ public sealed class Incident
         var isComplete = AllMandatoryDone(list);
 
         if (!wasComplete && isComplete)
+        {
             AppendSystemEntry(clock, op, $"Checkliste {kind} abgeschlossen: alle Pflichtpunkte erledigt");
+        }
 
         return item;
     }
@@ -286,9 +315,15 @@ public sealed class Incident
     private (List<ChecklistItem> List, ChecklistKind Kind) FindChecklistOwning(Guid itemId)
     {
         if (_checklistAufbau.Any(c => c.Id == itemId))
+        {
             return (_checklistAufbau, ChecklistKind.Aufbau);
+        }
+
         if (_checklistAbbau.Any(c => c.Id == itemId))
+        {
             return (_checklistAbbau, ChecklistKind.Abbau);
+        }
+
         throw new KeyNotFoundException($"Checklist item {itemId} not found.");
     }
 
@@ -306,6 +341,7 @@ public sealed class Incident
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
+
         // Direction rides the wire as a plain integer (AddJournalEntryCommand.Direction), so a
         // malformed value (e.g. a forged "direction": 99) must not reach EtbEntry.Create and get
         // persisted by an out-of-range ordinal. Note this intentionally still allows System: several
@@ -313,7 +349,10 @@ public sealed class Incident
         // same method with EtbDirection.System rather than the private AppendSystemEntry helper, so
         // rejecting it here would break them, not just a synced command's ability to forge one.
         if (!Enum.IsDefined(direction))
+        {
             throw new ArgumentException("Ungültige Richtung für einen ETB-Eintrag.", nameof(direction));
+        }
+
         var entry = EtbEntry.Create(clock.Now, direction, text, op, from, to);
         _journal.Add(entry);
         return entry;
@@ -339,18 +378,26 @@ public sealed class Incident
 
         var index = _journal.FindIndex(e => e.Id == entryId);
         if (index < 0)
+        {
             throw new KeyNotFoundException($"ETB-Eintrag {entryId} nicht gefunden.");
+        }
 
         var existing = _journal[index];
         if (existing.Direction == EtbDirection.System)
+        {
             throw new InvalidOperationException("Systemeinträge können nicht bearbeitet werden.");
+        }
 
         var edited = existing.WithEditedText(text, op, clock.Now);
         _journal[index] = edited;
+
         // WithEditedText is a no-op (returns the same instance) when the text didn't actually
         // change -- nothing to trace in that case.
         if (edited.Edits.Count > existing.Edits.Count)
+        {
             AppendSystemEntry(clock, op, $"ETB-Eintrag {existing.Timestamp:HH:mm} bearbeitet");
+        }
+
         return edited;
     }
 
@@ -391,9 +438,14 @@ public sealed class Incident
         EnsureOpen();
         var index = _roles.FindIndex(r => r.Id == assignmentId);
         if (index < 0)
+        {
             throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        }
+
         if (_roles[index].To is not null)
+        {
             throw new InvalidOperationException("Funktionszuweisung ist bereits beendet.");
+        }
 
         var ended = _roles[index].EndedAt(to);
         _roles[index] = ended;
@@ -407,8 +459,12 @@ public sealed class Incident
     /// entry: "wer hat wann welche Funktion übernommen" is exactly what the journal exists to answer.
     /// </summary>
     public RoleAssignment TransferRole(
-        IClock clock, SessionOperator op, Guid assignmentId,
-        string newPersonName, string? newCallSign, string? newPhone)
+        IClock clock,
+        SessionOperator op,
+        Guid assignmentId,
+        string newPersonName,
+        string? newCallSign,
+        string? newPhone)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -416,17 +472,27 @@ public sealed class Incident
 
         var index = _roles.FindIndex(r => r.Id == assignmentId);
         if (index < 0)
+        {
             throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        }
+
         if (_roles[index].To is not null)
+        {
             throw new InvalidOperationException("Funktionszuweisung ist bereits beendet.");
+        }
 
         var previous = _roles[index];
         var ended = previous.EndedAt(clock.Now);
         _roles[index] = ended;
 
         var next = RoleAssignment.Create(
-            ended.Role, newPersonName, newCallSign, from: clock.Now, to: null,
-            section: ended.Section, phone: newPhone);
+            ended.Role,
+            newPersonName,
+            newCallSign,
+            from: clock.Now,
+            to: null,
+            section: ended.Section,
+            phone: newPhone);
         _roles.Add(next);
 
         AppendSystemEntry(clock, op, $"Funktion {ended.Role} übergeben: {ended.PersonName} → {next.PersonName}");
@@ -445,15 +511,21 @@ public sealed class Incident
 
         var index = _roles.FindIndex(r => r.Id == assignmentId);
         if (index < 0)
+        {
             throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        }
 
         var previous = _roles[index];
         var updated = previous.WithPhone(phone);
         _roles[index] = updated;
 
         if (!string.Equals(previous.Phone, updated.Phone, StringComparison.Ordinal))
-            AppendSystemEntry(clock, op,
+        {
+            AppendSystemEntry(
+                clock,
+                op,
                 $"Handynummer für {updated.Role} ({updated.PersonName}) geändert: {previous.Phone ?? "—"} → {updated.Phone ?? "—"}");
+        }
 
         return updated;
     }
@@ -485,9 +557,14 @@ public sealed class Incident
         // "Einheit aufgenommen: Aich, Stärke 0/6/6" instead of trailing "davon 0 AGT — Status: ".
         var text = $"Einheit aufgenommen: {Label(unit)}, Stärke {unit.StrengthText}";
         if (unit.ScbaCount > 0)
+        {
             text += $", davon {unit.ScbaCount} AGT";
+        }
+
         if (unit.Status is not null)
+        {
             text += $" — Status: {unit.Status}";
+        }
 
         AppendSystemEntry(clock, op, text, to: unit.CallSign);
         return unit;
@@ -511,7 +588,9 @@ public sealed class Incident
 
         var index = _forces.FindIndex(f => f.Id == unitId);
         if (index < 0)
+        {
             throw new ArgumentException("Einheit nicht gefunden.", nameof(unitId));
+        }
 
         var previous = _forces[index];
         var updated = previous.WithStatusAndNotes(status, notes);
@@ -520,7 +599,9 @@ public sealed class Incident
         // Compare the normalised values, so re-selecting the same status -- or the same status
         // with stray whitespace -- is not a transition.
         if (!string.Equals(previous.Status, updated.Status, StringComparison.Ordinal))
+        {
             AppendSystemEntry(clock, op, StatusChangeText(previous, updated), from: updated.CallSign);
+        }
 
         return updated;
     }
@@ -536,8 +617,12 @@ public sealed class Incident
     /// the unit itself (<see cref="ForceUnit.WithStrength"/>). An unchanged resubmission is neither.
     /// </summary>
     public ForceUnit UpdateForceStrength(
-        IClock clock, SessionOperator op, Guid unitId,
-        int officerCount, int personnelCount, int scbaCount)
+        IClock clock,
+        SessionOperator op,
+        Guid unitId,
+        int officerCount,
+        int personnelCount,
+        int scbaCount)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -545,12 +630,16 @@ public sealed class Incident
 
         var index = _forces.FindIndex(f => f.Id == unitId);
         if (index < 0)
+        {
             throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+        }
 
         var previous = _forces[index];
         var updated = previous.WithStrength(officerCount, personnelCount, scbaCount, op, clock.Now);
         if (ReferenceEquals(updated, previous))
+        {
             return previous;
+        }
 
         _forces[index] = updated;
 
@@ -558,7 +647,10 @@ public sealed class Incident
         // AddForceUnit's optional clauses.
         var text = $"{Label(updated)}: Stärke {previous.StrengthText} → {updated.StrengthText}";
         if (previous.ScbaCount != updated.ScbaCount)
+        {
             text += $", davon AGT {previous.ScbaCount} → {updated.ScbaCount}";
+        }
+
         AppendSystemEntry(clock, op, text, from: updated.CallSign);
 
         return updated;
@@ -585,7 +677,9 @@ public sealed class Incident
 
         var index = _forces.FindIndex(f => f.Id == unitId);
         if (index < 0)
+        {
             throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+        }
 
         var unit = _forces[index];
         _forces.RemoveAt(index);
@@ -614,10 +708,21 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(clock);
         var number = truppNumber ?? NextFreeScbaTruppNumber();
         if (_scbaTrupps.Any(t => t.TruppNumber == number))
+        {
             throw new ArgumentException($"Truppnummer {number} ist bereits vergeben.", nameof(truppNumber));
+        }
+
         var trupp = AtemschutzTrupp.Register(
-            clock.Now, designation, members, entryPressure, number, callSign, task,
-            maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes);
+            clock.Now,
+            designation,
+            members,
+            entryPressure,
+            number,
+            callSign,
+            task,
+            maxDurationMinutes,
+            returnPressureBar,
+            pressureControlIntervalMinutes);
         _scbaTrupps.Add(trupp);
         return trupp;
     }
@@ -685,7 +790,10 @@ public sealed class Incident
         EnsureOpen();
         var index = _files.FindIndex(f => f.Id == fileId);
         if (index < 0)
+        {
             throw new KeyNotFoundException($"Datei {fileId} nicht gefunden.");
+        }
+
         var renamed = _files[index].WithDisplayName(displayName);
         _files[index] = renamed;
         return renamed;
@@ -711,9 +819,14 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
         if (!Enum.IsDefined(importance))
+        {
             throw new ArgumentException("Unbekannte Wichtigkeit.", nameof(importance));
+        }
+
         if (!Enum.IsDefined(urgency))
+        {
             throw new ArgumentException("Unbekannte Dringlichkeit.", nameof(urgency));
+        }
 
         var task = IncidentTask.Create(clock.Now, text, assignee, importance, urgency, timerMinutes, op);
         _tasks.Add(task);
@@ -733,7 +846,9 @@ public sealed class Incident
 
         var index = _tasks.FindIndex(t => t.Id == taskId);
         if (index < 0)
+        {
             throw new KeyNotFoundException($"Aufgabe {taskId} nicht gefunden.");
+        }
 
         var updated = _tasks[index].WithCompletion(isDone, op, clock.Now);
         _tasks[index] = updated;
@@ -755,10 +870,16 @@ public sealed class Incident
         _buildings.Add(building);
 
         for (var floor = 0; floor <= floorCount; floor++)
+        {
             for (var apt = 1; apt <= apartmentsPerFloor; apt++)
+            {
                 _dwellings.Add(Dwelling.Create(building.Id, floor, apt));
+            }
+        }
 
-        AppendSystemEntry(clock, op,
+        AppendSystemEntry(
+            clock,
+            op,
             $"CO-Messprotokoll eröffnet: {building.Name} (EG–{FloorLabel(floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss)");
     }
 
@@ -783,7 +904,9 @@ public sealed class Incident
 
         var text = $"CO-Struktur geändert: {building.Name} jetzt EG–{FloorLabel(floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss";
         if (removed > 0)
+        {
             text += $", {removed} Wohnungen entfernt";
+        }
 
         AppendSystemEntry(clock, op, text);
     }
@@ -808,13 +931,17 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(op);
 
         if (coValue is < 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(coValue), "CO-Messwert darf nicht negativ sein.");
+        }
 
         var building = FindBuilding(buildingId);
         var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
 
         if (dwelling.CoValue == coValue)
+        {
             return;
+        }
 
         var index = _dwellings.IndexOf(dwelling);
         _dwellings[index] = dwelling.WithCoValue(coValue);
@@ -836,7 +963,9 @@ public sealed class Incident
         var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
 
         if (dwelling.Status == status)
+        {
             return;
+        }
 
         var index = _dwellings.IndexOf(dwelling);
         _dwellings[index] = dwelling.WithStatus(status);

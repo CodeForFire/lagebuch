@@ -14,13 +14,18 @@ public class EtbViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => changes++)
         {
             NewText = "Lagemeldung",
             NewDirection = EtbDirection.Incoming,
-            NewFrom = "ILS"
+            NewFrom = "ILS",
         };
 
         Assert.True(vm.AddEntryCommand.CanExecute(null));
@@ -31,7 +36,7 @@ public class EtbViewModelTests
         Assert.Equal(2, session.Incident.Journal.Count);
         Assert.Equal("Lagemeldung", session.Incident.Journal[^1].Text);
         Assert.Equal("Lagemeldung", vm.Entries[0].Text);
-        Assert.Equal("", vm.NewText);
+        Assert.Equal(string.Empty, vm.NewText);
         Assert.Equal(1, changes);
     }
 
@@ -39,8 +44,13 @@ public class EtbViewModelTests
     public void AddEntry_disabled_when_text_blank()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "  " };
 
         Assert.False(vm.AddEntryCommand.CanExecute(null));
@@ -50,8 +60,13 @@ public class EtbViewModelTests
     public void ReadOnly_session_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Close();
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "x" };
 
@@ -66,6 +81,7 @@ public class EtbViewModelTests
         Assert.Contains(EtbDirection.Incoming, vm.DirectionOptions.Select(o => o.Value));
         Assert.Contains(EtbDirection.Outgoing, vm.DirectionOptions.Select(o => o.Value));
         Assert.Contains(EtbDirection.Internal, vm.DirectionOptions.Select(o => o.Value));
+
         // System is written only by the app, never picked by a human.
         Assert.DoesNotContain(EtbDirection.System, vm.DirectionOptions.Select(o => o.Value));
     }
@@ -74,8 +90,14 @@ public class EtbViewModelTests
     public void HideSystemEntries_hides_system_rows_and_keeps_human_rows()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+
         // StartNew logs "Einsatz begonnen" (System); add one human entry.
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Lagemeldung" };
         vm.AddEntryCommand.Execute(null);
@@ -97,8 +119,13 @@ public class EtbViewModelTests
     public void System_entry_added_while_filtering_stays_hidden_but_human_entry_appears()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
         vm.HideSystemEntries = true;
         Assert.Empty(vm.Entries); // the "Einsatz begonnen" System row is hidden
@@ -144,8 +171,13 @@ public class EtbViewModelTests
     public void CallSignOptions_reflects_the_Funkrufnamen_master_data()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var masterData = MasterDataSet.Empty with { RadioCallSigns = new[] { "Leitstelle", "Land 1" } };
 
         var vm = new EtbViewModel(session, clock, masterData, () => { });
@@ -182,6 +214,7 @@ public class EtbViewModelTests
 
         Assert.False(vm.IsEditing);
         Assert.Equal(string.Empty, vm.EditText);
+
         // A save also appends a System trace of the correction (security review, #73), so the
         // edited row is no longer necessarily Entries[0] -- find it by its new text instead.
         var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung korrigiert");
@@ -221,8 +254,13 @@ public class EtbViewModelTests
     public void CanEdit_is_false_for_System_entries()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
 
         // The automatic "Einsatz begonnen" entry from StartNew is the only row at this point.
@@ -237,8 +275,13 @@ public class EtbViewModelTests
     public void ReadOnly_session_disables_editing()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
         session.Close();
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
@@ -255,8 +298,13 @@ public class EtbViewModelTests
     public void History_stays_viewable_on_a_read_only_session()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var entry = session.Incident.AddJournalEntry(clock, session.Operator!, EtbDirection.Incoming, "Lagemeldung");
         session.Incident.EditJournalEntry(clock, session.Operator!, entry.Id, "Lagemeldung korrigiert");
         session.Close();
@@ -307,8 +355,13 @@ public class EtbViewModelTests
     private static EtbViewModel NewVm()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         return new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
     }
 }

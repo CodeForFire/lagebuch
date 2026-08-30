@@ -3,9 +3,17 @@ namespace LageBuch.Domain;
 public sealed class IncidentClosedException : InvalidOperationException
 {
     public IncidentClosedException()
-        : base("Der Einsatz ist abgeschlossen und schreibgeschützt.") { }
+        : base("Der Einsatz ist abgeschlossen und schreibgeschützt.")
+    {
+    }
 
-    public IncidentClosedException(string message) : base(message) { }
+    public IncidentClosedException(string message)
+        : base(message)
+    {
+    }
 
-    public IncidentClosedException(string message, Exception innerException) : base(message, innerException) { }
+    public IncidentClosedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

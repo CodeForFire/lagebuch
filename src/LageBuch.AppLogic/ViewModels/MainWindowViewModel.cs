@@ -6,7 +6,12 @@ namespace LageBuch.AppLogic.ViewModels;
 
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    private enum PendingAction { None, New, Join }
+    private enum PendingAction
+    {
+        None,
+        New,
+        Join,
+    }
 
     private readonly HomeViewModel _home;
     private readonly MasterDataEditorViewModel _editor;
@@ -53,11 +58,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (ReferenceEquals(CurrentView, _editor))
         {
             if (_editor.PendingConfirm is not null)
+            {
                 return; // a discard prompt is already up — don't stack a second one
+            }
+
             _editor.ConfirmDiscardThen(proceed);
         }
         else
+        {
             proceed();
+        }
     }
 
     [RelayCommand]
@@ -95,12 +105,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var action = _pending;
         PendingPrompt = null;
         _pending = PendingAction.None;
-        if (op is null) return;
+        if (op is null)
+        {
+            return;
+        }
 
         if (action == PendingAction.New)
+        {
             _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.Keyword));
+        }
         else if (action == PendingAction.Join)
+        {
             _home.JoinDeviceCommand.Execute(new JoinRequest(op, prompt!.Host, prompt.Pin));
+        }
     }
 
     [RelayCommand]

@@ -5,7 +5,10 @@ public sealed class ChecklistItem
     public ChecklistItem(string text, bool isMandatory)
     {
         if (string.IsNullOrWhiteSpace(text))
+        {
             throw new ArgumentException("Checklistentext darf nicht leer sein.", nameof(text));
+        }
+
         Id = Guid.NewGuid();
         Text = text.Trim();
         IsMandatory = isMandatory;
@@ -24,9 +27,13 @@ public sealed class ChecklistItem
         => new(id, text, isDone, note, isMandatory);
 
     public Guid Id { get; }
+
     public string Text { get; }
+
     public bool IsDone { get; private set; }
+
     public string? Note { get; private set; }
+
     public bool IsMandatory { get; }
 
     public void Toggle() => IsDone = !IsDone;

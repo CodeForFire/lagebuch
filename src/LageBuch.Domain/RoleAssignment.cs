@@ -20,11 +20,19 @@ public sealed record RoleAssignment(
         string? phone = null)
     {
         if (string.IsNullOrWhiteSpace(role))
+        {
             throw new ArgumentException("Funktion darf nicht leer sein.", nameof(role));
+        }
+
         if (string.IsNullOrWhiteSpace(personName))
+        {
             throw new ArgumentException("Name darf nicht leer sein.", nameof(personName));
+        }
+
         if (from is { } f && to is { } t && t < f)
+        {
             throw new ArgumentException("Bis-Zeitpunkt darf nicht vor dem Von-Zeitpunkt liegen.", nameof(to));
+        }
 
         return new RoleAssignment(
             Guid.NewGuid(),
@@ -44,7 +52,10 @@ public sealed record RoleAssignment(
     public RoleAssignment EndedAt(DateTimeOffset to)
     {
         if (From is { } f && to < f)
+        {
             throw new ArgumentException("Bis-Zeitpunkt darf nicht vor dem Von-Zeitpunkt liegen.", nameof(to));
+        }
+
         return this with { To = to };
     }
 

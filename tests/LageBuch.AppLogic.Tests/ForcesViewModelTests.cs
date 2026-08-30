@@ -20,8 +20,13 @@ public class ForcesViewModelTests
     public void AddForce_appends_and_updates_total()
     {
         var changes = 0;
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB",
@@ -50,7 +55,6 @@ public class ForcesViewModelTests
     }
 
     // --- Issue #18 ---
-
     [Fact]
     public void Brigade_options_come_from_master_data()
     {
@@ -127,7 +131,8 @@ public class ForcesViewModelTests
         vm.NewNotes = "Notiz";
         vm.AddForceCommand.Execute(null);
 
-        Assert.Equal("", vm.NewBrigade);
+        Assert.Equal(string.Empty, vm.NewBrigade);
+
         // Empty means 0 -- the fields are nullable so the placeholder shows instead of a "0".
         Assert.Null(vm.NewOfficerCount);
         Assert.Null(vm.NewMannschaftCount);
@@ -137,12 +142,16 @@ public class ForcesViewModelTests
     }
 
     // --- Issue #76: Wache → Fahrzeug relation -----------------------------------------------
-
     [Fact]
     public void Vehicle_options_hide_taken_call_signs_until_their_row_is_removed()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
         vm.NewBrigade = "FFB Wache 1";
         Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
@@ -163,8 +172,13 @@ public class ForcesViewModelTests
     public void A_typed_duplicate_call_sign_blocks_adding_with_a_hint()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -190,9 +204,15 @@ public class ForcesViewModelTests
     public void Rows_without_a_call_sign_never_count_as_duplicates()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { });
+
         // Two units without any call sign must remain possible.
         foreach (var mannschaft in new[] { 6, 9 })
         {
@@ -235,8 +255,13 @@ public class ForcesViewModelTests
                 new Vehicle("FFB Wache 1", "ffb 1/44/1", 6),
             },
         };
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), masterData, () => { });
 
         vm.NewBrigade = "FFB Wache 1";
@@ -254,6 +279,7 @@ public class ForcesViewModelTests
         vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB 1/40/1", 9);
 
         Assert.Equal("FFB 1/40/1", vm.NewCallSign);
+
         // 9 seats preset as 1 Führungskraft + 8 Mannschaft.
         Assert.Equal(1, vm.NewOfficerCount);
         Assert.Equal(8, vm.NewMannschaftCount);
@@ -265,8 +291,13 @@ public class ForcesViewModelTests
     public void Gf_and_mann_are_stored_as_total_with_officer_count()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -283,13 +314,17 @@ public class ForcesViewModelTests
     }
 
     // --- Issue #76: editable Stärke -----------------------------------------------------------
-
     [Fact]
     public void Editing_a_rows_strength_reaches_the_domain_with_an_etb_entry()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -302,6 +337,7 @@ public class ForcesViewModelTests
         row.OfficerCount = 1;
         row.MannschaftCount = 8;
         row.ScbaCount = 3;
+
         // One deliberate correction is one ETB entry -- the three fields commit together.
         row.CommitStrength();
 
@@ -318,8 +354,13 @@ public class ForcesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => changes++)
         {
             NewBrigade = "FFB Wache 1",
@@ -348,8 +389,13 @@ public class ForcesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9);
         seed.Close();
 
@@ -366,8 +412,13 @@ public class ForcesViewModelTests
     public void A_noop_strength_resubmission_adds_neither_history_nor_etb_entry()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "Aich",
@@ -389,8 +440,13 @@ public class ForcesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Incident.AddForceUnit(clock, new SessionOperator("Müller"), "FFB Wache 1", 9);
         seed.Close();
 
@@ -428,8 +484,13 @@ public class ForcesViewModelTests
     public void Editing_a_row_status_reaches_the_domain_and_persists()
     {
         var changes = 0;
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB Wache 1",
@@ -443,6 +504,7 @@ public class ForcesViewModelTests
         row.Status = "Im Einsatz";
 
         Assert.Equal("Im Einsatz", session.Incident.Forces[0].Status);
+
         // An edit is a change to the Einsatz record, so it has to trigger the same save the add does.
         Assert.Equal(1, changes);
     }
@@ -450,8 +512,13 @@ public class ForcesViewModelTests
     [Fact]
     public void Editing_a_row_bemerkung_reaches_the_domain()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -468,8 +535,13 @@ public class ForcesViewModelTests
     [Fact]
     public void Editing_a_row_leaves_the_rest_of_the_unit_alone()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -487,6 +559,7 @@ public class ForcesViewModelTests
         Assert.Equal("FFB 1/40/1", unit.CallSign);
         Assert.Equal(9, unit.PersonnelCount);
         Assert.Equal(4, unit.ScbaCount);
+
         // Totals are derived from the units, so they must not drift on a status edit.
         Assert.Equal(9, vm.TotalPersonnel);
         Assert.Equal(4, vm.TotalScba);
@@ -498,8 +571,13 @@ public class ForcesViewModelTests
         // Pins that the view model hands the real clock and operator down: the domain guarantees
         // an entry exists, but only this layer decides whose name is on it.
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -525,8 +603,13 @@ public class ForcesViewModelTests
         // A Bemerkung edit is a label correction, not a reportable event, so it must never add a
         // journal entry -- regardless of how many times Notes is set here.
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
@@ -544,11 +627,15 @@ public class ForcesViewModelTests
         Assert.Equal("übe", session.Incident.Forces[0].Notes);
     }
 
-
     private static ForcesViewModel NewVm()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         return new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
     }
 }

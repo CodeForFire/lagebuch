@@ -11,7 +11,10 @@ public class MigrationForwardCompatTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     [Fact]
@@ -25,6 +28,7 @@ public class MigrationForwardCompatTests : IDisposable
                 "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (0);";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -59,6 +63,7 @@ public class MigrationForwardCompatTests : IDisposable
                 "DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (1);";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         // Act + Assert: opening the old file must upgrade it in place, not throw.
@@ -82,6 +87,7 @@ public class MigrationForwardCompatTests : IDisposable
                     "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (2);";
                 v1.ExecuteNonQuery();
             }
+
             using (var v2 = cn.CreateCommand())
             {
                 v2.CommandText = """
@@ -101,6 +107,7 @@ public class MigrationForwardCompatTests : IDisposable
                 v2.ExecuteNonQuery();
             }
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -113,10 +120,12 @@ public class MigrationForwardCompatTests : IDisposable
                 "SELECT registered_at, start_time, entry_pressure, pressure_control_interval_minutes, trupp_number FROM scba_trupps;";
             using var r = read.ExecuteReader();
             Assert.True(r.Read());
+
             // An existing V2 trupp was already under air: start == entry, pressure preserved.
             Assert.Equal(r.GetString(0), r.GetString(1));
             Assert.Equal(300, r.GetInt32(2));
             Assert.Equal(AtemschutzTrupp.DefaultPressureControlIntervalMinutes, r.GetInt32(3));
+
             // #78: the V17 rebuild backfills trupp_number from the pre-existing registration ordinal.
             Assert.Equal(1, r.GetInt32(4));
         }
@@ -140,6 +149,7 @@ public class MigrationForwardCompatTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -152,6 +162,7 @@ public class MigrationForwardCompatTests : IDisposable
             using var r = read.ExecuteReader();
             Assert.True(r.Read());
             Assert.Equal("Müller", r.GetString(0));
+
             // Widening must not disturb the existing row; the new columns simply read as null.
             Assert.True(r.IsDBNull(1));
             Assert.True(r.IsDBNull(2));
@@ -177,6 +188,7 @@ public class MigrationForwardCompatTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -203,6 +215,7 @@ public class MigrationForwardCompatTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -215,6 +228,7 @@ public class MigrationForwardCompatTests : IDisposable
             using var r = read.ExecuteReader();
             Assert.True(r.Read());
             Assert.Equal(9, r.GetInt32(0));
+
             // No AGT count was ever recorded for this unit, and 0 reads the same as "none known"
             // for the header total -- so the NOT NULL DEFAULT 0 does not invent information.
             Assert.Equal(0, r.GetInt32(1));
@@ -243,6 +257,7 @@ public class MigrationForwardCompatTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -274,6 +289,7 @@ public class MigrationForwardCompatTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -309,6 +325,7 @@ public class MigrationForwardCompatTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -341,6 +358,7 @@ public class MigrationForwardCompatTests : IDisposable
             cmd.Parameters.AddWithValue("$v", newer);
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -357,6 +375,7 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Theory]
+
     // The old members column was free text with " / " as a mere watermark hint, so the data in
     // the wild is not uniform. Everything must survive; nothing may be silently dropped.
     [InlineData("Müller / Schmidt", new[] { "Müller", "Schmidt" })]
@@ -380,9 +399,14 @@ public class MigrationForwardCompatTests : IDisposable
         using var r = read.ExecuteReader();
         var names = new List<string>();
         var roles = new List<int>();
-        while (r.Read()) { roles.Add(r.GetInt32(0)); names.Add(r.GetString(1)); }
+        while (r.Read())
+        {
+            roles.Add(r.GetInt32(0));
+            names.Add(r.GetString(1));
+        }
 
         Assert.Equal(expected, names);
+
         // First name becomes the Truppführer, the rest follow in position order.
         Assert.Equal(Enumerable.Range(0, expected.Length), roles);
     }
@@ -400,8 +424,12 @@ public class MigrationForwardCompatTests : IDisposable
         {
             info.CommandText = "SELECT name FROM pragma_table_info('scba_trupps');";
             using var ir = info.ExecuteReader();
-            while (ir.Read()) columns.Add(ir.GetString(0));
+            while (ir.Read())
+            {
+                columns.Add(ir.GetString(0));
+            }
         }
+
         Assert.DoesNotContain("members", columns);
 
         using var read = cn.CreateCommand();
@@ -414,6 +442,7 @@ public class MigrationForwardCompatTests : IDisposable
         Assert.Equal(300, r.GetInt32(2));
         Assert.Equal(30, r.GetInt32(3));
         Assert.Equal(5, r.GetInt32(4));
+
         // #78: the V17 rebuild backfills trupp_number from the pre-existing registration ordinal.
         Assert.Equal(1, r.GetInt32(5));
     }
@@ -448,6 +477,7 @@ public class MigrationForwardCompatTests : IDisposable
             insert.Parameters.AddWithValue("$m", members);
             insert.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
     }
 

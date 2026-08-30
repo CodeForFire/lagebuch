@@ -2,26 +2,13 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
+using LageBuch.Documents;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
-using LageBuch.Documents;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
-
-public enum TaskFilterKind
-{
-    Open,
-    Done,
-    All,
-}
-
-/// <summary>An enum value paired with its German label (EtbDirectionOption precedent). Two
-/// closed records instead of a generic one, so Avalonia compiled-bind templates stay simple.</summary>
-public readonly record struct ImportanceOption(TaskImportance Value, string Label);
-
-public readonly record struct UrgencyOption(TaskUrgency Value, string Label);
 
 /// <summary>
 /// The AUFGABEN tab (#88). Unlike the journal this list mutates in place (completion reorders,
@@ -35,6 +22,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
+
     // Null on a read-only workspace: rows are static history there and the due alarm is gated off
     // anyway, so holding a live ticker subscription would only keep the clock ticking for nothing
     // (ScbaViewModel precedent — keeps Closing_workspace_drops_reminder at zero subscribers).
@@ -42,8 +30,12 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     private readonly HashSet<Guid> _dueAnnounced = new();
 
     public TasksViewModel(
-        IIncidentSession session, IClock clock, ITicker ticker, IAlarmService alarm,
-        MasterDataSet masterData, Action onChanged)
+        IIncidentSession session,
+        IClock clock,
+        ITicker ticker,
+        IAlarmService alarm,
+        MasterDataSet masterData,
+        Action onChanged)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(ticker);
@@ -53,6 +45,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         _alarm = alarm;
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
+
         // Callsigns, Funktionen and personnel names suggest; anything else stays free text.
         AssigneeOptions = masterData.RadioCallSigns
             .Concat(masterData.Roles)
@@ -66,7 +59,9 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     }
 
     public bool IsReadOnly { get; }
+
     public ObservableCollection<TaskRow> Rows { get; }
+
     public IReadOnlyList<string> AssigneeOptions { get; }
 
     // Shared with TaskDialogViewModel (same assembly) so picker wording matches everywhere.
@@ -83,6 +78,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
             .ToArray();
 
     public IReadOnlyList<ImportanceOption> ImportanceOptions { get; } = ImportanceLevels();
+
     public IReadOnlyList<UrgencyOption> UrgencyOptions { get; } = UrgencyLevels();
 
     // Display order (spec §4): open first, then urgency desc -> importance desc -> oldest first.
@@ -94,7 +90,6 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
              .ThenBy(t => t.CreatedAt);
 
     // --- Filter: three-state radio group (ALLE/OFFEN/ERLEDIGT), default OFFEN. ---
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOpenFilter))]
     [NotifyPropertyChangedFor(nameof(IsDoneFilter))]
@@ -108,19 +103,37 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     public bool IsOpenFilter
     {
         get => Filter == TaskFilterKind.Open;
-        set { if (value) Filter = TaskFilterKind.Open; }
+        set
+        {
+            if (value)
+            {
+                Filter = TaskFilterKind.Open;
+            }
+        }
     }
 
     public bool IsDoneFilter
     {
         get => Filter == TaskFilterKind.Done;
-        set { if (value) Filter = TaskFilterKind.Done; }
+        set
+        {
+            if (value)
+            {
+                Filter = TaskFilterKind.Done;
+            }
+        }
     }
 
     public bool IsAllFilter
     {
         get => Filter == TaskFilterKind.All;
-        set { if (value) Filter = TaskFilterKind.All; }
+        set
+        {
+            if (value)
+            {
+                Filter = TaskFilterKind.All;
+            }
+        }
     }
 
     [RelayCommand]
@@ -140,7 +153,6 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     };
 
     // --- Input dock ---
-
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
     private string _newText = string.Empty;
@@ -175,12 +187,13 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     }
 
     // --- Live countdown + one-shot due alarm ---
-
     private void OnTick()
     {
         var now = _clock.Now;
         foreach (var row in Rows)
+        {
             row.RefreshClock(now);
+        }
 
         // Audible cue on the open->due crossing, exactly once per task per VM lifetime. Runs on
         // joined clients too — the sound is local feedback, not logging (IsRemote gates writes).
@@ -189,8 +202,12 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         if (!IsReadOnly)
         {
             foreach (var task in _session.Incident.Tasks)
+            {
                 if (!task.IsCompleted && task.DueAt <= now && _dueAnnounced.Add(task.Id))
+                {
                     _alarm.Play(AlarmSound.TaskDue);
+                }
+            }
         }
     }
 
@@ -211,7 +228,9 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
 
         Rows.Clear();
         foreach (var row in visible)
+        {
             Rows.Add(row);
+        }
     }
 
     public void Dispose()
@@ -251,6 +270,7 @@ public sealed partial class TaskRow : ObservableObject
         IsImportanceMedium = task.Importance == TaskImportance.Medium;
         IsImportanceLow = task.Importance == TaskImportance.Low;
         _isDone = task.IsCompleted;
+
         // German short stamp for completed rows; Sync() recreates the row on completion, so a
         // static snapshot is enough. Empty while open — the view hides the label then.
         CompletedDisplay = task.CompletedAt is { } completedAt
@@ -261,17 +281,29 @@ public sealed partial class TaskRow : ObservableObject
     }
 
     public Guid Id { get; }
+
     public string Text { get; }
+
     public string Assignee { get; }
+
     public string CreatedDisplay { get; }
+
     public string ImportanceLabel { get; }
+
     public string UrgencyLabel { get; }
+
     public bool IsUrgencyHigh { get; }
+
     public bool IsUrgencyMedium { get; }
+
     public bool IsUrgencyLow { get; }
+
     public bool IsImportanceHigh { get; }
+
     public bool IsImportanceMedium { get; }
+
     public bool IsImportanceLow { get; }
+
     public bool IsReadOnly { get; }
 
     /// <summary>"ERLEDIGT · HH:mm" once done, empty while open (completion time from the task).</summary>
@@ -301,7 +333,10 @@ public sealed partial class TaskRow : ObservableObject
     {
         var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == _id);
         if (task is null)
+        {
             return;
+        }
+
         IsOverdue = ComputeIsOverdue(task, now);
         RemainingDisplay = ComputeRemaining(task, now);
         OnPropertyChanged(nameof(IsOverdue));
@@ -313,12 +348,34 @@ public sealed partial class TaskRow : ObservableObject
     private static string ComputeRemaining(IncidentTask task, DateTimeOffset now)
     {
         if (task.IsCompleted)
+        {
             return "–";
+        }
+
         if (task.DueAt == DateTimeOffset.MaxValue)
+        {
             return "–";
+        }
+
         if (task.DueAt <= now)
+        {
             return "FÄLLIG";
+        }
+
         var remaining = task.DueAt - now;
         return $"noch {(int)remaining.TotalMinutes:D2}:{remaining.Seconds:D2}";
     }
 }
+
+public enum TaskFilterKind
+{
+    Open,
+    Done,
+    All,
+}
+
+/// <summary>An enum value paired with its German label (EtbDirectionOption precedent). Two
+/// closed records instead of a generic one, so Avalonia compiled-bind templates stay simple.</summary>
+public readonly record struct ImportanceOption(TaskImportance Value, string Label);
+
+public readonly record struct UrgencyOption(TaskUrgency Value, string Label);

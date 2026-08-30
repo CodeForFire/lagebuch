@@ -22,7 +22,7 @@ public class SupportingEntitiesTests
     [Fact]
     public void RoleAssignment_requires_role_and_person()
     {
-        Assert.Throws<ArgumentException>(() => RoleAssignment.Create("EL", ""));
+        Assert.Throws<ArgumentException>(() => RoleAssignment.Create("EL", string.Empty));
         Assert.NotEqual(Guid.Empty, RoleAssignment.Create("EL", "Müller").Id);
     }
 

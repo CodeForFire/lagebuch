@@ -9,9 +9,13 @@ public class ChecklistViewModelTests
 
     private static LocalIncidentSession NewSession(
         IEnumerable<(string, bool)>? aufbau = null, IEnumerable<(string, bool)>? abbau = null) =>
-        LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(T0),
-            new SessionOperator("Müller"), "/x.fwincident",
-            aufbau ?? new[] { ("A?", false) }, abbau ?? Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            aufbau ?? new[] { ("A?", false) },
+            abbau ?? Array.Empty<(string, bool)>());
 
     [Fact]
     public void Setting_isdone_marks_item_done_and_fires_onchanged()
@@ -21,6 +25,7 @@ public class ChecklistViewModelTests
         var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => changes++);
 
         Assert.False(vm.Items[0].IsDone);
+
         // Simulates the CheckBox two-way IsChecked binding pushing the new value.
         vm.Items[0].IsDone = true;
 
@@ -46,13 +51,19 @@ public class ChecklistViewModelTests
     public void ReadOnly_session_does_not_mutate_domain()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
         session.Close();
         var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => Assert.Fail("onChanged must not fire when read-only"));
 
         Assert.True(vm.IsReadOnly);
         Assert.True(vm.Items[0].IsReadOnly);
+
         // Even if a value change slips through, the domain stays untouched.
         vm.Items[0].IsDone = true;
         Assert.False(session.Incident.ChecklistAufbau[0].IsDone);

@@ -16,9 +16,13 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
     {
         ArgumentNullException.ThrowIfNull(action);
         if (Dispatcher.UIThread.CheckAccess())
+        {
             action();
+        }
         else
+        {
             Dispatcher.UIThread.Post(action);
+        }
     }
 
     public Task<T> InvokeAsync<T>(Func<T> func) => Dispatcher.UIThread.InvokeAsync(func).GetTask();

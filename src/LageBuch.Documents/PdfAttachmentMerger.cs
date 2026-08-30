@@ -19,7 +19,9 @@ public static class PdfAttachmentMerger
         ArgumentNullException.ThrowIfNull(baseReport);
         ArgumentNullException.ThrowIfNull(pdfAttachments);
         if (pdfAttachments.Count == 0)
+        {
             return baseReport;
+        }
 
         var workDir = Path.Combine(Path.GetTempPath(), $"lagebuch-pdf-merge-{Guid.NewGuid():N}");
         Directory.CreateDirectory(workDir);

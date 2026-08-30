@@ -21,7 +21,9 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
     }
 
     public string Title { get; }
+
     public string Message { get; }
+
     public string ConfirmLabel { get; }
 
     /// <summary>Raised after Confirm or Cancel so the host removes the overlay.</summary>

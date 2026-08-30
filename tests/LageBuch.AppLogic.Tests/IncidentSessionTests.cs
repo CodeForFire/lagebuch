@@ -4,25 +4,6 @@ using LageBuch.Domain.Time;
 
 namespace LageBuch.AppLogic.Tests;
 
-// In-memory fake store — no disk, deterministic.
-internal sealed class FakeStore : IIncidentStore
-{
-    private readonly Dictionary<string, Incident> _saved = new();
-    public int SaveCount { get; private set; }
-    public void Save(string path, Incident incident) { _saved[path] = incident; SaveCount++; }
-    public Incident Load(string path) => _saved[path];
-    public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
-    private readonly Dictionary<string, byte[]> _files = new();
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
-    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
-}
-
-internal sealed class FixedClock : IClock
-{
-    public FixedClock(DateTimeOffset now) => Now = now;
-    public DateTimeOffset Now { get; set; }
-}
-
 public class IncidentSessionTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
@@ -32,8 +13,13 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false), ("B?", false) }, Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false), ("B?", false) },
+            Array.Empty<(string, bool)>());
 
         Assert.False(session.IsReadOnly);
         Assert.Equal(2, session.Incident.ChecklistAufbau.Count);
@@ -44,8 +30,13 @@ public class IncidentSessionTests
     public void Save_persists_to_the_session_path()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Save();
         Assert.Equal(2, store.SaveCount); // start + explicit save
         Assert.Equal(session.Incident.Id, store.Load("/x.fwincident").Id);
@@ -56,8 +47,13 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         clock.Now = T0.AddHours(1);
         session.Close();
 
@@ -70,8 +66,13 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var savesBefore = store.SaveCount;
 
         var bytes = new byte[] { 1, 2, 3 };
@@ -87,8 +88,13 @@ public class IncidentSessionTests
     public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
 
         Assert.Null(await session.GetFileBytesAsync(Guid.NewGuid()));
     }
@@ -97,8 +103,13 @@ public class IncidentSessionTests
     public async Task AddFileAsync_raises_Changed()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var raised = false;
         session.Changed += () => raised = true;
 
@@ -112,8 +123,13 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Close();
 
         var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", op: null);
@@ -124,8 +140,13 @@ public class IncidentSessionTests
     public void Open_editable_incident_requires_operator()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
 
         Assert.Throws<InvalidOperationException>(() => LocalIncidentSession.Open(store, new FixedClock(T0), "/x.fwincident", op: null));
     }
@@ -134,8 +155,13 @@ public class IncidentSessionTests
     public void OpenReadOnly_open_incident_is_readonly_without_operator()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
 
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
 
@@ -149,8 +175,13 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Close();
 
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
@@ -161,8 +192,13 @@ public class IncidentSessionTests
     public void ContinueEditing_on_open_session_sets_operator_and_makes_editable()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
 
         ro.ContinueEditing(new SessionOperator("Schmidt"));
@@ -176,8 +212,13 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Close();
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
 
@@ -189,8 +230,13 @@ public class IncidentSessionTests
     public void ContinueEditing_is_idempotent_when_editable()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
 
         session.ContinueEditing(new SessionOperator("Schmidt"));
 
@@ -201,8 +247,13 @@ public class IncidentSessionTests
     public void ContinueEditing_appends_resumed_audit_event_with_operator_display()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
 
         ro.ContinueEditing(new SessionOperator("Schmidt", "FFB 1"));
@@ -215,8 +266,13 @@ public class IncidentSessionTests
     public void IsReadOnly_true_exactly_when_operator_is_null()
     {
         var store = new FakeStore();
-        var editable = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var editable = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         Assert.False(editable.IsReadOnly); // has operator
 
         var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
@@ -227,10 +283,46 @@ public class IncidentSessionTests
     public async Task ExportPdfAsync_returns_a_pdf()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var bytes = await session.ExportPdfAsync();
         Assert.True(bytes.Length > 100);
         Assert.Equal(0x25, bytes[0]); // %
     }
+}
+
+// In-memory fake store — no disk, deterministic.
+internal sealed class FakeStore : IIncidentStore
+{
+    private readonly Dictionary<string, Incident> _saved = new();
+
+    public int SaveCount { get; private set; }
+
+    public void Save(string path, Incident incident)
+    {
+        _saved[path] = incident;
+        SaveCount++;
+    }
+
+    public Incident Load(string path) => _saved[path];
+
+    public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
+
+    private readonly Dictionary<string, byte[]> _files = new();
+
+    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+
+    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
+}
+
+internal sealed class FixedClock : IClock
+{
+    public FixedClock(DateTimeOffset now) => Now = now;
+
+    public DateTimeOffset Now { get; set; }
 }

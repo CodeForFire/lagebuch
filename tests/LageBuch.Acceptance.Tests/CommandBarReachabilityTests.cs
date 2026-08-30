@@ -25,7 +25,7 @@ public class CommandBarReachabilityTests
     private static Button ButtonNamed(Visual root, string name) =>
         root.GetVisualDescendants().OfType<Button>().First(b => b.Name == name);
 
-    private static (double left, double right) HorizontalBounds(Visual v, Visual relativeTo)
+    private static (double Left, double Right) HorizontalBounds(Visual v, Visual relativeTo)
     {
         var left = v.TranslatePoint(new Point(0, 0), relativeTo)!.Value.X;
         return (left, left + v.Bounds.Width);
@@ -43,8 +43,8 @@ public class CommandBarReachabilityTests
         var (left, right) = HorizontalBounds(ButtonNamed(view, "NewIncidentButton"), window);
 
         // Evidence in the failure message: where the button actually lands vs the viewport.
-        Assert.True(right <= PhoneWidth,
-            $"NEUER EINSATZ spans x=[{left:0}..{right:0}] but the viewport is only {PhoneWidth:0} wide " +
-            $"— it overflows the right edge by {right - PhoneWidth:0} px and is unreachable.");
+        var message = $"NEUER EINSATZ spans x=[{left:0}..{right:0}] but the viewport is only {PhoneWidth:0} wide " +
+            $"— it overflows the right edge by {right - PhoneWidth:0} px and is unreachable.";
+        Assert.True(right <= PhoneWidth, message);
     }
 }

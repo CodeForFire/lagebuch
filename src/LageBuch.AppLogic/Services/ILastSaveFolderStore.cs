@@ -8,5 +8,6 @@ namespace LageBuch.AppLogic.Services;
 public interface ILastSaveFolderStore
 {
     string? GetLastFolder();
+
     void SetLastFolder(string folder);
 }

@@ -14,11 +14,21 @@ public class CoMessprotokollRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), WorkspaceRenderHelper.MasterData(),
-            new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            WorkspaceRenderHelper.MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -29,7 +39,10 @@ public class CoMessprotokollRenderTests
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (string.IsNullOrWhiteSpace(dir))
+        {
             return;
+        }
+
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, name));

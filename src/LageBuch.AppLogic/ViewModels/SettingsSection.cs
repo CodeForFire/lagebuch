@@ -13,7 +13,8 @@ public sealed partial class SettingsSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public SettingsSection(string title, IncidentSettings settings, Action onChanged) : base(title)
+    public SettingsSection(string title, IncidentSettings settings, Action onChanged)
+        : base(title)
     {
         ArgumentNullException.ThrowIfNull(settings);
         _onChanged = onChanged;
@@ -48,11 +49,17 @@ public sealed partial class SettingsSection : EditorSection
     private int _returnPressureBar;
 
     partial void OnIlsReminderIntervalMinutesChanged(int value) => _onChanged();
+
     partial void OnIlsReminderFollowUpIntervalMinutesChanged(int value) => _onChanged();
+
     partial void OnAgtMaxDurationMinutesChanged(int value) => _onChanged();
+
     partial void OnCsaMaxDurationMinutesChanged(int value) => _onChanged();
+
     partial void OnLpaMaxDurationMinutesChanged(int value) => _onChanged();
+
     partial void OnPressureControlIntervalMinutesChanged(int value) => _onChanged();
+
     partial void OnReturnPressureBarChanged(int value) => _onChanged();
 
     public IncidentSettings ToSettings() => new(

@@ -17,16 +17,16 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 {
+    // The key under which this reminder's state is persisted on the incident, so it survives a
+    // close+reopen or a crash instead of restarting a fresh cycle.
+    private const string TimerKey = "ils-reminder";
+
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
     private readonly ReminderTimer _timer = new();
     private readonly IDisposable _subscription;
-
-    // The key under which this reminder's state is persisted on the incident, so it survives a
-    // close+reopen or a crash instead of restarting a fresh cycle.
-    private const string TimerKey = "ils-reminder";
 
     // The spoken cue repeats while a cycle sits unacknowledged, so it stays insistent instead of
     // being said once and forgotten; this tracks when it last played so OnTick only re-plays once
@@ -35,8 +35,13 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private DateTimeOffset? _lastAnnouncedAt;
 
     public ReminderViewModel(
-        IIncidentSession session, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged,
-        int firstIntervalMinutes, int recurringIntervalMinutes)
+        IIncidentSession session,
+        IClock clock,
+        ITicker ticker,
+        IAlarmService alarm,
+        Action onChanged,
+        int firstIntervalMinutes,
+        int recurringIntervalMinutes)
     {
         ArgumentNullException.ThrowIfNull(ticker);
         _session = session;
@@ -65,6 +70,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         _session.UpsertTimer(TimerKey, _timer.CycleAnchor, _timer.IntervalMinutes, _timer.RecurringIntervalMinutes, _timer.IsRunning);
 
     public bool IsRunning => _timer.IsRunning;
+
     public bool IsDue => _timer.IsDue(_clock.Now);
 
     public string RemainingDisplay
@@ -72,7 +78,10 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         get
         {
             if (_timer.IsDue(_clock.Now))
+            {
                 return "fällig";
+            }
+
             var remaining = _timer.Remaining(_clock.Now);
             return $"{(int)remaining.TotalMinutes:00}:{remaining.Seconds:00}";
         }
@@ -102,6 +111,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         _timer.Acknowledge(_clock);
         _lastAnnouncedAt = null;
         PersistTimer(); // durable anchor for the new (recurring) cycle
+
         // "Von" is us — the logged-in operator's call sign (e.g. the ELW's Funkrufname).
         _session.AddJournalEntry(
             EtbDirection.Outgoing, "Rückmeldung an ILS", from: _session.Operator?.CallSign, to: "ILS");

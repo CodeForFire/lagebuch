@@ -10,6 +10,7 @@ public partial class OperatorPromptView : UserControl
     public OperatorPromptView()
     {
         InitializeComponent();
+
         // Cursor straight into the name field — confirming the operator gates incident start.
         // Posted rather than called inline: when this prompt is realized as an overlay, its
         // subtree is not yet laid out at AttachedToVisualTree time, so a synchronous Focus() is

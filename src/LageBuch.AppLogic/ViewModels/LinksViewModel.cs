@@ -34,7 +34,9 @@ public sealed partial class LinksViewModel : ObservableObject
     /// just what the user themselves typed here.
     /// </summary>
     [RelayCommand]
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "Deliberately broad: any launcher failure surfaces in the view instead of crashing it.")]
     private async Task OpenAsync(Link link)
     {

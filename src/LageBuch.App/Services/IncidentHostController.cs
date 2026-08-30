@@ -29,14 +29,20 @@ internal sealed class IncidentHostController : IIncidentHostController
     }
 
     public bool CanHost => true;
+
     public bool IsHosting => _host?.IsRunning ?? false;
+
     public string? ShareHint { get; private set; }
+
     public string? SharePin { get; private set; }
 
     public async Task StartAsync(LocalIncidentSession session)
     {
         if (_host is not null)
+        {
             return;
+        }
+
         // A fresh 4-digit PIN per share session: the host reads it out, joiners type it (§ #64).
         // Cryptographic RNG so the PIN isn't predictable from a seeded/observed sequence — cheap
         // hardening even though a 4-digit space is small (brute-force is the accepted, documented risk).
@@ -45,6 +51,7 @@ internal sealed class IncidentHostController : IIncidentHostController
         await host.StartAsync(IPAddress.Any);
         _host = host;
         SharePin = pin;
+
         // Bound on every interface; show the nicest address to dial plus the same-machine shortcut.
         ShareHint = $"Erreichbar unter {LocalNetwork.DisplayAddress()}:{SyncProtocol.Port} · "
             + $"auf diesem Gerät: localhost:{SyncProtocol.Port}";
@@ -53,7 +60,10 @@ internal sealed class IncidentHostController : IIncidentHostController
     public async Task StopAsync()
     {
         if (_host is null)
+        {
             return;
+        }
+
         await _host.DisposeAsync();
         _host = null;
         ShareHint = null;
