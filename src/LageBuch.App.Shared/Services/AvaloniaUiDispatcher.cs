@@ -14,6 +14,7 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
     // only a genuine cross-thread call (a SignalR/Kestrel callback) is queued onto the dispatcher.
     public void Post(Action action)
     {
+        ArgumentNullException.ThrowIfNull(action);
         if (Dispatcher.UIThread.CheckAccess())
             action();
         else

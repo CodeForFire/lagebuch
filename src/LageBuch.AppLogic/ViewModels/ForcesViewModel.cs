@@ -33,6 +33,7 @@ public sealed partial class ForceRow : ObservableObject
         Action<string?, string?> onEdited, Action<int, int, int> onStrengthEdited,
         Action onRemoved)
     {
+        ArgumentNullException.ThrowIfNull(unit);
         Id = unit.Id;
         Brigade = unit.Brigade;
         CallSign = unit.CallSign;
@@ -169,6 +170,8 @@ public sealed partial class ForcesViewModel : ObservableObject
     public ForcesViewModel(
         IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;

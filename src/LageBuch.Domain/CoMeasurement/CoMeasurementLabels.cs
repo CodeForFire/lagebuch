@@ -21,13 +21,19 @@ public static class CoMeasurementLabels
             }
             : ApartmentLabel(apartmentNumber);
 
-    public static string ApartmentLabel(Building building, int apartmentNumber) =>
-        building.ApartmentLabels.TryGetValue(apartmentNumber, out var custom) && !string.IsNullOrWhiteSpace(custom)
+    public static string ApartmentLabel(Building building, int apartmentNumber)
+    {
+        ArgumentNullException.ThrowIfNull(building);
+        return building.ApartmentLabels.TryGetValue(apartmentNumber, out var custom) && !string.IsNullOrWhiteSpace(custom)
             ? custom!
             : DefaultApartmentLabel(apartmentNumber, building.ApartmentsPerFloor);
+    }
 
-    public static string DwellingLocation(Building building, int floorOrdinal, int apartmentNumber) =>
-        $"{building.Name}, {FloorLabel(floorOrdinal)}, {ApartmentLabel(building, apartmentNumber)}";
+    public static string DwellingLocation(Building building, int floorOrdinal, int apartmentNumber)
+    {
+        ArgumentNullException.ThrowIfNull(building);
+        return $"{building.Name}, {FloorLabel(floorOrdinal)}, {ApartmentLabel(building, apartmentNumber)}";
+    }
 
     public static string StatusText(DwellingStatus status) => status switch
     {

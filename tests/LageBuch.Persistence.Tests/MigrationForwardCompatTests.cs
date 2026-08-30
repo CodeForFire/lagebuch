@@ -367,6 +367,8 @@ public class MigrationForwardCompatTests : IDisposable
     [InlineData("", new[] { "Unbekannt" })]
     public void V5_trupp_members_split_into_rows_on_v6(string legacy, string[] expected)
     {
+        ArgumentNullException.ThrowIfNull(legacy);
+        ArgumentNullException.ThrowIfNull(expected);
         WriteV5TruppWithMembers(legacy);
 
         using var cn = SqliteConnectionFactory.OpenReadWrite(_path);

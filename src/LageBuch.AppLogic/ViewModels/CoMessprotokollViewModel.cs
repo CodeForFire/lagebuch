@@ -19,6 +19,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         Action<Guid, int, int, int?> onCoValueChanged,
         Action<Guid, int, int> onOpenEditor)
     {
+        ArgumentNullException.ThrowIfNull(dwelling);
         Id = dwelling.Id;
         BuildingId = dwelling.BuildingId;
         FloorOrdinal = dwelling.FloorOrdinal;
@@ -155,6 +156,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
 
     public CoMessprotokollViewModel(IIncidentSession session, IClock clock, Action onChanged)
     {
+        ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;

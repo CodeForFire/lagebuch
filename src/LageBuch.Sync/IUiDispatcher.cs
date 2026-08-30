@@ -35,6 +35,15 @@ public interface IUiDispatcher
 /// </summary>
 public sealed class ImmediateUiDispatcher : IUiDispatcher
 {
-    public void Post(Action action) => action();
-    public Task<T> InvokeAsync<T>(Func<T> func) => Task.FromResult(func());
+    public void Post(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        action();
+    }
+
+    public Task<T> InvokeAsync<T>(Func<T> func)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        return Task.FromResult(func());
+    }
 }

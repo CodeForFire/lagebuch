@@ -48,6 +48,7 @@ public class CommandSerializationTests
     [MemberData(nameof(AllCommands))]
     public void Command_round_trips_through_the_polymorphic_base(SyncCommand command)
     {
+        ArgumentNullException.ThrowIfNull(command);
         // Serialize as the base type so the $type discriminator is written; deserialize back as the
         // base and confirm the concrete type and every field survived.
         var json = SyncJson.Serialize(command);

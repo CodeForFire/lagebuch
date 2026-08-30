@@ -213,6 +213,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     /// </summary>
     public void ConfirmDiscardThen(Action proceed)
     {
+        ArgumentNullException.ThrowIfNull(proceed);
         if (!IsDirty)
         {
             proceed();

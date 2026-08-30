@@ -186,6 +186,7 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public Task AddFileAsync(string fileName, string contentType, byte[] bytes)
     {
+        ArgumentNullException.ThrowIfNull(bytes);
         var file = Incident.AddFile(_clock, RequireOperator(), fileName, contentType, bytes.LongLength);
         _store.SaveFileBytes(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes);
         Save();

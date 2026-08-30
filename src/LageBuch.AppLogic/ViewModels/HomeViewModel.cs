@@ -35,6 +35,7 @@ public sealed partial class HomeViewModel : ObservableObject
 
     public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null)
     {
+        ArgumentNullException.ThrowIfNull(recent);
         _store = store;
         _masterData = masterData;
         _recent = recent;

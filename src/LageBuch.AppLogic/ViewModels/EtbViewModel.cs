@@ -23,6 +23,7 @@ public sealed class EtbEntryRow
     public EtbEntryRow(
         EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         Id = entry.Id;
         Time = Formatting.Timestamp(entry.Timestamp);
         Direction = Formatting.Direction(entry.Direction);
@@ -83,6 +84,8 @@ public sealed partial class EtbViewModel : ObservableObject
     public EtbViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged,
         Action<string>? createTaskFromEntry = null)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;

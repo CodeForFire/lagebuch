@@ -15,6 +15,7 @@ public sealed partial class SettingsSection : EditorSection
 
     public SettingsSection(string title, IncidentSettings settings, Action onChanged) : base(title)
     {
+        ArgumentNullException.ThrowIfNull(settings);
         _onChanged = onChanged;
         _ilsReminderIntervalMinutes = settings.IlsReminderIntervalMinutes;
         _ilsReminderFollowUpIntervalMinutes = settings.IlsReminderFollowUpIntervalMinutes;
