@@ -262,7 +262,7 @@ public class WorkspaceAcceptanceTests
             Dispatcher.UIThread.RunJobs(); // let the async command's continuation reach the UI thread
 
             Assert.Single(session.Incident.Files);
-            Assert.Contains(session.Incident.Journal, e => e.Text.StartsWith("Datei hinzugefügt:"));
+            Assert.Contains(session.Incident.Journal, e => e.Text.StartsWith("Datei hinzugefügt:", StringComparison.Ordinal));
         }
         finally
         {

@@ -141,7 +141,7 @@ public class LayoutAlignmentTests
         // Each name is its own text run, not one joined string that the cell then clips.
         foreach (var name in new[] { "Hintersberger, Hans", "Kreutzkamp, Bastian", "Schormaier, Florian" })
             Assert.Contains(name, rendered);
-        Assert.DoesNotContain(rendered, s => s!.Contains("Hintersberger, Hans / "));
+        Assert.DoesNotContain(rendered, s => s!.Contains("Hintersberger, Hans / ", StringComparison.Ordinal));
 
         // Existing in the visual tree is not the same as being visible. DataGrid rows are styled
         // to a fixed 40px, which laid the third name out at y=40 in a 41px row — present, and

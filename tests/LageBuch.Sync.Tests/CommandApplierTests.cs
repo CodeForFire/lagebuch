@@ -72,7 +72,7 @@ public class CommandApplierTests
         // The strength correction arrived over the wire with officer count and edit trail intact.
         var corrected = incident.Forces[0];
         Assert.Equal((2, 12, 6, 1), (corrected.OfficerCount, corrected.PersonnelCount, corrected.ScbaCount,
-            incident.Journal.Count(e => e.Text.Contains('→'))));
+            incident.Journal.Count(e => e.Text.Contains('→', StringComparison.Ordinal))));
         var trupp = Assert.Single(incident.ScbaTrupps);
         Assert.Equal(300, trupp.EntryPressure);
     }

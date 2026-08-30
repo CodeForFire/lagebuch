@@ -279,7 +279,7 @@ public class ForcesViewModelTests
         var unit = Assert.Single(session.Incident.Forces);
         Assert.Equal((1, 9, 8), (unit.OfficerCount, unit.PersonnelCount, unit.MannschaftCount));
         Assert.Equal("1/8/9", unit.StrengthText);
-        Assert.Contains("Stärke 1/8/9", session.Incident.Journal[^1].Text);
+        Assert.Contains("Stärke 1/8/9", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
     }
 
     // --- Issue #76: editable Stärke -----------------------------------------------------------
@@ -309,8 +309,8 @@ public class ForcesViewModelTests
         Assert.Equal((1, 9, 3), (unit.OfficerCount, unit.PersonnelCount, unit.ScbaCount));
         Assert.Single(unit.Edits);
         Assert.Equal(before + 1, session.Incident.Journal.Count);
-        Assert.Contains("Stärke 0/6/6 → 1/8/9", session.Incident.Journal[^1].Text);
-        Assert.Contains("davon AGT 0 → 3", session.Incident.Journal[^1].Text);
+        Assert.Contains("Stärke 0/6/6 → 1/8/9", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+        Assert.Contains("davon AGT 0 → 3", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -340,7 +340,7 @@ public class ForcesViewModelTests
         Assert.Equal("Aich", remaining.Brigade);
         Assert.Equal(9, vm.TotalPersonnel);
         Assert.Equal(3, changes); // two adds + the removal
-        Assert.Contains("Einheit entfernt: FFB Wache 1 (FFB 1/40/1)", session.Incident.Journal[^1].Text);
+        Assert.Contains("Einheit entfernt: FFB Wache 1 (FFB 1/40/1)", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -516,7 +516,7 @@ public class ForcesViewModelTests
 
         vm.Forces[0].Status = "Im Einsatz";
         Assert.Equal(before + 2, session.Incident.Journal.Count);
-        Assert.Contains("Status Alarmiert → Im Einsatz", session.Incident.Journal[^1].Text);
+        Assert.Contains("Status Alarmiert → Im Einsatz", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
     }
 
     [Fact]

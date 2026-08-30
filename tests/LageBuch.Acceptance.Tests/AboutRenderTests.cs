@@ -43,8 +43,8 @@ public class AboutRenderTests
         var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("Lagebuch", texts);
         Assert.Contains(vm.RepositoryUrl, texts);
-        Assert.Contains(texts, t => t!.Contains("MIT"));
-        Assert.Contains(texts, t => t!.Contains("Thomas Müller"));
+        Assert.Contains(texts, t => t!.Contains("MIT", StringComparison.Ordinal));
+        Assert.Contains(texts, t => t!.Contains("Thomas Müller", StringComparison.Ordinal));
 
         Capture(window, "about-dialog.png");
     }

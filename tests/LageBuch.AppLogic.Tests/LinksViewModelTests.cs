@@ -71,7 +71,7 @@ public class LinksViewModelTests
         await vm.OpenCommand.ExecuteAsync(vm.Links[0]);
 
         Assert.NotNull(vm.ErrorMessage);
-        Assert.Contains("Wetterdienst", vm.ErrorMessage);
+        Assert.Contains("Wetterdienst", vm.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]

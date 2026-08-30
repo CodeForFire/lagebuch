@@ -146,8 +146,8 @@ public class CoMeasurementTests
         incident.AddCoBuilding(clock, op, "Haus A", 8, 10);
 
         var entry = incident.Journal.Last();
-        Assert.Contains("CO-Messprotokoll eröffnet", entry.Text);
-        Assert.Contains("Haus A", entry.Text);
+        Assert.Contains("CO-Messprotokoll eröffnet", entry.Text, StringComparison.Ordinal);
+        Assert.Contains("Haus A", entry.Text, StringComparison.Ordinal);
     }
 
     [Fact]

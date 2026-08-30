@@ -36,9 +36,9 @@ public class AboutViewModelTests
         // Must stay in sync with the LICENSE file in the repo root.
         var vm = new AboutViewModel(new FakeDialogs(), "0.1.0");
 
-        Assert.Contains("MIT", vm.LicenseLine);
-        Assert.Contains("Thomas Müller", vm.CopyrightLine);
-        Assert.Contains("2026", vm.CopyrightLine);
+        Assert.Contains("MIT", vm.LicenseLine, StringComparison.Ordinal);
+        Assert.Contains("Thomas Müller", vm.CopyrightLine, StringComparison.Ordinal);
+        Assert.Contains("2026", vm.CopyrightLine, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class AboutViewModelTests
         await vm.OpenRepositoryCommand.ExecuteAsync(null);
 
         Assert.NotNull(vm.ErrorMessage);
-        Assert.Contains("github.com/CodeForFire/lagebuch", vm.ErrorMessage);
+        Assert.Contains("github.com/CodeForFire/lagebuch", vm.ErrorMessage, StringComparison.Ordinal);
     }
 
     private sealed class ThrowingUrlDialogs : IFileDialogService

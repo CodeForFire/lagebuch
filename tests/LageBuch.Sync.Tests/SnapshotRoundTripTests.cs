@@ -136,7 +136,7 @@ public class SnapshotRoundTripTests
 
         var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident));
 
-        Assert.Contains("\"fileName\":\"brand.jpg\"", json);
+        Assert.Contains("\"fileName\":\"brand.jpg\"", json, StringComparison.Ordinal);
         // Not `Contains("bytes")` -- that's a false positive on "sizeBytes". The DTO simply has no
         // "bytes" property to serialize (unlike AddFileCommand, which does).
         Assert.DoesNotContain("\"bytes\":", json, StringComparison.OrdinalIgnoreCase);

@@ -57,7 +57,7 @@ public class HomeViewModelJoinTests
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
-        Assert.Contains("2.0.0", vm.JoinError); // names the host version it refused
+        Assert.Contains("2.0.0", vm.JoinError, StringComparison.Ordinal); // names the host version it refused
     }
 
     [Fact]
@@ -91,6 +91,6 @@ public class HomeViewModelJoinTests
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
-        Assert.Contains($"127.0.0.1:{port}", vm.JoinError); // names the device it couldn't reach
+        Assert.Contains($"127.0.0.1:{port}", vm.JoinError, StringComparison.Ordinal); // names the device it couldn't reach
     }
 }

@@ -334,7 +334,7 @@ public class IncidentOperationsTests
 
         incident.EditJournalEntry(clock, op, entry.Id, "Lagemeldung korrigiert");
 
-        var trace = Assert.Single(incident.Journal, e => e.Text.Contains("bearbeitet"));
+        var trace = Assert.Single(incident.Journal, e => e.Text.Contains("bearbeitet", StringComparison.Ordinal));
         Assert.Equal(EtbDirection.System, trace.Direction);
         Assert.Equal(T0.AddMinutes(5), trace.Timestamp);
     }

@@ -97,7 +97,7 @@ public class IncidentWorkspaceViewModelTests
         await vm.ToggleSharingCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsSharing);
-        Assert.Contains("Port 5859 belegt", vm.ShareStatus);
+        Assert.Contains("Port 5859 belegt", vm.ShareStatus, StringComparison.Ordinal);
     }
 
     private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
@@ -139,7 +139,7 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.Equal(before + 1, vm.Etb.Entries.Count);
         // Newest first, matching how the tab renders.
-        Assert.Contains("Einheit aufgenommen: FFB Wache 1", vm.Etb.Entries[0].Text);
+        Assert.Contains("Einheit aufgenommen: FFB Wache 1", vm.Etb.Entries[0].Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public class IncidentWorkspaceViewModelTests
         vm.Scba.AddTruppCommand.Execute(null);
 
         Assert.Equal(before + 1, vm.Etb.Entries.Count);
-        Assert.Contains("Angriffstrupp", vm.Etb.Entries[0].Text);
+        Assert.Contains("Angriffstrupp", vm.Etb.Entries[0].Text, StringComparison.Ordinal);
     }
 
     [Fact]

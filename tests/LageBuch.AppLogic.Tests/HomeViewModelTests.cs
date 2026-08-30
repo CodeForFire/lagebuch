@@ -245,8 +245,8 @@ public class HomeViewModelTests
 
         Assert.Null(opened);
         Assert.NotNull(vm.OpenError);
-        Assert.Contains("gone.fwincident", vm.OpenError!);
-        Assert.Contains("Datei kaputt.", vm.OpenError!);
+        Assert.Contains("gone.fwincident", vm.OpenError!, StringComparison.Ordinal);
+        Assert.Contains("Datei kaputt.", vm.OpenError!, StringComparison.Ordinal);
     }
 
     [Fact]

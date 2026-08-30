@@ -100,7 +100,7 @@ public class ForcesTabRenderTests
         var edit = Assert.Single(edited.Edits);
         Assert.Equal((0, 6, 0), (edit.PreviousOfficerCount, edit.PreviousPersonnelCount, edit.PreviousScbaCount));
         Assert.True(edited.HasHistory);
-        Assert.Contains("Stärke 0/6/6 → 1/7/8", Assert.Single(edited.EditLines));
+        Assert.Contains("Stärke 0/6/6 → 1/7/8", Assert.Single(edited.EditLines), StringComparison.Ordinal);
 
         Capture(window, "forces-strength-verlauf.png");
     }

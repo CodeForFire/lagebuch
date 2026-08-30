@@ -171,7 +171,7 @@ public class TasksViewModelTests
         clock.Now = T0.AddMinutes(4);
         ticker.Fire();
         Assert.False(row.IsOverdue);
-        Assert.StartsWith("noch", row.RemainingDisplay);
+        Assert.StartsWith("noch", row.RemainingDisplay, StringComparison.Ordinal);
 
         clock.Now = T0.AddMinutes(5).AddSeconds(1);
         ticker.Fire();
@@ -249,7 +249,7 @@ public class TasksViewModelTests
         var done = vm.Rows.Single(); // recreated by the write-back's Sync
 
         Assert.True(done.IsDone);
-        Assert.StartsWith("ERLEDIGT ·", done.CompletedDisplay);
+        Assert.StartsWith("ERLEDIGT ·", done.CompletedDisplay, StringComparison.Ordinal);
     }
 
     [Fact]

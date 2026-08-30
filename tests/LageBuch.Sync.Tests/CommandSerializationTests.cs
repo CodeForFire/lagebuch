@@ -63,7 +63,7 @@ public class CommandSerializationTests
     public void Discriminator_is_the_dollar_type_property()
     {
         var json = SyncJson.Serialize<SyncCommand>(new ToggleChecklistItemCommand(Op, Guid.NewGuid()));
-        Assert.Contains("\"$type\":\"toggleChecklistItem\"", json);
+        Assert.Contains("\"$type\":\"toggleChecklistItem\"", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -116,7 +116,7 @@ public class CommandSerializationTests
     public void UpdateForceStrength_uses_the_updateForceStrength_discriminator()
     {
         var json = SyncJson.Serialize<SyncCommand>(new UpdateForceStrengthCommand(Op, Guid.NewGuid(), 1, 9, 4));
-        Assert.Contains("\"$type\":\"updateForceStrength\"", json);
+        Assert.Contains("\"$type\":\"updateForceStrength\"", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class CommandSerializationTests
     {
         var unitId = Guid.NewGuid();
         var json = SyncJson.Serialize<SyncCommand>(new RemoveForceUnitCommand(Op, unitId));
-        Assert.Contains("\"$type\":\"removeForceUnit\"", json);
+        Assert.Contains("\"$type\":\"removeForceUnit\"", json, StringComparison.Ordinal);
 
         var command = Assert.IsType<RemoveForceUnitCommand>(SyncJson.Deserialize<SyncCommand>(json));
         Assert.Equal(unitId, command.UnitId);
