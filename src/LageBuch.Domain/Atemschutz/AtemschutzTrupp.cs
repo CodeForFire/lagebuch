@@ -160,7 +160,7 @@ public sealed class AtemschutzTrupp
     public static int RequiredMemberCount(string designation) =>
         IsChemicalTrupp(designation) ? ChemicalMemberCount : StandardMemberCount;
 
-    private static void ValidateCrew(string designation, IReadOnlyList<TruppMember> crew)
+    private static void ValidateCrew(string designation, List<TruppMember> crew)
     {
         // Atemschutz is never a solo activity -- a Trupp is the unit that goes under air together,
         // and the monitoring sheet has no concept of a single wearer. Enforcing the count here

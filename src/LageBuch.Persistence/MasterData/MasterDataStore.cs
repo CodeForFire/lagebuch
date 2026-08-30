@@ -93,7 +93,7 @@ public sealed class MasterDataStore
         }
     }
 
-    private static IEnumerable<(string Key, int Value)> SettingsRows(IncidentSettings s) => new[]
+    private static (string Key, int Value)[] SettingsRows(IncidentSettings s) => new[]
     {
         ("ils_reminder_interval_minutes", s.IlsReminderIntervalMinutes),
         ("ils_reminder_follow_up_interval_minutes", s.IlsReminderFollowUpIntervalMinutes),

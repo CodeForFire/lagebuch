@@ -120,6 +120,7 @@ internal sealed class SystemAlarmService : IAlarmService
         }
     }
 
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [DllImport("winmm.dll", CharSet = CharSet.Auto)]
     private static extern bool PlaySound(byte[]? data, IntPtr hModule, uint flags);
 }
