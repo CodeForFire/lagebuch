@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -166,6 +167,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     /// Offered only while the data is empty, so there is nothing to overwrite.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanImport))]
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Imports read arbitrary user-chosen files; any parse/IO failure is shown as an error.")]
     private async Task Import()
     {
         FileError = null;
@@ -190,6 +193,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     /// <summary>Writes the current editor contents (including unsaved edits and carried-through streets) to a JSON file.</summary>
     [RelayCommand]
+    [SuppressMessage("Design", "CA1031",
+        Justification = "IO and share failures are shown as an error, never a crash.")]
     private async Task Export()
     {
         FileError = null;

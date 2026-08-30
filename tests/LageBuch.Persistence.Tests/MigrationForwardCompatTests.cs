@@ -338,7 +338,8 @@ public class MigrationForwardCompatTests : IDisposable
         using (var cmd = cn.CreateCommand())
         {
             cmd.CommandText =
-                $"CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES ({newer});";
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES ($v);";
+            cmd.Parameters.AddWithValue("$v", newer);
             cmd.ExecuteNonQuery();
         }
         SqliteConnection.ClearAllPools();

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.Sqlite;
 
 namespace LageBuch.Persistence.Sqlite;
@@ -57,6 +58,8 @@ public static class SqliteConnectionFactory
         }
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: PRAGMA statements are compile-time constants.")]
     private static void Execute(SqliteConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();

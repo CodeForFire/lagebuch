@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -353,6 +354,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public string ShareButtonText => IsSharing ? "FREIGABE BEENDEN" : "IM NETZWERK FREIGEBEN";
 
     [RelayCommand]
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Host start can fail in several ways (port in use etc.); surfaces in the status line.")]
     private async Task ToggleSharing()
     {
         // Hosting exposes the local .fwincident, so it needs the concrete local session. The toggle is

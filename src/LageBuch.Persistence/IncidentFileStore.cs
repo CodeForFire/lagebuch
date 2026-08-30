@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace LageBuch.Persistence;
 
 /// <summary>
@@ -27,6 +29,8 @@ public sealed class IncidentFileStore : IIncidentFileStore
         File.WriteAllBytes(Path.Combine(folder, storageFileName), bytes);
     }
 
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Try-read: an unreadable attachment degrades to null, never fails incident load.")]
     public byte[]? TryReadBytes(string incidentPath, string storageFileName)
     {
         try

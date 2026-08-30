@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.Sqlite;
 
 namespace LageBuch.Persistence.Sqlite;
@@ -11,6 +12,8 @@ namespace LageBuch.Persistence.Sqlite;
 /// </summary>
 internal static class SchemaHelpers
 {
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: identifiers are compile-time schema constants from call sites; values use bound parameters.")]
     public static void AddColumnIfMissing(
         SqliteConnection cn, SqliteTransaction? tx, string table, string column, string type)
     {
@@ -31,6 +34,8 @@ internal static class SchemaHelpers
         return (long)cmd.ExecuteScalar()! > 0;
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: identifiers are compile-time schema constants from call sites; values use bound parameters.")]
     public static bool ColumnExists(SqliteConnection cn, SqliteTransaction? tx, string table, string column)
     {
         using var cmd = cn.CreateCommand();

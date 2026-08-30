@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -216,6 +217,8 @@ public sealed class MasterDataStore
             Run(cn, tx, $"INSERT INTO {table} (value) VALUES ($v);", p => p("$v", v));
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static List<string> ReadColumn(SqliteConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
@@ -269,6 +272,8 @@ public sealed class MasterDataStore
         static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static void Run(SqliteConnection cn, SqliteTransaction tx, string sql, Action<Action<string, object>> bind)
     {
         using var cmd = cn.CreateCommand();
@@ -278,6 +283,8 @@ public sealed class MasterDataStore
         cmd.ExecuteNonQuery();
     }
 
+    [SuppressMessage("Security", "CA2100",
+        Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static void Exec(SqliteConnection cn, string sql)
     {
         using var cmd = cn.CreateCommand();
