@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LageBuch.AppLogic.ViewModels;
 
@@ -7,6 +8,7 @@ public sealed partial class LinkRow : ObservableObject
 {
     private readonly Action _onChanged;
 
+    [SuppressMessage("Design", "CA1054", Justification = "URLs are free-form display strings in the domain; System.Uri would reject non-parseable values like relay links.")]
     public LinkRow(string name, string url, Action onChanged)
     {
         _onChanged = onChanged;

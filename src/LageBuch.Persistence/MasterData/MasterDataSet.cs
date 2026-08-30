@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using LageBuch.Domain.Atemschutz;
@@ -7,6 +8,8 @@ namespace LageBuch.Persistence.MasterData;
 public sealed record Street(string Name, string District);
 
 /// <summary>A named link — Stammdaten entry so useful external resources can be opened from an Einsatz.</summary>
+[SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
+[SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 public sealed record Link(string Name, string Url);
 
 /// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's Aufbau/Abbau

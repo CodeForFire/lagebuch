@@ -3,9 +3,11 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.ViewModels;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LageBuch.App.Shared;
 
+[SuppressMessage("Naming", "CA1724", Justification = "The Avalonia App class sits in the LageBuch.App.Shared namespace by design; the collision with the LageBuch.App namespace is inherent to the app's name.")]
 public partial class App : Application
 {
     /// <summary>

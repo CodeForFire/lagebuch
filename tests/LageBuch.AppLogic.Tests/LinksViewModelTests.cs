@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Persistence.MasterData;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -52,6 +53,7 @@ public class LinksViewModelTests
     [InlineData("file:///etc/passwd")]
     [InlineData("javascript:alert(1)")]
     [InlineData("ftp://example.org")]
+    [SuppressMessage("Design", "CA1054", Justification = "Test exercises links with free-form (even hostile) URL strings — that is the point of the test.")]
     public async Task OpenAsync_refuses_a_non_http_scheme(string url)
     {
         var dialogs = new FakeDialogs();

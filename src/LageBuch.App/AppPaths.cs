@@ -2,16 +2,16 @@ namespace LageBuch.App;
 
 internal static class AppPaths
 {
-    public static string AppDataDir =>
+    public static string Root =>
         GetAppDataDir(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
 
-    public static string MasterDataDbPath => Path.Combine(AppDataDir, "masterdata.db");
+    public static string MasterDataDbPath => Path.Combine(Root, "masterdata.db");
 
-    public static string RecentFilesJsonPath => Path.Combine(AppDataDir, "recent.json");
+    public static string RecentFilesJsonPath => Path.Combine(Root, "recent.json");
 
-    public static string LastSaveFolderJsonPath => Path.Combine(AppDataDir, "last-save-folder.json");
+    public static string LastSaveFolderJsonPath => Path.Combine(Root, "last-save-folder.json");
 
-    public static string AttachmentCacheDir => Path.Combine(AppDataDir, "attachment-cache");
+    public static string AttachmentCacheDir => Path.Combine(Root, "attachment-cache");
 
     public static string GetAppDataDir(string baseDir)
     {
