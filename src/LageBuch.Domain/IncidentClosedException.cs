@@ -6,4 +6,6 @@ public sealed class IncidentClosedException : InvalidOperationException
         : base("Der Einsatz ist abgeschlossen und schreibgeschützt.") { }
 
     public IncidentClosedException(string message) : base(message) { }
+
+    public IncidentClosedException(string message, Exception innerException) : base(message, innerException) { }
 }
