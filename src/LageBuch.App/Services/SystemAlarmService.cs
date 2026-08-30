@@ -14,7 +14,7 @@ namespace LageBuch.App.Services;
 /// Every path degrades to a silent no-op when the asset or the player is missing, so a build with
 /// no voice clip yet — or a host without the CLI player — simply stays quiet rather than crashing.
 /// </summary>
-public sealed class SystemAlarmService : IAlarmService
+internal sealed class SystemAlarmService : IAlarmService
 {
     private const uint SndAsync = 0x0001;   // play asynchronously
     private const uint SndNodefault = 0x0002; // no default beep if it fails

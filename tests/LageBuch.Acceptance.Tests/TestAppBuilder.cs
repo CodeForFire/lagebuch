@@ -5,7 +5,7 @@ using Avalonia.Headless;
 
 namespace LageBuch.Acceptance.Tests;
 
-public static class TestAppBuilder
+internal static class TestAppBuilder
 {
     // UseHeadlessDrawing = false keeps the real Skia text/render backend (bundled via
     // Avalonia.Desktop) so embedded custom fonts can be rasterized. The default headless

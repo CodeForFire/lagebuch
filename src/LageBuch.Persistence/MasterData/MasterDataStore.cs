@@ -11,7 +11,7 @@ public sealed class MasterDataStore
     /// its contents. Nothing is seeded: the app ships with no master data, so a fresh database comes
     /// back empty and is populated only by <see cref="Save"/> — i.e. the editor's Import.
     /// </summary>
-    public MasterDataSet GetOrCreate(string path)
+    public static MasterDataSet GetOrCreate(string path)
     {
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
         EnsureSchema(cn);
@@ -22,7 +22,7 @@ public sealed class MasterDataStore
     /// Replaces the master data with <paramref name="set"/>, in the given order. A full transactional
     /// replace, so deletes and reorders take effect exactly as supplied.
     /// </summary>
-    public void Save(string path, MasterDataSet set)
+    public static void Save(string path, MasterDataSet set)
     {
         ArgumentNullException.ThrowIfNull(set);
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);

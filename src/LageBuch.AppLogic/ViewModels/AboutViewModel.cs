@@ -23,13 +23,18 @@ public sealed partial class AboutViewModel : ObservableObject
         Version = version;
     }
 
+    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string AppName => "Lagebuch";
+    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string Descriptor => "Einsatzdokumentation";
     public string Version { get; }
+    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string RepositoryUrl => RepoUrl;
 
     // Kept in sync with the LICENSE file in the repo root.
+    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string LicenseLine => "Veröffentlicht unter der MIT-Lizenz.";
+    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
     public string CopyrightLine => "Copyright © 2026 Thomas Müller";
 
     [ObservableProperty]

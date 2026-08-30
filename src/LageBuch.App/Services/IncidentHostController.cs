@@ -14,7 +14,7 @@ namespace LageBuch.App.Services;
 /// reachable over loopback, the LAN, and a tailnet at once. Lives in the desktop head so ASP.NET
 /// Core stays out of the cross-platform AppLogic/Android build.
 /// </summary>
-public sealed class IncidentHostController : IIncidentHostController
+internal sealed class IncidentHostController : IIncidentHostController
 {
     private readonly IClock _clock;
     private readonly string _appVersion;

@@ -1,6 +1,6 @@
 namespace LageBuch.App;
 
-public static class AppPaths
+internal static class AppPaths
 {
     public static string AppDataDir =>
         GetAppDataDir(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
