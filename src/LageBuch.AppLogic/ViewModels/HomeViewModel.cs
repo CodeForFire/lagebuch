@@ -32,8 +32,11 @@ public sealed partial class HomeViewModel : ObservableObject
     // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
+    // Renders a route's map snapshot for the PDF (#150 phase 2). Null (most tests, and any build
+    // without Avalonia access) just means "no image in the PDF" -- the numeric table still exports.
+    private readonly IRouteOverviewRenderer? _routeOverviewRenderer;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, IRouteOverviewRenderer? routeOverviewRenderer = null)
     {
         _store = store;
         _masterData = masterData;
@@ -47,6 +50,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         _lastSaveFolder = lastSaveFolder;
         _attachmentCacheRoot = attachmentCacheRoot;
+        _routeOverviewRenderer = routeOverviewRenderer;
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -153,7 +157,8 @@ public sealed partial class HomeViewModel : ObservableObject
         if (existing is not null)
             RecentFiles.Remove(existing);
         InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController);
+        var workspace = new IncidentWorkspaceViewModel(
+            session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _routeOverviewRenderer);
         WorkspaceOpened?.Invoke(workspace);
     }
 

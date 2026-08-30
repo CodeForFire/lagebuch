@@ -108,6 +108,20 @@
                 </ScrollViewer>
               </DataTemplate>
 
+              <!-- Wasserförderung region of operation (#150 phase 2) -->
+              <DataTemplate x:DataType="vm:EinsatzgebietSection">
+                <StackPanel Spacing="12" MaxWidth="440" HorizontalAlignment="Left">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="NAME" Classes="overline" FontSize="10" />
+                    <TextBox Text="{Binding Name}" PlaceholderText="z. B. Landkreis Fürstenfeldbruck" />
+                  </StackPanel>
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="ORDNER (region.mbtiles + region.dem)" Classes="overline" FontSize="10" />
+                    <TextBox Text="{Binding FolderPath}" PlaceholderText="z. B. /var/lib/lagebuch/regions/ffb" />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+
               <!-- String-list / checklist editor -->
               <DataTemplate x:DataType="vm:EditableListSection">
                 <DockPanel>

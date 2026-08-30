@@ -262,4 +262,34 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(IncidentSettings.Defaults.ReturnPressureBar, settings.ReturnPressureBar);
         Assert.Equal(12, settings.IlsReminderIntervalMinutes); // the other keys are untouched
     }
+
+    [Fact]
+    public void A_fresh_database_reads_an_unconfigured_einsatzgebiet()
+    {
+        var set = new MasterDataStore().GetOrCreate(_path);
+        Assert.Equal(Einsatzgebiet.Empty, set.Einsatzgebiet);
+        Assert.False(set.Einsatzgebiet.IsConfigured);
+    }
+
+    [Fact]
+    public void Save_then_GetOrCreate_round_trips_the_einsatzgebiet()
+    {
+        var store = new MasterDataStore();
+        var einsatzgebiet = new Einsatzgebiet("Landkreis Fürstenfeldbruck", "/var/lib/lagebuch/regions/ffb");
+        store.Save(_path, MasterDataSet.Empty with { Einsatzgebiet = einsatzgebiet });
+
+        var loaded = store.GetOrCreate(_path).Einsatzgebiet;
+        Assert.Equal(einsatzgebiet, loaded);
+        Assert.True(loaded.IsConfigured);
+    }
+
+    [Fact]
+    public void Saving_the_einsatzgebiet_twice_updates_the_single_row_rather_than_duplicating_it()
+    {
+        var store = new MasterDataStore();
+        store.Save(_path, MasterDataSet.Empty with { Einsatzgebiet = new Einsatzgebiet("Erst", "/a") });
+        store.Save(_path, MasterDataSet.Empty with { Einsatzgebiet = new Einsatzgebiet("Zweit", "/b") });
+
+        Assert.Equal(new Einsatzgebiet("Zweit", "/b"), store.GetOrCreate(_path).Einsatzgebiet);
+    }
 }

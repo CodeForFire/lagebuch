@@ -247,10 +247,13 @@ public sealed class IncidentRepository
         {
             var w = incident.Wasserfoerderung[i];
             var positionsJson = System.Text.Json.JsonSerializer.Serialize(w.PumpPositionsMeters);
+            var routePointsJson = w.RoutePoints is null
+                ? (object)DBNull.Value
+                : System.Text.Json.JsonSerializer.Serialize(w.RoutePoints);
             Run(cn, tx,
                 "INSERT INTO wass_leitungen (id, ordinal, number, uebergabestelle, ansprechpartner, flow_lmin, feed_pressure_bar, " +
-                "length_m, elevation_rise_m, hose_count, reserve_hose_count, pump_count, reserve_pump_count, pump_positions) " +
-                "VALUES ($id,$o,$num,$ueb,$ap,$flow,$feed,$len,$rise,$hc,$rch,$pc,$rpc,$pos);",
+                "length_m, elevation_rise_m, hose_count, reserve_hose_count, pump_count, reserve_pump_count, pump_positions, route_points_json) " +
+                "VALUES ($id,$o,$num,$ueb,$ap,$flow,$feed,$len,$rise,$hc,$rch,$pc,$rpc,$pos,$route);",
                 p =>
                 {
                     p("$id", w.Id.ToString()); p("$o", i); p("$num", w.Number);
@@ -261,6 +264,7 @@ public sealed class IncidentRepository
                     p("$hc", w.HoseCount); p("$rch", w.ReserveHoseCount);
                     p("$pc", w.PumpCount); p("$rpc", w.ReservePumpCount);
                     p("$pos", positionsJson);
+                    p("$route", routePointsJson);
                 });
         }
 
@@ -461,13 +465,16 @@ public sealed class IncidentRepository
 
         var wasserfoerderung = ReadAll(cn,
             "SELECT id, number, uebergabestelle, ansprechpartner, flow_lmin, feed_pressure_bar, length_m, elevation_rise_m, " +
-            "hose_count, reserve_hose_count, pump_count, reserve_pump_count, pump_positions FROM wass_leitungen ORDER BY ordinal;",
+            "hose_count, reserve_hose_count, pump_count, reserve_pump_count, pump_positions, route_points_json FROM wass_leitungen ORDER BY ordinal;",
             r => Domain.Wasserfoerderung.WasserfoerderungLeitung.Rehydrate(
                 Guid.Parse(r.GetString(0)), r.GetInt32(1), Str(r, 2), Str(r, 3),
                 r.GetInt32(4), r.GetDouble(5), r.GetDouble(6), r.GetDouble(7),
                 r.GetInt32(8), r.GetInt32(9), r.GetInt32(10), r.GetInt32(11),
                 System.Text.Json.JsonSerializer.Deserialize<IReadOnlyList<double>>(r.GetString(12))
-                    ?? Array.Empty<double>()));
+                    ?? Array.Empty<double>(),
+                r.IsDBNull(13)
+                    ? null
+                    : System.Text.Json.JsonSerializer.Deserialize<IReadOnlyList<Domain.Wasserfoerderung.GeoPoint>>(r.GetString(13))));
 
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the

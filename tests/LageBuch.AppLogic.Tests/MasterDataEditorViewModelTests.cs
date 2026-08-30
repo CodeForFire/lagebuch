@@ -89,6 +89,9 @@ public class MasterDataEditorViewModelTests
     private static SettingsSection Settings(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<SettingsSection>().Single();
 
+    private static EinsatzgebietSection Einsatzgebiet(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<EinsatzgebietSection>().Single();
+
     private static VehiclesSection Vehicles(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<VehiclesSection>().Single();
 
@@ -120,8 +123,8 @@ public class MasterDataEditorViewModelTests
     public void Loads_a_section_per_category_and_starts_clean()
     {
         var vm = Vm(new InMemoryProvider());
-        // 14 categories plus #76's Fahrzeuge.
-        Assert.Equal(15, vm.Sections.Count);
+        // 14 categories plus #76's Fahrzeuge plus #150's Einsatzgebiet.
+        Assert.Equal(16, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
@@ -331,6 +334,35 @@ public class MasterDataEditorViewModelTests
 
         Assert.Equal(1, provider.SaveCount);
         Assert.Equal(45, provider.Get().Settings.IlsReminderFollowUpIntervalMinutes);
+    }
+
+    [Fact]
+    public void Einsatzgebiet_section_is_seeded_from_the_provider()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Einsatzgebiet = new Einsatzgebiet("Landkreis Fürstenfeldbruck", "/data/ffb"),
+        });
+        var gebiet = Einsatzgebiet(Vm(provider));
+
+        Assert.Equal("Landkreis Fürstenfeldbruck", gebiet.Name);
+        Assert.Equal("/data/ffb", gebiet.FolderPath);
+    }
+
+    [Fact]
+    public void Editing_the_einsatzgebiet_marks_dirty_and_Save_persists_it()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+
+        Einsatzgebiet(vm).Name = "Landkreis Fürstenfeldbruck";
+        Einsatzgebiet(vm).FolderPath = "/data/ffb";
+        Assert.True(vm.IsDirty);
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(1, provider.SaveCount);
+        Assert.Equal(new Einsatzgebiet("Landkreis Fürstenfeldbruck", "/data/ffb"), provider.Get().Einsatzgebiet);
     }
 
     // --- Import / Export (issue #46 follow-up) ---

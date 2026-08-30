@@ -233,4 +233,31 @@ public class IncidentSessionTests
         Assert.True(bytes.Length > 100);
         Assert.Equal(0x25, bytes[0]); // %
     }
+
+    [Fact]
+    public async Task ExportPdfAsync_threads_the_route_overview_png_dictionary_through()
+    {
+        var store = new FakeStore();
+        var session = LocalIncidentSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"),
+            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var route = new[]
+        {
+            new LageBuch.Domain.Wasserfoerderung.GeoPoint(48.0, 11.0),
+            new LageBuch.Domain.Wasserfoerderung.GeoPoint(48.002, 11.0),
+        };
+        var profile = new[]
+        {
+            new LageBuch.Domain.Wasserfoerderung.ElevationProfileSample(0, 0),
+            new LageBuch.Domain.Wasserfoerderung.ElevationProfileSample(400, 0),
+        };
+        var leitung = session.Incident.AddWasserfoerderungLeitungFromRoute(null, null, route, profile);
+        var tinyPng = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==");
+
+        var withoutImage = await session.ExportPdfAsync();
+        var withImage = await session.ExportPdfAsync(
+            new Dictionary<Guid, byte[]> { [leitung.Id] = tinyPng });
+
+        Assert.True(withImage.Length > withoutImage.Length);
+    }
 }

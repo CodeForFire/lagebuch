@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Documents;
+using LageBuch.Persistence.Wasserfoerderung;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -19,19 +20,97 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
+    private readonly IElevationSampler? _elevationSampler;
+    private readonly IMapTileSource? _tileSource;
 
-    public WasserfoerderungViewModel(IIncidentSession session, Action onChanged)
+    public WasserfoerderungViewModel(
+        IIncidentSession session, Action onChanged,
+        IElevationSampler? elevationSampler = null, IMapTileSource? tileSource = null)
     {
         _session = session;
         _onChanged = onChanged;
+        _elevationSampler = elevationSampler;
+        _tileSource = tileSource;
         IsReadOnly = session.IsReadOnly;
         Rows = new ObservableCollection<WasserfoerderungLeitungRow>();
+        DrawnRoutePoints = new ObservableCollection<GeoPoint>();
+        DrawnRoutePoints.CollectionChanged += (_, _) => UndoLastRoutePointCommand.NotifyCanExecuteChanged();
+        DrawnRoutePoints.CollectionChanged += (_, _) => FinishRouteCommand.NotifyCanExecuteChanged();
         _session.Changed += Sync;
         Sync();
     }
 
     public bool IsReadOnly { get; }
     public ObservableCollection<WasserfoerderungLeitungRow> Rows { get; }
+
+    /// <summary>True once both a tile source and an elevation sampler are configured — i.e. the
+    /// operator's Einsatzgebiet points at a folder that actually holds region.mbtiles + region.dem.</summary>
+    public bool IsMapModeAvailable => _elevationSampler is not null && _tileSource is not null;
+
+    public IMapTileSource? TileSource => _tileSource;
+
+    /// <summary>The in-progress polyline drawn on the map (#150 Plan B); cleared once a Leitung is finished.</summary>
+    public ObservableCollection<GeoPoint> DrawnRoutePoints { get; }
+
+    /// <summary>Manuell (Plan A) vs. Karte (Plan B) input mode. The view gates the toggle on
+    /// <see cref="IsMapModeAvailable"/> — this property itself does not re-check it.</summary>
+    [ObservableProperty]
+    private bool _isMapMode;
+
+    // No configured Einsatzgebiet has an obvious default location, so the map opens on a fixed,
+    // reasonable German fallback; the operator pans from there. Bounds keep zooming out from
+    // going past a whole-continent view or in past building-level detail.
+    private const int MinZoom = 3;
+    private const int MaxZoom = 19;
+
+    [ObservableProperty]
+    private double _mapCenterLatitude = 48.14;
+
+    [ObservableProperty]
+    private double _mapCenterLongitude = 11.58;
+
+    [ObservableProperty]
+    private int _mapZoom = 14;
+
+    [RelayCommand]
+    private void ZoomIn() => MapZoom = Math.Min(MaxZoom, MapZoom + 1);
+
+    [RelayCommand]
+    private void ZoomOut() => MapZoom = Math.Max(MinZoom, MapZoom - 1);
+
+    [RelayCommand]
+    private void AddRoutePoint(GeoPoint point) => DrawnRoutePoints.Add(point);
+
+    private bool CanUndoLastRoutePoint => DrawnRoutePoints.Count > 0;
+
+    [RelayCommand(CanExecute = nameof(CanUndoLastRoutePoint))]
+    private void UndoLastRoutePoint() => DrawnRoutePoints.RemoveAt(DrawnRoutePoints.Count - 1);
+
+    [RelayCommand]
+    private void ClearRoute() => DrawnRoutePoints.Clear();
+
+    private bool CanFinishRoute => !IsReadOnly && DrawnRoutePoints.Count >= 2 && _elevationSampler is not null;
+
+    /// <summary>"Fertig": samples the drawn polyline and records the Leitung from it (#150 Plan B).</summary>
+    [RelayCommand(CanExecute = nameof(CanFinishRoute))]
+    private void FinishRoute()
+    {
+        ErrorMessage = null;
+        try
+        {
+            var route = DrawnRoutePoints.ToList();
+            var profile = _elevationSampler!.Sample(route);
+            _session.AddWasserfoerderungLeitungFromRoute(NewUebergabestelle, NewAnsprechpartner, route, profile);
+            NewUebergabestelle = string.Empty;
+            NewAnsprechpartner = string.Empty;
+            DrawnRoutePoints.Clear();
+            _onChanged();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
 
     [ObservableProperty]
     private string? _newUebergabestelle;

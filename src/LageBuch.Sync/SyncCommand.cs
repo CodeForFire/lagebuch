@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync;
 
@@ -47,6 +48,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
 [JsonDerivedType(typeof(AddWasserfoerderungLeitungCommand), "addWasserfoerderungLeitung")]
 [JsonDerivedType(typeof(RemoveWasserfoerderungLeitungCommand), "removeWasserfoerderungLeitung")]
+[JsonDerivedType(typeof(AddWasserfoerderungLeitungFromRouteCommand), "addWasserfoerderungLeitungFromRoute")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -162,3 +164,12 @@ public sealed record AddWasserfoerderungLeitungCommand(
     string? Uebergabestelle, string? Ansprechpartner, double LengthMeters, double ElevationRiseMeters) : SyncCommand;
 
 public sealed record RemoveWasserfoerderungLeitungCommand(Guid LeitungId) : SyncCommand;
+
+// Plan B (#150 phase 2): carries the already-sampled profile so every replica computes the same
+// pump placement without needing its own copy of the DEM file — see
+// Incident.AddWasserfoerderungLeitungFromRoute.
+public sealed record AddWasserfoerderungLeitungFromRouteCommand(
+    string? Uebergabestelle,
+    string? Ansprechpartner,
+    IReadOnlyList<GeoPoint> RoutePoints,
+    IReadOnlyList<ElevationProfileSample> Profile) : SyncCommand;

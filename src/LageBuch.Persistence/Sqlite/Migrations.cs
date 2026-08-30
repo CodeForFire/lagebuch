@@ -5,7 +5,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 18;
+    public const int CurrentVersion = 19;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -103,6 +103,10 @@ public static class Migrations
         if (version < 18)
         {
             ApplyV18(cn, tx);
+        }
+        if (version < 19)
+        {
+            ApplyV19(cn, tx);
         }
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
@@ -565,6 +569,13 @@ public static class Migrations
                 pump_positions TEXT NOT NULL DEFAULT '[]'
             );
             """);
+    }
+
+    private static void ApplyV19(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Plan B (#150 phase 2): the drawn route, when the Leitung came from the map. NULL means
+        // the Leitung was entered manually (Plan A) -- LengthMeters/ElevationRiseMeters apply either way.
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "wass_leitungen", "route_points_json", "TEXT");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

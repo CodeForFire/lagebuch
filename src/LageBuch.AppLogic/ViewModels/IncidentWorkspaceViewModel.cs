@@ -6,6 +6,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
+using LageBuch.Persistence.Wasserfoerderung;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -22,8 +23,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
+    private readonly IRouteOverviewRenderer? _routeOverviewRenderer;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IRouteOverviewRenderer? routeOverviewRenderer = null)
     {
         _session = session;
         _local = session as LocalIncidentSession;
@@ -33,6 +35,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _dialogs = dialogs;
         _alarm = alarm;
         _hostController = hostController;
+        _routeOverviewRenderer = routeOverviewRenderer;
         IsReadOnly = session.IsReadOnly;
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
@@ -235,7 +238,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
 
         Wasserfoerderung?.Dispose();
-        Wasserfoerderung = new WasserfoerderungViewModel(_session, OnChanged);
+        var (elevationSampler, tileSource) = BuildWasserfoerderungMapSources();
+        Wasserfoerderung = new WasserfoerderungViewModel(_session, OnChanged, elevationSampler, tileSource);
 
         Reminder?.Dispose();
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
@@ -259,6 +263,24 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Wasserfoerderung));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
+    }
+
+    /// <summary>
+    /// Builds the map data sources for the Wasserförderung tab's "Karte" mode (#150 phase 2) from
+    /// the Stammdaten-configured Einsatzgebiet, or (null, null) when unconfigured or the region
+    /// folder is missing either file — in which case the tab silently falls back to Manuell entry.
+    /// </summary>
+    private (IElevationSampler? ElevationSampler, IMapTileSource? TileSource) BuildWasserfoerderungMapSources()
+    {
+        if (!_masterData.Einsatzgebiet.IsConfigured)
+            return (null, null);
+
+        var demPath = Path.Combine(_masterData.Einsatzgebiet.FolderPath, "region.dem");
+        var mbtilesPath = Path.Combine(_masterData.Einsatzgebiet.FolderPath, "region.mbtiles");
+        if (!File.Exists(demPath) || !File.Exists(mbtilesPath))
+            return (null, null);
+
+        return (new DemFileElevationSampler(demPath), new MbTilesFileSource(mbtilesPath));
     }
 
     private bool CanClose => !IsReadOnly;
@@ -332,8 +354,35 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
             return;
-        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync());
+        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync(BuildRouteOverviewPngById()));
         await _dialogs.ShareFileAsync(path, "application/pdf");
+    }
+
+    /// <summary>
+    /// Renders a map snapshot for every route-based Wasserförderung Leitung (#150 phase 2), when
+    /// both a renderer and the region's tiles are available; a Leitung the renderer fails on (or
+    /// with no route at all — Plan A manual entry) simply has no entry, unchanged from Phase 1.
+    /// </summary>
+    private IReadOnlyDictionary<Guid, byte[]> BuildRouteOverviewPngById()
+    {
+        var result = new Dictionary<Guid, byte[]>();
+        if (_routeOverviewRenderer is null)
+            return result;
+
+        var (_, tileSource) = BuildWasserfoerderungMapSources();
+        if (tileSource is null)
+            return result;
+
+        foreach (var leitung in _session.Incident.Wasserfoerderung)
+        {
+            if (leitung.RoutePoints is null)
+                continue;
+            var png = _routeOverviewRenderer.Render(leitung.RoutePoints, tileSource);
+            if (png is not null)
+                result[leitung.Id] = png;
+        }
+
+        return result;
     }
 
     // ===== Multi-device hosting (#52): flip "Im Netzwerk freigeben" to expose this open incident. =====

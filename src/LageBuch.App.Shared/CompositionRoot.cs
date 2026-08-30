@@ -1,3 +1,4 @@
+using LageBuch.App.Shared.Services;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
@@ -28,7 +29,7 @@ public static class CompositionRoot
         ILastSaveFolderStore? lastSaveFolder = null,
         string? attachmentCacheRoot = null)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, new RouteOverviewRenderer());
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
         return new MainWindowViewModel(home, editor, dialogs, appVersion);
     }

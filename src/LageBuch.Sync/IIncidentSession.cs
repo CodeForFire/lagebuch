@@ -4,6 +4,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync;
 
@@ -72,6 +73,12 @@ public interface IIncidentSession
     /// and every derived figure.</summary>
     void AddWasserfoerderungLeitung(string? uebergabestelle, string? ansprechpartner, double lengthMeters, double elevationRiseMeters);
     void RemoveWasserfoerderungLeitung(Guid leitungId);
+
+    void AddWasserfoerderungLeitungFromRoute(
+        string? uebergabestelle,
+        string? ansprechpartner,
+        IReadOnlyList<GeoPoint> routePoints,
+        IReadOnlyList<ElevationProfileSample> profile);
     void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
         int? truppNumber = null,
         string? callSign = null,

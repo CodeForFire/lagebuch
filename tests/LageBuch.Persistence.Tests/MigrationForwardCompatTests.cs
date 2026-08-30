@@ -357,6 +357,49 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void V18_file_gains_a_null_route_points_column_on_upgrade_to_v19()
+    {
+        // V19 adds route_points_json (#150 Plan B). A v18 file must upgrade cleanly, keep its
+        // existing Leitung row untouched, and read the new column back as NULL (Plan A entry).
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (18);
+                CREATE TABLE wass_leitungen (
+                    id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, number INTEGER NOT NULL,
+                    uebergabestelle TEXT, ansprechpartner TEXT, flow_lmin INTEGER NOT NULL,
+                    feed_pressure_bar REAL NOT NULL, length_m REAL NOT NULL, elevation_rise_m REAL NOT NULL,
+                    hose_count INTEGER NOT NULL, reserve_hose_count INTEGER NOT NULL,
+                    pump_count INTEGER NOT NULL, reserve_pump_count INTEGER NOT NULL,
+                    pump_positions TEXT NOT NULL DEFAULT '[]');
+                INSERT INTO wass_leitungen (id, ordinal, number, uebergabestelle, ansprechpartner,
+                    flow_lmin, feed_pressure_bar, length_m, elevation_rise_m, hose_count,
+                    reserve_hose_count, pump_count, reserve_pump_count, pump_positions)
+                VALUES ('11111111-1111-1111-1111-111111111111', 0, 1, 'TLF 20/8', 'FFB 1/44/1',
+                    800, 8, 2000, 0, 100, 20, 3, 1, '[0,620,1240,1860]');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Assert.Equal(18, Migrations.GetVersion(cn));
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var read = cn.CreateCommand();
+            read.CommandText = "SELECT number, route_points_json FROM wass_leitungen;";
+            using var r = read.ExecuteReader();
+            Assert.True(r.Read());
+            Assert.Equal(1L, (long)r.GetInt64(0));
+            Assert.True(r.IsDBNull(1));
+        }
+    }
+
+    [Fact]
     public void A_file_from_a_newer_version_is_refused_and_its_marker_left_alone()
     {
         // A file written by a build that is ahead of this one. Migrate has no migration to run --

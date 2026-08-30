@@ -4,6 +4,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync.Tests;
 
@@ -225,5 +226,22 @@ public class SnapshotRoundTripTests
         Assert.Equal(original.Wasserfoerderung[0].PumpPositionsMeters, restored.Wasserfoerderung[0].PumpPositionsMeters);
         Assert.Null(restored.Wasserfoerderung[1].Uebergabestelle);
         Assert.Equal(0, restored.Wasserfoerderung[1].PumpCount);
+        Assert.Null(restored.Wasserfoerderung[0].RoutePoints);
+    }
+
+    [Fact]
+    public void Wasserfoerderung_route_points_round_trip_through_the_snapshot()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Test", null);
+        var original = Incident.Start(clock, op);
+        var route = new[] { new GeoPoint(48.0, 11.0), new GeoPoint(48.002, 11.0) };
+        var profile = new[] { new ElevationProfileSample(0, 0), new ElevationProfileSample(2000, 100) };
+        original.AddWasserfoerderungLeitungFromRoute("TLF 20/8", "FFB 1/44/1", route, profile);
+
+        var snapshot = SnapshotMapper.ToSnapshot(original);
+        var restored = SnapshotMapper.FromSnapshot(snapshot);
+
+        Assert.Equal(route, restored.Wasserfoerderung[0].RoutePoints);
     }
 }

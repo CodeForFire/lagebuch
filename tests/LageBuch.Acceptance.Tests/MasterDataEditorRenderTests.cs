@@ -61,8 +61,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var list = view.GetControl<ListBox>("CategoryList");
-        // 14 categories plus #76's Fahrzeuge.
-        Assert.Equal(15, list.ItemCount);
+        // 14 categories plus #76's Fahrzeuge plus #150's Einsatzgebiet.
+        Assert.Equal(16, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).

@@ -57,7 +57,7 @@ public static class SnapshotMapper
             incident.Wasserfoerderung.Select(w => new WasserfoerderungLeitungDto(
                 w.Id, w.Number, w.Uebergabestelle, w.Ansprechpartner, w.FlowLMin, w.FeedPressureBar,
                 w.LengthMeters, w.ElevationRiseMeters, w.HoseCount, w.ReserveHoseCount,
-                w.PumpCount, w.ReservePumpCount, w.PumpPositionsMeters)).ToList());
+                w.PumpCount, w.ReservePumpCount, w.PumpPositionsMeters, w.RoutePoints)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -103,7 +103,7 @@ public static class SnapshotMapper
             snapshot.Wasserfoerderung.Select(w => WasserfoerderungLeitung.Rehydrate(
                 w.Id, w.Number, w.Uebergabestelle, w.Ansprechpartner, w.FlowLMin, w.FeedPressureBar,
                 w.LengthMeters, w.ElevationRiseMeters, w.HoseCount, w.ReserveHoseCount,
-                w.PumpCount, w.ReservePumpCount, w.PumpPositionsMeters)));
+                w.PumpCount, w.ReservePumpCount, w.PumpPositionsMeters, w.RoutePoints)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(
