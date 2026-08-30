@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
@@ -56,7 +57,7 @@ public class ModuleTabsScrollingTests
             .ToArray();
         Assert.True(columns.Length == 1,
             $"nav rail wrapped into {columns.Length} columns at x=" +
-            string.Join(", ", columns.Select(c => c.ToString("F0"))) +
+            string.Join(", ", columns.Select(c => c.ToString("F0", CultureInfo.InvariantCulture))) +
             " -- it must overflow into a scrollbar instead.");
 
         // The overflow lands in a ScrollViewer, not silent clipping.

@@ -72,13 +72,13 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     // Shared with TaskDialogViewModel (same assembly) so picker wording matches everywhere.
     internal static IReadOnlyList<ImportanceOption> ImportanceLevels() =>
         Enum.GetValues<TaskImportance>()
-            .OrderByDescending(v => Convert.ToInt32(v))
+            .OrderByDescending(v => (int)v)
             .Select(v => new ImportanceOption(v, Formatting.Level(v)))
             .ToArray();
 
     internal static IReadOnlyList<UrgencyOption> UrgencyLevels() =>
         Enum.GetValues<TaskUrgency>()
-            .OrderByDescending(v => Convert.ToInt32(v))
+            .OrderByDescending(v => (int)v)
             .Select(v => new UrgencyOption(v, Formatting.Level(v)))
             .ToArray();
 

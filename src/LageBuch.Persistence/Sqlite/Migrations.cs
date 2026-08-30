@@ -1,3 +1,4 @@
+using System.Globalization;
 using LageBuch.Domain.Atemschutz;
 using Microsoft.Data.Sqlite;
 
@@ -18,7 +19,7 @@ public static class Migrations
         using var read = cn.CreateCommand();
         read.CommandText = "SELECT version FROM schema_version LIMIT 1;";
         var result = read.ExecuteScalar();
-        return result is null ? 0 : Convert.ToInt32(result);
+        return result is null ? 0 : Convert.ToInt32(result, CultureInfo.InvariantCulture);
     }
 
     public static void Migrate(SqliteConnection cn)

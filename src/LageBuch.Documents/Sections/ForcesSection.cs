@@ -1,3 +1,4 @@
+using System.Globalization;
 using LageBuch.Domain;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -40,7 +41,7 @@ public static class ForcesSection
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.CallSign));
                         // Stärke im 1/1/2-Format: Führungskräfte/Mannschaft/Gesamt (#76).
                         table.Cell().Element(Cells.Body).Text(unit.StrengthText);
-                        table.Cell().Element(Cells.Body).Text(unit.ScbaCount.ToString());
+                        table.Cell().Element(Cells.Body).Text(unit.ScbaCount.ToString(CultureInfo.InvariantCulture));
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.Status));
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.Notes));
                     }
@@ -56,7 +57,7 @@ public static class ForcesSection
                 t.Span("Gesamtstärke: ").SemiBold();
                 t.Span($"{incident.TotalOfficer}/{incident.TotalPersonnel - incident.TotalOfficer}/{incident.TotalPersonnel}");
                 t.Span("   davon Atemschutzgeräteträger: ").SemiBold();
-                t.Span(incident.TotalScba.ToString());
+                t.Span(incident.TotalScba.ToString(CultureInfo.InvariantCulture));
             });
         });
     }
