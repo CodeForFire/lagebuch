@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -68,7 +69,9 @@ internal sealed class NoopTicker : ITicker
 }
 internal sealed class NoopAlarmService : IAlarmService
 {
+    [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
     public void Start() { }
+    [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
     public void Stop() { }
     public void Play(AlarmSound sound) { }
 }

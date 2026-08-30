@@ -55,6 +55,8 @@ internal sealed class SystemAlarmService : IAlarmService
     }
 
     // Runs on the SerialAudioQueue's worker thread; blocks until the clip finishes playing.
+    [SuppressMessage("Design", "CA1031",
+        Justification = "Player binary missing (e.g. a headless Linux host without ALSA) — stay silent.")]
     private void PlayBlocking(AlarmSound sound, byte[] bytes)
     {
         if (OperatingSystem.IsWindows())
