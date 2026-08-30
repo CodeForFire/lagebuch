@@ -9,7 +9,7 @@ namespace LageBuch.Sync.Hosting.Tests;
 public class IncidentHostTests
 {
     private static async Task<IncidentSnapshot> GetSnapshotAsync(HttpClient http) =>
-        SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(SyncProtocol.SnapshotPath));
+        SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute)));
 
     [Fact]
     public async Task Host_serves_version_and_snapshot_and_applies_a_posted_command()
@@ -25,7 +25,7 @@ public class IncidentHostTests
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         // Version handshake.
-        var version = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(SyncProtocol.VersionPath));
+        var version = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute)));
         Assert.Equal("1.2.3", version.Version);
 
         // Initial snapshot reflects the hosted incident.
@@ -36,7 +36,7 @@ public class IncidentHostTests
         var command = new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
             EtbDirection.Incoming, "Von der Einsatzstelle", "Leitstelle", "ELW");
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        var response = await http.PostAsync(SyncProtocol.CommandPath, content);
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         response.EnsureSuccessStatusCode();
 
         var after = await GetSnapshotAsync(http);
@@ -62,7 +62,7 @@ public class IncidentHostTests
 
         var command = new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), entry.Id, "Lagemeldung korrigiert");
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        var response = await http.PostAsync(SyncProtocol.CommandPath, content);
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         response.EnsureSuccessStatusCode();
 
         var after = await GetSnapshotAsync(http);
@@ -89,7 +89,7 @@ public class IncidentHostTests
 
         var command = new EditJournalEntryCommand(new OperatorDto("Client", null), Guid.NewGuid(), "Text");
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        var response = await http.PostAsync(SyncProtocol.CommandPath, content);
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -111,7 +111,7 @@ public class IncidentHostTests
             EtbDirection.Internal, "zu spät", null, null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
 
-        var response = await http.PostAsync(SyncProtocol.CommandPath, content);
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -131,16 +131,16 @@ public class IncidentHostTests
         if (pin is not null)
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(SyncProtocol.VersionPath)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(SyncProtocol.SnapshotPath)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))).StatusCode);
 
         var command = new AddJournalEntryCommand(new OperatorDto("Client", null),
             EtbDirection.Internal, "x", null, null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(SyncProtocol.CommandPath, content)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content)).StatusCode);
 
         // The hub's negotiate is an HTTP POST that carries the same header, so the gate blocks it too.
-        var negotiate = await http.PostAsync(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", null);
+        var negotiate = await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null);
         Assert.Equal(HttpStatusCode.Unauthorized, negotiate.StatusCode);
     }
 
@@ -160,7 +160,7 @@ public class IncidentHostTests
         var bytes = new byte[] { 1, 2, 3, 4, 5 };
         var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", bytes);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        var postResponse = await http.PostAsync(SyncProtocol.CommandPath, content);
+        var postResponse = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         postResponse.EnsureSuccessStatusCode();
 
         // Broadcast/response snapshot carries metadata only — no bytes, small regardless of file size.
@@ -174,7 +174,7 @@ public class IncidentHostTests
         Assert.Contains(session.Incident.Journal, e => e.Text == "Datei hinzugefügt: brand.jpg");
 
         // A client pulls the bytes back on demand.
-        var getResponse = await http.GetAsync(SyncProtocol.FilesPath(fileMeta.Id));
+        var getResponse = await http.GetAsync(new Uri(SyncProtocol.FilesPath(fileMeta.Id), UriKind.RelativeOrAbsolute));
         getResponse.EnsureSuccessStatusCode();
         Assert.Equal("image/jpeg", getResponse.Content.Headers.ContentType?.MediaType);
         Assert.Equal(bytes, await getResponse.Content.ReadAsByteArrayAsync());
@@ -193,7 +193,7 @@ public class IncidentHostTests
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
-        var response = await http.GetAsync(SyncProtocol.FilesPath(Guid.NewGuid()));
+        var response = await http.GetAsync(new Uri(SyncProtocol.FilesPath(Guid.NewGuid()), UriKind.RelativeOrAbsolute));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -210,7 +210,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
 
-        var response = await http.GetAsync(SyncProtocol.FilesPath(Guid.NewGuid()));
+        var response = await http.GetAsync(new Uri(SyncProtocol.FilesPath(Guid.NewGuid()), UriKind.RelativeOrAbsolute));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -228,7 +228,7 @@ public class IncidentHostTests
         using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
-        var negotiate = await http.PostAsync(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", null);
+        var negotiate = await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null);
         negotiate.EnsureSuccessStatusCode();
     }
 }
