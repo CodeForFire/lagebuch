@@ -7,6 +7,7 @@ namespace LageBuch.Documents.Sections;
 
 public static class TasksSection
 {
+    private static readonly string[] HeaderTitles = ["", "Wichtig", "Dringlich", "Fällig", "Zugeteilt", "Aufgabe", "Erledigt"];
     public static void Compose(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -41,7 +42,7 @@ public static class TasksSection
 
                 table.Header(header =>
                 {
-                    foreach (var title in new[] { "", "Wichtig", "Dringlich", "Fällig", "Zugeteilt", "Aufgabe", "Erledigt" })
+                    foreach (var title in HeaderTitles)
                         header.Cell().Element(HeaderCell).Text(title).SemiBold();
                 });
 

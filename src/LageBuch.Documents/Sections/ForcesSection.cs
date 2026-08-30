@@ -8,6 +8,7 @@ namespace LageBuch.Documents.Sections;
 
 public static class ForcesSection
 {
+    private static readonly string[] HeaderTitles = ["Feuerwehr", "Funkrufname", "Stärke", "AGT", "Status", "Bemerkung"];
     public static void Compose(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -31,7 +32,7 @@ public static class ForcesSection
 
                     table.Header(header =>
                     {
-                        foreach (var title in new[] { "Feuerwehr", "Funkrufname", "Stärke", "AGT", "Status", "Bemerkung" })
+                        foreach (var title in HeaderTitles)
                             header.Cell().Element(Cells.Header).Text(title).SemiBold();
                     });
 

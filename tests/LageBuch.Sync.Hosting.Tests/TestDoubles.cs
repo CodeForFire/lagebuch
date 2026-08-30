@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using LageBuch.AppLogic;
@@ -34,7 +35,9 @@ internal sealed class NoTicker : ITicker
 
 internal sealed class NoAlarm : IAlarmService
 {
+    [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
     public void Start() { }
+    [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
     public void Stop() { }
     public void Play(AlarmSound sound) { }
 }

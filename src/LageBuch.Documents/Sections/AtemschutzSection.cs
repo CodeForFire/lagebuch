@@ -7,6 +7,9 @@ namespace LageBuch.Documents.Sections;
 
 public static class AtemschutzSection
 {
+    private static readonly string[] HeaderTitles =
+        ["Trupp", "Mannschaft", "Funkrufname", "Start", "Rückzug", "Ende", "Druck Start", "Druck akt."];
+
     public static void Compose(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -36,8 +39,7 @@ public static class AtemschutzSection
 
                 table.Header(header =>
                 {
-                    foreach (var title in new[]
-                             { "Trupp", "Mannschaft", "Funkrufname", "Start", "Rückzug", "Ende", "Druck Start", "Druck akt." })
+                    foreach (var title in HeaderTitles)
                         header.Cell().Element(Cells.Header).Text(title).SemiBold();
                 });
 

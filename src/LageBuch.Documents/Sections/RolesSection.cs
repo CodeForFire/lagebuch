@@ -7,6 +7,7 @@ namespace LageBuch.Documents.Sections;
 
 public static class RolesSection
 {
+    private static readonly string[] HeaderTitles = ["Funktion", "Name", "Abschnitt", "Funkrufname", "Handynummer", "Von", "Bis"];
     public static void Compose(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -37,7 +38,7 @@ public static class RolesSection
 
                 table.Header(header =>
                 {
-                    foreach (var title in new[] { "Funktion", "Name", "Abschnitt", "Funkrufname", "Handynummer", "Von", "Bis" })
+                    foreach (var title in HeaderTitles)
                         header.Cell().Element(Cells.Header).Text(title).SemiBold();
                 });
 

@@ -7,6 +7,7 @@ namespace LageBuch.Documents.Sections;
 
 public static class EtbSection
 {
+    private static readonly string[] HeaderTitles = ["Zeit", "Richtung", "Von", "An", "Eintrag", "Erfasst von"];
     public static void Compose(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -34,7 +35,7 @@ public static class EtbSection
 
                 table.Header(header =>
                 {
-                    foreach (var title in new[] { "Zeit", "Richtung", "Von", "An", "Eintrag", "Erfasst von" })
+                    foreach (var title in HeaderTitles)
                         header.Cell().Element(HeaderCell).Text(title).SemiBold();
                 });
 
