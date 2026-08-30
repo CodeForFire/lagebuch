@@ -15,9 +15,10 @@ namespace LageBuch.App.Services;
 /// </summary>
 internal sealed class SystemAlarmService : IAlarmService
 {
-    private const uint SndAsync = 0x0001;   // play asynchronously
     private const uint SndNodefault = 0x0002; // no default beep if it fails
     private const uint SndMemory = 0x0004;  // pszSound points to in-memory WAV
+    // No SND_ASYNC: playback must block the queue's worker thread until the clip finishes,
+    // so cues play one after another instead of overlapping (see SerialAudioQueue).
 
     // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent.
     private static readonly IReadOnlyDictionary<AlarmSound, string> VoiceAssets =
@@ -33,6 +34,7 @@ internal sealed class SystemAlarmService : IAlarmService
 
     private readonly Dictionary<AlarmSound, byte[]> _voiceBytes = new();
     private readonly Dictionary<AlarmSound, string> _voiceTempFiles = new();
+    private readonly SerialAudioQueue _queue = new();
 
     public SystemAlarmService()
     {
@@ -65,9 +67,15 @@ internal sealed class SystemAlarmService : IAlarmService
         if (!_voiceBytes.TryGetValue(sound, out var bytes))
             return; // no clip bundled for this cue yet
 
+        _queue.Enqueue(() => PlayBlocking(sound, bytes));
+    }
+
+    // Runs on the SerialAudioQueue's worker thread; blocks until the clip finishes playing.
+    private void PlayBlocking(AlarmSound sound, byte[] bytes)
+    {
         if (OperatingSystem.IsWindows())
         {
-            PlaySound(bytes, IntPtr.Zero, SndAsync | SndMemory | SndNodefault);
+            PlaySound(bytes, IntPtr.Zero, SndMemory | SndNodefault);
             return;
         }
 
@@ -78,11 +86,12 @@ internal sealed class SystemAlarmService : IAlarmService
         var player = OperatingSystem.IsMacOS() ? "afplay" : "aplay";
         try
         {
-            Process.Start(new ProcessStartInfo(player, $"\"{path}\"")
+            using var process = Process.Start(new ProcessStartInfo(player, $"\"{path}\"")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
             });
+            process?.WaitForExit();
         }
         catch
         {
