@@ -32,6 +32,13 @@ internal sealed class InMemoryStore : IIncidentStore
     public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
 }
 
+internal sealed class FakeTimeProvider : TimeProvider
+{
+    public DateTimeOffset UtcNow { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
+    public override DateTimeOffset GetUtcNow() => UtcNow;
+    public void Advance(TimeSpan by) => UtcNow += by;
+}
+
 internal sealed class FixedClock : IClock
 {
     public DateTimeOffset Now { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
