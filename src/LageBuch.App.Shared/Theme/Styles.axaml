@@ -283,6 +283,33 @@
   <Style Selector="TabControl">
     <Setter Property="TabStripPlacement" Value="Left" />
     <Setter Property="Padding" Value="0" />
+    <!-- Avalonia's default Left-placement items panel is a vertical WrapPanel with no scroll
+         wrapper at all: once the rail runs out of height it wraps into a second column overlapping
+         the first two tabs with the last two (reported live on a short window — WASSERFÖRDERUNG
+         rendered beside AUFBAU, ABBAU beside ETB), and forcing a single-column panel alone just
+         turns that into a silent, unreachable clip instead (confirmed via a headless test: no
+         ScrollViewer anywhere wraps PART_ItemsPresenter, so a short window drops the last tabs off
+         the bottom edge with no way back). This is a single-column "dispatch rail" by design (fixed
+         172px-wide TabItems below) with only one placement ever used in this app, so replace the
+         whole template with a purpose-built one: single-column items panel, wrapped in its own
+         ScrollViewer, laid out beside the content host. -->
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Vertical" />
+      </ItemsPanelTemplate>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="Auto,*">
+          <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+          </ScrollViewer>
+          <ContentPresenter Grid.Column="1" Name="PART_SelectedContentHost"
+                            Content="{TemplateBinding SelectedContent}"
+                            ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
   </Style>
   <Style Selector="TabControl /template/ ItemsPresenter#PART_ItemsPresenter">
     <Setter Property="Margin" Value="0" />
