@@ -14,6 +14,13 @@ namespace LageBuch.App.Shared;
 /// </summary>
 public static class CompositionRoot
 {
+    /// <summary>
+    /// Raw-served manifest of published Wasserförderung region packs (#150 follow-up) — see
+    /// tools/build-region-pack/README.md for how a pack is built and published here.
+    /// </summary>
+    public const string RegionPackManifestUrl =
+        "https://raw.githubusercontent.com/CodeForFire/lagebuch-regions/main/regions.json";
+
     public static MainWindowViewModel CreateMainWindowViewModel(
         IIncidentStore store,
         IMasterDataProvider masterData,
@@ -26,11 +33,15 @@ public static class CompositionRoot
         IIncidentHostController hostController,
         IUiDispatcher uiDispatcher,
         string appVersion,
+        string regionsDir,
         ILastSaveFolderStore? lastSaveFolder = null,
         string? attachmentCacheRoot = null)
     {
         var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, new RouteOverviewRenderer());
-        var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
+        var httpClient = new HttpClient();
+        var regionCatalog = new RegionPackCatalogService(httpClient, RegionPackManifestUrl);
+        var regionInstaller = new RegionPackInstaller(httpClient, regionsDir);
+        var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService, regionCatalog, regionInstaller);
         return new MainWindowViewModel(home, editor, dialogs, appVersion);
     }
 }

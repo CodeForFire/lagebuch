@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             xmlns:services="clr-namespace:LageBuch.AppLogic.Services;assembly=LageBuch.AppLogic"
              x:Class="LageBuch.App.Shared.Views.MasterDataEditorView"
              x:DataType="vm:MasterDataEditorViewModel">
   <Panel>
@@ -108,18 +109,63 @@
                 </ScrollViewer>
               </DataTemplate>
 
-              <!-- Wasserförderung region of operation (#150 phase 2) -->
+              <!-- Wasserförderung region of operation (#150 phase 2 + region-pack follow-up):
+                   pick a published pack from the catalog and download it; manual folder entry
+                   stays available under "Erweitert" for a self-built or hand-placed pack. -->
               <DataTemplate x:DataType="vm:EinsatzgebietSection">
-                <StackPanel Spacing="12" MaxWidth="440" HorizontalAlignment="Left">
-                  <StackPanel Spacing="4">
-                    <TextBlock Text="NAME" Classes="overline" FontSize="10" />
-                    <TextBox Text="{Binding Name}" PlaceholderText="z. B. Landkreis Fürstenfeldbruck" />
+                <ScrollViewer>
+                  <StackPanel Spacing="12" MaxWidth="480" HorizontalAlignment="Left">
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="KARTENPAKET" Classes="overline" FontSize="10" />
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <ComboBox x:Name="RegionComboBox" Grid.Column="0" HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding AvailableRegions}"
+                                  SelectedItem="{Binding SelectedRegion}"
+                                  PlaceholderText="Region auswählen…">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="services:RegionPackInfo">
+                              <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button x:Name="DownloadButton" Grid.Column="1" Content="HERUNTERLADEN"
+                                Command="{Binding DownloadSelectedRegionCommand}" />
+                      </Grid>
+                    </StackPanel>
+
+                    <Border x:Name="CatalogStatusBanner"
+                            IsVisible="{Binding CatalogStatus, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            Background="#241608" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                            CornerRadius="{StaticResource RadiusSm}" Padding="8,6">
+                      <TextBlock Text="{Binding CatalogStatus}" FontSize="12"
+                                 Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap" />
+                    </Border>
+
+                    <ProgressBar x:Name="DownloadProgressBar" Minimum="0" Maximum="1"
+                                 Value="{Binding DownloadProgress}" Height="4" />
+
+                    <TextBlock x:Name="AttributionText" Text="{Binding SelectedRegion.Attribution}"
+                               IsVisible="{Binding SelectedRegion, Converter={x:Static ObjectConverters.IsNotNull}}"
+                               Classes="secondary" FontSize="11" TextWrapping="Wrap" />
+
+                    <TextBlock x:Name="KartendatenStatusText" Text="{Binding KartendatenStatus}"
+                               IsVisible="{Binding KartendatenStatus, Converter={x:Static ObjectConverters.IsNotNull}}"
+                               FontSize="12" TextWrapping="Wrap" />
+
+                    <Expander Header="Erweitert (manueller Ordnerpfad)">
+                      <StackPanel Spacing="12" Margin="0,12,0,0">
+                        <StackPanel Spacing="4">
+                          <TextBlock Text="NAME" Classes="overline" FontSize="10" />
+                          <TextBox Text="{Binding Name}" PlaceholderText="z. B. Landkreis Fürstenfeldbruck" />
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                          <TextBlock Text="ORDNER (region.mbtiles + region.dem)" Classes="overline" FontSize="10" />
+                          <TextBox Text="{Binding FolderPath}" PlaceholderText="z. B. /var/lib/lagebuch/regions/ffb" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Expander>
                   </StackPanel>
-                  <StackPanel Spacing="4">
-                    <TextBlock Text="ORDNER (region.mbtiles + region.dem)" Classes="overline" FontSize="10" />
-                    <TextBox Text="{Binding FolderPath}" PlaceholderText="z. B. /var/lib/lagebuch/regions/ffb" />
-                  </StackPanel>
-                </StackPanel>
+                </ScrollViewer>
               </DataTemplate>
 
               <!-- String-list / checklist editor -->

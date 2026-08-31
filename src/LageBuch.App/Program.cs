@@ -37,6 +37,7 @@ internal static class Program
             new IncidentHostController(clock, version, uiDispatcher),
             uiDispatcher,
             version,
+            AppPaths.RegionsDir,
             new JsonLastSaveFolderStore(AppPaths.LastSaveFolderJsonPath),
             AppPaths.AttachmentCacheDir);
     }
