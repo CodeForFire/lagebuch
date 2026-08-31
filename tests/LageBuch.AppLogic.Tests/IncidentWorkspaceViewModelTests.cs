@@ -32,6 +32,140 @@ public class IncidentWorkspaceViewModelTests
             host);
     }
 
+    // #150 follow-up: a configured region's actual tiles must drive the Karte mode's initial
+    // view, not the unrelated hardcoded German fallback (root cause of the real Fürstenfeldbruck
+    // pack opening on a blank map).
+    [Fact]
+    public void Wasserfoerderung_map_opens_centered_on_the_configured_regions_tiles()
+    {
+        var regionDir = Path.Combine(Path.GetTempPath(), $"region-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(regionDir);
+        try
+        {
+            using (var writer = new BinaryWriter(File.Create(Path.Combine(regionDir, "region.dem"))))
+            {
+                writer.Write("FWDM"u8.ToArray());
+                writer.Write(1);
+                writer.Write(48.2);
+                writer.Write(11.4);
+                writer.Write(0.01);
+                writer.Write(10);
+                writer.Write(10);
+                for (var i = 0; i < 100; i++)
+                {
+                    writer.Write((short)500);
+                }
+            }
+
+            using (var cn = LageBuch.Persistence.Sqlite.SqliteConnectionFactory.OpenReadWrite(Path.Combine(regionDir, "region.mbtiles")))
+            using (var cmd = cn.CreateCommand())
+            {
+                cmd.CommandText =
+                    "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);";
+                cmd.ExecuteNonQuery();
+
+                // The single seeded tile is XYZ (z=11, x=1085, y=708) -> TMS row (2047-708)=1339.
+                cmd.CommandText = "INSERT INTO tiles VALUES (11, 1085, 1339, X'00');";
+                cmd.ExecuteNonQuery();
+            }
+
+            var clock = new FixedClock(T0);
+            var session = LocalIncidentSession.StartNew(
+                new FakeStore(),
+                clock,
+                new SessionOperator("Müller"),
+                "/x.fwincident",
+                Array.Empty<(string, bool)>(),
+                Array.Empty<(string, bool)>());
+            var masterData = Md() with { Einsatzgebiet = new Einsatzgebiet("Testgebiet", regionDir) };
+            var vm = new IncidentWorkspaceViewModel(
+                session,
+                clock,
+                new FakeTicker(),
+                masterData,
+                new FakeDialogs(),
+                new FakeAlarmService(),
+                new NoopIncidentHostController());
+
+            // A single-tile bounds region centers on that exact tile's own center.
+            var expectedCenter = WebMercator.ToGeo(1085.5 * 256, 708.5 * 256, 11);
+            Assert.Equal(expectedCenter.Latitude, vm.Wasserfoerderung.MapCenterLatitude, 6);
+            Assert.Equal(expectedCenter.Longitude, vm.Wasserfoerderung.MapCenterLongitude, 6);
+            Assert.Equal(11, vm.Wasserfoerderung.MapZoom);
+        }
+        finally
+        {
+            Directory.Delete(regionDir, recursive: true);
+        }
+    }
+
+    // #150 follow-up: zooming out must stop at the configured region's own lowest rendered zoom
+    // (there's nothing to show below it), not the unrelated fixed constant (3) — that constant
+    // would let the operator zoom out to a blank map for any per-Landkreis pack, which only ever
+    // renders a narrow zoom band.
+    [Fact]
+    public void Wasserfoerderung_map_cannot_zoom_out_past_the_configured_regions_lowest_zoom()
+    {
+        var regionDir = Path.Combine(Path.GetTempPath(), $"region-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(regionDir);
+        try
+        {
+            using (var writer = new BinaryWriter(File.Create(Path.Combine(regionDir, "region.dem"))))
+            {
+                writer.Write("FWDM"u8.ToArray());
+                writer.Write(1);
+                writer.Write(48.2);
+                writer.Write(11.4);
+                writer.Write(0.01);
+                writer.Write(10);
+                writer.Write(10);
+                for (var i = 0; i < 100; i++)
+                {
+                    writer.Write((short)500);
+                }
+            }
+
+            using (var cn = LageBuch.Persistence.Sqlite.SqliteConnectionFactory.OpenReadWrite(Path.Combine(regionDir, "region.mbtiles")))
+            using (var cmd = cn.CreateCommand())
+            {
+                cmd.CommandText =
+                    "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);";
+                cmd.ExecuteNonQuery();
+                cmd.CommandText = "INSERT INTO tiles VALUES (11, 1085, 1339, X'00');";
+                cmd.ExecuteNonQuery();
+            }
+
+            var clock = new FixedClock(T0);
+            var session = LocalIncidentSession.StartNew(
+                new FakeStore(),
+                clock,
+                new SessionOperator("Müller"),
+                "/x.fwincident",
+                Array.Empty<(string, bool)>(),
+                Array.Empty<(string, bool)>());
+            var masterData = Md() with { Einsatzgebiet = new Einsatzgebiet("Testgebiet", regionDir) };
+            var vm = new IncidentWorkspaceViewModel(
+                session,
+                clock,
+                new FakeTicker(),
+                masterData,
+                new FakeDialogs(),
+                new FakeAlarmService(),
+                new NoopIncidentHostController());
+
+            for (var i = 0; i < 20; i++)
+            {
+                vm.Wasserfoerderung.ZoomOutCommand.Execute(null);
+            }
+
+            Assert.Equal(11, vm.Wasserfoerderung.MapZoom);
+        }
+        finally
+        {
+            Directory.Delete(regionDir, recursive: true);
+        }
+    }
+
     // --- Network sharing (no Tailscale required) --------------------------------------------
     [Fact]
     public async Task Toggling_sharing_on_starts_the_host_and_shows_its_hint()

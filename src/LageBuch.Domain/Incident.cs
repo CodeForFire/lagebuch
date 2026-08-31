@@ -885,6 +885,28 @@ public sealed class Incident
         return leitung;
     }
 
+    /// <summary>
+    /// Plan B (#150 phase 2): plans and records a Leitung from a route drawn on the map. The
+    /// elevation profile is sampled by the caller (before this runs) so every replica stores the
+    /// same computed numbers regardless of local DEM-file differences.
+    /// </summary>
+    public WasserfoerderungLeitung AddWasserfoerderungLeitungFromRoute(
+        string? uebergabestelle,
+        string? ansprechpartner,
+        IReadOnlyList<GeoPoint> routePoints,
+        IReadOnlyList<ElevationProfileSample> profile)
+    {
+        EnsureOpen();
+        var leitung = WasserfoerderungLeitung.CreateFromRoute(
+            number: _wasserfoerderung.Count + 1,
+            uebergabestelle: uebergabestelle,
+            ansprechpartner: ansprechpartner,
+            routePoints: routePoints,
+            profile: profile);
+        _wasserfoerderung.Add(leitung);
+        return leitung;
+    }
+
     /// <summary>Removes the planned Leitung. Unknown ids throw so a replayed command fails loudly.</summary>
     public void RemoveWasserfoerderungLeitung(Guid leitungId)
     {

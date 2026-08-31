@@ -100,7 +100,8 @@ public static class SnapshotMapper
                 w.ReserveHoseCount,
                 w.PumpCount,
                 w.ReservePumpCount,
-                w.PumpPositionsMeters)).ToList());
+                w.PumpPositionsMeters,
+                w.RoutePoints)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -184,7 +185,8 @@ public static class SnapshotMapper
                 w.ReserveHoseCount,
                 w.PumpCount,
                 w.ReservePumpCount,
-                w.PumpPositionsMeters)));
+                w.PumpPositionsMeters,
+                w.RoutePoints)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

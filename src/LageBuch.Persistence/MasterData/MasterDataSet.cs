@@ -21,7 +21,11 @@ public sealed record MasterDataSet(
 
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
-    IncidentSettings Settings)
+    IncidentSettings Settings,
+
+    // Region of operation for the Wasserförderung map (#150 phase 2). Unlike the lists, always
+    // populated — a store with no override yields Einsatzgebiet.Empty, never a null.
+    Einsatzgebiet Einsatzgebiet)
 {
     /// <summary>
     /// Every category empty. Intended for tests and for callers that need a starting point to
@@ -39,13 +43,15 @@ public sealed record MasterDataSet(
         Array.Empty<string>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
-        IncidentSettings.Defaults);
+        IncidentSettings.Defaults,
+        Einsatzgebiet.Empty);
 
     /// <summary>
     /// True when no category holds a single entry. A fresh install starts here, and it is the
     /// condition under which the Stammdaten editor offers Import — a bootstrap, not a merge.
-    /// <see cref="Settings"/> deliberately does not count: it always carries defaults, and letting it
-    /// mark the set non-empty would suppress the Import bootstrap on an otherwise fresh install.
+    /// <see cref="Settings"/> and the Einsatzgebiet field deliberately do not count: they always
+    /// carry a value (defaults, or an empty region), and letting either mark the set non-empty
+    /// would suppress the Import bootstrap on an otherwise fresh install.
     /// </summary>
     public bool IsEmpty =>
         Roles.Count == 0
@@ -228,6 +234,18 @@ public static class AnonymizedExampleData
 }
 
 /// <summary>
+/// The operator's configured region of operation (#150, Plan B) — a folder expected to hold
+/// <c>region.mbtiles</c> (map tiles) and <c>region.dem</c> (elevation), set up once at
+/// installation. Global config, like everything else in <see cref="MasterDataSet"/>.
+/// </summary>
+public sealed record Einsatzgebiet(string Name, string FolderPath)
+{
+    public static Einsatzgebiet Empty { get; } = new(string.Empty, string.Empty);
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(FolderPath);
+}
+
+/// <summary>
 /// Reads and writes the master-data interchange format — one JSON object whose top-level keys are
 /// all optional (a missing key means an empty category). The same shape covers the whole set, so a
 /// file holding only <c>personnel</c>, only the non-personal lists, or everything at once all parse.
@@ -281,7 +299,8 @@ public static class MasterDataJson
             Arr(root, "truppTypes"),
             ParsePersonnel(root),
             vehicles,
-            ParseSettings(root));
+            ParseSettings(root),
+            ParseEinsatzgebiet(root));
     }
 
     /// <summary>
@@ -340,6 +359,22 @@ public static class MasterDataJson
             Int(s, "returnPressureBar", d.ReturnPressureBar));
     }
 
+    /// <summary>
+    /// Reads the optional <c>einsatzgebiet</c> object. A missing object falls back to
+    /// <see cref="Einsatzgebiet.Empty"/> so an older file still yields a complete record.
+    /// </summary>
+    private static Einsatzgebiet ParseEinsatzgebiet(JsonElement root)
+    {
+        if (!root.TryGetProperty("einsatzgebiet", out var e) || e.ValueKind != JsonValueKind.Object)
+        {
+            return Einsatzgebiet.Empty;
+        }
+
+        return new Einsatzgebiet(
+            e.TryGetProperty("name", out var n) ? n.GetString() ?? string.Empty : string.Empty,
+            e.TryGetProperty("folderPath", out var f) ? f.GetString() ?? string.Empty : string.Empty);
+    }
+
     private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
     {
         if (!root.TryGetProperty("personnel", out var arr) || arr.ValueKind != JsonValueKind.Array)
@@ -395,6 +430,7 @@ public static class MasterDataJson
                 lpaMaxDurationMinutes = set.Settings.LpaMaxDurationMinutes,
                 returnPressureBar = set.Settings.ReturnPressureBar,
             },
+            einsatzgebiet = new { name = set.Einsatzgebiet.Name, folderPath = set.Einsatzgebiet.FolderPath },
         };
 
         return JsonSerializer.Serialize(model, ExportOptions);

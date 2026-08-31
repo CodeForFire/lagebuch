@@ -1,6 +1,7 @@
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync.Tests;
 
@@ -58,6 +59,11 @@ public class CommandSerializationTests
         new AddWasserfoerderungLeitungCommand("TLF 20/8", "FFB 1/44/1", 2000, 100),
         new AddWasserfoerderungLeitungCommand(null, null, 400, 0),
         new RemoveWasserfoerderungLeitungCommand(Guid.NewGuid()),
+        new AddWasserfoerderungLeitungFromRouteCommand(
+            "TLF 20/8",
+            "FFB 1/44/1",
+            new[] { new GeoPoint(48.0, 11.0), new GeoPoint(48.002, 11.0) },
+            new[] { new ElevationProfileSample(0, 0), new ElevationProfileSample(400, 0) }),
     }.Select(c => new object[] { c });
 
     [Theory]

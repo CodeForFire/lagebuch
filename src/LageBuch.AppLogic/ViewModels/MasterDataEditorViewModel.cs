@@ -18,6 +18,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private readonly IMasterDataProvider _provider;
     private readonly IFileDialogService _dialogs;
     private readonly IMasterDataFileService _files;
+    private readonly IRegionPackCatalogService _regionCatalog;
+    private readonly IRegionPackInstaller _regionInstaller;
     private MasterDataSet _original = MasterDataSet.Empty;
     private bool _originalIsEmpty = true;
 
@@ -42,12 +44,20 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
     private SettingsSection _settings = null!;
+    private EinsatzgebietSection _einsatzgebiet = null!;
 
-    public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
+    public MasterDataEditorViewModel(
+        IMasterDataProvider provider,
+        IFileDialogService dialogs,
+        IMasterDataFileService files,
+        IRegionPackCatalogService regionCatalog,
+        IRegionPackInstaller regionInstaller)
     {
         _provider = provider;
         _dialogs = dialogs;
         _files = files;
+        _regionCatalog = regionCatalog;
+        _regionInstaller = regionInstaller;
         Load();
     }
 
@@ -115,12 +125,16 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),
             _personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty),
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
+            _einsatzgebiet = new EinsatzgebietSection(
+                "Einsatzgebiet", set.Einsatzgebiet, MarkDirty, _regionCatalog, _regionInstaller),
         };
 
         foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
         {
             Sections.Add(section);
         }
+
+        _einsatzgebiet.LoadCatalogCommand.Execute(null);
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }
@@ -158,6 +172,9 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),
+        Einsatzgebiet = _einsatzgebiet.ToEinsatzgebiet(),
+
+        // Streets are not editable here; _original carries them through unchanged.
     };
 
     [RelayCommand(CanExecute = nameof(CanSave))]

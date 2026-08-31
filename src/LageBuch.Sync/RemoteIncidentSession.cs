@@ -9,6 +9,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -233,6 +234,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void RemoveWasserfoerderungLeitung(Guid leitungId) =>
         Send(new RemoveWasserfoerderungLeitungCommand(leitungId));
+
+    public void AddWasserfoerderungLeitungFromRoute(
+        string? uebergabestelle,
+        string? ansprechpartner,
+        IReadOnlyList<GeoPoint> routePoints,
+        IReadOnlyList<ElevationProfileSample> profile) =>
+        Send(new AddWasserfoerderungLeitungFromRouteCommand(uebergabestelle, ansprechpartner, routePoints, profile));
 
     public void AddScbaTrupp(
         string designation,

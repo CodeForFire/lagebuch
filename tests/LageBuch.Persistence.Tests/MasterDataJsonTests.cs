@@ -204,6 +204,30 @@ public class MasterDataJsonTests
     }
 
     [Fact]
+    public void Parse_reads_the_einsatzgebiet_object()
+    {
+        var set = Parse("""
+            {
+              "einsatzgebiet": { "name": "Landkreis Fürstenfeldbruck", "folderPath": "/data/ffb" }
+            }
+            """);
+
+        Assert.Equal(new Einsatzgebiet("Landkreis Fürstenfeldbruck", "/data/ffb"), set.Einsatzgebiet);
+    }
+
+    [Fact]
+    public void Parse_uses_an_empty_einsatzgebiet_when_the_object_is_absent()
+        => Assert.Equal(Einsatzgebiet.Empty, Parse("""{ "roles": ["EL"] }""").Einsatzgebiet);
+
+    [Fact]
+    public void Serialize_round_trips_the_einsatzgebiet()
+    {
+        var original = MasterDataSet.Empty with { Einsatzgebiet = new Einsatzgebiet("FFB", "/data/ffb") };
+
+        Assert.Equal(original.Einsatzgebiet, Parse(MasterDataJson.Serialize(original)).Einsatzgebiet);
+    }
+
+    [Fact]
     public void IsEmpty_is_true_only_when_no_category_has_content()
     {
         Assert.True(MasterDataSet.Empty.IsEmpty);

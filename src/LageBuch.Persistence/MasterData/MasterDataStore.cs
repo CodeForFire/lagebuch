@@ -98,6 +98,17 @@ public sealed class MasterDataStore
                     p("$v", value);
                 });
 
+        // Single fixed row (id=0), UPSERT like settings.
+        Run(
+            cn,
+            tx,
+            "INSERT INTO md_einsatzgebiet (id, name, folder_path) VALUES (0, $n, $f) ON CONFLICT(id) DO UPDATE SET name=excluded.name, folder_path=excluded.folder_path;",
+            p =>
+            {
+                p("$n", set.Einsatzgebiet.Name);
+                p("$f", set.Einsatzgebiet.FolderPath);
+            });
+
         tx.Commit();
     }
 
@@ -164,6 +175,11 @@ public sealed class MasterDataStore
                 phone TEXT
             );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_einsatzgebiet (
+                id INTEGER PRIMARY KEY CHECK (id = 0),
+                name TEXT NOT NULL DEFAULT '',
+                folder_path TEXT NOT NULL DEFAULT ''
+            );
             """;
         Exec(cn, schema);
 
@@ -187,7 +203,8 @@ public sealed class MasterDataStore
             ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
             ReadPersonnel(cn),
             ReadVehicles(cn),
-            ReadSettings(cn));
+            ReadSettings(cn),
+            ReadEinsatzgebiet(cn));
     }
 
     // Rows are ordered globally by ordinal (Aufbau's block precedes Abbau's — see
@@ -233,6 +250,14 @@ public sealed class MasterDataStore
             Get("csa_max_duration_minutes", d.CsaMaxDurationMinutes),
             Get("lpa_max_duration_minutes", d.LpaMaxDurationMinutes),
             Get("return_pressure_bar", d.ReturnPressureBar));
+    }
+
+    private static Einsatzgebiet ReadEinsatzgebiet(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT name, folder_path FROM md_einsatzgebiet WHERE id = 0;";
+        using var r = cmd.ExecuteReader();
+        return r.Read() ? new Einsatzgebiet(r.GetString(0), r.GetString(1)) : Einsatzgebiet.Empty;
     }
 
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)

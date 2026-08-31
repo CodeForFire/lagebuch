@@ -3,6 +3,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync.Tests;
 
@@ -310,6 +311,31 @@ public class CommandApplierTests
 
         // The host (defaults) computes the derived figures — not the sending client.
         Assert.Equal(800, leitung.FlowLMin);
+    }
+
+    [Fact]
+    public void AddWasserfoerderungLeitungFromRoute_over_the_wire_plans_from_the_profile()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var route = new[] { new GeoPoint(48.0, 11.0), new GeoPoint(48.002, 11.0) };
+
+        // Interior crest at 200 m (see FörderstreckePlannerProfileTests) -- 1 pump for a 400 m
+        // route that a flat 2-point Plan(400, 0, ...) would need none for.
+        var profile = new[]
+        {
+            new ElevationProfileSample(0, 0),
+            new ElevationProfileSample(200, 50),
+            new ElevationProfileSample(400, 0),
+        };
+        var cmd = new AddWasserfoerderungLeitungFromRouteCommand("TLF 20/8", "FFB 1/44/1", route, profile);
+
+        ApplyOverWire(cmd, incident, clock);
+
+        var leitung = Assert.Single(incident.Wasserfoerderung);
+        Assert.Equal(route, leitung.RoutePoints);
+        Assert.Equal(400, leitung.LengthMeters);
+        Assert.Equal(1, leitung.PumpCount);
     }
 
     [Fact]

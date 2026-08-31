@@ -168,6 +168,9 @@ public static class CommandApplier
             case RemoveWasserfoerderungLeitungCommand c:
                 incident.RemoveWasserfoerderungLeitung(c.LeitungId);
                 break;
+            case AddWasserfoerderungLeitungFromRouteCommand c:
+                incident.AddWasserfoerderungLeitungFromRoute(c.Uebergabestelle, c.Ansprechpartner, c.RoutePoints, c.Profile);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(command),

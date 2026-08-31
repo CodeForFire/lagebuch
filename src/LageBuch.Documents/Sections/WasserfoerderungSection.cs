@@ -14,8 +14,10 @@ public static class WasserfoerderungSection
         "Länge", "Höhen-unterschied", "Verstärker-pumpen", "Reserve-pumpen",
     ];
 
-    public static void Compose(IContainer container, Incident incident)
+    public static void Compose(
+        IContainer container, Incident incident, IReadOnlyDictionary<Guid, byte[]>? routeOverviewPngById = null)
     {
+        routeOverviewPngById ??= new Dictionary<Guid, byte[]>();
         container.Column(column =>
         {
             column.Spacing(4);
@@ -62,6 +64,23 @@ public static class WasserfoerderungSection
                     table.Cell().Element(BodyCell).Text(leitung.ReservePumpCount.ToString(CultureInfo.InvariantCulture));
                 }
             });
+
+            // Plan B (#150 phase 2): a small route-overview snapshot per drawn Leitung, when one
+            // was rendered for it. A manually entered (Plan A) Leitung has no RoutePoints and so
+            // never has an entry here — this loop leaves the Phase 1 layout untouched for those.
+            foreach (var leitung in incident.Wasserfoerderung)
+            {
+                if (leitung.RoutePoints is null || !routeOverviewPngById.TryGetValue(leitung.Id, out var png))
+                {
+                    continue;
+                }
+
+                column.Item().PaddingTop(4).Column(overview =>
+                {
+                    overview.Item().Text($"Ltg {leitung.Number} — Kartenübersicht").FontSize(9).SemiBold();
+                    overview.Item().MaxWidth(280).Image(png);
+                });
+            }
 
             column.Item().PaddingTop(2).Text(
                 "Planung: B-800, B-Schlauch 20 m, 8 bar Speisedruck, 1,5 bar Pumpeneingang, " +

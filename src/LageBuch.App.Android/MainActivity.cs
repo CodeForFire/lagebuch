@@ -73,6 +73,7 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
             new NoopIncidentHostController(),
             new LageBuch.App.Shared.Services.AvaloniaUiDispatcher(),
             typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+            AndroidAppPaths.RegionsDir(this),
             lastSaveFolder: null,
             attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this));
         return base.CustomizeAppBuilder(builder).WithInterFont();

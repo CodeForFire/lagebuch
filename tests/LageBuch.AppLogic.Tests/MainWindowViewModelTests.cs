@@ -14,7 +14,7 @@ public class MainWindowViewModelTests
     private static MainWindowViewModel New(IFileDialogService? dialogs = null)
     {
         var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), dialogs ?? new FakeDialogs(), "0.1.0");
+        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller()), dialogs ?? new FakeDialogs(), "0.1.0");
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class MainWindowViewModelTests
         var clock = new FixedClock(T0);
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller()), new FakeDialogs(), "0.1.0");
 
         vm.RequestOpenFileCommand.Execute(null);
 
@@ -88,7 +88,7 @@ public class MainWindowViewModelTests
         var clock = new FixedClock(T0);
         LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
-        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller()), new FakeDialogs(), "0.1.0");
 
         vm.OpenRecent("/x.fwincident");
 

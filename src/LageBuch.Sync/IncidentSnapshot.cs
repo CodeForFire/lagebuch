@@ -3,6 +3,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync;
 
@@ -155,4 +156,5 @@ public sealed record WasserfoerderungLeitungDto(
     int ReserveHoseCount,
     int PumpCount,
     int ReservePumpCount,
-    IReadOnlyList<double> PumpPositionsMeters);
+    IReadOnlyList<double> PumpPositionsMeters,
+    IReadOnlyList<GeoPoint>? RoutePoints = null);

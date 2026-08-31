@@ -8,6 +8,7 @@ using LageBuch.Domain.Files;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic;
@@ -115,7 +116,7 @@ public sealed class LocalIncidentSession : IIncidentSession
     // every attached file's bytes land in this device's own sibling folder the moment it's added —
     // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
     // network pull, only IIncidentStore.
-    public Task<byte[]> ExportPdfAsync()
+    public Task<byte[]> ExportPdfAsync(IReadOnlyDictionary<Guid, byte[]>? routeOverviewPngById = null)
     {
         var fileBytes = new Dictionary<Guid, byte[]>();
         foreach (var file in Incident.Files)
@@ -127,7 +128,7 @@ public sealed class LocalIncidentSession : IIncidentSession
             }
         }
 
-        return Task.FromResult(IncidentPdf.Generate(Incident, fileBytes));
+        return Task.FromResult(IncidentPdf.Generate(Incident, fileBytes, routeOverviewPngById));
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
@@ -185,6 +186,13 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void RemoveWasserfoerderungLeitung(Guid leitungId) =>
         Mutate(() => Incident.RemoveWasserfoerderungLeitung(leitungId));
+
+    public void AddWasserfoerderungLeitungFromRoute(
+        string? uebergabestelle,
+        string? ansprechpartner,
+        IReadOnlyList<GeoPoint> routePoints,
+        IReadOnlyList<ElevationProfileSample> profile) =>
+        Mutate(() => Incident.AddWasserfoerderungLeitungFromRoute(uebergabestelle, ansprechpartner, routePoints, profile));
 
     public void AddScbaTrupp(
         string designation,

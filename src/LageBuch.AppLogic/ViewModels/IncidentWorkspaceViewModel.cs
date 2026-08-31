@@ -6,7 +6,9 @@ using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Persistence.MasterData;
+using LageBuch.Persistence.Wasserfoerderung;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -24,8 +26,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
+    private readonly IRouteOverviewRenderer? _routeOverviewRenderer;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IRouteOverviewRenderer? routeOverviewRenderer = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -36,6 +39,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _dialogs = dialogs;
         _alarm = alarm;
         _hostController = hostController;
+        _routeOverviewRenderer = routeOverviewRenderer;
         IsReadOnly = session.IsReadOnly;
 
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
@@ -257,7 +261,16 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
 
         Wasserfoerderung?.Dispose();
-        Wasserfoerderung = new WasserfoerderungViewModel(_session, OnChanged);
+        var (elevationSampler, tileSource) = BuildWasserfoerderungMapSources();
+        var initialMapView = InitialMapViewFrom(tileSource);
+        Wasserfoerderung = new WasserfoerderungViewModel(
+            _session,
+            OnChanged,
+            elevationSampler,
+            tileSource,
+            initialMapView?.Center,
+            initialMapView?.Zoom,
+            initialMinZoom: initialMapView?.Zoom);
 
         Reminder?.Dispose();
 
@@ -287,6 +300,50 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Wasserfoerderung));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
+    }
+
+    /// <summary>
+    /// Builds the map data sources for the Wasserförderung tab's "Karte" mode (#150 phase 2) from
+    /// the Stammdaten-configured Einsatzgebiet, or (null, null) when unconfigured or the region
+    /// folder is missing either file — in which case the tab silently falls back to Manuell entry.
+    /// </summary>
+    private (IElevationSampler? ElevationSampler, IMapTileSource? TileSource) BuildWasserfoerderungMapSources()
+    {
+        if (!_masterData.Einsatzgebiet.IsConfigured)
+        {
+            return (null, null);
+        }
+
+        var demPath = Path.Combine(_masterData.Einsatzgebiet.FolderPath, "region.dem");
+        var mbtilesPath = Path.Combine(_masterData.Einsatzgebiet.FolderPath, "region.mbtiles");
+        if (!File.Exists(demPath) || !File.Exists(mbtilesPath))
+        {
+            return (null, null);
+        }
+
+        return (new DemFileElevationSampler(demPath), new MbTilesFileSource(mbtilesPath));
+    }
+
+    /// <summary>
+    /// Derives the Karte mode's initial view — and, doubling as the region's lowest usable zoom
+    /// (<c>initialMinZoom</c>), the floor past which zooming out has nothing to show — from the
+    /// tiles the configured region actually has, rather than an unrelated fixed fallback (#150
+    /// follow-up). A real per-Landkreis pack has no tiles anywhere near
+    /// <see cref="WasserfoerderungViewModel"/>'s hardcoded German default and only ever renders a
+    /// narrow zoom band, so without this the map opened blank (or could be zoomed out to blank).
+    /// </summary>
+    private static (GeoPoint Center, int Zoom)? InitialMapViewFrom(IMapTileSource? tileSource)
+    {
+        if (tileSource?.GetTileBounds() is not { } bounds)
+        {
+            return null;
+        }
+
+        var centerTileX = (bounds.MinX + bounds.MaxX + 1) / 2.0;
+        var centerTileY = (bounds.MinY + bounds.MaxY + 1) / 2.0;
+        var center = WebMercator.ToGeo(
+            centerTileX * WebMercator.TileSizePixels, centerTileY * WebMercator.TileSizePixels, bounds.Zoom);
+        return (center, bounds.Zoom);
     }
 
     private bool CanClose => !IsReadOnly;
@@ -368,8 +425,44 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             return;
         }
 
-        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync());
+        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync(BuildRouteOverviewPngById()));
         await _dialogs.ShareFileAsync(path, "application/pdf");
+    }
+
+    /// <summary>
+    /// Renders a map snapshot for every route-based Wasserförderung Leitung (#150 phase 2), when
+    /// both a renderer and the region's tiles are available; a Leitung the renderer fails on (or
+    /// with no route at all — Plan A manual entry) simply has no entry, unchanged from Phase 1.
+    /// </summary>
+    private Dictionary<Guid, byte[]> BuildRouteOverviewPngById()
+    {
+        var result = new Dictionary<Guid, byte[]>();
+        if (_routeOverviewRenderer is null)
+        {
+            return result;
+        }
+
+        var (_, tileSource) = BuildWasserfoerderungMapSources();
+        if (tileSource is null)
+        {
+            return result;
+        }
+
+        foreach (var leitung in _session.Incident.Wasserfoerderung)
+        {
+            if (leitung.RoutePoints is null)
+            {
+                continue;
+            }
+
+            var png = _routeOverviewRenderer.Render(leitung.RoutePoints, tileSource);
+            if (png is not null)
+            {
+                result[leitung.Id] = png;
+            }
+        }
+
+        return result;
     }
 
     // ===== Multi-device hosting (#52): flip "Im Netzwerk freigeben" to expose this open incident. =====

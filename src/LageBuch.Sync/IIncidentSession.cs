@@ -5,6 +5,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync;
 
@@ -92,6 +93,14 @@ public interface IIncidentSession
     void AddWasserfoerderungLeitung(string? uebergabestelle, string? ansprechpartner, double lengthMeters, double elevationRiseMeters);
 
     void RemoveWasserfoerderungLeitung(Guid leitungId);
+
+    /// <summary>Plans one Förderstrecke-Leitung from a drawn map route, with a real elevation
+    /// profile (#150, Plan B). The host recomputes length/rise from the route and profile.</summary>
+    void AddWasserfoerderungLeitungFromRoute(
+        string? uebergabestelle,
+        string? ansprechpartner,
+        IReadOnlyList<GeoPoint> routePoints,
+        IReadOnlyList<ElevationProfileSample> profile);
 
     void AddScbaTrupp(
         string designation,

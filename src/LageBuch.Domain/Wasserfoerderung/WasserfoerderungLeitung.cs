@@ -41,6 +41,9 @@ public sealed record WasserfoerderungLeitung
     /// <summary>Meters from the water source where a pump sits; index 0 is the feed pump.</summary>
     public IReadOnlyList<double> PumpPositionsMeters { get; private init; } = Array.Empty<double>();
 
+    /// <summary>The drawn polyline (#150, Plan B); null when the Leitung came from manual entry (Plan A).</summary>
+    public IReadOnlyList<GeoPoint>? RoutePoints { get; private init; }
+
     public static WasserfoerderungLeitung Create(
         int number,
         string? uebergabestelle,
@@ -88,7 +91,8 @@ public sealed record WasserfoerderungLeitung
         int reserveHoseCount,
         int pumpCount,
         int reservePumpCount,
-        IReadOnlyList<double> pumpPositionsMeters)
+        IReadOnlyList<double> pumpPositionsMeters,
+        IReadOnlyList<GeoPoint>? routePoints = null)
         => new()
         {
             Id = id,
@@ -104,5 +108,47 @@ public sealed record WasserfoerderungLeitung
             PumpCount = pumpCount,
             ReservePumpCount = reservePumpCount,
             PumpPositionsMeters = pumpPositionsMeters,
+            RoutePoints = routePoints,
         };
+
+    /// <summary>
+    /// Plan B (#150 phase 2): plans from an already-sampled terrain profile along a drawn route
+    /// instead of a single manually entered length/rise. The profile is sampled once (by the
+    /// caller, before this runs) so every replica stores the same numbers regardless of local DEM
+    /// differences — see <see cref="Incident.AddWasserfoerderungLeitungFromRoute"/>.
+    /// </summary>
+    public static WasserfoerderungLeitung CreateFromRoute(
+        int number,
+        string? uebergabestelle,
+        string? ansprechpartner,
+        IReadOnlyList<GeoPoint> routePoints,
+        IReadOnlyList<ElevationProfileSample> profile,
+        FörderstreckeConfig? config = null)
+    {
+        if (number < 1)
+        {
+            throw new ArgumentException("Die Leitungsnummer muss >= 1 sein.", nameof(number));
+        }
+
+        config ??= FörderstreckeConfig.Default;
+        var plan = FörderstreckePlanner.PlanFromProfile(profile, config);
+
+        return new WasserfoerderungLeitung
+        {
+            Id = Guid.NewGuid(),
+            Number = number,
+            Uebergabestelle = string.IsNullOrWhiteSpace(uebergabestelle) ? null : uebergabestelle.Trim(),
+            Ansprechpartner = string.IsNullOrWhiteSpace(ansprechpartner) ? null : ansprechpartner.Trim(),
+            FlowLMin = config.FlowLMin,
+            FeedPressureBar = config.FeedPressureBar,
+            LengthMeters = plan.LengthMeters,
+            ElevationRiseMeters = profile[^1].ElevationMeters - profile[0].ElevationMeters,
+            HoseCount = plan.HoseCount,
+            ReserveHoseCount = plan.ReserveHoseCount,
+            PumpCount = plan.PumpCount,
+            ReservePumpCount = plan.ReservePumpCount,
+            PumpPositionsMeters = plan.PumpPositionsMeters,
+            RoutePoints = routePoints,
+        };
+    }
 }

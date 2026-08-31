@@ -103,7 +103,7 @@ public class AboutRenderTests
             new NoopAlarmService(),
             new NoopIncidentHostController(),
             "0.1.0");
-        var editor = new MasterDataEditorViewModel(masterData, dialogs, new NoFiles());
+        var editor = new MasterDataEditorViewModel(masterData, dialogs, new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller());
         return new MainWindowViewModel(home, editor, dialogs, "0.1.0");
     }
 
@@ -123,6 +123,18 @@ public class AboutRenderTests
         public void Write(string path, MasterDataSet set)
         {
         }
+    }
+
+    private sealed class NoRegionCatalog : IRegionPackCatalogService
+    {
+        public Task<IReadOnlyList<RegionPackInfo>> GetAvailableRegionsAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<RegionPackInfo>>(Array.Empty<RegionPackInfo>());
+    }
+
+    private sealed class NoRegionInstaller : IRegionPackInstaller
+    {
+        public Task<string> DownloadAndInstallAsync(RegionPackInfo pack, IProgress<double>? progress, CancellationToken ct = default) =>
+            Task.FromResult(string.Empty);
     }
 
     private sealed class EmptyRecent : IRecentFilesStore
