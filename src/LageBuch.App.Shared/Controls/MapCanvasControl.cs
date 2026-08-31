@@ -16,7 +16,9 @@ namespace LageBuch.App.Shared.Controls;
 /// <see cref="PointClickedCommand"/>), right-click undoes the last one (via
 /// <see cref="UndoRequestedCommand"/>); finishing the route is a separate, explicit action in the
 /// view (not a click gesture here), to avoid a fast double left-click accidentally placing two
-/// points and then finishing.
+/// points and then finishing. Ctrl+left-drag pans instead of adding a point (#150 follow-up) —
+/// reusing the same Ctrl convention as wheel/pinch zoom, so the primary click-to-draw gesture is
+/// never at risk of being misread as a pan.
 /// </summary>
 public sealed class MapCanvasControl : Control
 {
@@ -54,6 +56,11 @@ public sealed class MapCanvasControl : Control
     // Scale relative to gesture start, not incrementally) -- reset in OnPinchEnded.
     private double _pinchStartScale = 1.0;
     private int _pinchStartZoom;
+
+    // Ctrl+drag panning state (#150 follow-up) -- null when not currently panning.
+    private Point? _panStartScreenPoint;
+    private double _panStartCenterLatitude;
+    private double _panStartCenterLongitude;
 
     public MapCanvasControl()
     {
@@ -156,10 +163,55 @@ public sealed class MapCanvasControl : Control
         if (!current.Properties.IsLeftButtonPressed)
             return;
 
+        if ((e.KeyModifiers & KeyModifiers.Control) != 0)
+        {
+            _panStartScreenPoint = current.Position;
+            _panStartCenterLatitude = CenterLatitude;
+            _panStartCenterLongitude = CenterLongitude;
+            e.Handled = true;
+            return;
+        }
+
         var geoPoint = ScreenToGeo(current.Position);
 
         if (PointClickedCommand?.CanExecute(geoPoint) == true)
             PointClickedCommand.Execute(geoPoint);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        if (_panStartScreenPoint is not { } start)
+            return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            _panStartScreenPoint = null;
+            return;
+        }
+
+        var current = e.GetPosition(this);
+        var (startWorldX, startWorldY) = WebMercator.ToWorldPixel(
+            new GeoPoint(_panStartCenterLatitude, _panStartCenterLongitude), Zoom);
+        // Dragging reveals content on the opposite side, so the center moves against the drag.
+        var newWorldX = startWorldX - (current.X - start.X);
+        var newWorldY = startWorldY - (current.Y - start.Y);
+        var newCenter = WebMercator.ToGeo(newWorldX, newWorldY, Zoom);
+        var change = new MapViewChange(newCenter.Latitude, newCenter.Longitude, Zoom);
+
+        if (ViewChangedCommand?.CanExecute(change) == true)
+            ViewChangedCommand.Execute(change);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+
+        if (_panStartScreenPoint is null)
+            return;
+        _panStartScreenPoint = null;
         e.Handled = true;
     }
 

@@ -24,6 +24,14 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
     private readonly IElevationSampler? _elevationSampler;
     private readonly IMapTileSource? _tileSource;
 
+    // The view the map opened with (region-derived center/zoom, or the hardcoded default) --
+    // kept so ResetMapViewCommand has a "home" to return to. Cursor-anchored wheel/pinch zoom
+    // shifts the center as a side effect, and there is no drag-to-pan, so without this a drifted
+    // view had no way back at all (#150 follow-up).
+    private readonly double _initialCenterLatitude;
+    private readonly double _initialCenterLongitude;
+    private readonly int _initialZoom;
+
     public WasserfoerderungViewModel(
         IIncidentSession session, Action onChanged,
         IElevationSampler? elevationSampler = null, IMapTileSource? tileSource = null,
@@ -49,6 +57,10 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
         }
         if (initialMapZoom is { } zoom)
             _mapZoom = Math.Clamp(zoom, _minZoom, MaxZoom);
+
+        _initialCenterLatitude = _mapCenterLatitude;
+        _initialCenterLongitude = _mapCenterLongitude;
+        _initialZoom = _mapZoom;
 
         _session.Changed += Sync;
         Sync();
@@ -104,6 +116,17 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
         MapCenterLatitude = change.CenterLatitude;
         MapCenterLongitude = change.CenterLongitude;
         MapZoom = Math.Clamp(change.Zoom, _minZoom, MaxZoom);
+    }
+
+    /// <summary>"Zentrieren": returns to the view the map opened with (#150 follow-up) — the only
+    /// way back once cursor-anchored zooming has drifted the center away from the region, since
+    /// there is no drag-to-pan.</summary>
+    [RelayCommand]
+    private void ResetMapView()
+    {
+        MapCenterLatitude = _initialCenterLatitude;
+        MapCenterLongitude = _initialCenterLongitude;
+        MapZoom = _initialZoom;
     }
 
     [RelayCommand]

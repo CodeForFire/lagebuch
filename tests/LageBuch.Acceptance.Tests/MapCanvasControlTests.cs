@@ -211,4 +211,52 @@ public class MapCanvasControlTests
         Assert.Equal(1, undoCount);
         Assert.Null(clicked);
     }
+
+    // #150 follow-up: cursor-anchored zoom drifts the center with no drag-to-pan to correct it,
+    // so once the view drifted off the region entirely there was no way back. Ctrl+drag pans
+    // (moving the map opposite the drag direction, standard map UX), without also adding a route
+    // point (which plain left-click still does).
+    [AvaloniaFact]
+    public void CtrlDrag_pans_the_map_and_does_not_add_a_route_point()
+    {
+        GeoPoint? clicked = null;
+        MapViewChange? change = null;
+        var pointCommand = new RelayCommand<GeoPoint>(p => clicked = p);
+        var viewCommand = new RelayCommand<MapViewChange>(c => change = c);
+        var (window, control) = ShowControl(onPointClicked: pointCommand, onViewChanged: viewCommand);
+
+        var start = control.TranslatePoint(new Point(200, 150), window)!.Value;
+        var end = control.TranslatePoint(new Point(240, 150), window)!.Value; // drag 40px right
+
+        window.MouseDown(start, MouseButton.Left, RawInputModifiers.Control);
+        window.MouseMove(end, RawInputModifiers.LeftMouseButton);
+        window.MouseUp(end, MouseButton.Left);
+
+        Assert.Null(clicked); // dragging must not also place a route point
+        Assert.NotNull(change);
+        Assert.Equal(15, change!.Zoom); // pan alone leaves zoom untouched
+        // Dragging right reveals content that was to the left -- the center's longitude decreases.
+        Assert.True(change.CenterLongitude < 11.0, $"Expected longitude to decrease, was {change.CenterLongitude}");
+        Assert.Equal(48.0, change.CenterLatitude, 3); // purely horizontal drag -> latitude unchanged
+    }
+
+    [AvaloniaFact]
+    public void Plain_drag_without_ctrl_still_adds_a_route_point_and_does_not_pan()
+    {
+        GeoPoint? clicked = null;
+        MapViewChange? change = null;
+        var pointCommand = new RelayCommand<GeoPoint>(p => clicked = p);
+        var viewCommand = new RelayCommand<MapViewChange>(c => change = c);
+        var (window, control) = ShowControl(onPointClicked: pointCommand, onViewChanged: viewCommand);
+
+        var start = control.TranslatePoint(new Point(200, 150), window)!.Value;
+        var end = control.TranslatePoint(new Point(240, 150), window)!.Value;
+
+        window.MouseDown(start, MouseButton.Left);
+        window.MouseMove(end);
+        window.MouseUp(end, MouseButton.Left);
+
+        Assert.NotNull(clicked); // existing click-to-add-point behaviour is unaffected
+        Assert.Null(change); // no Ctrl held -> no pan
+    }
 }

@@ -23,9 +23,11 @@
     <!-- Everything below the header scrolls as one unit rather than fighting the header/each
          other for space when the window is short or narrow (#150 phase 2 regression: a fixed
          Height map plus stacked Bottom-docked panels overflowed a modest window and rendered on
-         top of the header buttons). -->
+         top of the header buttons). Right margin matches Fluent's overlay scrollbar width (#150
+         follow-up regression: once content needs scrolling, that scrollbar renders on top of, not
+         narrowing, the content, silently swallowing clicks on the map's own right edge). -->
     <ScrollViewer>
-      <StackPanel Spacing="16">
+      <StackPanel Spacing="16" Margin="0,0,16,0">
         <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Height="260">
           <DataGrid x:Name="WasserfoerderungGrid" ItemsSource="{Binding Rows}" IsReadOnly="{Binding IsReadOnly}"
@@ -103,6 +105,8 @@
               </HeaderedContentControl>
               <Button Content="−" Width="32" Command="{Binding ZoomOutCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
               <Button Content="+" Width="32" Command="{Binding ZoomInCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+              <Button Content="ZENTRIEREN" Command="{Binding ResetMapViewCommand}"
+                      VerticalAlignment="Bottom" Margin="0,0,0,1" />
               <Button Content="RÜCKGÄNGIG" Command="{Binding UndoLastRoutePointCommand}"
                       VerticalAlignment="Bottom" Margin="0,0,0,1" />
               <Button Content="ROUTE LÖSCHEN" Command="{Binding ClearRouteCommand}"
@@ -110,6 +114,7 @@
               <Button Classes="signal" Content="FERTIG" Command="{Binding FinishRouteCommand}"
                       VerticalAlignment="Bottom" Margin="0,0,0,1" />
             </WrapPanel>
+            <TextBlock Text="Strg + Scrollen: Zoom · Strg + Ziehen: Verschieben" Classes="secondary hint" />
             <TextBlock Text="{Binding ErrorMessage}" Foreground="#FF3D2E" Classes="hint"
                        IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>

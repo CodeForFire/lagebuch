@@ -117,6 +117,40 @@ public class WasserfoerderungViewModelTests
         Assert.Equal(19, vm.MapZoom);
     }
 
+    // #150 follow-up: with no drag-to-pan and no way back, zooming (cursor-anchored, so it shifts
+    // the center) could drift the operator's view off the region's tiles entirely with no way to
+    // recover. ResetMapViewCommand must restore the view exactly where it started.
+    [Fact]
+    public void ResetMapView_restores_the_initial_center_and_zoom_after_drifting_away()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource(),
+            initialMapCenter: new GeoPoint(48.19, 11.15), initialMapZoom: 13, initialMinZoom: 11);
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(50.0, 20.0, 19));
+        Assert.Equal(50.0, vm.MapCenterLatitude);
+
+        vm.ResetMapViewCommand.Execute(null);
+
+        Assert.Equal(48.19, vm.MapCenterLatitude);
+        Assert.Equal(11.15, vm.MapCenterLongitude);
+        Assert.Equal(13, vm.MapZoom);
+    }
+
+    [Fact]
+    public void ResetMapView_restores_the_hardcoded_default_when_no_initial_view_was_given()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(50.0, 20.0, 19));
+        vm.ResetMapViewCommand.Execute(null);
+
+        Assert.Equal(48.14, vm.MapCenterLatitude);
+        Assert.Equal(11.58, vm.MapCenterLongitude);
+        Assert.Equal(14, vm.MapZoom);
+    }
+
     [Fact]
     public void AddRoutePoint_appends_and_UndoLastRoutePoint_removes_the_last_one()
     {
