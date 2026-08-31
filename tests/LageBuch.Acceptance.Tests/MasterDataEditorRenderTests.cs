@@ -51,10 +51,22 @@ public class MasterDataEditorRenderTests
         public void Write(string path, MasterDataSet set) { }
     }
 
+    private sealed class NoRegionCatalog : IRegionPackCatalogService
+    {
+        public Task<IReadOnlyList<RegionPackInfo>> GetAvailableRegionsAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<RegionPackInfo>>(Array.Empty<RegionPackInfo>());
+    }
+
+    private sealed class NoRegionInstaller : IRegionPackInstaller
+    {
+        public Task<string> DownloadAndInstallAsync(RegionPackInfo pack, IProgress<double>? progress, CancellationToken ct = default) =>
+            Task.FromResult(string.Empty);
+    }
+
     [AvaloniaFact]
     public void The_editor_renders_with_every_category()
     {
-        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller());
         var view = new MasterDataEditorView { DataContext = vm };
         var window = new Window { Content = view, Width = 1080, Height = 680 };
         window.Show();
@@ -80,7 +92,7 @@ public class MasterDataEditorRenderTests
     [AvaloniaFact]
     public void Checkliste_aufbau_section_renders_text_and_mandatory_checkbox_per_row()
     {
-        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller());
         vm.SelectedSection = vm.Sections.Single(s => s.Title == "Checkliste Aufbau");
         var view = new MasterDataEditorView { DataContext = vm };
         var window = new Window { Content = view, Width = 1080, Height = 680 };
@@ -104,7 +116,7 @@ public class MasterDataEditorRenderTests
     [AvaloniaFact]
     public void Links_section_renders_name_and_url_per_row()
     {
-        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller());
         vm.SelectedSection = vm.Sections.Single(s => s.Title == "Links");
         var view = new MasterDataEditorView { DataContext = vm };
         var window = new Window { Content = view, Width = 1080, Height = 680 };
@@ -127,7 +139,7 @@ public class MasterDataEditorRenderTests
     [AvaloniaFact]
     public void Fahrzeuge_section_renders_wache_callsign_and_seats_per_row()
     {
-        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles(), new NoRegionCatalog(), new NoRegionInstaller());
         var section = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
         section.AddCommand.Execute(null);
         section.Rows[0].Wache = "FFB Wache 1";
@@ -157,5 +169,52 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, "master-data-editor-fahrzeuge-after.png"));
+    }
+
+    private sealed class FakeRegionCatalog(IReadOnlyList<RegionPackInfo> regions) : IRegionPackCatalogService
+    {
+        public Task<IReadOnlyList<RegionPackInfo>> GetAvailableRegionsAsync(CancellationToken ct = default) =>
+            Task.FromResult(regions);
+    }
+
+    // #150 follow-up (downloadable region packs): a dropdown lists the published catalog, and
+    // the old manual-folder fields collapse behind "Erweitert" instead of being the primary path.
+    [AvaloniaFact]
+    public void Einsatzgebiet_section_renders_region_dropdown_with_advanced_fields_collapsed()
+    {
+        var pack = new RegionPackInfo(
+            "Landkreis Fürstenfeldbruck", "ffb", "https://example.org/ffb.zip", 12_345_678,
+            48.0877067, 10.9930275, 48.2967233, 11.4128816, "2026-09-01",
+            "© OpenStreetMap contributors (ODbL). Höhendaten: SRTM (NASA/USGS, gemeinfrei).");
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles(),
+            new FakeRegionCatalog(new[] { pack }), new NoRegionInstaller());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Einsatzgebiet");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var comboBox = view.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "RegionComboBox");
+        Assert.Single(comboBox.ItemsSource!.Cast<object>());
+
+        var expander = view.GetVisualDescendants().OfType<Expander>().Single();
+        Assert.False(expander.IsExpanded);
+
+        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Combine(dir, "master-data-editor-einsatzgebiet-collapsed.png"));
+
+        // Expand "Erweitert" and re-capture: the manual Name/Ordner fields are still there.
+        expander.IsExpanded = true;
+        Dispatcher.UIThread.RunJobs();
+        var textBoxes = view.GetVisualDescendants().OfType<TextBox>()
+            .Where(t => t.PlaceholderText is not null &&
+                (t.PlaceholderText.Contains("Fürstenfeldbruck") || t.PlaceholderText.Contains("/regions/ffb")))
+            .ToList();
+        Assert.Equal(2, textBoxes.Count);
+
+        using var expandedFrame = window.CaptureRenderedFrame()!;
+        expandedFrame.SavePng(Path.Combine(dir, "master-data-editor-einsatzgebiet-expanded.png"));
     }
 }

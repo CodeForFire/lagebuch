@@ -17,6 +17,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private readonly IMasterDataProvider _provider;
     private readonly IFileDialogService _dialogs;
     private readonly IMasterDataFileService _files;
+    private readonly IRegionPackCatalogService _regionCatalog;
+    private readonly IRegionPackInstaller _regionInstaller;
     private MasterDataSet _original = MasterDataSet.Empty;
     private bool _originalIsEmpty = true;
 
@@ -30,11 +32,15 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private SettingsSection _settings = null!;
     private EinsatzgebietSection _einsatzgebiet = null!;
 
-    public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
+    public MasterDataEditorViewModel(
+        IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files,
+        IRegionPackCatalogService regionCatalog, IRegionPackInstaller regionInstaller)
     {
         _provider = provider;
         _dialogs = dialogs;
         _files = files;
+        _regionCatalog = regionCatalog;
+        _regionInstaller = regionInstaller;
         Load();
     }
 
@@ -100,7 +106,9 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
         Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
         Sections.Add(_vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged));
-        Sections.Add(_einsatzgebiet = new EinsatzgebietSection("Einsatzgebiet", set.Einsatzgebiet, MarkDirty));
+        Sections.Add(_einsatzgebiet = new EinsatzgebietSection(
+            "Einsatzgebiet", set.Einsatzgebiet, MarkDirty, _regionCatalog, _regionInstaller));
+        _einsatzgebiet.LoadCatalogCommand.Execute(null);
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }

@@ -69,7 +69,8 @@ public class MasterDataEditorViewModelTests
 
     private static MasterDataEditorViewModel Vm(
         IMasterDataProvider provider, IFileDialogService? dialogs = null, IMasterDataFileService? files = null) =>
-        new(provider, dialogs ?? new FakeDialogs(), files ?? new FakeFileService());
+        new(provider, dialogs ?? new FakeDialogs(), files ?? new FakeFileService(),
+            new NoRegionCatalog(), new NoRegionInstaller());
 
     private static EditableListSection Roles(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<EditableListSection>().First(s => s.Title == "Rollen");
@@ -549,4 +550,18 @@ public class MasterDataEditorViewModelTests
         Assert.Null(vm.VehicleConflicts);
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
+}
+
+// Shared no-op fakes for constructor sites that don't exercise region-pack behavior — reused from
+// MainWindowViewModelTests.cs, same convention as FakeDialogs/FakeStore/etc.
+internal sealed class NoRegionCatalog : IRegionPackCatalogService
+{
+    public Task<IReadOnlyList<RegionPackInfo>> GetAvailableRegionsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<RegionPackInfo>>(Array.Empty<RegionPackInfo>());
+}
+
+internal sealed class NoRegionInstaller : IRegionPackInstaller
+{
+    public Task<string> DownloadAndInstallAsync(RegionPackInfo pack, IProgress<double>? progress, CancellationToken ct = default)
+        => Task.FromResult("/unused");
 }

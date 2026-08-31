@@ -13,6 +13,9 @@ public static class AppPaths
 
     public static string AttachmentCacheDir => Path.Combine(AppDataDir, "attachment-cache");
 
+    /// <summary>Where downloaded Wasserförderung region packs (#150 follow-up) get extracted, one subfolder per slug.</summary>
+    public static string RegionsDir => Path.Combine(AppDataDir, "regions");
+
     public static string GetAppDataDir(string baseDir)
     {
         var dir = Path.Combine(baseDir, "Lagebuch");
