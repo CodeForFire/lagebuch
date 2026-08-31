@@ -110,6 +110,7 @@ public class MasterDataJsonTests
             Einsatzarten = new[] { "B", "THL", "R" },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä") },
+
             // relaxed escaping must survive the round trip
             ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Ä ö ü / ß Schritt", true) },
             ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbau Ä ö ü", false) },
@@ -219,6 +220,7 @@ public class MasterDataJsonTests
     public void IsEmpty_is_true_only_when_no_category_has_content()
     {
         Assert.True(MasterDataSet.Empty.IsEmpty);
+
         // Settings always carry values, so they must not count toward emptiness (else Import hides).
         Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3, 4, 5, 6, 7) }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Roles = new[] { "EL" } }).IsEmpty);

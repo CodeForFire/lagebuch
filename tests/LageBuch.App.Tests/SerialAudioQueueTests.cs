@@ -18,7 +18,8 @@ public class SerialAudioQueueTests
 
         Assert.True(done.Wait(TimeSpan.FromSeconds(5)), "queued actions never completed");
         Assert.Equal(2, events.Count);
-        Assert.True(events[1].StartMs >= events[0].EndMs,
+        Assert.True(
+            events[1].StartMs >= events[0].EndMs,
             "second action started before the first one finished");
     }
 
@@ -34,7 +35,11 @@ public class SerialAudioQueueTests
             var id = i;
             queue.Enqueue(() =>
             {
-                lock (order) order.Add(id);
+                lock (order)
+                {
+                    order.Add(id);
+                }
+
                 done.Signal();
             });
         }
@@ -73,7 +78,8 @@ public class SerialAudioQueueTests
         queue.Enqueue(() => Thread.Sleep(TimeSpan.FromSeconds(30))); // simulates a hung player
         queue.Enqueue(() => laterRan.Set());
 
-        Assert.True(laterRan.Wait(TimeSpan.FromSeconds(2)),
+        Assert.True(
+            laterRan.Wait(TimeSpan.FromSeconds(2)),
             "later action never ran; the stuck item wedged the queue");
     }
 
@@ -87,7 +93,11 @@ public class SerialAudioQueueTests
         var start = sw.ElapsedMilliseconds;
         Thread.Sleep(sleep);
         var end = sw.ElapsedMilliseconds;
-        lock (events) events.Add((id, start, end));
+        lock (events)
+        {
+            events.Add((id, start, end));
+        }
+
         done.Signal();
     }
 }

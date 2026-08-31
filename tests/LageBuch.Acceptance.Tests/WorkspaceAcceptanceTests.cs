@@ -15,65 +15,128 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
 
+// SA1649 (file name must match first type name) doesn't fit here: this is a deliberate grab-bag
+// of small shared test doubles (no single type is "the" WorkspaceAcceptanceTests type), the same
+// grouping convention SA1402 is already disabled repo-wide for.
+#pragma warning disable SA1649
+
 namespace LageBuch.Acceptance.Tests;
 
 internal sealed class FakeStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _d = new();
+
     public int SaveCount { get; private set; }
-    public void Save(string path, Incident incident) { _d[path] = incident; SaveCount++; }
+
+    public void Save(string path, Incident incident)
+    {
+        _d[path] = incident;
+        SaveCount++;
+    }
+
     public Incident Load(string path) => _d[path];
+
     public IncidentState? TryReadState(string path) => _d.TryGetValue(path, out var i) ? i.State : null;
+
     private readonly Dictionary<string, byte[]> _files = new();
+
     public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+
     public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
 }
+
 internal sealed class FakeDialogs : IFileDialogService
 {
     public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+
     public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
     public Task OpenFileAsync(string path) => Task.CompletedTask;
+
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
+
 // Mirrors FakeDialogs but returns a caller-supplied path from PickAttachmentAsync, so a UI-driven
 // "add file" test can exercise a real AddFileCommand execution without a real OS file picker.
 internal sealed class AttachmentDialogs : IFileDialogService
 {
     private readonly string? _path;
+
     public AttachmentDialogs(string? path) => _path = path;
+
     public string? LastOpenedPath { get; private set; }
+
     public string? LastOpenedUrl { get; private set; }
+
     public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
     public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+
     public Task<string?> PickAttachmentAsync() => Task.FromResult(_path);
-    public Task OpenFileAsync(string path) { LastOpenedPath = path; return Task.CompletedTask; }
-    public Task OpenUrlAsync(string url) { LastOpenedUrl = url; return Task.CompletedTask; }
+
+    public Task OpenFileAsync(string path)
+    {
+        LastOpenedPath = path;
+        return Task.CompletedTask;
+    }
+
+    public Task OpenUrlAsync(string url)
+    {
+        LastOpenedUrl = url;
+        return Task.CompletedTask;
+    }
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
+
 internal sealed class FixedClock : IClock
 {
     public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 }
+
 internal sealed class NoopTicker : ITicker
 {
     public IDisposable Subscribe(Action onTick) => new Sub();
-    private sealed class Sub : IDisposable { public void Dispose() { } }
+
+    private sealed class Sub : IDisposable
+    {
+        public void Dispose()
+        {
+        }
+    }
 }
+
 internal sealed class NoopAlarmService : IAlarmService
 {
     [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
-    public void Start() { }
+    public void Start()
+    {
+    }
+
     [SuppressMessage("Performance", "CA1822", Justification = "Implements IAlarmService; interface members cannot be static.")]
-    public void Stop() { }
-    public void Play(AlarmSound sound) { }
+    public void Stop()
+    {
+    }
+
+    public void Play(AlarmSound sound)
+    {
+    }
 }
 
 public class WorkspaceAcceptanceTests
@@ -90,9 +153,13 @@ public class WorkspaceAcceptanceTests
 
     private static IncidentWorkspaceViewModel BuildWorkspace(out LocalIncidentSession session)
     {
-        session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
+        session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>());
         return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
 
@@ -101,10 +168,18 @@ public class WorkspaceAcceptanceTests
     {
         var store = new FakeStore();
         var clock = new FixedClock();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller", "FFB 12/1"),
-            "/x.fwincident", new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>());
         if (closed)
+        {
             seed.Close();
+        }
+
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
         return new IncidentWorkspaceViewModel(ro, clock, new NoopTicker(), Md(), new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
     }
@@ -133,6 +208,7 @@ public class WorkspaceAcceptanceTests
 
         textBox.Focus();
         window.KeyTextInput("Lagemeldung erhalten");
+
         // Ensure the binding pushed the value:
         Assert.Equal("Lagemeldung erhalten", vm.Etb.NewText);
 
@@ -159,7 +235,9 @@ public class WorkspaceAcceptanceTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
+        {
             before.SavePng(Path.Combine(dir, "etb-edit-before.png"));
+        }
 
         var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung erhalten");
         Assert.False(row.WasEdited);
@@ -167,10 +245,13 @@ public class WorkspaceAcceptanceTests
         Assert.True(vm.Etb.IsEditing);
 
         using (var editing = window.CaptureRenderedFrame()!)
+        {
             editing.SavePng(Path.Combine(dir, "etb-edit-panel.png"));
+        }
 
         var editTextBox = view.GetControl<TextBox>("EditTextBox");
         editTextBox.Focus();
+
         // Replace the whole content: select-all then type, mirroring how a user would correct it.
         editTextBox.SelectAll();
         window.KeyTextInput("Lagemeldung korrigiert");
@@ -185,13 +266,17 @@ public class WorkspaceAcceptanceTests
         Assert.Equal("Lagemeldung erhalten", Assert.Single(edited.Edits).PreviousText);
 
         using (var after = window.CaptureRenderedFrame()!)
+        {
             after.SavePng(Path.Combine(dir, "etb-edit-after.png"));
+        }
 
         // History viewing is decoupled from editing (security review, #73) -- capture it separately.
         edited.ShowHistoryCommand.Execute(null);
         Assert.NotNull(vm.Etb.HistoryEntry);
         using (var history = window.CaptureRenderedFrame()!)
+        {
             history.SavePng(Path.Combine(dir, "etb-edit-history.png"));
+        }
     }
 
     // System-generated entries (the automatic "Einsatz begonnen" line) are never editable —
@@ -300,11 +385,21 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Aufbau_tab_dot_turns_green_once_its_mandatory_item_is_checked()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            new[] { ("Blaulicht aus?", true) }, Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(),
-            new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", true) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            Md(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
         var view = new IncidentWorkspaceView { DataContext = vm };
         var window = new Window { Content = view, Width = 1000, Height = 700 };
         window.Show();
@@ -313,6 +408,7 @@ public class WorkspaceAcceptanceTests
         var incompleteDot = view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AufbauIncompleteDot");
         Assert.False(completeDot.IsVisible);
         Assert.True(incompleteDot.IsVisible);
+
         // The neighboring ABBAU list has no items -- vacuously complete from the start.
         Assert.True(view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AbbauCompleteDot").IsVisible);
 
@@ -320,7 +416,9 @@ public class WorkspaceAcceptanceTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
+        {
             before.SavePng(Path.Combine(dir, "checkliste-aufbau-abbau-before.png"));
+        }
 
         vm.ChecklistAufbau.Items[0].IsDone = true;
 
@@ -328,7 +426,9 @@ public class WorkspaceAcceptanceTests
         Assert.False(incompleteDot.IsVisible);
 
         using (var after = window.CaptureRenderedFrame()!)
+        {
             after.SavePng(Path.Combine(dir, "checkliste-aufbau-abbau-after.png"));
+        }
     }
 
     [AvaloniaFact]
@@ -528,6 +628,7 @@ public class WorkspaceAcceptanceTests
     public void Transferring_a_role_via_the_ui_ends_the_old_row_and_hides_it_behind_the_filter()
     {
         var vm = BuildWorkspace(out var session);
+
         // No explicit `from`: the session's own FixedClock is what TransferRole stamps the handover
         // with, and this test doesn't have a handle on it -- an unstamped Von avoids a spurious
         // "Bis vor Von" the wall clock would otherwise trigger.
@@ -540,7 +641,9 @@ public class WorkspaceAcceptanceTests
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
+        {
             before.SavePng(Path.Combine(dir, "roles-transfer-before.png"));
+        }
 
         var row = Assert.Single(vm.Roles.Roles);
         Assert.True(row.BeginTransferCommand.CanExecute(null));
@@ -548,7 +651,9 @@ public class WorkspaceAcceptanceTests
         Assert.True(vm.Roles.IsTransferring);
 
         using (var panel = window.CaptureRenderedFrame()!)
+        {
             panel.SavePng(Path.Combine(dir, "roles-transfer-panel.png"));
+        }
 
         view.GetControl<AutoCompleteBox>("TransferPersonNameBox").Text = "Schmidt";
         Assert.Equal("Schmidt", vm.Roles.TransferPersonName);
@@ -558,6 +663,7 @@ public class WorkspaceAcceptanceTests
 
         Assert.False(vm.Roles.IsTransferring);
         Assert.Equal(2, session.Incident.Roles.Count);
+
         // "Nur aktuell" is the default filter: the handed-over assignment drops out of the grid.
         var current = Assert.Single(vm.Roles.Roles);
         Assert.Equal("Schmidt", current.PersonName);
@@ -568,6 +674,8 @@ public class WorkspaceAcceptanceTests
         Assert.Contains(vm.Roles.Roles, r => r.PersonName == "Müller" && !r.IsRunning);
 
         using (var after = window.CaptureRenderedFrame()!)
+        {
             after.SavePng(Path.Combine(dir, "roles-transfer-after.png"));
+        }
     }
 }

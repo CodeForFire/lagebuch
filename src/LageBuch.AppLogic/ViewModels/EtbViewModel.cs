@@ -11,64 +11,12 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-/// <summary>
-/// One rendered ETB row. Carries its own <see cref="BeginEditCommand"/> (rather than the view
-/// reaching back up to <see cref="EtbViewModel"/> via a $parent binding, mirroring
-/// <see cref="ForceRow"/>'s reasoning) but is otherwise plain data: an edit happens through
-/// <see cref="EtbViewModel"/>'s edit panel, not a per-keystroke two-way binding on the row itself,
-/// so the row is replaced wholesale (not mutated in place) whenever its entry changes.
-/// </summary>
-public sealed class EtbEntryRow
-{
-    public EtbEntryRow(
-        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
-    {
-        ArgumentNullException.ThrowIfNull(entry);
-        Id = entry.Id;
-        Time = Formatting.Timestamp(entry.Timestamp);
-        Direction = Formatting.Direction(entry.Direction);
-        From = entry.From;
-        To = entry.To;
-        Text = entry.Text;
-        EnteredBy = entry.EnteredBy;
-        DirectionValue = entry.Direction;
-        WasEdited = entry.Edits.Count > 0;
-        Edits = entry.Edits;
-        IsEditable = entry.Direction != EtbDirection.System;
-        BeginEditCommand = new RelayCommand(() => beginEdit(this), () => canEdit(this));
-        // Deliberately not gated on IsReadOnly/IsEditable like BeginEditCommand: a closed or
-        // remotely-joined-read-only incident must still let its history be read, since that is the
-        // one thing that makes an edit acceptable in the first place.
-        ShowHistoryCommand = new RelayCommand(() => showHistory(this), () => WasEdited);
-    }
-
-    public Guid Id { get; }
-    public string Time { get; }
-    public string Direction { get; }
-    public string? From { get; }
-    public string? To { get; }
-    public string Text { get; }
-    public string EnteredBy { get; }
-    public EtbDirection DirectionValue { get; }
-    public bool WasEdited { get; }
-    public IReadOnlyList<EtbEntryEdit> Edits { get; }
-    public bool IsEditable { get; }
-    public ICommand BeginEditCommand { get; }
-    public ICommand ShowHistoryCommand { get; }
-}
-
-/// <summary>
-/// An <see cref="EtbDirection"/> paired with its German label, so the picker shows the same
-/// wording as the grid and the PDF. Binding the raw enum makes Avalonia fall back to
-/// <see cref="Enum.ToString()"/>, which leaks the English identifiers into the UI.
-/// </summary>
-public sealed record EtbDirectionOption(EtbDirection Value, string Label);
-
 public sealed partial class EtbViewModel : ObservableObject
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
+
     // Opens the create-task overlay pre-filled with an entry's text (#88); null where the host
     // offers no task feature, which disables the "add & create task" dock button too.
     private readonly Action<string>? _createTaskFromEntry;
@@ -81,7 +29,11 @@ public sealed partial class EtbViewModel : ObservableObject
     // instead of a linear scan of _all for every journal entry.
     private readonly Dictionary<Guid, EtbEntryRow> _byId = new();
 
-    public EtbViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged,
+    public EtbViewModel(
+        IIncidentSession session,
+        IClock clock,
+        MasterDataSet masterData,
+        Action onChanged,
         Action<string>? createTaskFromEntry = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -93,6 +45,7 @@ public sealed partial class EtbViewModel : ObservableObject
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
         Entries = new ObservableCollection<EtbEntryRow>();
+
         // Any change to the incident — from this tab, another tab, or (when joined) another device —
         // brings the journal up to date through the same path.
         _session.Changed += Sync;
@@ -124,28 +77,38 @@ public sealed partial class EtbViewModel : ObservableObject
             _all.Insert(0, row);
             _byId[row.Id] = row;
             if (IsVisible(row))
+            {
                 Entries.Insert(0, row);
+            }
         }
 
         foreach (var entry in journal)
         {
             if (!_byId.TryGetValue(entry.Id, out var current) || current.Edits.Count == entry.Edits.Count)
+            {
                 continue;
+            }
 
             var updated = ToRow(entry);
             _all[_all.IndexOf(current)] = updated;
             _byId[entry.Id] = updated;
             var entriesIndex = Entries.IndexOf(current);
             if (entriesIndex >= 0)
+            {
                 Entries[entriesIndex] = updated;
+            }
 
             if (EditingEntry?.Id == entry.Id)
+            {
                 CancelEdit(); // the entry being edited changed underneath us (another device saved first)
+            }
         }
     }
 
     public bool IsReadOnly { get; }
+
     public IReadOnlyList<string> CallSignOptions { get; }
+
     public ObservableCollection<EtbEntryRow> Entries { get; }
 
     // System-generated lines (Kräfte, Atemschutz, Einsatz-Lebenszyklus) are usually less important
@@ -210,7 +173,6 @@ public sealed partial class EtbViewModel : ObservableObject
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEditing))]
     private EtbEntryRow? _editingEntry;
@@ -250,7 +212,6 @@ public sealed partial class EtbViewModel : ObservableObject
 
     // --- View an edited entry's history: available whenever WasEdited, independent of IsReadOnly
     //     and of the edit panel above -- a closed incident must still let its history be read. ---
-
     [ObservableProperty]
     private EtbEntryRow? _historyEntry;
 
@@ -266,3 +227,69 @@ public sealed partial class EtbViewModel : ObservableObject
     private EtbEntryRow ToRow(EtbEntry e) =>
         new(e, BeginEdit, CanEdit, ShowHistory);
 }
+
+/// <summary>
+/// One rendered ETB row. Carries its own <see cref="BeginEditCommand"/> (rather than the view
+/// reaching back up to <see cref="EtbViewModel"/> via a $parent binding, mirroring
+/// <see cref="ForceRow"/>'s reasoning) but is otherwise plain data: an edit happens through
+/// <see cref="EtbViewModel"/>'s edit panel, not a per-keystroke two-way binding on the row itself,
+/// so the row is replaced wholesale (not mutated in place) whenever its entry changes.
+/// </summary>
+public sealed class EtbEntryRow
+{
+    public EtbEntryRow(
+        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        Id = entry.Id;
+        Time = Formatting.Timestamp(entry.Timestamp);
+        Direction = Formatting.Direction(entry.Direction);
+        From = entry.From;
+        To = entry.To;
+        Text = entry.Text;
+        EnteredBy = entry.EnteredBy;
+        DirectionValue = entry.Direction;
+        WasEdited = entry.Edits.Count > 0;
+        Edits = entry.Edits;
+        IsEditable = entry.Direction != EtbDirection.System;
+        BeginEditCommand = new RelayCommand(() => beginEdit(this), () => canEdit(this));
+
+        // Deliberately not gated on IsReadOnly/IsEditable like BeginEditCommand: a closed or
+        // remotely-joined-read-only incident must still let its history be read, since that is the
+        // one thing that makes an edit acceptable in the first place.
+        ShowHistoryCommand = new RelayCommand(() => showHistory(this), () => WasEdited);
+    }
+
+    public Guid Id { get; }
+
+    public string Time { get; }
+
+    public string Direction { get; }
+
+    public string? From { get; }
+
+    public string? To { get; }
+
+    public string Text { get; }
+
+    public string EnteredBy { get; }
+
+    public EtbDirection DirectionValue { get; }
+
+    public bool WasEdited { get; }
+
+    public IReadOnlyList<EtbEntryEdit> Edits { get; }
+
+    public bool IsEditable { get; }
+
+    public ICommand BeginEditCommand { get; }
+
+    public ICommand ShowHistoryCommand { get; }
+}
+
+/// <summary>
+/// An <see cref="EtbDirection"/> paired with its German label, so the picker shows the same
+/// wording as the grid and the PDF. Binding the raw enum makes Avalonia fall back to
+/// <see cref="Enum.ToString()"/>, which leaks the English identifiers into the UI.
+/// </summary>
+public sealed record EtbDirectionOption(EtbDirection Value, string Label);

@@ -10,10 +10,13 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
 {
     private static readonly FilePickerFileType Incident =
         new("Einsatzdokumentation") { Patterns = new[] { "*.fwincident" } };
+
     private static readonly FilePickerFileType Pdf =
         new("PDF-Dokument") { Patterns = new[] { "*.pdf" } };
+
     private static readonly FilePickerFileType Json =
         new("Stammdaten (JSON)") { Patterns = new[] { "*.json" } };
+
     private static readonly FilePickerFileType Attachment =
         new("Bild oder PDF") { Patterns = new[] { "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp", "*.pdf" } };
 
@@ -24,26 +27,35 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     public async Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
     {
         var top = _topLevel();
-        if (top is null) return null;
+        if (top is null)
+        {
+            return null;
+        }
+
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Einsatz speichern",
             SuggestedFileName = suggestedFileName,
             DefaultExtension = "fwincident",
             FileTypeChoices = new[] { Incident },
-            SuggestedStartLocation = await ResolveStartLocation(top, initialFolder)
+            SuggestedStartLocation = await ResolveStartLocation(top, initialFolder),
         });
         return file?.TryGetLocalPath();
     }
 
     // A missing/moved/inaccessible folder just means no start-location hint — the OS picker falls
     // back to wherever it last remembered, exactly like today's behavior with no hint at all.
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "Missing/moved/inaccessible folder means no start hint, by design (see comment).")]
     private static async Task<IStorageFolder?> ResolveStartLocation(TopLevel top, string? folder)
     {
         if (string.IsNullOrWhiteSpace(folder))
+        {
             return null;
+        }
+
         try
         {
             return await top.StorageProvider.TryGetFolderFromPathAsync(folder);
@@ -57,12 +69,16 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     public async Task<string?> PickOpenAsync()
     {
         var top = _topLevel();
-        if (top is null) return null;
+        if (top is null)
+        {
+            return null;
+        }
+
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Einsatz öffnen",
             AllowMultiple = false,
-            FileTypeFilter = new[] { Incident }
+            FileTypeFilter = new[] { Incident },
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
@@ -70,13 +86,17 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     public async Task<string?> PickExportPdfAsync(string suggestedFileName)
     {
         var top = _topLevel();
-        if (top is null) return null;
+        if (top is null)
+        {
+            return null;
+        }
+
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "PDF exportieren",
             SuggestedFileName = suggestedFileName,
             DefaultExtension = "pdf",
-            FileTypeChoices = new[] { Pdf }
+            FileTypeChoices = new[] { Pdf },
         });
         return file?.TryGetLocalPath();
     }
@@ -84,12 +104,16 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     public async Task<string?> PickImportJsonAsync()
     {
         var top = _topLevel();
-        if (top is null) return null;
+        if (top is null)
+        {
+            return null;
+        }
+
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Stammdaten importieren",
             AllowMultiple = false,
-            FileTypeFilter = new[] { Json }
+            FileTypeFilter = new[] { Json },
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
@@ -97,13 +121,17 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     public async Task<string?> PickExportJsonAsync(string suggestedFileName)
     {
         var top = _topLevel();
-        if (top is null) return null;
+        if (top is null)
+        {
+            return null;
+        }
+
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Stammdaten exportieren",
             SuggestedFileName = suggestedFileName,
             DefaultExtension = "json",
-            FileTypeChoices = new[] { Json }
+            FileTypeChoices = new[] { Json },
         });
         return file?.TryGetLocalPath();
     }
@@ -111,12 +139,16 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     public async Task<string?> PickAttachmentAsync()
     {
         var top = _topLevel();
-        if (top is null) return null;
+        if (top is null)
+        {
+            return null;
+        }
+
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Datei anhängen",
             AllowMultiple = false,
-            FileTypeFilter = new[] { Attachment }
+            FileTypeFilter = new[] { Attachment },
         });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
@@ -134,7 +166,9 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
         // anything but http(s) regardless of what a caller passes in.
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
             return Task.CompletedTask;
+        }
 
         LaunchWithOsDefault(uri.AbsoluteUri);
         return Task.CompletedTask;
@@ -146,9 +180,13 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
     private static void LaunchWithOsDefault(string target)
     {
         if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+        {
             Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+        }
         else
+        {
             Process.Start(new ProcessStartInfo("xdg-open", $"\"{target}\"") { UseShellExecute = false });
+        }
     }
 
     // The user already chose the exact destination via the native save dialog above — there is

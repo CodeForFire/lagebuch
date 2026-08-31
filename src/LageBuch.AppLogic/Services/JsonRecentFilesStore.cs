@@ -12,7 +12,9 @@ public sealed class JsonRecentFilesStore : IRecentFilesStore
     public IReadOnlyList<string> GetRecent()
     {
         if (!File.Exists(_path))
+        {
             return Array.Empty<string>();
+        }
 
         try
         {
@@ -31,7 +33,9 @@ public sealed class JsonRecentFilesStore : IRecentFilesStore
         list.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
         list.Insert(0, path);
         if (list.Count > MaxEntries)
+        {
             list.RemoveRange(MaxEntries, list.Count - MaxEntries);
+        }
 
         File.WriteAllText(_path, JsonSerializer.Serialize(list));
     }

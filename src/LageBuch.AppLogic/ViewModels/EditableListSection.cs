@@ -8,7 +8,8 @@ public sealed partial class EditableListSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public EditableListSection(string title, IEnumerable<string> values, Action onChanged) : base(title)
+    public EditableListSection(string title, IEnumerable<string> values, Action onChanged)
+        : base(title)
     {
         _onChanged = onChanged;
         Items = new ObservableCollection<MasterDataItem>(values.Select(v => new MasterDataItem(v, onChanged)));
@@ -26,21 +27,32 @@ public sealed partial class EditableListSection : EditorSection
     [RelayCommand]
     private void Remove(MasterDataItem item)
     {
-        if (Items.Remove(item)) _onChanged();
+        if (Items.Remove(item))
+        {
+            _onChanged();
+        }
     }
 
     [RelayCommand]
     private void MoveUp(MasterDataItem item)
     {
         var i = Items.IndexOf(item);
-        if (i > 0) { Items.Move(i, i - 1); _onChanged(); }
+        if (i > 0)
+        {
+            Items.Move(i, i - 1);
+            _onChanged();
+        }
     }
 
     [RelayCommand]
     private void MoveDown(MasterDataItem item)
     {
         var i = Items.IndexOf(item);
-        if (i >= 0 && i < Items.Count - 1) { Items.Move(i, i + 1); _onChanged(); }
+        if (i >= 0 && i < Items.Count - 1)
+        {
+            Items.Move(i, i + 1);
+            _onChanged();
+        }
     }
 
     /// <summary>Trimmed, non-empty, de-duplicated (ordinal, first wins), in current order.</summary>
@@ -51,8 +63,12 @@ public sealed partial class EditableListSection : EditorSection
         foreach (var item in Items)
         {
             var v = item.Value?.Trim() ?? string.Empty;
-            if (v.Length > 0 && seen.Add(v)) result.Add(v);
+            if (v.Length > 0 && seen.Add(v))
+            {
+                result.Add(v);
+            }
         }
+
         return result;
     }
 }

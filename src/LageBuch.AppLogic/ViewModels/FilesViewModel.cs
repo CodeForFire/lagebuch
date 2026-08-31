@@ -20,8 +20,15 @@ public sealed partial class IncidentFileRow : ObservableObject
     private readonly Action<string?> _onRenamed;
 
     public IncidentFileRow(
-        Guid id, string fileName, string displayName, string sizeDisplay, string addedAtDisplay,
-        string addedBy, bool isImage, bool isReadOnly, Action<string?> onRenamed)
+        Guid id,
+        string fileName,
+        string displayName,
+        string sizeDisplay,
+        string addedAtDisplay,
+        string addedBy,
+        bool isImage,
+        bool isReadOnly,
+        Action<string?> onRenamed)
     {
         Id = id;
         FileName = fileName;
@@ -35,11 +42,17 @@ public sealed partial class IncidentFileRow : ObservableObject
     }
 
     public Guid Id { get; }
+
     public string FileName { get; }
+
     public string SizeDisplay { get; }
+
     public string AddedAtDisplay { get; }
+
     public string AddedBy { get; }
+
     public bool IsImage { get; }
+
     public bool IsReadOnly { get; }
 
     [ObservableProperty]
@@ -77,6 +90,7 @@ public sealed partial class FilesViewModel : ObservableObject
     }
 
     public bool IsReadOnly { get; }
+
     public ObservableCollection<IncidentFileRow> Files { get; }
 
     [ObservableProperty]
@@ -90,20 +104,27 @@ public sealed partial class FilesViewModel : ObservableObject
     {
         var files = _session.Incident.Files;
         for (var i = _rendered; i < files.Count; i++)
+        {
             Files.Insert(0, ToRow(files[i]));
+        }
+
         _rendered = files.Count;
     }
 
     private bool CanAddFile => !IsReadOnly && !IsUploading;
 
     [RelayCommand(CanExecute = nameof(CanAddFile))]
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "Domain guards, IO and network failures are heterogeneous; all surface as one error line.")]
     private async Task AddFileAsync()
     {
         var path = await _dialogs.PickAttachmentAsync();
         if (string.IsNullOrWhiteSpace(path))
+        {
             return;
+        }
 
         ErrorMessage = null;
         IsUploading = true;
@@ -135,21 +156,28 @@ public sealed partial class FilesViewModel : ObservableObject
             ErrorMessage = $"„{row.DisplayName}“ ist nicht verfügbar.";
             return;
         }
+
         var tempPath = Path.Combine(Path.GetTempPath(), row.FileName);
         await File.WriteAllBytesAsync(tempPath, bytes);
         await _dialogs.OpenFileAsync(tempPath);
     }
 
     private IncidentFileRow ToRow(IncidentFile f) => new(
-        f.Id, f.FileName, f.DisplayName, FormatSize(f.SizeBytes), Formatting.Timestamp(f.AddedAt), f.AddedBy,
-        f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase), IsReadOnly,
+        f.Id,
+        f.FileName,
+        f.DisplayName,
+        FormatSize(f.SizeBytes),
+        Formatting.Timestamp(f.AddedAt),
+        f.AddedBy,
+        f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase),
+        IsReadOnly,
         displayName => _session.RenameFile(f.Id, displayName));
 
     private static string FormatSize(long bytes) => bytes switch
     {
         < 1024 => $"{bytes} B",
         < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
-        _ => $"{bytes / (1024.0 * 1024.0):0.#} MB"
+        _ => $"{bytes / (1024.0 * 1024.0):0.#} MB",
     };
 
     // Mirrors IncidentFile.AllowedContentTypes' extensions — the picker already restricts choice to
@@ -161,6 +189,6 @@ public sealed partial class FilesViewModel : ObservableObject
         ".GIF" => "image/gif",
         ".WEBP" => "image/webp",
         ".PDF" => "application/pdf",
-        _ => "application/octet-stream"
+        _ => "application/octet-stream",
     };
 }

@@ -49,7 +49,6 @@ public class IncidentOperationsTests
     // --- ETB logging for mandatory checklist completion -------------------------------------
     // "Systemmeldung" means an ETB entry (not a UI notification): the moment every mandatory
     // item in a list becomes checked, that transition is logged automatically, exactly once.
-
     [Fact]
     public void Completing_all_mandatory_aufbau_items_logs_a_system_entry_once()
     {
@@ -126,6 +125,7 @@ public class IncidentOperationsTests
 
         Assert.Equal("Im Einsatz", updated.Status);
         Assert.Equal("über DLK angefordert", updated.Notes);
+
         // Replaced in place: same identity, same position, everything else untouched.
         Assert.Equal(unit.Id, updated.Id);
         Assert.Same(updated, Assert.Single(incident.Forces));
@@ -170,7 +170,6 @@ public class IncidentOperationsTests
     // --- ETB logging for Kräfte -------------------------------------------------------------
     // The Einsatztagebuch has to answer "when did which LageBuch arrive and change state", so
     // these entries are generated in the domain: no caller can record a unit without one.
-
     private static Etb.EtbEntry LastEntry(Incident incident) => incident.Journal[^1];
 
     [Fact]
@@ -187,6 +186,7 @@ public class IncidentOperationsTests
         Assert.Equal(
             "Einheit aufgenommen: FFB Wache 1 (FFB 1/40/1), Stärke 0/9/9, davon 4 AGT — Status: Alarmiert",
             entry.Text);
+
         // The Einsatzleitung alarms the unit, so the call sign is the recipient -- same split
         // ScbaViewModel uses for "bereitgestellt" versus "Druckkontrolle".
         Assert.Equal("FFB 1/40/1", entry.To);
@@ -201,6 +201,7 @@ public class IncidentOperationsTests
         incident.AddForceUnit(clock, op, "Aich", 6);
 
         var entry = LastEntry(incident);
+
         // No call sign, no AGT, no status: none of them appear as empty decoration.
         Assert.Equal("Einheit aufgenommen: Aich, Stärke 0/6/6", entry.Text);
         Assert.Null(entry.To);
@@ -218,6 +219,7 @@ public class IncidentOperationsTests
         Assert.Equal(before + 1, incident.Journal.Count);
         var entry = LastEntry(incident);
         Assert.Equal("FFB Wache 1 (FFB 1/40/1): Status Alarmiert → Im Einsatz", entry.Text);
+
         // The unit reports its own status, so here the call sign is the source.
         Assert.Equal("FFB 1/40/1", entry.From);
         Assert.Null(entry.To);
@@ -285,7 +287,6 @@ public class IncidentOperationsTests
             () => incident.UpdateForceUnit(clock, op, unit.Id, "Im Einsatz", null));
         Assert.Equal(after, incident.Journal.Count);
     }
-
 
     [Fact]
     public void Add_journal_entry_appends_with_clock_timestamp()
@@ -488,7 +489,7 @@ public class IncidentOperationsTests
     public void Blank_section_and_phone_become_null_rather_than_empty()
     {
         var incident = NewIncident(out var clock, out var op);
-        incident.AssignRole(clock, op, "EL", "Müller", section: "   ", phone: "");
+        incident.AssignRole(clock, op, "EL", "Müller", section: "   ", phone: string.Empty);
 
         var role = Assert.Single(incident.Roles);
         Assert.Null(role.Section);
@@ -519,6 +520,7 @@ public class IncidentOperationsTests
         var ended = incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(30));
 
         Assert.Equal(clock.Now.AddMinutes(30), ended.To);
+
         // Assignments are immutable records, so ending one replaces it -- the aggregate must not
         // grow a second entry, and the surviving one must be the ended copy.
         Assert.Equal(ended, Assert.Single(incident.Roles));
@@ -571,6 +573,7 @@ public class IncidentOperationsTests
 
         var closedRunning = incident.Roles.Single(r => r.Id == running.Id);
         Assert.Equal(clock.Now, closedRunning.To);
+
         // An assignment that was already ended before the close keeps its original Bis time.
         var closedAlreadyEnded = incident.Roles.Single(r => r.Id == alreadyEnded.Id);
         Assert.Equal(clock.Now.AddMinutes(-20), closedAlreadyEnded.To);

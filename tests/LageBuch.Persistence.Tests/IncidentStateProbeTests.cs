@@ -9,12 +9,19 @@ namespace LageBuch.Persistence.Tests;
 public class IncidentStateProbeTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"probe-{Guid.NewGuid():N}.fwincident");
-    private sealed class Clock : IClock { public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2)); }
+
+    private sealed class Clock : IClock
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+    }
 
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     private void Save(bool closed)
@@ -22,7 +29,11 @@ public class IncidentStateProbeTests : IDisposable
         var clock = new Clock();
         var op = new SessionOperator("Müller");
         var incident = Incident.Start(clock, op);
-        if (closed) incident.Close(clock, op);
+        if (closed)
+        {
+            incident.Close(clock, op);
+        }
+
         IncidentRepository.Save(_path, incident);
     }
 

@@ -1,6 +1,6 @@
+using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
-using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -8,12 +8,17 @@ public class CoMessprotokollViewModelTests
 {
     private static readonly FixedClock Clock = new(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
 
-    private static (LocalIncidentSession session, CoMessprotokollViewModel vm) CreateVm()
+    private static (LocalIncidentSession Session, CoMessprotokollViewModel Vm) CreateVm()
     {
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, Clock, op, Path.GetTempFileName(),
-            Enumerable.Empty<(string, bool)>(), Enumerable.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            Clock,
+            op,
+            Path.GetTempFileName(),
+            Enumerable.Empty<(string, bool)>(),
+            Enumerable.Empty<(string, bool)>());
         session.AddCoBuilding("Haus A", 2, 3);
         var vm = new CoMessprotokollViewModel(session, Clock, () => { });
         return (session, vm);
@@ -36,8 +41,13 @@ public class CoMessprotokollViewModelTests
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
         var path = Path.GetTempFileName();
-        LocalIncidentSession.StartNew(store, Clock, op, path,
-            Enumerable.Empty<(string, bool)>(), Enumerable.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            Clock,
+            op,
+            path,
+            Enumerable.Empty<(string, bool)>(),
+            Enumerable.Empty<(string, bool)>());
         var session = LocalIncidentSession.OpenReadOnly(store, Clock, path);
         var vm = new CoMessprotokollViewModel(session, Clock, () => { });
 
@@ -80,8 +90,13 @@ public class CoMessprotokollViewModelTests
     {
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, Clock, op, Path.GetTempFileName(),
-            Enumerable.Empty<(string, bool)>(), Enumerable.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            Clock,
+            op,
+            Path.GetTempFileName(),
+            Enumerable.Empty<(string, bool)>(),
+            Enumerable.Empty<(string, bool)>());
         var vm = new CoMessprotokollViewModel(session, Clock, () => { });
 
         Assert.False(vm.HasBuildings);

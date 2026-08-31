@@ -1,5 +1,5 @@
-using CommunityToolkit.Mvvm.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace LageBuch.AppLogic.ViewModels;
 
@@ -16,9 +16,12 @@ public sealed partial class LinkRow : ObservableObject
         _url = url;
     }
 
-    [ObservableProperty] private string _name;
-    [ObservableProperty] private string _url;
+    [ObservableProperty]
+    private string _name;
+    [ObservableProperty]
+    private string _url;
 
     partial void OnNameChanged(string value) => _onChanged();
+
     partial void OnUrlChanged(string value) => _onChanged();
 }

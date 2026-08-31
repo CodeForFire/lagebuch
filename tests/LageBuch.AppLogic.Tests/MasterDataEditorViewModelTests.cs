@@ -17,27 +17,46 @@ public class MasterDataEditorViewModelTests
 
         private MasterDataSet _set;
 
-        public InMemoryProvider() : this(DefaultSet) { }
+        public InMemoryProvider()
+            : this(DefaultSet)
+        {
+        }
 
         public InMemoryProvider(MasterDataSet initial) => _set = initial;
 
         public int SaveCount { get; private set; }
+
         public MasterDataSet Get() => _set;
-        public void Save(MasterDataSet set) { _set = set; SaveCount++; }
+
+        public void Save(MasterDataSet set)
+        {
+            _set = set;
+            SaveCount++;
+        }
     }
 
     private sealed class FakeDialogs : IFileDialogService
     {
         public string? ImportPath { get; set; }
+
         public string? ExportPath { get; set; }
+
         public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>(null);
+
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
         public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+
         public Task<string?> PickImportJsonAsync() => Task.FromResult(ImportPath);
+
         public Task<string?> PickExportJsonAsync(string s) => Task.FromResult(ExportPath);
+
         public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
         public Task OpenFileAsync(string path) => Task.CompletedTask;
+
         public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
         public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 
@@ -53,7 +72,9 @@ public class MasterDataEditorViewModelTests
         }
 
         public string? WrittenPath { get; private set; }
+
         public MasterDataSet? Written { get; private set; }
+
         public bool WriteThrows { get; set; }
 
         public MasterDataSet Read(string path) =>
@@ -61,7 +82,11 @@ public class MasterDataEditorViewModelTests
 
         public void Write(string path, MasterDataSet set)
         {
-            if (WriteThrows) throw new IOException("disk voll");
+            if (WriteThrows)
+            {
+                throw new IOException("disk voll");
+            }
+
             WrittenPath = path;
             Written = set;
         }
@@ -120,6 +145,7 @@ public class MasterDataEditorViewModelTests
     public void Loads_a_section_per_category_and_starts_clean()
     {
         var vm = Vm(new InMemoryProvider());
+
         // 14 categories plus #76's Fahrzeuge.
         Assert.Equal(15, vm.Sections.Count);
         Assert.False(vm.IsDirty);
@@ -334,7 +360,6 @@ public class MasterDataEditorViewModelTests
     }
 
     // --- Import / Export (issue #46 follow-up) ---
-
     [Fact]
     public void Import_is_disabled_when_master_data_already_exists()
     {
@@ -354,7 +379,8 @@ public class MasterDataEditorViewModelTests
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var imported = MasterDataSet.Empty with { Roles = new[] { "EL", "ZF" } };
-        var vm = Vm(provider,
+        var vm = Vm(
+            provider,
             new FakeDialogs { ImportPath = "/import.json" },
             new FakeFileService(read: imported));
 
@@ -375,7 +401,8 @@ public class MasterDataEditorViewModelTests
             Roles = new[] { "EL" },
             Streets = new[] { new Street("Bahnhofstr.", "FFB") }, // no streets UI: must ride through _original
         };
-        var vm = Vm(provider,
+        var vm = Vm(
+            provider,
             new FakeDialogs { ImportPath = "/import.json" },
             new FakeFileService(read: imported));
 
@@ -391,7 +418,8 @@ public class MasterDataEditorViewModelTests
     public async Task A_failed_import_surfaces_an_error_and_writes_nothing()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty);
-        var vm = Vm(provider,
+        var vm = Vm(
+            provider,
             new FakeDialogs { ImportPath = "/broken.json" },
             new FakeFileService(readError: new System.Text.Json.JsonException("kaputt")));
 
@@ -436,7 +464,8 @@ public class MasterDataEditorViewModelTests
     [Fact]
     public async Task A_failed_export_surfaces_an_error()
     {
-        var vm = Vm(new InMemoryProvider(),
+        var vm = Vm(
+            new InMemoryProvider(),
             new FakeDialogs { ExportPath = "/out.json" },
             new FakeFileService { WriteThrows = true });
 
@@ -491,7 +520,7 @@ public class MasterDataEditorViewModelTests
     [Fact]
     public void Empty_call_signs_never_count_as_duplicates()
     {
-        var set = SetWithVehicles(new Vehicle("FFB Wache 1", "", 9), new Vehicle("Aich", "  ", 6));
+        var set = SetWithVehicles(new Vehicle("FFB Wache 1", string.Empty, 9), new Vehicle("Aich", "  ", 6));
         var vm = Vm(new InMemoryProvider(set));
         var section = Vehicles(vm);
         section.AddCommand.Execute(null); // third blank row

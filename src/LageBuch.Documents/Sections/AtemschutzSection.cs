@@ -40,7 +40,9 @@ public static class AtemschutzSection
                 table.Header(header =>
                 {
                     foreach (var title in HeaderTitles)
+                    {
                         header.Cell().Element(Cells.Header).Text(title).SemiBold();
+                    }
                 });
 
                 foreach (var trupp in incident.ScbaTrupps)

@@ -31,7 +31,10 @@ public class JoinPromptRenderTests
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (string.IsNullOrWhiteSpace(dir))
+        {
             return;
+        }
+
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, name));

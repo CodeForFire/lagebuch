@@ -19,10 +19,22 @@ public class HeaderHeroTests
 
     private static IncidentWorkspaceViewModel BuildWorkspace(string? keyword)
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>(), keyword: keyword);
-        return new IncidentWorkspaceViewModel(session, new FixedClock(), new NoopTicker(), Md(),
-            new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>(),
+            keyword: keyword);
+        return new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            Md(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
     }
 
     private static Window Show(IncidentWorkspaceViewModel vm)
@@ -79,7 +91,8 @@ public class HeaderHeroTests
 
         var chip = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "IncidentNumberChip");
         Assert.True(chip.IsVisible);
-        Assert.True(chip.Bounds.Width > 20,
+        Assert.True(
+            chip.Bounds.Width > 20,
             $"the Einsatznummer chip rendered at {chip.Bounds.Width:F0}px wide — looks like the collapsed-ancestor zero-width trap.");
 
         var addButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "AddIncidentNumberButton");

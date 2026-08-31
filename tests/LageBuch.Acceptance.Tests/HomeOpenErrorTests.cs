@@ -18,13 +18,15 @@ namespace LageBuch.Acceptance.Tests;
 // banner run off the right edge of the window.
 public class HomeOpenErrorTests
 {
-
     private sealed class Md : IMasterDataProvider
     {
         // `Empty with` rather than the positional constructor: master data gains fields often
         // enough that spelling every one out here just breaks the build on the next addition.
         public MasterDataSet Get() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
-        public void Save(MasterDataSet set) { }
+
+        public void Save(MasterDataSet set)
+        {
+        }
     }
 
     private sealed class SeededRecent : IRecentFilesStore
@@ -35,27 +37,49 @@ public class HomeOpenErrorTests
             "/home/operator/Einsaetze/Einsatz-6666.fwincident",
             "/home/operator/Einsaetze/Einsatz5.fwincident",
         };
+
         public IReadOnlyList<string> GetRecent() => _list;
-        public void Add(string path) { }
+
+        public void Add(string path)
+        {
+        }
     }
 
     // Fails the way the real repository does for a file written by a newer build.
     private sealed class BrokenStore : IIncidentStore
     {
-        public void Save(string path, Incident incident) { }
+        public void Save(string path, Incident incident)
+        {
+        }
+
         public Incident Load(string path) =>
             throw new LageBuch.Persistence.Sqlite.UnsupportedSchemaVersionException(6, 5);
+
         public IncidentState? TryReadState(string path) => null;
-        public void SaveFileBytes(string path, string storageFileName, byte[] bytes) { }
+
+        public void SaveFileBytes(string path, string storageFileName, byte[] bytes)
+        {
+        }
+
         public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
     }
 
     private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null)
     {
-        var vm = new HomeViewModel(new BrokenStore(), new Md(), new SeededRecent(),
-            new FakeDialogs(), new FixedClock(), new ManualTicker(), new NoopAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new HomeViewModel(
+            new BrokenStore(),
+            new Md(),
+            new SeededRecent(),
+            new FakeDialogs(),
+            new FixedClock(),
+            new ManualTicker(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0");
         if (triggerError)
+        {
             vm.OpenRecentCommand.Execute("/home/operator/Einsaetze/Einsatz-1234.fwincident");
+        }
 
         var window = new Window { Content = new HomeView { DataContext = vm }, Width = 1100, Height = 820 };
         window.Show();
@@ -69,6 +93,7 @@ public class HomeOpenErrorTests
             using var frame = window.CaptureRenderedFrame()!;
             frame.SavePng(Path.Combine(dir, renderTo));
         }
+
         return (window, vm);
     }
 
@@ -92,6 +117,7 @@ public class HomeOpenErrorTests
         Assert.NotNull(vm.OpenError);
         var banner = Banner(window);
         Assert.True(banner.IsVisible);
+
         // The window survived and still shows the recent list underneath.
         Assert.Equal(3, window.GetVisualDescendants().OfType<ListBox>().First().ItemCount);
     }
@@ -110,9 +136,11 @@ public class HomeOpenErrorTests
         var messageRight = message.TranslatePoint(new Point(message.Bounds.Width, 0), window)!.Value.X;
         var bannerRight = banner.TranslatePoint(new Point(banner.Bounds.Width, 0), window)!.Value.X;
 
-        Assert.True(messageRight <= bannerRight,
+        Assert.True(
+            messageRight <= bannerRight,
             $"message runs to x={messageRight} but the banner ends at x={bannerRight} — it is not wrapping");
-        Assert.True(message.Bounds.Height > 30,
+        Assert.True(
+            message.Bounds.Height > 30,
             $"message is {message.Bounds.Height}px tall — it did not wrap onto a second line");
     }
 }

@@ -11,7 +11,10 @@ public class MasterDataProviderTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     [Fact]
@@ -49,8 +52,13 @@ public class MasterDataProviderTests : IDisposable
         static int IndexOfName(IReadOnlyList<Person> people, string lastName)
         {
             for (var i = 0; i < people.Count; i++)
+            {
                 if (people[i].LastName == lastName)
+                {
                     return i;
+                }
+            }
+
             return -1;
         }
     }

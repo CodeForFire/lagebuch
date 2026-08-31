@@ -30,9 +30,13 @@ public class EnterOnDropdownTests
     private static ScbaViewModel BuildScba()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            new[] { ("Blaulicht aus?", false) }, Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>());
         return new ScbaViewModel(session, Md(), clock, new NoopTicker(), new NoopAlarmService(), () => { });
     }
 
@@ -40,6 +44,7 @@ public class EnterOnDropdownTests
     public void Enter_on_an_open_suggestion_dropdown_does_not_add_the_trupp()
     {
         var vm = BuildScba();
+
         // All required fields are filled, so AddTrupp *could* execute — the user is only picking
         // the Truppmann from the suggestion list.
         vm.NewDesignation = "Angriffstrupp";

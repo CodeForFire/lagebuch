@@ -5,8 +5,8 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
-using LageBuch.Domain.Time;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Sync;
 
@@ -33,7 +33,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     }
 
     public Incident Incident { get; }
+
     public string Path { get; }
+
     public SessionOperator? Operator { get; private set; }
 
     public event Action? Changed;
@@ -58,6 +60,7 @@ public sealed class LocalIncidentSession : IIncidentSession
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(op);
+
         // The Einsatznummer goes through the factory rather than SetIncidentNumber afterwards, so the
         // automatic "Einsatz begonnen" entry can name it.
         var incident = Incident.Start(clock, op, keyword: keyword, incidentNumber: incidentNumber);
@@ -72,7 +75,10 @@ public sealed class LocalIncidentSession : IIncidentSession
         ArgumentNullException.ThrowIfNull(store);
         var incident = store.Load(path);
         if (incident.State == IncidentState.Open && op is null)
+        {
             throw new InvalidOperationException("Ein offener Einsatz erfordert einen Bearbeiter.");
+        }
+
         var effectiveOperator = incident.State == IncidentState.Closed ? null : op;
         return new LocalIncidentSession(store, clock, incident, path, effectiveOperator);
     }
@@ -90,9 +96,15 @@ public sealed class LocalIncidentSession : IIncidentSession
     {
         ArgumentNullException.ThrowIfNull(op);
         if (Incident.State == IncidentState.Closed)
+        {
             throw new InvalidOperationException("Ein abgeschlossener Einsatz kann nicht weiter bearbeitet werden.");
+        }
+
         if (Operator is not null)
+        {
             return; // already editable
+        }
+
         Operator = op;
         Incident.ResumeEditing(_clock, op);
         Save();
@@ -110,13 +122,15 @@ public sealed class LocalIncidentSession : IIncidentSession
         {
             var bytes = _store.TryReadFileBytes(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
             if (bytes is not null)
+            {
                 fileBytes[file.Id] = bytes;
+            }
         }
+
         return Task.FromResult(IncidentPdf.Generate(Incident, fileBytes));
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
-
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         Mutate(() => Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to));
 
@@ -125,8 +139,14 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(_clock, RequireOperator(), itemId));
 
-    public void AssignRole(string role, string personName, string? callSign = null,
-        DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null) =>
+    public void AssignRole(
+        string role,
+        string personName,
+        string? callSign = null,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? section = null,
+        string? phone = null) =>
         Mutate(() => Incident.AssignRole(_clock, RequireOperator(), role, personName, callSign, from, to, section, phone));
 
     public void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null) =>
@@ -135,8 +155,14 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
 
-    public void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
-        string? status = null, string? notes = null, int scbaCount = 0, int officerCount = 0) =>
+    public void AddForceUnit(
+        string brigade,
+        int personnelCount,
+        string? callSign = null,
+        string? status = null,
+        string? notes = null,
+        int scbaCount = 0,
+        int officerCount = 0) =>
         Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
@@ -154,15 +180,27 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));
 
-    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
+    public void AddScbaTrupp(
+        string designation,
+        IEnumerable<TruppMember> members,
+        int entryPressure,
         int? truppNumber = null,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
-        Mutate(() => Incident.AddScbaTrupp(_clock, designation, members, entryPressure, truppNumber, callSign, task,
-            maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes));
+        Mutate(() => Incident.AddScbaTrupp(
+            _clock,
+            designation,
+            members,
+            entryPressure,
+            truppNumber,
+            callSign,
+            task,
+            maxDurationMinutes,
+            returnPressureBar,
+            pressureControlIntervalMinutes));
 
     public void StartScbaTrupp(Guid truppId) =>
         Mutate(() => Incident.StartScbaTrupp(_clock, truppId));
@@ -177,8 +215,11 @@ public sealed class LocalIncidentSession : IIncidentSession
         Mutate(() => Incident.MarkScbaRemoved(_clock, truppId));
 
     public void SetIncidentNumber(IncidentNumber? number) => Mutate(() => Incident.SetIncidentNumber(number));
+
     public void SetKeyword(string? keyword) => Mutate(() => Incident.SetKeyword(keyword));
+
     public void SetAddress(string? street, string? district) => Mutate(() => Incident.SetAddress(street, district));
+
     public void SetStatus(string? status) => Mutate(() => Incident.SetStatus(status));
 
     public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) =>
@@ -238,7 +279,10 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void Close()
     {
         if (IsReadOnly)
+        {
             throw new InvalidOperationException("Der Einsatz ist bereits abgeschlossen.");
+        }
+
         Incident.Close(_clock, RequireOperator());
         Save();
         Changed?.Invoke();
@@ -247,7 +291,10 @@ public sealed class LocalIncidentSession : IIncidentSession
     private void Mutate(Action apply)
     {
         if (IsReadOnly)
+        {
             throw new InvalidOperationException("Der Einsatz ist bereits abgeschlossen.");
+        }
+
         apply();
         Save();
         Changed?.Invoke();

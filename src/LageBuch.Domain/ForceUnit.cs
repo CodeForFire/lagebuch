@@ -8,6 +8,7 @@ public sealed record ForceUnit(
     int ScbaCount,
     string? Status,
     string? Notes,
+
     // Appended last with a default so pre-#76 construction sites (repository, snapshot, sync) keep
     // compiling — and old rows/payloads read as "keine Führungskraft erfasst" (0/x/x) instead of
     // breaking. The total is unchanged by this field: Mannschaft is derived, not stored.
@@ -29,20 +30,32 @@ public sealed record ForceUnit(
         int officerCount = 0)
     {
         if (string.IsNullOrWhiteSpace(brigade))
+        {
             throw new ArgumentException("Feuerwehr darf nicht leer sein.", nameof(brigade));
+        }
+
         ArgumentOutOfRangeException.ThrowIfNegative(personnelCount);
         ArgumentOutOfRangeException.ThrowIfNegative(scbaCount);
+
         // Atemschutzgeräteträger are a subset of the crew, so they can never outnumber it. Worth
         // enforcing rather than merely displaying: this count is what tells the Einsatzleiter how
         // many Trupps can actually be formed.
         if (scbaCount > personnelCount)
-            throw new ArgumentOutOfRangeException(nameof(scbaCount),
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(scbaCount),
                 "Atemschutzgeräteträger dürfen die Gesamtstärke nicht übersteigen.");
+        }
+
         ArgumentOutOfRangeException.ThrowIfNegative(officerCount);
+
         // Führungskräfte are likewise a subset of the crew (#76).
         if (officerCount > personnelCount)
-            throw new ArgumentOutOfRangeException(nameof(officerCount),
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(officerCount),
                 "Führungskräfte dürfen die Gesamtstärke nicht übersteigen.");
+        }
 
         return new ForceUnit(
             Guid.NewGuid(),
@@ -82,7 +95,7 @@ public sealed record ForceUnit(
         IEnumerable<ForceUnitStrengthEdit>? edits = null)
         => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount)
         {
-            Edits = (edits ?? Enumerable.Empty<ForceUnitStrengthEdit>()).ToList()
+            Edits = (edits ?? Enumerable.Empty<ForceUnitStrengthEdit>()).ToList(),
         };
 
     /// <summary>
@@ -94,24 +107,36 @@ public sealed record ForceUnit(
     /// inflate the retained history. Validation mirrors <see cref="Create"/>.
     /// </summary>
     public ForceUnit WithStrength(
-        int officerCount, int personnelCount, int scbaCount,
-        SessionOperator editor, DateTimeOffset editedAt)
+        int officerCount,
+        int personnelCount,
+        int scbaCount,
+        SessionOperator editor,
+        DateTimeOffset editedAt)
     {
         ArgumentNullException.ThrowIfNull(editor);
         ArgumentOutOfRangeException.ThrowIfNegative(personnelCount);
         if (scbaCount < 0 || scbaCount > personnelCount)
-            throw new ArgumentOutOfRangeException(nameof(scbaCount),
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(scbaCount),
                 "Atemschutzgeräteträger dürfen die Gesamtstärke nicht übersteigen.");
+        }
+
         if (officerCount < 0 || officerCount > personnelCount)
-            throw new ArgumentOutOfRangeException(nameof(officerCount),
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(officerCount),
                 "Führungskräfte dürfen die Gesamtstärke nicht übersteigen.");
+        }
 
         if (officerCount == OfficerCount && personnelCount == PersonnelCount && scbaCount == ScbaCount)
+        {
             return this;
+        }
 
         var edits = new List<ForceUnitStrengthEdit>(Edits)
         {
-            new(OfficerCount, PersonnelCount, ScbaCount, editor.Display, editedAt)
+            new(OfficerCount, PersonnelCount, ScbaCount, editor.Display, editedAt),
         };
         return this with
         {

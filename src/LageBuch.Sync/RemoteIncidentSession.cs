@@ -1,7 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
-using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
@@ -30,6 +30,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private Incident _incident;
 
     public SessionOperator? Operator { get; }
+
     public Incident Incident => _incident;
 
     // The client never writes locally, so it is never "read-only" in the editing sense — but a
@@ -93,26 +94,40 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
     public static async Task<RemoteIncidentSession> ConnectAsync(
-        string host, SessionOperator op, string localVersion, IUiDispatcher ui, string? pin = null,
-        int port = SyncProtocol.Port, IRetryPolicy? reconnectPolicy = null, string? cacheRoot = null,
+        string host,
+        SessionOperator op,
+        string localVersion,
+        IUiDispatcher ui,
+        string? pin = null,
+        int port = SyncProtocol.Port,
+        IRetryPolicy? reconnectPolicy = null,
+        string? cacheRoot = null,
         CancellationToken ct = default)
     {
         var baseUri = new Uri($"http://{host}:{port}");
         var http = new HttpClient { BaseAddress = baseUri };
         if (!string.IsNullOrEmpty(pin))
+        {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
+        }
+
         try
         {
             // The PIN gates every endpoint, so the first request already reflects it: a 401 means the
             // PIN is wrong/missing — reported as such before the version compare (auth precedes content).
             var versionResponse = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute), ct);
             if (versionResponse.StatusCode == HttpStatusCode.Unauthorized)
+            {
                 throw new PinRejectedException();
+            }
+
             versionResponse.EnsureSuccessStatusCode();
 
             var hostVersion = SyncJson.Deserialize<VersionInfo>(await versionResponse.Content.ReadAsStringAsync(ct)).Version;
             if (hostVersion != localVersion)
+            {
                 throw new VersionMismatchException(localVersion, hostVersion);
+            }
 
             var initial = SnapshotMapper.FromSnapshot(
                 SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct)));
@@ -121,7 +136,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .WithUrl(new Uri(baseUri, SyncProtocol.HubPath), o =>
                 {
                     if (!string.IsNullOrEmpty(pin))
+                    {
                         o.Headers.Add(SyncProtocol.PinHeader, pin);
+                    }
                 })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
@@ -129,14 +146,27 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
             var session = new RemoteIncidentSession(http, hub, ui, op, initial, cacheRoot);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
+
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
             // marshalled onto the UI thread because it drives view state (the reconnect banner, the
             // return-Home navigation) exactly as OnSnapshot drives the journal.
             // Reconnecting = transient drop (keep the workspace open, disable input); Closed = the
             // reconnect window ran out or the host went away for good (return to Home).
-            hub.Reconnecting += _ => { session._ui.Post(() => session.Disconnected?.Invoke()); return Task.CompletedTask; };
-            hub.Reconnected += async _ => { await session.ResyncAsync(); session._ui.Post(() => session.Reconnected?.Invoke()); };
-            hub.Closed += _ => { session._ui.Post(() => session.Ended?.Invoke()); return Task.CompletedTask; };
+            hub.Reconnecting += _ =>
+            {
+                session._ui.Post(() => session.Disconnected?.Invoke());
+                return Task.CompletedTask;
+            };
+            hub.Reconnected += async _ =>
+            {
+                await session.ResyncAsync();
+                session._ui.Post(() => session.Reconnected?.Invoke());
+            };
+            hub.Closed += _ =>
+            {
+                session._ui.Post(() => session.Ended?.Invoke());
+                return Task.CompletedTask;
+            };
             await hub.StartAsync(ct);
             return session;
         }
@@ -149,7 +179,6 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     // --- IIncidentSession mutation surface: every call is a fire-and-forget command to the host;
     //     the resulting state arrives via the broadcast, never from these calls. ---
-
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         Send(new AddJournalEntryCommand(Op(), direction, text, from, to));
 
@@ -158,8 +187,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void ToggleChecklistItem(Guid itemId) => Send(new ToggleChecklistItemCommand(Op(), itemId));
 
-    public void AssignRole(string role, string personName, string? callSign = null,
-        DateTimeOffset? from = null, DateTimeOffset? to = null, string? section = null, string? phone = null) =>
+    public void AssignRole(
+        string role,
+        string personName,
+        string? callSign = null,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? section = null,
+        string? phone = null) =>
         Send(new AssignRoleCommand(Op(), role, personName, callSign, from, to, section, phone));
 
     public void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null) =>
@@ -168,8 +203,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Send(new EditRolePhoneCommand(Op(), assignmentId, phone));
 
-    public void AddForceUnit(string brigade, int personnelCount, string? callSign = null,
-        string? status = null, string? notes = null, int scbaCount = 0, int officerCount = 0) =>
+    public void AddForceUnit(
+        string brigade,
+        int personnelCount,
+        string? callSign = null,
+        string? status = null,
+        string? notes = null,
+        int scbaCount = 0,
+        int officerCount = 0) =>
         Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
@@ -187,31 +228,49 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));
 
-    public void AddScbaTrupp(string designation, IEnumerable<TruppMember> members, int entryPressure,
+    public void AddScbaTrupp(
+        string designation,
+        IEnumerable<TruppMember> members,
+        int entryPressure,
         int? truppNumber = null,
         string? callSign = null,
         string? task = null,
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
-        Send(new AddScbaTruppCommand(designation,
+        Send(new AddScbaTruppCommand(
+            designation,
             members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
-            callSign, task, maxDurationMinutes, returnPressureBar, pressureControlIntervalMinutes,
-            entryPressure, truppNumber));
+            callSign,
+            task,
+            maxDurationMinutes,
+            returnPressureBar,
+            pressureControlIntervalMinutes,
+            entryPressure,
+            truppNumber));
 
     public void StartScbaTrupp(Guid truppId) => Send(new StartScbaTruppCommand(truppId));
+
     public void RecordScbaPressure(Guid truppId, int bar) => Send(new RecordScbaPressureCommand(truppId, bar));
+
     public void WithdrawScbaTrupp(Guid truppId) => Send(new WithdrawScbaTruppCommand(truppId));
+
     public void MarkScbaRemoved(Guid truppId) => Send(new MarkScbaRemovedCommand(truppId));
+
     public void SetIncidentNumber(IncidentNumber? number) => Send(new SetIncidentNumberCommand(number?.Value));
+
     public void SetKeyword(string? keyword) => Send(new SetKeywordCommand(keyword));
+
     public void SetAddress(string? street, string? district) => Send(new SetAddressCommand(street, district));
+
     public void SetStatus(string? status) => Send(new SetStatusCommand(status));
 
     // No-op: incident-level timers (the ILS reminder) are host-authoritative and never built on a
     // joined client (IncidentWorkspaceViewModel gates the reminder on !IsRemote), so this is unreachable
     // here. The host's persisted timer state still rides the broadcast snapshot as read-only display.
-    public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) { }
+    public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning)
+    {
+    }
 
     public void Close() => Send(new CloseIncidentCommand(Op()));
 
@@ -222,8 +281,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(bytes);
         if (bytes.LongLength > IncidentFile.MaxSizeBytes)
+        {
             throw new ArgumentException(
                 $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.", nameof(bytes));
+        }
+
         await SendAsync(new AddFileCommand(Op(), fileName, contentType, bytes));
     }
 
@@ -234,11 +296,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     {
         var file = _incident.Files.FirstOrDefault(f => f.Id == fileId);
         if (file is null)
+        {
             return null;
+        }
 
         var cachePath = CachePathFor(fileId, file.FileName);
         if (cachePath is not null && File.Exists(cachePath))
+        {
             return await File.ReadAllBytesAsync(cachePath);
+        }
 
         HttpResponseMessage response;
         try
@@ -249,8 +315,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         {
             return null; // host unreachable — degrade quietly, same as a missing local file
         }
+
         if (!response.IsSuccessStatusCode)
+        {
             return null;
+        }
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
         if (cachePath is not null)
@@ -258,6 +327,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
             await File.WriteAllBytesAsync(cachePath, bytes);
         }
+
         return bytes;
     }
 

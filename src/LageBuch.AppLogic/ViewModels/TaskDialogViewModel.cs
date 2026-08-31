@@ -62,6 +62,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         TimerMinutes = IncidentTask.DefaultTimerMinutes(value);
 
     public IReadOnlyList<ImportanceOption> ImportanceOptions { get; }
+
     public IReadOnlyList<UrgencyOption> UrgencyOptions { get; }
 
     private bool CanSave =>

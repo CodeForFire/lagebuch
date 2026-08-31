@@ -13,6 +13,8 @@ public static class PdfLicense
     public static void Ensure()
     {
         if (Interlocked.Exchange(ref _configured, 1) == 0)
+        {
             QuestPDF.Settings.License = LicenseType.Community;
+        }
     }
 }

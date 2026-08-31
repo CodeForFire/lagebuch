@@ -17,7 +17,7 @@ public static class CoMeasurementLabels
                 1 => "Links",
                 2 => "Mitte",
                 3 => "Rechts",
-                _ => ApartmentLabel(apartmentNumber)
+                _ => ApartmentLabel(apartmentNumber),
             }
             : ApartmentLabel(apartmentNumber);
 
@@ -40,7 +40,7 @@ public static class CoMeasurementLabels
         DwellingStatus.NotSearched => "noch nicht abgesucht",
         DwellingStatus.Searched => "abgesucht – keine Personen betroffen",
         DwellingStatus.Affected => "Person(en) betroffen",
-        _ => throw new ArgumentOutOfRangeException(nameof(status))
+        _ => throw new ArgumentOutOfRangeException(nameof(status)),
     };
 
     public static string StatusChip(DwellingStatus status) => status switch
@@ -48,6 +48,6 @@ public static class CoMeasurementLabels
         DwellingStatus.NotSearched => "GELB",
         DwellingStatus.Searched => "GRÜN",
         DwellingStatus.Affected => "ROT",
-        _ => throw new ArgumentOutOfRangeException(nameof(status))
+        _ => throw new ArgumentOutOfRangeException(nameof(status)),
     };
 }

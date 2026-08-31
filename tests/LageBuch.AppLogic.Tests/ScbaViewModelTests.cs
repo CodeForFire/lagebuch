@@ -1,7 +1,7 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
-using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -17,14 +17,23 @@ public class ScbaViewModelTests
     };
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
 
     private static ScbaViewModel Vm(FixedClock clock, LocalIncidentSession session, Action? onChanged = null, FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
         new(session, Md(), clock, ticker ?? new FakeTicker(), alarm ?? new FakeAlarmService(), onChanged ?? (() => { }));
 
-    private static ScbaTruppRow Register(ScbaViewModel vm, string designation = "Angriffstrupp",
-        string truppfuehrer = "Müller", string truppmann = "Schmidt", string? zweiterTruppmann = null)
+    private static ScbaTruppRow Register(
+        ScbaViewModel vm,
+        string designation = "Angriffstrupp",
+        string truppfuehrer = "Müller",
+        string truppmann = "Schmidt",
+        string? zweiterTruppmann = null)
     {
         vm.NewDesignation = designation;
         vm.NewTruppfuehrer = truppfuehrer;
@@ -404,7 +413,6 @@ public class ScbaViewModelTests
     }
 
     // --- Druckabfrage audio cue (issue #78 follow-up) ---
-
     [Fact]
     public void Control_due_plays_the_cue_once_and_not_again_while_still_due()
     {
@@ -501,7 +509,6 @@ public class ScbaViewModelTests
     }
 
     // --- Crew entry (issue #15) ---
-
     [Fact]
     public void A_trupp_needs_both_crew_names_before_it_can_be_registered()
     {
@@ -560,7 +567,8 @@ public class ScbaViewModelTests
 
         Register(vm, AtemschutzTrupp.ChemicalTruppDesignation, "Müller", "Schmidt", "Huber");
 
-        Assert.Contains(session.Incident.Journal,
+        Assert.Contains(
+            session.Incident.Journal,
             e => e.Text == "Trupp 1 (CSA-Trupp) bereitgestellt: Müller / Schmidt / Huber, Einstiegsdruck 300 bar");
     }
 
@@ -581,13 +589,12 @@ public class ScbaViewModelTests
         var vm = Vm(clock, NewSession(clock));
         Register(vm, AtemschutzTrupp.ChemicalTruppDesignation, "Müller", "Schmidt", "Huber");
 
-        Assert.Equal("", vm.NewTruppfuehrer);
-        Assert.Equal("", vm.NewTruppmann);
-        Assert.Equal("", vm.NewZweiterTruppmann);
+        Assert.Equal(string.Empty, vm.NewTruppfuehrer);
+        Assert.Equal(string.Empty, vm.NewTruppmann);
+        Assert.Equal(string.Empty, vm.NewZweiterTruppmann);
     }
 
     // --- Truppnummer and Einstiegsdruck on the registration form (issue #78) ---
-
     [Fact]
     public void NewTruppNumber_defaults_to_the_next_free_number_and_advances_after_registering()
     {
@@ -633,7 +640,6 @@ public class ScbaViewModelTests
     }
 
     // --- Abfrage-Intervall defaults to a third of Einsatzzeit (issue #78) ---
-
     [Fact]
     public void NewControlIntervalMinutes_defaults_to_a_third_of_the_einsatzzeit()
     {
@@ -680,13 +686,22 @@ public class ScbaViewModelTests
 
     // Distinct values so a swapped mapping is caught; nothing here matches a compiled-in default.
     private static readonly IncidentSettings CustomSettings = new(
-        IlsReminderIntervalMinutes: 15, IlsReminderFollowUpIntervalMinutes: 30,
-        AgtMaxDurationMinutes: 35, CsaMaxDurationMinutes: 22,
-        LpaMaxDurationMinutes: 48, PressureControlIntervalMinutes: 7, ReturnPressureBar: 55);
+        IlsReminderIntervalMinutes: 15,
+        IlsReminderFollowUpIntervalMinutes: 30,
+        AgtMaxDurationMinutes: 35,
+        CsaMaxDurationMinutes: 22,
+        LpaMaxDurationMinutes: 48,
+        PressureControlIntervalMinutes: 7,
+        ReturnPressureBar: 55);
 
     private static ScbaViewModel VmWith(FixedClock clock, LocalIncidentSession session, IncidentSettings settings) =>
-        new(session, MasterDataSet.Empty with { TruppTypes = new[] { "Angriffstrupp" }, Settings = settings },
-            clock, new FakeTicker(), new FakeAlarmService(), () => { });
+        new(
+            session,
+            MasterDataSet.Empty with { TruppTypes = new[] { "Angriffstrupp" }, Settings = settings },
+            clock,
+            new FakeTicker(),
+            new FakeAlarmService(),
+            () => { });
 
     [Fact]
     public void New_trupp_defaults_come_from_settings()
@@ -746,6 +761,7 @@ public class ScbaViewModelTests
         Register(vm);                                 // adds an Angriffstrupp, then resets the form
 
         Assert.Equal(35, vm.NewMaxDurationMinutes);   // reset to AGT default
+
         // Override cleared: a CSA selection now re-suggests the CSA default again.
         vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
         Assert.Equal(22, vm.NewMaxDurationMinutes);

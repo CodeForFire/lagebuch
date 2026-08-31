@@ -21,22 +21,34 @@ public static class LocalNetwork
         foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
         {
             if (nic.OperationalStatus != OperationalStatus.Up)
+            {
                 continue;
+            }
+
             var looksLikeTailscale = nic.Name.StartsWith("tailscale", StringComparison.OrdinalIgnoreCase)
                 || nic.Name.StartsWith("ts", StringComparison.OrdinalIgnoreCase);
             foreach (var addr in nic.GetIPProperties().UnicastAddresses)
             {
                 var ip = addr.Address;
                 if (ip.AddressFamily != AddressFamily.InterNetwork)
+                {
                     continue;
+                }
+
                 // A tailnet address is the best answer — return the moment we see one.
                 if (looksLikeTailscale || IsCarrierGradeNat(ip))
+                {
                     return ip;
+                }
+
                 // Otherwise remember the first private LAN address as the fallback below Tailscale.
                 if (privateLan is null && IsPrivateLan(ip))
+                {
                     privateLan = ip;
+                }
             }
         }
+
         return privateLan ?? IPAddress.Loopback;
     }
 

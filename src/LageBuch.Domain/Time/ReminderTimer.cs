@@ -24,9 +24,15 @@ public sealed class ReminderTimer
     {
         ArgumentNullException.ThrowIfNull(clock);
         if (firstIntervalMinutes <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(firstIntervalMinutes), "Interval must be positive.");
+        }
+
         if (recurringIntervalMinutes <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(recurringIntervalMinutes), "Interval must be positive.");
+        }
+
         IntervalMinutes = firstIntervalMinutes;
         RecurringIntervalMinutes = recurringIntervalMinutes;
         CycleAnchor = clock.Now;
@@ -42,9 +48,15 @@ public sealed class ReminderTimer
     public void Resume(DateTimeOffset anchor, int currentIntervalMinutes, int recurringIntervalMinutes)
     {
         if (currentIntervalMinutes <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(currentIntervalMinutes), "Interval must be positive.");
+        }
+
         if (recurringIntervalMinutes <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(recurringIntervalMinutes), "Interval must be positive.");
+        }
+
         IntervalMinutes = currentIntervalMinutes;
         RecurringIntervalMinutes = recurringIntervalMinutes;
         CycleAnchor = anchor;
@@ -57,7 +69,10 @@ public sealed class ReminderTimer
     {
         ArgumentNullException.ThrowIfNull(clock);
         if (!IsRunning)
+        {
             return;
+        }
+
         // Subsequent cycles run on the recurring interval — the first "after 15 min" gives way to
         // the "then every 30 min" cadence once the crew has reported back at least once.
         IntervalMinutes = RecurringIntervalMinutes;

@@ -1,7 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Persistence.MasterData;
-using System.Diagnostics.CodeAnalysis;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -12,13 +12,21 @@ public class LinksViewModelTests
     private sealed class ThrowingDialogs : IFileDialogService
     {
         public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>(null);
+
         public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
         public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
+
         public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
         public Task<string?> PickExportJsonAsync(string s) => Task.FromResult<string?>(null);
+
         public Task<string?> PickAttachmentAsync() => Task.FromResult<string?>(null);
+
         public Task OpenFileAsync(string path) => Task.CompletedTask;
+
         public Task OpenUrlAsync(string url) => throw new InvalidOperationException("kein Browser gefunden");
+
         public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 

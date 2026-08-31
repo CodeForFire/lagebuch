@@ -10,12 +10,19 @@ namespace LageBuch.Persistence.Tests;
 public class IncidentRepositorySaveTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"save-{Guid.NewGuid():N}.fwincident");
-    private sealed class Clock : IClock { public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2)); }
+
+    private sealed class Clock : IClock
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+    }
 
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     [Fact]
@@ -33,6 +40,7 @@ public class IncidentRepositorySaveTests : IDisposable
         using var cmd = cn.CreateCommand();
         cmd.CommandText = "SELECT incident_number FROM incident_meta;";
         Assert.Equal("B 1.2 260715 4242", (string)cmd.ExecuteScalar()!);
+
         // Two rows: the automatic "Einsatz begonnen" entry from Incident.Start plus the
         // manual one above.
         cmd.CommandText = "SELECT count(*) FROM etb_entries;";
@@ -73,6 +81,7 @@ public class IncidentRepositorySaveTests : IDisposable
             cmd.CommandText = "UPDATE incident_meta SET incident_number = NULL, ils_number = '4711';";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         Assert.Equal("4711", IncidentRepository.Load(_path).IncidentNumber!.Value);

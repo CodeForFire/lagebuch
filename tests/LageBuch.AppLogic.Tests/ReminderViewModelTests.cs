@@ -5,42 +5,20 @@ using LageBuch.Domain.Etb;
 
 namespace LageBuch.AppLogic.Tests;
 
-// Records Start/Stop (looping siren) and Play (one-shot spoken cues) so tests can assert the
-// audible output fired without real audio.
-internal sealed class FakeAlarmService : IAlarmService
-{
-    public List<AlarmSound> Played { get; } = new();
-    public void Play(AlarmSound sound) => Played.Add(sound);
-}
-
-// Synchronous fake ticker — tests call Fire() to advance a "tick".
-internal sealed class FakeTicker : ITicker
-{
-    private readonly List<Action> _subs = new();
-    public int SubscriberCount => _subs.Count;
-    public IDisposable Subscribe(Action onTick)
-    {
-        _subs.Add(onTick);
-        return new Sub(() => _subs.Remove(onTick));
-    }
-    public void Fire() { foreach (var s in _subs.ToArray()) s(); }
-    private sealed class Sub : IDisposable
-    {
-        private readonly Action _dispose;
-        public Sub(Action dispose) => _dispose = dispose;
-        public void Dispose() => _dispose();
-    }
-}
-
 public class ReminderViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 23, 9, 0, 0, TimeSpan.FromHours(2));
 
-    private static (LocalIncidentSession session, FixedClock clock) NewSession()
+    private static (LocalIncidentSession Session, FixedClock Clock) NewSession()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         return (session, clock);
     }
 
@@ -183,8 +161,14 @@ public class ReminderViewModelTests
     public void A_fresh_reminder_persists_its_running_state_on_the_incident()
     {
         var (session, clock) = NewSession();
-        _ = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { },
-            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        _ = new ReminderViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            new FakeAlarmService(),
+            () => { },
+            firstIntervalMinutes: 15,
+            recurringIntervalMinutes: 30);
 
         var timer = session.Incident.FindTimer("ils-reminder");
         Assert.NotNull(timer);
@@ -197,14 +181,27 @@ public class ReminderViewModelTests
     public void Reopening_recovers_the_running_cycle_from_persisted_state()
     {
         var (session, clock) = NewSession();
+
         // First build persists a fresh cycle anchored at T0 (first interval 15).
-        _ = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { },
-            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        _ = new ReminderViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            new FakeAlarmService(),
+            () => { },
+            firstIntervalMinutes: 15,
+            recurringIntervalMinutes: 30);
 
         // Time passes, then the workspace is rebuilt (reopen/crash) from the SAME incident.
         clock.Now = T0.AddMinutes(5);
-        var reopened = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { },
-            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        var reopened = new ReminderViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            new FakeAlarmService(),
+            () => { },
+            firstIntervalMinutes: 15,
+            recurringIntervalMinutes: 30);
 
         // Resumes the elapsed cycle — 10:00 left, not a fresh 15:00.
         Assert.True(reopened.IsRunning);
@@ -217,8 +214,14 @@ public class ReminderViewModelTests
     {
         var (session, clock) = NewSession();
         var ticker = new FakeTicker();
-        var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { },
-            firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        var vm = new ReminderViewModel(
+            session,
+            clock,
+            ticker,
+            new FakeAlarmService(),
+            () => { },
+            firstIntervalMinutes: 15,
+            recurringIntervalMinutes: 30);
 
         clock.Now = T0.AddMinutes(15);
         ticker.Fire();
@@ -228,5 +231,45 @@ public class ReminderViewModelTests
         Assert.NotNull(timer);
         Assert.Equal(T0.AddMinutes(15), timer!.CycleAnchor);
         Assert.Equal(30, timer.IntervalMinutes); // switched to the recurring cadence, durably
+    }
+}
+
+// Records Start/Stop (looping siren) and Play (one-shot spoken cues) so tests can assert the
+// audible output fired without real audio.
+internal sealed class FakeAlarmService : IAlarmService
+{
+    public List<AlarmSound> Played { get; } = new();
+
+    public void Play(AlarmSound sound) => Played.Add(sound);
+}
+
+// Synchronous fake ticker — tests call Fire() to advance a "tick".
+internal sealed class FakeTicker : ITicker
+{
+    private readonly List<Action> _subs = new();
+
+    public int SubscriberCount => _subs.Count;
+
+    public IDisposable Subscribe(Action onTick)
+    {
+        _subs.Add(onTick);
+        return new Sub(() => _subs.Remove(onTick));
+    }
+
+    public void Fire()
+    {
+        foreach (var s in _subs.ToArray())
+        {
+            s();
+        }
+    }
+
+    private sealed class Sub : IDisposable
+    {
+        private readonly Action _dispose;
+
+        public Sub(Action dispose) => _dispose = dispose;
+
+        public void Dispose() => _dispose();
     }
 }

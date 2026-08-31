@@ -6,59 +6,6 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
-internal sealed class FakeDialogs : IFileDialogService
-{
-    public string? ExportPath { get; set; }
-    public string? AttachmentPath { get; set; }
-    public string? LastOpenedPath { get; private set; }
-    public string? LastOpenedUrl { get; private set; }
-    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
-    public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
-    public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(ExportPath);
-    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
-    public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
-    public Task<string?> PickAttachmentAsync() => Task.FromResult(AttachmentPath);
-    public Task OpenFileAsync(string path) { LastOpenedPath = path; return Task.CompletedTask; }
-    public Task OpenUrlAsync(string url) { LastOpenedUrl = url; return Task.CompletedTask; }
-    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
-}
-
-// Hostable controller double: unlike NoopIncidentHostController (CanHost=false, which hides the
-// toggle) this reports CanHost=true so ToggleSharing runs. Optionally fails StartAsync to exercise
-// the bind-failure path (e.g. port already in use).
-internal sealed class FakeHostController : IIncidentHostController
-{
-    private readonly Exception? _failWith;
-    public FakeHostController(string shareHint = "Erreichbar unter 192.168.0.5:5859", Exception? failWith = null)
-    {
-        ShareHint = shareHint;
-        _failWith = failWith;
-    }
-
-    public bool CanHost => true;
-    public bool IsHosting { get; private set; }
-    public string? ShareHint { get; }
-    public string? SharePin { get; private set; }
-    public bool StartCalled { get; private set; }
-
-    public Task StartAsync(LocalIncidentSession session)
-    {
-        StartCalled = true;
-        if (_failWith is not null)
-            throw _failWith;
-        IsHosting = true;
-        SharePin = "1234";
-        return Task.CompletedTask;
-    }
-
-    public Task StopAsync()
-    {
-        IsHosting = false;
-        SharePin = null;
-        return Task.CompletedTask;
-    }
-}
-
 public class IncidentWorkspaceViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
@@ -68,13 +15,24 @@ public class IncidentWorkspaceViewModelTests
     private static IncidentWorkspaceViewModel EditableWorkspace(IIncidentHostController host)
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
-        return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), host);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        return new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            host);
     }
 
     // --- Network sharing (no Tailscale required) --------------------------------------------
-
     [Fact]
     public async Task Toggling_sharing_on_starts_the_host_and_shows_its_hint()
     {
@@ -104,9 +62,21 @@ public class IncidentWorkspaceViewModelTests
     {
         store = new FakeStore();
         clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
-        return new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), dialogs ?? new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        return new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs ?? new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
     }
 
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
@@ -114,19 +84,33 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
         if (closed)
+        {
             seed.Close();
+        }
+
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
-        return new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        return new IncidentWorkspaceViewModel(
+            ro,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
     }
 
     // --- ETB stays live ---------------------------------------------------------------------
     // Entries appended by a module used to sit invisible in the journal until the Einsatz was
     // closed, resumed or reopened, because Etb.Entries was a snapshot taken in BuildChildren and
     // only the ETB tab's own AddEntry inserted into it. Atemschutz has shipped with this.
-
     [Fact]
     public void An_entry_logged_from_the_kraefte_tab_appears_in_the_etb_immediately()
     {
@@ -138,6 +122,7 @@ public class IncidentWorkspaceViewModelTests
         vm.Forces.AddForceCommand.Execute(null);
 
         Assert.Equal(before + 1, vm.Etb.Entries.Count);
+
         // Newest first, matching how the tab renders.
         Assert.Contains("Einheit aufgenommen: FFB Wache 1", vm.Etb.Entries[0].Text, StringComparison.Ordinal);
     }
@@ -162,10 +147,21 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("Blaulicht aus?", true) }, Array.Empty<(string, bool)>());
-        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(),
-            new FakeAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", true) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
         var before = vm.Etb.Entries.Count;
 
         vm.ChecklistAufbau.Items[0].IsDone = true;
@@ -204,7 +200,6 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("Lagemeldung erhalten", vm.Etb.Entries[0].Text);
     }
 
-
     [Fact]
     public void Editing_a_child_autosaves()
     {
@@ -238,27 +233,51 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
         seed.Incident.SetIncidentNumber(new Domain.ValueObjects.IncidentNumber("B 99"));
         seed.Save();
         var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
 
-        var vm = new IncidentWorkspaceViewModel(reopened, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        var vm = new IncidentWorkspaceViewModel(
+            reopened,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
 
         Assert.Equal("B 99", vm.IncidentNumberInput);
     }
 
     // --- Header hero + Einsatznummer add-later (#69) -----------------------------------------
-
     [Fact]
     public void HeroText_shows_the_keyword_when_set()
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), keyword: "B3P");
-        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>(),
+            keyword: "B3P");
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
 
         Assert.Equal("B3P", vm.HeroText);
         Assert.True(vm.ShowEinsatznummerSlot);
@@ -272,11 +291,25 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), incidentNumber: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
-        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>(),
+            incidentNumber: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
 
         Assert.Equal("B 1.2 260715 123", vm.HeroText);
+
         // The number is already the hero -- no redundant chip alongside it.
         Assert.False(vm.ShowEinsatznummerSlot);
     }
@@ -295,9 +328,22 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), keyword: "B3P");
-        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>(),
+            keyword: "B3P");
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
 
         vm.BeginEditIncidentNumberCommand.Execute(null);
         Assert.True(vm.IsEditingIncidentNumber);
@@ -319,9 +365,22 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>(), keyword: "B3P");
-        var vm = new IncidentWorkspaceViewModel(session, clock, new FakeTicker(), Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>(),
+            keyword: "B3P");
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
 
         vm.BeginEditIncidentNumberCommand.Execute(null);
         vm.IncidentNumberEditInput = "B 1.2 260715 123";
@@ -474,11 +533,22 @@ public class IncidentWorkspaceViewModelTests
         var callSigns = new[] { "FFB 1/40/1", "Aich 42/1" };
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
-        var vm = new IncidentWorkspaceViewModel(ro, clock, new FakeTicker(),
+        var vm = new IncidentWorkspaceViewModel(
+            ro,
+            clock,
+            new FakeTicker(),
             MasterDataSet.Empty with { RadioCallSigns = callSigns },
-            new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
 
         vm.ContinueEditingCommand.Execute(null);
 
@@ -549,10 +619,22 @@ public class IncidentWorkspaceViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", new[] { ("A?", false) }, Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
         var ticker = new FakeTicker();
-        var vm = new IncidentWorkspaceViewModel(session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            ticker,
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
 
         vm.CloseIncidentCommand.Execute(null);
         vm.PendingConfirm!.ConfirmCommand.Execute(null); // confirm the close
@@ -579,5 +661,86 @@ public class IncidentWorkspaceViewModelTests
         Assert.NotNull(vm.PendingTaskDialog);
         Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
+    }
+}
+
+internal sealed class FakeDialogs : IFileDialogService
+{
+    public string? ExportPath { get; set; }
+
+    public string? AttachmentPath { get; set; }
+
+    public string? LastOpenedPath { get; private set; }
+
+    public string? LastOpenedUrl { get; private set; }
+
+    public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+
+    public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
+    public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(ExportPath);
+
+    public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
+    public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
+    public Task<string?> PickAttachmentAsync() => Task.FromResult(AttachmentPath);
+
+    public Task OpenFileAsync(string path)
+    {
+        LastOpenedPath = path;
+        return Task.CompletedTask;
+    }
+
+    public Task OpenUrlAsync(string url)
+    {
+        LastOpenedUrl = url;
+        return Task.CompletedTask;
+    }
+
+    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
+}
+
+// Hostable controller double: unlike NoopIncidentHostController (CanHost=false, which hides the
+// toggle) this reports CanHost=true so ToggleSharing runs. Optionally fails StartAsync to exercise
+// the bind-failure path (e.g. port already in use).
+internal sealed class FakeHostController : IIncidentHostController
+{
+    private readonly Exception? _failWith;
+
+    public FakeHostController(string shareHint = "Erreichbar unter 192.168.0.5:5859", Exception? failWith = null)
+    {
+        ShareHint = shareHint;
+        _failWith = failWith;
+    }
+
+    public bool CanHost => true;
+
+    public bool IsHosting { get; private set; }
+
+    public string? ShareHint { get; }
+
+    public string? SharePin { get; private set; }
+
+    public bool StartCalled { get; private set; }
+
+    public Task StartAsync(LocalIncidentSession session)
+    {
+        StartCalled = true;
+        if (_failWith is not null)
+        {
+            throw _failWith;
+        }
+
+        IsHosting = true;
+        SharePin = "1234";
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync()
+    {
+        IsHosting = false;
+        SharePin = null;
+        return Task.CompletedTask;
     }
 }

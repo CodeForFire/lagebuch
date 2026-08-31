@@ -21,7 +21,10 @@ public class AboutRenderTests
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (string.IsNullOrWhiteSpace(dir))
+        {
             return;
+        }
+
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, name));
@@ -90,9 +93,16 @@ public class AboutRenderTests
     {
         var dialogs = new FakeDialogs();
         var masterData = new StaticMasterData(WorkspaceRenderHelper.MasterData());
-        var home = new HomeViewModel(new FakeStore(), masterData,
-            new EmptyRecent(), dialogs, new FixedClock(), new NoopTicker(), new NoopAlarmService(),
-            new NoopIncidentHostController(), "0.1.0");
+        var home = new HomeViewModel(
+            new FakeStore(),
+            masterData,
+            new EmptyRecent(),
+            dialogs,
+            new FixedClock(),
+            new NoopTicker(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController(),
+            "0.1.0");
         var editor = new MasterDataEditorViewModel(masterData, dialogs, new NoFiles());
         return new MainWindowViewModel(home, editor, dialogs, "0.1.0");
     }
@@ -100,19 +110,29 @@ public class AboutRenderTests
     private sealed class StaticMasterData(MasterDataSet set) : IMasterDataProvider
     {
         public MasterDataSet Get() => set;
-        public void Save(MasterDataSet s) { }
+
+        public void Save(MasterDataSet s)
+        {
+        }
     }
 
     private sealed class NoFiles : IMasterDataFileService
     {
         public MasterDataSet Read(string path) => MasterDataSet.Empty;
-        public void Write(string path, MasterDataSet set) { }
+
+        public void Write(string path, MasterDataSet set)
+        {
+        }
     }
 
     private sealed class EmptyRecent : IRecentFilesStore
     {
         private readonly List<string> _list = new();
+
         public IReadOnlyList<string> GetRecent() => _list;
-        public void Add(string path) { }
+
+        public void Add(string path)
+        {
+        }
     }
 }

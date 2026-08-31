@@ -11,7 +11,9 @@ public partial class HomeView : UserControl
         RecentList.DoubleTapped += (_, _) =>
         {
             if (DataContext is HomeViewModel vm && RecentList.SelectedItem is RecentFileItem item)
+            {
                 vm.OpenRecentCommand.Execute(item.Path);
+            }
         };
     }
 }

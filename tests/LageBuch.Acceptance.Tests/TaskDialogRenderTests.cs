@@ -17,9 +17,13 @@ public class TaskDialogRenderTests
     [AvaloniaFact]
     public void Task_dialog_renders_with_prefilled_text()
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), new FixedClock(),
-            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var masterData = MasterDataSet.Empty with { RadioCallSigns = AnonymizedExampleData.RadioCallSigns };
         var dialogVm = new TaskDialogViewModel(session, masterData, "Lagemeldung übermittelt", () => { });
 

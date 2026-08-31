@@ -18,11 +18,24 @@ public class SharePanelRenderTests
     private sealed class FakeHost : IIncidentHostController
     {
         public bool CanHost => true;
+
         public bool IsHosting { get; private set; }
+
         public string? ShareHint => "Erreichbar unter 192.168.0.5:5859 · auf diesem Gerät: localhost:5859";
+
         public string? SharePin => IsHosting ? "1234" : null;
-        public Task StartAsync(LocalIncidentSession session) { IsHosting = true; return Task.CompletedTask; }
-        public Task StopAsync() { IsHosting = false; return Task.CompletedTask; }
+
+        public Task StartAsync(LocalIncidentSession session)
+        {
+            IsHosting = true;
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync()
+        {
+            IsHosting = false;
+            return Task.CompletedTask;
+        }
     }
 
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
@@ -38,7 +51,10 @@ public class SharePanelRenderTests
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (string.IsNullOrWhiteSpace(dir))
+        {
             return;
+        }
+
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, name));
@@ -54,7 +70,8 @@ public class SharePanelRenderTests
 
         Assert.Equal("IM NETZWERK FREIGEBEN", vm.ShareButtonText);
         Assert.Null(vm.ShareStatus);
-        Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(),
+        Assert.DoesNotContain(
+            window.GetVisualDescendants().OfType<TextBlock>(),
             t => t.Text != null && t.Text.StartsWith("Erreichbar unter", StringComparison.Ordinal));
         Capture(window, "share-before.png");
     }
@@ -91,7 +108,8 @@ public class SharePanelRenderTests
 
         var pinValue = window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "PinValue");
         Assert.Equal(vm.SharePin, pinValue.Text);   // the number itself, no static prefix to mask a 0-width bug
-        Assert.True(pinValue.Bounds.Width > 0,
+        Assert.True(
+            pinValue.Bounds.Width > 0,
             $"PIN number '{pinValue.Text}' rendered at {pinValue.Bounds.Width:F0}px wide — it exists in the tree but is not laid out, so the number is invisible on first share.");
     }
 }

@@ -69,7 +69,8 @@ public class LayoutAlignmentTests
         // DisplayFont, and the two have slightly different line-height metrics at the same pixel
         // size -- that residual gap is a font trait, not a layout bug, and varies a little across
         // platforms (this app's CI matrix includes windows-latest).
-        Assert.True(delta <= 6,
+        Assert.True(
+            delta <= 6,
             $"Einsatznummer hero and status readout centres are {delta:F0}px apart — they don't sit on one line.");
     }
 
@@ -114,7 +115,8 @@ public class LayoutAlignmentTests
 
         // Wide enough for two family names side by side; below this the grid must scroll
         // horizontally instead of silently hiding the column.
-        Assert.True(crew.ActualWidth >= 160,
+        Assert.True(
+            crew.ActualWidth >= 160,
             $"MANNSCHAFT collapsed to {crew.ActualWidth:F0}px at a window width of {width}px.");
     }
 
@@ -140,7 +142,10 @@ public class LayoutAlignmentTests
 
         // Each name is its own text run, not one joined string that the cell then clips.
         foreach (var name in new[] { "Hintersberger, Hans", "Kreutzkamp, Bastian", "Schormaier, Florian" })
+        {
             Assert.Contains(name, rendered);
+        }
+
         Assert.DoesNotContain(rendered, s => s!.Contains("Hintersberger, Hans / ", StringComparison.Ordinal));
 
         // Existing in the visual tree is not the same as being visible. DataGrid rows are styled
@@ -154,7 +159,8 @@ public class LayoutAlignmentTests
         foreach (var line in crewCell.GetVisualDescendants().OfType<TextBlock>())
         {
             var top = line.TranslatePoint(new Point(0, 0), row)!.Value.Y;
-            Assert.True(top + line.Bounds.Height <= row.Bounds.Height,
+            Assert.True(
+                top + line.Bounds.Height <= row.Bounds.Height,
                 $"'{line.Text}' extends to {top + line.Bounds.Height:F0}px in a {row.Bounds.Height:F0}px row — clipped.");
         }
     }
@@ -183,7 +189,8 @@ public class LayoutAlignmentTests
         var grid = view.GetVisualDescendants().OfType<DataGrid>().Single();
         var total = grid.Columns.Sum(c => c.ActualWidth);
 
-        Assert.True(total <= grid.Bounds.Width + 1,
+        Assert.True(
+            total <= grid.Bounds.Width + 1,
             $"columns need {total:F0}px in a {grid.Bounds.Width:F0}px grid — the row overflows.");
     }
 }

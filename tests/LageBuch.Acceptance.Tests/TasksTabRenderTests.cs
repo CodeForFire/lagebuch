@@ -18,12 +18,22 @@ public class TasksTabRenderTests
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session, ManualTicker Ticker, FixedClock Clock) ShowWorkspace()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var ticker = new ManualTicker();
-        var vm = new IncidentWorkspaceViewModel(session, clock, ticker, WorkspaceRenderHelper.MasterData(),
-            new FakeDialogs(), new NoopAlarmService(), new NoopIncidentHostController());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            ticker,
+            WorkspaceRenderHelper.MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -34,7 +44,10 @@ public class TasksTabRenderTests
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (string.IsNullOrWhiteSpace(dir))
+        {
             return;
+        }
+
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Combine(dir, name));

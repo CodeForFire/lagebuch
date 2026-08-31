@@ -27,7 +27,13 @@ public class OperatorPromptViewModelTests
     {
         var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
         var raised = false;
-        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OperatorPromptViewModel.Result)) raised = true; };
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(OperatorPromptViewModel.Result))
+            {
+                raised = true;
+            }
+        };
         vm.ConfirmCommand.Execute(null);
         Assert.True(raised);
         Assert.NotNull(vm.Result);

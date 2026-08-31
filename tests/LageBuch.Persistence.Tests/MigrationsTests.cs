@@ -10,7 +10,10 @@ public class MigrationsTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     [Fact]
@@ -28,6 +31,7 @@ public class MigrationsTests : IDisposable
             Migrations.Migrate(cn);
             Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
         }
+
         // re-open and migrate again: no error, same version
         using (var cn2 = SqliteConnectionFactory.OpenReadWrite(_path))
         {
@@ -105,6 +109,7 @@ public class MigrationsTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
@@ -127,6 +132,7 @@ public class MigrationsTests : IDisposable
                 "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (1);";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
@@ -154,6 +160,7 @@ public class MigrationsTests : IDisposable
                 "CREATE TABLE checklist_items (id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL, text TEXT NOT NULL, is_done INTEGER NOT NULL, note TEXT);";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);

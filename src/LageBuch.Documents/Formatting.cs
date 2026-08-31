@@ -17,14 +17,14 @@ public static class Formatting
         EtbDirection.Outgoing => "Ausgang",
         EtbDirection.Internal => "Intern",
         EtbDirection.System => "System",
-        _ => direction.ToString()
+        _ => direction.ToString(),
     };
 
     public static string State(IncidentState state) => state switch
     {
         IncidentState.Open => "Offen",
         IncidentState.Closed => "Abgeschlossen",
-        _ => state.ToString()
+        _ => state.ToString(),
     };
 
     public static string OrDash(string? value) =>

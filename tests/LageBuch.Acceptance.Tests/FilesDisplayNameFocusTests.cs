@@ -18,8 +18,13 @@ public class FilesDisplayNameFocusTests
         store = new FakeStore();
         var clock = new FixedClock();
         var op = new SessionOperator("Müller", "FFB 12/1");
-        session = LocalIncidentSession.StartNew(store, clock, op, "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 10);
         return new FilesViewModel(session, new FakeDialogs(), () => { });
     }
@@ -44,7 +49,8 @@ public class FilesDisplayNameFocusTests
             Dispatcher.UIThread.RunJobs();
 
             var focused = window.FocusManager?.GetFocusedElement();
-            Assert.True(nameBox.IsFocused,
+            Assert.True(
+                nameBox.IsFocused,
                 $"DisplayName box lost focus after typing '{ch}'. FocusManager focused element = {focused?.GetType().Name ?? "null"}.");
         }
 
@@ -79,6 +85,7 @@ public class FilesDisplayNameFocusTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Küche", session.Incident.Files.Single().DisplayName);
+
         // Five keystrokes committed as one edit -> exactly one save, not one per keystroke.
         Assert.Equal(saveCountBefore + 1, store.SaveCount);
     }

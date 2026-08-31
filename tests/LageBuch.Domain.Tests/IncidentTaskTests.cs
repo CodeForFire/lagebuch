@@ -10,8 +10,14 @@ public class IncidentTaskTests
     [Fact]
     public void Create_trims_assigns_id_and_computes_due_at()
     {
-        var task = IncidentTask.Create(T0, "  Tür sichern  ", "  FFB 1/44/1 ",
-            TaskImportance.High, TaskUrgency.High, timerMinutes: 5, Op);
+        var task = IncidentTask.Create(
+            T0,
+            "  Tür sichern  ",
+            "  FFB 1/44/1 ",
+            TaskImportance.High,
+            TaskUrgency.High,
+            timerMinutes: 5,
+            Op);
 
         Assert.NotEqual(Guid.Empty, task.Id);
         Assert.Equal("Tür sichern", task.Text);
@@ -76,8 +82,17 @@ public class IncidentTaskTests
     {
         var id = Guid.NewGuid();
         var due = T0.AddMinutes(5);
-        var task = IncidentTask.Rehydrate(id, T0, "Text", "Aich 42/1",
-            TaskImportance.High, TaskUrgency.Medium, "System", due, T0.AddMinutes(2), "Schmidt");
+        var task = IncidentTask.Rehydrate(
+            id,
+            T0,
+            "Text",
+            "Aich 42/1",
+            TaskImportance.High,
+            TaskUrgency.Medium,
+            "System",
+            due,
+            T0.AddMinutes(2),
+            "Schmidt");
 
         Assert.Equal(id, task.Id);
         Assert.Equal("System", task.CreatedBy);

@@ -17,6 +17,7 @@ public static class Migrations
             create.CommandText = "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);";
             create.ExecuteNonQuery();
         }
+
         using var read = cn.CreateCommand();
         read.CommandText = "SELECT version FROM schema_version LIMIT 1;";
         var result = read.ExecuteScalar();
@@ -33,84 +34,103 @@ public static class Migrations
         // so the file silently claims a schema it does not have -- and the next read fails deep in
         // a SELECT against a column the newer build had already dropped.
         if (version > CurrentVersion)
+        {
             throw new UnsupportedSchemaVersionException(version, CurrentVersion);
+        }
 
         using var tx = cn.BeginTransaction();
         if (version < 1)
         {
             ApplyV1(cn, tx);
         }
+
         if (version < 2)
         {
             ApplyV2(cn, tx);
         }
+
         if (version < 3)
         {
             ApplyV3(cn, tx);
         }
+
         if (version < 4)
         {
             ApplyV4(cn, tx);
         }
+
         if (version < 5)
         {
             ApplyV5(cn, tx);
         }
+
         if (version < 6)
         {
             ApplyV6(cn, tx);
         }
+
         if (version < 7)
         {
             ApplyV7(cn, tx);
         }
+
         if (version < 8)
         {
             ApplyV8(cn, tx);
         }
+
         if (version < 9)
         {
             ApplyV9(cn, tx);
         }
+
         if (version < 10)
         {
             ApplyV10(cn, tx);
         }
+
         if (version < 11)
         {
             ApplyV11(cn, tx);
         }
+
         if (version < 12)
         {
             ApplyV12(cn, tx);
         }
+
         if (version < 13)
         {
             ApplyV13(cn, tx);
         }
+
         if (version < 14)
         {
             ApplyV14(cn, tx);
         }
+
         if (version < 15)
         {
             ApplyV15(cn, tx);
         }
+
         if (version < 16)
         {
             ApplyV16(cn, tx);
         }
+
         if (version < 17)
         {
             ApplyV17(cn, tx);
         }
+
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
     }
 
     private static void ApplyV1(SqliteConnection cn, SqliteTransaction tx)
     {
-        Exec(cn, tx, """
+        const string sql1 = """
             CREATE TABLE incident_meta (
                 id TEXT PRIMARY KEY,
                 started_at TEXT NOT NULL,
@@ -124,8 +144,9 @@ public static class Migrations
                 closed_at TEXT,
                 closed_by TEXT
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql1);
+        const string sql2 = """
             CREATE TABLE checklist_items (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -133,8 +154,9 @@ public static class Migrations
                 is_done INTEGER NOT NULL,
                 note TEXT
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql2);
+        const string sql3 = """
             CREATE TABLE etb_entries (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -145,8 +167,9 @@ public static class Migrations
                 text TEXT NOT NULL,
                 entered_by TEXT NOT NULL
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql3);
+        const string sql4 = """
             CREATE TABLE role_assignments (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -156,8 +179,9 @@ public static class Migrations
                 from_time TEXT,
                 to_time TEXT
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql4);
+        const string sql5 = """
             CREATE TABLE force_units (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -167,20 +191,22 @@ public static class Migrations
                 status TEXT,
                 notes TEXT
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql5);
+        const string sql6 = """
             CREATE TABLE audit_events (
                 ordinal INTEGER PRIMARY KEY,
                 at TEXT NOT NULL,
                 action TEXT NOT NULL,
                 by_operator TEXT NOT NULL
             );
-            """);
+            """;
+        Exec(cn, tx, sql6);
     }
 
     private static void ApplyV2(SqliteConnection cn, SqliteTransaction tx)
     {
-        Exec(cn, tx, """
+        const string sql7 = """
             CREATE TABLE scba_trupps (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -194,8 +220,9 @@ public static class Migrations
                 return_pressure_bar INTEGER NOT NULL,
                 exit_time TEXT
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql7);
+        const string sql8 = """
             CREATE TABLE scba_pressure_readings (
                 id TEXT PRIMARY KEY,
                 trupp_id TEXT NOT NULL,
@@ -203,7 +230,8 @@ public static class Migrations
                 reading_time TEXT NOT NULL,
                 bar INTEGER NOT NULL
             );
-            """);
+            """;
+        Exec(cn, tx, sql8);
     }
 
     private static void ApplyV3(SqliteConnection cn, SqliteTransaction tx)
@@ -212,7 +240,7 @@ public static class Migrations
         // registered_at and a nullable start_time/start_pressure (null while on standby), plus a
         // pressure-control interval. Rebuild the table (portable across SQLite versions) and map
         // any existing V2 rows — those were already "under air", so start == entry.
-        Exec(cn, tx, """
+        const string sql9 = """
             CREATE TABLE scba_trupps_v3 (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -228,8 +256,9 @@ public static class Migrations
                 pressure_control_interval_minutes INTEGER NOT NULL,
                 exit_time TEXT
             );
-            """);
-        Exec(cn, tx, $"""
+            """;
+        Exec(cn, tx, sql9);
+        var migrateTruppsSql = $"""
             INSERT INTO scba_trupps_v3
                 (id, ordinal, designation, members, call_sign, task, registered_at, start_time,
                  start_pressure, max_duration_minutes, return_pressure_bar,
@@ -238,7 +267,8 @@ public static class Migrations
                    entry_pressure, max_duration_minutes, return_pressure_bar,
                    {AtemschutzTrupp.DefaultPressureControlIntervalMinutes}, exit_time
             FROM scba_trupps;
-            """);
+            """;
+        Exec(cn, tx, migrateTruppsSql);
         Exec(cn, tx, "DROP TABLE scba_trupps;");
         Exec(cn, tx, "ALTER TABLE scba_trupps_v3 RENAME TO scba_trupps;");
     }
@@ -264,17 +294,20 @@ public static class Migrations
     {
         // A Trupp's crew stops being one free-text string and becomes addressable rows, mirroring
         // how scba_pressure_readings already hangs off a Trupp.
-        Exec(cn, tx, """
+        const string sql10 = """
             CREATE TABLE IF NOT EXISTS scba_trupp_members (
                 trupp_id TEXT NOT NULL,
                 ordinal INTEGER NOT NULL,
                 role INTEGER NOT NULL,
                 name TEXT NOT NULL
             );
-            """);
+            """;
+        Exec(cn, tx, sql10);
 
         if (!SchemaHelpers.TableExists(cn, tx, "scba_trupps") || !SchemaHelpers.ColumnExists(cn, tx, "scba_trupps", "members"))
+        {
             return;
+        }
 
         // Split the old "Müller / Schmidt" convention into rows. The separator was only ever a
         // watermark hint, so anything that does not split cleanly is kept whole as the Truppführer
@@ -287,7 +320,9 @@ public static class Migrations
             read.CommandText = "SELECT id, members FROM scba_trupps;";
             using var r = read.ExecuteReader();
             while (r.Read())
+            {
                 legacy.Add((r.GetString(0), r.IsDBNull(1) ? string.Empty : r.GetString(1)));
+            }
         }
 
         foreach (var (id, members) in legacy)
@@ -296,7 +331,9 @@ public static class Migrations
                 .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList();
             if (names.Count == 0)
+            {
                 names.Add(string.IsNullOrWhiteSpace(members) ? "Unbekannt" : members.Trim());
+            }
 
             for (var i = 0; i < names.Count; i++)
             {
@@ -314,7 +351,7 @@ public static class Migrations
 
         // Drop the members column by rebuilding, exactly as V3 did: portable across SQLite
         // versions, and the explicit DDL keeps the resulting shape visible in the diff.
-        Exec(cn, tx, """
+        const string sql11 = """
             CREATE TABLE scba_trupps_v6 (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -329,8 +366,9 @@ public static class Migrations
                 pressure_control_interval_minutes INTEGER NOT NULL,
                 exit_time TEXT
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql11);
+        const string sql12 = """
             INSERT INTO scba_trupps_v6
                 (id, ordinal, designation, call_sign, task, registered_at, start_time,
                  start_pressure, max_duration_minutes, return_pressure_bar,
@@ -339,7 +377,8 @@ public static class Migrations
                    start_pressure, max_duration_minutes, return_pressure_bar,
                    pressure_control_interval_minutes, exit_time
             FROM scba_trupps;
-            """);
+            """;
+        Exec(cn, tx, sql12);
         Exec(cn, tx, "DROP TABLE scba_trupps;");
         Exec(cn, tx, "ALTER TABLE scba_trupps_v6 RENAME TO scba_trupps;");
     }
@@ -357,7 +396,7 @@ public static class Migrations
     // the anchor + cadence are stored, live values are recomputed from now (like the SCBA countdowns).
     private static void ApplyV8(SqliteConnection cn, SqliteTransaction tx)
     {
-        Exec(cn, tx, """
+        const string sql13 = """
             CREATE TABLE IF NOT EXISTS incident_timers (
                 key TEXT PRIMARY KEY,
                 cycle_anchor TEXT NOT NULL,
@@ -365,7 +404,8 @@ public static class Migrations
                 recurring_interval_minutes INTEGER NOT NULL,
                 is_running INTEGER NOT NULL
             );
-            """);
+            """;
+        Exec(cn, tx, sql13);
     }
 
     // Checkliste splits into two independent lists (Aufbau/Abbau) with a mandatory flag per item.
@@ -382,7 +422,7 @@ public static class Migrations
     // full-rewrite-per-save table set so an unrelated edit never rewrites attachment content.
     private static void ApplyV10(SqliteConnection cn, SqliteTransaction tx)
     {
-        Exec(cn, tx, """
+        const string sql14 = """
             CREATE TABLE IF NOT EXISTS incident_files (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -392,7 +432,8 @@ public static class Migrations
                 added_at TEXT NOT NULL,
                 added_by TEXT NOT NULL
             );
-            """);
+            """;
+        Exec(cn, tx, sql14);
     }
 
     // A file's display label, editable independently of its original file_name (#62 follow-up).
@@ -405,7 +446,7 @@ public static class Migrations
     // history lives in this table (#73).
     private static void ApplyV12(SqliteConnection cn, SqliteTransaction tx)
     {
-        Exec(cn, tx, """
+        const string sql15 = """
             CREATE TABLE IF NOT EXISTS etb_entry_edits (
                 id TEXT PRIMARY KEY,
                 entry_id TEXT NOT NULL,
@@ -414,7 +455,8 @@ public static class Migrations
                 edited_by TEXT NOT NULL,
                 edited_at TEXT NOT NULL
             );
-            """);
+            """;
+        Exec(cn, tx, sql15);
     }
 
     // Kräfte gain a Führungskräfte counter and corrigible Stärke (#76). officer_count is NOT NULL
@@ -424,7 +466,7 @@ public static class Migrations
     private static void ApplyV13(SqliteConnection cn, SqliteTransaction tx)
     {
         SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "officer_count", "INTEGER NOT NULL DEFAULT 0");
-        Exec(cn, tx, """
+        const string sql16 = """
             CREATE TABLE IF NOT EXISTS force_unit_edits (
                 id TEXT PRIMARY KEY,
                 unit_id TEXT NOT NULL,
@@ -435,7 +477,8 @@ public static class Migrations
                 edited_by TEXT NOT NULL,
                 edited_at TEXT NOT NULL
             );
-            """);
+            """;
+        Exec(cn, tx, sql16);
     }
 
     // Aufgabenliste (#88): one row per task, ordered by ordinal. due_at carries the timer target
@@ -443,7 +486,7 @@ public static class Migrations
     // countdown/overdue display is recomputed from now, exactly like the SCBA timers.
     private static void ApplyV14(SqliteConnection cn, SqliteTransaction tx)
     {
-        Exec(cn, tx, """
+        const string sql17 = """
             CREATE TABLE IF NOT EXISTS incident_tasks (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -457,12 +500,13 @@ public static class Migrations
                 completed_at TEXT,
                 completed_by TEXT
             );
-            """);
+            """;
+        Exec(cn, tx, sql17);
     }
 
     private static void ApplyV15(SqliteConnection cn, SqliteTransaction tx)
     {
-        Exec(cn, tx, """
+        const string sql18 = """
             CREATE TABLE IF NOT EXISTS co_buildings (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -471,8 +515,9 @@ public static class Migrations
                 floor_descriptions TEXT NOT NULL DEFAULT '{}',
                 ordinal INTEGER NOT NULL
             );
-            """);
-        Exec(cn, tx, """
+            """;
+        Exec(cn, tx, sql18);
+        const string sql19 = """
             CREATE TABLE IF NOT EXISTS co_dwellings (
                 id TEXT PRIMARY KEY,
                 building_id TEXT NOT NULL,
@@ -483,7 +528,8 @@ public static class Migrations
                 key_available INTEGER,
                 co_value INTEGER
             );
-            """);
+            """;
+        Exec(cn, tx, sql19);
     }
 
     private static void ApplyV16(SqliteConnection cn, SqliteTransaction tx)
@@ -505,9 +551,11 @@ public static class Migrations
         // up trying to rebuild from a start_pressure column that is already gone.
         if (!SchemaHelpers.TableExists(cn, tx, "scba_trupps") ||
             !SchemaHelpers.ColumnExists(cn, tx, "scba_trupps", "start_pressure"))
+        {
             return;
+        }
 
-        Exec(cn, tx, """
+        const string sql20 = """
             CREATE TABLE scba_trupps_v17 (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -524,12 +572,14 @@ public static class Migrations
                 pressure_control_interval_minutes INTEGER NOT NULL,
                 exit_time TEXT
             );
-            """);
+            """;
+        Exec(cn, tx, sql20);
+
         // Backfill trupp_number from the existing registration-order "ordinal" (+1, since ordinal
         // is 0-based) so pre-existing rows get stable, unique, sequential numbers instead of all
         // colliding on the same value -- a fresh Incident.AddScbaTrupp rejects a duplicate the
         // moment one more Trupp is added to an old file.
-        Exec(cn, tx, """
+        const string sql21 = """
             INSERT INTO scba_trupps_v17
                 (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time,
                  entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar,
@@ -538,7 +588,8 @@ public static class Migrations
                    start_pressure, NULL, max_duration_minutes, return_pressure_bar,
                    pressure_control_interval_minutes, exit_time
             FROM scba_trupps;
-            """);
+            """;
+        Exec(cn, tx, sql21);
         Exec(cn, tx, "DROP TABLE scba_trupps;");
         Exec(cn, tx, "ALTER TABLE scba_trupps_v17 RENAME TO scba_trupps;");
     }
@@ -553,7 +604,9 @@ public static class Migrations
         cmd.ExecuteNonQuery();
     }
 
-    [SuppressMessage("Security", "CA2100",
+    [SuppressMessage(
+        "Security",
+        "CA2100",
         Justification = "Audited: SQL is migration DDL/data built from compile-time constants; values use bound parameters.")]
     private static void Exec(SqliteConnection cn, SqliteTransaction tx, string sql)
     {

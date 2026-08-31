@@ -55,10 +55,14 @@ public sealed class AtemschutzTrupp
     private readonly List<PressureReading> _readings = new();
     private readonly List<TruppMember> _members = new();
 
-    private AtemschutzTrupp() { }
+    private AtemschutzTrupp()
+    {
+    }
 
     public Guid Id { get; private init; }
+
     public int TruppNumber { get; private init; }
+
     public string Designation { get; private init; } = string.Empty;
 
     /// <summary>"Trupp {N} ({Designation})" — the display form used in the grid, ETB text, the
@@ -83,6 +87,7 @@ public sealed class AtemschutzTrupp
     public string MembersDisplay => string.Join(" / ", _members.Select(m => m.Name));
 
     public string? CallSign { get; private init; }
+
     public string? Task { get; private init; }
 
     /// <summary>When the Trupp was announced/registered (not yet necessarily under air).</summary>
@@ -96,7 +101,9 @@ public sealed class AtemschutzTrupp
     public int? EntryPressure { get; private set; }
 
     public int MaxDurationMinutes { get; private init; }
+
     public int ReturnPressureBar { get; private init; }
+
     public int PressureControlIntervalMinutes { get; private init; }
 
     /// <summary>When the Trupp began its Rückzug. Null before withdrawing, and while still waiting/active.</summary>
@@ -121,12 +128,18 @@ public sealed class AtemschutzTrupp
     {
         ArgumentNullException.ThrowIfNull(members);
         if (string.IsNullOrWhiteSpace(designation))
+        {
             throw new ArgumentException("Trupp-Bezeichnung darf nicht leer sein.", nameof(designation));
+        }
+
         var crew = members.ToList();
         ValidateCrew(designation, crew);
         ValidatePressure(entryPressure, nameof(entryPressure));
         if (entryPressure <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(entryPressure), "Einstiegsdruck muss größer als 0 sein.");
+        }
+
         ValidatePressure(returnPressureBar, nameof(returnPressureBar));
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxDurationMinutes);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pressureControlIntervalMinutes);
@@ -142,7 +155,7 @@ public sealed class AtemschutzTrupp
             Task = string.IsNullOrWhiteSpace(task) ? null : task.Trim(),
             MaxDurationMinutes = maxDurationMinutes,
             ReturnPressureBar = returnPressureBar,
-            PressureControlIntervalMinutes = pressureControlIntervalMinutes
+            PressureControlIntervalMinutes = pressureControlIntervalMinutes,
         };
         trupp._members.AddRange(crew);
         return trupp;
@@ -167,13 +180,21 @@ public sealed class AtemschutzTrupp
         // rather than in the ViewModel keeps it true for rehydrated and imported data as well.
         var required = RequiredMemberCount(designation);
         if (crew.Count != required)
+        {
             throw new ArgumentException(
                 $"{designation.Trim()} muss aus genau {required} Personen bestehen (angegeben: {crew.Count}).",
                 nameof(crew));
+        }
+
         if (crew.Any(m => m is null || string.IsNullOrWhiteSpace(m.Name)))
+        {
             throw new ArgumentException("Alle Truppmitglieder müssen einen Namen haben.", nameof(crew));
+        }
+
         if (crew.Select(m => m.Role).Distinct().Count() != crew.Count)
+        {
             throw new ArgumentException("Jede Truppfunktion darf nur einmal besetzt sein.", nameof(crew));
+        }
     }
 
     public static AtemschutzTrupp Rehydrate(
@@ -207,8 +228,9 @@ public sealed class AtemschutzTrupp
             MaxDurationMinutes = maxDurationMinutes,
             ReturnPressureBar = returnPressureBar,
             PressureControlIntervalMinutes = pressureControlIntervalMinutes,
-            ExitTime = exitTime
+            ExitTime = exitTime,
         };
+
         // Rehydrate deliberately does not re-run ValidateCrew: a stored Trupp is history, and
         // refusing to open an incident because an old record has the wrong crew size would make
         // the file unreadable rather than merely imperfect.
@@ -222,14 +244,20 @@ public sealed class AtemschutzTrupp
     public void Start(DateTimeOffset time)
     {
         if (HasStarted)
+        {
             throw new InvalidOperationException("Trupp ist bereits unter Atemschutz.");
+        }
+
         StartTime = time;
     }
 
     public void RecordPressure(DateTimeOffset time, int bar)
     {
         if (!(IsActive || IsWithdrawing))
+        {
             throw new InvalidOperationException("Druckkontrolle nur für einen Trupp unter Atemschutz möglich.");
+        }
+
         ValidatePressure(bar, nameof(bar));
         _readings.Add(new PressureReading(time, bar));
     }
@@ -238,7 +266,10 @@ public sealed class AtemschutzTrupp
     public void Withdraw(DateTimeOffset time)
     {
         if (!IsActive)
+        {
             throw new InvalidOperationException("Rückzug nur für einen Trupp im Einsatz möglich.");
+        }
+
         WithdrawTime = time;
     }
 
@@ -246,9 +277,15 @@ public sealed class AtemschutzTrupp
     public void MarkRemoved(DateTimeOffset time)
     {
         if (WithdrawTime is null)
+        {
             throw new InvalidOperationException("Trupp muss zuerst den Rückzug antreten.");
+        }
+
         if (ExitTime is not null)
+        {
             throw new InvalidOperationException("Trupp ist bereits abgenommen.");
+        }
+
         ExitTime = time;
     }
 
@@ -308,6 +345,8 @@ public sealed class AtemschutzTrupp
     private static void ValidatePressure(int bar, string paramName)
     {
         if (bar < 0 || bar > MaxPressureBar)
+        {
             throw new ArgumentOutOfRangeException(paramName, $"Druck muss zwischen 0 und {MaxPressureBar} bar liegen.");
+        }
     }
 }

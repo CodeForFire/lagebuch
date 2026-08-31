@@ -17,7 +17,10 @@ public class CoMeasurementPersistenceTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     private static Incident CreateIncidentWithBuilding()

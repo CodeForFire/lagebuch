@@ -20,12 +20,23 @@ namespace LageBuch.Sync.Hosting.Tests;
 public class WorkspaceCollaborationTests
 {
     private static LocalIncidentSession HostSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", new[] { ("Punkt A", false) }, Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            new[] { ("Punkt A", false) },
+            Array.Empty<(string, bool)>());
 
     private static IncidentWorkspaceViewModel Workspace(IIncidentSession session, IClock clock) =>
-        new(session, clock, new NoTicker(), MasterDataSet.Empty,
-            new NoDialogs(), new NoAlarm(), new NoopIncidentHostController());
+        new(
+            session,
+            clock,
+            new NoTicker(),
+            MasterDataSet.Empty,
+            new NoDialogs(),
+            new NoAlarm(),
+            new NoopIncidentHostController());
 
     // Completes when the client next applies a host broadcast (times out so a broken push fails fast).
     private static Task NextChange(RemoteIncidentSession session, TimeSpan? timeout = null)
@@ -34,7 +45,12 @@ public class WorkspaceCollaborationTests
         void Handler() => tcs.TrySetResult();
         session.Changed += Handler;
         return tcs.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(5))
-            .ContinueWith(t => { session.Changed -= Handler; t.GetAwaiter().GetResult(); },
+            .ContinueWith(
+                t =>
+                {
+                    session.Changed -= Handler;
+                    t.GetAwaiter().GetResult();
+                },
                 TaskContinuationOptions.ExecuteSynchronously);
     }
 
@@ -84,8 +100,13 @@ public class WorkspaceCollaborationTests
     {
         var clock = new FixedClock();
         var hostSession = HostSession(clock);
-        var entry = hostSession.Incident.AddJournalEntry(clock, new SessionOperator("Host", "FFB 1"),
-            EtbDirection.Incoming, "Lage erkundet", "Leitstelle", "ELW");
+        var entry = hostSession.Incident.AddJournalEntry(
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            EtbDirection.Incoming,
+            "Lage erkundet",
+            "Leitstelle",
+            "ELW");
         var (host, port) = await TestHost.StartAsync(hostSession, clock);
         await using var _ = host;
 
@@ -131,8 +152,12 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(),
-            TestHost.DefaultPin, port);
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            TestHost.DefaultPin,
+            port);
 
         // Host creates -> client sees it appear with a host-clock due time.
         var change = NextChange(client);

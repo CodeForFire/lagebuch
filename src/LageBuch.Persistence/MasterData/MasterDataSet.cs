@@ -5,6 +5,72 @@ using LageBuch.Domain.Atemschutz;
 
 namespace LageBuch.Persistence.MasterData;
 
+public sealed record MasterDataSet(
+    IReadOnlyList<string> Roles,
+    IReadOnlyList<string> Status,
+    IReadOnlyList<string> Equipment,
+    IReadOnlyList<string> Districts,
+    IReadOnlyList<string> RadioCallSigns,
+    IReadOnlyList<string> Brigades,
+
+    // UnitStatus is the status of a single unit (Alarmiert, Auf Anfahrt, ...) and is deliberately
+    // separate from Status above, which is the incident-level vocabulary (aufgenommen, ...).
+    IReadOnlyList<string> UnitStatus,
+    IReadOnlyList<Street> Streets,
+    IReadOnlyList<Link> Links,
+    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
+    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau,
+    IReadOnlyList<string> TruppTypes,
+    IReadOnlyList<Person> Personnel,
+
+    // Einsatzart values (ABek Bayern) — the leading token of the complete Einsatznummer.
+    IReadOnlyList<string> Einsatzarten,
+
+    // Vehicles per Wache with their seat count (#76).
+    IReadOnlyList<Vehicle> Vehicles,
+
+    // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
+    // no overrides yields IncidentSettings.Defaults, never a zeroed record.
+    IncidentSettings Settings)
+{
+    /// <summary>
+    /// Every category empty. Intended for tests and for callers that need a starting point to
+    /// override with a <c>with</c> expression, so that adding a category to this positional record
+    /// does not force an edit in every construction site.
+    /// </summary>
+    public static MasterDataSet Empty { get; } = new(
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<Street>(),
+        Array.Empty<Link>(),
+        Array.Empty<ChecklistTemplateItem>(),
+        Array.Empty<ChecklistTemplateItem>(),
+        Array.Empty<string>(),
+        Array.Empty<Person>(),
+        Array.Empty<string>(),
+        Array.Empty<Vehicle>(),
+        IncidentSettings.Defaults);
+
+    /// <summary>
+    /// True when no category holds a single entry. A fresh install starts here, and it is the
+    /// condition under which the Stammdaten editor offers Import — a bootstrap, not a merge.
+    /// <see cref="Settings"/> deliberately does not count: it always carries defaults, and letting it
+    /// mark the set non-empty would suppress the Import bootstrap on an otherwise fresh install.
+    /// </summary>
+    public bool IsEmpty =>
+        Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
+        && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
+        && Streets.Count == 0 && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
+        && TruppTypes.Count == 0
+        && Personnel.Count == 0 && Einsatzarten.Count == 0
+        && Vehicles.Count == 0;
+}
+
 public sealed record Street(string Name, string District);
 
 /// <summary>A named link — Stammdaten entry so useful external resources can be opened from an Einsatz.</summary>
@@ -24,19 +90,26 @@ public sealed record ChecklistTemplateItem(string Text, bool IsMandatory);
 /// usable values rather than zeros.
 /// </summary>
 public sealed record IncidentSettings(
+
     // "Rückmeldung an ILS" — minutes until the first reminder is due.
     int IlsReminderIntervalMinutes,
+
     // "Rückmeldung an ILS" — recurring interval after the first reminder. Stored/editable
     // here but not yet consumed by the reminder timer (see #70).
     int IlsReminderFollowUpIntervalMinutes,
+
     // Atemschutz Einsatzzeit for an ordinary AGT-Trupp.
     int AgtMaxDurationMinutes,
+
     // Atemschutz Einsatzzeit for a CSA-Trupp (chemical suit) — shorter than an AGT.
     int CsaMaxDurationMinutes,
+
     // Atemschutz Einsatzzeit for an LPA-Trupp (long-duration apparatus) — longer than an AGT.
     int LpaMaxDurationMinutes,
+
     // Interval between Druckkontrollen (Atemschutzkontrolle).
     int PressureControlIntervalMinutes,
+
     // Rückzugsdruck: pressure at or below which a Trupp must turn back.
     int ReturnPressureBar)
 {
@@ -97,6 +170,7 @@ public static class AnonymizedExampleData
     public const string OperatorSurname = "Müller";
     public const string OperatorSurnameAlt = "Schmidt";
     public const string OperatorSurnameThird = "Wagner";
+
     // First name for the full-name example (OperatorPromptView's NAME field). Deliberately not
     // "Thomas" — that would read as a real contributor's actual name rather than a placeholder.
     public const string OperatorFirstName = "Jens";
@@ -129,6 +203,7 @@ public static class AnonymizedExampleData
     public const string OperatorNamePlaceholder = "z. B. " + OperatorSurname;
     public const string OperatorNamePlaceholderAlt = "z. B. " + OperatorSurnameAlt;
     public const string OperatorNamePlaceholderThird = "z. B. " + OperatorSurnameThird;
+
     // Full-name form, for the one field that asks for a proper name rather than a short crew/
     // assignee entry (OperatorPromptView's NAME field).
     public const string OperatorFullNamePlaceholder = "z. B. " + OperatorSurname + ", " + OperatorFirstName;
@@ -171,59 +246,6 @@ public static class AnonymizedExampleData
         new Link(LinkName, LinkUrl),
         new Link("Kartendienst", "https://example.org/karte"),
     };
-}
-
-public sealed record MasterDataSet(
-    IReadOnlyList<string> Roles,
-    IReadOnlyList<string> Status,
-    IReadOnlyList<string> Equipment,
-    IReadOnlyList<string> Districts,
-    IReadOnlyList<string> RadioCallSigns,
-    IReadOnlyList<string> Brigades,
-    // UnitStatus is the status of a single unit (Alarmiert, Auf Anfahrt, ...) and is deliberately
-    // separate from Status above, which is the incident-level vocabulary (aufgenommen, ...).
-    IReadOnlyList<string> UnitStatus,
-    IReadOnlyList<Street> Streets,
-    IReadOnlyList<Link> Links,
-    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
-    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau,
-    IReadOnlyList<string> TruppTypes,
-    IReadOnlyList<Person> Personnel,
-    // Einsatzart values (ABek Bayern) — the leading token of the complete Einsatznummer.
-    IReadOnlyList<string> Einsatzarten,
-    // Vehicles per Wache with their seat count (#76).
-    IReadOnlyList<Vehicle> Vehicles,
-    // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
-    // no overrides yields IncidentSettings.Defaults, never a zeroed record.
-    IncidentSettings Settings)
-{
-    /// <summary>
-    /// Every category empty. Intended for tests and for callers that need a starting point to
-    /// override with a <c>with</c> expression, so that adding a category to this positional record
-    /// does not force an edit in every construction site.
-    /// </summary>
-    public static MasterDataSet Empty { get; } = new(
-        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<Street>(),
-        Array.Empty<Link>(),
-        Array.Empty<ChecklistTemplateItem>(), Array.Empty<ChecklistTemplateItem>(),
-        Array.Empty<string>(), Array.Empty<Person>(), Array.Empty<string>(),
-        Array.Empty<Vehicle>(),
-        IncidentSettings.Defaults);
-
-    /// <summary>
-    /// True when no category holds a single entry. A fresh install starts here, and it is the
-    /// condition under which the Stammdaten editor offers Import — a bootstrap, not a merge.
-    /// <see cref="Settings"/> deliberately does not count: it always carries defaults, and letting it
-    /// mark the set non-empty would suppress the Import bootstrap on an otherwise fresh install.
-    /// </summary>
-    public bool IsEmpty =>
-        Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
-        && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
-        && Streets.Count == 0 && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
-        && TruppTypes.Count == 0
-        && Personnel.Count == 0 && Einsatzarten.Count == 0
-        && Vehicles.Count == 0;
 }
 
 /// <summary>
@@ -306,11 +328,15 @@ public static class MasterDataJson
         ParseChecklistTemplate(JsonElement root)
     {
         if (root.TryGetProperty("checklistTemplateAufbau", out _) || root.TryGetProperty("checklistTemplateAbbau", out _))
+        {
             return (ChecklistItems(root, "checklistTemplateAufbau"), ChecklistItems(root, "checklistTemplateAbbau"));
+        }
 
         if (root.TryGetProperty("checklistTemplate", out var legacy) && legacy.ValueKind == JsonValueKind.Array)
+        {
             return (legacy.EnumerateArray().Select(x => new ChecklistTemplateItem(x.GetString()!, false)).ToList(),
                 Array.Empty<ChecklistTemplateItem>());
+        }
 
         return (Array.Empty<ChecklistTemplateItem>(), Array.Empty<ChecklistTemplateItem>());
 
@@ -333,7 +359,9 @@ public static class MasterDataJson
     {
         var d = IncidentSettings.Defaults;
         if (!root.TryGetProperty("settings", out var s) || s.ValueKind != JsonValueKind.Object)
+        {
             return d;
+        }
 
         static int Int(JsonElement e, string prop, int fallback) =>
             e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : fallback;
@@ -351,7 +379,9 @@ public static class MasterDataJson
     private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
     {
         if (!root.TryGetProperty("personnel", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
             return Array.Empty<Person>();
+        }
 
         return arr.EnumerateArray()
             .Select(p => new Person(

@@ -14,7 +14,9 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     private readonly Action<Guid, int, int> _onOpenEditor;
 
     public DwellingCellViewModel(
-        Dwelling dwelling, Building building, bool isReadOnly,
+        Dwelling dwelling,
+        Building building,
+        bool isReadOnly,
         Action<Guid, int, int, DwellingStatus> onStatusChanged,
         Action<Guid, int, int, int?> onCoValueChanged,
         Action<Guid, int, int> onOpenEditor)
@@ -36,9 +38,13 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     }
 
     public Guid Id { get; }
+
     public Guid BuildingId { get; }
+
     public int FloorOrdinal { get; }
+
     public int ApartmentNumber { get; }
+
     public bool IsReadOnly { get; }
 
     [ObservableProperty]
@@ -64,7 +70,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     {
         true => "\uD83D\uDD11",
         false => "\u2716",
-        _ => ""
+        _ => string.Empty,
     };
 
     // Mirrors the spray-marked "X-code" convention search teams already use on doors: a single
@@ -75,7 +81,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         DwellingStatus.NotSearched => "\u2571",
         DwellingStatus.Searched => "\u2715",
         DwellingStatus.Affected => "\u2297",
-        _ => "\u2571"
+        _ => "\u2571",
     };
 
     private static string GetStatusBrush(DwellingStatus status) => status switch
@@ -83,7 +89,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         DwellingStatus.NotSearched => "#FFC000",
         DwellingStatus.Searched => "#92D050",
         DwellingStatus.Affected => "#FF0000",
-        _ => "#FFC000"
+        _ => "#FFC000",
     };
 
     partial void OnStatusChanged(DwellingStatus value)
@@ -120,6 +126,7 @@ public sealed partial class ApartmentColumnViewModel : ObservableObject
     }
 
     public int ApartmentNumber { get; }
+
     public bool IsReadOnly { get; }
 
     [ObservableProperty]
@@ -143,8 +150,11 @@ public sealed partial class FloorRowViewModel : ObservableObject
     }
 
     public int Ordinal { get; }
+
     public string Label { get; }
+
     public IReadOnlyList<DwellingCellViewModel> Cells { get; }
+
     public string? Description { get; }
 }
 
@@ -192,10 +202,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     {
         BuildingOptions.Clear();
         foreach (var b in _session.Incident.Buildings)
+        {
             BuildingOptions.Add(b);
+        }
 
         if (SelectedBuilding is null || !_session.Incident.Buildings.Contains(SelectedBuilding))
+        {
             SelectedBuilding = BuildingOptions.FirstOrDefault();
+        }
 
         BuildMatrix();
         OnPropertyChanged(nameof(IsReadOnly));
@@ -258,7 +272,11 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
 
     private void OnApartmentLabelChanged(int apartmentNumber, string? label)
     {
-        if (SelectedBuilding is null) return;
+        if (SelectedBuilding is null)
+        {
+            return;
+        }
+
         _session.SetApartmentLabel(SelectedBuilding.Id, apartmentNumber, label);
         _onChanged();
     }
@@ -306,7 +324,11 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRemoveBuilding))]
     private void RemoveBuilding()
     {
-        if (SelectedBuilding is null) return;
+        if (SelectedBuilding is null)
+        {
+            return;
+        }
+
         IsRemoveBuildingConfirmOpen = true;
     }
 
@@ -318,7 +340,11 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     [RelayCommand]
     private void ConfirmRemoveBuilding()
     {
-        if (SelectedBuilding is null) return;
+        if (SelectedBuilding is null)
+        {
+            return;
+        }
+
         _session.RemoveCoBuilding(SelectedBuilding.Id);
         IsRemoveBuildingConfirmOpen = false;
         _onChanged();
@@ -335,7 +361,6 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
         IsEditorOpen = false;
     }
 
-
     [RelayCommand]
     private void SetEditorStatusNotSearched() => SetEditorStatus(DwellingStatus.NotSearched);
 
@@ -347,7 +372,11 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
 
     private void SetEditorStatus(DwellingStatus status)
     {
-        if (SelectedCell is null) return;
+        if (SelectedCell is null)
+        {
+            return;
+        }
+
         SelectedCell.Status = status;
     }
 
@@ -361,9 +390,16 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
 
     private void PersistSelectedCellDetails()
     {
-        if (SelectedCell is null) return;
-        _session.SetDwellingDetails(SelectedCell.BuildingId, SelectedCell.FloorOrdinal,
-            SelectedCell.ApartmentNumber, SelectedCell.ResidentName, SelectedCell.KeyAvailable);
-    }
+        if (SelectedCell is null)
+        {
+            return;
+        }
 
+        _session.SetDwellingDetails(
+            SelectedCell.BuildingId,
+            SelectedCell.FloorOrdinal,
+            SelectedCell.ApartmentNumber,
+            SelectedCell.ResidentName,
+            SelectedCell.KeyAvailable);
+    }
 }

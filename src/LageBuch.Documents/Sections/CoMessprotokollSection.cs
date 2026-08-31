@@ -35,7 +35,10 @@ public static class CoMessprotokollSection
                     {
                         columns.ConstantColumn(60);
                         for (var apt = 1; apt <= building.ApartmentsPerFloor; apt++)
+                        {
                             columns.ConstantColumn(65);
+                        }
+
                         columns.RelativeColumn(2);
                     });
 
@@ -43,7 +46,10 @@ public static class CoMessprotokollSection
                     {
                         header.Cell().Element(Cells.Header).Text("Geschoss");
                         for (var apt = 1; apt <= building.ApartmentsPerFloor; apt++)
+                        {
                             header.Cell().Element(Cells.Header).Text(CoMeasurementLabels.ApartmentLabel(building, apt));
+                        }
+
                         header.Cell().Element(Cells.Header).Text("Lage");
                     });
 
@@ -85,7 +91,11 @@ public static class CoMessprotokollSection
                 foreach (var d in affected)
                 {
                     var building = incident.Buildings.FirstOrDefault(b => b.Id == d.BuildingId);
-                    if (building is null) continue;
+                    if (building is null)
+                    {
+                        continue;
+                    }
+
                     var location = CoMeasurementLabels.DwellingLocation(building, d.FloorOrdinal, d.ApartmentNumber);
                     var resident = d.ResidentName ?? "—";
                     var key = d.KeyAvailable is true ? "ja" : d.KeyAvailable is false ? "nein" : "—";
@@ -112,7 +122,7 @@ public static class CoMessprotokollSection
         DwellingStatus.NotSearched => HexColor("#FFC000"),
         DwellingStatus.Searched => HexColor("#92D050"),
         DwellingStatus.Affected => HexColor("#FF0000"),
-        _ => Colors.White
+        _ => Colors.White,
     };
 
     private static string HexColor(string hex) => hex;

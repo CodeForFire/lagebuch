@@ -19,8 +19,13 @@ public class RolesViewModelTests
 
     private static RolesViewModel NewVm(FixedClock clock, MasterDataSet md, Action? onChanged = null)
     {
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         return new RolesViewModel(session, clock, md, onChanged ?? (() => { }));
     }
 
@@ -29,15 +34,20 @@ public class RolesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new RolesViewModel(session, clock, Md(), () => changes++)
         {
             NewRole = "EL",
             NewPersonName = "Müller",
             NewSection = "Abschnitt Nord",
             NewCallSign = "FFB 12/1",
-            NewPhone = "01 71 / 1 11 11 11"
+            NewPhone = "01 71 / 1 11 11 11",
         };
 
         Assert.Equal(new[] { "EL", "ZF" }, vm.RoleOptions);
@@ -48,7 +58,7 @@ public class RolesViewModelTests
         Assert.Equal("Abschnitt Nord", assignment.Section);
         Assert.Equal("01 71 / 1 11 11 11", assignment.Phone);
         Assert.Single(vm.Roles);
-        Assert.Equal("", vm.NewPersonName);
+        Assert.Equal(string.Empty, vm.NewPersonName);
         Assert.Null(vm.NewSection);
         Assert.Null(vm.NewPhone);
         Assert.Equal(1, changes);
@@ -59,7 +69,7 @@ public class RolesViewModelTests
     {
         var vm = NewVm(new FixedClock(T0), Md());
         vm.NewRole = "EL";
-        vm.NewPersonName = "";
+        vm.NewPersonName = string.Empty;
         Assert.False(vm.AddRoleCommand.CanExecute(null));
     }
 
@@ -67,15 +77,19 @@ public class RolesViewModelTests
     public void ReadOnly_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Close();
         var vm = new RolesViewModel(session, clock, Md(), () => { }) { NewRole = "EL", NewPersonName = "Müller" };
         Assert.False(vm.AddRoleCommand.CanExecute(null));
     }
 
     // --- Abschnitt / von / bis / Handynummer (issue #17) ---
-
     [Fact]
     public void Von_is_stamped_from_the_clock_when_the_assignment_is_created()
     {
@@ -94,7 +108,6 @@ public class RolesViewModelTests
 
     // --- Rolle übertragen (issue #75): replaces the old standalone "beenden" action -- an
     //     assignment now only ends as part of a handover, or automatically when the incident closes. ---
-
     [Fact]
     public void Transferring_a_role_ends_the_old_assignment_and_starts_a_new_one()
     {
@@ -174,8 +187,13 @@ public class RolesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", from: T0);
         seed.Save();
 
@@ -187,17 +205,23 @@ public class RolesViewModelTests
     }
 
     // --- Handynummer editieren (issue #75): a live cell, mirroring ForceRow's Status/Notes. ---
-
     [Fact]
     public void Editing_the_phone_number_inline_writes_through_and_notifies()
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new RolesViewModel(session, clock, Md(), () => changes++)
         {
-            NewRole = "EL", NewPersonName = "Müller", NewPhone = "0171",
+            NewRole = "EL",
+            NewPersonName = "Müller",
+            NewPhone = "0171",
         };
         vm.AddRoleCommand.Execute(null);
         changes = 0;
@@ -214,8 +238,13 @@ public class RolesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"),
-            "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", phone: "0171", from: T0);
         seed.Save();
 
@@ -228,13 +257,17 @@ public class RolesViewModelTests
     }
 
     // --- Filter: nur aktuell (default) vs alles (issue #75), mirrors EtbViewModel.HideSystemEntries. ---
-
     [Fact]
     public void ShowAllRoles_defaults_to_hiding_ended_assignments()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var ended = session.Incident.AssignRole(clock, new SessionOperator("Müller"), "EL", "Müller", from: T0);
         session.Incident.EndRoleAssignment(ended.Id, T0.AddMinutes(10));
         session.Incident.AssignRole(clock, new SessionOperator("Müller"), "ZF", "Huber", from: T0);
@@ -250,7 +283,6 @@ public class RolesViewModelTests
     }
 
     // --- Personnel roster (issue #17) ---
-
     [Fact]
     public void Picking_a_known_person_fills_in_phone_and_call_sign()
     {

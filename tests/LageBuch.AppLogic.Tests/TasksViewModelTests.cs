@@ -14,9 +14,13 @@ public class TasksViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(store, clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         return (session, clock, store);
     }
 
@@ -32,8 +36,13 @@ public class TasksViewModelTests
     {
         var (session, _, _) = NewSession();
         var changedCount = 0;
-        var vm = new TasksViewModel(session, new FixedClock(T0), new FakeTicker(),
-            new FakeAlarmService(), MasterData(), () => changedCount++);
+        var vm = new TasksViewModel(
+            session,
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            MasterData(),
+            () => changedCount++);
 
         vm.NewText = "Tür sichern";
         vm.NewAssignee = "FFB 1/44/1";
@@ -93,14 +102,16 @@ public class TasksViewModelTests
         var vm = NewVm(session, clock);
 
         // Open: urgency desc -> importance desc -> age asc; done hidden by the OFFEN default filter.
-        Assert.Equal(new[] { "high-important", "high-urgent", "old-low" },
+        Assert.Equal(
+            new[] { "high-important", "high-urgent", "old-low" },
             vm.Rows.Select(r => r.Text).ToArray());
 
         vm.Filter = TaskFilterKind.Done;
         Assert.Equal(new[] { "done-high", "done-old" }, vm.Rows.Select(r => r.Text).ToArray());
 
         vm.Filter = TaskFilterKind.All;
-        Assert.Equal(new[] { "high-important", "high-urgent", "old-low", "done-high", "done-old" },
+        Assert.Equal(
+            new[] { "high-important", "high-urgent", "old-low", "done-high", "done-old" },
             vm.Rows.Select(r => r.Text).ToArray());
     }
 
@@ -225,8 +236,13 @@ public class TasksViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident",
-            Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
 
         var vm = new TasksViewModel(ro, clock, new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
@@ -269,8 +285,16 @@ public class TasksViewModelTests
         Assert.Equal(TaskFilterKind.Done, vm.Filter); // ... that must not flip the filter
     }
 
-    private static TasksViewModel NewVm(LocalIncidentSession session, FixedClock clock,
-        FakeTicker? ticker = null, FakeAlarmService? alarm = null) =>
-        new(session, clock, ticker ?? new FakeTicker(), alarm ?? new FakeAlarmService(),
-            MasterData(), () => { });
+    private static TasksViewModel NewVm(
+        LocalIncidentSession session,
+        FixedClock clock,
+        FakeTicker? ticker = null,
+        FakeAlarmService? alarm = null) =>
+        new(
+            session,
+            clock,
+            ticker ?? new FakeTicker(),
+            alarm ?? new FakeAlarmService(),
+            MasterData(),
+            () => { });
 }

@@ -8,12 +8,19 @@ namespace LageBuch.Persistence.Tests;
 public class ClosedIncidentReadOnlyTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"ro-{Guid.NewGuid():N}.fwincident");
-    private sealed class Clock : IClock { public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2)); }
+
+    private sealed class Clock : IClock
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+    }
 
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     private void SaveClosedIncident()

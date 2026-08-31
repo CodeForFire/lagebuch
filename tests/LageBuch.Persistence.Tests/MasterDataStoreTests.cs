@@ -10,7 +10,10 @@ public class MasterDataStoreTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
     }
 
     [Fact]
@@ -25,7 +28,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void GetOrCreate_is_idempotent_and_never_seeds()
     {
-
         Assert.True(MasterDataStore.GetOrCreate(_path).IsEmpty);
         Assert.True(MasterDataStore.GetOrCreate(_path).IsEmpty); // still empty on a second open
     }
@@ -33,7 +35,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_then_GetOrCreate_round_trips_every_category_including_personnel()
     {
-
         var set = MasterDataSet.Empty with
         {
             Roles = new[] { "EL", "ZF" },
@@ -70,7 +71,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Vehicles_round_trip_with_wache_callsign_and_seats()
     {
-
         var set = MasterDataSet.Empty with
         {
             Vehicles = new[]
@@ -89,7 +89,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Personnel_optional_fields_round_trip_as_null()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Personnel = new[] { new Person("Musterfrau", "Erika", null, null, null) },
@@ -104,7 +103,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Personnel_come_back_name_sorted()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Personnel = new[]
@@ -121,7 +119,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_round_trips_an_added_and_a_removed_street()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Streets = new[] { new Street("Alt Str.", "FFB"), new Street("Bahnhofstr.", "FFB") },
@@ -140,7 +137,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_round_trips_an_added_and_a_removed_link()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             Links = new[] { new Link("Alt Link", "https://old.example"), new Link("Wetterdienst", "https://dwd.de") },
@@ -159,7 +155,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_round_trips_a_checklist_reorder_and_delete()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             ChecklistTemplateAufbau = Items("A", "B", "C"),
@@ -176,7 +171,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_round_trips_aufbau_and_abbau_independently_with_mandatory_flags()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
             ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Fahrzeug prüfen", true) },
@@ -203,6 +197,7 @@ public class MasterDataStoreTests : IDisposable
                 """;
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         var set = MasterDataStore.GetOrCreate(_path);
@@ -214,7 +209,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void A_value_deleted_through_Save_stays_deleted()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { "EL", "ZF" } });
 
         MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { "ZF" } });
@@ -224,7 +218,7 @@ public class MasterDataStoreTests : IDisposable
 
     [Fact]
     public void A_person_without_a_first_name_displays_as_the_last_name_alone()
-        => Assert.Equal("Mustermann", new Person("Mustermann", "", null, null, null).DisplayName);
+        => Assert.Equal("Mustermann", new Person("Mustermann", string.Empty, null, null, null).DisplayName);
 
     [Fact]
     public void A_fresh_database_reads_the_default_settings()
@@ -236,7 +230,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_then_GetOrCreate_round_trips_settings()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
 
         Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 4, 55), MasterDataStore.GetOrCreate(_path).Settings);
@@ -245,7 +238,6 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void A_missing_setting_key_falls_back_to_its_default()
     {
-
         MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
 
         // Simulate a store written before a setting existed: drop one row, which read must backfill.
@@ -256,6 +248,7 @@ public class MasterDataStoreTests : IDisposable
             cmd.CommandText = "DELETE FROM md_settings WHERE key = 'return_pressure_bar';";
             cmd.ExecuteNonQuery();
         }
+
         SqliteConnection.ClearAllPools();
 
         var settings = MasterDataStore.GetOrCreate(_path).Settings;

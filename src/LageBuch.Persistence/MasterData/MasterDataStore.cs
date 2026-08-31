@@ -41,18 +41,46 @@ public sealed class MasterDataStore
 
         Run(cn, tx, "DELETE FROM md_streets;", _ => { });
         foreach (var s in set.Streets)
-            Run(cn, tx, "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
-                p => { p("$n", s.Name); p("$d", s.District); });
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
+                p =>
+                {
+                    p("$n", s.Name);
+                    p("$d", s.District);
+                });
+        }
 
         Run(cn, tx, "DELETE FROM md_links;", _ => { });
         foreach (var l in set.Links)
-            Run(cn, tx, "INSERT INTO md_links (name, url) VALUES ($n,$u);",
-                p => { p("$n", l.Name); p("$u", l.Url); });
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_links (name, url) VALUES ($n,$u);",
+                p =>
+                {
+                    p("$n", l.Name);
+                    p("$u", l.Url);
+                });
+        }
 
         Run(cn, tx, "DELETE FROM md_vehicles;", _ => { });
         foreach (var v in set.Vehicles)
-            Run(cn, tx, "INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ($w,$c,$s);",
-                p => { p("$w", v.Wache); p("$c", v.CallSign); p("$s", v.Seats); });
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ($w,$c,$s);",
+                p =>
+                {
+                    p("$w", v.Wache);
+                    p("$c", v.CallSign);
+                    p("$s", v.Seats);
+                });
+        }
 
         Run(cn, tx, "DELETE FROM md_checklist_template;", _ => { });
         InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAufbau, kind: 0, ordinalOffset: 0);
@@ -60,21 +88,33 @@ public sealed class MasterDataStore
 
         Run(cn, tx, "DELETE FROM md_personnel;", _ => { });
         foreach (var person in set.Personnel)
-            Run(cn, tx, "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone) VALUES ($l,$f,$r,$c,$p);",
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone) VALUES ($l,$f,$r,$c,$p);",
                 p =>
                 {
-                    p("$l", person.LastName); p("$f", person.FirstName);
+                    p("$l", person.LastName);
+                    p("$f", person.FirstName);
                     p("$r", (object?)person.Role ?? DBNull.Value);
                     p("$c", (object?)person.CallSign ?? DBNull.Value);
                     p("$p", (object?)person.Phone ?? DBNull.Value);
                 });
+        }
 
         // Settings are a single row per key; UPSERT rather than delete-and-reinsert so a key the
         // store already carries keeps its identity, and so writing a subset never drops the rest.
         foreach (var (key, value) in SettingsRows(set.Settings))
-            Run(cn, tx,
+            Run(
+                cn,
+                tx,
                 "INSERT INTO md_settings (key, value) VALUES ($k,$v) ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
-                p => { p("$k", key); p("$v", value); });
+                p =>
+                {
+                    p("$k", key);
+                    p("$v", value);
+                });
 
         tx.Commit();
     }
@@ -88,8 +128,17 @@ public sealed class MasterDataStore
         {
             var item = items[i];
             var ordinal = ordinalOffset + i;
-            Run(cn, tx, "INSERT INTO md_checklist_template (ordinal, text, is_mandatory, kind) VALUES ($o,$t,$m,$k);",
-                p => { p("$o", ordinal); p("$t", item.Text); p("$m", item.IsMandatory ? 1 : 0); p("$k", kind); });
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_checklist_template (ordinal, text, is_mandatory, kind) VALUES ($o,$t,$m,$k);",
+                p =>
+                {
+                    p("$o", ordinal);
+                    p("$t", item.Text);
+                    p("$m", item.IsMandatory ? 1 : 0);
+                    p("$k", kind);
+                });
         }
     }
 
@@ -112,7 +161,7 @@ public sealed class MasterDataStore
 
     private static void EnsureSchema(SqliteConnection cn)
     {
-        Exec(cn, """
+        const string schema = """
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_equipment (value TEXT NOT NULL);
@@ -139,7 +188,8 @@ public sealed class MasterDataStore
                 phone TEXT
             );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
-            """);
+            """;
+        Exec(cn, schema);
 
         // Widen a pre-existing md_checklist_template that predates the Aufbau/Abbau split — this
         // store has no version marker, so every open re-checks rather than gating on one.
@@ -184,6 +234,7 @@ public sealed class MasterDataStore
             var item = new ChecklistTemplateItem(r.GetString(0), r.GetInt32(1) != 0);
             (r.GetInt32(2) == 0 ? aufbau : abbau).Add(item);
         }
+
         return (aufbau, abbau);
     }
 
@@ -194,7 +245,10 @@ public sealed class MasterDataStore
         {
             cmd.CommandText = "SELECT key, value FROM md_settings;";
             using var r = cmd.ExecuteReader();
-            while (r.Read()) stored[r.GetString(0)] = r.GetInt32(1);
+            while (r.Read())
+            {
+                stored[r.GetString(0)] = r.GetInt32(1);
+            }
         }
 
         // Per-key fallback to the defaults: a store written before a given setting existed simply
@@ -214,10 +268,14 @@ public sealed class MasterDataStore
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)
     {
         foreach (var v in values)
+        {
             Run(cn, tx, $"INSERT INTO {table} (value) VALUES ($v);", p => p("$v", v));
+        }
     }
 
-    [SuppressMessage("Security", "CA2100",
+    [SuppressMessage(
+        "Security",
+        "CA2100",
         Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static List<string> ReadColumn(SqliteConnection cn, string sql)
     {
@@ -225,7 +283,11 @@ public sealed class MasterDataStore
         cmd.CommandText = sql;
         using var r = cmd.ExecuteReader();
         var list = new List<string>();
-        while (r.Read()) list.Add(r.GetString(0));
+        while (r.Read())
+        {
+            list.Add(r.GetString(0));
+        }
+
         return list;
     }
 
@@ -235,7 +297,11 @@ public sealed class MasterDataStore
         cmd.CommandText = "SELECT name, district FROM md_streets;";
         using var r = cmd.ExecuteReader();
         var list = new List<Street>();
-        while (r.Read()) list.Add(new Street(r.GetString(0), r.GetString(1)));
+        while (r.Read())
+        {
+            list.Add(new Street(r.GetString(0), r.GetString(1)));
+        }
+
         return list;
     }
 
@@ -245,7 +311,11 @@ public sealed class MasterDataStore
         cmd.CommandText = "SELECT name, url FROM md_links;";
         using var r = cmd.ExecuteReader();
         var list = new List<Link>();
-        while (r.Read()) list.Add(new Link(r.GetString(0), r.GetString(1)));
+        while (r.Read())
+        {
+            list.Add(new Link(r.GetString(0), r.GetString(1)));
+        }
+
         return list;
     }
 
@@ -255,7 +325,11 @@ public sealed class MasterDataStore
         cmd.CommandText = "SELECT wache, call_sign, seats FROM md_vehicles;";
         using var r = cmd.ExecuteReader();
         var list = new List<Vehicle>();
-        while (r.Read()) list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2)));
+        while (r.Read())
+        {
+            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2)));
+        }
+
         return list;
     }
 
@@ -266,13 +340,18 @@ public sealed class MasterDataStore
         using var r = cmd.ExecuteReader();
         var list = new List<Person>();
         while (r.Read())
+        {
             list.Add(new Person(r.GetString(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4)));
+        }
+
         return list;
 
         static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     }
 
-    [SuppressMessage("Security", "CA2100",
+    [SuppressMessage(
+        "Security",
+        "CA2100",
         Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static void Run(SqliteConnection cn, SqliteTransaction tx, string sql, Action<Action<string, object>> bind)
     {
@@ -283,7 +362,9 @@ public sealed class MasterDataStore
         cmd.ExecuteNonQuery();
     }
 
-    [SuppressMessage("Security", "CA2100",
+    [SuppressMessage(
+        "Security",
+        "CA2100",
         Justification = "Audited: SQL built from compile-time schema constants; values use bound parameters.")]
     private static void Exec(SqliteConnection cn, string sql)
     {

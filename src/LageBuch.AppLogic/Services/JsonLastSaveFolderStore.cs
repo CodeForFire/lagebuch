@@ -11,7 +11,9 @@ public sealed class JsonLastSaveFolderStore : ILastSaveFolderStore
     public string? GetLastFolder()
     {
         if (!File.Exists(_path))
+        {
             return null;
+        }
 
         try
         {

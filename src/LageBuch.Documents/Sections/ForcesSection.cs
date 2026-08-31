@@ -9,6 +9,7 @@ namespace LageBuch.Documents.Sections;
 public static class ForcesSection
 {
     private static readonly string[] HeaderTitles = ["Feuerwehr", "Funkrufname", "Stärke", "AGT", "Status", "Bemerkung"];
+
     public static void Compose(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -33,13 +34,16 @@ public static class ForcesSection
                     table.Header(header =>
                     {
                         foreach (var title in HeaderTitles)
+                        {
                             header.Cell().Element(Cells.Header).Text(title).SemiBold();
+                        }
                     });
 
                     foreach (var unit in incident.Forces)
                     {
                         table.Cell().Element(Cells.Body).Text(unit.Brigade);
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(unit.CallSign));
+
                         // Stärke im 1/1/2-Format: Führungskräfte/Mannschaft/Gesamt (#76).
                         table.Cell().Element(Cells.Body).Text(unit.StrengthText);
                         table.Cell().Element(Cells.Body).Text(unit.ScbaCount.ToString(CultureInfo.InvariantCulture));

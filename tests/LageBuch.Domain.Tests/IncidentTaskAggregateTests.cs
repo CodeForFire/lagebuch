@@ -25,6 +25,7 @@ public class IncidentTaskAggregateTests
         Assert.Equal(2, incident.Tasks.Count);
         Assert.Equal("Erste", incident.Tasks[0].Text);
         Assert.Equal("Zweite", incident.Tasks[1].Text);
+
         // No ETB system line for task lifecycle (deliberate spec decision): the journal grew
         // only by its own "Einsatz begonnen" entry.
         Assert.Single(incident.Journal);
@@ -75,11 +76,28 @@ public class IncidentTaskAggregateTests
         seed.SetTaskCompleted(seed.Tasks[1].Id, true, clock, op);
 
         var restored = Incident.Rehydrate(
-            seed.Id, seed.StartedAt, seed.State, seed.IncidentNumber, seed.Keyword, seed.Street,
-            seed.District, seed.Status, seed.ClosedAt, seed.ClosedBy,
-            seed.ChecklistAufbau, seed.ChecklistAbbau, seed.Journal, seed.Roles, seed.Forces,
-            seed.ScbaTrupps, seed.Audit, seed.Timers, seed.Files, seed.Tasks,
-            seed.Buildings, seed.Dwellings);
+            seed.Id,
+            seed.StartedAt,
+            seed.State,
+            seed.IncidentNumber,
+            seed.Keyword,
+            seed.Street,
+            seed.District,
+            seed.Status,
+            seed.ClosedAt,
+            seed.ClosedBy,
+            seed.ChecklistAufbau,
+            seed.ChecklistAbbau,
+            seed.Journal,
+            seed.Roles,
+            seed.Forces,
+            seed.ScbaTrupps,
+            seed.Audit,
+            seed.Timers,
+            seed.Files,
+            seed.Tasks,
+            seed.Buildings,
+            seed.Dwellings);
 
         Assert.Equal(2, restored.Tasks.Count);
         Assert.Equal("Offen", restored.Tasks[0].Text);

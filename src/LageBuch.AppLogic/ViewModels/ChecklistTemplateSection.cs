@@ -12,7 +12,8 @@ public sealed partial class ChecklistTemplateSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public ChecklistTemplateSection(string title, IEnumerable<ChecklistTemplateItem> items, Action onChanged) : base(title)
+    public ChecklistTemplateSection(string title, IEnumerable<ChecklistTemplateItem> items, Action onChanged)
+        : base(title)
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<ChecklistTemplateRow>(
@@ -31,21 +32,32 @@ public sealed partial class ChecklistTemplateSection : EditorSection
     [RelayCommand]
     private void Remove(ChecklistTemplateRow row)
     {
-        if (Rows.Remove(row)) _onChanged();
+        if (Rows.Remove(row))
+        {
+            _onChanged();
+        }
     }
 
     [RelayCommand]
     private void MoveUp(ChecklistTemplateRow row)
     {
         var i = Rows.IndexOf(row);
-        if (i > 0) { Rows.Move(i, i - 1); _onChanged(); }
+        if (i > 0)
+        {
+            Rows.Move(i, i - 1);
+            _onChanged();
+        }
     }
 
     [RelayCommand]
     private void MoveDown(ChecklistTemplateRow row)
     {
         var i = Rows.IndexOf(row);
-        if (i >= 0 && i < Rows.Count - 1) { Rows.Move(i, i + 1); _onChanged(); }
+        if (i >= 0 && i < Rows.Count - 1)
+        {
+            Rows.Move(i, i + 1);
+            _onChanged();
+        }
     }
 
     /// <summary>
@@ -59,8 +71,12 @@ public sealed partial class ChecklistTemplateSection : EditorSection
         foreach (var row in Rows)
         {
             var text = row.Text?.Trim() ?? string.Empty;
-            if (text.Length > 0) result.Add(new ChecklistTemplateItem(text, row.IsMandatory));
+            if (text.Length > 0)
+            {
+                result.Add(new ChecklistTemplateItem(text, row.IsMandatory));
+            }
         }
+
         return result;
     }
 }

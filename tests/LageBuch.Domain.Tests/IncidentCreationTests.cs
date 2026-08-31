@@ -1,14 +1,8 @@
 using LageBuch.Domain.Etb;
-using LageBuch.Domain.ValueObjects;
 using LageBuch.Domain.Time;
+using LageBuch.Domain.ValueObjects;
 
 namespace LageBuch.Domain.Tests;
-
-internal sealed class FixedClock : IClock
-{
-    public FixedClock(DateTimeOffset now) => Now = now;
-    public DateTimeOffset Now { get; set; }
-}
 
 public class IncidentCreationTests
 {
@@ -51,7 +45,8 @@ public class IncidentCreationTests
     public void Start_with_incident_number_names_it_in_the_opening_entry()
     {
         var incident = Incident.Start(
-            new FixedClock(T0), new SessionOperator("Müller"),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
             incidentNumber: new IncidentNumber("B 1.2 260715 1297"));
 
         Assert.Equal("B 1.2 260715 1297", incident.IncidentNumber!.Value);
@@ -83,4 +78,11 @@ public class IncidentCreationTests
 
         Assert.Null(incident.IncidentNumber);
     }
+}
+
+internal sealed class FixedClock : IClock
+{
+    public FixedClock(DateTimeOffset now) => Now = now;
+
+    public DateTimeOffset Now { get; set; }
 }

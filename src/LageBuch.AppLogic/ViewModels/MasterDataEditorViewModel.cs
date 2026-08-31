@@ -22,9 +22,34 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private bool _originalIsEmpty = true;
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _roles = null!, _status = null!, _unitStatus = null!, _equipment = null!,
-        _districts = null!, _brigades = null!, _callSigns = null!, _truppTypes = null!, _einsatzarten = null!;
-    private ChecklistTemplateSection _checklistAufbau = null!, _checklistAbbau = null!;
+    private EditableListSection _roles = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _status = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _unitStatus = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _equipment = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _districts = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _brigades = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _callSigns = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _truppTypes = null!;
+
+    // Typed handles kept so BuildSet reads each section without fragile positional casts.
+    private EditableListSection _einsatzarten = null!;
+
+    private ChecklistTemplateSection _checklistAufbau = null!;
+    private ChecklistTemplateSection _checklistAbbau = null!;
     private LinksSection _links = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
@@ -141,6 +166,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),
+
         // Streets are not editable here; _original carries them through unchanged.
     };
 
@@ -167,13 +193,18 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     /// Offered only while the data is empty, so there is nothing to overwrite.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanImport))]
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "Imports read arbitrary user-chosen files; any parse/IO failure is shown as an error.")]
     private async Task Import()
     {
         FileError = null;
         var path = await _dialogs.PickImportJsonAsync();
-        if (string.IsNullOrWhiteSpace(path)) return;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
 
         MasterDataSet imported;
         try
@@ -193,13 +224,18 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     /// <summary>Writes the current editor contents (including unsaved edits and carried-through streets) to a JSON file.</summary>
     [RelayCommand]
-    [SuppressMessage("Design", "CA1031",
+    [SuppressMessage(
+        "Design",
+        "CA1031",
         Justification = "IO and share failures are shown as an error, never a crash.")]
     private async Task Export()
     {
         FileError = null;
         var path = await _dialogs.PickExportJsonAsync("stammdaten.json");
-        if (string.IsNullOrWhiteSpace(path)) return;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
 
         try
         {
@@ -229,7 +265,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             "Änderungen verwerfen?",
             "Die Stammdaten wurden geändert. Beim Verlassen gehen die nicht gespeicherten Änderungen verloren.",
             "VERWERFEN",
-            () => { Load(); proceed(); });
+            () =>
+            {
+                Load();
+                proceed();
+            });
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }

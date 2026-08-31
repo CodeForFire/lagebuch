@@ -44,7 +44,7 @@ public class CoMeasurementTests
     public void Building_Create_EmptyName_Throws()
     {
         Assert.Throws<ArgumentException>(() =>
-            Building.Create("", 8, 10, 0));
+            Building.Create(string.Empty, 8, 10, 0));
     }
 
     [Fact]
@@ -91,7 +91,8 @@ public class CoMeasurementTests
     public void CoMeasurementLabels_DwellingLocation()
     {
         var building = Building.Create("Haus A", 8, 10, 0);
-        Assert.Equal("Haus A, 3. OG, Whg. 2",
+        Assert.Equal(
+            "Haus A, 3. OG, Whg. 2",
             CoMeasurementLabels.DwellingLocation(building, 3, 2));
     }
 
@@ -117,7 +118,7 @@ public class CoMeasurementTests
     {
         var building = Building.Create("Haus A", 8, 10, 0)
             .WithFloorDescription(3, "links");
-        var updated = building.WithFloorDescription(3, "");
+        var updated = building.WithFloorDescription(3, string.Empty);
         Assert.False(updated.FloorDescriptions.ContainsKey(3));
     }
 

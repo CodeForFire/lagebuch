@@ -8,7 +8,7 @@ public enum TruppRole
 {
     Truppfuehrer = 0,
     Truppmann = 1,
-    ZweiterTruppmann = 2
+    ZweiterTruppmann = 2,
 }
 
 /// <summary>One named person in a Trupp, addressable by their position.</summary>
@@ -17,7 +17,10 @@ public sealed record TruppMember(TruppRole Role, string Name)
     public static TruppMember Create(TruppRole role, string name)
     {
         if (string.IsNullOrWhiteSpace(name))
+        {
             throw new ArgumentException("Name darf nicht leer sein.", nameof(name));
+        }
+
         return new TruppMember(role, name.Trim());
     }
 
@@ -34,7 +37,10 @@ public sealed record TruppMember(TruppRole Role, string Name)
             Create(TruppRole.Truppmann, truppmann),
         };
         if (!string.IsNullOrWhiteSpace(zweiterTruppmann))
+        {
             crew.Add(Create(TruppRole.ZweiterTruppmann, zweiterTruppmann));
+        }
+
         return crew;
     }
 
@@ -43,6 +49,6 @@ public sealed record TruppMember(TruppRole Role, string Name)
         TruppRole.Truppfuehrer => "Truppführer",
         TruppRole.Truppmann => "Truppmann",
         TruppRole.ZweiterTruppmann => "2. Truppmann",
-        _ => Role.ToString()
+        _ => Role.ToString(),
     };
 }

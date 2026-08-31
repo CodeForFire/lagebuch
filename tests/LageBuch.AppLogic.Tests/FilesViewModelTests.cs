@@ -12,8 +12,13 @@ public class FilesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
         await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
         try
@@ -43,8 +48,13 @@ public class FilesViewModelTests
     public async Task AddFile_cancelled_picker_does_nothing()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var vm = new FilesViewModel(session, new FakeDialogs { AttachmentPath = null }, () => { });
 
         await vm.AddFileCommand.ExecuteAsync(null);
@@ -57,8 +67,13 @@ public class FilesViewModelTests
     public async Task AddFile_surfaces_a_domain_rejection_as_an_error_instead_of_throwing()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var path = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(path, "hello");
         try
@@ -80,8 +95,13 @@ public class FilesViewModelTests
     public void ReadOnly_session_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Close();
         var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
 
@@ -93,8 +113,13 @@ public class FilesViewModelTests
     public async Task OpenFile_writes_a_temp_copy_and_hands_it_to_the_dialog_service()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
         var dialogs = new FakeDialogs();
         var vm = new FilesViewModel(session, dialogs, () => { });
@@ -109,7 +134,10 @@ public class FilesViewModelTests
         }
         finally
         {
-            if (dialogs.LastOpenedPath is not null) File.Delete(dialogs.LastOpenedPath);
+            if (dialogs.LastOpenedPath is not null)
+            {
+                File.Delete(dialogs.LastOpenedPath);
+            }
         }
     }
 
@@ -117,8 +145,13 @@ public class FilesViewModelTests
     public void Row_seeds_DisplayName_from_the_file_name()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
 
         var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
@@ -130,8 +163,13 @@ public class FilesViewModelTests
     public void Editing_DisplayName_writes_through_to_the_domain()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         var file = session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
         var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
         var row = Assert.Single(vm.Files);
@@ -145,8 +183,13 @@ public class FilesViewModelTests
     public void Editing_DisplayName_on_a_readonly_session_is_ignored()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(new FakeStore(), clock,
-            new SessionOperator("Müller", "FFB 12/1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
         session.Close();
         var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
@@ -165,7 +208,13 @@ public class FilesViewModelTests
         var clock = new FixedClock(T0);
         var store = new FakeStore();
         var op = new SessionOperator("Müller", "FFB 12/1");
-        var seed = LocalIncidentSession.StartNew(store, clock, op, "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         seed.Incident.AddFile(clock, op, "vorab.pdf", "application/pdf", 10);
 
         var vm = new FilesViewModel(seed, new FakeDialogs(), () => { });

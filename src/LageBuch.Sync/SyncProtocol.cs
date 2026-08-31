@@ -35,11 +35,20 @@ public sealed record VersionInfo(string Version);
 /// </summary>
 public sealed class PinRejectedException : Exception
 {
-    public PinRejectedException() : this("Falsche PIN.") { }
+    public PinRejectedException()
+        : this("Falsche PIN.")
+    {
+    }
 
-    public PinRejectedException(string message) : base(message) { }
+    public PinRejectedException(string message)
+        : base(message)
+    {
+    }
 
-    public PinRejectedException(string message, Exception innerException) : base(message, innerException) { }
+    public PinRejectedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }
 
 /// <summary>
@@ -55,11 +64,20 @@ public sealed class VersionMismatchException : Exception
         HostVersion = hostVersion;
     }
 
-    public VersionMismatchException() : this("unbekannt", "unbekannt") { }
+    public VersionMismatchException()
+        : this("unbekannt", "unbekannt")
+    {
+    }
 
-    public VersionMismatchException(string message) : base(message) { }
+    public VersionMismatchException(string message)
+        : base(message)
+    {
+    }
 
-    public VersionMismatchException(string message, Exception innerException) : base(message, innerException) { }
+    public VersionMismatchException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 
     public string LocalVersion { get; } = string.Empty;
 

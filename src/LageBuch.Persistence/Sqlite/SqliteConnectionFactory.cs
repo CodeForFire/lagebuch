@@ -34,20 +34,25 @@ public static class SqliteConnectionFactory
         {
             DataSource = path,
             Mode = mode,
+
             // Pooling keeps the sqlite handle open after Dispose, which on Windows keeps the file
             // locked. For a desktop app whose whole job is opening and closing the user's Einsatz
             // files, a handle outliving its connection is a bug, not an optimisation -- and the
             // pool saves nothing here, since a file is opened a handful of times per session.
-            Pooling = false
+            Pooling = false,
         }.ToString());
 
         try
         {
             cn.Open();
+
             // WAL is a write to the database header, so it is meaningless -- and refused -- on a
             // read-only connection.
             if (journal)
+            {
                 Execute(cn, "PRAGMA journal_mode=WAL;");
+            }
+
             Execute(cn, "PRAGMA foreign_keys=ON;");
             return cn;
         }
@@ -58,7 +63,9 @@ public static class SqliteConnectionFactory
         }
     }
 
-    [SuppressMessage("Security", "CA2100",
+    [SuppressMessage(
+        "Security",
+        "CA2100",
         Justification = "Audited: PRAGMA statements are compile-time constants.")]
     private static void Execute(SqliteConnection cn, string sql)
     {

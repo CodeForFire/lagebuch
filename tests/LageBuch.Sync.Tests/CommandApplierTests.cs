@@ -20,8 +20,15 @@ public class CommandApplierTests
         var clock = new FixedClock();
         var incident = NewIncident(clock);
 
-        ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
-            EtbDirection.Incoming, "Meldung von der Einsatzstelle", "Leitstelle", "ELW"), incident, clock);
+        ApplyOverWire(
+            new AddJournalEntryCommand(
+                new OperatorDto("Client", "RUF 1"),
+                EtbDirection.Incoming,
+                "Meldung von der Einsatzstelle",
+                "Leitstelle",
+                "ELW"),
+            incident,
+            clock);
 
         var entry = incident.Journal.Last();
         Assert.Equal("Meldung von der Einsatzstelle", entry.Text);
@@ -61,18 +68,32 @@ public class CommandApplierTests
         ApplyOverWire(new AssignRoleCommand(op, "EL", "Huber", "FFB 1", clock.Now, null, null, null), incident, clock);
         ApplyOverWire(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", "Im Einsatz", null, 4, 1), incident, clock);
         ApplyOverWire(new UpdateForceStrengthCommand(op, incident.Forces[0].Id, 2, 12, 6), incident, clock);
-        ApplyOverWire(new AddScbaTruppCommand("Angriffstrupp",
-            new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
-            "AT-1", null, 30, 60, 5, EntryPressure: 300), incident, clock);
+        ApplyOverWire(
+            new AddScbaTruppCommand(
+                "Angriffstrupp",
+                new[] { new TruppMemberDto(TruppRole.Truppfuehrer, "Müller"), new TruppMemberDto(TruppRole.Truppmann, "Schmidt") },
+                "AT-1",
+                null,
+                30,
+                60,
+                5,
+                EntryPressure: 300),
+            incident,
+            clock);
         ApplyOverWire(new StartScbaTruppCommand(incident.ScbaTrupps.Last().Id), incident, clock);
 
         Assert.True(incident.ChecklistAufbau[0].IsDone);
         Assert.Single(incident.Roles);
         Assert.Equal(12, incident.TotalPersonnel);
+
         // The strength correction arrived over the wire with officer count and edit trail intact.
         var corrected = incident.Forces[0];
-        Assert.Equal((2, 12, 6, 1), (corrected.OfficerCount, corrected.PersonnelCount, corrected.ScbaCount,
-            incident.Journal.Count(e => e.Text.Contains('→', StringComparison.Ordinal))));
+        var actual = (
+            corrected.OfficerCount,
+            corrected.PersonnelCount,
+            corrected.ScbaCount,
+            incident.Journal.Count(e => e.Text.Contains('→', StringComparison.Ordinal)));
+        Assert.Equal((2, 12, 6, 1), actual);
         var trupp = Assert.Single(incident.ScbaTrupps);
         Assert.Equal(300, trupp.EntryPressure);
     }
@@ -85,8 +106,11 @@ public class CommandApplierTests
         var saved = new List<(string StorageFileName, byte[] Bytes)>();
         var bytes = new byte[] { 1, 2, 3 };
 
-        CommandApplier.Apply(new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", bytes),
-            incident, clock, (name, b) => saved.Add((name, b)));
+        CommandApplier.Apply(
+            new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", bytes),
+            incident,
+            clock,
+            (name, b) => saved.Add((name, b)));
 
         var file = Assert.Single(incident.Files);
         Assert.Equal("brand.jpg", file.FileName);
@@ -104,8 +128,10 @@ public class CommandApplierTests
         var clock = new FixedClock();
         var incident = NewIncident(clock);
 
-        CommandApplier.Apply(new AddFileCommand(new OperatorDto("Client", null), "x.pdf", "application/pdf", new byte[] { 1 }),
-            incident, clock);
+        CommandApplier.Apply(
+            new AddFileCommand(new OperatorDto("Client", null), "x.pdf", "application/pdf", new byte[] { 1 }),
+            incident,
+            clock);
 
         Assert.Single(incident.Files);
     }
@@ -131,8 +157,15 @@ public class CommandApplierTests
         ApplyOverWire(new CloseIncidentCommand(new OperatorDto("Host", "FFB 1")), incident, clock);
 
         Assert.Throws<IncidentClosedException>(() =>
-            ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", null),
-                EtbDirection.Internal, "zu spät", null, null), incident, clock));
+            ApplyOverWire(
+                new AddJournalEntryCommand(
+                    new OperatorDto("Client", null),
+                    EtbDirection.Internal,
+                    "zu spät",
+                    null,
+                    null),
+                incident,
+                clock));
     }
 
     [Fact]
@@ -140,12 +173,21 @@ public class CommandApplierTests
     {
         var clock = new FixedClock();
         var incident = NewIncident(clock);
-        ApplyOverWire(new AddJournalEntryCommand(new OperatorDto("Client", "RUF 1"),
-            EtbDirection.Incoming, "Lagemeldung", null, null), incident, clock);
+        ApplyOverWire(
+            new AddJournalEntryCommand(
+                new OperatorDto("Client", "RUF 1"),
+                EtbDirection.Incoming,
+                "Lagemeldung",
+                null,
+                null),
+            incident,
+            clock);
         var entry = incident.Journal.Last();
 
-        ApplyOverWire(new EditJournalEntryCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Korrigiert"),
-            incident, clock);
+        ApplyOverWire(
+            new EditJournalEntryCommand(new OperatorDto("Editor", "RUF 2"), entry.Id, "Korrigiert"),
+            incident,
+            clock);
 
         var edited = incident.Journal.Single(e => e.Id == entry.Id);
         Assert.Equal("Korrigiert", edited.Text);
@@ -160,8 +202,10 @@ public class CommandApplierTests
         var systemEntry = incident.Journal.Single(e => e.Direction == EtbDirection.System);
 
         Assert.Throws<InvalidOperationException>(() =>
-            ApplyOverWire(new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert"),
-                incident, clock));
+            ApplyOverWire(
+                new EditJournalEntryCommand(new OperatorDto("Client", null), systemEntry.Id, "Manipuliert"),
+                incident,
+                clock));
     }
 
     [Fact]
@@ -170,8 +214,16 @@ public class CommandApplierTests
         var clock = new FixedClock();
         var incident = NewIncident(clock);
 
-        ApplyOverWire(new AddTaskCommand(new OperatorDto("Client", "RUF 1"), "Tür sichern", "FFB 1/44/1",
-            TaskImportance.High, TaskUrgency.Medium, 10), incident, clock);
+        ApplyOverWire(
+            new AddTaskCommand(
+                new OperatorDto("Client", "RUF 1"),
+                "Tür sichern",
+                "FFB 1/44/1",
+                TaskImportance.High,
+                TaskUrgency.Medium,
+                10),
+            incident,
+            clock);
 
         var task = Assert.Single(incident.Tasks);
         Assert.Equal("Tür sichern", task.Text);
@@ -185,7 +237,7 @@ public class CommandApplierTests
         var clock = new FixedClock();
         var incident = NewIncident(clock);
         var op = new OperatorDto("Client", null);
-        ApplyOverWire(new AddTaskCommand(op, "X", "", TaskImportance.Low, TaskUrgency.Low, 5), incident, clock);
+        ApplyOverWire(new AddTaskCommand(op, "X", string.Empty, TaskImportance.Low, TaskUrgency.Low, 5), incident, clock);
         var taskId = incident.Tasks[0].Id;
 
         clock.Now = clock.Now.AddMinutes(1);

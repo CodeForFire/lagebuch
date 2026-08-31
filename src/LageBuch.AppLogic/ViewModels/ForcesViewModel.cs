@@ -29,8 +29,11 @@ public sealed partial class ForceRow : ObservableObject
     private readonly Action _onRemoved;
 
     public ForceRow(
-        Domain.ForceUnit unit, IReadOnlyList<string> statusOptions, bool isReadOnly,
-        Action<string?, string?> onEdited, Action<int, int, int> onStrengthEdited,
+        Domain.ForceUnit unit,
+        IReadOnlyList<string> statusOptions,
+        bool isReadOnly,
+        Action<string?, string?> onEdited,
+        Action<int, int, int> onStrengthEdited,
         Action onRemoved)
     {
         ArgumentNullException.ThrowIfNull(unit);
@@ -51,8 +54,11 @@ public sealed partial class ForceRow : ObservableObject
     }
 
     public Guid Id { get; }
+
     public string Brigade { get; }
+
     public string? CallSign { get; }
+
     public bool IsReadOnly { get; }
 
     /// <summary>Wert-Historie der Stärke (#76), für die Verlauf-Anzeige.</summary>
@@ -111,7 +117,10 @@ public sealed partial class ForceRow : ObservableObject
     private void PushStatusNotes()
     {
         if (IsReadOnly)
+        {
             return;
+        }
+
         _onEdited(Status, Notes);
     }
 
@@ -120,7 +129,10 @@ public sealed partial class ForceRow : ObservableObject
     public void CommitStrength()
     {
         if (IsReadOnly)
+        {
             return;
+        }
+
         _onStrengthEdited(OfficerCount ?? 0, MannschaftCount ?? 0, ScbaCount ?? 0);
     }
 
@@ -135,7 +147,10 @@ public sealed partial class ForceRow : ObservableObject
     private void Remove()
     {
         if (!CanRemove)
+        {
             return;
+        }
+
         _onRemoved();
     }
 
@@ -191,7 +206,10 @@ public sealed partial class ForcesViewModel : ObservableObject
     {
         Forces.Clear();
         foreach (var f in _session.Incident.Forces)
+        {
             Forces.Add(ToRow(f));
+        }
+
         TotalPersonnel = _session.Incident.TotalPersonnel;
         TotalOfficer = _session.Incident.TotalOfficer;
         TotalScba = _session.Incident.TotalScba;
@@ -203,7 +221,9 @@ public sealed partial class ForcesViewModel : ObservableObject
     }
 
     public bool IsReadOnly { get; }
+
     public IReadOnlyList<string> BrigadeOptions { get; }
+
     public IReadOnlyList<string> CallSignOptions { get; }
 
     /// <summary>
@@ -305,6 +325,7 @@ public sealed partial class ForcesViewModel : ObservableObject
         if (value is null)
             return; // also fires when the form resets -- must not re-prefill then
         NewCallSign = value.CallSign;
+
         // Sitzplätze-Vorbelegung: 9 Sitze ergeben 1 Führungskraft + 8 Mannschaft (#76).
         NewOfficerCount = Math.Min(1, value.Seats);
         NewMannschaftCount = Math.Max(value.Seats - 1, 0);
@@ -313,10 +334,13 @@ public sealed partial class ForcesViewModel : ObservableObject
 
     private bool CanAddForce =>
         !IsReadOnly && !string.IsNullOrWhiteSpace(NewBrigade)
+
         // Lifted comparisons: null >= 0 is false, so every operand coalesces first.
         && (NewOfficerCount ?? 0) >= 0 && (NewMannschaftCount ?? 0) >= 0 && (NewScbaCount ?? 0) >= 0
+
         // Mirrors the domain rule, so an over-count disables the button instead of throwing on click.
         && (NewScbaCount ?? 0) <= (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0)
+
         // Ein Fahrzeug ist einzig — sein Funkrufname darf nicht schon in der Liste stehen.
         && !IsDuplicateCallSign;
 
@@ -324,8 +348,13 @@ public sealed partial class ForcesViewModel : ObservableObject
     private void AddForce()
     {
         _session.AddForceUnit(
-            NewBrigade, (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0), NewCallSign, NewStatus, NewNotes,
-            NewScbaCount ?? 0, NewOfficerCount ?? 0); // Changed → RefreshForces
+            NewBrigade,
+            (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0),
+            NewCallSign,
+            NewStatus,
+            NewNotes,
+            NewScbaCount ?? 0,
+            NewOfficerCount ?? 0); // Changed → RefreshForces
         NewBrigade = string.Empty;
         NewCallSign = null;
         NewOfficerCount = null;
@@ -337,7 +366,10 @@ public sealed partial class ForcesViewModel : ObservableObject
     }
 
     private ForceRow ToRow(Domain.ForceUnit f) =>
-        new(f, StatusOptions, IsReadOnly,
+        new(
+            f,
+            StatusOptions,
+            IsReadOnly,
             (status, notes) =>
             {
                 _session.UpdateForceUnit(f.Id, status, notes);

@@ -9,30 +9,50 @@ public sealed record IncidentFile
 
     public static readonly IReadOnlySet<string> AllowedContentTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"
+        "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf",
     };
 
-    private IncidentFile() { }
+    private IncidentFile()
+    {
+    }
 
     public Guid Id { get; private init; }
+
     public string FileName { get; private init; } = string.Empty;
+
     public string DisplayName { get; private init; } = string.Empty;
+
     public string ContentType { get; private init; } = string.Empty;
+
     public long SizeBytes { get; private init; }
+
     public DateTimeOffset AddedAt { get; private init; }
+
     public string AddedBy { get; private init; } = string.Empty;
 
     public static IncidentFile Create(
         string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy)
     {
         if (string.IsNullOrWhiteSpace(fileName))
+        {
             throw new ArgumentException("Dateiname darf nicht leer sein.", nameof(fileName));
+        }
+
         if (!AllowedContentTypes.Contains(contentType))
+        {
             throw new ArgumentException($"Dateityp '{contentType}' wird nicht unterstützt.", nameof(contentType));
+        }
+
         if (sizeBytes <= 0)
+        {
             throw new ArgumentException("Dateigröße muss positiv sein.", nameof(sizeBytes));
+        }
+
         if (sizeBytes > MaxSizeBytes)
+        {
             throw new ArgumentException($"Datei ist größer als das Limit von {MaxSizeBytes / (1024 * 1024)} MB.", nameof(sizeBytes));
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(addedBy);
 
         var trimmedName = fileName.Trim();
@@ -44,7 +64,7 @@ public sealed record IncidentFile
             ContentType = contentType,
             SizeBytes = sizeBytes,
             AddedAt = addedAt,
-            AddedBy = addedBy
+            AddedBy = addedBy,
         };
     }
 
@@ -58,7 +78,7 @@ public sealed record IncidentFile
             ContentType = contentType,
             SizeBytes = sizeBytes,
             AddedAt = addedAt,
-            AddedBy = addedBy
+            AddedBy = addedBy,
         };
 
     /// <summary>
@@ -69,7 +89,7 @@ public sealed record IncidentFile
     /// </summary>
     public IncidentFile WithDisplayName(string? displayName) => this with
     {
-        DisplayName = string.IsNullOrWhiteSpace(displayName) ? FileName : displayName.Trim()
+        DisplayName = string.IsNullOrWhiteSpace(displayName) ? FileName : displayName.Trim(),
     };
 
     /// <summary>

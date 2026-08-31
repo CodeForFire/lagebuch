@@ -39,14 +39,19 @@ public static class EnterSubmit
         {
             box.RemoveHandler(InputElement.KeyDownEvent, OnPreviewKeyDown);
             if (e.NewValue is ICommand)
+            {
                 box.AddHandler(InputElement.KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+            }
         });
     }
 
     private static void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || sender is not AutoCompleteBox box || box.IsDropDownOpen)
+        {
             return;
+        }
+
         var command = GetCommand(box);
         if (command?.CanExecute(null) == true)
         {

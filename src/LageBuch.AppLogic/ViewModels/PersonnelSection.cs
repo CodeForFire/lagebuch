@@ -9,7 +9,8 @@ public sealed partial class PersonnelSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public PersonnelSection(string title, IEnumerable<Person> people, Action onChanged) : base(title)
+    public PersonnelSection(string title, IEnumerable<Person> people, Action onChanged)
+        : base(title)
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<PersonRow>(
@@ -28,7 +29,10 @@ public sealed partial class PersonnelSection : EditorSection
     [RelayCommand]
     private void Remove(PersonRow row)
     {
-        if (Rows.Remove(row)) _onChanged();
+        if (Rows.Remove(row))
+        {
+            _onChanged();
+        }
     }
 
     /// <summary>Rows with a non-blank last name; trimmed, with blank optionals collapsed to null.</summary>
@@ -38,9 +42,14 @@ public sealed partial class PersonnelSection : EditorSection
         foreach (var r in Rows)
         {
             var last = r.LastName?.Trim() ?? string.Empty;
-            if (last.Length == 0) continue;
+            if (last.Length == 0)
+            {
+                continue;
+            }
+
             result.Add(new Person(last, r.FirstName?.Trim() ?? string.Empty, Nz(r.Role), Nz(r.CallSign), Nz(r.Phone)));
         }
+
         return result;
 
         static string? Nz(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

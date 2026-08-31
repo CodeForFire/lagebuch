@@ -69,6 +69,7 @@ public class ForceRemovalTests
 
         Assert.Throws<KeyNotFoundException>(() => incident.RemoveForceUnit(clock, op, Guid.NewGuid()));
         incident.RemoveForceUnit(clock, op, unit.Id);
+
         // Gone is gone: a replayed removal must fail loudly rather than silently no-op.
         Assert.Throws<KeyNotFoundException>(() => incident.RemoveForceUnit(clock, op, unit.Id));
     }
