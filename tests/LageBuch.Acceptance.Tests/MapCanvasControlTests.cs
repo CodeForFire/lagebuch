@@ -7,6 +7,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.App.Shared.Controls;
+using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Persistence.Wasserfoerderung;
 
@@ -19,6 +20,7 @@ public class MapCanvasControlTests
     {
         public byte[]? GetTile(int zoom, int x, int y) => SolidTilePng.Bytes;
         public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
+        public int? GetMaxZoom() => null;
     }
 
     // A real, decodable 4x4 solid-color PNG (built once via Avalonia's own encoder) so
@@ -39,7 +41,8 @@ public class MapCanvasControlTests
     }
 
     private static (Window Window, MapCanvasControl Control) ShowControl(
-        IReadOnlyList<GeoPoint>? routePoints = null, RelayCommand<GeoPoint>? onPointClicked = null, RelayCommand? onUndo = null)
+        IReadOnlyList<GeoPoint>? routePoints = null, RelayCommand<GeoPoint>? onPointClicked = null,
+        RelayCommand? onUndo = null, RelayCommand<MapViewChange>? onViewChanged = null)
     {
         var control = new MapCanvasControl
         {
@@ -52,6 +55,7 @@ public class MapCanvasControlTests
             RoutePoints = routePoints,
             PointClickedCommand = onPointClicked,
             UndoRequestedCommand = onUndo,
+            ViewChangedCommand = onViewChanged,
         };
         var window = new Window { Content = control, Width = 400, Height = 300 };
         window.Show();
@@ -68,6 +72,92 @@ public class MapCanvasControlTests
 
         Assert.NotNull(frame);
     }
+
+    // #150 follow-up: zooming past a tile source's actual max detail must still draw something
+    // (an overzoomed ancestor tile), not silently skip the tile.
+    private sealed class MaxZoomSpyTileSource : IMapTileSource
+    {
+        public readonly List<(int Zoom, int X, int Y)> Requested = new();
+
+        public byte[]? GetTile(int zoom, int x, int y)
+        {
+            Requested.Add((zoom, x, y));
+            return zoom <= 15 ? SolidTilePng.Bytes : null;
+        }
+
+        public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
+        public int? GetMaxZoom() => 15;
+    }
+
+    [AvaloniaFact]
+    public void Zooming_past_the_sources_max_detail_falls_back_to_the_overzoomed_ancestor_tile()
+    {
+        var spy = new MaxZoomSpyTileSource();
+        var control = new MapCanvasControl
+        {
+            Width = 256,
+            Height = 256,
+            TileSource = spy,
+            CenterLatitude = 48.0,
+            CenterLongitude = 11.0,
+            Zoom = 17,
+        };
+        var window = new Window { Content = control, Width = 256, Height = 256 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame();
+
+        Assert.NotNull(frame);
+        Assert.Contains(spy.Requested, r => r.Zoom == 17); // tried the exact tile first
+        Assert.Contains(spy.Requested, r => r.Zoom == 15); // fell back to the max-zoom ancestor
+    }
+
+    // #150 follow-up: scroll-wheel zoom was entirely missing before this fix -- only two tiny
+    // +/- buttons existed. Scrolling up over the control's exact center must zoom in by one level
+    // while keeping that same geo point (the center) stationary, i.e. center unchanged.
+    [AvaloniaFact]
+    public void Scrolling_up_zooms_in_by_one_level_keeping_the_cursors_geo_point_stationary()
+    {
+        MapViewChange? change = null;
+        var command = new RelayCommand<MapViewChange>(c => change = c);
+        var (window, control) = ShowControl(onViewChanged: command);
+
+        var center = control.TranslatePoint(new Point(200, 150), window)!.Value;
+        window.MouseWheel(center, new Vector(0, 1));
+
+        Assert.NotNull(change);
+        Assert.Equal(16, change!.Zoom);
+        Assert.Equal(48.0, change.CenterLatitude, 3);
+        Assert.Equal(11.0, change.CenterLongitude, 3);
+    }
+
+    [AvaloniaFact]
+    public void Scrolling_down_zooms_out_by_one_level()
+    {
+        MapViewChange? change = null;
+        var command = new RelayCommand<MapViewChange>(c => change = c);
+        var (window, control) = ShowControl(onViewChanged: command);
+
+        var center = control.TranslatePoint(new Point(200, 150), window)!.Value;
+        window.MouseWheel(center, new Vector(0, -1));
+
+        Assert.NotNull(change);
+        Assert.Equal(14, change!.Zoom);
+    }
+
+    // #150 follow-up: pinch-to-zoom (primarily for Android touch) can't be driven through
+    // Avalonia.Headless (no touch/gesture simulation API exists there), so its scale->zoom-delta
+    // math is unit-tested directly instead.
+    [Theory]
+    [InlineData(1.0, 0)]     // no pinch movement -> no zoom change
+    [InlineData(2.0, 1)]     // pinch-out to double size -> zoom in one level
+    [InlineData(4.0, 2)]     // quadruple size -> zoom in two levels
+    [InlineData(0.5, -1)]    // pinch-in to half size -> zoom out one level
+    [InlineData(1.4, 0)]     // small movement rounds back to no change
+    [InlineData(1.6, 1)]     // past the rounding midpoint commits to the next level
+    public void PinchScaleToZoomDelta_rounds_to_the_nearest_zoom_level(double relativeScale, int expectedDelta)
+        => Assert.Equal(expectedDelta, MapCanvasControl.PinchScaleToZoomDelta(relativeScale));
 
     [AvaloniaFact]
     public void Left_click_at_the_controls_center_invokes_PointClicked_with_the_center_geo_point()

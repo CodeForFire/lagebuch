@@ -1,3 +1,4 @@
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Wasserfoerderung;
@@ -30,6 +31,7 @@ public class WasserfoerderungViewModelTests
     {
         public byte[]? GetTile(int zoom, int x, int y) => null;
         public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
+        public int? GetMaxZoom() => null;
     }
 
     private static (LocalIncidentSession Session, FakeStore Store) NewSession()
@@ -83,6 +85,36 @@ public class WasserfoerderungViewModelTests
         Assert.Equal(48.14, vm.MapCenterLatitude);
         Assert.Equal(11.58, vm.MapCenterLongitude);
         Assert.Equal(14, vm.MapZoom);
+    }
+
+    // #150 follow-up: wheel/pinch zoom on the map canvas routes through this command instead of
+    // two-way property binding (matching PointClickedCommand/UndoRequestedCommand's existing
+    // control->VM pattern), so it must apply the new view exactly as given.
+    [Fact]
+    public void ChangeMapView_applies_the_given_center_and_zoom()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(48.2, 11.3, 13));
+
+        Assert.Equal(48.2, vm.MapCenterLatitude);
+        Assert.Equal(11.3, vm.MapCenterLongitude);
+        Assert.Equal(13, vm.MapZoom);
+    }
+
+    [Fact]
+    public void ChangeMapView_clamps_zoom_to_the_configured_min_and_max()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource(),
+            initialMinZoom: 11);
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(48.2, 11.3, 5));
+        Assert.Equal(11, vm.MapZoom);
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(48.2, 11.3, 25));
+        Assert.Equal(19, vm.MapZoom);
     }
 
     [Fact]

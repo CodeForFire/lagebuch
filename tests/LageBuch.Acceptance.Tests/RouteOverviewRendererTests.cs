@@ -13,6 +13,7 @@ public class RouteOverviewRendererTests
     {
         public byte[]? GetTile(int zoom, int x, int y) => null;
         public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
+        public int? GetMaxZoom() => null;
     }
 
     [AvaloniaFact]

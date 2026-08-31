@@ -109,4 +109,38 @@ public class MbTilesFileSourceTests : IDisposable
         Assert.Equal(2, bounds.Value.MinY);
         Assert.Equal(6, bounds.Value.MaxY);
     }
+
+    [Fact]
+    public void GetMaxZoom_returns_null_when_the_file_has_no_tiles()
+    {
+        var emptyPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mbtiles");
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(emptyPath))
+        using (var create = cn.CreateCommand())
+        {
+            create.CommandText =
+                "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);";
+            create.ExecuteNonQuery();
+        }
+        try
+        {
+            var source = new MbTilesFileSource(emptyPath);
+
+            Assert.Null(source.GetMaxZoom());
+        }
+        finally
+        {
+            File.Delete(emptyPath);
+        }
+    }
+
+    [Fact]
+    public void GetMaxZoom_returns_the_highest_zoom_level_present()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+            InsertTile(cn, zoom: 7, column: 0, tmsRow: 0, data: new byte[] { 0x11 });
+
+        var source = new MbTilesFileSource(_path);
+
+        Assert.Equal(7, source.GetMaxZoom());
+    }
 }

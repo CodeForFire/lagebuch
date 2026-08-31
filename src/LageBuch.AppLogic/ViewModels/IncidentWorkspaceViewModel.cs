@@ -242,7 +242,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         var (elevationSampler, tileSource) = BuildWasserfoerderungMapSources();
         var initialMapView = InitialMapViewFrom(tileSource);
         Wasserfoerderung = new WasserfoerderungViewModel(
-            _session, OnChanged, elevationSampler, tileSource, initialMapView?.Center, initialMapView?.Zoom);
+            _session, OnChanged, elevationSampler, tileSource,
+            initialMapView?.Center, initialMapView?.Zoom, initialMinZoom: initialMapView?.Zoom);
 
         Reminder?.Dispose();
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
@@ -287,10 +288,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Derives the Karte mode's initial view from the tiles the configured region actually has,
-    /// rather than an unrelated fixed fallback (#150 follow-up) — a real per-Landkreis pack has no
-    /// tiles anywhere near <see cref="WasserfoerderungViewModel"/>'s hardcoded German default, so
-    /// without this the map opened blank until the operator happened to pan to the right area.
+    /// Derives the Karte mode's initial view — and, doubling as the region's lowest usable zoom
+    /// (<c>initialMinZoom</c>), the floor past which zooming out has nothing to show — from the
+    /// tiles the configured region actually has, rather than an unrelated fixed fallback (#150
+    /// follow-up). A real per-Landkreis pack has no tiles anywhere near
+    /// <see cref="WasserfoerderungViewModel"/>'s hardcoded German default and only ever renders a
+    /// narrow zoom band, so without this the map opened blank (or could be zoomed out to blank).
     /// </summary>
     private static (GeoPoint Center, int Zoom)? InitialMapViewFrom(IMapTileSource? tileSource)
     {

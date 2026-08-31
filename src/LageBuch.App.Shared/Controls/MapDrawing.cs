@@ -39,23 +39,56 @@ public static class MapDrawing
 
         var (firstTileX, firstTileY) = WebMercator.ToTileIndex(centerX - width / 2, centerY - height / 2);
         var (lastTileX, lastTileY) = WebMercator.ToTileIndex(centerX + width / 2, centerY + height / 2);
+        var sourceMaxZoom = tileSource.GetMaxZoom();
 
         for (var tx = firstTileX; tx <= lastTileX; tx++)
         {
             for (var ty = firstTileY; ty <= lastTileY; ty++)
             {
                 var bytes = tileSource.GetTile(zoom, tx, ty);
+                var sourceRect = (Rect?)null;
+
                 if (bytes is null)
-                    continue;
+                {
+                    if (ComputeOverzoomTile(zoom, tx, ty, sourceMaxZoom) is not { } overzoom)
+                        continue;
+                    bytes = tileSource.GetTile(overzoom.Zoom, overzoom.X, overzoom.Y);
+                    if (bytes is null)
+                        continue;
+                    sourceRect = overzoom.SourceRect;
+                }
 
                 using var stream = new MemoryStream(bytes);
                 using var bitmap = new Bitmap(stream);
                 var screenX = tx * WebMercator.TileSizePixels - centerX + width / 2;
                 var screenY = ty * WebMercator.TileSizePixels - centerY + height / 2;
                 var destRect = new Rect(screenX, screenY, WebMercator.TileSizePixels, WebMercator.TileSizePixels);
-                context.DrawImage(bitmap, new Rect(bitmap.Size), destRect);
+                context.DrawImage(bitmap, sourceRect ?? new Rect(bitmap.Size), destRect);
             }
         }
+    }
+
+    /// <summary>
+    /// When the exact tile at (<paramref name="zoom"/>, <paramref name="x"/>, <paramref name="y"/>)
+    /// isn't available and <paramref name="zoom"/> is past the source's actual max detail
+    /// (<paramref name="sourceMaxZoom"/>), computes the ancestor tile at that max zoom and the
+    /// source sub-rect within it covering this tile's area — "overzoom": an increasingly blurry
+    /// but still-oriented view past the region's native detail, instead of drawing nothing
+    /// (#150 follow-up). Null when zoom is already within range, or the source's max is unknown
+    /// (an empty tile source).
+    /// </summary>
+    public static (int Zoom, int X, int Y, Rect SourceRect)? ComputeOverzoomTile(int zoom, int x, int y, int? sourceMaxZoom)
+    {
+        if (sourceMaxZoom is not { } maxZoom || zoom <= maxZoom)
+            return null;
+
+        var levels = zoom - maxZoom;
+        var ancestorX = x >> levels;
+        var ancestorY = y >> levels;
+        var subSize = (double)WebMercator.TileSizePixels / (1 << levels);
+        var subX = (x - (ancestorX << levels)) * subSize;
+        var subY = (y - (ancestorY << levels)) * subSize;
+        return (maxZoom, ancestorX, ancestorY, new Rect(subX, subY, subSize, subSize));
     }
 
     private static void DrawRoute(

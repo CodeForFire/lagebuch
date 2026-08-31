@@ -12,4 +12,11 @@ public interface IMapTileSource
     /// tiles actually present, instead of an unrelated fixed fallback (#150 follow-up).
     /// </summary>
     (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds();
+
+    /// <summary>
+    /// The highest zoom level this source has any tiles at, or null when it has none — lets a
+    /// caller detect when a requested zoom is past the region's native detail and fall back to
+    /// overzooming an ancestor tile instead of drawing nothing (#150 follow-up).
+    /// </summary>
+    int? GetMaxZoom();
 }

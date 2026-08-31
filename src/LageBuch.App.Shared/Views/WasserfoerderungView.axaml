@@ -125,7 +125,8 @@
               Zoom="{Binding MapZoom}"
               RoutePoints="{Binding DrawnRoutePoints}"
               PointClickedCommand="{Binding AddRoutePointCommand}"
-              UndoRequestedCommand="{Binding UndoLastRoutePointCommand}" />
+              UndoRequestedCommand="{Binding UndoLastRoutePointCommand}"
+              ViewChangedCommand="{Binding ChangeMapViewCommand}" />
         </Border>
       </StackPanel>
     </ScrollViewer>

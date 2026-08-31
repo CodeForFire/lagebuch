@@ -41,13 +41,30 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<ICommand?> UndoRequestedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(UndoRequestedCommand));
 
+    public static readonly StyledProperty<ICommand?> ViewChangedCommandProperty =
+        AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(ViewChangedCommand));
+
     static MapCanvasControl()
     {
         AffectsRender<MapCanvasControl>(
             TileSourceProperty, CenterLatitudeProperty, CenterLongitudeProperty, ZoomProperty, RoutePointsProperty);
     }
 
-    public MapCanvasControl() => Focusable = true;
+    // Cumulative pinch scale since the gesture started (Avalonia.Input.Gestures.PinchEvent reports
+    // Scale relative to gesture start, not incrementally) -- reset in OnPinchEnded.
+    private double _pinchStartScale = 1.0;
+    private int _pinchStartZoom;
+
+    public MapCanvasControl()
+    {
+        Focusable = true;
+        // Avalonia.Input.Gestures (which raises PinchEvent/PinchEndedEvent) is internal; the
+        // documented public way to opt a control into pinch recognition is registering a
+        // recognizer here, then handling the routed events declared on InputElement itself.
+        GestureRecognizers.Add(new PinchGestureRecognizer());
+        AddHandler(PinchEvent, OnPinch);
+        AddHandler(PinchEndedEvent, OnPinchEnded);
+    }
 
     public IMapTileSource? TileSource
     {
@@ -93,6 +110,18 @@ public sealed class MapCanvasControl : Control
         set => SetValue(UndoRequestedCommandProperty, value);
     }
 
+    /// <summary>
+    /// Invoked with a <see cref="MapViewChange"/> from a wheel or pinch zoom (#150 follow-up).
+    /// A command rather than two-way binding CenterLatitude/CenterLongitude/Zoom, matching this
+    /// control's existing pattern for control->VM communication (<see cref="PointClickedCommand"/>,
+    /// <see cref="UndoRequestedCommand"/>) instead of changing those three properties' binding mode.
+    /// </summary>
+    public ICommand? ViewChangedCommand
+    {
+        get => GetValue(ViewChangedCommandProperty);
+        set => SetValue(ViewChangedCommandProperty, value);
+    }
+
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -127,13 +156,73 @@ public sealed class MapCanvasControl : Control
         if (!current.Properties.IsLeftButtonPressed)
             return;
 
-        var (centerX, centerY) = WebMercator.ToWorldPixel(new GeoPoint(CenterLatitude, CenterLongitude), Zoom);
-        var worldX = current.Position.X + centerX - Bounds.Width / 2;
-        var worldY = current.Position.Y + centerY - Bounds.Height / 2;
-        var geoPoint = WebMercator.ToGeo(worldX, worldY, Zoom);
+        var geoPoint = ScreenToGeo(current.Position);
 
         if (PointClickedCommand?.CanExecute(geoPoint) == true)
             PointClickedCommand.Execute(geoPoint);
         e.Handled = true;
+    }
+
+    private GeoPoint ScreenToGeo(Point screenPoint)
+    {
+        var (centerX, centerY) = WebMercator.ToWorldPixel(new GeoPoint(CenterLatitude, CenterLongitude), Zoom);
+        var worldX = screenPoint.X + centerX - Bounds.Width / 2;
+        var worldY = screenPoint.Y + centerY - Bounds.Height / 2;
+        return WebMercator.ToGeo(worldX, worldY, Zoom);
+    }
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        var newZoom = Zoom + (e.Delta.Y > 0 ? 1 : -1);
+        ZoomAt(e.GetPosition(this), newZoom);
+        e.Handled = true;
+    }
+
+    // PinchEventArgs.Scale is cumulative relative to the gesture's start, not incremental between
+    // events, so the target zoom is derived fresh each time from the gesture's starting zoom.
+    private void OnPinch(object? sender, PinchEventArgs e)
+    {
+        if (_pinchStartZoom == 0)
+        {
+            _pinchStartScale = e.Scale;
+            _pinchStartZoom = Zoom;
+        }
+
+        var relativeScale = e.Scale / _pinchStartScale;
+        var newZoom = _pinchStartZoom + PinchScaleToZoomDelta(relativeScale);
+        var origin = new Point(e.ScaleOrigin.X * Bounds.Width, e.ScaleOrigin.Y * Bounds.Height);
+        ZoomAt(origin, newZoom);
+        e.Handled = true;
+    }
+
+    private void OnPinchEnded(object? sender, PinchEndedEventArgs e)
+    {
+        _pinchStartZoom = 0;
+        _pinchStartScale = 1.0;
+    }
+
+    /// <summary>Each zoom level doubles resolution, so a relative pinch scale of 2x is +1 zoom
+    /// level — public/static for direct unit testing since Avalonia.Headless cannot synthesize
+    /// pinch/touch input to drive this through a full gesture pipeline (#150 follow-up).</summary>
+    public static int PinchScaleToZoomDelta(double relativeScale) =>
+        (int)Math.Round(Math.Log2(Math.Max(relativeScale, 0.01)));
+
+    /// <summary>Zooms to <paramref name="newZoom"/> while keeping the geo point currently under
+    /// <paramref name="screenPoint"/> stationary on screen (#150 follow-up) — the standard
+    /// "zoom to cursor"/"zoom to pinch centroid" map UX.</summary>
+    private void ZoomAt(Point screenPoint, int newZoom)
+    {
+        var anchorGeo = ScreenToGeo(screenPoint);
+
+        var (anchorWorldX, anchorWorldY) = WebMercator.ToWorldPixel(anchorGeo, newZoom);
+        var newCenterX = anchorWorldX - (screenPoint.X - Bounds.Width / 2);
+        var newCenterY = anchorWorldY - (screenPoint.Y - Bounds.Height / 2);
+        var newCenter = WebMercator.ToGeo(newCenterX, newCenterY, newZoom);
+        var change = new MapViewChange(newCenter.Latitude, newCenter.Longitude, newZoom);
+
+        if (ViewChangedCommand?.CanExecute(change) == true)
+            ViewChangedCommand.Execute(change);
     }
 }
