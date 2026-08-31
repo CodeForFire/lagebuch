@@ -19,7 +19,14 @@ public sealed class RegionPackInstaller(HttpClient httpClient, string regionsBas
 
         var zipBytes = await DownloadAsync(pack.DownloadUrl, progress, ct);
 
-        var folder = Path.Combine(regionsBaseDir, pack.Slug);
+        // Defense in depth: RegionPackCatalogJson already rejects unsafe slugs when parsing the
+        // manifest, but a slug ending up here from anywhere else must not be able to escape
+        // regionsBaseDir either.
+        var baseFull = Path.GetFullPath(regionsBaseDir) + Path.DirectorySeparatorChar;
+        var folder = Path.GetFullPath(Path.Combine(regionsBaseDir, pack.Slug));
+        if (!folder.StartsWith(baseFull, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Region slug '{pack.Slug}' escapes the regions directory.");
+
         if (Directory.Exists(folder))
             Directory.Delete(folder, recursive: true);
         Directory.CreateDirectory(folder);

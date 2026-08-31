@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace LageBuch.AppLogic.Services;
 
@@ -11,6 +12,11 @@ namespace LageBuch.AppLogic.Services;
 /// </summary>
 public static class RegionPackCatalogJson
 {
+    // RegionPackInstaller joins this straight onto a base directory (<regionsBaseDir>/<slug>) —
+    // reject anything that could escape that directory (path separators, "..", empty) here rather
+    // than trusting the installer alone to catch it.
+    private static readonly Regex SafeSlug = new("^[a-z0-9][a-z0-9_-]{0,63}$", RegexOptions.Compiled);
+
     public static IReadOnlyList<RegionPackInfo> Parse(string json)
     {
         try
@@ -40,7 +46,7 @@ public static class RegionPackCatalogJson
             return false;
 
         if (!TryGetString(entry, "name", out var name) ||
-            !TryGetString(entry, "slug", out var slug) ||
+            !TryGetString(entry, "slug", out var slug) || !SafeSlug.IsMatch(slug) ||
             !TryGetString(entry, "downloadUrl", out var downloadUrl) ||
             !TryGetString(entry, "builtAt", out var builtAt) ||
             !TryGetString(entry, "attribution", out var attribution) ||

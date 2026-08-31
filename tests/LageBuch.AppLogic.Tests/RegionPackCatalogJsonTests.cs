@@ -70,4 +70,46 @@ public class RegionPackCatalogJsonTests
     [Fact]
     public void Parse_of_an_empty_array_returns_an_empty_list()
         => Assert.Empty(RegionPackCatalogJson.Parse("[]"));
+
+    // The manifest is fetched from a third-party-controlled URL and its slug ends up as a path
+    // component (RegionPackInstaller extracts to <regionsBaseDir>/<slug>) — an entry with a
+    // path-traversal slug like "../../etc" must be rejected rather than silently accepted.
+    [Theory]
+    [InlineData("../evil")]
+    [InlineData("..\\evil")]
+    [InlineData("a/b")]
+    [InlineData("a\\b")]
+    [InlineData("")]
+    [InlineData("UPPER")]
+    [InlineData(".")]
+    public void Parse_rejects_entries_with_an_unsafe_slug(string unsafeSlug)
+    {
+        var json = $$"""
+            [
+              { "name": "Evil", "slug": "{{unsafeSlug.Replace("\\", "\\\\")}}", "downloadUrl": "https://x/e.zip", "sizeBytes": 1,
+                "boundingBox": { "minLat": 0, "minLon": 0, "maxLat": 1, "maxLon": 1 },
+                "builtAt": "2026-01-01", "attribution": "x" }
+            ]
+            """;
+
+        Assert.Empty(RegionPackCatalogJson.Parse(json));
+    }
+
+    [Theory]
+    [InlineData("ffb")]
+    [InlineData("landkreis-ffb")]
+    [InlineData("region_1")]
+    [InlineData("a")]
+    public void Parse_accepts_entries_with_a_safe_slug(string safeSlug)
+    {
+        var json = $$"""
+            [
+              { "name": "OK", "slug": "{{safeSlug}}", "downloadUrl": "https://x/ok.zip", "sizeBytes": 1,
+                "boundingBox": { "minLat": 0, "minLon": 0, "maxLat": 1, "maxLon": 1 },
+                "builtAt": "2026-01-01", "attribution": "x" }
+            ]
+            """;
+
+        Assert.Equal(safeSlug, Assert.Single(RegionPackCatalogJson.Parse(json)).Slug);
+    }
 }
