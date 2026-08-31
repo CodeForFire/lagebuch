@@ -4,7 +4,7 @@ namespace LageBuch.Sync.Hosting;
 
 /// <summary>
 /// Per-source-IP brute-force guard for the share PIN (§ P0 #3). After a failed attempt the next
-/// attempt from that IP is delayed by 2^(failures) seconds (capped at <see cref="MaxBackoffSeconds"/>);
+/// attempt from that IP is delayed by 2^(failures-1) seconds (capped at <see cref="MaxBackoffSeconds"/>);
 /// a correct PIN clears the counter. One instance lives for the lifetime of the host middleware,
 /// so state is deliberately lost on restart (share sessions are short-lived).
 /// </summary>
