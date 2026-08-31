@@ -118,6 +118,13 @@ internal static class TestHost
     /// <summary>The share PIN the test host runs with; clients pass this to ConnectAsync to be let in.</summary>
     public const string DefaultPin = "1234";
 
+    public static HttpClientHandler InsecureTrustAllHandler() =>
+        new()
+        {
+            CheckCertificateRevocationList = true,
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+        };
+
     public static int FreeTcpPort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
