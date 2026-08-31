@@ -61,4 +61,52 @@ public class MbTilesFileSourceTests : IDisposable
 
         Assert.Null(source.GetTile(zoom: 10, x: 1, y: 2));
     }
+
+    [Fact]
+    public void GetTileBounds_returns_null_when_the_file_has_no_tiles()
+    {
+        var emptyPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mbtiles");
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(emptyPath))
+        using (var create = cn.CreateCommand())
+        {
+            create.CommandText =
+                "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB);";
+            create.ExecuteNonQuery();
+        }
+        try
+        {
+            var source = new MbTilesFileSource(emptyPath);
+
+            Assert.Null(source.GetTileBounds());
+        }
+        finally
+        {
+            File.Delete(emptyPath);
+        }
+    }
+
+    [Fact]
+    public void GetTileBounds_flips_stored_tms_rows_back_to_xyz_and_uses_the_lowest_zoom_present()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            // Zoom 3 (already seeded: XYZ x=1,y=2 -> TMS row 5) gets a second tile to give it a
+            // real column/row spread. Zoom 5 is also seeded, deliberately with a wider spread, to
+            // prove the lowest zoom present (3) wins, not the widest bounds.
+            InsertTile(cn, zoom: 3, column: 3, tmsRow: 1, data: new byte[] { 0xCD }); // XYZ (x=3,y=6)
+            InsertTile(cn, zoom: 5, column: 0, tmsRow: 0, data: new byte[] { 0xEE });
+            InsertTile(cn, zoom: 5, column: 31, tmsRow: 31, data: new byte[] { 0xFF });
+        }
+
+        var source = new MbTilesFileSource(_path);
+        var bounds = source.GetTileBounds();
+
+        Assert.NotNull(bounds);
+        Assert.Equal(3, bounds!.Value.Zoom);
+        Assert.Equal(1, bounds.Value.MinX);
+        Assert.Equal(3, bounds.Value.MaxX);
+        // Seeded tiles: XYZ (x=1,y=2) -> TMS row 5; and TMS row 1 at zoom 3 -> XYZ row (8-1-1)=6.
+        Assert.Equal(2, bounds.Value.MinY);
+        Assert.Equal(6, bounds.Value.MaxY);
+    }
 }

@@ -29,6 +29,7 @@ public class WasserfoerderungViewModelTests
     private sealed class FakeTileSource : IMapTileSource
     {
         public byte[]? GetTile(int zoom, int x, int y) => null;
+        public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
     }
 
     private static (LocalIncidentSession Session, FakeStore Store) NewSession()
@@ -57,6 +58,31 @@ public class WasserfoerderungViewModelTests
         var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
 
         Assert.True(vm.IsMapModeAvailable);
+    }
+
+    // #150 follow-up: with a real region pack, the map must open already centered on the
+    // configured Einsatzgebiet's tiles, not the unrelated hardcoded German fallback.
+    [Fact]
+    public void Map_opens_centered_on_the_given_initial_view_when_provided()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource(),
+            initialMapCenter: new GeoPoint(48.19, 11.15), initialMapZoom: 11);
+
+        Assert.Equal(48.19, vm.MapCenterLatitude);
+        Assert.Equal(11.15, vm.MapCenterLongitude);
+        Assert.Equal(11, vm.MapZoom);
+    }
+
+    [Fact]
+    public void Map_falls_back_to_the_hardcoded_default_when_no_initial_view_is_given()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
+
+        Assert.Equal(48.14, vm.MapCenterLatitude);
+        Assert.Equal(11.58, vm.MapCenterLongitude);
+        Assert.Equal(14, vm.MapZoom);
     }
 
     [Fact]

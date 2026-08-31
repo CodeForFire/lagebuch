@@ -25,7 +25,8 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
 
     public WasserfoerderungViewModel(
         IIncidentSession session, Action onChanged,
-        IElevationSampler? elevationSampler = null, IMapTileSource? tileSource = null)
+        IElevationSampler? elevationSampler = null, IMapTileSource? tileSource = null,
+        GeoPoint? initialMapCenter = null, int? initialMapZoom = null)
     {
         _session = session;
         _onChanged = onChanged;
@@ -36,6 +37,15 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
         DrawnRoutePoints = new ObservableCollection<GeoPoint>();
         DrawnRoutePoints.CollectionChanged += (_, _) => UndoLastRoutePointCommand.NotifyCanExecuteChanged();
         DrawnRoutePoints.CollectionChanged += (_, _) => FinishRouteCommand.NotifyCanExecuteChanged();
+
+        if (initialMapCenter is { } center)
+        {
+            _mapCenterLatitude = center.Latitude;
+            _mapCenterLongitude = center.Longitude;
+        }
+        if (initialMapZoom is { } zoom)
+            _mapZoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+
         _session.Changed += Sync;
         Sync();
     }
@@ -57,9 +67,11 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
     [ObservableProperty]
     private bool _isMapMode;
 
-    // No configured Einsatzgebiet has an obvious default location, so the map opens on a fixed,
-    // reasonable German fallback; the operator pans from there. Bounds keep zooming out from
-    // going past a whole-continent view or in past building-level detail.
+    // The constructor overrides these from the configured region's actual tile bounds
+    // (IncidentWorkspaceViewModel, #150 follow-up) whenever one is available; a region with no
+    // tiles at all (or no Einsatzgebiet configured) falls back to this fixed, reasonable German
+    // default and the operator pans from there. Bounds keep zooming out from going past a
+    // whole-continent view or in past building-level detail.
     private const int MinZoom = 3;
     private const int MaxZoom = 19;
 

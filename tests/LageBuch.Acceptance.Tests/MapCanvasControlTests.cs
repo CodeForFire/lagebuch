@@ -18,6 +18,7 @@ public class MapCanvasControlTests
     private sealed class FakeTileSource : IMapTileSource
     {
         public byte[]? GetTile(int zoom, int x, int y) => SolidTilePng.Bytes;
+        public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
     }
 
     // A real, decodable 4x4 solid-color PNG (built once via Avalonia's own encoder) so
