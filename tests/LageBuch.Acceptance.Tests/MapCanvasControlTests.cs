@@ -114,17 +114,17 @@ public class MapCanvasControlTests
     }
 
     // #150 follow-up: scroll-wheel zoom was entirely missing before this fix -- only two tiny
-    // +/- buttons existed. Scrolling up over the control's exact center must zoom in by one level
-    // while keeping that same geo point (the center) stationary, i.e. center unchanged.
+    // +/- buttons existed. Ctrl+scrolling up over the control's exact center must zoom in by one
+    // level while keeping that same geo point (the center) stationary, i.e. center unchanged.
     [AvaloniaFact]
-    public void Scrolling_up_zooms_in_by_one_level_keeping_the_cursors_geo_point_stationary()
+    public void CtrlScrolling_up_zooms_in_by_one_level_keeping_the_cursors_geo_point_stationary()
     {
         MapViewChange? change = null;
         var command = new RelayCommand<MapViewChange>(c => change = c);
         var (window, control) = ShowControl(onViewChanged: command);
 
         var center = control.TranslatePoint(new Point(200, 150), window)!.Value;
-        window.MouseWheel(center, new Vector(0, 1));
+        window.MouseWheel(center, new Vector(0, 1), RawInputModifiers.Control);
 
         Assert.NotNull(change);
         Assert.Equal(16, change!.Zoom);
@@ -133,17 +133,37 @@ public class MapCanvasControlTests
     }
 
     [AvaloniaFact]
-    public void Scrolling_down_zooms_out_by_one_level()
+    public void CtrlScrolling_down_zooms_out_by_one_level()
     {
         MapViewChange? change = null;
         var command = new RelayCommand<MapViewChange>(c => change = c);
         var (window, control) = ShowControl(onViewChanged: command);
 
         var center = control.TranslatePoint(new Point(200, 150), window)!.Value;
-        window.MouseWheel(center, new Vector(0, -1));
+        window.MouseWheel(center, new Vector(0, -1), RawInputModifiers.Control);
 
         Assert.NotNull(change);
         Assert.Equal(14, change!.Zoom);
+    }
+
+    // #150 follow-up regression fix: the map sits inside the tab's outer ScrollViewer (see
+    // WasserfoerderungView.axaml) -- plain scroll (no Ctrl) must NOT be swallowed as a zoom, or
+    // the whole page becomes unscrollable wherever the cursor happens to be over the map, and a
+    // laptop trackpad's rapid wheel-delta stream during a scroll swipe zooms wildly, rendering the
+    // map unreadable.
+    [AvaloniaFact]
+    public void Plain_scrolling_without_ctrl_does_not_zoom()
+    {
+        MapViewChange? change = null;
+        var command = new RelayCommand<MapViewChange>(c => change = c);
+        var (window, control) = ShowControl(onViewChanged: command);
+
+        var center = control.TranslatePoint(new Point(200, 150), window)!.Value;
+        window.MouseWheel(center, new Vector(0, 1));
+        window.MouseWheel(center, new Vector(0, -1));
+
+        Assert.Null(change);
+        Assert.Equal(15, control.Zoom);
     }
 
     // #150 follow-up: pinch-to-zoom (primarily for Android touch) can't be driven through

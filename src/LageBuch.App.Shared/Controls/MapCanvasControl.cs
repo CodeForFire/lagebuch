@@ -175,6 +175,15 @@ public sealed class MapCanvasControl : Control
     {
         base.OnPointerWheelChanged(e);
 
+        // The map sits inside the Wasserförderung tab's own scrollable page (see
+        // WasserfoerderungView.axaml) -- a plain scroll must fall through to that ScrollViewer
+        // instead of zooming here, or the page becomes unscrollable wherever the cursor happens to
+        // land on the map, and a laptop trackpad's rapid wheel-delta stream during a scroll swipe
+        // zooms wildly, rendering the map unreadable (#150 follow-up). Ctrl+scroll to zoom matches
+        // the same convention most embedded maps use for exactly this reason.
+        if ((e.KeyModifiers & KeyModifiers.Control) == 0)
+            return;
+
         var newZoom = Zoom + (e.Delta.Y > 0 ? 1 : -1);
         ZoomAt(e.GetPosition(this), newZoom);
         e.Handled = true;
