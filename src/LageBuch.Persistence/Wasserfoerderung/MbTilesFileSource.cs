@@ -49,4 +49,14 @@ public sealed class MbTilesFileSource(string mbtilesFilePath) : IMapTileSource
         var maxRow = (1 << zoom) - 1;
         return (zoom, minX, maxX, maxRow - maxTmsRow, maxRow - minTmsRow);
     }
+
+    public int? GetMaxZoom()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadOnly(mbtilesFilePath);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT MAX(zoom_level) FROM tiles;";
+
+        var result = cmd.ExecuteScalar();
+        return result is long max ? (int)max : null;
+    }
 }

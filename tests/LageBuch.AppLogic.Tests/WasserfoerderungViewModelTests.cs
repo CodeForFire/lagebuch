@@ -1,3 +1,4 @@
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Wasserfoerderung;
@@ -30,6 +31,7 @@ public class WasserfoerderungViewModelTests
     {
         public byte[]? GetTile(int zoom, int x, int y) => null;
         public (int Zoom, int MinX, int MaxX, int MinY, int MaxY)? GetTileBounds() => null;
+        public int? GetMaxZoom() => null;
     }
 
     private static (LocalIncidentSession Session, FakeStore Store) NewSession()
@@ -79,6 +81,70 @@ public class WasserfoerderungViewModelTests
     {
         var (session, _) = NewSession();
         var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
+
+        Assert.Equal(48.14, vm.MapCenterLatitude);
+        Assert.Equal(11.58, vm.MapCenterLongitude);
+        Assert.Equal(14, vm.MapZoom);
+    }
+
+    // #150 follow-up: wheel/pinch zoom on the map canvas routes through this command instead of
+    // two-way property binding (matching PointClickedCommand/UndoRequestedCommand's existing
+    // control->VM pattern), so it must apply the new view exactly as given.
+    [Fact]
+    public void ChangeMapView_applies_the_given_center_and_zoom()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(48.2, 11.3, 13));
+
+        Assert.Equal(48.2, vm.MapCenterLatitude);
+        Assert.Equal(11.3, vm.MapCenterLongitude);
+        Assert.Equal(13, vm.MapZoom);
+    }
+
+    [Fact]
+    public void ChangeMapView_clamps_zoom_to_the_configured_min_and_max()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource(),
+            initialMinZoom: 11);
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(48.2, 11.3, 5));
+        Assert.Equal(11, vm.MapZoom);
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(48.2, 11.3, 25));
+        Assert.Equal(19, vm.MapZoom);
+    }
+
+    // #150 follow-up: with no drag-to-pan and no way back, zooming (cursor-anchored, so it shifts
+    // the center) could drift the operator's view off the region's tiles entirely with no way to
+    // recover. ResetMapViewCommand must restore the view exactly where it started.
+    [Fact]
+    public void ResetMapView_restores_the_initial_center_and_zoom_after_drifting_away()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource(),
+            initialMapCenter: new GeoPoint(48.19, 11.15), initialMapZoom: 13, initialMinZoom: 11);
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(50.0, 20.0, 19));
+        Assert.Equal(50.0, vm.MapCenterLatitude);
+
+        vm.ResetMapViewCommand.Execute(null);
+
+        Assert.Equal(48.19, vm.MapCenterLatitude);
+        Assert.Equal(11.15, vm.MapCenterLongitude);
+        Assert.Equal(13, vm.MapZoom);
+    }
+
+    [Fact]
+    public void ResetMapView_restores_the_hardcoded_default_when_no_initial_view_was_given()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
+
+        vm.ChangeMapViewCommand.Execute(new MapViewChange(50.0, 20.0, 19));
+        vm.ResetMapViewCommand.Execute(null);
 
         Assert.Equal(48.14, vm.MapCenterLatitude);
         Assert.Equal(11.58, vm.MapCenterLongitude);

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Documents;
 using LageBuch.Persistence.Wasserfoerderung;
@@ -23,10 +24,18 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
     private readonly IElevationSampler? _elevationSampler;
     private readonly IMapTileSource? _tileSource;
 
+    // The view the map opened with (region-derived center/zoom, or the hardcoded default) --
+    // kept so ResetMapViewCommand has a "home" to return to. Cursor-anchored wheel/pinch zoom
+    // shifts the center as a side effect, and there is no drag-to-pan, so without this a drifted
+    // view had no way back at all (#150 follow-up).
+    private readonly double _initialCenterLatitude;
+    private readonly double _initialCenterLongitude;
+    private readonly int _initialZoom;
+
     public WasserfoerderungViewModel(
         IIncidentSession session, Action onChanged,
         IElevationSampler? elevationSampler = null, IMapTileSource? tileSource = null,
-        GeoPoint? initialMapCenter = null, int? initialMapZoom = null)
+        GeoPoint? initialMapCenter = null, int? initialMapZoom = null, int? initialMinZoom = null)
     {
         _session = session;
         _onChanged = onChanged;
@@ -38,13 +47,20 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
         DrawnRoutePoints.CollectionChanged += (_, _) => UndoLastRoutePointCommand.NotifyCanExecuteChanged();
         DrawnRoutePoints.CollectionChanged += (_, _) => FinishRouteCommand.NotifyCanExecuteChanged();
 
+        if (initialMinZoom is { } minZoom)
+            _minZoom = minZoom;
+
         if (initialMapCenter is { } center)
         {
             _mapCenterLatitude = center.Latitude;
             _mapCenterLongitude = center.Longitude;
         }
         if (initialMapZoom is { } zoom)
-            _mapZoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+            _mapZoom = Math.Clamp(zoom, _minZoom, MaxZoom);
+
+        _initialCenterLatitude = _mapCenterLatitude;
+        _initialCenterLongitude = _mapCenterLongitude;
+        _initialZoom = _mapZoom;
 
         _session.Changed += Sync;
         Sync();
@@ -67,12 +83,13 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
     [ObservableProperty]
     private bool _isMapMode;
 
-    // The constructor overrides these from the configured region's actual tile bounds
-    // (IncidentWorkspaceViewModel, #150 follow-up) whenever one is available; a region with no
-    // tiles at all (or no Einsatzgebiet configured) falls back to this fixed, reasonable German
-    // default and the operator pans from there. Bounds keep zooming out from going past a
-    // whole-continent view or in past building-level detail.
-    private const int MinZoom = 3;
+    // The constructor overrides MinZoom from the configured region's actual tile bounds
+    // (IncidentWorkspaceViewModel, #150 follow-up) whenever one is available — going lower than
+    // the region's own lowest rendered zoom has nothing to show. A region with no tiles at all
+    // (or no Einsatzgebiet configured) falls back to this fixed default. MaxZoom stays a generous
+    // constant regardless: zooming past a region's native detail is handled by MapDrawing's
+    // overzoom fallback (an increasingly blurry but still-oriented view), not blocked here.
+    private readonly int _minZoom = 3;
     private const int MaxZoom = 19;
 
     [ObservableProperty]
@@ -88,7 +105,29 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
     private void ZoomIn() => MapZoom = Math.Min(MaxZoom, MapZoom + 1);
 
     [RelayCommand]
-    private void ZoomOut() => MapZoom = Math.Max(MinZoom, MapZoom - 1);
+    private void ZoomOut() => MapZoom = Math.Max(_minZoom, MapZoom - 1);
+
+    /// <summary>Applies a wheel/pinch-driven view change from the map canvas (#150 follow-up) —
+    /// the control->VM counterpart of <see cref="AddRoutePointCommand"/>/<see cref="UndoLastRoutePointCommand"/>,
+    /// used instead of two-way property binding on CenterLatitude/CenterLongitude/Zoom.</summary>
+    [RelayCommand]
+    private void ChangeMapView(MapViewChange change)
+    {
+        MapCenterLatitude = change.CenterLatitude;
+        MapCenterLongitude = change.CenterLongitude;
+        MapZoom = Math.Clamp(change.Zoom, _minZoom, MaxZoom);
+    }
+
+    /// <summary>"Zentrieren": returns to the view the map opened with (#150 follow-up) — the only
+    /// way back once cursor-anchored zooming has drifted the center away from the region, since
+    /// there is no drag-to-pan.</summary>
+    [RelayCommand]
+    private void ResetMapView()
+    {
+        MapCenterLatitude = _initialCenterLatitude;
+        MapCenterLongitude = _initialCenterLongitude;
+        MapZoom = _initialZoom;
+    }
 
     [RelayCommand]
     private void AddRoutePoint(GeoPoint point) => DrawnRoutePoints.Add(point);
