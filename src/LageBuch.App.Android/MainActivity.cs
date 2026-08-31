@@ -21,6 +21,11 @@ namespace LageBuch.App.Android;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity<SharedApp>
 {
+    // OpenDocument (rather than GetContent) accepts multiple MIME types on Launch, needed
+    // since an attachment can be any of several image types or a PDF.
+    private static readonly string[] AttachmentMimeTypes =
+        ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
+
     private ActivityResultLauncher? _importLauncher;
     private ActivityResultLauncher? _attachmentLauncher;
     private AndroidFileDialogService? _dialogs;
@@ -51,8 +56,7 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
     {
         _dialogs = new AndroidFileDialogService(this);
         _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
-        _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(
-            new[] { "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf" });
+        _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(AttachmentMimeTypes);
         SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
             new IncidentStore(),
             new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
