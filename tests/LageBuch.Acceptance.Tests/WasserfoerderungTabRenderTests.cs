@@ -154,4 +154,53 @@ public class WasserfoerderungTabRenderTests
             Directory.Delete(regionDir, recursive: true);
         }
     }
+
+    // Regression for a real layout bug: at a window short/narrow enough that the DataGrid's
+    // share of the DockPanel collapses to zero, the Bottom-docked Map Border (later in Z-order)
+    // rendered on top of and overlapping the mode-toggle buttons above it, and the Karte input
+    // dock's unwrapped button row pushed "FERTIG" past the window's right edge entirely.
+    [AvaloniaFact]
+    public void Karte_mode_content_never_overlaps_the_header_or_overflows_the_window()
+    {
+        var regionDir = CreateRegionFolder();
+        try
+        {
+            var masterData = WorkspaceRenderHelper.MasterData() with
+            {
+                Einsatzgebiet = new Einsatzgebiet("Testgebiet", regionDir),
+            };
+            var (window, vm, _) = ShowWorkspace(masterData);
+            window.Width = 1920;
+            window.Height = 700; // short enough to reproduce the DataGrid-collapses-to-zero overflow
+            Dispatcher.UIThread.RunJobs();
+
+            Tabs(window).SelectedIndex = 9; // WASSERFÖRDERUNG
+            Dispatcher.UIThread.RunJobs();
+
+            var view = (IncidentWorkspaceView)window.Content!;
+            var karteButton = view.GetVisualDescendants().OfType<ToggleButton>().First(b => b.Content as string == "KARTE");
+            var karteCenter = karteButton.TranslatePoint(
+                new Point(karteButton.Bounds.Width / 2, karteButton.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(karteCenter, MouseButton.Left);
+            window.MouseUp(karteCenter, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            var manuellButton = view.GetVisualDescendants().OfType<ToggleButton>().First(b => b.Content as string == "MANUELL");
+            var mapCanvas = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+            var fertigButton = view.GetVisualDescendants().OfType<Button>().First(b => b.Content as string == "FERTIG");
+
+            var headerBottom = manuellButton.TranslatePoint(new Point(0, manuellButton.Bounds.Height), window)!.Value.Y;
+            var mapTop = mapCanvas.TranslatePoint(new Point(0, 0), window)!.Value.Y;
+            var fertigRight = fertigButton.TranslatePoint(new Point(fertigButton.Bounds.Width, 0), window)!.Value.X;
+
+            Assert.True(mapTop >= headerBottom,
+                $"Map (top={mapTop}) overlaps the mode-toggle header (bottom={headerBottom}).");
+            Assert.True(fertigRight <= window.ClientSize.Width,
+                $"FERTIG button's right edge ({fertigRight}) is past the window width ({window.ClientSize.Width}).");
+        }
+        finally
+        {
+            Directory.Delete(regionDir, recursive: true);
+        }
+    }
 }
