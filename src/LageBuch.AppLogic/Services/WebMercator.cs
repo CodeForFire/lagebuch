@@ -1,11 +1,11 @@
 using LageBuch.Domain.Wasserfoerderung;
 
-namespace LageBuch.App.Shared.Controls;
+namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// Standard OSM/slippy-map Web Mercator tile math (#150 Plan B) — pure functions, no Avalonia
-/// dependency, shared by the Wasserförderung map canvas's pan/zoom and the "click adds a route
-/// point" conversion.
+/// dependency, shared by the Wasserförderung map canvas's pan/zoom, the "click adds a route
+/// point" conversion, and deriving a region's initial map view from its tile bounds.
 /// </summary>
 public static class WebMercator
 {

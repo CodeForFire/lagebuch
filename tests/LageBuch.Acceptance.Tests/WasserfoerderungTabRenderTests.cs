@@ -124,6 +124,15 @@ public class WasserfoerderungTabRenderTests
             Dispatcher.UIThread.RunJobs();
             Assert.True(vm.Wasserfoerderung.IsMapMode);
 
+            // #150 follow-up regression: at this window size the tab's content is tall enough
+            // that the outer ScrollViewer shows its (Fluent overlay-style) vertical scrollbar,
+            // which renders on top of -- not narrowing -- the content. p2 deliberately clicks
+            // right at the map's own edge to prove that scrollbar no longer swallows the click
+            // (WasserfoerderungView.axaml reserves a matching right margin for exactly this).
+            var scrollBar = view.GetVisualDescendants().OfType<ScrollBar>()
+                .Single(sb => sb.Orientation == Avalonia.Layout.Orientation.Vertical && sb.IsVisible);
+            Assert.True(scrollBar.Bounds.Width > 0, "Test premise: a visible vertical scrollbar must exist here.");
+
             var canvas = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
             var p1 = canvas.TranslatePoint(new Point(10, 10), window)!.Value;
             var p2 = canvas.TranslatePoint(new Point(canvas.Bounds.Width - 10, 10), window)!.Value;

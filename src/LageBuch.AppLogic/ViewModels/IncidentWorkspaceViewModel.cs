@@ -5,6 +5,7 @@ using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Persistence.Wasserfoerderung;
 using LageBuch.Sync;
@@ -239,7 +240,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
         Wasserfoerderung?.Dispose();
         var (elevationSampler, tileSource) = BuildWasserfoerderungMapSources();
-        Wasserfoerderung = new WasserfoerderungViewModel(_session, OnChanged, elevationSampler, tileSource);
+        var initialMapView = InitialMapViewFrom(tileSource);
+        Wasserfoerderung = new WasserfoerderungViewModel(
+            _session, OnChanged, elevationSampler, tileSource,
+            initialMapView?.Center, initialMapView?.Zoom, initialMinZoom: initialMapView?.Zoom);
 
         Reminder?.Dispose();
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
@@ -281,6 +285,26 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             return (null, null);
 
         return (new DemFileElevationSampler(demPath), new MbTilesFileSource(mbtilesPath));
+    }
+
+    /// <summary>
+    /// Derives the Karte mode's initial view — and, doubling as the region's lowest usable zoom
+    /// (<c>initialMinZoom</c>), the floor past which zooming out has nothing to show — from the
+    /// tiles the configured region actually has, rather than an unrelated fixed fallback (#150
+    /// follow-up). A real per-Landkreis pack has no tiles anywhere near
+    /// <see cref="WasserfoerderungViewModel"/>'s hardcoded German default and only ever renders a
+    /// narrow zoom band, so without this the map opened blank (or could be zoomed out to blank).
+    /// </summary>
+    private static (GeoPoint Center, int Zoom)? InitialMapViewFrom(IMapTileSource? tileSource)
+    {
+        if (tileSource?.GetTileBounds() is not { } bounds)
+            return null;
+
+        var centerTileX = (bounds.MinX + bounds.MaxX + 1) / 2.0;
+        var centerTileY = (bounds.MinY + bounds.MaxY + 1) / 2.0;
+        var center = WebMercator.ToGeo(
+            centerTileX * WebMercator.TileSizePixels, centerTileY * WebMercator.TileSizePixels, bounds.Zoom);
+        return (center, bounds.Zoom);
     }
 
     private bool CanClose => !IsReadOnly;
