@@ -8,17 +8,19 @@
       <!-- ===================== Status header ===================== -->
       <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
-              Padding="24,14">
-        <StackPanel Spacing="14">
+              Padding="24,10">
+        <StackPanel Spacing="10">
           <!-- Incident identity. The Stichwort is what identifies THIS incident from the first minute
                (the Einsatznummer is usually unknown until ILS calls back, #69), so it is the hero —
-               large tactical monospace under a single quiet "EINSATZ" label — rather than the app's
-               own name boxed off small to the side. The Einsatznummer becomes a secondary chip once
-               known, with a quiet add-affordance while it isn't. Status shares the hero's line on the
-               right as a bare dot + word, no chrome. The app name lives once, up in the command bar. -->
-          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="EINSATZ" Classes="overline" Margin="0,0,0,2" />
-            <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+               large tactical monospace — rather than the app's own name boxed off small to the side.
+               The Einsatznummer becomes a secondary chip once known, with a quiet add-affordance while
+               it isn't. Status shares the hero's line on the right as a bare dot + word, no chrome.
+               The app name lives once, up in the command bar. Sharing (#52) is a compact icon button
+               on that same status line rather than a labelled button on its own row — once active, the
+               address/PIN it reveals sit immediately left of the status pill, so the whole identity
+               block never grows past one line. -->
+          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
               <TextBlock x:Name="EinsatznummerValue" Classes="metric" Text="{Binding HeroText}" />
 
               <!-- The three Einsatznummer-slot states are independent siblings (not nested inside a
@@ -55,46 +57,65 @@
               </StackPanel>
             </StackPanel>
 
-            <StackPanel Grid.Row="1" Grid.Column="1" x:Name="StatusReadout"
-                        Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-              <Ellipse Width="10" Height="10" VerticalAlignment="Center" Fill="{StaticResource ActiveBrush}" />
-              <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Medium" FontSize="16"
-                         Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
-                         Text="{Binding StatusDisplay}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <!-- Multi-device sharing (#52): expose this open incident to other devices over the
+                   network (loopback, LAN, or a tailnet) — a compact icon button on the status line
+                   rather than a labelled button on its own row. -->
+              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
+                          IsVisible="{Binding CanHost}">
+                <Button Classes="icon-btn" ToolTip.Tip="{Binding ShareButtonText}"
+                        Command="{Binding ToggleSharingCommand}">
+                  <Panel>
+                    <PathIcon IsVisible="{Binding !IsSharing}"
+                              Data="M18,16.08c-0.76,0-1.44,0.3-1.96,0.77L8.91,12.7c0.05-0.23,0.09-0.46,0.09-0.7s-0.04-0.47-0.09-0.7l7.05-4.11c0.54,0.5,1.25,0.81,2.04,0.81c1.66,0,3-1.34,3-3c0-1.66-1.34-3-3-3s-3,1.34-3,3c0,0.24,0.04,0.47,0.09,0.7L8.04,9.81C7.5,9.31,6.79,9,6,9c-1.66,0-3,1.34-3,3s1.34,3,3,3c0.79,0,1.5-0.31,2.04-0.81l7.12,4.16c-0.05,0.21-0.08,0.43-0.08,0.65c0,1.61,1.31,2.92,2.92,2.92s2.92-1.31,2.92-2.92C21,17.39,19.69,16.08,18,16.08z" />
+                    <!-- Stop-sharing state: a plain "close" X. The earlier flat filled square had
+                         no internal detail, so at 14px it read as an unrendered/missing icon rather
+                         than an affordance (reported via screenshot) — the X's crossing strokes give
+                         it a recognizable silhouette at the same size. -->
+                    <PathIcon IsVisible="{Binding IsSharing}"
+                              Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+                  </Panel>
+                </Button>
+                <TextBlock Classes="body" VerticalAlignment="Center"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           Text="{Binding ShareStatus}"
+                           IsVisible="{Binding ShareStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <!-- The PIN a joining device must enter; read it out to whoever is connecting (#64).
+                     The label and value gate their OWN IsVisible and hang off the always-visible
+                     sharing group — they are NOT wrapped in a Border that collapses on SharePin. A
+                     data-bound text element stranded inside an IsVisible-collapsed container is
+                     measured to zero width the first time the container un-collapses (the text
+                     arrives in the same notification) and caches it, so on the first share the number
+                     showed blank until a later relayout. The ShareStatus line above renders on first
+                     share for exactly this reason. -->
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                  <TextBlock Text="PIN" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                             Foreground="{StaticResource AmberBrush}"
+                             IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <TextBlock x:Name="PinValue" Text="{Binding SharePin}" VerticalAlignment="Center"
+                             FontWeight="Medium" FontFamily="{StaticResource MonoFont}"
+                             Foreground="{StaticResource AmberBrush}"
+                             IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </StackPanel>
+              </StackPanel>
+
+              <Border Width="1" Height="18" Background="{StaticResource HairlineBrush}"
+                      VerticalAlignment="Center" IsVisible="{Binding CanHost}" />
+
+              <StackPanel x:Name="StatusReadout" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                <Ellipse Width="10" Height="10" VerticalAlignment="Center" Fill="{StaticResource ActiveBrush}" />
+                <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Medium" FontSize="16"
+                           Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
+                           Text="{Binding StatusDisplay}" />
+              </StackPanel>
             </StackPanel>
           </Grid>
-
-          <!-- Multi-device sharing (#52): expose this open incident to other devices over the
-               network (loopback, LAN, or a tailnet) — the status line shows the address to dial. -->
-          <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding CanHost}">
-            <Button Classes="ghost" Content="{Binding ShareButtonText}" Command="{Binding ToggleSharingCommand}" />
-            <TextBlock Classes="body" VerticalAlignment="Center"
-                       Foreground="{StaticResource TextSecondaryBrush}"
-                       Text="{Binding ShareStatus}"
-                       IsVisible="{Binding ShareStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <!-- The PIN a joining device must enter; read it out to whoever is connecting (#64).
-                 The label and value gate their OWN IsVisible and hang off the always-visible sharing
-                 row — they are NOT wrapped in a Border that collapses on SharePin. A data-bound text
-                 element stranded inside an IsVisible-collapsed container is measured to zero width the
-                 first time the container un-collapses (the text arrives in the same notification) and
-                 caches it, so on the first share the number showed blank until a later relayout. The
-                 ShareStatus line above renders on first share for exactly this reason. -->
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <TextBlock Text="PIN" Classes="overline" FontSize="10" VerticalAlignment="Center"
-                         Foreground="{StaticResource AmberBrush}"
-                         IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
-              <TextBlock x:Name="PinValue" Text="{Binding SharePin}" VerticalAlignment="Center"
-                         FontWeight="Medium" FontFamily="{StaticResource MonoFont}"
-                         Foreground="{StaticResource AmberBrush}"
-                         IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            </StackPanel>
-          </StackPanel>
 
           <!-- Joined-client disconnect banner (#52 §7): auto-reconnect is running; input is greyed
                out until it succeeds. "Zur Startseite" lets the user give up without waiting. -->
           <Border x:Name="DisconnectedBanner" Background="#241608"
                   BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
                   IsVisible="{Binding !IsConnected}">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Center" Margin="0,0,12,0"
@@ -109,7 +130,7 @@
           <!-- Read-only banner -->
           <Border x:Name="ReadOnlyBanner" Background="#241608"
                   BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
                   IsVisible="{Binding IsReadOnly}">
             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
               <TextBlock Text="🔒" FontSize="15" VerticalAlignment="Center" />
@@ -124,7 +145,7 @@
           <!-- ILS reminder bar -->
           <Border x:Name="ReminderBar" Background="#0B1A2A"
                   BorderBrush="{StaticResource IncomingBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,6"
                   IsVisible="{Binding HasReminder}">
             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
                         DataContext="{Binding Reminder}">
@@ -165,7 +186,7 @@
           <!-- Atemschutz pressure-control reminder (soonest-due Trupp across all tabs) -->
           <Border x:Name="ScbaControlBar" Background="#241608"
                   BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,6"
                   IsVisible="{Binding Scba.HasControlReminder}">
             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
                         DataContext="{Binding Scba}">
@@ -187,7 +208,7 @@
           <!-- Atemschutz Rückzugsalarm: unmissable red banner + audible alarm (life-safety) -->
           <Border x:Name="ScbaAlarmBar" Background="{StaticResource SignalGradientBrush}"
                   BorderBrush="{StaticResource SignalHotBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="16,12"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="16,10"
                   BoxShadow="0 0 22 -2 #CCFF3D2E"
                   IsVisible="{Binding Scba.IsAnyAlarm}">
             <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Scba}">
