@@ -691,7 +691,6 @@ public class ScbaViewModelTests
         AgtMaxDurationMinutes: 35,
         CsaMaxDurationMinutes: 22,
         LpaMaxDurationMinutes: 48,
-        PressureControlIntervalMinutes: 7,
         ReturnPressureBar: 55);
 
     private static ScbaViewModel VmWith(FixedClock clock, LocalIncidentSession session, IncidentSettings settings) =>

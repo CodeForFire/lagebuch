@@ -38,17 +38,12 @@ public class MasterDataStoreTests : IDisposable
         var set = MasterDataSet.Empty with
         {
             Roles = new[] { "EL", "ZF" },
-            Status = new[] { "aufgenommen" },
             UnitStatus = new[] { "Alarmiert" },
-            Equipment = new[] { "Mobilteil 1" },
-            Districts = new[] { "FFB" },
             Brigades = new[] { "FFB Wache 1" },
             RadioCallSigns = new[] { "Land 1" },
             TruppTypes = new[] { "Angriffstrupp" },
-            Einsatzarten = new[] { "B", "THL" },
             ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
             ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbauschritt", true) },
-            Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
@@ -56,12 +51,10 @@ public class MasterDataStoreTests : IDisposable
 
         var reopened = MasterDataStore.GetOrCreate(_path);
         Assert.Equal(new[] { "EL", "ZF" }, reopened.Roles);
-        Assert.Equal(new[] { "B", "THL" }, reopened.Einsatzarten);
         Assert.Equal(
             new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
             reopened.ChecklistTemplateAufbau);
         Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplateAbbau);
-        Assert.Contains(reopened.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("Land 1", max.CallSign);
@@ -114,24 +107,6 @@ public class MasterDataStoreTests : IDisposable
 
         var names = MasterDataStore.GetOrCreate(_path).Personnel.Select(p => p.LastName).ToList();
         Assert.Equal(new[] { "Amsel", "Zieger" }, names);
-    }
-
-    [Fact]
-    public void Save_round_trips_an_added_and_a_removed_street()
-    {
-        MasterDataStore.Save(_path, MasterDataSet.Empty with
-        {
-            Streets = new[] { new Street("Alt Str.", "FFB"), new Street("Bahnhofstr.", "FFB") },
-        });
-
-        var current = MasterDataStore.GetOrCreate(_path);
-        var edited = current with { Streets = current.Streets.Skip(1).Append(new Street("Neu Str.", "Aich")).ToList() };
-        MasterDataStore.Save(_path, edited);
-
-        var reopened = MasterDataStore.GetOrCreate(_path);
-        Assert.Contains(reopened.Streets, s => s.Name == "Neu Str." && s.District == "Aich");
-        Assert.DoesNotContain(reopened.Streets, s => s.Name == "Alt Str.");
-        Assert.Equal(2, reopened.Streets.Count);
     }
 
     [Fact]
@@ -230,15 +205,15 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_then_GetOrCreate_round_trips_settings()
     {
-        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 55) });
 
-        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 4, 55), MasterDataStore.GetOrCreate(_path).Settings);
+        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 55), MasterDataStore.GetOrCreate(_path).Settings);
     }
 
     [Fact]
     public void A_missing_setting_key_falls_back_to_its_default()
     {
-        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 55) });
 
         // Simulate a store written before a setting existed: drop one row, which read must backfill.
         using (var cn = new SqliteConnection($"Data Source={_path}"))

@@ -112,7 +112,7 @@ git tag v0.3.0 && git push origin v0.3.0
 
 ## Master data
 
-Dropdown contents (roles, radio call signs, streets, personnel, ...) are treated
+Dropdown contents (roles, radio call signs, brigades, personnel, ...) are treated
 as PII and are **never compiled into the application**. A fresh install starts
 with **empty** master data; you populate it in the in-app **Stammdaten** editor
 by importing a JSON file, and can write your own data back out again.

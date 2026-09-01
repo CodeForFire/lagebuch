@@ -93,12 +93,6 @@
                       <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
                     <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
-                      <TextBlock Grid.Column="0" Text="Atemschutzkontrolle – Intervall" VerticalAlignment="Center" />
-                      <NumericUpDown Grid.Column="1" Value="{Binding PressureControlIntervalMinutes}"
-                                     Minimum="1" Maximum="60" Increment="1" FormatString="0" />
-                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
                       <TextBlock Grid.Column="0" Text="Rückzugsdruck" VerticalAlignment="Center" />
                       <NumericUpDown Grid.Column="1" Value="{Binding ReturnPressureBar}"
                                      Minimum="0" Maximum="400" Increment="5" FormatString="0" />

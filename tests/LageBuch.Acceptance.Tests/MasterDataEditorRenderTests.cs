@@ -17,14 +17,10 @@ public class MasterDataEditorRenderTests
         public MasterDataSet Get() => MasterDataSet.Empty with
         {
             Roles = new[] { "EL", "EAL", "ZF", "GF" },
-            Status = new[] { "aufgenommen", "übermittelt", "abgearbeitet" },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
-            Equipment = new[] { "Mobilteil 1", "Digitalkamera" },
-            Districts = new[] { "Aich", "FFB", "Puch" },
             Brigades = new[] { "FFB Wache 1", "Aich", "Puch" },
             RadioCallSigns = new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
             TruppTypes = new[] { "Angriffstrupp", "Wassertrupp", "CSA-Trupp" },
-            Einsatzarten = new[] { "B", "THL", "R" },
             ChecklistTemplateAufbau = new[]
             {
                 new ChecklistTemplateItem("Aufstellort ELW frei?", true),
@@ -68,8 +64,8 @@ public class MasterDataEditorRenderTests
 
         var list = view.GetControl<ListBox>("CategoryList");
 
-        // 14 categories plus #76's Fahrzeuge.
-        Assert.Equal(15, list.ItemCount);
+        // 10 categories plus #76's Fahrzeuge.
+        Assert.Equal(11, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
