@@ -27,13 +27,22 @@ and [QuestPDF](https://www.questpdf.com/) report generation.
 - **ETB** (Einsatztagebuch) — manual entries with incoming/outgoing direction,
   automatic lifecycle logging (open, close, reopen), later editing that keeps a
   full history
-- **Kräfte** — units and crews with status and Bemerkung; Trupps are registered
-  as crews, not individuals
+- **Kräfte** — units added from a Stammdaten Fahrzeug (live-filtered by typed
+  Wache, already-assigned vehicles excluded), Stärke tracked as three numbers
+  and committed as one atomic write plus one ETB entry via an explicit
+  "Übernehmen" action, not per keystroke; Trupps are registered as crews, not
+  individuals
+- **Aufgaben** — task list with urgency/importance, assignee suggestions from
+  call signs, Funktionen and personnel, a spoken due-alarm, and one-click
+  creation straight from an ETB entry
 - **Funktionen** — command roles (EL, Abschnitt, von/bis) with transfer support
   and editable mobile numbers
 - **Atemschutzüberwachung** — SCBA teams with pressure-control interval,
   max-duration countdown, two-stage ILS Rückmeldung reminder with spoken cues
   and a Rückzugsalarm siren
+- **CO-Messprotokoll** — building/floor/apartment search grid with per-dwelling
+  status (not searched / searched / affected), CO ppm value, resident name and
+  key-availability marker, mirroring the real-world door-marking convention
 - **Checklisten** — Aufbau/Abbau checklists from your own master data, mandatory
   items highlighted, completion logged to the ETB
 - **Dateien** — attach photos and PDFs to an incident; they are merged into the
@@ -42,6 +51,11 @@ and [QuestPDF](https://www.questpdf.com/) report generation.
 
 **Beyond a single window:**
 
+- **ILS status reminder** — incident-wide (not per Trupp): fires after a
+  configurable "Erstmeldung nach" interval, then repeats on a configurable
+  "Intervall" with a spoken cue and an ERLEDIGT option; persists across
+  close/reopen/crash and is suppressed on joined/remote clients so the host
+  doesn't double-log
 - **PDF export** — one-click QuestPDF incident report
 - **Multi-device sync** — host an incident on the ELW laptop and follow along
   from other devices over LAN or Tailscale (SignalR); joining requires a share
