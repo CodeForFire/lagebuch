@@ -11,6 +11,14 @@
   "checklistTemplateAbbau": [
     { "text": "Fahrzeug abgerüstet?", "mandatory": true }
   ],
+  "links": [
+    { "name": "Wetterdienst", "url": "https://dwd.de" },
+    { "name": "Kartendienst", "url": "https://example.org/karte" }
+  ],
+  "vehicles": [
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9 },
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6 }
+  ],
   "personnel": [
     { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000" },
     { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null }

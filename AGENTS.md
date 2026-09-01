@@ -51,3 +51,11 @@ open a PR. Absolute rule, no exceptions.
 
 Never commit `docs/superpowers/` — local tooling artifacts only. If tracked,
 remove them and add to `.gitignore`.
+
+## Master-data example file
+
+`docs/master-data.example.json` is documented (README.md) as the full
+Stammdaten schema reference. Whenever `MasterDataSet` or `MasterDataJson`
+in `src/LageBuch.Persistence/MasterData/MasterDataSet.cs` gains, loses, or
+renames a top-level field, update `docs/master-data.example.json` in the
+same PR so it stays a complete, accurate example of every category.
