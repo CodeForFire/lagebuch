@@ -11,10 +11,10 @@ reports.
 Built with .NET 8 + Avalonia (desktop & Android), SQLite storage, SignalR sync
 and [QuestPDF](https://www.questpdf.com/) report generation.
 
-| | | |
-|---|---|---|
-| ![Home](docs/screenshots/home.png) | ![ETB](docs/screenshots/etb.png) | ![Checklisten](docs/screenshots/checkliste.png) |
-| ![Funktionen](docs/screenshots/funktionen.png) | ![Atemschutz](docs/screenshots/atemschutz.png) | ![Stammdaten](docs/screenshots/stammdaten-editor.png) |
+| | | | |
+|---|---|---|---|
+| ![Home](docs/screenshots/home.png) | ![ETB](docs/screenshots/etb.png) | ![Aufgaben](docs/screenshots/aufgaben.png) | ![Funktionen](docs/screenshots/funktionen.png) |
+| ![Atemschutz](docs/screenshots/atemschutz.png) | ![CO-Messung](docs/screenshots/co-messung.png) | ![Checklisten](docs/screenshots/checkliste.png) | ![Stammdaten](docs/screenshots/stammdaten-editor.png) |
 
 *All screenshots show fictional data.*
 
