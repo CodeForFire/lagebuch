@@ -4,10 +4,9 @@
 [![Release](https://img.shields.io/github/v/release/CodeForFire/lagebuch)](../../releases)
 
 Offline-first incident documentation (**Einsatzdokumentation**) for fire brigades.
-Lagebuch ("log book") replaces the macro-enabled Excel templates many volunteer
-departments still fight with: one robust desktop application for the command
-vehicle (ELW), cross-platform and fully offline, with optional multi-device sync
-and PDF reports.
+Lagebuch ("log book") is one robust desktop application for the command vehicle
+(ELW), cross-platform and fully offline, with optional multi-device sync and PDF
+reports.
 
 Built with .NET 8 + Avalonia (desktop & Android), SQLite storage, SignalR sync
 and [QuestPDF](https://www.questpdf.com/) report generation.
@@ -24,7 +23,7 @@ and [QuestPDF](https://www.questpdf.com/) report generation.
 **Incident workspace** — one window per Einsatz, keyboard-first:
 
 - **Einsatzkopf** — Stichwort as the header hero, complete Bavarian-format
-  Einsatznummer (`B 1.2 <JJMMTT> <lfd.Nr.`), ILS number addable later
+  Einsatznummer (`B 1.2 <JJMMTT> <lfd.Nr.>`), ILS number addable later
 - **ETB** (Einsatztagebuch) — manual entries with incoming/outgoing direction,
   automatic lifecycle logging (open, close, reopen), later editing that keeps a
   full history
