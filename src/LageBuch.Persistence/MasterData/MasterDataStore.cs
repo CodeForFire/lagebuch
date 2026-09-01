@@ -30,28 +30,10 @@ public sealed class MasterDataStore
         using var tx = cn.BeginTransaction();
 
         ReplaceList(cn, tx, "md_roles", set.Roles);
-        ReplaceList(cn, tx, "md_status", set.Status);
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
-        ReplaceList(cn, tx, "md_equipment", set.Equipment);
-        ReplaceList(cn, tx, "md_districts", set.Districts);
         ReplaceList(cn, tx, "md_call_signs", set.RadioCallSigns);
         ReplaceList(cn, tx, "md_brigades", set.Brigades);
         ReplaceList(cn, tx, "md_trupp_types", set.TruppTypes);
-        ReplaceList(cn, tx, "md_einsatzarten", set.Einsatzarten);
-
-        Run(cn, tx, "DELETE FROM md_streets;", _ => { });
-        foreach (var s in set.Streets)
-        {
-            Run(
-                cn,
-                tx,
-                "INSERT INTO md_streets (name, district) VALUES ($n,$d);",
-                p =>
-                {
-                    p("$n", s.Name);
-                    p("$d", s.District);
-                });
-        }
 
         Run(cn, tx, "DELETE FROM md_links;", _ => { });
         foreach (var l in set.Links)
@@ -149,7 +131,6 @@ public sealed class MasterDataStore
         ("agt_max_duration_minutes", s.AgtMaxDurationMinutes),
         ("csa_max_duration_minutes", s.CsaMaxDurationMinutes),
         ("lpa_max_duration_minutes", s.LpaMaxDurationMinutes),
-        ("pressure_control_interval_minutes", s.PressureControlIntervalMinutes),
         ("return_pressure_bar", s.ReturnPressureBar),
     };
 
@@ -163,13 +144,9 @@ public sealed class MasterDataStore
     {
         const string schema = """
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_status (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_equipment (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_call_signs (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_brigades (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS md_checklist_template (
@@ -179,7 +156,6 @@ public sealed class MasterDataStore
                 kind INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_einsatzarten (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_personnel (
                 last_name TEXT NOT NULL,
                 first_name TEXT NOT NULL,
@@ -202,19 +178,14 @@ public sealed class MasterDataStore
         var (checklistAufbau, checklistAbbau) = ReadChecklistTemplate(cn);
         return new(
             ReadColumn(cn, "SELECT value FROM md_roles;"),
-            ReadColumn(cn, "SELECT value FROM md_status;"),
-            ReadColumn(cn, "SELECT value FROM md_equipment;"),
-            ReadColumn(cn, "SELECT value FROM md_districts;"),
             ReadColumn(cn, "SELECT value FROM md_call_signs;"),
             ReadColumn(cn, "SELECT value FROM md_brigades;"),
             ReadColumn(cn, "SELECT value FROM md_unit_status;"),
-            ReadStreets(cn),
             ReadLinks(cn),
             checklistAufbau,
             checklistAbbau,
             ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
             ReadPersonnel(cn),
-            ReadColumn(cn, "SELECT value FROM md_einsatzarten;"),
             ReadVehicles(cn),
             ReadSettings(cn));
     }
@@ -261,7 +232,6 @@ public sealed class MasterDataStore
             Get("agt_max_duration_minutes", d.AgtMaxDurationMinutes),
             Get("csa_max_duration_minutes", d.CsaMaxDurationMinutes),
             Get("lpa_max_duration_minutes", d.LpaMaxDurationMinutes),
-            Get("pressure_control_interval_minutes", d.PressureControlIntervalMinutes),
             Get("return_pressure_bar", d.ReturnPressureBar));
     }
 
@@ -286,20 +256,6 @@ public sealed class MasterDataStore
         while (r.Read())
         {
             list.Add(r.GetString(0));
-        }
-
-        return list;
-    }
-
-    private static List<Street> ReadStreets(SqliteConnection cn)
-    {
-        using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT name, district FROM md_streets;";
-        using var r = cmd.ExecuteReader();
-        var list = new List<Street>();
-        while (r.Read())
-        {
-            list.Add(new Street(r.GetString(0), r.GetString(1)));
         }
 
         return list;

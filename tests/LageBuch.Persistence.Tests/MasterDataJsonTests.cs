@@ -15,17 +15,12 @@ public class MasterDataJsonTests
         var set = Parse("""
             {
               "roles": ["EL", "ZF"],
-              "status": ["aufgenommen"],
               "unitStatus": ["Alarmiert"],
-              "equipment": ["Mobilteil 1"],
-              "districts": ["FFB"],
               "radioCallSigns": ["Land 1"],
               "brigades": ["FFB Wache 1"],
               "truppTypes": ["Angriffstrupp"],
-              "einsatzarten": ["B", "THL"],
               "checklistTemplateAufbau": [{ "text": "Schritt 1", "mandatory": true }],
               "checklistTemplateAbbau": [{ "text": "Abbauschritt", "mandatory": false }],
-              "streets": [{ "name": "Bahnhofstr.", "district": "FFB" }],
               "links": [{ "name": "Wetterdienst", "url": "https://dwd.de" }],
               "personnel": [{ "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Land 1", "phone": "0171" }]
             }
@@ -33,10 +28,8 @@ public class MasterDataJsonTests
 
         Assert.Equal(new[] { "EL", "ZF" }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
-        Assert.Equal(new[] { "B", "THL" }, set.Einsatzarten);
         Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplateAufbau));
         Assert.Equal(new ChecklistTemplateItem("Abbauschritt", false), Assert.Single(set.ChecklistTemplateAbbau));
-        Assert.Contains(set.Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(set.Links));
         var max = set.Personnel.Single();
         Assert.Equal("Max", max.FirstName);
@@ -72,8 +65,7 @@ public class MasterDataJsonTests
     {
         var set = Parse("""{ "roles": ["EL"] }""");
         Assert.Equal(new[] { "EL" }, set.Roles);
-        Assert.Empty(set.Status);
-        Assert.Empty(set.Streets);
+        Assert.Empty(set.UnitStatus);
         Assert.Empty(set.Links);
         Assert.Empty(set.Personnel);
     }
@@ -107,8 +99,6 @@ public class MasterDataJsonTests
         {
             Roles = new[] { "EL", "ZF" },
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
-            Einsatzarten = new[] { "B", "THL", "R" },
-            Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä") },
 
             // relaxed escaping must survive the round trip
@@ -127,8 +117,6 @@ public class MasterDataJsonTests
         Assert.Equal(original.UnitStatus, reparsed.UnitStatus);
         Assert.Equal(original.ChecklistTemplateAufbau, reparsed.ChecklistTemplateAufbau);
         Assert.Equal(original.ChecklistTemplateAbbau, reparsed.ChecklistTemplateAbbau);
-        Assert.Equal(original.Einsatzarten, reparsed.Einsatzarten);
-        Assert.Equal(original.Streets, reparsed.Streets);
         Assert.Equal(original.Links, reparsed.Links);
         Assert.Equal(original.Personnel, reparsed.Personnel);
     }
@@ -183,13 +171,12 @@ public class MasterDataJsonTests
                 "agtMaxDurationMinutes": 25,
                 "csaMaxDurationMinutes": 18,
                 "lpaMaxDurationMinutes": 40,
-                "pressureControlIntervalMinutes": 4,
                 "returnPressureBar": 55
               }
             }
             """);
 
-        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 4, 55), set.Settings);
+        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 55), set.Settings);
     }
 
     [Fact]
@@ -211,7 +198,7 @@ public class MasterDataJsonTests
     [Fact]
     public void Serialize_round_trips_settings()
     {
-        var original = MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55) };
+        var original = MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 55) };
 
         Assert.Equal(original.Settings, Parse(MasterDataJson.Serialize(original)).Settings);
     }
@@ -222,10 +209,9 @@ public class MasterDataJsonTests
         Assert.True(MasterDataSet.Empty.IsEmpty);
 
         // Settings always carry values, so they must not count toward emptiness (else Import hides).
-        Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3, 4, 5, 6, 7) }).IsEmpty);
+        Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3, 4, 5, 6) }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Roles = new[] { "EL" } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
-        Assert.False((MasterDataSet.Empty with { Streets = new[] { new Street("S", "D") } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Links = new[] { new Link("N", "U") } }).IsEmpty);
     }
 }

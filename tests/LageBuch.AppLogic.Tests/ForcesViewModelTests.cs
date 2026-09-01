@@ -65,7 +65,7 @@ public class ForcesViewModelTests
     [Fact]
     public void Status_options_are_the_per_unit_vocabulary_not_the_incident_one()
     {
-        // masterData.Status is aufgenommen/übermittelt/...; a unit is Alarmiert/Im Einsatz/...
+        // A unit's status vocabulary (Alarmiert/Im Einsatz/...) is masterData.UnitStatus.
         Assert.Equal(new[] { "Alarmiert", "Im Einsatz" }, NewVm().StatusOptions);
     }
 

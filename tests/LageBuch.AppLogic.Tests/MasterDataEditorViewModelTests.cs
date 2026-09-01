@@ -11,7 +11,6 @@ public class MasterDataEditorViewModelTests
         private static readonly MasterDataSet DefaultSet = MasterDataSet.Empty with
         {
             Roles = new[] { "EL", "ZF" },
-            Streets = new[] { new Street("Bahnhofstr.", "FFB") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
 
@@ -146,11 +145,21 @@ public class MasterDataEditorViewModelTests
     {
         var vm = Vm(new InMemoryProvider());
 
-        // 14 categories plus #76's Fahrzeuge.
-        Assert.Equal(15, vm.Sections.Count);
+        // 10 categories plus #76's Fahrzeuge.
+        Assert.Equal(11, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
+
+        // Einstellungen stays pinned first (a meta section, not a data category); the rest sort
+        // alphabetically below it.
+        Assert.Equal(
+            new[]
+            {
+                "Einstellungen", "Checkliste Abbau", "Checkliste Aufbau", "Einheiten-Status",
+                "Fahrzeuge", "Funkrufnamen", "Links", "Personal", "Rollen", "Trupp-Typen", "Wachen",
+            },
+            vm.Sections.Select(s => s.Title));
     }
 
     [Fact]
@@ -163,7 +172,7 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
-    public void Save_persists_edits_carries_streets_through_and_clears_dirty()
+    public void Save_persists_edits_and_clears_dirty()
     {
         var provider = new InMemoryProvider();
         var vm = Vm(provider);
@@ -175,7 +184,6 @@ public class MasterDataEditorViewModelTests
         Assert.False(vm.IsDirty);
         Assert.Equal(1, provider.SaveCount);
         Assert.DoesNotContain("EL", provider.Get().Roles);
-        Assert.Single(provider.Get().Streets); // streets untouched by the editor
     }
 
     [Fact]
@@ -235,7 +243,7 @@ public class MasterDataEditorViewModelTests
     /// <summary>
     /// Every section must land in its own category on Save. Each section gets a
     /// marker value unique to that category, so a swapped mapping in BuildSet (e.g. writing
-    /// _status where _unitStatus belongs) puts a marker in the wrong list and fails the assertion
+    /// _roles where _unitStatus belongs) puts a marker in the wrong list and fails the assertion
     /// for the category that should have received it.
     /// </summary>
     [Fact]
@@ -243,8 +251,7 @@ public class MasterDataEditorViewModelTests
     {
         var listTitles = new[]
         {
-            "Rollen", "Status", "Einheiten-Status", "Ausrüstung", "Bezirke",
-            "Wachen", "Funkrufnamen", "Trupp-Typen", "Einsatzarten",
+            "Rollen", "Einheiten-Status", "Wachen", "Funkrufnamen", "Trupp-Typen",
         };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
@@ -278,14 +285,10 @@ public class MasterDataEditorViewModelTests
 
         var set = provider.Get();
         Assert.Contains("MARK-Rollen", set.Roles);
-        Assert.Contains("MARK-Status", set.Status);
         Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
-        Assert.Contains("MARK-Ausrüstung", set.Equipment);
-        Assert.Contains("MARK-Bezirke", set.Districts);
         Assert.Contains("MARK-Wachen", set.Brigades);
         Assert.Contains("MARK-Funkrufnamen", set.RadioCallSigns);
         Assert.Contains("MARK-Trupp-Typen", set.TruppTypes);
-        Assert.Contains("MARK-Einsatzarten", set.Einsatzarten);
         Assert.Contains(set.ChecklistTemplateAufbau, i => i.Text == "MARK-ChecklisteAufbau");
         Assert.Contains(set.ChecklistTemplateAbbau, i => i.Text == "MARK-ChecklisteAbbau");
         Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
@@ -316,7 +319,7 @@ public class MasterDataEditorViewModelTests
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty with
         {
-            Settings = new IncidentSettings(12, 33, 25, 18, 40, 4, 55),
+            Settings = new IncidentSettings(12, 33, 25, 18, 40, 55),
         });
         var settings = Settings(Vm(provider));
 
@@ -325,7 +328,6 @@ public class MasterDataEditorViewModelTests
         Assert.Equal(25, settings.AgtMaxDurationMinutes);
         Assert.Equal(18, settings.CsaMaxDurationMinutes);
         Assert.Equal(40, settings.LpaMaxDurationMinutes);
-        Assert.Equal(4, settings.PressureControlIntervalMinutes);
         Assert.Equal(55, settings.ReturnPressureBar);
     }
 
@@ -393,13 +395,12 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
-    public async Task Save_after_import_persists_the_imported_set_including_streets()
+    public async Task Save_after_import_persists_the_imported_set()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var imported = MasterDataSet.Empty with
         {
             Roles = new[] { "EL" },
-            Streets = new[] { new Street("Bahnhofstr.", "FFB") }, // no streets UI: must ride through _original
         };
         var vm = Vm(
             provider,
@@ -411,7 +412,6 @@ public class MasterDataEditorViewModelTests
 
         Assert.Equal(1, provider.SaveCount);
         Assert.Equal(new[] { "EL" }, provider.Get().Roles);
-        Assert.Contains(provider.Get().Streets, s => s.Name == "Bahnhofstr." && s.District == "FFB");
     }
 
     [Fact]
@@ -444,9 +444,9 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
-    public async Task Export_writes_the_current_editor_contents_including_unsaved_edits_and_streets()
+    public async Task Export_writes_the_current_editor_contents_including_unsaved_edits()
     {
-        var provider = new InMemoryProvider(); // DefaultSet: EL, ZF + a street + a person
+        var provider = new InMemoryProvider(); // DefaultSet: EL, ZF + a person
         var files = new FakeFileService();
         var vm = Vm(provider, new FakeDialogs { ExportPath = "/out.json" }, files);
         Section(vm, "Rollen").AddCommand.Execute(null);
@@ -458,7 +458,6 @@ public class MasterDataEditorViewModelTests
         Assert.NotNull(files.Written);
         Assert.Contains("NEU", files.Written!.Roles);
         Assert.Contains("EL", files.Written.Roles);
-        Assert.Contains(files.Written.Streets, s => s.Name == "Bahnhofstr."); // carried through unchanged
     }
 
     [Fact]

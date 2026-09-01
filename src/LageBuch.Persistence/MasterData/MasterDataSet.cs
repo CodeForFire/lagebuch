@@ -7,24 +7,14 @@ namespace LageBuch.Persistence.MasterData;
 
 public sealed record MasterDataSet(
     IReadOnlyList<string> Roles,
-    IReadOnlyList<string> Status,
-    IReadOnlyList<string> Equipment,
-    IReadOnlyList<string> Districts,
     IReadOnlyList<string> RadioCallSigns,
     IReadOnlyList<string> Brigades,
-
-    // UnitStatus is the status of a single unit (Alarmiert, Auf Anfahrt, ...) and is deliberately
-    // separate from Status above, which is the incident-level vocabulary (aufgenommen, ...).
     IReadOnlyList<string> UnitStatus,
-    IReadOnlyList<Street> Streets,
     IReadOnlyList<Link> Links,
     IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
     IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau,
     IReadOnlyList<string> TruppTypes,
     IReadOnlyList<Person> Personnel,
-
-    // Einsatzart values (ABek Bayern) — the leading token of the complete Einsatznummer.
-    IReadOnlyList<string> Einsatzarten,
 
     // Vehicles per Wache with their seat count (#76).
     IReadOnlyList<Vehicle> Vehicles,
@@ -43,16 +33,11 @@ public sealed record MasterDataSet(
         Array.Empty<string>(),
         Array.Empty<string>(),
         Array.Empty<string>(),
-        Array.Empty<string>(),
-        Array.Empty<string>(),
-        Array.Empty<string>(),
-        Array.Empty<Street>(),
         Array.Empty<Link>(),
         Array.Empty<ChecklistTemplateItem>(),
         Array.Empty<ChecklistTemplateItem>(),
         Array.Empty<string>(),
         Array.Empty<Person>(),
-        Array.Empty<string>(),
         Array.Empty<Vehicle>(),
         IncidentSettings.Defaults);
 
@@ -63,15 +48,13 @@ public sealed record MasterDataSet(
     /// mark the set non-empty would suppress the Import bootstrap on an otherwise fresh install.
     /// </summary>
     public bool IsEmpty =>
-        Roles.Count == 0 && Status.Count == 0 && Equipment.Count == 0 && Districts.Count == 0
+        Roles.Count == 0
         && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
-        && Streets.Count == 0 && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
+        && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
         && TruppTypes.Count == 0
-        && Personnel.Count == 0 && Einsatzarten.Count == 0
+        && Personnel.Count == 0
         && Vehicles.Count == 0;
 }
-
-public sealed record Street(string Name, string District);
 
 /// <summary>A named link — Stammdaten entry so useful external resources can be opened from an Einsatz.</summary>
 [SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
@@ -107,9 +90,6 @@ public sealed record IncidentSettings(
     // Atemschutz Einsatzzeit for an LPA-Trupp (long-duration apparatus) — longer than an AGT.
     int LpaMaxDurationMinutes,
 
-    // Interval between Druckkontrollen (Atemschutzkontrolle).
-    int PressureControlIntervalMinutes,
-
     // Rückzugsdruck: pressure at or below which a Trupp must turn back.
     int ReturnPressureBar)
 {
@@ -123,7 +103,6 @@ public sealed record IncidentSettings(
         AgtMaxDurationMinutes: AtemschutzTrupp.DefaultMaxDurationMinutes,
         CsaMaxDurationMinutes: AtemschutzTrupp.DefaultChemicalMaxDurationMinutes,
         LpaMaxDurationMinutes: AtemschutzTrupp.DefaultLpaMaxDurationMinutes,
-        PressureControlIntervalMinutes: AtemschutzTrupp.DefaultPressureControlIntervalMinutes,
         ReturnPressureBar: AtemschutzTrupp.DefaultReturnPressureBar);
 }
 
@@ -272,15 +251,6 @@ public static class MasterDataJson
                 ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
                 : Array.Empty<string>();
 
-        IReadOnlyList<Street> streets =
-            root.TryGetProperty("streets", out var st) && st.ValueKind == JsonValueKind.Array
-                ? st.EnumerateArray()
-                    .Select(s => new Street(
-                        s.GetProperty("name").GetString()!,
-                        s.TryGetProperty("district", out var d) ? d.GetString() ?? string.Empty : string.Empty))
-                    .ToList()
-                : Array.Empty<Street>();
-
         IReadOnlyList<Link> links =
             root.TryGetProperty("links", out var lk) && lk.ValueKind == JsonValueKind.Array
                 ? lk.EnumerateArray()
@@ -302,19 +272,14 @@ public static class MasterDataJson
 
         return new MasterDataSet(
             Arr(root, "roles"),
-            Arr(root, "status"),
-            Arr(root, "equipment"),
-            Arr(root, "districts"),
             Arr(root, "radioCallSigns"),
             Arr(root, "brigades"),
             Arr(root, "unitStatus"),
-            streets,
             links,
             checklistAufbau,
             checklistAbbau,
             Arr(root, "truppTypes"),
             ParsePersonnel(root),
-            Arr(root, "einsatzarten"),
             vehicles,
             ParseSettings(root));
     }
@@ -372,7 +337,6 @@ public static class MasterDataJson
             Int(s, "agtMaxDurationMinutes", d.AgtMaxDurationMinutes),
             Int(s, "csaMaxDurationMinutes", d.CsaMaxDurationMinutes),
             Int(s, "lpaMaxDurationMinutes", d.LpaMaxDurationMinutes),
-            Int(s, "pressureControlIntervalMinutes", d.PressureControlIntervalMinutes),
             Int(s, "returnPressureBar", d.ReturnPressureBar));
     }
 
@@ -406,17 +370,12 @@ public static class MasterDataJson
         var model = new
         {
             roles = set.Roles,
-            status = set.Status,
             unitStatus = set.UnitStatus,
-            equipment = set.Equipment,
-            districts = set.Districts,
             radioCallSigns = set.RadioCallSigns,
             brigades = set.Brigades,
             truppTypes = set.TruppTypes,
-            einsatzarten = set.Einsatzarten,
             checklistTemplateAufbau = set.ChecklistTemplateAufbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
-            streets = set.Streets.Select(s => new { name = s.Name, district = s.District }),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
             vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats }),
             personnel = set.Personnel.Select(p => new
@@ -434,7 +393,6 @@ public static class MasterDataJson
                 agtMaxDurationMinutes = set.Settings.AgtMaxDurationMinutes,
                 csaMaxDurationMinutes = set.Settings.CsaMaxDurationMinutes,
                 lpaMaxDurationMinutes = set.Settings.LpaMaxDurationMinutes,
-                pressureControlIntervalMinutes = set.Settings.PressureControlIntervalMinutes,
                 returnPressureBar = set.Settings.ReturnPressureBar,
             },
         };

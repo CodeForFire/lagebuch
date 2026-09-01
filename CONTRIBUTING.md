@@ -60,7 +60,7 @@ A PR template with a short checklist will guide you:
 
 ## Master data and PII
 
-Dropdown contents (roles, call signs, streets, personnel) are treated as
+Dropdown contents (roles, call signs, brigades, personnel) are treated as
 personally identifying data and must **never** be committed to this repository.
 `seed-source/` and `*.masterdata.json` are gitignored for exactly this reason;
 the only tracked master data is the anonymised

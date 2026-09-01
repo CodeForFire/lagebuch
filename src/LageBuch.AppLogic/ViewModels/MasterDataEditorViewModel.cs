@@ -9,9 +9,9 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// The Stammdaten editor. Loads every editable category from the provider into its own section,
-/// tracks a single dirty flag across them, and writes the whole set back on Save. Streets are read
-/// but not editable, so they are carried through untouched. Import (offered only while the data is
-/// empty) fills the editor from a JSON file for review; Export writes the current set back out.
+/// tracks a single dirty flag across them, and writes the whole set back on Save. Import (offered
+/// only while the data is empty) fills the editor from a JSON file for review; Export writes the
+/// current set back out.
 /// </summary>
 public sealed partial class MasterDataEditorViewModel : ObservableObject
 {
@@ -25,16 +25,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private EditableListSection _roles = null!;
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _status = null!;
-
-    // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private EditableListSection _unitStatus = null!;
-
-    // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _equipment = null!;
-
-    // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _districts = null!;
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private EditableListSection _brigades = null!;
@@ -44,9 +35,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private EditableListSection _truppTypes = null!;
-
-    // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _einsatzarten = null!;
 
     private ChecklistTemplateSection _checklistAufbau = null!;
     private ChecklistTemplateSection _checklistAbbau = null!;
@@ -110,21 +98,29 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         var previousIndex = SelectedSection is null ? 0 : Sections.IndexOf(SelectedSection);
 
         Sections.Clear();
+
+        // Einstellungen is a meta section (numeric defaults), not a data category, so it stays
+        // pinned first; everything else sorts alphabetically below it.
         Sections.Add(_settings = new SettingsSection("Einstellungen", set.Settings, MarkDirty));
-        Sections.Add(_roles = new EditableListSection("Rollen", set.Roles, MarkDirty));
-        Sections.Add(_status = new EditableListSection("Status", set.Status, MarkDirty));
-        Sections.Add(_unitStatus = new EditableListSection("Einheiten-Status", set.UnitStatus, MarkDirty));
-        Sections.Add(_equipment = new EditableListSection("Ausrüstung", set.Equipment, MarkDirty));
-        Sections.Add(_districts = new EditableListSection("Bezirke", set.Districts, MarkDirty));
-        Sections.Add(_brigades = new EditableListSection("Wachen", set.Brigades, MarkDirty));
-        Sections.Add(_callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty));
-        Sections.Add(_truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty));
-        Sections.Add(_einsatzarten = new EditableListSection("Einsatzarten", set.Einsatzarten, MarkDirty));
-        Sections.Add(_links = new LinksSection("Links", set.Links, MarkDirty));
-        Sections.Add(_checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty));
-        Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
-        Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
-        Sections.Add(_vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged));
+
+        EditorSection[] categories =
+        {
+            _roles = new EditableListSection("Rollen", set.Roles, MarkDirty),
+            _unitStatus = new EditableListSection("Einheiten-Status", set.UnitStatus, MarkDirty),
+            _brigades = new EditableListSection("Wachen", set.Brigades, MarkDirty),
+            _callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty),
+            _truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty),
+            _links = new LinksSection("Links", set.Links, MarkDirty),
+            _checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty),
+            _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),
+            _personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty),
+            _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
+        };
+
+        foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
+        {
+            Sections.Add(section);
+        }
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }
@@ -152,22 +148,16 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private MasterDataSet BuildSet() => _original with
     {
         Roles = _roles.ToValues(),
-        Status = _status.ToValues(),
         UnitStatus = _unitStatus.ToValues(),
-        Equipment = _equipment.ToValues(),
-        Districts = _districts.ToValues(),
         Brigades = _brigades.ToValues(),
         RadioCallSigns = _callSigns.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
-        Einsatzarten = _einsatzarten.ToValues(),
         Links = _links.ToValues(),
         ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
         ChecklistTemplateAbbau = _checklistAbbau.ToValues(),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),
-
-        // Streets are not editable here; _original carries them through unchanged.
     };
 
     [RelayCommand(CanExecute = nameof(CanSave))]
