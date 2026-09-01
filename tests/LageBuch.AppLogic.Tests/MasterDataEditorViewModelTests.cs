@@ -150,6 +150,16 @@ public class MasterDataEditorViewModelTests
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
+
+        // Einstellungen stays pinned first (a meta section, not a data category); the rest sort
+        // alphabetically below it.
+        Assert.Equal(
+            new[]
+            {
+                "Einstellungen", "Checkliste Abbau", "Checkliste Aufbau", "Einheiten-Status",
+                "Fahrzeuge", "Funkrufnamen", "Links", "Personal", "Rollen", "Trupp-Typen", "Wachen",
+            },
+            vm.Sections.Select(s => s.Title));
     }
 
     [Fact]

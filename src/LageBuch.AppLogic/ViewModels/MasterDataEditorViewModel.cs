@@ -98,17 +98,29 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         var previousIndex = SelectedSection is null ? 0 : Sections.IndexOf(SelectedSection);
 
         Sections.Clear();
+
+        // Einstellungen is a meta section (numeric defaults), not a data category, so it stays
+        // pinned first; everything else sorts alphabetically below it.
         Sections.Add(_settings = new SettingsSection("Einstellungen", set.Settings, MarkDirty));
-        Sections.Add(_roles = new EditableListSection("Rollen", set.Roles, MarkDirty));
-        Sections.Add(_unitStatus = new EditableListSection("Einheiten-Status", set.UnitStatus, MarkDirty));
-        Sections.Add(_brigades = new EditableListSection("Wachen", set.Brigades, MarkDirty));
-        Sections.Add(_callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty));
-        Sections.Add(_truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty));
-        Sections.Add(_links = new LinksSection("Links", set.Links, MarkDirty));
-        Sections.Add(_checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty));
-        Sections.Add(_checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty));
-        Sections.Add(_personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty));
-        Sections.Add(_vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged));
+
+        EditorSection[] categories =
+        {
+            _roles = new EditableListSection("Rollen", set.Roles, MarkDirty),
+            _unitStatus = new EditableListSection("Einheiten-Status", set.UnitStatus, MarkDirty),
+            _brigades = new EditableListSection("Wachen", set.Brigades, MarkDirty),
+            _callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty),
+            _truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty),
+            _links = new LinksSection("Links", set.Links, MarkDirty),
+            _checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty),
+            _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),
+            _personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty),
+            _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
+        };
+
+        foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
+        {
+            Sections.Add(section);
+        }
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }
