@@ -12,6 +12,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Wasserfoerderung;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -173,6 +174,53 @@ public class WasserfoerderungTabRenderTests
             Assert.Equal(2, leitung.RoutePoints!.Count);
             Assert.Empty(vm.Wasserfoerderung.DrawnRoutePoints);
             Capture(window, "wasserfoerderung-karte-finished.png");
+        }
+        finally
+        {
+            Directory.Delete(regionDir, recursive: true);
+        }
+    }
+
+    // #150 follow-up: selecting an existing route in the grid must show it on the map -- the
+    // DataGrid had no SelectedItem binding at all, so nothing happened.
+    [AvaloniaFact]
+    public void Selecting_an_existing_route_in_the_grid_shows_it_on_the_map()
+    {
+        var regionDir = CreateRegionFolder();
+        try
+        {
+            var masterData = WorkspaceRenderHelper.MasterData() with
+            {
+                Einsatzgebiet = new Einsatzgebiet("Testgebiet", regionDir),
+            };
+            var (window, vm, session) = ShowWorkspace(masterData);
+
+            // Offsets from the map's actual initial center (region-derived, not a fixed constant)
+            // so the route falls inside the visible viewport regardless of the region's own
+            // coordinates.
+            var centerLat = vm.Wasserfoerderung.MapCenterLatitude;
+            var centerLon = vm.Wasserfoerderung.MapCenterLongitude;
+            var route = new[] { new GeoPoint(centerLat, centerLon), new GeoPoint(centerLat + 0.001, centerLon + 0.001) };
+            var profile = new[]
+            {
+                new ElevationProfileSample(0, 0),
+                new ElevationProfileSample(100, 0),
+            };
+            session.AddWasserfoerderungLeitungFromRoute("TLF 20/8", "FFB 1/44/1", route, profile);
+
+            Tabs(window).SelectedIndex = 9; // WASSERFÖRDERUNG
+            Dispatcher.UIThread.RunJobs();
+            vm.Wasserfoerderung.IsMapMode = false; // start in MANUELL to prove selection switches it back
+
+            var view = (IncidentWorkspaceView)window.Content!;
+            var grid = view.GetVisualDescendants().OfType<DataGrid>().Single(g => g.Name == "WasserfoerderungGrid");
+            grid.SelectedItem = Assert.Single(vm.Wasserfoerderung.Rows);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(vm.Wasserfoerderung.IsMapMode);
+            var canvas = view.GetVisualDescendants().OfType<MapCanvasControl>().Single();
+            Assert.Equal(route, canvas.SelectedRoutePoints);
+            Capture(window, "wasserfoerderung-selected-route.png");
         }
         finally
         {

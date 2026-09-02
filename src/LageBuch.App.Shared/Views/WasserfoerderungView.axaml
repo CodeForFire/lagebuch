@@ -31,7 +31,7 @@
         <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Height="260">
           <DataGrid x:Name="WasserfoerderungGrid" ItemsSource="{Binding Rows}" IsReadOnly="{Binding IsReadOnly}"
-                    CanUserSortColumns="False">
+                    SelectedItem="{Binding SelectedRow}" CanUserSortColumns="False">
             <DataGrid.Columns>
               <DataGridTextColumn Header="LEITUNG" Binding="{Binding NumberDisplay}" IsReadOnly="True" />
               <DataGridTextColumn Header="ÜBERGABESTELLE" Binding="{Binding UebergabestelleDisplay}" Width="*"
@@ -129,6 +129,7 @@
               CenterLongitude="{Binding MapCenterLongitude}"
               Zoom="{Binding MapZoom}"
               RoutePoints="{Binding DrawnRoutePoints}"
+              SelectedRoutePoints="{Binding SelectedRoutePoints}"
               PointClickedCommand="{Binding AddRoutePointCommand}"
               UndoRequestedCommand="{Binding UndoLastRoutePointCommand}"
               ViewChangedCommand="{Binding ChangeMapViewCommand}" />

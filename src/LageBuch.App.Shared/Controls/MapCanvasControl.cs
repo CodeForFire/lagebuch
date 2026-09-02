@@ -38,6 +38,11 @@ public sealed class MapCanvasControl : Control
     public static readonly StyledProperty<IReadOnlyList<GeoPoint>?> RoutePointsProperty =
         AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<GeoPoint>?>(nameof(RoutePoints));
 
+    /// <summary>A selected existing Leitung's saved route (#150 follow-up), drawn as a reference
+    /// overlay distinct from <see cref="RoutePoints"/>'s in-progress sketch.</summary>
+    public static readonly StyledProperty<IReadOnlyList<GeoPoint>?> SelectedRoutePointsProperty =
+        AvaloniaProperty.Register<MapCanvasControl, IReadOnlyList<GeoPoint>?>(nameof(SelectedRoutePoints));
+
     public static readonly StyledProperty<ICommand?> PointClickedCommandProperty =
         AvaloniaProperty.Register<MapCanvasControl, ICommand?>(nameof(PointClickedCommand));
 
@@ -50,7 +55,12 @@ public sealed class MapCanvasControl : Control
     static MapCanvasControl()
     {
         AffectsRender<MapCanvasControl>(
-            TileSourceProperty, CenterLatitudeProperty, CenterLongitudeProperty, ZoomProperty, RoutePointsProperty);
+            TileSourceProperty,
+            CenterLatitudeProperty,
+            CenterLongitudeProperty,
+            ZoomProperty,
+            RoutePointsProperty,
+            SelectedRoutePointsProperty);
 
         RoutePointsProperty.Changed.AddClassHandler<MapCanvasControl>((control, e) => control.OnRoutePointsChanged(e));
     }
@@ -105,6 +115,12 @@ public sealed class MapCanvasControl : Control
     {
         get => GetValue(RoutePointsProperty);
         set => SetValue(RoutePointsProperty, value);
+    }
+
+    public IReadOnlyList<GeoPoint>? SelectedRoutePoints
+    {
+        get => GetValue(SelectedRoutePointsProperty);
+        set => SetValue(SelectedRoutePointsProperty, value);
     }
 
     // RoutePoints is bound to the VM's live ObservableCollection<GeoPoint> (see
@@ -171,7 +187,7 @@ public sealed class MapCanvasControl : Control
         // regardless of tile/route state.
         context.FillRectangle(Brushes.Transparent, new Rect(0, 0, width, height));
 
-        MapDrawing.Draw(context, TileSource, RoutePoints, CenterLatitude, CenterLongitude, Zoom, width, height);
+        MapDrawing.Draw(context, TileSource, RoutePoints, CenterLatitude, CenterLongitude, Zoom, width, height, SelectedRoutePoints);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)

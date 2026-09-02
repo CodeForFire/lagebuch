@@ -241,6 +241,56 @@ public class WasserfoerderungViewModelTests
         Assert.Equal(1, changedCount);
     }
 
+    // Selecting an existing (Plan B) route in the grid must show it on the map -- previously
+    // nothing wired DataGrid.SelectedItem to anything, so it silently did nothing.
+    [Fact]
+    public void Selecting_a_row_with_a_saved_route_exposes_it_and_switches_to_map_mode()
+    {
+        var (session, _) = NewSession();
+        var sampler = new FakeElevationSampler();
+        var vm = new WasserfoerderungViewModel(session, () => { }, sampler, new FakeTileSource());
+        var route = new[] { new GeoPoint(48.0, 11.0), new GeoPoint(48.002, 11.0) };
+        vm.AddRoutePointCommand.Execute(route[0]);
+        vm.AddRoutePointCommand.Execute(route[1]);
+        vm.FinishRouteCommand.Execute(null);
+        vm.IsMapMode = false; // simulate having switched back to MANUELL after finishing
+
+        vm.SelectedRow = Assert.Single(vm.Rows);
+
+        Assert.Equal(route, vm.SelectedRoutePoints);
+        Assert.True(vm.IsMapMode);
+    }
+
+    [Fact]
+    public void Selecting_a_manual_row_without_a_route_exposes_no_selected_route_and_does_not_force_map_mode()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { }, new FakeElevationSampler(), new FakeTileSource());
+        session.AddWasserfoerderungLeitung("TLF 20/8", "FFB 1/44/1", 2000, 100);
+
+        vm.SelectedRow = Assert.Single(vm.Rows);
+
+        Assert.Null(vm.SelectedRoutePoints);
+        Assert.False(vm.IsMapMode);
+    }
+
+    [Fact]
+    public void Deselecting_the_row_clears_the_selected_route()
+    {
+        var (session, _) = NewSession();
+        var sampler = new FakeElevationSampler();
+        var vm = new WasserfoerderungViewModel(session, () => { }, sampler, new FakeTileSource());
+        var route = new[] { new GeoPoint(48.0, 11.0), new GeoPoint(48.002, 11.0) };
+        vm.AddRoutePointCommand.Execute(route[0]);
+        vm.AddRoutePointCommand.Execute(route[1]);
+        vm.FinishRouteCommand.Execute(null);
+        vm.SelectedRow = Assert.Single(vm.Rows);
+
+        vm.SelectedRow = null;
+
+        Assert.Null(vm.SelectedRoutePoints);
+    }
+
     [Fact]
     public void Zoom_commands_step_within_bounds()
     {

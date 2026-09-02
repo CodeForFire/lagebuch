@@ -20,7 +20,13 @@ public static class MapDrawing
     private static readonly IPen RoutePen = new Pen(Brushes.OrangeRed, 3);
     private static readonly IBrush RoutePointBrush = Brushes.OrangeRed;
 
-    [SuppressMessage("Design", "CA1062", Justification = "routePoints is null by design for a manually entered (Plan A) Leitung — that is a normal, handled input, not a guard omission.")]
+    // A selected existing Leitung's saved route (#150 follow-up) is a reference overlay, not the
+    // thing being actively drawn -- a visually distinct color keeps it from being mistaken for an
+    // in-progress DrawnRoutePoints sketch.
+    private static readonly IPen SelectedRoutePen = new Pen(Brushes.DodgerBlue, 3);
+    private static readonly IBrush SelectedRoutePointBrush = Brushes.DodgerBlue;
+
+    [SuppressMessage("Design", "CA1062", Justification = "routePoints/selectedRoutePoints are null by design -- a manually entered (Plan A) Leitung or no map-mode drawing/selection in progress -- that is a normal, handled input, not a guard omission.")]
     public static void Draw(
         DrawingContext context,
         IMapTileSource? tileSource,
@@ -29,7 +35,8 @@ public static class MapDrawing
         double centerLongitude,
         int zoom,
         double width,
-        double height)
+        double height,
+        IReadOnlyList<GeoPoint>? selectedRoutePoints = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (width <= 0 || height <= 0)
@@ -40,7 +47,8 @@ public static class MapDrawing
         var (centerX, centerY) = WebMercator.ToWorldPixel(new GeoPoint(centerLatitude, centerLongitude), zoom);
 
         DrawTiles(context, tileSource, zoom, centerX, centerY, width, height);
-        DrawRoute(context, routePoints, zoom, centerX, centerY, width, height);
+        DrawRoute(context, selectedRoutePoints, zoom, centerX, centerY, width, height, SelectedRoutePen, SelectedRoutePointBrush);
+        DrawRoute(context, routePoints, zoom, centerX, centerY, width, height, RoutePen, RoutePointBrush);
     }
 
     private static void DrawTiles(
@@ -120,7 +128,9 @@ public static class MapDrawing
         double centerX,
         double centerY,
         double width,
-        double height)
+        double height,
+        IPen pen,
+        IBrush pointBrush)
     {
         if (routePoints is not { Count: > 0 })
         {
@@ -134,10 +144,10 @@ public static class MapDrawing
             var screen = new Point(worldX - centerX + (width / 2), worldY - centerY + (height / 2));
             if (previous is { } prev)
             {
-                context.DrawLine(RoutePen, prev, screen);
+                context.DrawLine(pen, prev, screen);
             }
 
-            context.DrawEllipse(RoutePointBrush, null, screen, RoutePointRadius, RoutePointRadius);
+            context.DrawEllipse(pointBrush, null, screen, RoutePointRadius, RoutePointRadius);
             previous = screen;
         }
     }

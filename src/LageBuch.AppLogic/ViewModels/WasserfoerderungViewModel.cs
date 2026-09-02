@@ -143,6 +143,25 @@ public sealed partial class WasserfoerderungViewModel : ObservableObject, IDispo
         MapZoom = _initialZoom;
     }
 
+    /// <summary>The grid's selected Leitung (#150 follow-up: selecting an existing route must show
+    /// it on the map). Null-ing this out (deselecting) clears <see cref="SelectedRoutePoints"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedRoutePoints))]
+    private WasserfoerderungLeitungRow? _selectedRow;
+
+    /// <summary>The selected row's saved route (null for a Plan A/manual Leitung, or when nothing
+    /// is selected) -- bound onto the map as a reference overlay alongside any in-progress
+    /// <see cref="DrawnRoutePoints"/> sketch.</summary>
+    public IReadOnlyList<GeoPoint>? SelectedRoutePoints => SelectedRow?.RoutePoints;
+
+    partial void OnSelectedRowChanged(WasserfoerderungLeitungRow? value)
+    {
+        if (value?.RoutePoints is { Count: > 0 } && IsMapModeAvailable)
+        {
+            IsMapMode = true;
+        }
+    }
+
     [RelayCommand]
     private void AddRoutePoint(GeoPoint point) => DrawnRoutePoints.Add(point);
 
@@ -272,9 +291,14 @@ public sealed partial class WasserfoerderungLeitungRow : ObservableObject
         ReservePumpDisplay = leitung.ReservePumpCount.ToString(CultureInfo.InvariantCulture);
         ReserveHoseDisplay = leitung.ReserveHoseCount.ToString(CultureInfo.InvariantCulture);
         ResultDisplay = BuildResult(leitung);
+        RoutePoints = leitung.RoutePoints;
     }
 
     public Guid Id => _id;
+
+    /// <summary>The drawn polyline this Leitung was created from (#150 Plan B); null for a
+    /// manually entered (Plan A) Leitung.</summary>
+    public IReadOnlyList<GeoPoint>? RoutePoints { get; }
 
     public bool IsReadOnly { get; }
 

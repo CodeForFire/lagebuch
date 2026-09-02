@@ -84,6 +84,30 @@ public class MapCanvasControlTests
         Assert.NotNull(frame);
     }
 
+    // #150 follow-up: selecting an existing Leitung in the grid must show its saved route on the
+    // map as a reference overlay, distinct from any in-progress RoutePoints sketch.
+    [AvaloniaFact]
+    public void SelectedRoutePoints_render_in_a_distinct_color_from_RoutePoints()
+    {
+        var control = new MapCanvasControl
+        {
+            Width = 200,
+            Height = 200,
+            CenterLatitude = 48.0,
+            CenterLongitude = 11.0,
+            Zoom = 15,
+            RoutePoints = new[] { new GeoPoint(48.0, 11.002) }, // offset from center
+            SelectedRoutePoints = new[] { new GeoPoint(48.0, 11.0) }, // == control's center
+        };
+        var window = new Window { Content = control, Width = 200, Height = 200 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = window.CaptureRenderedFrame()!;
+
+        Assert.Equal(Colors.DodgerBlue, SamplePixel(frame, 100, 100));
+    }
+
     // Regression: RoutePoints is bound to the VM's live ObservableCollection<GeoPoint>
     // (WasserfoerderungView.axaml), which is mutated in place -- Add/RemoveAt/Clear -- never
     // reassigned. AffectsRender only reacts to the property's own value (the collection reference)
