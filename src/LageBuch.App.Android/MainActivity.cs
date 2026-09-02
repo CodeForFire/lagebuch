@@ -8,6 +8,7 @@ using LageBuch.App.Shared;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
+
 // Inside the LageBuch.App.Android namespace the bare name "App" binds to the LageBuch.App
 // namespace, not LageBuch.App.Shared.App — alias it so the shared Application type is reachable.
 using SharedApp = LageBuch.App.Shared.App;

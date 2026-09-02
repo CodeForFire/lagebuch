@@ -3,7 +3,14 @@ namespace LageBuch.Sync.Hosting.Tests;
 public class JsonTrustStoreTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"trust-{Guid.NewGuid():N}.json");
-    public void Dispose() { if (File.Exists(_path)) File.Delete(_path); }
+
+    public void Dispose()
+    {
+        if (File.Exists(_path))
+        {
+            File.Delete(_path);
+        }
+    }
 
     [Fact]
     public void Empty_or_missing_file_returns_null()

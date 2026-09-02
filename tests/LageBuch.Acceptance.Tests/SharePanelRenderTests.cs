@@ -22,6 +22,7 @@ public class SharePanelRenderTests
         public bool IsHosting { get; private set; }
 
         public string? ShareHint => "Erreichbar unter https://192.168.0.5:5859 · auf diesem Gerät: https://localhost:5859";
+
         public string? SharePin => IsHosting ? "1234" : null;
 
         public Task StartAsync(LocalIncidentSession session)

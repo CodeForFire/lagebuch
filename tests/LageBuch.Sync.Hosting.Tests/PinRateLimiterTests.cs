@@ -49,7 +49,10 @@ public class PinRateLimiterTests
         var t = new FakeTimeProvider();
         var limiter = new PinRateLimiter(t);
         for (var i = 0; i < 10; i++)
+        {
             limiter.RecordFailure("10.0.0.1");
+        }
+
         Assert.True(limiter.ShouldThrottle("10.0.0.1", out var retryAfter));
         Assert.Equal(60, retryAfter);
     }

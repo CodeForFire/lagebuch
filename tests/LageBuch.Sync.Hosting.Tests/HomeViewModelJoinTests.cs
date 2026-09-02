@@ -14,8 +14,16 @@ namespace LageBuch.Sync.Hosting.Tests;
 public class HomeViewModelJoinTests
 {
     private static HomeViewModel Home(ITrustStore? trust = null) =>
-        new(new InMemoryStore(), new EmptyMasterData(), new NoRecentFiles(), new NoDialogs(),
-            new FixedClock(), new NoTicker(), new NoAlarm(), new NoopIncidentHostController(), "1.0.0",
+        new(
+            new InMemoryStore(),
+            new EmptyMasterData(),
+            new NoRecentFiles(),
+            new NoDialogs(),
+            new FixedClock(),
+            new NoTicker(),
+            new NoAlarm(),
+            new NoopIncidentHostController(),
+            "1.0.0",
             trustStore: trust);
 
     private static LocalIncidentSession HostSession(FixedClock clock) =>

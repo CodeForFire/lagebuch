@@ -241,8 +241,13 @@ public class RemoteClientTests
 
         var trust = new InMemoryTrustStore();
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(),
-            TestHost.DefaultPin, port, trustStore: trust);
+            "127.0.0.1",
+            new SessionOperator("Client"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            TestHost.DefaultPin,
+            port,
+            trustStore: trust);
 
         Assert.NotNull(client);
         Assert.Single(trust.Thumbprints); // first use captured it
@@ -259,8 +264,14 @@ public class RemoteClientTests
         await using var _ = host;
 
         await Assert.ThrowsAsync<CertificateChangedException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0",
-                new ImmediateUiDispatcher(), TestHost.DefaultPin, port, trustStore: trust));
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("Client"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                TestHost.DefaultPin,
+                port,
+                trustStore: trust));
     }
 
     [Fact]
@@ -288,7 +299,12 @@ public class RemoteClientTests
         // throttled /version endpoint) must surface the 429 as a PinRejectedException, not an opaque
         // HTTP error. Done within the window; a 2s backoff gives this assertion ample time.
         await Assert.ThrowsAsync<PinRejectedException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0",
-                new ImmediateUiDispatcher(), "wrong", port));
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("Client"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                "wrong",
+                port));
     }
 }

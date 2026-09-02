@@ -35,7 +35,9 @@ internal sealed class InMemoryStore : IIncidentStore
 internal sealed class FakeTimeProvider : TimeProvider
 {
     public DateTimeOffset UtcNow { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
+
     public override DateTimeOffset GetUtcNow() => UtcNow;
+
     public void Advance(TimeSpan by) => UtcNow += by;
 }
 
@@ -48,8 +50,11 @@ internal sealed class FixedClock : IClock
 internal sealed class InMemoryTrustStore : ITrustStore
 {
     private readonly Dictionary<string, string> _map = new(StringComparer.Ordinal);
+
     public IReadOnlyDictionary<string, string> Thumbprints => _map;
+
     public string? GetThumbprint(string hostAddress) => _map.TryGetValue(hostAddress, out var t) ? t : null;
+
     public void SaveThumbprint(string hostAddress, string thumbprint) => _map[hostAddress] = thumbprint;
 }
 

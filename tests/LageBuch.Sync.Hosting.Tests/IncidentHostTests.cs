@@ -303,8 +303,13 @@ public class IncidentHostTests
     public async Task Host_serves_over_https_with_self_signed_cert()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
@@ -320,8 +325,13 @@ public class IncidentHostTests
     public async Task Repeated_wrong_pins_from_one_ip_trigger_429_with_retry_after()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(new InMemoryStore(), clock,
-            new SessionOperator("Host", "FFB 1"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
