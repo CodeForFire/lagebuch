@@ -3,6 +3,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Wasserfoerderung;
 
 namespace LageBuch.Sync.Tests;
 
@@ -290,5 +291,63 @@ public class CommandApplierTests
         var dwelling = incident.Dwellings.First(d =>
             d.BuildingId == buildingId && d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
         Assert.Equal(DwellingStatus.Searched, dwelling.Status);
+    }
+
+    [Fact]
+    public void AddWasserfoerderungLeitung_over_the_wire_plans_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var cmd = new AddWasserfoerderungLeitungCommand("TLF 20/8", "FFB 1/44/1", 2000, 100);
+
+        ApplyOverWire(cmd, incident, clock);
+
+        var leitung = Assert.Single(incident.Wasserfoerderung);
+        Assert.Equal(1, leitung.Number);
+        Assert.Equal("TLF 20/8", leitung.Uebergabestelle);
+        Assert.Equal(2000, leitung.LengthMeters);
+        Assert.Equal(100, leitung.ElevationRiseMeters);
+        Assert.Equal(4, leitung.PumpCount);
+
+        // The host (defaults) computes the derived figures — not the sending client.
+        Assert.Equal(800, leitung.FlowLMin);
+    }
+
+    [Fact]
+    public void AddWasserfoerderungLeitungFromRoute_over_the_wire_plans_from_the_profile()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var route = new[] { new GeoPoint(48.0, 11.0), new GeoPoint(48.002, 11.0) };
+
+        // Interior crest at 200 m (see FörderstreckePlannerProfileTests) -- 1 pump for a 400 m
+        // route that a flat 2-point Plan(400, 0, ...) would need none for.
+        var profile = new[]
+        {
+            new ElevationProfileSample(0, 0),
+            new ElevationProfileSample(200, 50),
+            new ElevationProfileSample(400, 0),
+        };
+        var cmd = new AddWasserfoerderungLeitungFromRouteCommand("TLF 20/8", "FFB 1/44/1", route, profile);
+
+        ApplyOverWire(cmd, incident, clock);
+
+        var leitung = Assert.Single(incident.Wasserfoerderung);
+        Assert.Equal(route, leitung.RoutePoints);
+        Assert.Equal(400, leitung.LengthMeters);
+        Assert.Equal(1, leitung.PumpCount);
+    }
+
+    [Fact]
+    public void RemoveWasserfoerderungLeitung_over_the_wire_takes_the_line_off()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        incident.AddWasserfoerderungLeitung("TLF 20/8", "FFB 1/44/1", 2000, 100);
+        var id = incident.Wasserfoerderung[0].Id;
+
+        ApplyOverWire(new RemoveWasserfoerderungLeitungCommand(id), incident, clock);
+
+        Assert.Empty(incident.Wasserfoerderung);
     }
 }

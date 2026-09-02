@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 17;
+    public const int CurrentVersion = 19;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -122,6 +122,16 @@ public static class Migrations
         if (version < 17)
         {
             ApplyV17(cn, tx);
+        }
+
+        if (version < 18)
+        {
+            ApplyV18(cn, tx);
+        }
+
+        if (version < 19)
+        {
+            ApplyV19(cn, tx);
         }
 
         SetVersion(cn, tx, CurrentVersion);
@@ -592,6 +602,38 @@ public static class Migrations
         Exec(cn, tx, sql21);
         Exec(cn, tx, "DROP TABLE scba_trupps;");
         Exec(cn, tx, "ALTER TABLE scba_trupps_v17 RENAME TO scba_trupps;");
+    }
+
+    private static void ApplyV18(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Wasserförderungs-Leitungen (#150, Plan A). The planned figures are stored verbatim so
+        // the PDF and remote clients never recompute them.
+        const string sql18 = """
+            CREATE TABLE IF NOT EXISTS wass_leitungen (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                number INTEGER NOT NULL,
+                uebergabestelle TEXT,
+                ansprechpartner TEXT,
+                flow_lmin INTEGER NOT NULL,
+                feed_pressure_bar REAL NOT NULL,
+                length_m REAL NOT NULL,
+                elevation_rise_m REAL NOT NULL,
+                hose_count INTEGER NOT NULL,
+                reserve_hose_count INTEGER NOT NULL,
+                pump_count INTEGER NOT NULL,
+                reserve_pump_count INTEGER NOT NULL,
+                pump_positions TEXT NOT NULL DEFAULT '[]'
+            );
+            """;
+        Exec(cn, tx, sql18);
+    }
+
+    private static void ApplyV19(SqliteConnection cn, SqliteTransaction tx)
+    {
+        // Plan B (#150 phase 2): the drawn route, when the Leitung came from the map. NULL means
+        // the Leitung was entered manually (Plan A) -- LengthMeters/ElevationRiseMeters apply either way.
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "wass_leitungen", "route_points_json", "TEXT");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

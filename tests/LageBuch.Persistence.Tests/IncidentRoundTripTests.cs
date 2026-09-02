@@ -433,4 +433,60 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Empty(loaded.Tasks);           // old file has no tasks — loads cleanly, migrates to V14
         Assert.Equal("Brand", loaded.Keyword);
     }
+
+    [Fact]
+    public void Wasserfoerderung_leitungen_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        incident.AddWasserfoerderungLeitung("TLF 20/8", "FFB 1/44/1", 2000, 100);
+        incident.AddWasserfoerderungLeitung(null, null, 400, 0);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(2, loaded.Wasserfoerderung.Count);
+        var first = loaded.Wasserfoerderung[0];
+        Assert.Equal(1, first.Number);
+        Assert.Equal("TLF 20/8", first.Uebergabestelle);
+        Assert.Equal("FFB 1/44/1", first.Ansprechpartner);
+        Assert.Equal(800, first.FlowLMin);
+        Assert.Equal(2000, first.LengthMeters);
+        Assert.Equal(100, first.ElevationRiseMeters);
+        Assert.Equal(100, first.HoseCount);
+        Assert.Equal(4, first.PumpCount);
+        Assert.Equal(1, first.ReservePumpCount);
+        Assert.Equal(20, first.ReserveHoseCount);
+        Assert.Equal(incident.Wasserfoerderung[0].PumpPositionsMeters, first.PumpPositionsMeters);
+        Assert.Equal(2, loaded.Wasserfoerderung[1].Number);
+        Assert.Null(loaded.Wasserfoerderung[1].Uebergabestelle);
+        Assert.Equal(0, loaded.Wasserfoerderung[1].PumpCount);
+        Assert.Null(first.RoutePoints); // manual (Plan A) entry
+        Assert.Null(loaded.Wasserfoerderung[1].RoutePoints);
+    }
+
+    [Fact]
+    public void Wasserfoerderung_leitung_from_route_round_trips_its_route_points()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var route = new[]
+        {
+            new LageBuch.Domain.Wasserfoerderung.GeoPoint(48.000, 11.000),
+            new LageBuch.Domain.Wasserfoerderung.GeoPoint(48.002, 11.000),
+        };
+        var profile = new[]
+        {
+            new LageBuch.Domain.Wasserfoerderung.ElevationProfileSample(0, 0),
+            new LageBuch.Domain.Wasserfoerderung.ElevationProfileSample(2000, 100),
+        };
+        incident.AddWasserfoerderungLeitungFromRoute("TLF 20/8", "FFB 1/44/1", route, profile);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(route, loaded.Wasserfoerderung[0].RoutePoints);
+    }
 }

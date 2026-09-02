@@ -93,7 +93,12 @@ public class MasterDataEditorViewModelTests
 
     private static MasterDataEditorViewModel Vm(
         IMasterDataProvider provider, IFileDialogService? dialogs = null, IMasterDataFileService? files = null) =>
-        new(provider, dialogs ?? new FakeDialogs(), files ?? new FakeFileService());
+        new(
+            provider,
+            dialogs ?? new FakeDialogs(),
+            files ?? new FakeFileService(),
+            new NoRegionCatalog(),
+            new NoRegionInstaller());
 
     private static EditableListSection Roles(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<EditableListSection>().First(s => s.Title == "Rollen");
@@ -112,6 +117,9 @@ public class MasterDataEditorViewModelTests
 
     private static SettingsSection Settings(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<SettingsSection>().Single();
+
+    private static EinsatzgebietSection Einsatzgebiet(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<EinsatzgebietSection>().Single();
 
     private static VehiclesSection Vehicles(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<VehiclesSection>().Single();
@@ -145,8 +153,8 @@ public class MasterDataEditorViewModelTests
     {
         var vm = Vm(new InMemoryProvider());
 
-        // 10 categories plus #76's Fahrzeuge.
-        Assert.Equal(11, vm.Sections.Count);
+        // 10 categories plus #76's Fahrzeuge plus #150's Einsatzgebiet.
+        Assert.Equal(12, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
@@ -157,7 +165,8 @@ public class MasterDataEditorViewModelTests
             new[]
             {
                 "Einstellungen", "Checkliste Abbau", "Checkliste Aufbau", "Einheiten-Status",
-                "Fahrzeuge", "Funkrufnamen", "Links", "Personal", "Rollen", "Trupp-Typen", "Wachen",
+                "Einsatzgebiet", "Fahrzeuge", "Funkrufnamen", "Links", "Personal", "Rollen",
+                "Trupp-Typen", "Wachen",
             },
             vm.Sections.Select(s => s.Title));
     }
@@ -361,6 +370,35 @@ public class MasterDataEditorViewModelTests
         Assert.Equal(45, provider.Get().Settings.IlsReminderFollowUpIntervalMinutes);
     }
 
+    [Fact]
+    public void Einsatzgebiet_section_is_seeded_from_the_provider()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Einsatzgebiet = new Einsatzgebiet("Landkreis Fürstenfeldbruck", "/data/ffb"),
+        });
+        var gebiet = Einsatzgebiet(Vm(provider));
+
+        Assert.Equal("Landkreis Fürstenfeldbruck", gebiet.Name);
+        Assert.Equal("/data/ffb", gebiet.FolderPath);
+    }
+
+    [Fact]
+    public void Editing_the_einsatzgebiet_marks_dirty_and_Save_persists_it()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+
+        Einsatzgebiet(vm).Name = "Landkreis Fürstenfeldbruck";
+        Einsatzgebiet(vm).FolderPath = "/data/ffb";
+        Assert.True(vm.IsDirty);
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(1, provider.SaveCount);
+        Assert.Equal(new Einsatzgebiet("Landkreis Fürstenfeldbruck", "/data/ffb"), provider.Get().Einsatzgebiet);
+    }
+
     // --- Import / Export (issue #46 follow-up) ---
     [Fact]
     public void Import_is_disabled_when_master_data_already_exists()
@@ -545,4 +583,18 @@ public class MasterDataEditorViewModelTests
         Assert.Null(vm.VehicleConflicts);
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
+}
+
+// Shared no-op fakes for constructor sites that don't exercise region-pack behavior — reused from
+// MainWindowViewModelTests.cs, same convention as FakeDialogs/FakeStore/etc.
+internal sealed class NoRegionCatalog : IRegionPackCatalogService
+{
+    public Task<IReadOnlyList<RegionPackInfo>> GetAvailableRegionsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<RegionPackInfo>>(Array.Empty<RegionPackInfo>());
+}
+
+internal sealed class NoRegionInstaller : IRegionPackInstaller
+{
+    public Task<string> DownloadAndInstallAsync(RegionPackInfo pack, IProgress<double>? progress, CancellationToken ct = default)
+        => Task.FromResult("/unused");
 }

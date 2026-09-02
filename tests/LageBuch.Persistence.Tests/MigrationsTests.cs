@@ -73,6 +73,26 @@ public class MigrationsTests : IDisposable
     }
 
     [Fact]
+    public void V18_creates_the_wasserfoerderung_table()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='wass_leitungen';";
+        Assert.Equal(1L, (long)cmd.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void V19_adds_the_route_points_column_to_wasserfoerderung()
+    {
+        using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT count(*) FROM pragma_table_info('wass_leitungen') WHERE name='route_points_json';";
+        Assert.Equal(1L, (long)cmd.ExecuteScalar()!);
+    }
+
+    [Fact]
     public void Migrate_adds_the_officer_count_column_and_the_force_unit_edits_table()
     {
         using var cn = SqliteConnectionFactory.OpenReadWrite(_path);
