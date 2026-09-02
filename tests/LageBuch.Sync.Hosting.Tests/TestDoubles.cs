@@ -44,6 +44,15 @@ internal sealed class FixedClock : IClock
     public DateTimeOffset Now { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
 }
 
+/// <summary>In-memory <see cref="ITrustStore"/> recording thumbprints keyed by host address.</summary>
+internal sealed class InMemoryTrustStore : ITrustStore
+{
+    private readonly Dictionary<string, string> _map = new(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string, string> Thumbprints => _map;
+    public string? GetThumbprint(string hostAddress) => _map.TryGetValue(hostAddress, out var t) ? t : null;
+    public void SaveThumbprint(string hostAddress, string thumbprint) => _map[hostAddress] = thumbprint;
+}
+
 // Minimal service doubles for constructing ViewModels (IncidentWorkspaceViewModel/HomeViewModel).
 internal sealed class NoTicker : ITicker
 {

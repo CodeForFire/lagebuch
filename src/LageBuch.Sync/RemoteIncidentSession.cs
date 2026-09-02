@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Serialization;
 using LageBuch.Domain;
@@ -75,8 +76,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     /// <summary>
     /// Version-handshakes, fetches the initial snapshot, and opens the push channel. Throws
-    /// <see cref="PinRejectedException"/> when the host refuses the share PIN,
-    /// <see cref="VersionMismatchException"/> on a version mismatch, and
+    /// <see cref="PinRejectedException"/> when the host refuses the share PIN (either a wrong/missing
+    /// PIN, i.e. a 401, or a rate-limited one, i.e. a 429 after too many failed attempts),
+    /// <see cref="VersionMismatchException"/> on a version mismatch,
+    /// <see cref="CertificateChangedException"/> when the host presents a certificate that differs
+    /// from the one previously trusted for that address, and
     /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable.
     /// </summary>
     /// <param name="host">The host's Tailscale/LAN address to dial.</param>
@@ -92,20 +96,49 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// supply it (a folder under the app's data/cache dir). Null disables caching — bytes are
     /// re-fetched from the host on every call, which is correct, just not free.
     /// </param>
+    /// <param name="trustStore">
+    /// Optional store of trusted TLS thumbprints, keyed by host address, driving Trust-on-First-Use:
+    /// on first contact the presented certificate's thumbprint is saved and accepted; on a later
+    /// connect the host's certificate is accepted only if its thumbprint still matches the saved one,
+    /// otherwise <see cref="CertificateChangedException"/> is thrown. When null the host's (self-signed)
+    /// certificate is accepted as-is, preserving the pre-TOFU behavior.
+    /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
     public static async Task<RemoteIncidentSession> ConnectAsync(
-        string host,
-        SessionOperator op,
-        string localVersion,
-        IUiDispatcher ui,
-        string? pin = null,
-        int port = SyncProtocol.Port,
-        IRetryPolicy? reconnectPolicy = null,
-        string? cacheRoot = null,
-        CancellationToken ct = default)
+        string host, SessionOperator op, string localVersion, IUiDispatcher ui, string? pin = null,
+        int port = SyncProtocol.Port, IRetryPolicy? reconnectPolicy = null, string? cacheRoot = null,
+        ITrustStore? trustStore = null, CancellationToken ct = default)
     {
-        var baseUri = new Uri($"http://{host}:{port}");
-        var http = new HttpClient { BaseAddress = baseUri };
+        var baseUri = new Uri($"https://{host}:{port}");
+
+        // A single handler backs both the HttpClient and the SignalR hub connection, so they agree on
+        // TLS validation. With a trust store, pin the presented cert via Trust-on-First-Use; without
+        // one, accept any cert (the host serves a fresh self-signed cert per share session, so it is
+        // never in the OS trust store — accepting it is what keeps the pre-TOFU path working). A
+        // certificate that differs from the previously-trusted one throws CertificateChangedException
+        // from inside the callback; the connect await surfaces it (§ P0 #2).
+#pragma warning disable CA2000 // The handler's lifetime is taken on by the HttpClient below (disposed in DisposeAsync after the hub), so an unconditional using would dispose it while the hub's long-lived transport was still using it.
+        var handler = new HttpClientHandler { CheckCertificateRevocationList = true };
+        if (trustStore is not null)
+            handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
+            {
+                if (cert is null)
+                    return false;
+                var thumbprint = Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256));
+                var known = trustStore.GetThumbprint(host);
+                if (known is null)
+                {
+                    trustStore.SaveThumbprint(host, thumbprint);
+                    return true;
+                }
+                if (string.Equals(known, thumbprint, StringComparison.OrdinalIgnoreCase))
+                    return true;
+                throw new CertificateChangedException(host);
+            };
+        else
+            handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+#pragma warning restore CA2000
+        var http = new HttpClient(handler) { BaseAddress = baseUri };
         if (!string.IsNullOrEmpty(pin))
         {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
@@ -115,12 +148,27 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         {
             // The PIN gates every endpoint, so the first request already reflects it: a 401 means the
             // PIN is wrong/missing — reported as such before the version compare (auth precedes content).
-            var versionResponse = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute), ct);
+            // A cert that differs from the trusted one makes the TLS handshake fail: .NET wraps the
+            // CertificateChangedException the callback threw in an HttpRequestException, so unwrap and
+            // rethrow it so the cert change surfaces as its typed exception, not an opaque HTTP error.
+            HttpResponseMessage versionResponse;
+            try
+            {
+                versionResponse = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute), ct);
+            }
+            catch (HttpRequestException ex) when (FindInner<CertificateChangedException>(ex) is { } certChanged)
+            {
+                throw certChanged;
+            }
             if (versionResponse.StatusCode == HttpStatusCode.Unauthorized)
             {
                 throw new PinRejectedException();
             }
-
+            if (versionResponse.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                var retryAfter = versionResponse.Headers.RetryAfter?.Delta?.TotalSeconds ?? 60;
+                throw new PinRejectedException($"Zu viele Fehlversuche. Bitte {retryAfter:F0}s warten.");
+            }
             versionResponse.EnsureSuccessStatusCode();
 
             var hostVersion = SyncJson.Deserialize<VersionInfo>(await versionResponse.Content.ReadAsStringAsync(ct)).Version;
@@ -139,6 +187,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     {
                         o.Headers.Add(SyncProtocol.PinHeader, pin);
                     }
+                    o.HttpMessageHandlerFactory = _ => handler;
                 })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
@@ -391,6 +440,17 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     private async Task ResyncAsync() =>
         OnSnapshot(SyncJson.Deserialize<IncidentSnapshot>(await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))));
+
+    // .NET wraps an exception thrown inside ServerCertificateCustomValidationCallback in an
+    // HttpRequestException, keeping it as an inner cause rather than letting it propagate as-is; walk
+    // the inner chain so the typed CertificateChangedException can be surfaced to the caller.
+    private static TException? FindInner<TException>(Exception ex) where TException : Exception
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e is TException t)
+                return t;
+        return null;
+    }
 
     public async ValueTask DisposeAsync()
     {
