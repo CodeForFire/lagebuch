@@ -36,7 +36,7 @@ public class IncidentWorkspaceViewModelTests
     [Fact]
     public async Task Toggling_sharing_on_starts_the_host_and_shows_its_hint()
     {
-        var host = new FakeHostController(shareHint: "Erreichbar unter 192.168.0.5:5859 · auf diesem Gerät: localhost:5859");
+        var host = new FakeHostController(shareHint: "Erreichbar unter https://192.168.0.5:5859 · auf diesem Gerät: https://localhost:5859");
         var vm = EditableWorkspace(host);
 
         await vm.ToggleSharingCommand.ExecuteAsync(null);
@@ -708,7 +708,7 @@ internal sealed class FakeHostController : IIncidentHostController
 {
     private readonly Exception? _failWith;
 
-    public FakeHostController(string shareHint = "Erreichbar unter 192.168.0.5:5859", Exception? failWith = null)
+    public FakeHostController(string shareHint = "Erreichbar unter https://192.168.0.5:5859", Exception? failWith = null)
     {
         ShareHint = shareHint;
         _failWith = failWith;
