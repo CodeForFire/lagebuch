@@ -156,7 +156,7 @@ public sealed class IncidentHost : IAsyncDisposable
 
     // Exactly one PIN header, matching the host's, is accepted. A missing/duplicated/mismatched header
     // is refused. The comparison is ordinal — the PIN is a short numeric string, not a secret to defend
-    // against timing analysis over a LAN it is already sent in cleartext on.
+    // against timing analysis over a LAN it is already carried over TLS.
     private bool PinMatches(Microsoft.Extensions.Primitives.StringValues header) =>
         header.Count == 1 && string.Equals(header[0], _pin, StringComparison.Ordinal);
 
