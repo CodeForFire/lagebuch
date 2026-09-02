@@ -180,6 +180,45 @@ public class WasserfoerderungTabRenderTests
         }
     }
 
+    // Regression: the zoom +/- buttons are 32px wide but inherit the default Button style's
+    // 16px-per-side padding, leaving 0px for the glyph -- it rendered as an empty square instead
+    // of "+"/"-".
+    [AvaloniaFact]
+    public void Zoom_buttons_render_their_glyph()
+    {
+        var regionDir = CreateRegionFolder();
+        try
+        {
+            var masterData = WorkspaceRenderHelper.MasterData() with
+            {
+                Einsatzgebiet = new Einsatzgebiet("Testgebiet", regionDir),
+            };
+            var (window, vm, _) = ShowWorkspace(masterData);
+
+            Tabs(window).SelectedIndex = 9; // WASSERFÖRDERUNG
+            Dispatcher.UIThread.RunJobs();
+            vm.Wasserfoerderung.IsMapMode = true;
+            Dispatcher.UIThread.RunJobs();
+
+            var view = (IncidentWorkspaceView)window.Content!;
+            var zoomButtons = view.GetVisualDescendants().OfType<Button>()
+                .Where(b => b.Content as string is "−" or "+").ToList();
+
+            Assert.Equal(2, zoomButtons.Count);
+            foreach (var button in zoomButtons)
+            {
+                var textBlock = button.GetVisualDescendants().OfType<TextBlock>().Single();
+                Assert.True(
+                    textBlock.Bounds.Width > 0,
+                    $"Zoom button '{button.Content}' glyph has zero width (Padding={button.Padding}, Bounds={button.Bounds}).");
+            }
+        }
+        finally
+        {
+            Directory.Delete(regionDir, recursive: true);
+        }
+    }
+
     // Regression for a real layout bug: at a window short/narrow enough that the DataGrid's
     // share of the DockPanel collapses to zero, the Bottom-docked Map Border (later in Z-order)
     // rendered on top of and overlapping the mode-toggle buttons above it, and the Karte input

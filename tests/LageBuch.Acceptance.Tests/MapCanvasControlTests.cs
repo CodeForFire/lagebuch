@@ -1,9 +1,13 @@
+using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.App.Shared.Controls;
@@ -78,6 +82,54 @@ public class MapCanvasControlTests
         using var frame = window.CaptureRenderedFrame();
 
         Assert.NotNull(frame);
+    }
+
+    // Regression: RoutePoints is bound to the VM's live ObservableCollection<GeoPoint>
+    // (WasserfoerderungView.axaml), which is mutated in place -- Add/RemoveAt/Clear -- never
+    // reassigned. AffectsRender only reacts to the property's own value (the collection reference)
+    // changing, so a newly drawn point did not repaint until something unrelated invalidated the
+    // control. This asserts the actually-composited pixel, not just VM state, since a forced
+    // re-render (e.g. CaptureRenderedFrame after a resize) would mask the bug.
+    [AvaloniaFact]
+    public void Mutating_the_bound_RoutePoints_collection_in_place_repaints_without_reassigning_the_property()
+    {
+        var points = new ObservableCollection<GeoPoint>();
+        var control = new MapCanvasControl
+        {
+            Width = 200,
+            Height = 200,
+            CenterLatitude = 48.0,
+            CenterLongitude = 11.0,
+            Zoom = 15,
+            RoutePoints = points,
+        };
+        var window = new Window { Content = control, Width = 200, Height = 200 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        using (var before = window.CaptureRenderedFrame()!)
+        {
+            Assert.NotEqual(Colors.OrangeRed, SamplePixel(before, 100, 100));
+        }
+
+        // Same collection instance, mutated in place -- exactly how the real binding works.
+        points.Add(new GeoPoint(48.0, 11.0)); // == control's center -> draws exactly at (100,100)
+        Dispatcher.UIThread.RunJobs();
+
+        using var after = window.CaptureRenderedFrame()!;
+        Assert.Equal(Colors.OrangeRed, SamplePixel(after, 100, 100));
+    }
+
+    private static Color SamplePixel(WriteableBitmap frame, int x, int y)
+    {
+        using var buffer = frame.Lock();
+        Assert.Equal(PixelFormat.Rgba8888, buffer.Format);
+        var offset = (y * buffer.RowBytes) + (x * 4);
+        var r = Marshal.ReadByte(buffer.Address, offset);
+        var g = Marshal.ReadByte(buffer.Address, offset + 1);
+        var b = Marshal.ReadByte(buffer.Address, offset + 2);
+        var a = Marshal.ReadByte(buffer.Address, offset + 3);
+        return Color.FromArgb(a, r, g, b);
     }
 
     // #150 follow-up: zooming past a tile source's actual max detail must still draw something

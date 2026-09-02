@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
@@ -50,6 +51,8 @@ public sealed class MapCanvasControl : Control
     {
         AffectsRender<MapCanvasControl>(
             TileSourceProperty, CenterLatitudeProperty, CenterLongitudeProperty, ZoomProperty, RoutePointsProperty);
+
+        RoutePointsProperty.Changed.AddClassHandler<MapCanvasControl>((control, e) => control.OnRoutePointsChanged(e));
     }
 
     // Cumulative pinch scale since the gesture started (Avalonia.Input.Gestures.PinchEvent reports
@@ -103,6 +106,26 @@ public sealed class MapCanvasControl : Control
         get => GetValue(RoutePointsProperty);
         set => SetValue(RoutePointsProperty, value);
     }
+
+    // RoutePoints is bound to the VM's live ObservableCollection<GeoPoint> (see
+    // WasserfoerderungView.axaml), which is mutated in place -- Add/RemoveAt/Clear -- rather than
+    // replaced with a new instance. AffectsRender only reacts to the RoutePoints property's own
+    // value (the collection reference) changing, so without this a newly drawn point would not
+    // repaint until something unrelated happened to invalidate the visual.
+    private void OnRoutePointsChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is INotifyCollectionChanged oldCollection)
+        {
+            oldCollection.CollectionChanged -= OnRoutePointsCollectionChanged;
+        }
+
+        if (e.NewValue is INotifyCollectionChanged newCollection)
+        {
+            newCollection.CollectionChanged += OnRoutePointsCollectionChanged;
+        }
+    }
+
+    private void OnRoutePointsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => InvalidateVisual();
 
     /// <summary>Invoked with the clicked point's <see cref="GeoPoint"/> on a left click.</summary>
     public ICommand? PointClickedCommand

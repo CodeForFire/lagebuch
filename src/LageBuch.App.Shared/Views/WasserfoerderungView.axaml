@@ -103,8 +103,8 @@
               <HeaderedContentControl Classes="field" Header="ANSPRECHPARTNER">
                 <TextBox Width="150" Text="{Binding NewAnsprechpartner}" />
               </HeaderedContentControl>
-              <Button Content="−" Width="32" Command="{Binding ZoomOutCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
-              <Button Content="+" Width="32" Command="{Binding ZoomInCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+              <Button Content="−" Width="32" Padding="0" Command="{Binding ZoomOutCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+              <Button Content="+" Width="32" Padding="0" Command="{Binding ZoomInCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
               <Button Content="ZENTRIEREN" Command="{Binding ResetMapViewCommand}"
                       VerticalAlignment="Bottom" Margin="0,0,0,1" />
               <Button Content="RÜCKGÄNGIG" Command="{Binding UndoLastRoutePointCommand}"
