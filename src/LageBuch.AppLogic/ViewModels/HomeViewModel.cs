@@ -37,8 +37,13 @@ public sealed partial class HomeViewModel : ObservableObject
     // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
+    // Remembers the TLS thumbprint of each host a device first joined (Trust-on-First-Use), so a
+    // re-join that presents a different certificate can be flagged as a potential MITM/duplicate.
+    // Null (most tests) means "trust nothing and never record" -- the join then fails on any cert
+    // mismatch but has no store to compare against, so every first join succeeds without TOFU.
+    private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -53,6 +58,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         _lastSaveFolder = lastSaveFolder;
         _attachmentCacheRoot = attachmentCacheRoot;
+        _trustStore = trustStore;
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -206,7 +212,7 @@ public sealed partial class HomeViewModel : ObservableObject
         try
         {
             var session = await RemoteIncidentSession.ConnectAsync(
-                host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port, cacheRoot: _attachmentCacheRoot);
+                host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port, cacheRoot: _attachmentCacheRoot, trustStore: _trustStore);
             JoinError = null;
             OpenRemoteWorkspace(session, _masterData.Get());
         }
@@ -218,6 +224,13 @@ public sealed partial class HomeViewModel : ObservableObject
         catch (VersionMismatchException ex)
         {
             // Distinct, explicit message: mixed versions across an un-auto-updated fleet are expected (§7).
+            JoinError = ex.Message;
+        }
+        catch (CertificateChangedException ex)
+        {
+            // The host presented a different TLS cert than the one previously trusted for this address
+            // (Trust-on-First-Use violation, § P0 #2) — a restart with a new ephemeral cert, or a
+            // man-in-the-middle. Surface the German "geändert" message so the user can reset trust.
             JoinError = ex.Message;
         }
         catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
