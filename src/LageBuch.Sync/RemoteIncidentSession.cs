@@ -105,9 +105,16 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
     public static async Task<RemoteIncidentSession> ConnectAsync(
-        string host, SessionOperator op, string localVersion, IUiDispatcher ui, string? pin = null,
-        int port = SyncProtocol.Port, IRetryPolicy? reconnectPolicy = null, string? cacheRoot = null,
-        ITrustStore? trustStore = null, CancellationToken ct = default)
+        string host,
+        SessionOperator op,
+        string localVersion,
+        IUiDispatcher ui,
+        string? pin = null,
+        int port = SyncProtocol.Port,
+        IRetryPolicy? reconnectPolicy = null,
+        string? cacheRoot = null,
+        ITrustStore? trustStore = null,
+        CancellationToken ct = default)
     {
         var baseUri = new Uri($"https://{host}:{port}");
 
@@ -120,10 +127,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 #pragma warning disable CA2000 // The handler's lifetime is taken on by the HttpClient below (disposed in DisposeAsync after the hub), so an unconditional using would dispose it while the hub's long-lived transport was still using it.
         var handler = new HttpClientHandler { CheckCertificateRevocationList = true };
         if (trustStore is not null)
+        {
             handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
             {
                 if (cert is null)
+                {
                     return false;
+                }
+
                 var thumbprint = Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256));
                 var known = trustStore.GetThumbprint(host);
                 if (known is null)
@@ -131,12 +142,19 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     trustStore.SaveThumbprint(host, thumbprint);
                     return true;
                 }
+
                 if (string.Equals(known, thumbprint, StringComparison.OrdinalIgnoreCase))
+                {
                     return true;
+                }
+
                 throw new CertificateChangedException(host);
             };
+        }
         else
+        {
             handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+        }
 #pragma warning restore CA2000
         var http = new HttpClient(handler) { BaseAddress = baseUri };
         if (!string.IsNullOrEmpty(pin))
@@ -160,15 +178,18 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             {
                 throw certChanged;
             }
+
             if (versionResponse.StatusCode == HttpStatusCode.Unauthorized)
             {
                 throw new PinRejectedException();
             }
+
             if (versionResponse.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 var retryAfter = versionResponse.Headers.RetryAfter?.Delta?.TotalSeconds ?? 60;
                 throw new PinRejectedException($"Zu viele Fehlversuche. Bitte {retryAfter:F0}s warten.");
             }
+
             versionResponse.EnsureSuccessStatusCode();
 
             var hostVersion = SyncJson.Deserialize<VersionInfo>(await versionResponse.Content.ReadAsStringAsync(ct)).Version;
@@ -187,6 +208,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     {
                         o.Headers.Add(SyncProtocol.PinHeader, pin);
                     }
+
                     o.HttpMessageHandlerFactory = _ => handler;
                 })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
@@ -444,11 +466,17 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // .NET wraps an exception thrown inside ServerCertificateCustomValidationCallback in an
     // HttpRequestException, keeping it as an inner cause rather than letting it propagate as-is; walk
     // the inner chain so the typed CertificateChangedException can be surfaced to the caller.
-    private static TException? FindInner<TException>(Exception ex) where TException : Exception
+    private static TException? FindInner<TException>(Exception ex)
+        where TException : Exception
     {
         for (var e = ex; e is not null; e = e.InnerException)
+        {
             if (e is TException t)
+            {
                 return t;
+            }
+        }
+
         return null;
     }
 

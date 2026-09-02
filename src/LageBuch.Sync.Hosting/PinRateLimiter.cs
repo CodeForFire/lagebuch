@@ -25,7 +25,9 @@ internal sealed class PinRateLimiter
     {
         retryAfterSeconds = 0;
         if (!_attempts.TryGetValue(ip, out var state))
+        {
             return false;
+        }
 
         var elapsed = (_time.GetUtcNow() - state.LastFailure).TotalSeconds;
         var delay = Math.Min(BackoffSeconds(state.Failures), MaxBackoffSeconds);
@@ -34,11 +36,13 @@ internal sealed class PinRateLimiter
             retryAfterSeconds = (int)Math.Ceiling(delay - elapsed);
             return true;
         }
+
         return false;
     }
 
     public void RecordFailure(string ip) =>
-        _attempts.AddOrUpdate(ip,
+        _attempts.AddOrUpdate(
+            ip,
             _ => new State(1, _time.GetUtcNow()),
             (_, s) => new State(s.Failures + 1, _time.GetUtcNow()));
 

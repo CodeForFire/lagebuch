@@ -52,10 +52,12 @@ public sealed class IncidentHost : IAsyncDisposable
 
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
+
         // Serve TLS with a fresh self-signed cert minted per share session; the client pins it via
         // Trust-on-First-Use (§ P0 #2) rather than the OS trust store.
         (_cert, _) = SyncCertificate.Generate();
         builder.WebHost.UseKestrel(o => o.Listen(bindAddress, port, l => l.UseHttps(_cert)));
+
         // Keep the hub's JSON aligned with SyncJson: enums as strings, web (camelCase) naming.
         builder.Services.AddSignalR().AddJsonProtocol(o =>
             o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -77,6 +79,7 @@ public sealed class IncidentHost : IAsyncDisposable
                 context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 return;
             }
+
             await next();
         });
 
@@ -94,6 +97,7 @@ public sealed class IncidentHost : IAsyncDisposable
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
+
             _rateLimiter.RecordSuccess(ip);
             await next();
         });

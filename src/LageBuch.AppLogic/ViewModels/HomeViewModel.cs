@@ -37,6 +37,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
+
     // Remembers the TLS thumbprint of each host a device first joined (Trust-on-First-Use), so a
     // re-join that presents a different certificate can be flagged as a potential MITM/duplicate.
     // Null (most tests) means "trust nothing and never record" -- the join then fails on any cert

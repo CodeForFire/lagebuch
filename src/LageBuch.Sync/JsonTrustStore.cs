@@ -34,7 +34,10 @@ public sealed class JsonTrustStore : ITrustStore
     private Dictionary<string, string> Load()
     {
         if (!File.Exists(_path))
+        {
             return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
         try
         {
             return JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(_path))

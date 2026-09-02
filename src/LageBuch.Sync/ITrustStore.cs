@@ -7,5 +7,6 @@ namespace LageBuch.Sync;
 public interface ITrustStore
 {
     string? GetThumbprint(string hostAddress);
+
     void SaveThumbprint(string hostAddress, string thumbprint);
 }
