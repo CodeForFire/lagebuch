@@ -59,9 +59,15 @@ public sealed partial class AboutViewModel : ObservableObject
     private async Task OpenRepositoryAsync()
     {
         ErrorMessage = null;
+        if (!HttpUrlValidator.TryGetHttpUri(RepositoryUrl, out var uri))
+        {
+            ErrorMessage = $"„{RepositoryUrl}“ hat keine gültige http(s)-Adresse.";
+            return;
+        }
+
         try
         {
-            await _dialogs.OpenUrlAsync(RepositoryUrl);
+            await _dialogs.OpenUrlAsync(uri.AbsoluteUri);
         }
         catch (Exception ex)
         {

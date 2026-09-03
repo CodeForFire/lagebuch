@@ -42,8 +42,7 @@ public sealed partial class LinksViewModel : ObservableObject
     {
         ErrorMessage = null;
         var candidate = link.Url.Contains("://", StringComparison.Ordinal) ? link.Url : $"https://{link.Url}";
-        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (!HttpUrlValidator.TryGetHttpUri(candidate, out var uri))
         {
             ErrorMessage = $"„{link.Name}“ hat keine gültige http(s)-Adresse.";
             return;
