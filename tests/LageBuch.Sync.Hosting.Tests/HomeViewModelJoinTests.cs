@@ -272,5 +272,11 @@ public class HomeViewModelJoinTests
         Assert.Null(opened);
         Assert.NotNull(vm.JoinError);
         Assert.Contains("Stammdaten", vm.JoinError, StringComparison.Ordinal);
+
+        // The property that actually matters: ConnectAsync had already opened the hub connection
+        // before the parse failed, so the banner alone doesn't prove anything -- the same assertions
+        // above would pass just as well if the session were leaked. Only the server observing the
+        // connection close proves it was torn down rather than abandoned (#183).
+        await host.WaitForClientDisconnectAsync(TimeSpan.FromSeconds(10));
     }
 }
