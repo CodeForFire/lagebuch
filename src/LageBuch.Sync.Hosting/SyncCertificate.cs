@@ -37,7 +37,13 @@ public static class SyncCertificate
                 new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") },
                 critical: false));
 
-        var cert = request.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddHours(24));
+        using var ephemeral = request.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddHours(24));
+
+        // CreateSelfSigned's private key is ephemeral (in-memory CNG on Windows, not a persisted key
+        // container). Kestrel's Windows (Schannel) TLS server handshake can't use that key as-is and
+        // aborts the connection before the client even sees an alert — round-tripping through PFX
+        // gives the cert a private key SslStream can actually use for the handshake on every platform.
+        var cert = X509CertificateLoader.LoadPkcs12(ephemeral.Export(X509ContentType.Pfx), password: null);
         var thumbprint = Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256));
         return (cert, thumbprint);
     }
