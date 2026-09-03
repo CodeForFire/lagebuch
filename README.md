@@ -89,8 +89,8 @@ The packages are **not code-signed**, so the OS warns on first launch:
 - **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click
   the app → Open** once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
 - **Linux** — `sudo dpkg -i lagebuch_*.deb` (or `sudo apt install ./lagebuch_*.deb`).
-- **Android** — open the `.apk`; enable *install from unknown sources* for this
-  app once when prompted.
+- **Android** — requires Android 6.0 (API 23) or newer; open the `.apk`;
+  enable *install from unknown sources* for this app once when prompted.
 
 The macOS `.dmg` is built on demand rather than on every tag: run the **Release**
 workflow manually (*Actions → Release → Run workflow*) with the release version,

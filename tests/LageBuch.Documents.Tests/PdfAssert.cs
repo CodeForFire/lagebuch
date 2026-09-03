@@ -23,5 +23,5 @@ internal static class PdfAssert
     /// parser — good enough to assert "the merge added N pages" without a parsing dependency.
     /// </summary>
     public static int CountPages(byte[] bytes) =>
-        Regex.Matches(Encoding.Latin1.GetString(bytes), @"/Type\s*/Page(?!s)").Count;
+        Regex.Count(Encoding.Latin1.GetString(bytes), @"/Type\s*/Page(?!s)");
 }
