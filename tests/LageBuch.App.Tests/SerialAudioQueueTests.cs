@@ -78,8 +78,11 @@ public class SerialAudioQueueTests
         queue.Enqueue(() => Thread.Sleep(TimeSpan.FromSeconds(30))); // simulates a hung player
         queue.Enqueue(() => laterRan.Set());
 
+        // The later action's own Task.Run still has to wait its turn for a thread-pool thread,
+        // which under CI load can take longer than the 200ms watchdog itself — same 5s budget as
+        // this file's other CountdownEvent/ManualResetEventSlim waits, not a tighter one.
         Assert.True(
-            laterRan.Wait(TimeSpan.FromSeconds(2)),
+            laterRan.Wait(TimeSpan.FromSeconds(5)),
             "later action never ran; the stuck item wedged the queue");
     }
 
