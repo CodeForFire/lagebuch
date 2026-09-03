@@ -69,11 +69,11 @@ public sealed class IncidentStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => IncidentRepository.TryReadState(path);
 
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) =>
-        _fileStore.SaveBytes(path, storageFileName, bytes);
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        _fileStore.SaveBytesAsync(path, storageFileName, bytes, cancellationToken);
 
-    public byte[]? TryReadFileBytes(string path, string storageFileName) =>
-        _fileStore.TryReadBytes(path, storageFileName);
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        _fileStore.TryReadBytesAsync(path, storageFileName, cancellationToken);
 
     private void RunWriter()
     {

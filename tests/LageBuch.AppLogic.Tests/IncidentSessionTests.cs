@@ -85,6 +85,31 @@ public class IncidentSessionTests
     }
 
     [Fact]
+    public async Task AddFileAsync_does_not_block_the_caller_while_the_file_write_is_in_flight()
+    {
+        // issue #167 P1 #1: the file write must be genuinely async — not a synchronous write
+        // masquerading as async behind Task.CompletedTask, which would have already finished (and
+        // blocked whatever thread called AddFileAsync) by the time this method's Task is observed.
+        var release = new TaskCompletionSource();
+        var store = new DelayedFileWriteStore(release.Task);
+        var session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+
+        var addTask = session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+
+        Assert.False(addTask.IsCompleted); // still awaiting the (currently stuck) file write
+        release.SetResult();
+        await addTask;
+
+        Assert.Single(session.Incident.Files);
+    }
+
+    [Fact]
     public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
     {
         var store = new FakeStore();
@@ -317,9 +342,44 @@ internal sealed class FakeStore : IIncidentStore
 
     private readonly Dictionary<string, byte[]> _files = new();
 
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
+    {
+        _files[$"{path}/{storageFileName}"] = bytes;
+        return Task.CompletedTask;
+    }
 
-    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
+
+    public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+}
+
+// SaveFileBytesAsync doesn't complete until the caller-supplied gate task does — lets a test prove
+// its caller isn't blocked synchronously waiting on the write (issue #167 P1 #1).
+internal sealed class DelayedFileWriteStore : IIncidentStore
+{
+    private readonly Task _gate;
+    private readonly Dictionary<string, Incident> _saved = new();
+
+    public DelayedFileWriteStore(Task gate) => _gate = gate;
+
+    public void Save(string path, Incident incident) => _saved[path] = incident;
+
+    public Task FlushAsync() => Task.CompletedTask;
+
+    public Incident Load(string path) => _saved[path];
+
+    public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
+
+    public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        await _gate;
+
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
 
     public event Action<Exception>? SaveFailed
     {

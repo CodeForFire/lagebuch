@@ -29,13 +29,15 @@ public interface IIncidentStore
     /// Writes an attached file's bytes to storage alongside the incident at <paramref name="path"/>,
     /// keyed by <paramref name="storageFileName"/> (see <c>IncidentFile.StorageFileName</c>). Kept
     /// out of <see cref="Save"/>'s SQLite tables — see <c>LageBuch.Persistence.IncidentFileStore</c>
-    /// for why.
+    /// for why. Genuinely async (real disk I/O, not queued like <see cref="Save"/>) — see issue #167
+    /// P1 #1: unlike <see cref="Save"/>, a file write has no ordering dependency on other writes, so
+    /// real async I/O is enough to free the caller without a second queuing mechanism.
     /// </summary>
-    void SaveFileBytes(string path, string storageFileName, byte[] bytes);
+    Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default);
 
     /// <summary>Null when the bytes are unavailable (never written, or storage unreachable) —
     /// never throws, so a caller degrades quietly.</summary>
-    byte[]? TryReadFileBytes(string path, string storageFileName);
+    Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Raised on the background writer thread when a queued <see cref="Save"/> throws (the queue
