@@ -29,7 +29,7 @@ its argument straight to `dotnet`:
 
 ```bash
 docker run --rm -v "$PWD":/src lagebuch-android-build \
-  build src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Debug -f net9.0-android
+  build src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Debug -f net10.0-android
 ```
 
 Produce an installable `.apk` (add `EmbedAssembliesIntoApk=true` for a Debug
@@ -39,16 +39,16 @@ and a sideloaded APK will crash at startup with "No assemblies found"):
 
 ```bash
 docker run --rm -v "$PWD":/src lagebuch-android-build \
-  publish src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Debug -f net9.0-android \
+  publish src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Debug -f net10.0-android \
   -p:AndroidPackageFormat=apk -p:EmbedAssembliesIntoApk=true
 ```
 
 The APK lands at
-`src/LageBuch.App.Android/bin/Debug/net9.0-android/de.codeforfire.lagebuch-Signed.apk`.
+`src/LageBuch.App.Android/bin/Debug/net10.0-android/de.codeforfire.lagebuch-Signed.apk`.
 Install it to a running emulator or connected device with:
 
 ```bash
-adb install -r src/LageBuch.App.Android/bin/Debug/net9.0-android/de.codeforfire.lagebuch-Signed.apk
+adb install -r src/LageBuch.App.Android/bin/Debug/net10.0-android/de.codeforfire.lagebuch-Signed.apk
 ```
 
 ## Notes
@@ -58,7 +58,7 @@ adb install -r src/LageBuch.App.Android/bin/Debug/net9.0-android/de.codeforfire.
   `sdkmanager`/`android sdk` invocation fails oddly, check
   https://developer.android.com/studio#command-tools for the current build
   and bump it.
-- `platforms/android-35` + `build-tools/35.0.0` are installed alongside 34
-  because `Microsoft.Android.Sdk.Linux` 35.x compiles against the latest API
-  level it bundles regardless of the app's `targetSdkVersion` (error
-  `XA5207` otherwise).
+- `platforms/android-36` + `build-tools/36.0.0` are installed alongside 34
+  because the .NET 10 Android workload compiles against the latest API
+  level it bundles for `net10.0-android36.0`, regardless of the app's
+  `targetSdkVersion` (error `XA5207` otherwise).
