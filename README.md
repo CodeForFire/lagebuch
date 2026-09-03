@@ -109,10 +109,28 @@ dotnet build
 dotnet test
 ```
 
+If your machine's JDK is newer than JDK 21, the Android head will fail to
+build (`Microsoft.Android.Sdk` rejects newer JDKs outright — error
+`XA0030`). Use the Docker-based build in [`docker/`](docker/) instead.
+
 ## Run
 
 ```bash
 dotnet run --project src/LageBuch.App/LageBuch.App.csproj
+```
+
+## Common tasks
+
+A `Makefile` wraps the commands above plus the Android and packaging ones.
+Run `make` for the full list:
+
+```bash
+make build            # everything except the Android head
+make test             # PROJECT=... and/or FILTER=... to narrow
+make run              # the desktop app
+make apk              # build an installable APK in Docker
+make run-android      # boot the emulator, install and launch
+make package-linux    # build a local .deb
 ```
 
 ## Releasing (maintainers)

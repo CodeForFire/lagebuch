@@ -1,0 +1,23 @@
+{
+  "solution": {
+    "path": "LageBuch.sln",
+    "projects": [
+      "src/LageBuch.App.Shared/LageBuch.App.Shared.csproj",
+      "src/LageBuch.App/LageBuch.App.csproj",
+      "src/LageBuch.AppLogic/LageBuch.AppLogic.csproj",
+      "src/LageBuch.Documents/LageBuch.Documents.csproj",
+      "src/LageBuch.Domain/LageBuch.Domain.csproj",
+      "src/LageBuch.Persistence/LageBuch.Persistence.csproj",
+      "src/LageBuch.Sync.Hosting/LageBuch.Sync.Hosting.csproj",
+      "src/LageBuch.Sync/LageBuch.Sync.csproj",
+      "tests/LageBuch.Acceptance.Tests/LageBuch.Acceptance.Tests.csproj",
+      "tests/LageBuch.App.Tests/LageBuch.App.Tests.csproj",
+      "tests/LageBuch.AppLogic.Tests/LageBuch.AppLogic.Tests.csproj",
+      "tests/LageBuch.Documents.Tests/LageBuch.Documents.Tests.csproj",
+      "tests/LageBuch.Domain.Tests/LageBuch.Domain.Tests.csproj",
+      "tests/LageBuch.Persistence.Tests/LageBuch.Persistence.Tests.csproj",
+      "tests/LageBuch.Sync.Hosting.Tests/LageBuch.Sync.Hosting.Tests.csproj",
+      "tests/LageBuch.Sync.Tests/LageBuch.Sync.Tests.csproj"
+    ]
+  }
+}

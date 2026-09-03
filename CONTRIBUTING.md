@@ -15,6 +15,10 @@ contribution, from a typo fix to a new feature, is welcome.
   dotnet workload install android
   ```
 
+  If your JDK is newer than JDK 21, building the Android head will fail
+  (`Microsoft.Android.Sdk` rejects it — error `XA0030`); use the
+  Docker-based build in [`docker/`](docker/) instead.
+
 Build and test:
 
 ```bash
@@ -27,6 +31,12 @@ Run the desktop app:
 ```bash
 dotnet run --project src/LageBuch.App/LageBuch.App.csproj
 ```
+
+The repo's `Makefile` wraps these and the Android/packaging commands — run
+`make` for the list. Note that `make build` and `make test` use
+`LageBuch.Desktop.slnf`, the solution without the Android head, so they work
+on machines whose JDK is too new to build it; `make build-all` covers
+everything.
 
 ## Workflow
 
