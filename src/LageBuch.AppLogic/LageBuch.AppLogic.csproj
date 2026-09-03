@@ -11,6 +11,10 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="LageBuch.AppLogic.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
