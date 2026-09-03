@@ -5,7 +5,8 @@
 
        Subtrees that intentionally deviate keep their own Directory.Packages.props
        (nearest file wins; they import this one):
-         - src/LageBuch.App.Android            (Avalonia 11.x head, pending lockstep upgrade)
+         - src/LageBuch.App.Android            (Avalonia.Android is Android-only, never referenced
+                                                 by the desktop projects, plus two AndroidX floors)
          - tests/LageBuch.Acceptance.Tests     (xunit.v3 stack)
        Single-reference exceptions use VersionOverride in the .csproj. -->
   <PropertyGroup>
