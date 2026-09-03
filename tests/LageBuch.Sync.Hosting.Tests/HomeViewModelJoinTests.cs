@@ -2,6 +2,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Sync.Hosting.Tests;
 
@@ -291,5 +292,107 @@ public class HomeViewModelJoinTests
         // above would pass just as well if the session were leaked. Only the server observing the
         // connection close proves it was torn down rather than abandoned (#183).
         await host.WaitForClientDisconnectAsync(TimeSpan.FromSeconds(10));
+    }
+
+    // #182: the connect dialog (MainWindowViewModel.PendingPrompt) must stay open across a failed
+    // join, with an inline error, instead of closing and forcing the operator to retype everything.
+    private static MainWindowViewModel MainWindowVm(HomeViewModel home) =>
+        new(home, new MasterDataEditorViewModel(new EmptyMasterData(), new NoDialogs(), new NoMasterDataFiles()), new NoDialogs(), "0.1.0");
+
+    [Fact]
+    public async Task Wrong_pin_keeps_the_join_dialog_open_with_the_error_and_clears_only_the_pin()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        var home = Home();
+        var vm = MainWindowVm(home);
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.Host = $"127.0.0.1:{port}";
+        prompt.Pin = "9999";
+        prompt.OperatorName = "Client";
+        prompt.ConfirmCommand.Execute(null);
+
+        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+
+        Assert.NotNull(vm.PendingPrompt); // dialog stayed open
+        Assert.Same(prompt, vm.PendingPrompt);
+        Assert.Equal("Falsche PIN.", prompt.ErrorMessage);
+        Assert.Equal(string.Empty, prompt.Pin);
+        Assert.Equal($"127.0.0.1:{port}", prompt.Host); // Host/Name kept, not lost
+        Assert.Equal("Client", prompt.OperatorName);
+        Assert.Null(home.JoinError); // ownership moved to the dialog -- no duplicate Home banner
+    }
+
+    [Fact]
+    public async Task A_successful_join_still_closes_the_dialog()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var vm = MainWindowVm(Home());
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.Host = $"127.0.0.1:{port}";
+        prompt.Pin = TestHost.DefaultPin;
+        prompt.OperatorName = "Client";
+        prompt.ConfirmCommand.Execute(null);
+
+        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        await ((IncidentWorkspaceViewModel)vm.CurrentView!).LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Resetting_trust_from_inside_the_dialog_clears_the_banner_and_lets_a_retry_join()
+    {
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var home = Home(trust);
+        var vm = MainWindowVm(home);
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.Host = $"127.0.0.1:{port}";
+        prompt.Pin = TestHost.DefaultPin;
+        prompt.OperatorName = "Client";
+        prompt.ConfirmCommand.Execute(null);
+        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+
+        Assert.NotNull(vm.PendingPrompt);
+        Assert.True(prompt.CertificateChanged);
+        Assert.NotNull(prompt.ErrorMessage);
+
+        vm.ResetTrustCommand.Execute(null);
+
+        Assert.Null(prompt.ErrorMessage);
+        Assert.False(prompt.CertificateChanged);
+        Assert.Same(prompt, vm.PendingPrompt); // dialog still open, ready for a retry
+
+        prompt.Pin = TestHost.DefaultPin; // ReportJoinFailure cleared it
+        prompt.ConfirmCommand.Execute(null);
+        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        await ((IncidentWorkspaceViewModel)vm.CurrentView!).LeaveAsync();
+    }
+}
+
+internal sealed class NoMasterDataFiles : IMasterDataFileService
+{
+    public MasterDataSet Read(string path) => MasterDataSet.Empty;
+
+    public void Write(string path, MasterDataSet set)
+    {
     }
 }

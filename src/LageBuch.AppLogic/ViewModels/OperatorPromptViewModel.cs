@@ -23,7 +23,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     // so the joining device says who documents here and which host to reach in one step.
     public bool CollectsHost { get; }
 
-    // The host's Tailscale name or IP, entered only in the join flow. Mandatory there (gates Confirm).
+    // The host's LAN or Tailscale address/name, entered only in the join flow. Mandatory there (gates Confirm).
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private string _host = string.Empty;
@@ -52,6 +52,21 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     [ObservableProperty]
     private string? _keyword;
 
+    // Set while a join attempt is in flight (#182), so Confirm can't be double-clicked mid-request.
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    private bool _isBusy;
+
+    // The failed join's message, shown inline so the dialog can stay open for a retry instead of
+    // closing and losing every field the operator already typed (#182).
+    [ObservableProperty]
+    private string? _errorMessage;
+
+    // True only when the last join failure was a TOFU certificate-changed rejection; drives the
+    // in-dialog "reset trust" button (mirrors HomeViewModel.CanResetTrustedCertificate from #181).
+    [ObservableProperty]
+    private bool _certificateChanged;
+
     private SessionOperator? _result;
 
     public SessionOperator? Result
@@ -61,6 +76,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     }
 
     private bool CanConfirm =>
+        !IsBusy &&
         !string.IsNullOrWhiteSpace(OperatorName) &&
         (!CollectsHost || (!string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(Pin)));
 
@@ -70,9 +86,28 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
         Result = new SessionOperator(OperatorName, OperatorCallSign);
     }
 
+    // Called by the host after a failed join attempt (#182): reports the error inline, clears only
+    // the PIN (Host/Name/Funkrufname stay as typed), and resets Result so the next Confirm() click
+    // produces a fresh non-null value and re-triggers the host's existing Result-changed handler.
+    public void ReportJoinFailure(string message, bool certificateChanged)
+    {
+        ErrorMessage = message;
+        CertificateChanged = certificateChanged;
+        Pin = string.Empty;
+        Result = null;
+    }
+
     // Raised when the operator dismisses the prompt (e.g. Escape). Hosts clear the overlay.
     public event EventHandler? Cancelled;
 
     [RelayCommand]
     private void Cancel() => Cancelled?.Invoke(this, EventArgs.Empty);
+
+    // Raised when the operator asks to reset TOFU trust for the host from within the dialog
+    // (#182), after a CertificateChanged join failure. Hosts relay this to
+    // HomeViewModel.ResetTrustedCertificateCommand, which owns the trust store.
+    public event EventHandler? ResetTrustRequested;
+
+    [RelayCommand]
+    private void ResetTrust() => ResetTrustRequested?.Invoke(this, EventArgs.Empty);
 }

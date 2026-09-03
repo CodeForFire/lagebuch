@@ -121,4 +121,81 @@ public class OperatorPromptViewModelTests
         var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
         Assert.True(vm.ConfirmCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void Busy_prompt_cannot_confirm_even_with_valid_fields()
+    {
+        // While a join attempt is in flight (#182), the Confirm button must not accept a second click.
+        var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1", Pin = "1234" };
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+
+        vm.IsBusy = true;
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Reporting_a_join_failure_clears_the_pin_but_keeps_the_rest()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true)
+        {
+            OperatorName = "Müller",
+            Host = "elw-1",
+            Pin = "9999",
+        };
+
+        vm.ReportJoinFailure("Falsche PIN.", certificateChanged: false);
+
+        Assert.Equal("Falsche PIN.", vm.ErrorMessage);
+        Assert.False(vm.CertificateChanged);
+        Assert.Equal(string.Empty, vm.Pin);
+        Assert.Equal("elw-1", vm.Host);
+        Assert.Equal("Müller", vm.OperatorName);
+    }
+
+    [Fact]
+    public void Reporting_a_certificate_changed_failure_sets_the_flag()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1", Pin = "1234" };
+
+        vm.ReportJoinFailure("Zertifikat geändert.", certificateChanged: true);
+
+        Assert.True(vm.CertificateChanged);
+    }
+
+    [Fact]
+    public void Reporting_a_join_failure_resets_result_so_confirm_can_fire_again()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1", Pin = "9999" };
+        vm.ConfirmCommand.Execute(null);
+        Assert.NotNull(vm.Result);
+
+        vm.ReportJoinFailure("Falsche PIN.", certificateChanged: false);
+        Assert.Null(vm.Result);
+
+        var raised = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(OperatorPromptViewModel.Result))
+            {
+                raised = true;
+            }
+        };
+        vm.Pin = "1234";
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.True(raised);
+        Assert.NotNull(vm.Result);
+    }
+
+    [Fact]
+    public void Reset_trust_command_raises_the_reset_trust_requested_event()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true);
+        var raised = false;
+        vm.ResetTrustRequested += (_, _) => raised = true;
+
+        vm.ResetTrustCommand.Execute(null);
+
+        Assert.True(raised);
+    }
 }

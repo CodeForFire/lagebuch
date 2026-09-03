@@ -18,11 +18,12 @@
         <StackPanel Margin="26,22,26,24" Spacing="6">
           <TextBlock Text="DOKUMENTATION" Classes="overline" />
           <TextBlock Text="Wer dokumentiert?" Classes="display" FontSize="22" Margin="0,0,0,8" />
-          <!-- Join flow only (§6): the host's Tailscale name or IP, entered alongside "who documents
-               here" so a joining device provides both in one prompt. -->
+          <!-- Join flow only (§6): the host's LAN or Tailscale address/name (hosting no longer
+               requires Tailscale, #59 follow-up), entered alongside "who documents here" so a
+               joining device provides both in one prompt. -->
           <StackPanel IsVisible="{Binding CollectsHost}" Spacing="3">
-            <TextBlock Text="GERÄT (TAILSCALE-NAME ODER IP)" Classes="overline" FontSize="10" Margin="0,4,0,3" />
-            <TextBox x:Name="HostBox" PlaceholderText="z. B. elw-1 oder 100.x.y.z" Text="{Binding Host}">
+            <TextBlock Text="GERÄT (NAME ODER IP-ADRESSE)" Classes="overline" FontSize="10" Margin="0,4,0,3" />
+            <TextBox x:Name="HostBox" PlaceholderText="z. B. elw-1 oder 192.168.1.10" Text="{Binding Host}">
               <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
               </TextBox.KeyBindings>
@@ -34,6 +35,26 @@
                 <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
               </TextBox.KeyBindings>
             </TextBox>
+            <!-- #182: a failed join stays on this dialog instead of closing it, reporting the
+                 error here so Host/Name/Funkrufname aren't lost; only the PIN above is cleared. -->
+            <Border x:Name="PromptErrorBanner" Background="#241608"
+                    BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusSm}" Padding="10,8" Margin="0,8,0,0"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="⚠" FontSize="14" VerticalAlignment="Top" Margin="0,0,10,0" />
+                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="PromptErrorMessage" Text="{Binding ErrorMessage}"
+                           FontWeight="SemiBold" TextWrapping="Wrap" FontSize="13"
+                           Foreground="{StaticResource AmberBrush}" />
+                <!-- TOFU cert-changed (#181): the only path to clearing the stale trust entry,
+                     now reachable without leaving this dialog. -->
+                <Button Grid.Row="1" Grid.Column="1" x:Name="PromptResetTrustButton" Classes="ghost"
+                        Content="VERTRAUENSZUORDNUNG ZURÜCKSETZEN" Margin="0,8,0,0" Padding="8,3"
+                        HorizontalAlignment="Left"
+                        Command="{Binding ResetTrustCommand}"
+                        IsVisible="{Binding CertificateChanged}" />
+              </Grid>
+            </Border>
           </StackPanel>
           <TextBlock Text="NAME" Classes="overline" FontSize="10" Margin="0,4,0,3" />
           <TextBox x:Name="OperatorNameBox"

@@ -51,4 +51,39 @@ public class JoinPromptRenderTests
         Assert.True(vm.ConfirmCommand.CanExecute(null)); // host + PIN + name all present
         Capture(window, "join-prompt.png");
     }
+
+    // #182: a failed join now reports its error inline instead of closing the dialog.
+    [AvaloniaFact]
+    public void Join_prompt_shows_the_error_inline_after_a_failed_attempt()
+    {
+        var (window, vm) = ShowJoinPrompt();
+
+        vm.ReportJoinFailure("Falsche PIN.", certificateChanged: false);
+        Dispatcher.UIThread.RunJobs();
+
+        var errorText = window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(t => t.Name == "PromptErrorMessage");
+        Assert.True(errorText.IsVisible);
+        Assert.Equal("Falsche PIN.", errorText.Text);
+
+        var resetTrustButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "PromptResetTrustButton");
+        Assert.False(resetTrustButton.IsVisible); // not a certificate-changed failure
+        Capture(window, "join-prompt-wrong-pin.png");
+    }
+
+    // #182: a TOFU certificate-changed failure additionally offers a reset-trust action in-dialog.
+    [AvaloniaFact]
+    public void Join_prompt_offers_reset_trust_after_a_certificate_changed_failure()
+    {
+        var (window, vm) = ShowJoinPrompt();
+
+        vm.ReportJoinFailure("Zertifikat für elw-1 hat sich geändert.", certificateChanged: true);
+        Dispatcher.UIThread.RunJobs();
+
+        var resetTrustButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "PromptResetTrustButton");
+        Assert.True(resetTrustButton.IsVisible);
+        Capture(window, "join-prompt-cert-changed.png");
+    }
 }
