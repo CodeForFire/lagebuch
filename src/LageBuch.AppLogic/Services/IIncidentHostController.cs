@@ -1,3 +1,5 @@
+using LageBuch.Persistence.MasterData;
+
 namespace LageBuch.AppLogic.Services;
 
 /// <summary>
@@ -19,7 +21,12 @@ public interface IIncidentHostController
     /// <summary>The PIN a joining device must enter while hosting; null when not hosting.</summary>
     string? SharePin { get; }
 
-    Task StartAsync(LocalIncidentSession session);
+    /// <summary>
+    /// Starts hosting. <paramref name="masterData"/> is the Stammdaten this workspace is running
+    /// on: the host is the Stammdaten master (#183), so joined clients run on this set for the
+    /// session instead of their own local one.
+    /// </summary>
+    Task StartAsync(LocalIncidentSession session, MasterDataSet masterData);
 
     Task StopAsync();
 }
@@ -35,7 +42,7 @@ public sealed class NoopIncidentHostController : IIncidentHostController
 
     public string? SharePin => null;
 
-    public Task StartAsync(LocalIncidentSession session) => Task.CompletedTask;
+    public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData) => Task.CompletedTask;
 
     public Task StopAsync() => Task.CompletedTask;
 }

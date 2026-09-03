@@ -414,7 +414,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             // Binds every interface (loopback + LAN + tailnet). Can still fail — most likely the
             // port is already taken by another instance sharing on this machine — so surface that
             // in the status line rather than letting it escape the command.
-            await _hostController.StartAsync(_local);
+            // _masterData, not a fresh provider read: joined clients must get the set this
+            // workspace is actually running on (#183).
+            await _hostController.StartAsync(_local, _masterData);
         }
         catch (Exception ex)
         {

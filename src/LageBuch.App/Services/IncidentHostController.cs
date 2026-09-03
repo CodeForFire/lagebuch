@@ -3,6 +3,7 @@ using System.Net;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Time;
+using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 using LageBuch.Sync.Hosting;
 
@@ -36,7 +37,7 @@ internal sealed class IncidentHostController : IIncidentHostController
 
     public string? SharePin { get; private set; }
 
-    public async Task StartAsync(LocalIncidentSession session)
+    public async Task StartAsync(LocalIncidentSession session, MasterDataSet masterData)
     {
         if (_host is not null)
         {
@@ -47,7 +48,7 @@ internal sealed class IncidentHostController : IIncidentHostController
         // Cryptographic RNG so the PIN isn't predictable from a seeded/observed sequence — cheap
         // hardening even though a 4-digit space is small (brute-force is the accepted, documented risk).
         var pin = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10_000).ToString("D4", CultureInfo.InvariantCulture);
-        var host = new IncidentHost(session, _clock, _appVersion, _ui, pin);
+        var host = new IncidentHost(session, _clock, _appVersion, _ui, pin, masterData);
         await host.StartAsync(IPAddress.Any);
         _host = host;
         SharePin = pin;
