@@ -31,6 +31,7 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
     private ActivityResultLauncher? _importLauncher;
     private ActivityResultLauncher? _attachmentLauncher;
     private AndroidFileDialogService? _dialogs;
+    private IncidentStore? _store;
 
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
@@ -44,6 +45,15 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
             new ActivityResultContracts.OpenDocument(),
             new ImportCallback(uri => _dialogs?.CompleteAttachment(uri)));
         base.OnCreate(savedInstanceState);
+    }
+
+    // Best-effort only (issue #167 P0 #1): Android can kill the process without calling OnPause at
+    // all, so this narrows the background writer's data-loss window for the common "user switches
+    // away" case rather than closing it. Fire-and-forget, not awaited — OnPause must return quickly.
+    protected override void OnPause()
+    {
+        base.OnPause();
+        _ = _store?.FlushAsync();
     }
 
     // AndroidX's RegisterForActivityResult takes an IActivityResultCallback, not a delegate, so the
@@ -62,8 +72,9 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
         _dialogs = new AndroidFileDialogService(this);
         _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
         _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(AttachmentMimeTypes);
+        _store = new IncidentStore();
         SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
-            new IncidentStore(),
+            _store,
             new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
             new JsonRecentFilesStore(AndroidAppPaths.RecentFilesJsonPath(this)),
             _dialogs,

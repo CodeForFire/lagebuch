@@ -26,8 +26,19 @@ internal static class Program
         var clock = new SystemClock();
         var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
         var uiDispatcher = new LageBuch.App.Shared.Services.AvaloniaUiDispatcher();
+        var store = new IncidentStore();
+
+        // Best-effort: drain IncidentStore's background writer (issue #167 P0 #1) before the process
+        // actually exits, so the last queued save isn't lost. Blocking briefly here is fine — Exit
+        // fires once shutdown is already underway, and FlushAsync's own writer thread completes the
+        // wait, so there's no deadlock risk.
+        if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
+        {
+            desktopLifetime.Exit += (_, _) => store.FlushAsync().GetAwaiter().GetResult();
+        }
+
         return LageBuch.App.Shared.CompositionRoot.CreateMainWindowViewModel(
-            new IncidentStore(),
+            store,
             new MasterDataProvider(AppPaths.MasterDataDbPath),
             new JsonRecentFilesStore(AppPaths.RecentFilesJsonPath),
             dialogs,

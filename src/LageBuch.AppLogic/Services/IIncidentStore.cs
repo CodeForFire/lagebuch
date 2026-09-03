@@ -1,10 +1,20 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.Domain;
 
 namespace LageBuch.AppLogic.Services;
 
 public interface IIncidentStore
 {
+    /// <summary>
+    /// Queues <paramref name="incident"/> to be written to <paramref name="path"/> and returns once
+    /// the write is queued — not once it is durable. Writes queued for the same store are applied in
+    /// the order <see cref="Save"/> was called. Call <see cref="FlushAsync"/> to wait for every queued
+    /// write to complete, e.g. before the app exits.
+    /// </summary>
     void Save(string path, Incident incident);
+
+    /// <summary>Waits for every write queued so far via <see cref="Save"/> to complete.</summary>
+    Task FlushAsync();
 
     Incident Load(string path);
 
@@ -26,4 +36,15 @@ public interface IIncidentStore
     /// <summary>Null when the bytes are unavailable (never written, or storage unreachable) —
     /// never throws, so a caller degrades quietly.</summary>
     byte[]? TryReadFileBytes(string path, string storageFileName);
+
+    /// <summary>
+    /// Raised on the background writer thread when a queued <see cref="Save"/> throws (the queue
+    /// keeps serving later writes regardless). Fires off the UI thread — marshal it yourself (e.g.
+    /// via <c>IUiDispatcher</c>) before touching UI-bound state from a handler.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1003",
+        Justification = "A plain Exception payload doesn't warrant a bespoke EventArgs type; matches this codebase's other events (e.g. IIncidentSession.Changed), which favor plain delegates over the sender/EventArgs pattern.")]
+    event Action<Exception>? SaveFailed;
 }

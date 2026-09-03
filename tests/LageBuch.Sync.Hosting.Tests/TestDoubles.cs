@@ -21,6 +21,8 @@ internal sealed class InMemoryStore : IIncidentStore
 
     public void Save(string path, Incident incident) => _byPath[path] = incident;
 
+    public Task FlushAsync() => Task.CompletedTask;
+
     public Incident Load(string path) => _byPath[path];
 
     public IncidentState? TryReadState(string path) => _byPath.TryGetValue(path, out var i) ? i.State : null;
@@ -30,6 +32,12 @@ internal sealed class InMemoryStore : IIncidentStore
     public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
 
     public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
+
+    public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
 }
 
 internal sealed class FakeTimeProvider : TimeProvider
