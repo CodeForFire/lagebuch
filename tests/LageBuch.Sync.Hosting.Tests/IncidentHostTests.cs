@@ -233,6 +233,52 @@ public class IncidentHostTests
     }
 
     [Fact]
+    public async Task Uploading_a_file_does_not_hold_the_UI_dispatcher_during_the_disk_write()
+    {
+        // issue #167 P1 #1: applying the domain mutation (needs the UI thread) and writing the
+        // bytes (must not block it) are two separate _ui.InvokeAsync hops around a genuinely async
+        // write — this proves the write happens between them, not inside either.
+        var clock = new FixedClock();
+        var gate = new TaskCompletionSource();
+        var store = new DelayedFileWriteStore(gate.Task);
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var dispatcher = new RecordingUiDispatcher();
+        await using var host = new IncidentHost(session, clock, "1.0.0", dispatcher, "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+        var postTask = http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+
+        // Wait for the domain-mutation dispatch to run — it must complete even while the write
+        // afterward is still stuck on the gate.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (dispatcher.InvokeCount < 1 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.Equal(1, dispatcher.InvokeCount);
+        Assert.False(postTask.IsCompleted); // stuck on the byte write, not on a blocked UI thread
+
+        gate.SetResult();
+        var response = await postTask;
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal(2, dispatcher.InvokeCount); // domain mutation, then SaveExternalChange
+    }
+
+    [Fact]
     public async Task GetFile_returns_404_for_an_unknown_id()
     {
         var clock = new FixedClock();

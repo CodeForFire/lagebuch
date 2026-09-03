@@ -108,6 +108,7 @@ dotnet_diagnostic.CA1826.severity = none
 dotnet_diagnostic.CA2008.severity = none
 dotnet_diagnostic.CA1829.severity = none
 dotnet_diagnostic.CA2213.severity = none
+dotnet_diagnostic.CA2025.severity = none
 
 [{src/LageBuch.App.Android/*.cs,src/LageBuch.App.Android/**/*.cs}]
 # Java-managed objects (Intent, Java.IO.File, ActivityResultLauncher, ActivityResultContracts.*)

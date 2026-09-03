@@ -440,11 +440,11 @@ internal sealed class ThrowingStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => null;
 
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes)
-    {
-    }
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 
-    public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
 
     public event Action<Exception>? SaveFailed
     {
@@ -467,11 +467,11 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes)
-    {
-    }
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 
-    public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
 
     public event Action<Exception>? SaveFailed
     {
@@ -502,11 +502,11 @@ internal sealed class CountingStore : IIncidentStore
     // A passive peek, not a load — must not count against the load-once guard.
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes)
-    {
-    }
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 
-    public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
 
     public event Action<Exception>? SaveFailed
     {

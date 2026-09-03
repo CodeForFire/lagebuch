@@ -42,9 +42,14 @@ internal sealed class FakeStore : IIncidentStore
 
     private readonly Dictionary<string, byte[]> _files = new();
 
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
+    {
+        _files[$"{path}/{storageFileName}"] = bytes;
+        return Task.CompletedTask;
+    }
 
-    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 
     public event Action<Exception>? SaveFailed
     {

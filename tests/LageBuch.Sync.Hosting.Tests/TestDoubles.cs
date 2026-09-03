@@ -29,9 +29,14 @@ internal sealed class InMemoryStore : IIncidentStore
 
     private readonly Dictionary<string, byte[]> _files = new();
 
-    public void SaveFileBytes(string path, string storageFileName, byte[] bytes) => _files[$"{path}/{storageFileName}"] = bytes;
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
+    {
+        _files[$"{path}/{storageFileName}"] = bytes;
+        return Task.CompletedTask;
+    }
 
-    public byte[]? TryReadFileBytes(string path, string storageFileName) => _files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null;
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 
     public event Action<Exception>? SaveFailed
     {
@@ -245,4 +250,55 @@ internal sealed class SingleThreadUiDispatcher : IUiDispatcher, IDisposable
     }
 
     public void Dispose() => _queue.CompleteAdding();
+}
+
+/// <summary>
+/// Runs every callback inline (like <see cref="ImmediateUiDispatcher"/>) but counts calls, so a test
+/// can prove how many UI-thread hops a host operation takes — e.g. that a file upload's byte write
+/// (issue #167 P1 #1) happens between two hops rather than inside either one.
+/// </summary>
+internal sealed class RecordingUiDispatcher : IUiDispatcher
+{
+    public int InvokeCount { get; private set; }
+
+    public void Post(Action action) => action();
+
+    public Task<T> InvokeAsync<T>(Func<T> func)
+    {
+        InvokeCount++;
+        return Task.FromResult(func());
+    }
+}
+
+/// <summary>
+/// An <see cref="IIncidentStore"/> whose file writes don't complete until the caller-supplied gate
+/// task does — lets a test hold an upload mid-write to observe what has (and hasn't) happened by
+/// then, e.g. that the UI dispatcher was already released before the write finished.
+/// </summary>
+internal sealed class DelayedFileWriteStore : IIncidentStore
+{
+    private readonly Task _gate;
+    private readonly Dictionary<string, Incident> _saved = new();
+
+    public DelayedFileWriteStore(Task gate) => _gate = gate;
+
+    public void Save(string path, Incident incident) => _saved[path] = incident;
+
+    public Task FlushAsync() => Task.CompletedTask;
+
+    public Incident Load(string path) => _saved[path];
+
+    public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
+
+    public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        await _gate;
+
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
+
+    public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
 }

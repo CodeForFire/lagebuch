@@ -115,19 +115,19 @@ public sealed class LocalIncidentSession : IIncidentSession
     // every attached file's bytes land in this device's own sibling folder the moment it's added —
     // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
     // network pull, only IIncidentStore.
-    public Task<byte[]> ExportPdfAsync()
+    public async Task<byte[]> ExportPdfAsync()
     {
         var fileBytes = new Dictionary<Guid, byte[]>();
         foreach (var file in Incident.Files)
         {
-            var bytes = _store.TryReadFileBytes(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
+            var bytes = await _store.TryReadFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
             if (bytes is not null)
             {
                 fileBytes[file.Id] = bytes;
             }
         }
 
-        return Task.FromResult(IncidentPdf.Generate(Incident, fileBytes));
+        return IncidentPdf.Generate(Incident, fileBytes);
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
@@ -225,29 +225,28 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) =>
         Mutate(() => Incident.UpsertTimer(key, cycleAnchor, intervalMinutes, recurringIntervalMinutes, isRunning));
 
-    public Task AddFileAsync(string fileName, string contentType, byte[] bytes)
+    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         var file = Incident.AddFile(_clock, RequireOperator(), fileName, contentType, bytes.LongLength);
-        _store.SaveFileBytes(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes);
+        await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes);
         Save();
         Changed?.Invoke();
-        return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Writes attachment bytes already recorded on <see cref="Incident"/> elsewhere — used by the
-    /// host applying a joined client's <c>AddFileCommand</c> (see <c>CommandApplier</c>'s
-    /// <c>saveFileBytes</c> callback), where the metadata mutation and the byte write are two
-    /// separate steps rather than going through <see cref="AddFileAsync"/>.
+    /// Writes attachment bytes for a file already recorded on <see cref="Incident"/> elsewhere —
+    /// used by the host after applying a joined client's <c>AddFileCommand</c> via
+    /// <see cref="LageBuch.Sync.CommandApplier"/>, where the metadata mutation (on the UI thread)
+    /// and the byte write (off it, genuinely async — issue #167 P1 #1) are two separate steps
+    /// rather than going through <see cref="AddFileAsync"/>.
     /// </summary>
-    public void SaveFileBytes(string storageFileName, byte[] bytes) => _store.SaveFileBytes(Path, storageFileName, bytes);
+    public Task SaveFileBytesAsync(string storageFileName, byte[] bytes) => _store.SaveFileBytesAsync(Path, storageFileName, bytes);
 
-    public Task<byte[]?> GetFileBytesAsync(Guid fileId)
+    public async Task<byte[]?> GetFileBytesAsync(Guid fileId)
     {
         var file = Incident.Files.FirstOrDefault(f => f.Id == fileId);
-        var bytes = file is null ? null : _store.TryReadFileBytes(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
-        return Task.FromResult(bytes);
+        return file is null ? null : await _store.TryReadFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
     }
 
     public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));

@@ -140,21 +140,29 @@ public sealed class IncidentHost : IAsyncDisposable
 
     private async Task<IResult> HandleCommand(SyncCommand command)
     {
-        // A Kestrel request thread runs this. Apply + enqueue-persist + notify on the UI thread so the
-        // host's authoritative Incident is only ever mutated there (matching solo mode) and the
-        // Changed it raises reaches the host's own Avalonia-bound views — which reject an off-thread
-        // mutation. SaveExternalChange only queues the write (issue #167 P0 #1: IncidentStore's
-        // background writer owns the actual SQLite I/O), so this dispatch is a snapshot copy, not a
-        // full save — a remote client's edit no longer stalls the host's UI for a save's duration.
+        // A Kestrel request thread runs this. Apply on the UI thread so the host's authoritative
+        // Incident is only ever mutated there (matching solo mode) and the Changed it raises reaches
+        // the host's own Avalonia-bound views — which reject an off-thread mutation. An AddFileCommand's
+        // byte write is the one part of applying a command that isn't a UI-bound mutation: issue #167
+        // P1 #1 requires it happen off the UI thread, genuinely async, so it runs here — between the
+        // two UI-thread hops — rather than inside CommandApplier.Apply.
         try
         {
+            var addedFile = await _ui.InvokeAsync(() => CommandApplier.Apply(command, _session.Incident, _clock));
+
+            if (addedFile is not null && command is AddFileCommand addFile)
+            {
+                await _session.SaveFileBytesAsync(IncidentFile.StorageFileName(addedFile.Id, addedFile.FileName), addFile.Bytes);
+            }
+
             return await _ui.InvokeAsync(() =>
             {
-                CommandApplier.Apply(command, _session.Incident, _clock, _session.SaveFileBytes);
-
                 // Enqueue persist + raise the session's Changed, which refreshes the host's own UI and,
                 // through OnSessionChanged, broadcasts the new snapshot to every client — the same path
                 // a host edit takes (§5), so a client's contribution appears live on the host too.
+                // SaveExternalChange only queues the write (issue #167 P0 #1: IncidentStore's
+                // background writer owns the actual SQLite I/O), so this dispatch is a snapshot copy,
+                // not a full save.
                 _session.SaveExternalChange();
                 return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
             });

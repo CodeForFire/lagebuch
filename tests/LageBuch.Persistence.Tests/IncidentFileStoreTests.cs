@@ -18,22 +18,36 @@ public class IncidentFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void SaveBytes_then_TryReadBytes_round_trips()
+    public async Task SaveBytesAsync_then_TryReadBytesAsync_round_trips()
     {
         Directory.CreateDirectory(_dir);
         var bytes = new byte[] { 1, 2, 3, 4 };
 
-        _store.SaveBytes(_incidentPath, "abc.jpg", bytes);
-        var read = _store.TryReadBytes(_incidentPath, "abc.jpg");
+        await _store.SaveBytesAsync(_incidentPath, "abc.jpg", bytes);
+        var read = await _store.TryReadBytesAsync(_incidentPath, "abc.jpg");
 
         Assert.Equal(bytes, read);
     }
 
     [Fact]
-    public void SaveBytes_creates_a_sibling_files_folder_next_to_the_incident()
+    public async Task SaveBytesAsync_overwrites_an_existing_file_at_the_same_storage_name()
+    {
+        // Idempotency matters once uploads can be retried (issue #167 P1 #2) — a repeat write for
+        // the same storage name must replace, not corrupt or duplicate, the on-disk content.
+        Directory.CreateDirectory(_dir);
+        await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 1, 2, 3 });
+
+        await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 9, 9 });
+        var read = await _store.TryReadBytesAsync(_incidentPath, "abc.jpg");
+
+        Assert.Equal(new byte[] { 9, 9 }, read);
+    }
+
+    [Fact]
+    public async Task SaveBytesAsync_creates_a_sibling_files_folder_next_to_the_incident()
     {
         Directory.CreateDirectory(_dir);
-        _store.SaveBytes(_incidentPath, "abc.jpg", new byte[] { 1 });
+        await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 1 });
 
         var expectedFolder = Path.Combine(_dir, "20260622-0900-B.files");
         Assert.True(Directory.Exists(expectedFolder));
@@ -41,15 +55,15 @@ public class IncidentFileStoreTests : IDisposable
     }
 
     [Fact]
-    public void TryReadBytes_returns_null_for_a_file_that_was_never_written()
+    public async Task TryReadBytesAsync_returns_null_for_a_file_that_was_never_written()
     {
-        Assert.Null(_store.TryReadBytes(_incidentPath, "missing.jpg"));
+        Assert.Null(await _store.TryReadBytesAsync(_incidentPath, "missing.jpg"));
     }
 
     [Fact]
-    public void TryReadBytes_returns_null_rather_than_throwing_when_the_folder_does_not_exist()
+    public async Task TryReadBytesAsync_returns_null_rather_than_throwing_when_the_folder_does_not_exist()
     {
         // _dir is deliberately never created here — degrades quietly, like TryReadState.
-        Assert.Null(_store.TryReadBytes(_incidentPath, "abc.jpg"));
+        Assert.Null(await _store.TryReadBytesAsync(_incidentPath, "abc.jpg"));
     }
 }

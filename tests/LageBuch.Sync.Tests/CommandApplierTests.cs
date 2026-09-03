@@ -15,6 +15,18 @@ public class CommandApplierTests
         CommandApplier.Apply(SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize(command)), incident, clock);
 
     [Fact]
+    public void Applying_a_non_file_command_returns_null()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", "RUF 1");
+
+        var result = CommandApplier.Apply(new AddForceUnitCommand(op, "Aich", 9, "Aich 42/1", null, null, 4, 1), incident, clock);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public void Journal_entry_is_attributed_to_the_commands_operator_not_the_host()
     {
         var clock = new FixedClock();
@@ -99,41 +111,24 @@ public class CommandApplierTests
     }
 
     [Fact]
-    public void AddFileCommand_records_metadata_and_invokes_the_byte_writer()
+    public void AddFileCommand_records_metadata_and_returns_the_new_file()
     {
+        // issue #167 P1 #1: Apply no longer writes attachment bytes itself (that would happen on
+        // whatever thread called Apply — the host now does the write off the UI thread, itself,
+        // using the file this returns). Apply's only job here is the domain mutation.
         var clock = new FixedClock();
         var incident = NewIncident(clock);
-        var saved = new List<(string StorageFileName, byte[] Bytes)>();
         var bytes = new byte[] { 1, 2, 3 };
 
-        CommandApplier.Apply(
+        var file = CommandApplier.Apply(
             new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", bytes),
-            incident,
-            clock,
-            (name, b) => saved.Add((name, b)));
-
-        var file = Assert.Single(incident.Files);
-        Assert.Equal("brand.jpg", file.FileName);
-        Assert.Equal("Client (RUF 1)", file.AddedBy);
-        var write = Assert.Single(saved);
-        Assert.Equal($"{file.Id}.jpg", write.StorageFileName);
-        Assert.Equal(bytes, write.Bytes);
-    }
-
-    [Fact]
-    public void AddFileCommand_without_a_byte_writer_still_records_metadata()
-    {
-        // saveFileBytes is optional so every other command's test (this file) doesn't need to
-        // supply one; production (IncidentHost) always does.
-        var clock = new FixedClock();
-        var incident = NewIncident(clock);
-
-        CommandApplier.Apply(
-            new AddFileCommand(new OperatorDto("Client", null), "x.pdf", "application/pdf", new byte[] { 1 }),
             incident,
             clock);
 
-        Assert.Single(incident.Files);
+        var recorded = Assert.Single(incident.Files);
+        Assert.Same(recorded, file);
+        Assert.Equal("brand.jpg", file!.FileName);
+        Assert.Equal("Client (RUF 1)", file.AddedBy);
     }
 
     [Fact]
