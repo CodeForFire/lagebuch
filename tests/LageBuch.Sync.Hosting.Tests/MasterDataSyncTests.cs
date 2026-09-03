@@ -83,4 +83,25 @@ public class MasterDataSyncTests
         // Einsatzzeiten and Rückzugsdruck — the part that actually matters operationally.
         Assert.Equal(IncidentSettings.Defaults, set.Settings);
     }
+
+    [Fact]
+    public async Task Connected_client_exposes_the_hosts_master_data()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: SetWith("Host-Wache", 60));
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            TestHost.DefaultPin,
+            port);
+
+        var set = MasterDataJson.Parse(client.HostMasterDataJson);
+
+        Assert.Equal(new[] { "Host-Wache" }, set.Brigades);
+        Assert.Equal(60, set.Settings.ReturnPressureBar);
+    }
 }
