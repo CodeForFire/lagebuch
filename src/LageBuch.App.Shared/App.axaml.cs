@@ -29,11 +29,14 @@ public partial class App : Application
         {
             desktop.MainWindow = new MainWindow(CreateMainViewModel!());
         }
-        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+        else if (ApplicationLifetime is IActivityApplicationLifetime activity)
         {
-            var mainView = new MainView();
-            mainView.AttachViewModel(CreateMainViewModel!());
-            singleView.MainView = mainView;
+            activity.MainViewFactory = () =>
+            {
+                var mainView = new MainView();
+                mainView.AttachViewModel(CreateMainViewModel!());
+                return mainView;
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

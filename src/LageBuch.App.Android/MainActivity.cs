@@ -1,7 +1,6 @@
 using Android.Content.PM;
 using AndroidX.Activity.Result;
 using AndroidX.Activity.Result.Contract;
-using Avalonia;
 using Avalonia.Android;
 using LageBuch.App.Android.Services;
 using LageBuch.App.Shared;
@@ -21,7 +20,7 @@ namespace LageBuch.App.Android;
     Icon = "@drawable/icon",
     MainLauncher = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
-public class MainActivity : AvaloniaMainActivity<SharedApp>
+public class MainActivity : AvaloniaMainActivity
 {
     // OpenDocument (rather than GetContent) accepts multiple MIME types on Launch, needed
     // since an attachment can be any of several image types or a PDF.
@@ -33,6 +32,11 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
     private AndroidFileDialogService? _dialogs;
     private IncidentStore? _store;
 
+    // Avalonia 12 removed AvaloniaMainActivity<TApp>/CustomizeAppBuilder(AppBuilder) — app/AppBuilder
+    // setup moved to MainApplication, which runs before any Activity exists. This Activity-scoped
+    // wiring (file pickers need a live Activity to register against) instead runs here, before
+    // base.OnCreate() — which is what triggers Avalonia to invoke SharedApp.CreateMainViewModel via
+    // IActivityApplicationLifetime.MainViewFactory (see App.axaml.cs), same ordering as before.
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
         _importLauncher = RegisterForActivityResult(
@@ -44,6 +48,27 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
         _attachmentLauncher = RegisterForActivityResult(
             new ActivityResultContracts.OpenDocument(),
             new ImportCallback(uri => _dialogs?.CompleteAttachment(uri)));
+
+        _dialogs = new AndroidFileDialogService(this);
+        _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
+        _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(AttachmentMimeTypes);
+        _store = new IncidentStore();
+        SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
+            _store,
+            new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
+            new JsonRecentFilesStore(AndroidAppPaths.RecentFilesJsonPath(this)),
+            _dialogs,
+            new SystemClock(),
+            new LageBuch.App.Shared.Services.DispatcherTimerTicker(),
+            new AndroidAlarmService(),
+            new MasterDataFileService(),
+            new NoopIncidentHostController(),
+            new LageBuch.App.Shared.Services.AvaloniaUiDispatcher(),
+            typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+            lastSaveFolder: null,
+            attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
+            trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)));
+
         base.OnCreate(savedInstanceState);
     }
 
@@ -65,29 +90,5 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
         public ImportCallback(Action<global::Android.Net.Uri?> onResult) => _onResult = onResult;
 
         public void OnActivityResult(Java.Lang.Object? result) => _onResult(result as global::Android.Net.Uri);
-    }
-
-    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
-    {
-        _dialogs = new AndroidFileDialogService(this);
-        _dialogs.OnLaunchImportPicker = () => _importLauncher!.Launch("application/json");
-        _dialogs.OnLaunchAttachmentPicker = () => _attachmentLauncher!.Launch(AttachmentMimeTypes);
-        _store = new IncidentStore();
-        SharedApp.CreateMainViewModel = () => CompositionRoot.CreateMainWindowViewModel(
-            _store,
-            new MasterDataProvider(AndroidAppPaths.MasterDataDbPath(this)),
-            new JsonRecentFilesStore(AndroidAppPaths.RecentFilesJsonPath(this)),
-            _dialogs,
-            new SystemClock(),
-            new LageBuch.App.Shared.Services.DispatcherTimerTicker(),
-            new AndroidAlarmService(),
-            new MasterDataFileService(),
-            new NoopIncidentHostController(),
-            new LageBuch.App.Shared.Services.AvaloniaUiDispatcher(),
-            typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
-            lastSaveFolder: null,
-            attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
-            trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)));
-        return base.CustomizeAppBuilder(builder).WithInterFont();
     }
 }
