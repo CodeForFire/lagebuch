@@ -9,6 +9,9 @@ TestResults/
 coverage/
 *.trx
 artifacts/
+# `make package-linux` output
+publish/
+dist/
 
 # Project-specific: never commit the legacy template or planning artifacts
 *.xltm
