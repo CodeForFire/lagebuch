@@ -214,4 +214,26 @@ public class MasterDataJsonTests
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Links = new[] { new Link("N", "U") } }).IsEmpty);
     }
+
+    [Fact]
+    public void Parse_from_a_string_matches_parse_from_a_stream()
+    {
+        const string Json = """
+            {
+              "brigades": ["FFB Wache 1"],
+              "vehicles": [{ "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }],
+              "personnel": [{ "lastName": "Mustermann", "firstName": "Max" }],
+              "settings": { "returnPressureBar": 70 }
+            }
+            """;
+
+        var fromStream = MasterDataJson.Parse(new MemoryStream(Encoding.UTF8.GetBytes(Json)));
+        var fromString = MasterDataJson.Parse(Json);
+
+        Assert.Equal(fromStream.Brigades, fromString.Brigades);
+        Assert.Equal(fromStream.Vehicles, fromString.Vehicles);
+        Assert.Equal(fromStream.Personnel, fromString.Personnel);
+        Assert.Equal(fromStream.Settings, fromString.Settings);
+        Assert.Equal(70, fromString.Settings.ReturnPressureBar);
+    }
 }
