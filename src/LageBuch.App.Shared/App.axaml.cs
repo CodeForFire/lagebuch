@@ -12,9 +12,15 @@ public partial class App : Application
 {
     /// <summary>
     /// Set by the platform entry point (desktop <c>Program.cs</c>, Android <c>MainActivity</c>)
-    /// before Avalonia's framework init runs — only the platform head knows which
-    /// <see cref="LageBuch.AppLogic.Services.IFileDialogService"/>, paths, and
-    /// <see cref="LageBuch.AppLogic.Services.IAlarmService"/> implementation to wire up.
+    /// before the first <see cref="LageBuch.App.Shared.Views.MainView"/> or
+    /// <see cref="LageBuch.App.Shared.Views.MainWindow"/> is constructed — only the platform
+    /// head knows which <see cref="LageBuch.AppLogic.Services.IFileDialogService"/>, paths, and
+    /// <see cref="LageBuch.AppLogic.Services.IAlarmService"/> implementation to wire up. On
+    /// desktop that means before framework init returns. On Android, framework init runs in
+    /// <c>MainApplication</c> before any Activity exists, so this is set later, in
+    /// <c>MainActivity.OnCreate</c>, and read lazily via
+    /// <see cref="IActivityApplicationLifetime.MainViewFactory"/> below rather than eagerly at
+    /// framework-init time.
     /// </summary>
     public static Func<MainWindowViewModel>? CreateMainViewModel { get; set; }
 
