@@ -163,6 +163,20 @@ On macOS the app uses `~/.config`, **not** `~/Library/Application Support` —
 that is simply where .NET's `ApplicationData` folder resolves on Unix. To start
 over, delete `masterdata.db`; the app recreates it empty on the next launch.
 
+### Joined devices use the host's master data
+
+When you join another device's incident ("Mit Gerät verbinden"), that device's
+master data is used for the whole session — its brigades, radio call signs,
+vehicles and roster, and its Einsatzzeiten and Rückzugsdruck settings. The host
+is the master, so both devices always agree: an Atemschutz-Trupp registered from
+a joined tablet gets exactly the Einsatzzeit the host would have used.
+
+Your own `masterdata.db` is neither read nor modified while you are joined.
+Leaving the incident returns the device to its own master data — there is
+nothing to back up and nothing to restore. If the host has no master data at
+all, the joined device shows empty dropdowns too; every field still accepts
+free text.
+
 ### Import and export
 
 Open **Stammdaten** and use the header buttons:

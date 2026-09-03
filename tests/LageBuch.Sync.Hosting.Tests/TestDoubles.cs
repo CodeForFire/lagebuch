@@ -128,6 +128,27 @@ internal sealed class EmptyMasterData : IMasterDataProvider
     }
 }
 
+/// <summary>
+/// Serves a fixed set and records whether anything ever wrote back. Used to prove a joined client
+/// runs on the host's Stammdaten and never touches its own store (#183).
+/// </summary>
+internal sealed class FixedMasterData : IMasterDataProvider
+{
+    private MasterDataSet _set;
+
+    public FixedMasterData(MasterDataSet set) => _set = set;
+
+    public bool SaveCalled { get; private set; }
+
+    public MasterDataSet Get() => _set;
+
+    public void Save(MasterDataSet set)
+    {
+        SaveCalled = true;
+        _set = set;
+    }
+}
+
 internal sealed class NoRecentFiles : IRecentFilesStore
 {
     public IReadOnlyList<string> GetRecent() => Array.Empty<string>();

@@ -227,7 +227,12 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = null;
             _certificateChangedHost = null;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
-            OpenRemoteWorkspace(session, _masterData.Get());
+
+            // The host is the Stammdaten master (#183): the workspace is built from the host's set,
+            // never this device's, so both ends offer the same Wachen/Funkrufnamen/Personen and run
+            // the same Einsatzzeiten and Rückzugsdruck. Nothing is written to the local store —
+            // leaving the workspace is the entire "restore" path.
+            OpenRemoteWorkspace(session, MasterDataJson.Parse(session.HostMasterDataJson));
         }
         catch (PinRejectedException ex)
         {

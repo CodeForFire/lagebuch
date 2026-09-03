@@ -13,10 +13,10 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// </summary>
 public class HomeViewModelJoinTests
 {
-    private static HomeViewModel Home(ITrustStore? trust = null) =>
+    private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null) =>
         new(
             new InMemoryStore(),
-            new EmptyMasterData(),
+            masterData ?? new EmptyMasterData(),
             new NoRecentFiles(),
             new NoDialogs(),
             new FixedClock(),
@@ -54,6 +54,61 @@ public class HomeViewModelJoinTests
         Assert.False(opened!.CanExport);           // a client can't export the host's file
         Assert.False(opened.CanContinueEditing);   // nor resume a local file it doesn't own
         await opened.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Joined_workspace_uses_the_hosts_master_data_not_the_local_one()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock), clock, "1.0.0", masterData: MasterDataSyncTests.SetWith("Host-Wache", 60));
+        await using var _ = host;
+
+        // This device's own Stammdaten says something different, including a different Rückzugsdruck.
+        var local = new FixedMasterData(MasterDataSyncTests.SetWith("Client-Wache", 50));
+        var vm = Home(masterData: local);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        Assert.Null(vm.JoinError);
+        Assert.NotNull(opened);
+
+        // Pickers come from the host.
+        Assert.Contains("Host-Wache", opened!.Forces.BrigadeOptions);
+        Assert.DoesNotContain("Client-Wache", opened.Forces.BrigadeOptions);
+
+        // And so does the safety-relevant Atemschutz setting: a Trupp registered from this client
+        // is created with the host's Rückzugsdruck, not this device's (#183).
+        Assert.Equal(60, opened.Scba.NewReturnPressureBar);
+
+        await opened.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Joining_does_not_touch_the_local_master_data()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock), clock, "1.0.0", masterData: MasterDataSyncTests.SetWith("Host-Wache", 60));
+        await using var _ = host;
+
+        var local = new FixedMasterData(MasterDataSyncTests.SetWith("Client-Wache", 50));
+        var vm = Home(masterData: local);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        // Session-scoped adoption: nothing is written back, so leaving the workspace is the whole
+        // restore path and this device's own Stammdaten cannot be lost.
+        Assert.False(local.SaveCalled);
+        Assert.Equal(new[] { "Client-Wache" }, local.Get().Brigades);
+
+        await opened!.LeaveAsync();
     }
 
     [Fact]
