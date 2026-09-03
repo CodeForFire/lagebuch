@@ -32,6 +32,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public SessionOperator? Operator { get; }
 
+    /// <summary>
+    /// The host's Stammdaten, verbatim, in the <c>MasterDataJson</c> interchange format (#183).
+    /// Deliberately left unparsed here: this project references only LageBuch.Domain, while
+    /// MasterDataSet lives in LageBuch.Persistence — AppLogic, which references both, owns the
+    /// parse. Never null: <see cref="ConnectAsync"/> either fetches the payload or throws.
+    /// </summary>
+    public string HostMasterDataJson { get; }
+
     public Incident Incident => _incident;
 
     // The client never writes locally, so it is never "read-only" in the editing sense — but a
@@ -64,7 +72,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
     public event Action? Ended;
 
-    private RemoteIncidentSession(HttpClient http, HubConnection hub, IUiDispatcher ui, SessionOperator op, Incident initial, string? cacheRoot)
+    private RemoteIncidentSession(
+        HttpClient http,
+        HubConnection hub,
+        IUiDispatcher ui,
+        SessionOperator op,
+        Incident initial,
+        string? cacheRoot,
+        string hostMasterDataJson)
     {
         _http = http;
         _hub = hub;
@@ -72,6 +87,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Operator = op;
         _incident = initial;
         _cacheRoot = cacheRoot;
+        HostMasterDataJson = hostMasterDataJson;
     }
 
     /// <summary>
@@ -81,7 +97,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <see cref="VersionMismatchException"/> on a version mismatch,
     /// <see cref="CertificateChangedException"/> when the host presents a certificate that differs
     /// from the one previously trusted for that address, and
-    /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable.
+    /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable — including
+    /// when the Stammdaten fetch itself fails, which surfaces the same way.
     /// </summary>
     /// <param name="host">The host's Tailscale/LAN address to dial.</param>
     /// <param name="op">This device's operator, attributed on every command it sends.</param>
@@ -198,6 +215,16 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 throw new VersionMismatchException(localVersion, hostVersion);
             }
 
+            // The host is the Stammdaten master (#183). Pulled on the same HttpClient as everything
+            // else, so the PIN header and the Trust-on-First-Use certificate pin apply unchanged.
+            // Deliberately not re-fetched on reconnect: the host caches its serialized set at
+            // StartAsync, and both that cached copy and this client's workspace hold the same
+            // MasterDataSet as an immutable value fixed at open — the Stammdaten editor stays
+            // reachable throughout, but an edit made there produces a new value, it doesn't mutate
+            // the one already handed out. A resync round trip here would buy nothing.
+            var hostMasterDataJson = await http.GetStringAsync(
+                new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute), ct);
+
             var initial = SnapshotMapper.FromSnapshot(
                 SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct)));
 
@@ -215,7 +242,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, hub, ui, op, initial, cacheRoot);
+            var session = new RemoteIncidentSession(http, hub, ui, op, initial, cacheRoot, hostMasterDataJson);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is

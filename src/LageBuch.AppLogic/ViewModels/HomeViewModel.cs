@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net.Sockets;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -224,10 +225,34 @@ public sealed partial class HomeViewModel : ObservableObject
         {
             var session = await RemoteIncidentSession.ConnectAsync(
                 host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port, cacheRoot: _attachmentCacheRoot, trustStore: _trustStore);
+
+            // The host is the Stammdaten master (#183): the workspace is built from the host's set,
+            // never this device's. Parsed before anything opens, and the session is torn down if it
+            // fails — ConnectAsync has already opened a hub connection by this point, so simply
+            // letting the throw travel would leak it.
+            MasterDataSet hostMasterData;
+            try
+            {
+                hostMasterData = MasterDataJson.Parse(session.HostMasterDataJson);
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException
+                                          or KeyNotFoundException or FormatException)
+            {
+                // JsonDocument.Parse only throws JsonException, and only for malformed JSON. A
+                // well-formed-but-wrong-shape body ("[]", a personnel entry missing "lastName", a
+                // fractional "seats") makes ParseRoot's TryGetProperty/GetProperty/GetString/GetInt32
+                // calls throw InvalidOperationException, KeyNotFoundException or FormatException
+                // instead — every one of those shapes must land here too, or the DisposeAsync below
+                // (and the hub connection it closes) never runs.
+                await session.DisposeAsync();
+                throw new HostMasterDataUnreadableException(
+                    $"Stammdaten des Hosts konnten nicht gelesen werden. ({ex.Message})", ex);
+            }
+
             JoinError = null;
             _certificateChangedHost = null;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
-            OpenRemoteWorkspace(session, _masterData.Get());
+            OpenRemoteWorkspace(session, hostMasterData);
         }
         catch (PinRejectedException ex)
         {
@@ -251,6 +276,17 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = ex.Message;
             _certificateChangedHost = host;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
+        }
+        catch (HostMasterDataUnreadableException ex)
+        {
+            // Both ends run the same app version (the handshake enforces it), so an unreadable
+            // Stammdaten payload means corruption or something past the TOFU pin. Refuse the join
+            // rather than degrade into it — and never let it escape: an unhandled throw here kills
+            // the app mid-Einsatz. Scoped to this typed exception (rather than JsonException) so it
+            // can't also catch a JsonException thrown deserializing the version/snapshot response
+            // inside RemoteIncidentSession.ConnectAsync and mislabel that as a Stammdaten problem.
+            JoinError = ex.Message;
+            ClearCertificateChangedHost();
         }
         catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
         {

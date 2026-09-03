@@ -58,6 +58,20 @@ public class IncidentWorkspaceViewModelTests
         Assert.Contains("Port 5859 belegt", vm.ShareStatus, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Sharing_hands_the_host_the_workspaces_own_master_data()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        // The workspace's own set (Md()), not a re-read of the provider — so what joined clients
+        // receive is what this device is actually operating with (#183).
+        Assert.NotNull(host.LastMasterData);
+        Assert.Equal(new[] { "EL" }, host.LastMasterData!.Roles);
+    }
+
     private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
     {
         store = new FakeStore();
@@ -724,9 +738,13 @@ internal sealed class FakeHostController : IIncidentHostController
 
     public bool StartCalled { get; private set; }
 
-    public Task StartAsync(LocalIncidentSession session)
+    /// <summary>The Stammdaten the workspace handed over when sharing started (#183).</summary>
+    public MasterDataSet? LastMasterData { get; private set; }
+
+    public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData)
     {
         StartCalled = true;
+        LastMasterData = masterData;
         if (_failWith is not null)
         {
             throw _failWith;

@@ -13,10 +13,10 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// </summary>
 public class HomeViewModelJoinTests
 {
-    private static HomeViewModel Home(ITrustStore? trust = null) =>
+    private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null) =>
         new(
             new InMemoryStore(),
-            new EmptyMasterData(),
+            masterData ?? new EmptyMasterData(),
             new NoRecentFiles(),
             new NoDialogs(),
             new FixedClock(),
@@ -54,6 +54,61 @@ public class HomeViewModelJoinTests
         Assert.False(opened!.CanExport);           // a client can't export the host's file
         Assert.False(opened.CanContinueEditing);   // nor resume a local file it doesn't own
         await opened.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Joined_workspace_uses_the_hosts_master_data_not_the_local_one()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock), clock, "1.0.0", masterData: MasterDataSyncTests.SetWith("Host-Wache", 60));
+        await using var _ = host;
+
+        // This device's own Stammdaten says something different, including a different Rückzugsdruck.
+        var local = new FixedMasterData(MasterDataSyncTests.SetWith("Client-Wache", 50));
+        var vm = Home(masterData: local);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        Assert.Null(vm.JoinError);
+        Assert.NotNull(opened);
+
+        // Pickers come from the host.
+        Assert.Contains("Host-Wache", opened!.Forces.BrigadeOptions);
+        Assert.DoesNotContain("Client-Wache", opened.Forces.BrigadeOptions);
+
+        // And so does the safety-relevant Atemschutz setting: a Trupp registered from this client
+        // is created with the host's Rückzugsdruck, not this device's (#183).
+        Assert.Equal(60, opened.Scba.NewReturnPressureBar);
+
+        await opened.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Joining_does_not_touch_the_local_master_data()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock), clock, "1.0.0", masterData: MasterDataSyncTests.SetWith("Host-Wache", 60));
+        await using var _ = host;
+
+        var local = new FixedMasterData(MasterDataSyncTests.SetWith("Client-Wache", 50));
+        var vm = Home(masterData: local);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        // Session-scoped adoption: nothing is written back, so leaving the workspace is the whole
+        // restore path and this device's own Stammdaten cannot be lost.
+        Assert.False(local.SaveCalled);
+        Assert.Equal(new[] { "Client-Wache" }, local.Get().Brigades);
+
+        await opened!.LeaveAsync();
     }
 
     [Fact]
@@ -197,5 +252,44 @@ public class HomeViewModelJoinTests
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
         Assert.Contains($"127.0.0.1:{port}", vm.JoinError, StringComparison.Ordinal); // names the device it couldn't reach
+    }
+
+    [Theory]
+    [InlineData("{ not json")] // truncated JSON -- JsonDocument.Parse itself throws JsonException
+    [InlineData("[]")] // well-formed JSON, wrong root kind -- TryGetProperty throws InvalidOperationException
+    [InlineData("""{"personnel":[{"firstName":"Max"}]}""")] // well-formed, missing required field -- GetProperty("lastName") throws KeyNotFoundException
+    public async Task A_corrupt_master_data_payload_aborts_the_join_without_opening_a_workspace(string masterDataBody)
+    {
+        var clock = new FixedClock();
+        await using var host = await BadMasterDataHost.StartAsync(HostSession(clock).Incident, masterDataBody: masterDataBody);
+
+        var vm = Home();
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{host.Port}", TestHost.DefaultPin));
+
+        // The version handshake guarantees an identical build on both ends, so an unreadable
+        // payload means corruption or something past the TOFU pin — abort, don't degrade into it.
+        // This must hold for every shape above, not just truncated JSON: JsonDocument.Parse only
+        // ever throws JsonException, but MasterDataJson.ParseRoot's TryGetProperty/GetProperty calls
+        // throw InvalidOperationException or KeyNotFoundException on a well-formed-but-wrong-shape
+        // document, and a hole in the catch here would either leak the hub connection below or let
+        // the exception escape onto the UI thread and kill the app mid-Einsatz.
+        Assert.Null(opened);
+        Assert.NotNull(vm.JoinError);
+        Assert.Contains("Stammdaten", vm.JoinError, StringComparison.Ordinal);
+
+        // Like every other non-certificate failure kind, this one leaves nothing to reset trust for
+        // (#181) -- a stale "Vertrauen zurücksetzen" button after a Stammdaten failure would offer
+        // the user an action that cannot help them.
+        Assert.False(vm.CanResetTrustedCertificate);
+
+        // The property that actually matters: ConnectAsync had already opened the hub connection
+        // before the parse failed, so the banner alone doesn't prove anything -- the same assertions
+        // above would pass just as well if the session were leaked. Only the server observing the
+        // connection close proves it was torn down rather than abandoned (#183).
+        await host.WaitForClientDisconnectAsync(TimeSpan.FromSeconds(10));
     }
 }

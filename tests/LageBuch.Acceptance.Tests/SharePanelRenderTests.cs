@@ -7,6 +7,7 @@ using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -25,7 +26,7 @@ public class SharePanelRenderTests
 
         public string? SharePin => IsHosting ? "1234" : null;
 
-        public Task StartAsync(LocalIncidentSession session)
+        public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData)
         {
             IsHosting = true;
             return Task.CompletedTask;

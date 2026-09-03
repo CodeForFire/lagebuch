@@ -244,8 +244,22 @@ public static class MasterDataJson
     public static MasterDataSet Parse(Stream json)
     {
         using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        return ParseRoot(doc.RootElement);
+    }
 
+    /// <summary>
+    /// String overload of <see cref="Parse(Stream)"/> — identical format and identical failure
+    /// modes. Exists for callers that already hold the JSON as text rather than a stream: the sync
+    /// client receives the host's Stammdaten over HTTP as a string (#183).
+    /// </summary>
+    public static MasterDataSet Parse(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return ParseRoot(doc.RootElement);
+    }
+
+    private static MasterDataSet ParseRoot(JsonElement root)
+    {
         static IReadOnlyList<string> Arr(JsonElement e, string prop) =>
             e.TryGetProperty(prop, out var a) && a.ValueKind == JsonValueKind.Array
                 ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
