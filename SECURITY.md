@@ -39,6 +39,35 @@ address the issue before any public disclosure.
   share PIN to join an incident. Issues affecting that transport, the PIN gate,
   or the PDF export pipeline are very much in scope.
 
+## Known limitations
+
+- **Operator identity is self-asserted per device, not verified.** The
+  "Wer dokumentiert?" name/call sign attached to each sync command travels
+  with that command and is trusted by the host as-is — there is no
+  server-side lookup against any registered or authenticated identity. It is
+  used **only** for display and attribution (an ETB entry's "entered by",
+  an incident's "closed by", a file's "added by" metadata), never as an
+  authorization gate: once a device is past the PIN gate, every operator
+  name can perform every mutation.
+- **The PIN plus network reachability is the entire access-control
+  boundary.** A device that can reach the host over the LAN/Tailscale link
+  and knows the (rate-limited, TLS-protected) PIN is already fully trusted
+  to make arbitrary changes to the incident, regardless of what operator
+  name it claims. A compromised or careless device can misattribute its own
+  edits to a different operator, but it could just as easily make those
+  edits under its own name — the trust decision has already been made by
+  that point.
+- **This is an accepted trade-off, not an oversight.** The app's threat
+  model is a volunteer fire department's own devices on its own network,
+  not an adversarial multi-tenant system. Verifying operator identity
+  server-side would require inventing a session/identity-binding concept
+  that doesn't exist today — the SignalR hub carries no client-callable
+  methods, and sync commands travel over stateless HTTP POST — for a
+  marginal reduction of an already low-severity risk. If stronger
+  attribution is ever wanted, a cheap next step would be recording the
+  source device/IP alongside the claimed operator name in ETB entries,
+  without requiring a full identity-binding redesign.
+
 ## Non-security issues
 
 Anything that is not a vulnerability (crashes, data-entry problems, feature
