@@ -16,6 +16,14 @@ public static class SyncProtocol
 
     public static string FilesPath(Guid id) => $"/files/{id}";
 
+    /// <summary>
+    /// The host's Stammdaten, served in the <c>MasterDataJson</c> interchange format (#183). The
+    /// host is the master: a joined client runs on this set for the session instead of its own
+    /// local one, so both devices offer the same Wachen/Funkrufnamen/Personen and — the part that
+    /// matters operationally — the same Einsatzzeiten and Rückzugsdruck.
+    /// </summary>
+    public const string MasterDataPath = "/masterdata";
+
     /// <summary>SignalR method the host pushes the full snapshot on, after every applied command.</summary>
     public const string SnapshotMethod = "snapshot";
 

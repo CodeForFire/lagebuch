@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
+using LageBuch.Persistence.MasterData;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -27,18 +28,32 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly string _appVersion;
     private readonly string _pin;
     private readonly IUiDispatcher _ui;
+    private readonly string _masterDataJson;
     private readonly PinRateLimiter _rateLimiter = new();
     private X509Certificate2? _cert;
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
 
-    public IncidentHost(LocalIncidentSession session, IClock clock, string appVersion, IUiDispatcher ui, string pin)
+    public IncidentHost(
+        LocalIncidentSession session,
+        IClock clock,
+        string appVersion,
+        IUiDispatcher ui,
+        string pin,
+        MasterDataSet? masterData = null)
     {
         _session = session;
         _clock = clock;
         _appVersion = appVersion;
         _pin = pin;
         _ui = ui;
+
+        // Serialized once, here, rather than per request: the Stammdaten editor is a top-level view
+        // that an open workspace replaces, so the host's set provably cannot change while sharing.
+        // Caching it makes that guarantee structural rather than incidental (#183). Null means a
+        // host that has never imported anything — it serves an empty set, and its clients run
+        // empty too, because the host is the master unconditionally.
+        _masterDataJson = MasterDataJson.Serialize(masterData ?? MasterDataSet.Empty);
     }
 
     public bool IsRunning => _app is not null;
@@ -105,6 +120,10 @@ public sealed class IncidentHost : IAsyncDisposable
         app.MapHub<IncidentHub>(SyncProtocol.HubPath);
         app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(_appVersion), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options));
+
+        // Results.Content, not Results.Json: the payload is already serialized JSON text, and
+        // Results.Json would re-encode it into a JSON string literal.
+        app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(_masterDataJson, "application/json"));
         app.MapPost(SyncProtocol.CommandPath, HandleCommand);
         app.MapGet(SyncProtocol.FilesRouteTemplate, HandleGetFile);
 

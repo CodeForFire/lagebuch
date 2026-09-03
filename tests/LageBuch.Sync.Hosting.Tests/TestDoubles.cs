@@ -163,9 +163,10 @@ internal static class TestHost
         IClock clock,
         string version = "1.0.0",
         IUiDispatcher? ui = null,
-        string pin = DefaultPin)
+        string pin = DefaultPin,
+        MasterDataSet? masterData = null)
     {
-        var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher(), pin);
+        var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher(), pin, masterData);
         var port = FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
         return (host, port);
