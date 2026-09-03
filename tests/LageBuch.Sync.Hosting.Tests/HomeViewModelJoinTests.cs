@@ -97,6 +97,53 @@ public class HomeViewModelJoinTests
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
         Assert.Contains("geändert", vm.JoinError, StringComparison.Ordinal); // the cert-changed message
+        Assert.True(vm.CanResetTrustedCertificate); // #181: the banner alone left nobody a way out
+    }
+
+    [Fact]
+    public async Task Resetting_trust_after_a_cert_change_clears_the_banner_and_lets_a_retry_join()
+    {
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var vm = Home(trust);
+        vm.WorkspaceOpened = _ => { };
+        var request = new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin);
+        await vm.JoinDeviceCommand.ExecuteAsync(request);
+        Assert.NotNull(vm.JoinError); // stale thumbprint from the setup above -- the actual host cert differs
+
+        vm.ResetTrustedCertificateCommand.Execute(null);
+
+        Assert.Null(vm.JoinError);
+        Assert.False(vm.CanResetTrustedCertificate);
+        Assert.Null(trust.GetThumbprint("127.0.0.1")); // the stale pin is gone, so the retry below can re-pin it
+
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+        await vm.JoinDeviceCommand.ExecuteAsync(request);
+
+        Assert.Null(vm.JoinError);
+        Assert.NotNull(opened);
+        await opened!.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Non_certificate_failures_do_not_offer_a_trust_reset()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        var vm = Home(new InMemoryTrustStore());
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "9999"));
+
+        Assert.NotNull(vm.JoinError);
+        Assert.False(vm.CanResetTrustedCertificate);
     }
 
     [Fact]

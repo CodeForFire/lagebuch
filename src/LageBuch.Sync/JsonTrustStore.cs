@@ -31,6 +31,17 @@ public sealed class JsonTrustStore : ITrustStore
         }
     }
 
+    public void RemoveThumbprint(string hostAddress)
+    {
+        lock (_gate)
+        {
+            if (_cache.Remove(hostAddress))
+            {
+                File.WriteAllText(_path, JsonSerializer.Serialize(_cache));
+            }
+        }
+    }
+
     private Dictionary<string, string> Load()
     {
         if (!File.Exists(_path))

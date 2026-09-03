@@ -88,6 +88,16 @@ public sealed partial class HomeViewModel : ObservableObject
     [ObservableProperty]
     private string? _joinError;
 
+    /// <summary>
+    /// The dialed address a TOFU certificate-changed failure was just reported for, or null. Drives
+    /// <see cref="CanResetTrustedCertificate"/> — set only for that one failure kind (#181), since a
+    /// wrong PIN or an unreachable host has nothing to reset.
+    /// </summary>
+    private string? _certificateChangedHost;
+
+    /// <summary>Whether the Home screen should offer a "reset trust and try again" button.</summary>
+    public bool CanResetTrustedCertificate => _certificateChangedHost is not null;
+
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
@@ -215,31 +225,69 @@ public sealed partial class HomeViewModel : ObservableObject
             var session = await RemoteIncidentSession.ConnectAsync(
                 host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port, cacheRoot: _attachmentCacheRoot, trustStore: _trustStore);
             JoinError = null;
+            _certificateChangedHost = null;
+            OnPropertyChanged(nameof(CanResetTrustedCertificate));
             OpenRemoteWorkspace(session, _masterData.Get());
         }
         catch (PinRejectedException ex)
         {
             // Wrong/missing share PIN — say so plainly and leave them on Home to retry.
             JoinError = ex.Message;
+            ClearCertificateChangedHost();
         }
         catch (VersionMismatchException ex)
         {
             // Distinct, explicit message: mixed versions across an un-auto-updated fleet are expected (§7).
             JoinError = ex.Message;
+            ClearCertificateChangedHost();
         }
         catch (CertificateChangedException ex)
         {
             // The host presented a different TLS cert than the one previously trusted for this address
             // (Trust-on-First-Use violation, § P0 #2) — a restart with a new ephemeral cert, or a
-            // man-in-the-middle. Surface the German "geändert" message so the user can reset trust.
+            // man-in-the-middle. Surface the German "geändert" message, and remember the address so
+            // the Home screen can offer a "Vertrauen zurücksetzen" button (#181) instead of leaving the
+            // user stuck on a warning nobody can act on.
             JoinError = ex.Message;
+            _certificateChangedHost = host;
+            OnPropertyChanged(nameof(CanResetTrustedCertificate));
         }
         catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
         {
             // Host unreachable, or up but not currently sharing an incident — same answer for the user:
             // say which device and why, and leave them on Home to try again.
             JoinError = $"Verbindung zu {request.Host} nicht möglich. Teilt dieses Gerät gerade einen Einsatz? ({ex.Message})";
+            ClearCertificateChangedHost();
         }
+    }
+
+    private void ClearCertificateChangedHost()
+    {
+        if (_certificateChangedHost is null)
+        {
+            return;
+        }
+
+        _certificateChangedHost = null;
+        OnPropertyChanged(nameof(CanResetTrustedCertificate));
+    }
+
+    /// <summary>
+    /// Forgets the TLS thumbprint pinned for the host that just failed a TOFU check, so the next join
+    /// attempt re-pins whatever certificate it presents (#181). This is the user's only way out of a
+    /// "Zertifikat geändert" banner short of hand-editing the trust store file.
+    /// </summary>
+    [RelayCommand]
+    private void ResetTrustedCertificate()
+    {
+        if (_certificateChangedHost is not { } host)
+        {
+            return;
+        }
+
+        _trustStore?.RemoveThumbprint(host);
+        JoinError = null;
+        ClearCertificateChangedHost();
     }
 
     // The address is normally just a Tailscale name (the host binds the fixed SyncProtocol.Port), but

@@ -52,4 +52,21 @@ public class JsonTrustStoreTests : IDisposable
         Assert.Contains("10.0.0.5", ex.Message, StringComparison.Ordinal);
         Assert.True(ex.Message.Contains("geändert", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Remove_clears_a_saved_thumbprint()
+    {
+        var store = new JsonTrustStore(_path);
+        store.SaveThumbprint("10.0.0.5", "AAAA");
+        store.RemoveThumbprint("10.0.0.5");
+        Assert.Null(new JsonTrustStore(_path).GetThumbprint("10.0.0.5"));
+    }
+
+    [Fact]
+    public void Remove_of_an_unknown_host_does_not_throw()
+    {
+        var store = new JsonTrustStore(_path);
+        store.RemoveThumbprint("10.0.0.5"); // never saved -- must be a no-op, not an error
+        Assert.Null(store.GetThumbprint("10.0.0.5"));
+    }
 }
