@@ -41,15 +41,15 @@ public class MasterDataSyncTests
     public async Task Host_serves_its_master_data()
     {
         var clock = new FixedClock();
-        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: SetWith("Host-Wache", 60));
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: SetWith("Löschzug Fürstenfeldbruck", 60));
         await using var _ = host;
 
         using var http = Client(port, TestHost.DefaultPin);
         var set = MasterDataJson.Parse(
             await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
 
-        Assert.Equal(new[] { "Host-Wache" }, set.Brigades);
-        Assert.Equal(new Vehicle("Host-Wache", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
+        Assert.Equal(new[] { "Löschzug Fürstenfeldbruck" }, set.Brigades);
+        Assert.Equal(new Vehicle("Löschzug Fürstenfeldbruck", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
         Assert.Equal(60, set.Settings.ReturnPressureBar);
     }
 
@@ -57,7 +57,7 @@ public class MasterDataSyncTests
     public async Task Master_data_endpoint_rejects_a_wrong_pin()
     {
         var clock = new FixedClock();
-        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: SetWith("Host-Wache", 60));
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: SetWith("Löschzug Fürstenfeldbruck", 60));
         await using var _ = host;
 
         using var http = Client(port, "9999");
@@ -88,7 +88,7 @@ public class MasterDataSyncTests
     public async Task Connected_client_exposes_the_hosts_master_data()
     {
         var clock = new FixedClock();
-        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: SetWith("Host-Wache", 60));
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: SetWith("Löschzug Fürstenfeldbruck", 60));
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
@@ -101,7 +101,7 @@ public class MasterDataSyncTests
 
         var set = MasterDataJson.Parse(client.HostMasterDataJson);
 
-        Assert.Equal(new[] { "Host-Wache" }, set.Brigades);
+        Assert.Equal(new[] { "Löschzug Fürstenfeldbruck" }, set.Brigades);
         Assert.Equal(60, set.Settings.ReturnPressureBar);
     }
 }

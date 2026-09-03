@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Text.Json.Serialization;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
@@ -122,8 +123,11 @@ public sealed class IncidentHost : IAsyncDisposable
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options));
 
         // Results.Content, not Results.Json: the payload is already serialized JSON text, and
-        // Results.Json would re-encode it into a JSON string literal.
-        app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(_masterDataJson, "application/json"));
+        // Results.Json would re-encode it into a JSON string literal. MasterDataJson.Serialize uses
+        // UnsafeRelaxedJsonEscaping, so umlauts in e.g. Wachen names travel as raw UTF-8 bytes rather
+        // than \uXXXX escapes — pass the encoding explicitly so the response's charset says so too,
+        // matching /snapshot's Results.Json (which emits charset=utf-8 by default).
+        app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(_masterDataJson, "application/json", Encoding.UTF8));
         app.MapPost(SyncProtocol.CommandPath, HandleCommand);
         app.MapGet(SyncProtocol.FilesRouteTemplate, HandleGetFile);
 

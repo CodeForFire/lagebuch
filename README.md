@@ -171,11 +171,13 @@ vehicles and roster, and its Einsatzzeiten and Rückzugsdruck settings. The host
 is the master, so both devices always agree: an Atemschutz-Trupp registered from
 a joined tablet gets exactly the Einsatzzeit the host would have used.
 
-Your own `masterdata.db` is neither read nor modified while you are joined.
-Leaving the incident returns the device to its own master data — there is
-nothing to back up and nothing to restore. If the host has no master data at
-all, the joined device shows empty dropdowns too; every field still accepts
-free text.
+The join flow itself never reads or writes your own `masterdata.db` — it just
+isn't consulted while you're joined. (You can still open **Stammdaten** and
+edit it deliberately; that has no effect on the joined session, which keeps
+using the host's set.) Leaving the incident returns the device to its own
+master data — there is nothing to back up and nothing to restore. If the host
+has no master data at all, the joined device shows empty dropdowns too; every
+field still accepts free text.
 
 ### Import and export
 

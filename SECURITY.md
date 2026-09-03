@@ -32,9 +32,16 @@ address the issue before any public disclosure.
 
 ## Scope notes
 
-- **Master data and incident files stay on device.** `masterdata.db` and each
-  incident's `.fwincident` file live in local application data; nothing is
-  uploaded by the app itself.
+- **Master data and incident files stay on device**, with one exception: when
+  a device hosts an incident, it serves its full master-data set — including
+  the personnel roster's names and phone numbers — to every device that joins
+  that incident, over the same TLS + share-PIN-gated channel as everything
+  else. A joining device never persists what it receives; nothing is uploaded
+  by the app itself. Note that the roster is standing organizational data (the
+  whole brigade, across every incident), unlike the incident payload, which is
+  a single event — so a compromised PIN exposes something with a longer useful
+  life than the operation the PIN was issued for. `masterdata.db` and each
+  incident's `.fwincident` file otherwise live in local application data.
 - **Multi-device sync** runs over LAN/Tailscale via SignalR and requires a
   share PIN to join an incident. Issues affecting that transport, the PIN gate,
   or the PDF export pipeline are very much in scope.

@@ -218,8 +218,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             // The host is the Stammdaten master (#183). Pulled on the same HttpClient as everything
             // else, so the PIN header and the Trust-on-First-Use certificate pin apply unchanged.
             // Deliberately not re-fetched on reconnect: the host caches its serialized set at
-            // StartAsync and its Stammdaten editor is unreachable while a workspace is open, so the
-            // set cannot change during a share session. A resync round trip here would buy nothing.
+            // StartAsync, and both that cached copy and this client's workspace hold the same
+            // MasterDataSet as an immutable value fixed at open — the Stammdaten editor stays
+            // reachable throughout, but an edit made there produces a new value, it doesn't mutate
+            // the one already handed out. A resync round trip here would buy nothing.
             var hostMasterDataJson = await http.GetStringAsync(
                 new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute), ct);
 

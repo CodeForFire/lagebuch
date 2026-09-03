@@ -254,11 +254,14 @@ public class HomeViewModelJoinTests
         Assert.Contains($"127.0.0.1:{port}", vm.JoinError, StringComparison.Ordinal); // names the device it couldn't reach
     }
 
-    [Fact]
-    public async Task A_corrupt_master_data_payload_aborts_the_join_without_opening_a_workspace()
+    [Theory]
+    [InlineData("{ not json")] // truncated JSON -- JsonDocument.Parse itself throws JsonException
+    [InlineData("[]")] // well-formed JSON, wrong root kind -- TryGetProperty throws InvalidOperationException
+    [InlineData("""{"personnel":[{"firstName":"Max"}]}""")] // well-formed, missing required field -- GetProperty("lastName") throws KeyNotFoundException
+    public async Task A_corrupt_master_data_payload_aborts_the_join_without_opening_a_workspace(string masterDataBody)
     {
         var clock = new FixedClock();
-        await using var host = await BadMasterDataHost.StartAsync(HostSession(clock).Incident);
+        await using var host = await BadMasterDataHost.StartAsync(HostSession(clock).Incident, masterDataBody: masterDataBody);
 
         var vm = Home();
         IncidentWorkspaceViewModel? opened = null;
@@ -267,8 +270,13 @@ public class HomeViewModelJoinTests
         await vm.JoinDeviceCommand.ExecuteAsync(
             new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{host.Port}", TestHost.DefaultPin));
 
-        // The version handshake guarantees an identical build on both ends, so an unparseable
+        // The version handshake guarantees an identical build on both ends, so an unreadable
         // payload means corruption or something past the TOFU pin — abort, don't degrade into it.
+        // This must hold for every shape above, not just truncated JSON: JsonDocument.Parse only
+        // ever throws JsonException, but MasterDataJson.ParseRoot's TryGetProperty/GetProperty calls
+        // throw InvalidOperationException or KeyNotFoundException on a well-formed-but-wrong-shape
+        // document, and a hole in the catch here would either leak the hub connection below or let
+        // the exception escape onto the UI thread and kill the app mid-Einsatz.
         Assert.Null(opened);
         Assert.NotNull(vm.JoinError);
         Assert.Contains("Stammdaten", vm.JoinError, StringComparison.Ordinal);

@@ -13,10 +13,13 @@ namespace LageBuch.Sync.Hosting.Tests;
 
 /// <summary>
 /// A stand-in host that clears the version handshake, the snapshot fetch and the hub connect but
-/// serves a corrupt Stammdaten payload (#183). The real <see cref="IncidentHost"/> serializes a
-/// MasterDataSet and so cannot emit invalid JSON without a test-only hook in production code.
+/// serves a configurable bad Stammdaten payload at <c>/masterdata</c> (#183) — either malformed JSON
+/// (the default, "{ not json") or well-formed JSON of a shape <c>MasterDataJson.ParseRoot</c> can't
+/// make a <c>MasterDataSet</c> out of. The real <see cref="IncidentHost"/> serializes an actual
+/// MasterDataSet and so cannot emit either without a test-only hook in production code.
 /// Used to prove a joining client rejects the host and tears its connection down rather than
-/// leaking an open hub connection. No PIN middleware — the client's header is simply ignored.
+/// leaking an open hub connection, for every one of those failure shapes. No PIN middleware — the
+/// client's header is simply ignored.
 /// </summary>
 internal sealed class BadMasterDataHost : IAsyncDisposable
 {
@@ -32,7 +35,8 @@ internal sealed class BadMasterDataHost : IAsyncDisposable
 
     public int Port { get; }
 
-    public static async Task<BadMasterDataHost> StartAsync(Incident incident, string version = "1.0.0")
+    public static async Task<BadMasterDataHost> StartAsync(
+        Incident incident, string version = "1.0.0", string masterDataBody = "{ not json")
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -54,8 +58,10 @@ internal sealed class BadMasterDataHost : IAsyncDisposable
         app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(version), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(incident), SyncJson.Options));
 
-        // The whole point: well-formed HTTP, malformed Stammdaten.
-        app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content("{ not json", "application/json"));
+        // The whole point: well-formed HTTP, bad Stammdaten -- either malformed JSON (the default)
+        // or, for the shapes that MasterDataJson.ParseRoot chokes on (#183), well-formed JSON whose
+        // shape doesn't match a MasterDataSet.
+        app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(masterDataBody, "application/json"));
 
         await app.StartAsync();
         return new BadMasterDataHost(app, port, tracker);

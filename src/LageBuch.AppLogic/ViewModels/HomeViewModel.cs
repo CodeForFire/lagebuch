@@ -235,10 +235,18 @@ public sealed partial class HomeViewModel : ObservableObject
             {
                 hostMasterData = MasterDataJson.Parse(session.HostMasterDataJson);
             }
-            catch (JsonException)
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException
+                                          or KeyNotFoundException or FormatException)
             {
+                // JsonDocument.Parse only throws JsonException, and only for malformed JSON. A
+                // well-formed-but-wrong-shape body ("[]", a personnel entry missing "lastName", a
+                // fractional "seats") makes ParseRoot's TryGetProperty/GetProperty/GetString/GetInt32
+                // calls throw InvalidOperationException, KeyNotFoundException or FormatException
+                // instead — every one of those shapes must land here too, or the DisposeAsync below
+                // (and the hub connection it closes) never runs.
                 await session.DisposeAsync();
-                throw;
+                throw new HostMasterDataUnreadableException(
+                    $"Stammdaten des Hosts konnten nicht gelesen werden. ({ex.Message})", ex);
             }
 
             JoinError = null;
@@ -269,13 +277,15 @@ public sealed partial class HomeViewModel : ObservableObject
             _certificateChangedHost = host;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
         }
-        catch (JsonException ex)
+        catch (HostMasterDataUnreadableException ex)
         {
-            // Both ends run the same app version (the handshake enforces it), so an unparseable
+            // Both ends run the same app version (the handshake enforces it), so an unreadable
             // Stammdaten payload means corruption or something past the TOFU pin. Refuse the join
             // rather than degrade into it — and never let it escape: an unhandled throw here kills
-            // the app mid-Einsatz.
-            JoinError = $"Stammdaten des Hosts konnten nicht gelesen werden. ({ex.Message})";
+            // the app mid-Einsatz. Scoped to this typed exception (rather than JsonException) so it
+            // can't also catch a JsonException thrown deserializing the version/snapshot response
+            // inside RemoteIncidentSession.ConnectAsync and mislabel that as a Stammdaten problem.
+            JoinError = ex.Message;
             ClearCertificateChangedHost();
         }
         catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
