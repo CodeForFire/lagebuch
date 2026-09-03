@@ -182,8 +182,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
     // contract ("an http(s) URL") must hold regardless of what a future caller passes in.
     public Task OpenUrlAsync(string url)
     {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (!HttpUrlValidator.TryGetHttpUri(url, out var uri))
         {
             return Task.CompletedTask;
         }

@@ -164,8 +164,7 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
         // Belt-and-suspenders: LaunchWithOsDefault below is Process.Start with UseShellExecute=true,
         // which resolves arbitrary URI handlers and even local executable paths, so this refuses
         // anything but http(s) regardless of what a caller passes in.
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (!HttpUrlValidator.TryGetHttpUri(url, out var uri))
         {
             return Task.CompletedTask;
         }
