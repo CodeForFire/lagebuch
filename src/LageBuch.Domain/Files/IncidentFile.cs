@@ -7,10 +7,37 @@ public sealed record IncidentFile
     // phone photo or a scanned PDF.
     public const long MaxSizeBytes = 25 * 1024 * 1024;
 
-    public static readonly IReadOnlySet<string> AllowedContentTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf",
-    };
+    /// <summary>
+    /// The single extension→MIME table every allowlist and every path-to-content-type mapping in
+    /// the app derives from (picker filters, upload validation, Android share intents) — see
+    /// <see cref="GetMimeType"/>. Keying and lookup are case-insensitive.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> MimeTypesByExtension =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".jpg"] = "image/jpeg",
+            [".jpeg"] = "image/jpeg",
+            [".png"] = "image/png",
+            [".gif"] = "image/gif",
+            [".webp"] = "image/webp",
+            [".pdf"] = "application/pdf",
+        };
+
+    public static readonly IReadOnlySet<string> AllowedContentTypes =
+        new HashSet<string>(MimeTypesByExtension.Values, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The generic fallback used where "unknown" should still mean a concrete, valid MIME
+    /// type rather than Android's wildcard intent type — see <see cref="GetMimeType"/>.</summary>
+    public const string DefaultMimeType = "application/octet-stream";
+
+    /// <summary>
+    /// Maps a local file path's extension to the MIME type <see cref="MimeTypesByExtension"/>
+    /// knows, or <paramref name="fallback"/> when the extension is unrecognized. Callers pass their
+    /// own fallback because "unknown" means different things to different consumers — a concrete
+    /// generic type (<see cref="DefaultMimeType"/>) versus an Android intent wildcard (<c>*/*</c>).
+    /// </summary>
+    public static string GetMimeType(string path, string fallback) =>
+        MimeTypesByExtension.TryGetValue(Path.GetExtension(path), out var mimeType) ? mimeType : fallback;
 
     private IncidentFile()
     {

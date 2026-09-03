@@ -2,6 +2,7 @@ using Android.Content;
 using AndroidX.Core.Content;
 
 using LageBuch.AppLogic.Services;
+using LageBuch.Domain.Files;
 
 namespace LageBuch.App.Android.Services;
 
@@ -192,13 +193,5 @@ public sealed class AndroidFileDialogService : IFileDialogService
         return Task.CompletedTask;
     }
 
-    private static string MimeTypeOf(string path) => System.IO.Path.GetExtension(path).ToLowerInvariant() switch
-    {
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".png" => "image/png",
-        ".gif" => "image/gif",
-        ".webp" => "image/webp",
-        ".pdf" => "application/pdf",
-        _ => "*/*",
-    };
+    private static string MimeTypeOf(string path) => IncidentFile.GetMimeType(path, "*/*");
 }
