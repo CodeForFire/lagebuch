@@ -434,6 +434,8 @@ internal sealed class ThrowingStore : IIncidentStore
     {
     }
 
+    public Task FlushAsync() => Task.CompletedTask;
+
     public Incident Load(string path) => throw new InvalidOperationException(_message);
 
     public IncidentState? TryReadState(string path) => null;
@@ -443,6 +445,12 @@ internal sealed class ThrowingStore : IIncidentStore
     }
 
     public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
+
+    public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
 }
 
 // Loads what was saved; anything else throws — lets one test fail an open, then succeed.
@@ -451,6 +459,8 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
     private readonly Dictionary<string, Incident> _saved = new();
 
     public void Save(string path, Incident incident) => _saved[path] = incident;
+
+    public Task FlushAsync() => Task.CompletedTask;
 
     public Incident Load(string path) =>
         _saved.TryGetValue(path, out var i) ? i : throw new InvalidOperationException("Datei kaputt.");
@@ -462,6 +472,12 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
     }
 
     public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
+
+    public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
 }
 
 // Counts Load calls to guard against the old double-load regression.
@@ -474,6 +490,8 @@ internal sealed class CountingStore : IIncidentStore
     public void ResetLoadCount() => LoadCount = 0;
 
     public void Save(string path, Incident incident) => _saved[path] = incident;
+
+    public Task FlushAsync() => Task.CompletedTask;
 
     public Incident Load(string path)
     {
@@ -489,4 +507,10 @@ internal sealed class CountingStore : IIncidentStore
     }
 
     public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
+
+    public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
 }

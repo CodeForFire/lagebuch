@@ -52,6 +52,8 @@ public class HomeOpenErrorTests
         {
         }
 
+        public Task FlushAsync() => Task.CompletedTask;
+
         public Incident Load(string path) =>
             throw new LageBuch.Persistence.Sqlite.UnsupportedSchemaVersionException(6, 5);
 
@@ -62,6 +64,12 @@ public class HomeOpenErrorTests
         }
 
         public byte[]? TryReadFileBytes(string path, string storageFileName) => null;
+
+        public event Action<Exception>? SaveFailed
+        {
+            add { }
+            remove { }
+        }
     }
 
     private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null)

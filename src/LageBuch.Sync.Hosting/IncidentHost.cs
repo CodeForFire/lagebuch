@@ -116,18 +116,21 @@ public sealed class IncidentHost : IAsyncDisposable
 
     private async Task<IResult> HandleCommand(SyncCommand command)
     {
-        // A Kestrel request thread runs this. Apply + persist + notify on the UI thread so the host's
-        // authoritative Incident is only ever mutated there (matching solo mode) and the Changed it
-        // raises reaches the host's own Avalonia-bound views — which reject an off-thread mutation.
+        // A Kestrel request thread runs this. Apply + enqueue-persist + notify on the UI thread so the
+        // host's authoritative Incident is only ever mutated there (matching solo mode) and the
+        // Changed it raises reaches the host's own Avalonia-bound views — which reject an off-thread
+        // mutation. SaveExternalChange only queues the write (issue #167 P0 #1: IncidentStore's
+        // background writer owns the actual SQLite I/O), so this dispatch is a snapshot copy, not a
+        // full save — a remote client's edit no longer stalls the host's UI for a save's duration.
         try
         {
             return await _ui.InvokeAsync(() =>
             {
                 CommandApplier.Apply(command, _session.Incident, _clock, _session.SaveFileBytes);
 
-                // Persist + raise the session's Changed, which refreshes the host's own UI and, through
-                // OnSessionChanged, broadcasts the new snapshot to every client — the same path a host
-                // edit takes (§5), so a client's contribution appears live on the host too.
+                // Enqueue persist + raise the session's Changed, which refreshes the host's own UI and,
+                // through OnSessionChanged, broadcasts the new snapshot to every client — the same path
+                // a host edit takes (§5), so a client's contribution appears live on the host too.
                 _session.SaveExternalChange();
                 return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
             });
