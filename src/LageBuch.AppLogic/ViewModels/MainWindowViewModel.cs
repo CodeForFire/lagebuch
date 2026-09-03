@@ -98,13 +98,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void ShowMasterData() => NavigateAway(() => CurrentView = _editor);
 
     [RelayCommand]
-    private void ConfirmOperator()
+    private async Task ConfirmOperatorAsync()
     {
         var prompt = PendingPrompt;
         var op = prompt?.Result;
         var action = _pending;
-        PendingPrompt = null;
-        _pending = PendingAction.None;
         if (op is null)
         {
             return;
@@ -112,11 +110,45 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (action == PendingAction.New)
         {
+            PendingPrompt = null;
+            _pending = PendingAction.None;
             _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.Keyword));
+            return;
         }
-        else if (action == PendingAction.Join)
+
+        // Join (#182): keep the dialog up across the async connect attempt instead of closing it
+        // up front. On failure, report the error back into the same prompt instance rather than
+        // tearing it down, so a wrong PIN (or any other join failure) doesn't cost the operator
+        // every field they already typed.
+        prompt!.IsBusy = true;
+        await _home.JoinDeviceCommand.ExecuteAsync(new JoinRequest(op, prompt.Host, prompt.Pin));
+        prompt.IsBusy = false;
+
+        if (_home.JoinError is null)
         {
-            _home.JoinDeviceCommand.Execute(new JoinRequest(op, prompt!.Host, prompt.Pin));
+            PendingPrompt = null;
+            _pending = PendingAction.None;
+        }
+        else
+        {
+            // Ownership of the message moves to the dialog so the Home banner underneath doesn't
+            // also show it; _home's cert-changed host tracking is deliberately left alone, since
+            // ResetTrust() below still needs it.
+            prompt.ReportJoinFailure(_home.JoinError, _home.CanResetTrustedCertificate);
+            _home.JoinError = null;
+        }
+    }
+
+    // #182: lets the operator reset TOFU trust for the host without leaving the join dialog, then
+    // clears the dialog's own error state so they can retype the PIN and retry immediately.
+    [RelayCommand]
+    private void ResetTrust()
+    {
+        _home.ResetTrustedCertificateCommand.Execute(null);
+        if (PendingPrompt is { } prompt)
+        {
+            prompt.ErrorMessage = null;
+            prompt.CertificateChanged = false;
         }
     }
 

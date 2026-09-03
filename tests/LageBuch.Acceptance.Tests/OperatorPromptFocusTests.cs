@@ -58,4 +58,22 @@ public class OperatorPromptFocusTests
             nameBox.IsFocused,
             $"NAME box not focused. FocusManager focused element = {focused?.GetType().Name ?? "null"}.");
     }
+
+    // #182: the join dialog's fields read top to bottom as GERÄT, PIN, then NAME -- initial focus
+    // must land on the topmost one (GERÄT), not skip past it to NAME as it did before this fix.
+    [AvaloniaFact]
+    public void Join_prompt_focuses_the_host_field_not_the_name_field()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true, callSignOptions: new[] { "FFB 1/40/1" });
+        var window = new Window { Content = new OperatorPromptView { DataContext = vm }, Width = 640, Height = 560 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var hostBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "HostBox");
+        var focused = window.FocusManager?.GetFocusedElement();
+
+        Assert.True(
+            hostBox.IsFocused,
+            $"GERÄT box not focused. FocusManager focused element = {focused?.GetType().Name ?? "null"}.");
+    }
 }

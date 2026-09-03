@@ -34,6 +34,26 @@
                 <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
               </TextBox.KeyBindings>
             </TextBox>
+            <!-- #182: a failed join stays on this dialog instead of closing it, reporting the
+                 error here so Host/Name/Funkrufname aren't lost; only the PIN above is cleared. -->
+            <Border x:Name="PromptErrorBanner" Background="#241608"
+                    BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                    CornerRadius="{StaticResource RadiusSm}" Padding="10,8" Margin="0,8,0,0"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="⚠" FontSize="14" VerticalAlignment="Top" Margin="0,0,10,0" />
+                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="PromptErrorMessage" Text="{Binding ErrorMessage}"
+                           FontWeight="SemiBold" TextWrapping="Wrap" FontSize="13"
+                           Foreground="{StaticResource AmberBrush}" />
+                <!-- TOFU cert-changed (#181): the only path to clearing the stale trust entry,
+                     now reachable without leaving this dialog. -->
+                <Button Grid.Row="1" Grid.Column="1" x:Name="PromptResetTrustButton" Classes="ghost"
+                        Content="VERTRAUENSZUORDNUNG ZURÜCKSETZEN" Margin="0,8,0,0" Padding="8,3"
+                        HorizontalAlignment="Left"
+                        Command="{Binding ResetTrustCommand}"
+                        IsVisible="{Binding CertificateChanged}" />
+              </Grid>
+            </Border>
           </StackPanel>
           <TextBlock Text="NAME" Classes="overline" FontSize="10" Margin="0,4,0,3" />
           <TextBox x:Name="OperatorNameBox"
