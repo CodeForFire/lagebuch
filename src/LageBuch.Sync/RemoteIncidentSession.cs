@@ -375,7 +375,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // Unlike every other mutation, this is a real upload — genuinely awaited (per IIncidentSession's
     // doc comment) rather than fire-and-forget, so the caller can show a spinner and catch a
     // rejection (over the size cap, unsupported type, closed incident, or a network failure here).
-    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes)
+    // Issue #167 P1 #2: bytes no longer ride the AddFileCommand JSON — the client generates the file
+    // id, registers metadata via the usual command, then PUTs the raw bytes as a second request, so
+    // the base64/JSON inflation and the host's UI-thread block (issue #167 P1 #1) both go away.
+    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         if (bytes.LongLength > IncidentFile.MaxSizeBytes)
@@ -384,13 +387,19 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.", nameof(bytes));
         }
 
-        await SendAsync(new AddFileCommand(Op(), fileName, contentType, bytes));
+        var fileId = Guid.NewGuid();
+        await SendAsync(new AddFileCommand(Op(), fileId, fileName, contentType, bytes.LongLength), cancellationToken);
+
+        using var content = new ByteArrayContent(bytes);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        var response = await _http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), content, cancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 
     // On-demand pull (§5): the cached incident carries only file metadata (from the snapshot), so
     // bytes are fetched from the host the first time they're needed and cached locally afterwards —
     // mirroring how a join fetches GET /snapshot once rather than having it pushed continuously.
-    public async Task<byte[]?> GetFileBytesAsync(Guid fileId)
+    public async Task<byte[]?> GetFileBytesAsync(Guid fileId, CancellationToken cancellationToken = default)
     {
         var file = _incident.Files.FirstOrDefault(f => f.Id == fileId);
         if (file is null)
@@ -401,13 +410,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         var cachePath = CachePathFor(fileId, file.FileName);
         if (cachePath is not null && File.Exists(cachePath))
         {
-            return await File.ReadAllBytesAsync(cachePath);
+            return await File.ReadAllBytesAsync(cachePath, cancellationToken);
         }
 
         HttpResponseMessage response;
         try
         {
-            response = await _http.GetAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute));
+            response = await _http.GetAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), cancellationToken);
         }
         catch (HttpRequestException)
         {
@@ -419,11 +428,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             return null;
         }
 
-        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
         if (cachePath is not null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
-            await File.WriteAllBytesAsync(cachePath, bytes);
+            await File.WriteAllBytesAsync(cachePath, bytes, cancellationToken);
         }
 
         return bytes;

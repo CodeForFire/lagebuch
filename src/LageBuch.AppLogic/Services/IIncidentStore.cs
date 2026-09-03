@@ -35,6 +35,13 @@ public interface IIncidentStore
     /// </summary>
     Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Streams an attached file's bytes straight to storage without materializing the whole payload
+    /// in memory first — see <c>LageBuch.Persistence.IIncidentFileStore.SaveStreamAsync</c> (issue
+    /// #167 P1 #2).
+    /// </summary>
+    Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default);
+
     /// <summary>Null when the bytes are unavailable (never written, or storage unreachable) —
     /// never throws, so a caller degrades quietly.</summary>
     Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);

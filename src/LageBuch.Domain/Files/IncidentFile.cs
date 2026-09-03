@@ -58,7 +58,16 @@ public sealed record IncidentFile
     public string AddedBy { get; private init; } = string.Empty;
 
     public static IncidentFile Create(
-        string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy)
+        string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy) =>
+        Create(Guid.NewGuid(), fileName, contentType, sizeBytes, addedAt, addedBy);
+
+    /// <summary>
+    /// Overload taking an externally-supplied id (issue #167 P1 #2): the client generates the file id
+    /// up front so it can correlate the metadata command it sends with the raw-byte upload that
+    /// follows, before the domain has ever seen this file.
+    /// </summary>
+    public static IncidentFile Create(
+        Guid id, string fileName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy)
     {
         if (string.IsNullOrWhiteSpace(fileName))
         {
@@ -85,7 +94,7 @@ public sealed record IncidentFile
         var trimmedName = fileName.Trim();
         return new IncidentFile
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             FileName = trimmedName,
             DisplayName = trimmedName,
             ContentType = contentType,

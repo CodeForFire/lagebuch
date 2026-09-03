@@ -240,28 +240,30 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) =>
         Mutate(() => Incident.UpsertTimer(key, cycleAnchor, intervalMinutes, recurringIntervalMinutes, isRunning));
 
-    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes)
+    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         var file = Incident.AddFile(_clock, RequireOperator(), fileName, contentType, bytes.LongLength);
-        await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes);
+        await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes, cancellationToken);
         Save();
         Changed?.Invoke();
     }
 
     /// <summary>
-    /// Writes attachment bytes for a file already recorded on <see cref="Incident"/> elsewhere —
-    /// used by the host after applying a joined client's <c>AddFileCommand</c> via
-    /// <see cref="LageBuch.Sync.CommandApplier"/>, where the metadata mutation (on the UI thread)
-    /// and the byte write (off it, genuinely async — issue #167 P1 #1) are two separate steps
-    /// rather than going through <see cref="AddFileAsync"/>.
+    /// Streams attachment bytes for a file already recorded on <see cref="Incident"/> elsewhere — used
+    /// by the host after applying a joined client's <c>AddFileCommand</c> via
+    /// <see cref="LageBuch.Sync.CommandApplier"/>, where the metadata mutation and the byte transfer
+    /// are two separate requests (issue #167 P1 #2: the client PUTs the raw bytes directly rather than
+    /// riding them on the command), so this is called from the upload handler, not
+    /// <see cref="AddFileAsync"/>.
     /// </summary>
-    public Task SaveFileBytesAsync(string storageFileName, byte[] bytes) => _store.SaveFileBytesAsync(Path, storageFileName, bytes);
+    public Task SaveFileStreamAsync(string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
+        _store.SaveFileStreamAsync(Path, storageFileName, source, cancellationToken);
 
-    public async Task<byte[]?> GetFileBytesAsync(Guid fileId)
+    public async Task<byte[]?> GetFileBytesAsync(Guid fileId, CancellationToken cancellationToken = default)
     {
         var file = Incident.Files.FirstOrDefault(f => f.Id == fileId);
-        return file is null ? null : await _store.TryReadFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
+        return file is null ? null : await _store.TryReadFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
     }
 
     public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));

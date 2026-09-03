@@ -1,8 +1,11 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Files;
+using Microsoft.AspNetCore.Http;
 
 namespace LageBuch.Sync.Hosting.Tests;
 
@@ -192,8 +195,11 @@ public class IncidentHostTests
     }
 
     [Fact]
-    public async Task Client_uploads_a_file_and_can_pull_its_bytes_back()
+    public async Task Client_registers_a_file_then_uploads_its_bytes_and_can_pull_them_back()
     {
+        // issue #167 P1 #2: upload is now two requests — a small metadata command, then a raw-byte
+        // PUT keyed by the id the client generated for it — rather than the bytes riding the command
+        // as a base64-inflated JSON blob.
         var clock = new FixedClock();
         var session = LocalIncidentSession.StartNew(
             new InMemoryStore(),
@@ -210,7 +216,8 @@ public class IncidentHostTests
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         var bytes = new byte[] { 1, 2, 3, 4, 5 };
-        var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", bytes);
+        var fileId = Guid.NewGuid();
+        var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", bytes.LongLength);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
         var postResponse = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         postResponse.EnsureSuccessStatusCode();
@@ -218,12 +225,20 @@ public class IncidentHostTests
         // Broadcast/response snapshot carries metadata only — no bytes, small regardless of file size.
         var snapshot = SyncJson.Deserialize<IncidentSnapshot>(await postResponse.Content.ReadAsStringAsync());
         var fileMeta = Assert.Single(snapshot.Files);
+        Assert.Equal(fileId, fileMeta.Id);
         Assert.Equal("brand.jpg", fileMeta.FileName);
         Assert.Equal("Client (RUF 1)", fileMeta.AddedBy);
 
-        // Also lands in the host's own persisted state (attributed correctly, an ETB entry logged).
+        // Also lands in the host's own persisted state (attributed correctly, an ETB entry logged) —
+        // even before any bytes have arrived.
         Assert.Single(session.Incident.Files);
         Assert.Contains(session.Incident.Journal, e => e.Text == "Datei hinzugefügt: brand.jpg");
+
+        // The client PUTs the raw bytes next, keyed by the same id.
+        using var uploadContent = new ByteArrayContent(bytes);
+        uploadContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        var putResponse = await http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), uploadContent);
+        putResponse.EnsureSuccessStatusCode();
 
         // A client pulls the bytes back on demand.
         var getResponse = await http.GetAsync(new Uri(SyncProtocol.FilesPath(fileMeta.Id), UriKind.RelativeOrAbsolute));
@@ -233,11 +248,70 @@ public class IncidentHostTests
     }
 
     [Fact]
-    public async Task Uploading_a_file_does_not_hold_the_UI_dispatcher_during_the_disk_write()
+    public async Task UploadFile_returns_404_for_a_file_id_never_registered_via_a_command()
     {
-        // issue #167 P1 #1: applying the domain mutation (needs the UI thread) and writing the
-        // bytes (must not block it) are two separate _ui.InvokeAsync hops around a genuinely async
-        // write — this proves the write happens between them, not inside either.
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        using var uploadContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
+        var response = await http.PutAsync(new Uri(SyncProtocol.FilesPath(Guid.NewGuid()), UriKind.RelativeOrAbsolute), uploadContent);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadFile_rejects_a_body_over_the_cap()
+    {
+        // The server-side cap is independent of the metadata command's own (client-declared)
+        // SizeBytes — a lying/buggy client's PUT is still rejected. A real over-cap payload (rather
+        // than a length-only trick) exercises the same Content-Length fast-path HttpClient itself
+        // requires the sent byte count to match, so this is also the most realistic reproduction —
+        // and 25 MB over loopback is still a sub-second transfer.
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var fileId = Guid.NewGuid();
+        var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", 3);
+        var addContent = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+        (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), addContent)).EnsureSuccessStatusCode();
+
+        using var oversizedContent = new ByteArrayContent(new byte[IncidentFile.MaxSizeBytes + 1]);
+        var response = await http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), oversizedContent);
+
+        Assert.Equal((HttpStatusCode)StatusCodes.Status413PayloadTooLarge, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Uploading_a_files_bytes_never_touches_the_ui_dispatcher()
+    {
+        // issue #167 P1 #2: bytes now arrive via a standalone PUT (HandleUploadFile) rather than
+        // inline inside HandleCommand — like HandleGetFile, it's a pure disk write against
+        // already-registered domain state, so it never needs the UI-thread dispatch HandleCommand's
+        // metadata mutation still uses.
         var clock = new FixedClock();
         var gate = new TaskCompletionSource();
         var store = new DelayedFileWriteStore(gate.Task);
@@ -256,26 +330,31 @@ public class IncidentHostTests
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
-        var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), "brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        var fileId = Guid.NewGuid();
+        var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", 3);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        var postTask = http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+        var postResponse = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+        postResponse.EnsureSuccessStatusCode();
 
-        // Wait for the domain-mutation dispatch to run — it must complete even while the write
-        // afterward is still stuck on the gate.
+        Assert.Equal(2, dispatcher.InvokeCount); // domain mutation, then SaveExternalChange — metadata only
+
+        using var uploadContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
+        var putTask = http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), uploadContent);
+
+        // The PUT is stuck on the gated write — but it never touched the UI dispatcher to get there.
         var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (dispatcher.InvokeCount < 1 && DateTime.UtcNow < deadline)
+        while (!putTask.IsCompleted && DateTime.UtcNow < deadline && dispatcher.InvokeCount < 3)
         {
             await Task.Delay(10);
         }
 
-        Assert.Equal(1, dispatcher.InvokeCount);
-        Assert.False(postTask.IsCompleted); // stuck on the byte write, not on a blocked UI thread
+        Assert.False(putTask.IsCompleted);
+        Assert.Equal(2, dispatcher.InvokeCount); // unchanged — HandleUploadFile never calls _ui.InvokeAsync
 
         gate.SetResult();
-        var response = await postTask;
-        response.EnsureSuccessStatusCode();
-
-        Assert.Equal(2, dispatcher.InvokeCount); // domain mutation, then SaveExternalChange
+        var putResponse = await putTask;
+        putResponse.EnsureSuccessStatusCode();
+        Assert.Equal(2, dispatcher.InvokeCount);
     }
 
     [Fact]
