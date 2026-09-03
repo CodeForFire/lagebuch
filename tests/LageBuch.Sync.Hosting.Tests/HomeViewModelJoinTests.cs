@@ -281,6 +281,11 @@ public class HomeViewModelJoinTests
         Assert.NotNull(vm.JoinError);
         Assert.Contains("Stammdaten", vm.JoinError, StringComparison.Ordinal);
 
+        // Like every other non-certificate failure kind, this one leaves nothing to reset trust for
+        // (#181) -- a stale "Vertrauen zurücksetzen" button after a Stammdaten failure would offer
+        // the user an action that cannot help them.
+        Assert.False(vm.CanResetTrustedCertificate);
+
         // The property that actually matters: ConnectAsync had already opened the hub connection
         // before the parse failed, so the banner alone doesn't prove anything -- the same assertions
         // above would pass just as well if the session were leaked. Only the server observing the
