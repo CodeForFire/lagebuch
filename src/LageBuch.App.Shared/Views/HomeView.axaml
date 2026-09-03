@@ -45,11 +45,18 @@
                 BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
                 IsVisible="{Binding JoinError, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <Grid ColumnDefinitions="Auto,*">
-            <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Top" Margin="0,0,12,0" />
-            <TextBlock Grid.Column="1" x:Name="JoinErrorMessage" Text="{Binding JoinError}"
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Top" Margin="0,0,12,0" />
+            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="JoinErrorMessage" Text="{Binding JoinError}"
                        FontWeight="SemiBold" TextWrapping="Wrap"
                        Foreground="{StaticResource AmberBrush}" />
+            <!-- #181: a "geändert" (TOFU cert-changed) banner otherwise leaves no way to act on its
+                 own instructions; this is the only path to clearing the stale trust entry. -->
+            <Button Grid.Row="1" Grid.Column="1" x:Name="ResetTrustedCertificateButton" Classes="ghost"
+                    Content="VERTRAUENSZUORDNUNG ZURÜCKSETZEN" Margin="0,10,0,0" Padding="10,4"
+                    HorizontalAlignment="Left"
+                    Command="{Binding ResetTrustedCertificateCommand}"
+                    IsVisible="{Binding CanResetTrustedCertificate}" />
           </Grid>
         </Border>
 

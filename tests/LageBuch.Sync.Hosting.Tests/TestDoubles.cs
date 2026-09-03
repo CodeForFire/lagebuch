@@ -64,6 +64,8 @@ internal sealed class InMemoryTrustStore : ITrustStore
     public string? GetThumbprint(string hostAddress) => _map.TryGetValue(hostAddress, out var t) ? t : null;
 
     public void SaveThumbprint(string hostAddress, string thumbprint) => _map[hostAddress] = thumbprint;
+
+    public void RemoveThumbprint(string hostAddress) => _map.Remove(hostAddress);
 }
 
 // Minimal service doubles for constructing ViewModels (IncidentWorkspaceViewModel/HomeViewModel).
