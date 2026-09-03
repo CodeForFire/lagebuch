@@ -13,6 +13,8 @@ internal static class AppPaths
 
     public static string AttachmentCacheDir => Path.Combine(Root, "attachment-cache");
 
+    public static string TrustJsonPath => Path.Combine(Root, "trust.json");
+
     public static string GetAppDataDir(string baseDir)
     {
         var dir = Path.Combine(baseDir, "Lagebuch");

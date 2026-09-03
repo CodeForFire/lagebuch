@@ -231,4 +231,80 @@ public class RemoteClientTests
         await Assert.ThrowsAsync<PinRejectedException>(() =>
             RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), pin: null, port));
     }
+
+    [Fact]
+    public async Task Connect_trusts_a_cert_on_first_use_and_caches_the_thumbprint()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var trust = new InMemoryTrustStore();
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            TestHost.DefaultPin,
+            port,
+            trustStore: trust);
+
+        Assert.NotNull(client);
+        Assert.Single(trust.Thumbprints); // first use captured it
+    }
+
+    [Fact]
+    public async Task Connect_rejects_a_cert_that_differs_from_the_trusted_thumbprint()
+    {
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        await Assert.ThrowsAsync<CertificateChangedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("Client"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                TestHost.DefaultPin,
+                port,
+                trustStore: trust));
+    }
+
+    [Fact]
+    public async Task Connect_surfaces_429_as_pin_rejected_during_rate_limiting()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        // Drive the host's per-IP rate limiter into its backoff window with two wrong-PIN requests
+        // from this IP. The first wrong PIN is refused with 401 (and records a failure), the second
+        // inside the backoff window is refused with 429; after two failures the window is 2s wide.
+        using (var h = new HttpClient(TestHost.InsecureTrustAllHandler())
+               { BaseAddress = new Uri($"https://127.0.0.1:{port}") })
+        {
+            for (var i = 0; i < 2; i++)
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, SyncProtocol.VersionPath);
+                req.Headers.Add(SyncProtocol.PinHeader, "wrong");
+                await h.SendAsync(req);
+            }
+        }
+
+        // Still inside the 2s backoff window, a client connect (whose first handshake GET hits the
+        // throttled /version endpoint) must surface the 429 as a PinRejectedException, not an opaque
+        // HTTP error. Done within the window; a 2s backoff gives this assertion ample time.
+        await Assert.ThrowsAsync<PinRejectedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("Client"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                "wrong",
+                port));
+    }
 }

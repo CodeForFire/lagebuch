@@ -27,4 +27,7 @@ internal static class AndroidAppPaths
 
     public static string AttachmentCacheDir(Context context) =>
         System.IO.Path.Combine(CacheDir(context), "attachment-cache");
+
+    public static string TrustJsonPath(Context context) =>
+        System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "trust.json");
 }

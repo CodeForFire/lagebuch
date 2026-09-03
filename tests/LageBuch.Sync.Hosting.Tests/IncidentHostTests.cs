@@ -26,7 +26,7 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         // Version handshake.
@@ -68,7 +68,7 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         var entry = session.Incident.AddJournalEntry(
@@ -108,7 +108,7 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         var command = new EditJournalEntryCommand(new OperatorDto("Client", null), Guid.NewGuid(), "Text");
@@ -134,7 +134,7 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
         var command = new AddJournalEntryCommand(
             new OperatorDto("Client", null),
@@ -165,14 +165,19 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         if (pin is not null)
         {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
         }
 
+        // The PIN gate refuses the first request with 401 — the documented auth response.
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute))).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))).StatusCode);
+
+        // Every later request from the same IP returns 429: the gate still refuses an unauthenticated
+        // client, and the brute-force guard (P0 #3) throttles the repeats — so no endpoint or the hub
+        // is reachable without the right PIN.
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))).StatusCode);
 
         var command = new AddJournalEntryCommand(
             new OperatorDto("Client", null),
@@ -181,11 +186,9 @@ public class IncidentHostTests
             null,
             null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content)).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content)).StatusCode);
 
-        // The hub's negotiate is an HTTP POST that carries the same header, so the gate blocks it too.
-        var negotiate = await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null);
-        Assert.Equal(HttpStatusCode.Unauthorized, negotiate.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null)).StatusCode);
     }
 
     [Fact]
@@ -203,7 +206,7 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         var bytes = new byte[] { 1, 2, 3, 4, 5 };
@@ -244,7 +247,7 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         var response = await http.GetAsync(new Uri(SyncProtocol.FilesPath(Guid.NewGuid()), UriKind.RelativeOrAbsolute));
@@ -267,7 +270,7 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
 
         var response = await http.GetAsync(new Uri(SyncProtocol.FilesPath(Guid.NewGuid()), UriKind.RelativeOrAbsolute));
 
@@ -289,10 +292,63 @@ public class IncidentHostTests
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
 
-        using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
 
         var negotiate = await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null);
         negotiate.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Host_serves_over_https_with_self_signed_cert()
+    {
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var response = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Repeated_wrong_pins_from_one_ip_trigger_429_with_retry_after()
+    {
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "9999");
+
+        // First wrong PIN: 401 (no backoff yet).
+        var first = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
+        Assert.Equal(HttpStatusCode.Unauthorized, first.StatusCode);
+
+        // Second wrong PIN from same IP: throttled with429 + Retry-After.
+        var second = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.NotNull(second.Headers.RetryAfter);
+        Assert.True(second.Headers.TryGetValues("Retry-After", out var retryValues));
+        var retryAfterStr = Assert.Single(retryValues);
+        Assert.True(int.TryParse(retryAfterStr, out var retryAfter) && retryAfter >= 1 && retryAfter <= 60);
     }
 }

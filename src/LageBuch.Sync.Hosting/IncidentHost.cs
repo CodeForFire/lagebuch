@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
@@ -26,6 +27,8 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly string _appVersion;
     private readonly string _pin;
     private readonly IUiDispatcher _ui;
+    private readonly PinRateLimiter _rateLimiter = new();
+    private X509Certificate2? _cert;
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
 
@@ -49,7 +52,11 @@ public sealed class IncidentHost : IAsyncDisposable
 
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
-        builder.WebHost.UseUrls($"http://{bindAddress}:{port}");
+
+        // Serve TLS with a fresh self-signed cert minted per share session; the client pins it via
+        // Trust-on-First-Use (§ P0 #2) rather than the OS trust store.
+        (_cert, _) = SyncCertificate.Generate();
+        builder.WebHost.UseKestrel(o => o.Listen(bindAddress, port, l => l.UseHttps(_cert)));
 
         // Keep the hub's JSON aligned with SyncJson: enums as strings, web (camelCase) naming.
         builder.Services.AddSignalR().AddJsonProtocol(o =>
@@ -61,18 +68,37 @@ public sealed class IncidentHost : IAsyncDisposable
 
         var app = builder.Build();
 
-        // The join gate (§ #64): every request — the version/snapshot/command HTTP calls and the hub's
-        // negotiate/transport requests — must carry the share PIN in SyncProtocol.PinHeader. Rejecting
-        // here, before routing, keeps every endpoint and the hub gated with one check. Plain HTTP means
-        // the PIN is not secret against a LAN sniffer; it blocks uninvited joins, not eavesdropping.
+        // Brute-force gate (§ P0 #3): a source IP inside its backoff window is refused with 429 +
+        // Retry-After before it even reaches the PIN comparison.
         app.Use(async (context, next) =>
         {
+            var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (_rateLimiter.ShouldThrottle(ip, out var retryAfter))
+            {
+                context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return;
+            }
+
+            await next();
+        });
+
+        // The join gate (§ #64): every request — the version/snapshot/command HTTP calls and the hub's
+        // negotiate/transport requests — must carry the share PIN in SyncProtocol.PinHeader. Rejecting
+        // here, before routing, keeps every endpoint and the hub gated with one check. The PIN now
+        // travels over TLS (not cleartext), so a LAN sniffer no longer sees it; the gate still stops
+        // uninvited joins that know or guess it.
+        app.Use(async (context, next) =>
+        {
+            var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             if (!PinMatches(context.Request.Headers[SyncProtocol.PinHeader]))
             {
+                _rateLimiter.RecordFailure(ip);
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
 
+            _rateLimiter.RecordSuccess(ip);
             await next();
         });
 
@@ -134,7 +160,7 @@ public sealed class IncidentHost : IAsyncDisposable
 
     // Exactly one PIN header, matching the host's, is accepted. A missing/duplicated/mismatched header
     // is refused. The comparison is ordinal — the PIN is a short numeric string, not a secret to defend
-    // against timing analysis over a LAN it is already sent in cleartext on.
+    // against timing analysis over a LAN it is already carried over TLS.
     private bool PinMatches(Microsoft.Extensions.Primitives.StringValues header) =>
         header.Count == 1 && string.Equals(header[0], _pin, StringComparison.Ordinal);
 
@@ -152,6 +178,8 @@ public sealed class IncidentHost : IAsyncDisposable
             await _app.DisposeAsync();
             _app = null;
             _hub = null;
+            _cert?.Dispose();
+            _cert = null;
         }
     }
 

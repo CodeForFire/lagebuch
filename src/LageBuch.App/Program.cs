@@ -4,6 +4,7 @@ using LageBuch.App.Services;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
+using LageBuch.Sync;
 
 namespace LageBuch.App;
 
@@ -38,7 +39,8 @@ internal static class Program
             uiDispatcher,
             version,
             new JsonLastSaveFolderStore(AppPaths.LastSaveFolderJsonPath),
-            AppPaths.AttachmentCacheDir);
+            AppPaths.AttachmentCacheDir,
+            trustStore: new JsonTrustStore(AppPaths.TrustJsonPath));
     }
 
     public static AppBuilder BuildAvaloniaApp() =>

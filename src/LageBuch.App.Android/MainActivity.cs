@@ -7,6 +7,7 @@ using LageBuch.App.Android.Services;
 using LageBuch.App.Shared;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Time;
+using LageBuch.Sync;
 
 // Inside the LageBuch.App.Android namespace the bare name "App" binds to the LageBuch.App
 // namespace, not LageBuch.App.Shared.App — alias it so the shared Application type is reachable.
@@ -74,7 +75,8 @@ public class MainActivity : AvaloniaMainActivity<SharedApp>
             new LageBuch.App.Shared.Services.AvaloniaUiDispatcher(),
             typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
             lastSaveFolder: null,
-            attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this));
+            attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
+            trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)));
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
 }
