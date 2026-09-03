@@ -23,7 +23,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     // so the joining device says who documents here and which host to reach in one step.
     public bool CollectsHost { get; }
 
-    // The host's Tailscale name or IP, entered only in the join flow. Mandatory there (gates Confirm).
+    // The host's LAN or Tailscale address/name, entered only in the join flow. Mandatory there (gates Confirm).
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private string _host = string.Empty;
