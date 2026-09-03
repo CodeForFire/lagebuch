@@ -183,9 +183,22 @@ public class IncidentPdfTests
         var attachmentPdf = IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")));
         var file = incident.AddFile(new Clock(), new SessionOperator("Müller"), "bericht.pdf", "application/pdf", attachmentPdf.Length);
 
-        var withAttachment = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]> { [file.Id] = attachmentPdf });
+        // PDF attachments are merged straight from a disk path (issue #167 P1 #3), not from
+        // fileBytes — write the stand-in attachment to a temp file to exercise that path.
+        var attachmentPath = Path.Combine(Path.GetTempPath(), $"lagebuch-incident-pdf-test-{Guid.NewGuid():N}.pdf");
+        File.WriteAllBytes(attachmentPath, attachmentPdf);
+        try
+        {
+            var withAttachment = IncidentPdf.Generate(
+                incident,
+                pdfAttachmentPaths: new Dictionary<Guid, string> { [file.Id] = attachmentPath });
 
-        PdfAssert.IsPdf(withAttachment);
-        Assert.Equal(reportPages + PdfAssert.CountPages(attachmentPdf), PdfAssert.CountPages(withAttachment));
+            PdfAssert.IsPdf(withAttachment);
+            Assert.Equal(reportPages + PdfAssert.CountPages(attachmentPdf), PdfAssert.CountPages(withAttachment));
+        }
+        finally
+        {
+            File.Delete(attachmentPath);
+        }
     }
 }

@@ -319,12 +319,43 @@ public class IncidentSessionTests
         Assert.True(bytes.Length > 100);
         Assert.Equal(0x25, bytes[0]); // %
     }
+
+    [Fact]
+    public async Task ExportPdfAsync_merges_an_attached_pdfs_pages_via_its_disk_path()
+    {
+        // Exercises the issue #167 P1 #3 path end to end: AddFileAsync writes the attachment to
+        // disk (FakeStore's thin disk shim), and ExportPdfAsync must resolve and merge it from
+        // that real path rather than holding it in memory.
+        var store = new FakeStore();
+        var session = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/y.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+
+        var withoutAttachment = await session.ExportPdfAsync();
+
+        // Any valid PDF stands in for "an attached PDF" — the export itself already produces one.
+        await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
+
+        var withAttachment = await session.ExportPdfAsync();
+
+        Assert.True(
+            withAttachment.Length > withoutAttachment.Length,
+            $"Expected merging the attached PDF's pages to grow the export (without={withoutAttachment.Length}, with={withAttachment.Length}).");
+    }
 }
 
-// In-memory fake store — no disk, deterministic.
+// In-memory fake store — no disk, deterministic. File bytes also get a thin real-disk mirror (a
+// per-instance temp folder) purely so ResolveFileDiskPath has a real path to hand to QuestPDF's
+// DocumentOperation for PDF-attachment-merge tests (see issue #167 P1 #3) — everything else about
+// this fake stays in-memory.
 internal sealed class FakeStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _saved = new();
+    private readonly string _diskDir = Directory.CreateTempSubdirectory("lagebuch-fakestore-").FullName;
 
     public int SaveCount { get; private set; }
 
@@ -342,14 +373,16 @@ internal sealed class FakeStore : IIncidentStore
 
     private readonly Dictionary<string, byte[]> _files = new();
 
-    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
+    public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
     {
         _files[$"{path}/{storageFileName}"] = bytes;
-        return Task.CompletedTask;
+        await File.WriteAllBytesAsync(Path.Combine(_diskDir, storageFileName), bytes, cancellationToken);
     }
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
+
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(_diskDir, storageFileName);
 
     public event Action<Exception>? SaveFailed
     {
@@ -380,6 +413,8 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
+
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
     public event Action<Exception>? SaveFailed
     {

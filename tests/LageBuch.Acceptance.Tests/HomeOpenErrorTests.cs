@@ -65,6 +65,8 @@ public class HomeOpenErrorTests
         public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
             Task.FromResult<byte[]?>(null);
 
+        public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
+
         public event Action<Exception>? SaveFailed
         {
             add { }

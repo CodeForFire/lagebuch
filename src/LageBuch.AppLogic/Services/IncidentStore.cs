@@ -75,6 +75,9 @@ public sealed class IncidentStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         _fileStore.TryReadBytesAsync(path, storageFileName, cancellationToken);
 
+    public string ResolveFileDiskPath(string path, string storageFileName) =>
+        _fileStore.ResolveDiskPath(path, storageFileName);
+
     private void RunWriter()
     {
         foreach (var work in _writeQueue.GetConsumingEnumerable())

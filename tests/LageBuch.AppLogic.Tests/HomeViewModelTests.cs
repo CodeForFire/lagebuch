@@ -446,6 +446,8 @@ internal sealed class ThrowingStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
 
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
+
     public event Action<Exception>? SaveFailed
     {
         add { }
@@ -472,6 +474,8 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
+
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
     public event Action<Exception>? SaveFailed
     {
@@ -507,6 +511,8 @@ internal sealed class CountingStore : IIncidentStore
 
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
+
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
     public event Action<Exception>? SaveFailed
     {

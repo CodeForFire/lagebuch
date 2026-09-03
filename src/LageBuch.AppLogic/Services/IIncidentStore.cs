@@ -39,6 +39,11 @@ public interface IIncidentStore
     /// never throws, so a caller degrades quietly.</summary>
     Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);
 
+    /// <summary>The real path on disk for an attached file, for APIs that require a file path
+    /// rather than bytes (QuestPDF's <c>DocumentOperation</c> — see issue #167 P1 #3). Does not
+    /// guarantee the file exists.</summary>
+    string ResolveFileDiskPath(string path, string storageFileName);
+
     /// <summary>
     /// Raised on the background writer thread when a queued <see cref="Save"/> throws (the queue
     /// keeps serving later writes regardless). Fires off the UI thread — marshal it yourself (e.g.
