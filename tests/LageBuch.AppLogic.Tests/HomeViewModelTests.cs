@@ -434,7 +434,7 @@ internal sealed class ThrowingStore : IIncidentStore
     {
     }
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path) => throw new InvalidOperationException(_message);
 
@@ -465,7 +465,7 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
 
     public void Save(string path, Incident incident) => _saved[path] = incident;
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path) =>
         _saved.TryGetValue(path, out var i) ? i : throw new InvalidOperationException("Datei kaputt.");
@@ -501,7 +501,7 @@ internal sealed class CountingStore : IIncidentStore
 
     public void Save(string path, Incident incident) => _saved[path] = incident;
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path)
     {

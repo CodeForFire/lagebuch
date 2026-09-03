@@ -58,10 +58,11 @@ public sealed class IncidentStore : IIncidentStore
         });
     }
 
-    public Task FlushAsync()
+    public Task FlushAsync(CancellationToken cancellationToken = default)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _writeQueue.Add(() => tcs.SetResult());
+        cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
+        _writeQueue.Add(() => tcs.TrySetResult(), CancellationToken.None);
         return tcs.Task;
     }
 

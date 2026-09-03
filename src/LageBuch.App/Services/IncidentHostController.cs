@@ -37,7 +37,7 @@ internal sealed class IncidentHostController : IIncidentHostController
 
     public string? SharePin { get; private set; }
 
-    public async Task StartAsync(LocalIncidentSession session, MasterDataSet masterData)
+    public async Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
     {
         if (_host is not null)
         {
@@ -49,7 +49,7 @@ internal sealed class IncidentHostController : IIncidentHostController
         // hardening even though a 4-digit space is small (brute-force is the accepted, documented risk).
         var pin = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10_000).ToString("D4", CultureInfo.InvariantCulture);
         var host = new IncidentHost(session, _clock, _appVersion, _ui, pin, masterData);
-        await host.StartAsync(IPAddress.Any);
+        await host.StartAsync(IPAddress.Any, cancellationToken: cancellationToken);
         _host = host;
         SharePin = pin;
 
@@ -58,7 +58,7 @@ internal sealed class IncidentHostController : IIncidentHostController
             + $"auf diesem Gerät: https://localhost:{SyncProtocol.Port}";
     }
 
-    public async Task StopAsync()
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         if (_host is null)
         {

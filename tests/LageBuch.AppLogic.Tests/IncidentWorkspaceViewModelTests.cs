@@ -741,7 +741,7 @@ internal sealed class FakeHostController : IIncidentHostController
     /// <summary>The Stammdaten the workspace handed over when sharing started (#183).</summary>
     public MasterDataSet? LastMasterData { get; private set; }
 
-    public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData)
+    public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
     {
         StartCalled = true;
         LastMasterData = masterData;
@@ -755,7 +755,7 @@ internal sealed class FakeHostController : IIncidentHostController
         return Task.CompletedTask;
     }
 
-    public Task StopAsync()
+    public Task StopAsync(CancellationToken cancellationToken = default)
     {
         IsHosting = false;
         SharePin = null;

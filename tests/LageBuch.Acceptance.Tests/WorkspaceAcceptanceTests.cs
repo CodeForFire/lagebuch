@@ -34,7 +34,7 @@ internal sealed class FakeStore : IIncidentStore
         SaveCount++;
     }
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path) => _d[path];
 

@@ -217,14 +217,24 @@ public sealed partial class HomeViewModel : ObservableObject
     }
 
     // ===== Multi-device join (#52 §4/§6): connect to another device's hosted incident as a thin client. =====
-    [RelayCommand]
-    private async Task JoinDeviceAsync(JoinRequest request)
+    // IncludeCancelCommand: a join can hang (host unreachable but not yet timed out), so the view
+    // offers a Cancel affordance bound to the generated JoinDeviceCancelCommand while IsRunning.
+    [RelayCommand(IncludeCancelCommand = true)]
+    private async Task JoinDeviceAsync(JoinRequest request, CancellationToken cancellationToken)
     {
         var (host, port) = ParseHost(request.Host);
         try
         {
             var session = await RemoteIncidentSession.ConnectAsync(
-                host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port, cacheRoot: _attachmentCacheRoot, trustStore: _trustStore);
+                host,
+                request.Operator,
+                _appVersion,
+                _uiDispatcher,
+                request.Pin,
+                port,
+                cacheRoot: _attachmentCacheRoot,
+                trustStore: _trustStore,
+                ct: cancellationToken);
 
             // The host is the Stammdaten master (#183): the workspace is built from the host's set,
             // never this device's. Parsed before anything opens, and the session is torn down if it
@@ -287,6 +297,10 @@ public sealed partial class HomeViewModel : ObservableObject
             // inside RemoteIncidentSession.ConnectAsync and mislabel that as a Stammdaten problem.
             JoinError = ex.Message;
             ClearCertificateChangedHost();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // User cancelled via JoinDeviceCancelCommand — leave them on Home without an error banner.
         }
         catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
         {

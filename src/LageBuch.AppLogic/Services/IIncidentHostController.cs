@@ -26,9 +26,9 @@ public interface IIncidentHostController
     /// on: the host is the Stammdaten master (#183), so joined clients run on this set for the
     /// session instead of their own local one.
     /// </summary>
-    Task StartAsync(LocalIncidentSession session, MasterDataSet masterData);
+    Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default);
 
-    Task StopAsync();
+    Task StopAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>No-op controller for heads that cannot host; the toggle stays hidden (<see cref="CanHost"/> is false).</summary>
@@ -42,7 +42,7 @@ public sealed class NoopIncidentHostController : IIncidentHostController
 
     public string? SharePin => null;
 
-    public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData) => Task.CompletedTask;
+    public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-    public Task StopAsync() => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

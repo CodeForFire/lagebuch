@@ -365,7 +365,7 @@ internal sealed class FakeStore : IIncidentStore
         SaveCount++;
     }
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path) => _saved[path];
 
@@ -409,7 +409,7 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public void Save(string path, Incident incident) => _saved[path] = incident;
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path) => _saved[path];
 

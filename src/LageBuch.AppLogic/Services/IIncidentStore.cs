@@ -14,7 +14,7 @@ public interface IIncidentStore
     void Save(string path, Incident incident);
 
     /// <summary>Waits for every write queued so far via <see cref="Save"/> to complete.</summary>
-    Task FlushAsync();
+    Task FlushAsync(CancellationToken cancellationToken = default);
 
     Incident Load(string path);
 
