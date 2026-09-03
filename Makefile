@@ -25,6 +25,9 @@ VERSION      ?= 0.1.0
 ANDROID_HOME ?= $(HOME)/Android/Sdk
 ADB          := $(ANDROID_HOME)/platform-tools/adb
 EMULATOR_BIN := $(ANDROID_HOME)/emulator/emulator
+# The android CLI's `emulator create` names the AVD after its --profile, so
+# this is both the AVD instance name and the device profile to create it
+# with (`android emulator create --list-profiles` shows the full set).
 AVD          ?= medium_tablet
 IMAGE        ?= lagebuch-android-build
 DOCKER_HOME  ?= $(HOME)/.cache/lagebuch-android-build
@@ -140,8 +143,9 @@ emulator: ## Boot the emulator (AVD=name) and wait for it
 	  "$(EMULATOR_BIN)" -list-avds | grep -qx "$(AVD)" || { \
 	    echo "AVD '$(AVD)' not found. Available: $$("$(EMULATOR_BIN)" -list-avds | tr '\n' ' ')"; \
 	    echo "Create one with:"; \
-	    echo "  $(ANDROID_HOME)/cmdline-tools/latest/bin/sdkmanager 'system-images;android-34;google_apis;x86_64'"; \
-	    echo "  $(ANDROID_HOME)/cmdline-tools/latest/bin/avdmanager create avd -n $(AVD) -k 'system-images;android-34;google_apis;x86_64'"; \
+	    echo "  $(ANDROID_HOME)/cmdline-tools/latest/bin/android sdk install system-images/android-36/google_apis/x86_64"; \
+	    echo "  $(ANDROID_HOME)/cmdline-tools/latest/bin/android emulator create --profile=$(AVD)"; \
+	    echo "  ('android emulator create --list-profiles' shows other device profiles)"; \
 	    exit 1; \
 	  }; \
 	  echo "Booting $(AVD)..."; \
