@@ -1,7 +1,7 @@
 # Builds the Android head (src/LageBuch.App.Android) with a JDK the .NET
 # Android SDK actually supports. Microsoft.Android.Sdk currently rejects any
 # JDK above 21 (error XA0030), and several current Linux distros (e.g. Debian
-# testing/sid) no longer package anything below JDK 21+ builds beyond it —
+# testing/sid) no longer package any JDK as old as 21 —
 # see docker/README.md for usage and rationale.
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0
@@ -35,9 +35,9 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
     && rm cmdline-tools.zip \
     && mv cmdline-tools latest
 ENV PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
-# android-36 is required even though the app targets API 34: the .NET 10
-# Android workload compiles against the latest API it bundles for
-# net10.0-android36.0 (error XA5207 otherwise).
+# android-36 is required because the .NET 10 Android workload compiles
+# against the latest API it bundles for net10.0-android36.0, regardless of
+# targetSdkVersion (error XA5207 otherwise).
 RUN android sdk install platform-tools \
     "platforms/android-34" "build-tools/34.0.0" \
     "platforms/android-36" "build-tools/36.0.0"

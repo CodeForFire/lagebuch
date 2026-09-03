@@ -31,7 +31,7 @@ EMULATOR_BIN := $(ANDROID_HOME)/emulator/emulator
 AVD          ?= medium_tablet
 IMAGE        ?= lagebuch-android-build
 DOCKER_HOME  ?= $(HOME)/.cache/lagebuch-android-build
-APK          := src/LageBuch.App.Android/bin/$(CONFIG)/net9.0-android/$(APP_ID)-Signed.apk
+APK          := src/LageBuch.App.Android/bin/$(CONFIG)/net10.0-android/$(APP_ID)-Signed.apk
 
 # Matches .github/workflows/release.yml's PUBLISH_FLAGS.
 PUBLISH_FLAGS := -c Release --self-contained true -p:PublishSingleFile=true \
@@ -96,7 +96,7 @@ format-check: ## Fail if dotnet format would change anything
 	$(DOTNET) format whitespace $(SLNF) --verify-no-changes
 	$(DOTNET) format style $(SLNF) --verify-no-changes
 
-ci: ## Reproduce the CI build+test legs locally
+ci: ## Reproduce the CI build+test legs locally (desktop projects only — excludes the Android head)
 	$(DOTNET) restore $(SLNF)
 	$(DOTNET) build $(SLNF) --configuration Release --no-restore
 	$(DOTNET) test $(SLNF) --configuration Release --no-build --verbosity normal
@@ -130,7 +130,7 @@ apk: android-image ## Build an installable APK in Docker
 	  -v "$(DOCKER_HOME)":/home/build \
 	  -v "$$HOME/.nuget":/home/build/.nuget \
 	  -v "$$PWD":/src $(IMAGE) \
-	  publish $(ANDROID_PROJ) -c $(CONFIG) -f net9.0-android \
+	  publish $(ANDROID_PROJ) -c $(CONFIG) -f net10.0-android \
 	  -p:AndroidPackageFormat=apk -p:EmbedAssembliesIntoApk=true
 	@echo "APK: $(APK)"
 
