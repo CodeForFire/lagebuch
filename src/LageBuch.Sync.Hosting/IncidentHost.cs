@@ -3,6 +3,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
+using LageBuch.Domain.Files;
 using LageBuch.Domain.Time;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -158,7 +159,7 @@ public sealed class IncidentHost : IAsyncDisposable
         }
 
         var file = _session.Incident.Files.FirstOrDefault(f => f.Id == id);
-        return Results.Bytes(bytes, file?.ContentType ?? "application/octet-stream", fileDownloadName: file?.FileName);
+        return Results.Bytes(bytes, file?.ContentType ?? IncidentFile.DefaultMimeType, fileDownloadName: file?.FileName);
     }
 
     // Exactly one PIN header, matching the host's, is accepted. A missing/duplicated/mismatched header

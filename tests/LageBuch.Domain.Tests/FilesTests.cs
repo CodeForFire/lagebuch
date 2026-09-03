@@ -134,4 +134,34 @@ public class FilesTests
         Assert.Equal($"{id}.jpg", IncidentFile.StorageFileName(id, "brand.jpg"));
         Assert.Equal($"{id}.PDF", IncidentFile.StorageFileName(id, "Bericht.PDF"));
     }
+
+    [Fact]
+    public void AllowedContentTypes_matches_the_mime_table_exactly()
+    {
+        Assert.Equal(
+            new HashSet<string>(IncidentFile.MimeTypesByExtension.Values, StringComparer.OrdinalIgnoreCase),
+            IncidentFile.AllowedContentTypes);
+        Assert.Equal(5, IncidentFile.AllowedContentTypes.Count);
+    }
+
+    [Theory]
+    [InlineData("brand.jpg", "image/jpeg")]
+    [InlineData("brand.JPG", "image/jpeg")]
+    [InlineData("brand.jpeg", "image/jpeg")]
+    [InlineData("brand.png", "image/png")]
+    [InlineData("brand.gif", "image/gif")]
+    [InlineData("brand.webp", "image/webp")]
+    [InlineData("bericht.pdf", "application/pdf")]
+    [InlineData("bericht.PDF", "application/pdf")]
+    public void GetMimeType_recognizes_every_allowed_extension_case_insensitively(string path, string expected)
+    {
+        Assert.Equal(expected, IncidentFile.GetMimeType(path, "fallback"));
+    }
+
+    [Fact]
+    public void GetMimeType_returns_the_callers_fallback_for_an_unknown_extension()
+    {
+        Assert.Equal("application/octet-stream", IncidentFile.GetMimeType("notes.txt", "application/octet-stream"));
+        Assert.Equal("*/*", IncidentFile.GetMimeType("notes.txt", "*/*"));
+    }
 }
