@@ -253,4 +253,24 @@ public class HomeViewModelJoinTests
         Assert.NotNull(vm.JoinError);
         Assert.Contains($"127.0.0.1:{port}", vm.JoinError, StringComparison.Ordinal); // names the device it couldn't reach
     }
+
+    [Fact]
+    public async Task A_corrupt_master_data_payload_aborts_the_join_without_opening_a_workspace()
+    {
+        var clock = new FixedClock();
+        await using var host = await BadMasterDataHost.StartAsync(HostSession(clock).Incident);
+
+        var vm = Home();
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{host.Port}", TestHost.DefaultPin));
+
+        // The version handshake guarantees an identical build on both ends, so an unparseable
+        // payload means corruption or something past the TOFU pin — abort, don't degrade into it.
+        Assert.Null(opened);
+        Assert.NotNull(vm.JoinError);
+        Assert.Contains("Stammdaten", vm.JoinError, StringComparison.Ordinal);
+    }
 }

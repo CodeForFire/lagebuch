@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net.Sockets;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -224,15 +225,26 @@ public sealed partial class HomeViewModel : ObservableObject
         {
             var session = await RemoteIncidentSession.ConnectAsync(
                 host, request.Operator, _appVersion, _uiDispatcher, request.Pin, port, cacheRoot: _attachmentCacheRoot, trustStore: _trustStore);
+
+            // The host is the Stammdaten master (#183): the workspace is built from the host's set,
+            // never this device's. Parsed before anything opens, and the session is torn down if it
+            // fails — ConnectAsync has already opened a hub connection by this point, so simply
+            // letting the throw travel would leak it.
+            MasterDataSet hostMasterData;
+            try
+            {
+                hostMasterData = MasterDataJson.Parse(session.HostMasterDataJson);
+            }
+            catch (JsonException)
+            {
+                await session.DisposeAsync();
+                throw;
+            }
+
             JoinError = null;
             _certificateChangedHost = null;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
-
-            // The host is the Stammdaten master (#183): the workspace is built from the host's set,
-            // never this device's, so both ends offer the same Wachen/Funkrufnamen/Personen and run
-            // the same Einsatzzeiten and Rückzugsdruck. Nothing is written to the local store —
-            // leaving the workspace is the entire "restore" path.
-            OpenRemoteWorkspace(session, MasterDataJson.Parse(session.HostMasterDataJson));
+            OpenRemoteWorkspace(session, hostMasterData);
         }
         catch (PinRejectedException ex)
         {
@@ -256,6 +268,15 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = ex.Message;
             _certificateChangedHost = host;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
+        }
+        catch (JsonException ex)
+        {
+            // Both ends run the same app version (the handshake enforces it), so an unparseable
+            // Stammdaten payload means corruption or something past the TOFU pin. Refuse the join
+            // rather than degrade into it — and never let it escape: an unhandled throw here kills
+            // the app mid-Einsatz.
+            JoinError = $"Stammdaten des Hosts konnten nicht gelesen werden. ({ex.Message})";
+            ClearCertificateChangedHost();
         }
         catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
         {
