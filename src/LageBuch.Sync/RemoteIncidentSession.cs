@@ -24,10 +24,16 @@ namespace LageBuch.Sync;
 /// </summary>
 public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 {
+    // Default attachment-cache cap (issue #167 P2 finding: the disk cache in GetFileBytesAsync had
+    // no eviction at all). 500 MB comfortably covers a normal incident's attachments while bounding
+    // how much a device that's joined many incidents over time accumulates on disk.
+    public const long DefaultCacheMaxBytes = 500L * 1024 * 1024;
+
     private readonly HttpClient _http;
     private readonly HubConnection _hub;
     private readonly IUiDispatcher _ui;
     private readonly string? _cacheRoot;
+    private readonly long _cacheMaxBytes;
     private Incident _incident;
 
     public SessionOperator? Operator { get; }
@@ -79,6 +85,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         SessionOperator op,
         Incident initial,
         string? cacheRoot,
+        long cacheMaxBytes,
         string hostMasterDataJson)
     {
         _http = http;
@@ -87,6 +94,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Operator = op;
         _incident = initial;
         _cacheRoot = cacheRoot;
+        _cacheMaxBytes = cacheMaxBytes;
         HostMasterDataJson = hostMasterDataJson;
     }
 
@@ -113,6 +121,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// supply it (a folder under the app's data/cache dir). Null disables caching — bytes are
     /// re-fetched from the host on every call, which is correct, just not free.
     /// </param>
+    /// <param name="cacheMaxBytes">
+    /// Size cap for <paramref name="cacheRoot"/> across every incident cached there; once a newly
+    /// cached file pushes the total over this, the oldest files (by last-write time) are deleted
+    /// until back under it. Defaults to <see cref="DefaultCacheMaxBytes"/>; irrelevant when
+    /// <paramref name="cacheRoot"/> is null.
+    /// </param>
     /// <param name="trustStore">
     /// Optional store of trusted TLS thumbprints, keyed by host address, driving Trust-on-First-Use:
     /// on first contact the presented certificate's thumbprint is saved and accepted; on a later
@@ -130,6 +144,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         int port = SyncProtocol.Port,
         IRetryPolicy? reconnectPolicy = null,
         string? cacheRoot = null,
+        long cacheMaxBytes = DefaultCacheMaxBytes,
         ITrustStore? trustStore = null,
         CancellationToken ct = default)
     {
@@ -242,7 +257,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, hub, ui, op, initial, cacheRoot, hostMasterDataJson);
+            var session = new RemoteIncidentSession(http, hub, ui, op, initial, cacheRoot, cacheMaxBytes, hostMasterDataJson);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -433,6 +448,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         {
             Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
             await File.WriteAllBytesAsync(cachePath, bytes, cancellationToken);
+            EvictOldestCacheEntriesOverCap();
         }
 
         return bytes;
@@ -443,6 +459,42 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private string? CachePathFor(Guid fileId, string fileName) => _cacheRoot is null
         ? null
         : Path.Combine(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
+
+    // Runs across the whole cache root (every incident ever cached on this device, not just the
+    // current one), oldest-by-last-write-time first, so a device that's joined many incidents over
+    // time doesn't accumulate an unbounded amount of attachment data (issue #167 P2 finding).
+    private void EvictOldestCacheEntriesOverCap()
+    {
+        if (_cacheRoot is null || !Directory.Exists(_cacheRoot))
+        {
+            return;
+        }
+
+        var files = new DirectoryInfo(_cacheRoot)
+            .EnumerateFiles("*", SearchOption.AllDirectories)
+            .OrderBy(f => f.LastWriteTimeUtc)
+            .ToList();
+        var totalBytes = files.Sum(f => f.Length);
+
+        foreach (var file in files)
+        {
+            if (totalBytes <= _cacheMaxBytes)
+            {
+                break;
+            }
+
+            totalBytes -= file.Length;
+            try
+            {
+                file.Delete();
+            }
+            catch (IOException)
+            {
+                // Best-effort: a file another process/handle is using right now just stays, and
+                // the next eviction pass gets another chance at it.
+            }
+        }
+    }
 
     public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
 
