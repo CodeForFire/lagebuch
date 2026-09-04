@@ -48,7 +48,7 @@ public class CommandSerializationTests
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),
         new SetStatusCommand(null),
         new CloseIncidentCommand(Op),
-        new AddFileCommand(Op, "brand.jpg", "image/jpeg", new byte[] { 1, 2, 3, 4 }),
+        new AddFileCommand(Op, Guid.NewGuid(), "brand.jpg", "image/jpeg", 4),
         new RenameFileCommand(Guid.NewGuid(), "Küchenbrand"),
         new RenameFileCommand(Guid.NewGuid(), null),
         new AddTaskCommand(Op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium, 10),
@@ -82,14 +82,18 @@ public class CommandSerializationTests
     }
 
     [Fact]
-    public void AddFileCommand_bytes_base64_round_trip_exactly()
+    public void AddFileCommand_carries_metadata_only_no_bytes()
     {
-        var bytes = new byte[] { 0, 1, 254, 255, 42 };
-        var json = SyncJson.Serialize<SyncCommand>(new AddFileCommand(Op, "brand.jpg", "image/jpeg", bytes));
+        // issue #167 P1 #2: the attachment's bytes never ride this command — only the id the client
+        // generated up front (to correlate with the separate PUT upload) and the size it declares.
+        var fileId = Guid.NewGuid();
+        var json = SyncJson.Serialize<SyncCommand>(new AddFileCommand(Op, fileId, "brand.jpg", "image/jpeg", 5));
 
         var back = Assert.IsType<AddFileCommand>(SyncJson.Deserialize<SyncCommand>(json));
 
-        Assert.Equal(bytes, back.Bytes);
+        Assert.Equal(fileId, back.FileId);
+        Assert.Equal(5, back.SizeBytes);
+        Assert.DoesNotContain("\"bytes\"", json, StringComparison.OrdinalIgnoreCase);
     }
 
     // A pre-#76 host or client sends addForceUnit without OfficerCount; the missing property must

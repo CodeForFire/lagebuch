@@ -72,6 +72,9 @@ public sealed class IncidentStore : IIncidentStore
     public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
         _fileStore.SaveBytesAsync(path, storageFileName, bytes, cancellationToken);
 
+    public Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
+        _fileStore.SaveStreamAsync(path, storageFileName, source, cancellationToken);
+
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         _fileStore.TryReadBytesAsync(path, storageFileName, cancellationToken);
 

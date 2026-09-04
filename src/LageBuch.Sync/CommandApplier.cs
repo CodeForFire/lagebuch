@@ -20,11 +20,10 @@ public static class CommandApplier
     /// <param name="incident">The host's authoritative aggregate to mutate.</param>
     /// <param name="clock">The host's clock — authoritative timestamps for every applied command.</param>
     /// <returns>
-    /// The newly recorded <see cref="IncidentFile"/> for an <see cref="AddFileCommand"/> — the one
-    /// command whose application has a filesystem side effect the caller must still perform, since
-    /// attachment bytes are kept out of the domain/snapshot (see <see cref="IncidentSnapshot"/>) and
-    /// out of this dispatcher (issue #167 P1 #1: the byte write must happen off the UI thread, so the
-    /// host writes it itself after this call returns). Null for every other command.
+    /// The newly recorded <see cref="IncidentFile"/> for an <see cref="AddFileCommand"/> — informational
+    /// only, since the attachment's bytes never travel through this command (issue #167 P1 #2: they
+    /// PUT to <see cref="SyncProtocol.FilesPath"/> as a separate request, keyed by the id the command
+    /// already carries). Null for every other command.
     /// </returns>
     public static IncidentFile? Apply(SyncCommand command, Incident incident, IClock clock)
     {
@@ -120,7 +119,7 @@ public static class CommandApplier
                 incident.Close(clock, Operator(c.Operator));
                 break;
             case AddFileCommand c:
-                return incident.AddFile(clock, Operator(c.Operator), c.FileName, c.ContentType, c.Bytes.LongLength);
+                return incident.AddFile(clock, Operator(c.Operator), c.FileId, c.FileName, c.ContentType, c.SizeBytes);
             case RenameFileCommand c:
                 incident.RenameFile(c.FileId, c.DisplayName);
                 break;

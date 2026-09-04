@@ -128,11 +128,11 @@ public interface IIncidentSession
     /// caller needs to show a spinner and surface a thrown exception (closed incident, unsupported
     /// type, over the size cap, or — on a joined client — a network failure).
     /// </summary>
-    Task AddFileAsync(string fileName, string contentType, byte[] bytes);
+    Task AddFileAsync(string fileName, string contentType, byte[] bytes, CancellationToken cancellationToken = default);
 
     /// <summary>Null when the bytes are unavailable — never throws, so a caller (a file-row "open"
     /// action, or the PDF exporter) degrades quietly rather than crashing on a missing attachment.</summary>
-    Task<byte[]?> GetFileBytesAsync(Guid fileId);
+    Task<byte[]?> GetFileBytesAsync(Guid fileId, CancellationToken cancellationToken = default);
 
     /// <summary>Corrects a file's display label. Silent — no ETB entry, matching UpdateForceUnit's
     /// Bemerkung field. Null/blank resets the label back to the file's original name.</summary>

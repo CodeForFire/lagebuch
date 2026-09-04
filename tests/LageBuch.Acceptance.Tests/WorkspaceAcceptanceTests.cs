@@ -48,6 +48,13 @@ internal sealed class FakeStore : IIncidentStore
         return Task.CompletedTask;
     }
 
+    public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default)
+    {
+        using var ms = new MemoryStream();
+        await source.CopyToAsync(ms, cancellationToken);
+        await SaveFileBytesAsync(path, storageFileName, ms.ToArray(), cancellationToken);
+    }
+
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 

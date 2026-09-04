@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
@@ -112,10 +111,11 @@ public sealed record SetStatusCommand(string? Status) : SyncCommand;
 
 public sealed record CloseIncidentCommand(OperatorDto Operator) : SyncCommand;
 
-// Bytes ride this one-shot upload command (System.Text.Json base64-encodes byte[] automatically),
-// but never the broadcast snapshot that follows every command — see IncidentSnapshot/IncidentFileDto.
-[SuppressMessage("Performance", "CA1819", Justification = "byte[] is the wire representation System.Text.Json base64-encodes; a read-only wrapper would need a custom converter.")]
-public sealed record AddFileCommand(OperatorDto Operator, string FileName, string ContentType, byte[] Bytes) : SyncCommand;
+// Metadata only (issue #167 P1 #2) — the client generates FileId up front and PUTs the raw bytes to
+// SyncProtocol.FilesPath(FileId) as a separate request, so a multi-MB attachment never rides this
+// JSON command (previously base64-inflating it ~33% inside the whole-command payload). This command
+// just registers the file's existence/metadata on the domain; the bytes land on disk independently.
+public sealed record AddFileCommand(OperatorDto Operator, Guid FileId, string FileName, string ContentType, long SizeBytes) : SyncCommand;
 
 // No operator on the wire: renaming is a silent label correction (no ETB entry), unlike every
 // attributed command above.

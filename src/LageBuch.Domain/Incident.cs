@@ -769,13 +769,22 @@ public sealed class Incident
     /// <see cref="IncidentFile.StorageFileName"/> on the returned <see cref="IncidentFile"/>.
     /// </summary>
     public IncidentFile AddFile(
-        IClock clock, SessionOperator op, string fileName, string contentType, long sizeBytes)
+        IClock clock, SessionOperator op, string fileName, string contentType, long sizeBytes) =>
+        AddFile(clock, op, Guid.NewGuid(), fileName, contentType, sizeBytes);
+
+    /// <summary>
+    /// Overload taking an externally-supplied id (issue #167 P1 #2): a joined client generates the
+    /// file id before sending the metadata command, so it can correlate it with the raw-byte upload
+    /// that follows over a separate request.
+    /// </summary>
+    public IncidentFile AddFile(
+        IClock clock, SessionOperator op, Guid id, string fileName, string contentType, long sizeBytes)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var file = IncidentFile.Create(fileName, contentType, sizeBytes, clock.Now, op.Display);
+        var file = IncidentFile.Create(id, fileName, contentType, sizeBytes, clock.Now, op.Display);
         _files.Add(file);
         AppendSystemEntry(clock, op, $"Datei hinzugefügt: {file.FileName}");
         return file;

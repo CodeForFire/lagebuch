@@ -131,6 +131,7 @@ public sealed class IncidentHost : IAsyncDisposable
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(_masterDataJson, "application/json", Encoding.UTF8));
         app.MapPost(SyncProtocol.CommandPath, HandleCommand);
         app.MapGet(SyncProtocol.FilesRouteTemplate, HandleGetFile);
+        app.MapPut(SyncProtocol.FilesRouteTemplate, HandleUploadFile);
 
         _hub = app.Services.GetRequiredService<IHubContext<IncidentHub>>();
         _session.Changed += OnSessionChanged; // the host's own edits reach clients too
@@ -142,18 +143,13 @@ public sealed class IncidentHost : IAsyncDisposable
     {
         // A Kestrel request thread runs this. Apply on the UI thread so the host's authoritative
         // Incident is only ever mutated there (matching solo mode) and the Changed it raises reaches
-        // the host's own Avalonia-bound views — which reject an off-thread mutation. An AddFileCommand's
-        // byte write is the one part of applying a command that isn't a UI-bound mutation: issue #167
-        // P1 #1 requires it happen off the UI thread, genuinely async, so it runs here — between the
-        // two UI-thread hops — rather than inside CommandApplier.Apply.
+        // the host's own Avalonia-bound views — which reject an off-thread mutation. An AddFileCommand
+        // carries metadata only (issue #167 P1 #2) — the attachment's bytes arrive separately via
+        // HandleUploadFile, so applying this command is a pure UI-bound domain mutation like any other,
+        // with no off-thread byte write to sequence around it.
         try
         {
-            var addedFile = await _ui.InvokeAsync(() => CommandApplier.Apply(command, _session.Incident, _clock));
-
-            if (addedFile is not null && command is AddFileCommand addFile)
-            {
-                await _session.SaveFileBytesAsync(IncidentFile.StorageFileName(addedFile.Id, addedFile.FileName), addFile.Bytes);
-            }
+            await _ui.InvokeAsync(() => CommandApplier.Apply(command, _session.Incident, _clock));
 
             return await _ui.InvokeAsync(() =>
             {
@@ -191,6 +187,36 @@ public sealed class IncidentHost : IAsyncDisposable
 
         var file = _session.Incident.Files.FirstOrDefault(f => f.Id == id);
         return Results.Bytes(bytes, file?.ContentType ?? IncidentFile.DefaultMimeType, fileDownloadName: file?.FileName);
+    }
+
+    // The other half of the metadata/bytes split (issue #167 P1 #2): a client PUTs the raw attachment
+    // bytes here, keyed by the id its AddFileCommand already registered. A pure disk write against
+    // already-persisted domain state — like HandleGetFile, this doesn't need the UI-thread dispatch
+    // HandleCommand uses, and unlike the old inline byte write, it streams straight to disk (never a
+    // whole-file byte[] in memory here or in IncidentFileStore.SaveStreamAsync).
+    private async Task<IResult> HandleUploadFile(Guid id, HttpRequest request, CancellationToken cancellationToken)
+    {
+        var file = _session.Incident.Files.FirstOrDefault(f => f.Id == id);
+        if (file is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (request.ContentLength is { } contentLength && contentLength > IncidentFile.MaxSizeBytes)
+        {
+            return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
+
+        // Belt-and-suspenders for a body sent without Content-Length (or one that lies about it):
+        // Kestrel aborts the read with a 413 once the body exceeds this, even without the check above.
+        var maxBodySizeFeature = request.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+        if (maxBodySizeFeature is { IsReadOnly: false })
+        {
+            maxBodySizeFeature.MaxRequestBodySize = IncidentFile.MaxSizeBytes;
+        }
+
+        await _session.SaveFileStreamAsync(IncidentFile.StorageFileName(file.Id, file.FileName), request.Body, cancellationToken);
+        return Results.NoContent();
     }
 
     // Exactly one PIN header, matching the host's, is accepted. A missing/duplicated/mismatched header

@@ -62,6 +62,9 @@ public class HomeOpenErrorTests
         public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        public Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
         public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
             Task.FromResult<byte[]?>(null);
 
