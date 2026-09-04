@@ -129,6 +129,14 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         }
 
         ErrorMessage = null;
+
+        var sizeBytes = new FileInfo(path).Length;
+        if (sizeBytes > IncidentFile.MaxSizeBytes)
+        {
+            ErrorMessage = $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.";
+            return;
+        }
+
         IsUploading = true;
         try
         {

@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Files;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -84,6 +85,43 @@ public class FilesViewModelTests
 
             Assert.Empty(session.Incident.Files);
             Assert.NotNull(vm.ErrorMessage);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task AddFile_rejects_an_oversized_file_without_reading_it_into_memory()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path = Path.Combine(Path.GetTempPath(), $"riesig-{Guid.NewGuid():N}.jpg");
+        using (var fs = new FileStream(path, FileMode.CreateNew))
+        {
+            fs.SetLength(IncidentFile.MaxSizeBytes + 1); // sparse — no real disk write, so the test stays fast
+        }
+
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs { AttachmentPath = path }, () => { });
+
+            var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+            await vm.AddFileCommand.ExecuteAsync(null);
+            var allocatedDuring = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+
+            Assert.Empty(session.Incident.Files);
+            Assert.NotNull(vm.ErrorMessage);
+            Assert.True(
+                allocatedDuring < 10 * 1024 * 1024,
+                $"expected the oversized file to be rejected without reading it into memory, but the call allocated {allocatedDuring} bytes");
         }
         finally
         {
