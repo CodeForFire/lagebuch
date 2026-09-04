@@ -2,9 +2,12 @@ namespace LageBuch.Domain.Files;
 
 public sealed record IncidentFile
 {
-    // Base64 over a single POST inflates a binary payload ~33%, so 25 MB stays a one-shot,
-    // few-second transfer on the app's Tailscale-LAN sync path while comfortably covering a
-    // phone photo or a scanned PDF.
+    // Uploads stream straight to disk on the host (issue #167 P1 #2) without ever holding a
+    // whole-file byte[] there, but the client still reads the picked file fully into memory
+    // before sending it (FilesViewModel.AddFileAsync) and fully buffers a downloaded file too
+    // (RemoteIncidentSession.GetFileBytesAsync) — so this cap bounds that client-side allocation,
+    // not wire-transfer size. 25 MB keeps that a one-shot, few-second transfer on the app's
+    // Tailscale-LAN sync path while comfortably covering a phone photo or a scanned PDF.
     public const long MaxSizeBytes = 25 * 1024 * 1024;
 
     /// <summary>
