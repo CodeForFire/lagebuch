@@ -28,6 +28,7 @@ public partial class MainView : UserControl
                     }
                 };
                 prompt.Cancelled += (_, _) => viewModel.CancelOperatorCommand.Execute(null);
+                prompt.CancelJoinRequested += (_, _) => viewModel.CancelJoinCommand.Execute(null);
                 prompt.ResetTrustRequested += (_, _) => viewModel.ResetTrustCommand.Execute(null);
             }
         };

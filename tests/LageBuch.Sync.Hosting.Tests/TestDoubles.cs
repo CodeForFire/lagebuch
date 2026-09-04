@@ -21,7 +21,7 @@ internal sealed class InMemoryStore : IIncidentStore
 
     public void Save(string path, Incident incident) => _byPath[path] = incident;
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path) => _byPath[path];
 
@@ -293,7 +293,7 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public void Save(string path, Incident incident) => _saved[path] = incident;
 
-    public Task FlushAsync() => Task.CompletedTask;
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Incident Load(string path) => _saved[path];
 

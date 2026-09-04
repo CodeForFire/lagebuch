@@ -386,6 +386,47 @@ public class HomeViewModelJoinTests
         Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
         await ((IncidentWorkspaceViewModel)vm.CurrentView!).LeaveAsync();
     }
+
+    // #167 P1: a stuck join (host reachable but never completing the handshake) previously had no
+    // way out but the network layer's own multi-second timeout. IncludeCancelCommand wires an
+    // explicit abort — this pins that cancelling clears IsRunning and leaves no error banner up,
+    // since the user asked for this, it isn't a failure.
+    [Fact]
+    public async Task Cancelling_a_stuck_join_clears_running_state_without_a_banner()
+    {
+        // A bare listener accepts the TCP connection but never drives the socket, so the client's
+        // TLS handshake hangs indefinitely — exactly the "stuck" case the cancel button is for.
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        var vm = Home();
+        var opened = false;
+        vm.WorkspaceOpened = _ => opened = true;
+
+        // The cancel affordance only makes sense while a join is actually in flight.
+        Assert.False(vm.JoinDeviceCancelCommand.CanExecute(null));
+
+        var request = new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "0000");
+        var join = vm.JoinDeviceCommand.ExecuteAsync(request);
+
+        // Let the connect attempt actually reach the hung TLS handshake before cancelling it.
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!vm.JoinDeviceCommand.IsRunning && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(vm.JoinDeviceCommand.IsRunning);
+        Assert.True(vm.JoinDeviceCancelCommand.CanExecute(null));
+        vm.JoinDeviceCancelCommand.Execute(null);
+        await join;
+
+        Assert.False(vm.JoinDeviceCommand.IsRunning);
+        Assert.False(vm.JoinDeviceCancelCommand.CanExecute(null));
+        Assert.Null(vm.JoinError);
+        Assert.False(opened);
+    }
 }
 
 internal sealed class NoMasterDataFiles : IMasterDataFileService

@@ -52,7 +52,7 @@ public class HomeOpenErrorTests
         {
         }
 
-        public Task FlushAsync() => Task.CompletedTask;
+        public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Incident Load(string path) =>
             throw new LageBuch.Persistence.Sqlite.UnsupportedSchemaVersionException(6, 5);

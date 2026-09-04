@@ -60,7 +60,7 @@ public sealed class IncidentHost : IAsyncDisposable
 
     public bool IsRunning => _app is not null;
 
-    public async Task StartAsync(IPAddress bindAddress, int port = SyncProtocol.Port)
+    public async Task StartAsync(IPAddress bindAddress, int port = SyncProtocol.Port, CancellationToken cancellationToken = default)
     {
         if (_app is not null)
         {
@@ -135,7 +135,7 @@ public sealed class IncidentHost : IAsyncDisposable
 
         _hub = app.Services.GetRequiredService<IHubContext<IncidentHub>>();
         _session.Changed += OnSessionChanged; // the host's own edits reach clients too
-        await app.StartAsync();
+        await app.StartAsync(cancellationToken);
         _app = app;
     }
 
@@ -230,12 +230,12 @@ public sealed class IncidentHost : IAsyncDisposable
     private Task Broadcast(IncidentSnapshot snapshot) =>
         _hub is null ? Task.CompletedTask : _hub.Clients.All.SendAsync(SyncProtocol.SnapshotMethod, snapshot);
 
-    public async Task StopAsync()
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         _session.Changed -= OnSessionChanged;
         if (_app is not null)
         {
-            await _app.StopAsync();
+            await _app.StopAsync(cancellationToken);
             await _app.DisposeAsync();
             _app = null;
             _hub = null;

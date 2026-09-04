@@ -86,4 +86,32 @@ public class JoinPromptRenderTests
         Assert.True(resetTrustButton.IsVisible);
         Capture(window, "join-prompt-cert-changed.png");
     }
+
+    // #196: the capability to cancel a connection attempt lives in this dialog now, not in a
+    // Home-page banner behind it -- a "Verbindung wird hergestellt…" status plus an always-abortable
+    // Cancel button, both visible without leaving the prompt.
+    [AvaloniaFact]
+    public void Join_prompt_shows_a_connecting_status_and_stays_cancellable_while_busy()
+    {
+        var (window, vm) = ShowJoinPrompt();
+
+        var cancelButton = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CancelButton");
+        Assert.True(cancelButton.IsVisible);
+        Assert.True(cancelButton.IsEnabled);
+        Assert.Equal("ABBRECHEN", cancelButton.Content); // idle: this closes the dialog
+
+        var banner = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ConnectingBanner");
+        Assert.False(banner.IsVisible); // idle: no connection attempt in flight yet
+
+        vm.IsBusy = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(banner.IsVisible);
+
+        // #196: while busy, the same button only aborts the attempt (dialog stays up) -- its label
+        // must say so, since a bare "ABBRECHEN" would misleadingly read as "close this dialog".
+        Assert.Equal("VERBINDUNG ABBRECHEN", cancelButton.Content);
+        Assert.True(cancelButton.IsEnabled); // still abortable while connecting
+        Capture(window, "join-prompt-connecting.png");
+    }
 }

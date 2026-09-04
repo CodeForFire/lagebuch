@@ -26,13 +26,13 @@ public class SharePanelRenderTests
 
         public string? SharePin => IsHosting ? "1234" : null;
 
-        public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData)
+        public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
         {
             IsHosting = true;
             return Task.CompletedTask;
         }
 
-        public Task StopAsync()
+        public Task StopAsync(CancellationToken cancellationToken = default)
         {
             IsHosting = false;
             return Task.CompletedTask;
