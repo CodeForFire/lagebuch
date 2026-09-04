@@ -127,6 +127,35 @@ public class MasterDataEditorRenderTests
 
     // #76: the Fahrzeuge section — Wache + Funkrufname + Sitzplätze per row, Wache and
     // Funkrufname as AutoCompleteBoxes fed from the master data (free text still allowed).
+    // Issue #197: the ▲/▼/✕ row-action buttons used to be Unicode text on a Button, which
+    // defaults to Oswald -- a font that carries none of the three codepoints, so the affordance
+    // only ever appeared where the OS happened to supply a fallback face. Now PathIcons like the
+    // ETB grid's row actions, so the icons come from bundled vector data.
+    [AvaloniaFact]
+    public void Links_section_row_actions_render_laid_out_icons()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Links");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var rowButtons = view.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Classes.Contains("icon-btn"))
+            .ToList();
+
+        // Two Links rows, each with up/down/remove.
+        Assert.Equal(6, rowButtons.Count);
+        foreach (var button in rowButtons)
+        {
+            var icon = Assert.Single(button.GetVisualDescendants().OfType<PathIcon>());
+            Assert.True(
+                icon.Bounds.Width > 0,
+                $"the icon in the {button.GetValue(ToolTip.TipProperty)} button has zero width -- nothing is drawn");
+        }
+    }
+
     [AvaloniaFact]
     public void Fahrzeuge_section_renders_wache_callsign_and_seats_per_row()
     {

@@ -534,6 +534,32 @@ public class WorkspaceAcceptanceTests
         Assert.True(countdown.IsVisible);
     }
 
+    // Issue #197: the ⏱ / 🔒 banner glyphs used to be Unicode text on a TextBlock, which defaults
+    // to Barlow -- a font that carries neither codepoint, so the affordance only ever appeared
+    // where the OS happened to supply a fallback face. Now PathIcons like the ETB grid's row
+    // actions, so the icons come from bundled vector data.
+    [AvaloniaFact]
+    public void Reminder_bar_and_readonly_banner_render_laid_out_icons()
+    {
+        var vm = BuildWorkspace(out _);
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var reminderBar = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ReminderBar");
+        var reminderIcon = Assert.Single(reminderBar.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(reminderIcon.Bounds.Width > 0, "the reminder bar icon has zero width -- nothing is drawn");
+
+        var readOnlyVm = BuildReadOnlyWorkspace();
+        var readOnlyWindow = new Window { Content = new IncidentWorkspaceView { DataContext = readOnlyVm }, Width = 1000, Height = 700 };
+        readOnlyWindow.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var readOnlyBanner = readOnlyWindow.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ReadOnlyBanner");
+        var lockIcon = Assert.Single(readOnlyBanner.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(lockIcon.Bounds.Width > 0, "the read-only banner's lock icon has zero width -- nothing is drawn");
+    }
+
     [AvaloniaFact]
     public void Readonly_workspace_does_not_show_reminder_bar()
     {
@@ -692,5 +718,31 @@ public class WorkspaceAcceptanceTests
         {
             after.SavePng(Path.Combine(dir, "roles-transfer-after.png"));
         }
+    }
+
+    // Issue #197: the → in the transfer panel's summary line used to be baked into a MultiBinding
+    // StringFormat on a single TextBlock, which can't host a PathIcon -- and the text itself is
+    // rendered in Barlow, which doesn't carry the codepoint anyway. Now a separate PathIcon beside
+    // the (reworded) text, so the icon is drawn from bundled vector data.
+    [AvaloniaFact]
+    public void Transfer_panel_summary_renders_a_laid_out_arrow_icon_not_the_glyph()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.AssignRole("EL", "Müller", callSign: "FFB 12/1", section: "Abschnitt Nord");
+        var view = new RolesView { DataContext = vm.Roles };
+        var window = new Window { Content = view, Width = 1200, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Roles.Roles);
+        row.BeginTransferCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var summary = view.GetControl<TextBlock>("TransferSummaryText");
+        Assert.DoesNotContain("→", summary.Text, StringComparison.Ordinal);
+
+        var panel = view.GetControl<Border>("TransferPanel");
+        var icon = Assert.Single(panel.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(icon.Bounds.Width > 0, "the transfer summary's arrow icon has zero width -- nothing is drawn");
     }
 }

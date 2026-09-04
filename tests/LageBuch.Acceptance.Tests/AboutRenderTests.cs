@@ -52,6 +52,21 @@ public class AboutRenderTests
         Capture(window, "about-dialog.png");
     }
 
+    // Issue #197: the ⚠ error banner glyph used to be Unicode text on a TextBlock, which defaults
+    // to Barlow -- a font that doesn't carry it. Now a PathIcon like the ETB grid's row actions,
+    // so the icon is drawn from bundled vector data.
+    [AvaloniaFact]
+    public void Error_banner_renders_a_laid_out_icon()
+    {
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0") { ErrorMessage = "Fehler beim Öffnen." };
+        var window = new Window { Content = new AboutView { DataContext = vm }, Width = 640, Height = 640 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var icon = Assert.Single(window.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(icon.Bounds.Width > 0, "the error banner icon has zero width -- nothing is drawn");
+    }
+
     [AvaloniaFact]
     public void Command_bar_has_an_about_entry_point()
     {
