@@ -160,6 +160,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CurrentView = _home;
     }
 
+    // #196: the join dialog's own Cancel button raises this (instead of CancelOperator) while a
+    // connection attempt is in flight. It only aborts the attempt — the dialog stays up, and
+    // ConfirmOperatorAsync's already-awaited JoinDeviceCommand unwinds from the cancellation and
+    // closes the prompt itself once IsBusy clears.
+    [RelayCommand]
+    private void CancelJoin() => _home.JoinDeviceCancelCommand.Execute(null);
+
     [RelayCommand]
     private void GoHome() => NavigateAway(() => CurrentView = _home);
 

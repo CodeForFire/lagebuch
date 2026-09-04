@@ -188,6 +188,39 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
+    public void Cancel_command_raises_Cancelled_when_idle()
+    {
+        var vm = new OperatorPromptViewModel();
+        var cancelled = false;
+        var cancelJoinRaised = false;
+        vm.Cancelled += (_, _) => cancelled = true;
+        vm.CancelJoinRequested += (_, _) => cancelJoinRaised = true;
+
+        vm.CancelCommand.Execute(null);
+
+        Assert.True(cancelled);
+        Assert.False(cancelJoinRaised);
+    }
+
+    [Fact]
+    public void Cancel_command_raises_CancelJoinRequested_while_busy()
+    {
+        // #196: a busy dialog has a connection attempt in flight to abort, not just an overlay to
+        // dismiss -- the two must not be conflated, or cancelling a join would skip straight past
+        // HomeViewModel.JoinDeviceCancelCommand and leave the connect attempt running.
+        var vm = new OperatorPromptViewModel(collectHost: true) { IsBusy = true };
+        var cancelled = false;
+        var cancelJoinRaised = false;
+        vm.Cancelled += (_, _) => cancelled = true;
+        vm.CancelJoinRequested += (_, _) => cancelJoinRaised = true;
+
+        vm.CancelCommand.Execute(null);
+
+        Assert.True(cancelJoinRaised);
+        Assert.False(cancelled);
+    }
+
+    [Fact]
     public void Reset_trust_command_raises_the_reset_trust_requested_event()
     {
         var vm = new OperatorPromptViewModel(collectHost: true);

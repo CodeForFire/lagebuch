@@ -60,21 +60,6 @@
           </Grid>
         </Border>
 
-        <!-- Join-in-progress banner: a stuck/slow connect attempt otherwise has no way out but to
-             wait for the network layer's own timeout — this offers an explicit abort. -->
-        <Border x:Name="JoiningBanner" Background="{StaticResource SurfaceBrush}"
-                BorderBrush="{StaticResource IncomingBrush}" BorderThickness="1"
-                CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
-                IsVisible="{Binding JoinDeviceCommand.IsRunning}">
-          <Grid ColumnDefinitions="Auto,*,Auto">
-            <TextBlock Grid.Column="0" Text="⏳" FontSize="15" VerticalAlignment="Center" Margin="0,0,12,0" />
-            <TextBlock Grid.Column="1" x:Name="JoiningMessage" Text="Verbindung wird hergestellt…"
-                       VerticalAlignment="Center" Classes="secondary" />
-            <Button Grid.Column="2" x:Name="CancelJoinButton" Classes="ghost" Content="ABBRECHEN"
-                    Command="{Binding JoinDeviceCancelCommand}" Margin="12,0,0,0" />
-          </Grid>
-        </Border>
-
         <!-- Recent incidents panel -->
         <Border Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"

@@ -97,11 +97,27 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
         Result = null;
     }
 
-    // Raised when the operator dismisses the prompt (e.g. Escape). Hosts clear the overlay.
+    // Raised when the operator dismisses an idle prompt (e.g. Escape). Hosts clear the overlay.
     public event EventHandler? Cancelled;
 
+    // Raised instead of Cancelled while a join is in flight (#196): there is a connection attempt
+    // to abort, not just an overlay to dismiss. The dialog stays up until HomeViewModel.JoinDeviceAsync
+    // actually unwinds from the cancellation (IsBusy flips false), at which point the host closes the
+    // prompt through the normal post-join path (see MainWindowViewModel.ConfirmOperatorAsync).
+    public event EventHandler? CancelJoinRequested;
+
     [RelayCommand]
-    private void Cancel() => Cancelled?.Invoke(this, EventArgs.Empty);
+    private void Cancel()
+    {
+        if (IsBusy)
+        {
+            CancelJoinRequested?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            Cancelled?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     // Raised when the operator asks to reset TOFU trust for the host from within the dialog
     // (#182), after a CertificateChanged join failure. Hosts relay this to

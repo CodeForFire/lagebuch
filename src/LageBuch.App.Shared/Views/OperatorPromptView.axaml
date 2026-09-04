@@ -86,8 +86,23 @@
               </TextBox.KeyBindings>
             </TextBox>
           </StackPanel>
-          <Button x:Name="ConfirmButton" Classes="signal" Content="BESTÄTIGEN" Command="{Binding ConfirmCommand}"
-                  HorizontalAlignment="Right" Margin="0,16,0,0" />
+          <!-- Join-in-progress status (#196): a stuck/slow connect attempt otherwise has no way out
+               but to wait for the network layer's own timeout — the Cancel button below aborts it
+               without leaving this dialog. -->
+          <Border x:Name="ConnectingBanner" Background="{StaticResource SurfaceBrush}"
+                  BorderBrush="{StaticResource IncomingBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="10,8" Margin="0,8,0,0"
+                  IsVisible="{Binding IsBusy}">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <TextBlock Text="⏳" FontSize="14" VerticalAlignment="Center" />
+              <TextBlock x:Name="ConnectingMessage" Text="Verbindung wird hergestellt…"
+                         VerticalAlignment="Center" Classes="secondary" />
+            </StackPanel>
+          </Border>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+            <Button x:Name="ConfirmButton" Classes="signal" Content="BESTÄTIGEN" Command="{Binding ConfirmCommand}" />
+          </StackPanel>
         </StackPanel>
       </DockPanel>
     </Border>

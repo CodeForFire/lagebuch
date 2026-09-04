@@ -65,6 +65,40 @@ public class MainWindowViewModelTests
         Assert.IsType<HomeViewModel>(vm.CurrentView);
     }
 
+    // #196: the join dialog's own Cancel button -- not a Home-page banner behind it -- must be able
+    // to abort a stuck connect attempt. A bare TCP listener accepts the connection but never drives
+    // the socket, hanging the TLS handshake exactly like a host that's reachable but unresponsive.
+    [Fact]
+    public async Task CancelJoin_aborts_a_stuck_connection_attempt_and_closes_the_dialog()
+    {
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        var vm = New();
+        vm.RequestJoinDeviceCommand.Execute(null);
+        vm.PendingPrompt!.Host = $"127.0.0.1:{port}";
+        vm.PendingPrompt.Pin = "0000";
+        vm.PendingPrompt.OperatorName = "Client";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+
+        var confirming = vm.ConfirmOperatorCommand.ExecuteAsync(null);
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (vm.PendingPrompt is { IsBusy: false } && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(vm.PendingPrompt!.IsBusy);
+
+        vm.CancelJoinCommand.Execute(null);
+        await confirming;
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+    }
+
     [Fact]
     public void RequestOpenFile_opens_readonly_without_prompt()
     {
