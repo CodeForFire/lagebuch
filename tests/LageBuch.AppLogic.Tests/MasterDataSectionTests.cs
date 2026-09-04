@@ -9,7 +9,7 @@ public class MasterDataSectionTests
     public void Add_remove_and_reorder_a_list_and_flag_changes()
     {
         var changes = 0;
-        var s = new EditableListSection("Rollen", new[] { "EL", "ZF" }, () => changes++);
+        var s = new EditableListSection("Rollen", "ROLLE", new[] { "EL", "ZF" }, () => changes++);
 
         s.AddCommand.Execute(null);
         s.Items[^1].Value = "GF";
@@ -23,14 +23,14 @@ public class MasterDataSectionTests
     [Fact]
     public void ToValues_trims_drops_blanks_and_dedupes_keeping_first()
     {
-        var s = new EditableListSection("Rollen", new[] { " EL ", "EL", string.Empty, "ZF" }, () => { });
+        var s = new EditableListSection("Rollen", "ROLLE", new[] { " EL ", "EL", string.Empty, "ZF" }, () => { });
         Assert.Equal(new[] { "EL", "ZF" }, s.ToValues());
     }
 
     [Fact]
     public void MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
     {
-        var s = new EditableListSection("Rollen", new[] { "EL", "ZF" }, () => { });
+        var s = new EditableListSection("Rollen", "ROLLE", new[] { "EL", "ZF" }, () => { });
         s.MoveUpCommand.Execute(s.Items[0]);
         s.MoveDownCommand.Execute(s.Items[^1]);
         Assert.Equal(new[] { "EL", "ZF" }, s.ToValues());
@@ -40,7 +40,7 @@ public class MasterDataSectionTests
     public void No_op_list_edits_do_not_flag_changes_or_throw()
     {
         var changes = 0;
-        var s = new EditableListSection("Rollen", new[] { "EL", "ZF" }, () => changes++);
+        var s = new EditableListSection("Rollen", "ROLLE", new[] { "EL", "ZF" }, () => changes++);
         var foreignItem = new MasterDataItem("Fremd", () => { });
 
         var exception = Record.Exception(() =>
@@ -108,5 +108,38 @@ public class MasterDataSectionTests
 
         Assert.Equal(1, changes);
         Assert.Equal("Land 1", row.CallSign);
+    }
+
+    [Fact]
+    public void Vehicles_reorder_moves_a_row_and_flags_a_change()
+    {
+        var changes = 0;
+        var vehicles = new[]
+        {
+            new Vehicle("Wache 1", "Land 1", 6),
+            new Vehicle("Wache 1", "Land 2", 6),
+        };
+        var s = new VehiclesSection("Fahrzeuge", vehicles, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+
+        s.MoveUpCommand.Execute(s.Rows[^1]); // Land 2 moves ahead of Land 1
+
+        Assert.Equal(new[] { "Land 2", "Land 1" }, s.Rows.Select(r => r.CallSign));
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Vehicles_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
+    {
+        var vehicles = new[]
+        {
+            new Vehicle("Wache 1", "Land 1", 6),
+            new Vehicle("Wache 1", "Land 2", 6),
+        };
+        var s = new VehiclesSection("Fahrzeuge", vehicles, Array.Empty<string>(), Array.Empty<string>(), () => { });
+
+        s.MoveUpCommand.Execute(s.Rows[0]);
+        s.MoveDownCommand.Execute(s.Rows[^1]);
+
+        Assert.Equal(new[] { "Land 1", "Land 2" }, s.Rows.Select(r => r.CallSign));
     }
 }

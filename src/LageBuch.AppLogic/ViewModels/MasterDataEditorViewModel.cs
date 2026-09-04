@@ -105,11 +105,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
         EditorSection[] categories =
         {
-            _roles = new EditableListSection("Rollen", set.Roles, MarkDirty),
-            _unitStatus = new EditableListSection("Einheiten-Status", set.UnitStatus, MarkDirty),
-            _brigades = new EditableListSection("Wachen", set.Brigades, MarkDirty),
-            _callSigns = new EditableListSection("Funkrufnamen", set.RadioCallSigns, MarkDirty),
-            _truppTypes = new EditableListSection("Trupp-Typen", set.TruppTypes, MarkDirty),
+            _roles = new EditableListSection("Rollen", "ROLLE", set.Roles, MarkDirty),
+            _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
+            _brigades = new EditableListSection("Wachen", "WACHE", set.Brigades, MarkDirty),
+            _callSigns = new EditableListSection("Funkrufnamen", "RUFNAME", set.RadioCallSigns, MarkDirty),
+            _truppTypes = new EditableListSection("Trupp-Typen", "TYP", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),
             _checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty),
             _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),

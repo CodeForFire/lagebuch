@@ -8,12 +8,15 @@ public sealed partial class EditableListSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public EditableListSection(string title, IEnumerable<string> values, Action onChanged)
+    public EditableListSection(string title, string columnHeader, IEnumerable<string> values, Action onChanged)
         : base(title)
     {
         _onChanged = onChanged;
+        ColumnHeader = columnHeader;
         Items = new ObservableCollection<MasterDataItem>(values.Select(v => new MasterDataItem(v, onChanged)));
     }
+
+    public string ColumnHeader { get; }
 
     public ObservableCollection<MasterDataItem> Items { get; }
 

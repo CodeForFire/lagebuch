@@ -51,6 +51,28 @@ public sealed partial class VehiclesSection : EditorSection
         }
     }
 
+    [RelayCommand]
+    private void MoveUp(VehicleRow row)
+    {
+        var i = Rows.IndexOf(row);
+        if (i > 0)
+        {
+            Rows.Move(i, i - 1);
+            _onChanged();
+        }
+    }
+
+    [RelayCommand]
+    private void MoveDown(VehicleRow row)
+    {
+        var i = Rows.IndexOf(row);
+        if (i >= 0 && i < Rows.Count - 1)
+        {
+            Rows.Move(i, i + 1);
+            _onChanged();
+        }
+    }
+
     /// <summary>Rows with a non-blank Wache and Funkrufname; trimmed, seats as entered.</summary>
     public IReadOnlyList<Vehicle> ToValues()
     {
