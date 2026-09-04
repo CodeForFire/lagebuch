@@ -298,6 +298,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     private bool _isAddBuildingDialogOpen;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmAddBuildingCommand))]
     private string _newBuildingName = string.Empty;
 
     [ObservableProperty]
@@ -306,7 +307,9 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
     [ObservableProperty]
     private int _newBuildingApartments = 10;
 
-    [RelayCommand]
+    private bool CanConfirmAddBuilding => !string.IsNullOrWhiteSpace(NewBuildingName);
+
+    [RelayCommand(CanExecute = nameof(CanConfirmAddBuilding))]
     private void ConfirmAddBuilding()
     {
         _session.AddCoBuilding(NewBuildingName, NewBuildingFloors, NewBuildingApartments);
