@@ -28,13 +28,20 @@ internal static class Program
         var uiDispatcher = new LageBuch.App.Shared.Services.AvaloniaUiDispatcher();
         var store = new IncidentStore();
 
+        // CA2000: an app-lifetime singleton, disposed via the desktopLifetime.Exit hook below rather
+        // than a using block — same shape as SerialAudioQueue's own CA1001 suppression.
+#pragma warning disable CA2000
+        var alarms = new SystemAlarmService();
+#pragma warning restore CA2000
+
         // Best-effort: drain IncidentStore's background writer (issue #167 P0 #1) before the process
         // actually exits, so the last queued save isn't lost. Blocking briefly here is fine — Exit
         // fires once shutdown is already underway, and FlushAsync's own writer thread completes the
-        // wait, so there's no deadlock risk.
+        // wait, so there's no deadlock risk. Also cleans up the alarm temp WAVs (#167 P2).
         if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
         {
             desktopLifetime.Exit += (_, _) => store.FlushAsync().GetAwaiter().GetResult();
+            desktopLifetime.Exit += (_, _) => alarms.Dispose();
         }
 
         return LageBuch.App.Shared.CompositionRoot.CreateMainWindowViewModel(
@@ -44,7 +51,7 @@ internal static class Program
             dialogs,
             clock,
             new LageBuch.App.Shared.Services.DispatcherTimerTicker(),
-            new SystemAlarmService(),
+            alarms,
             new MasterDataFileService(),
             new IncidentHostController(clock, version, uiDispatcher),
             uiDispatcher,
