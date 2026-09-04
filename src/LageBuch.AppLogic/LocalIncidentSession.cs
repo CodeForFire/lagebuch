@@ -145,14 +145,19 @@ public sealed class LocalIncidentSession : IIncidentSession
         return IncidentPdf.Generate(Incident, fileBytes, pdfAttachmentPaths);
     }
 
-    // --- IIncidentSession mutation surface: apply → persist → notify. ---
+    // --- IIncidentSession mutation surface: build the same SyncCommand RemoteIncidentSession would
+    // send for this operation, then apply it locally via CommandApplier — the same dispatcher the
+    // sync host uses to apply a joined client's command (issue #167 P2: this used to hand-roll each
+    // domain call here, duplicating CommandApplier's own switch, so a fix to how a mutation applies
+    // had to land in two places). The command is built inside Apply's lambda, not before calling it,
+    // so Mutate's IsReadOnly guard still runs before Op() ever touches Operator. ---
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
-        Mutate(() => Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to));
+        Apply(() => new AddJournalEntryCommand(Op(), direction, text, from, to));
 
     public void EditJournalEntry(Guid entryId, string text) =>
-        Mutate(() => Incident.EditJournalEntry(_clock, RequireOperator(), entryId, text));
+        Apply(() => new EditJournalEntryCommand(Op(), entryId, text));
 
-    public void ToggleChecklistItem(Guid itemId) => Mutate(() => Incident.ToggleChecklistItem(_clock, RequireOperator(), itemId));
+    public void ToggleChecklistItem(Guid itemId) => Apply(() => new ToggleChecklistItemCommand(Op(), itemId));
 
     public void AssignRole(
         string role,
@@ -162,13 +167,13 @@ public sealed class LocalIncidentSession : IIncidentSession
         DateTimeOffset? to = null,
         string? section = null,
         string? phone = null) =>
-        Mutate(() => Incident.AssignRole(_clock, RequireOperator(), role, personName, callSign, from, to, section, phone));
+        Apply(() => new AssignRoleCommand(Op(), role, personName, callSign, from, to, section, phone));
 
     public void TransferRole(Guid assignmentId, string newPersonName, string? newCallSign = null, string? newPhone = null) =>
-        Mutate(() => Incident.TransferRole(_clock, RequireOperator(), assignmentId, newPersonName, newCallSign, newPhone));
+        Apply(() => new TransferRoleCommand(Op(), assignmentId, newPersonName, newCallSign, newPhone));
 
     public void EditRolePhone(Guid assignmentId, string? phone) =>
-        Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
+        Apply(() => new EditRolePhoneCommand(Op(), assignmentId, phone));
 
     public void AddForceUnit(
         string brigade,
@@ -178,22 +183,22 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? notes = null,
         int scbaCount = 0,
         int officerCount = 0) =>
-        Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
+        Apply(() => new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
-        Mutate(() => Incident.UpdateForceUnit(_clock, RequireOperator(), unitId, status, notes));
+        Apply(() => new UpdateForceUnitCommand(Op(), unitId, status, notes));
 
     public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
-        Mutate(() => Incident.UpdateForceStrength(_clock, RequireOperator(), unitId, officerCount, personnelCount, scbaCount));
+        Apply(() => new UpdateForceStrengthCommand(Op(), unitId, officerCount, personnelCount, scbaCount));
 
     public void RemoveForceUnit(Guid unitId) =>
-        Mutate(() => Incident.RemoveForceUnit(_clock, RequireOperator(), unitId));
+        Apply(() => new RemoveForceUnitCommand(Op(), unitId));
 
     public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
-        Mutate(() => Incident.AddTask(_clock, RequireOperator(), text, assignee, importance, urgency, timerMinutes));
+        Apply(() => new AddTaskCommand(Op(), text, assignee ?? string.Empty, importance, urgency, timerMinutes));
 
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
-        Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));
+        Apply(() => new SetTaskCompletedCommand(Op(), taskId, isDone));
 
     public void AddScbaTrupp(
         string designation,
@@ -205,38 +210,40 @@ public sealed class LocalIncidentSession : IIncidentSession
         int maxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes,
         int returnPressureBar = AtemschutzTrupp.DefaultReturnPressureBar,
         int pressureControlIntervalMinutes = AtemschutzTrupp.DefaultPressureControlIntervalMinutes) =>
-        Mutate(() => Incident.AddScbaTrupp(
-            _clock,
+        Apply(() => new AddScbaTruppCommand(
             designation,
-            members,
-            entryPressure,
-            truppNumber,
+            members.Select(m => new TruppMemberDto(m.Role, m.Name)).ToList(),
             callSign,
             task,
             maxDurationMinutes,
             returnPressureBar,
-            pressureControlIntervalMinutes));
+            pressureControlIntervalMinutes,
+            entryPressure,
+            truppNumber));
 
     public void StartScbaTrupp(Guid truppId) =>
-        Mutate(() => Incident.StartScbaTrupp(_clock, truppId));
+        Apply(() => new StartScbaTruppCommand(truppId));
 
     public void RecordScbaPressure(Guid truppId, int bar) =>
-        Mutate(() => Incident.RecordScbaPressure(_clock, truppId, bar));
+        Apply(() => new RecordScbaPressureCommand(truppId, bar));
 
     public void WithdrawScbaTrupp(Guid truppId) =>
-        Mutate(() => Incident.WithdrawScbaTrupp(_clock, truppId));
+        Apply(() => new WithdrawScbaTruppCommand(truppId));
 
     public void MarkScbaRemoved(Guid truppId) =>
-        Mutate(() => Incident.MarkScbaRemoved(_clock, truppId));
+        Apply(() => new MarkScbaRemovedCommand(truppId));
 
-    public void SetIncidentNumber(IncidentNumber? number) => Mutate(() => Incident.SetIncidentNumber(number));
+    public void SetIncidentNumber(IncidentNumber? number) => Apply(() => new SetIncidentNumberCommand(number?.Value));
 
-    public void SetKeyword(string? keyword) => Mutate(() => Incident.SetKeyword(keyword));
+    public void SetKeyword(string? keyword) => Apply(() => new SetKeywordCommand(keyword));
 
-    public void SetAddress(string? street, string? district) => Mutate(() => Incident.SetAddress(street, district));
+    public void SetAddress(string? street, string? district) => Apply(() => new SetAddressCommand(street, district));
 
-    public void SetStatus(string? status) => Mutate(() => Incident.SetStatus(status));
+    public void SetStatus(string? status) => Apply(() => new SetStatusCommand(status));
 
+    // Not routed through Apply/CommandApplier: incident-level timers are host-authoritative and have
+    // no SyncCommand at all (RemoteIncidentSession.UpsertTimer is an intentional no-op) — this really
+    // is Local-only state, not a duplicated code path.
     public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) =>
         Mutate(() => Incident.UpsertTimer(key, cycleAnchor, intervalMinutes, recurringIntervalMinutes, isRunning));
 
@@ -266,43 +273,35 @@ public sealed class LocalIncidentSession : IIncidentSession
         return file is null ? null : await _store.TryReadFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
     }
 
-    public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));
+    public void RenameFile(Guid fileId, string? displayName) => Apply(() => new RenameFileCommand(fileId, displayName));
 
     public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor) =>
-        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor));
+        Apply(() => new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor));
 
     public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor) =>
-        Mutate(() => Incident.UpdateCoBuildingStructure(_clock, RequireOperator(), buildingId, floorCount, apartmentsPerFloor));
+        Apply(() => new UpdateCoBuildingStructureCommand(Op(), buildingId, floorCount, apartmentsPerFloor));
 
     public void RemoveCoBuilding(Guid buildingId) =>
-        Mutate(() => Incident.RemoveCoBuilding(_clock, RequireOperator(), buildingId));
+        Apply(() => new RemoveCoBuildingCommand(Op(), buildingId));
 
     public void RecordCoValue(Guid buildingId, int floorOrdinal, int apartmentNumber, int? coValue) =>
-        Mutate(() => Incident.RecordCoValue(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, coValue));
+        Apply(() => new RecordCoValueCommand(Op(), buildingId, floorOrdinal, apartmentNumber, coValue));
 
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
-        Mutate(() => Incident.SetDwellingStatus(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, status));
+        Apply(() => new SetDwellingStatusCommand(Op(), buildingId, floorOrdinal, apartmentNumber, status));
 
     public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable) =>
-        Mutate(() => Incident.SetDwellingDetails(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable));
+        Apply(() => new UpdateDwellingDetailsCommand(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable));
 
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
-        Mutate(() => Incident.SetFloorDescription(buildingId, floorOrdinal, description));
+        Apply(() => new SetFloorDescriptionCommand(buildingId, floorOrdinal, description));
 
     public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
-        Mutate(() => Incident.SetApartmentLabel(buildingId, apartmentNumber, label));
+        Apply(() => new SetApartmentLabelCommand(buildingId, apartmentNumber, label));
 
-    public void Close()
-    {
-        if (IsReadOnly)
-        {
-            throw new InvalidOperationException("Der Einsatz ist bereits abgeschlossen.");
-        }
+    public void Close() => Apply(() => new CloseIncidentCommand(Op()));
 
-        Incident.Close(_clock, RequireOperator());
-        Save();
-        Changed?.Invoke();
-    }
+    private void Apply(Func<SyncCommand> command) => Mutate(() => CommandApplier.Apply(command(), Incident, _clock));
 
     private void Mutate(Action apply)
     {
@@ -333,4 +332,10 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     private SessionOperator RequireOperator() =>
         Operator ?? throw new InvalidOperationException("Kein Bearbeiter für diese Änderung vorhanden.");
+
+    private OperatorDto Op()
+    {
+        var op = RequireOperator();
+        return new OperatorDto(op.Name, op.CallSign);
+    }
 }
