@@ -117,13 +117,25 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
         };
 
-        foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
+        foreach (var section in categories.OrderBy(s => s.Title, SectionTitleComparer))
         {
             Sections.Add(section);
         }
 
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }
+
+    /// <summary>
+    /// Alphabetical, except Checkliste Aufbau (setup) comes before Abbau (teardown) — the order
+    /// they happen in, which plain alphabetical sorting would otherwise reverse.
+    /// </summary>
+    private static readonly IComparer<string> SectionTitleComparer = Comparer<string>.Create((x, y) =>
+        (x, y) switch
+        {
+            ("Checkliste Aufbau", "Checkliste Abbau") => -1,
+            ("Checkliste Abbau", "Checkliste Aufbau") => 1,
+            _ => string.Compare(x, y, StringComparison.OrdinalIgnoreCase),
+        });
 
     private void OnVehiclesChanged()
     {

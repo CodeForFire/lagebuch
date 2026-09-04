@@ -152,11 +152,11 @@ public class MasterDataEditorViewModelTests
         Assert.NotNull(vm.SelectedSection);
 
         // Einstellungen stays pinned first (a meta section, not a data category); the rest sort
-        // alphabetically below it.
+        // alphabetically below it, except Checkliste Aufbau (setup) comes before Abbau (teardown).
         Assert.Equal(
             new[]
             {
-                "Einstellungen", "Checkliste Abbau", "Checkliste Aufbau", "Einheiten-Status",
+                "Einstellungen", "Checkliste Aufbau", "Checkliste Abbau", "Einheiten-Status",
                 "Fahrzeuge", "Funkrufnamen", "Links", "Personal", "Rollen", "Trupp-Typen", "Wachen",
             },
             vm.Sections.Select(s => s.Title));
