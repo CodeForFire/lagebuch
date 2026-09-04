@@ -5,7 +5,7 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-public sealed partial class ChecklistViewModel : ObservableObject
+public sealed partial class ChecklistViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly ChecklistKind _kind;
@@ -34,6 +34,15 @@ public sealed partial class ChecklistViewModel : ObservableObject
     [ObservableProperty]
     private bool _allMandatoryDone;
 
+    public void Dispose()
+    {
+        _session.Changed -= Recompute;
+        foreach (var item in Items)
+        {
+            item.Dispose();
+        }
+    }
+
     private void Recompute() => AllMandatoryDone = ComputeAllMandatoryDone();
 
     private bool ComputeAllMandatoryDone() =>
@@ -43,7 +52,7 @@ public sealed partial class ChecklistViewModel : ObservableObject
         kind == ChecklistKind.Aufbau ? incident.ChecklistAufbau : incident.ChecklistAbbau;
 }
 
-public sealed partial class ChecklistItemViewModel : ObservableObject
+public sealed partial class ChecklistItemViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly ChecklistKind _kind;
@@ -75,6 +84,8 @@ public sealed partial class ChecklistItemViewModel : ObservableObject
         // Reflect toggles made elsewhere (another tab, or another device once joined).
         _session.Changed += SyncFromIncident;
     }
+
+    public void Dispose() => _session.Changed -= SyncFromIncident;
 
     private void SyncFromIncident()
     {

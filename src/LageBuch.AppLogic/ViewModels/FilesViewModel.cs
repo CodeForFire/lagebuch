@@ -66,7 +66,7 @@ public sealed partial class IncidentFileRow : ObservableObject
     }
 }
 
-public sealed partial class FilesViewModel : ObservableObject
+public sealed partial class FilesViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IFileDialogService _dialogs;
@@ -88,6 +88,8 @@ public sealed partial class FilesViewModel : ObservableObject
         _session.Changed += Sync;
         Sync();
     }
+
+    public void Dispose() => _session.Changed -= Sync;
 
     public bool IsReadOnly { get; }
 

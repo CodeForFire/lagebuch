@@ -665,6 +665,53 @@ public class IncidentWorkspaceViewModelTests
         Assert.Null(vm.Reminder);
     }
 
+    // BuildChildren replaces 11 child view models on every lifecycle rebuild (ctor, continue-editing,
+    // close, remote read-only flip); each child subscribes to _session.Changed in its own constructor.
+    // Before this fix, 7 of them were simply overwritten instead of disposed first, so their old
+    // instances stayed subscribed forever — a leak that grows with every rebuild.
+    [Fact]
+    public void Rebuilding_children_does_not_leak_Changed_subscriptions()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        vm.ContinueEditingCommand.Execute(null); // rebuild #2
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmContinueEditing();
+        var afterFirstRebuild = ChangedSubscriberCount(session);
+
+        vm.CloseIncidentCommand.Execute(null); // rebuild #3
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        var afterSecondRebuild = ChangedSubscriberCount(session);
+
+        Assert.Equal(afterFirstRebuild, afterSecondRebuild);
+    }
+
+    private static int ChangedSubscriberCount(LocalIncidentSession session)
+    {
+        var field = typeof(LocalIncidentSession).GetField(
+            nameof(LocalIncidentSession.Changed), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var handler = (Delegate?)field!.GetValue(session);
+        return handler?.GetInvocationList().Length ?? 0;
+    }
+
     [Fact]
     public void Etb_add_and_create_task_opens_prefilled_task_dialog()
     {

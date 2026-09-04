@@ -158,7 +158,7 @@ public sealed partial class FloorRowViewModel : ObservableObject
     public string? Description { get; }
 }
 
-public sealed partial class CoMessprotokollViewModel : ObservableObject
+public sealed partial class CoMessprotokollViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -174,6 +174,8 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject
         _session.Changed += Refresh;
         Refresh();
     }
+
+    public void Dispose() => _session.Changed -= Refresh;
 
     public bool IsReadOnly { get; }
 

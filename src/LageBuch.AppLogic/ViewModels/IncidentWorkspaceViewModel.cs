@@ -232,23 +232,38 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     private void BuildChildren()
     {
+        // Every child below subscribes to _session.Changed in its own constructor; disposing the
+        // outgoing instance before replacing it is what unsubscribes the old handler (issue #167 P2
+        // finding — this used to be uneven, leaking stale subscriptions on every rebuild).
+        ChecklistAufbau?.Dispose();
         ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
+
+        ChecklistAbbau?.Dispose();
         ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
+
+        Etb?.Dispose();
         Etb = new EtbViewModel(
             _session,
             _clock,
             _masterData,
             OnChanged,
             text => OpenTaskDialog(text));
+
+        Roles?.Dispose();
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
+
+        Forces?.Dispose();
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
 
         Scba?.Dispose();
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
+        Files?.Dispose();
         Files = new FilesViewModel(_session, _dialogs, OnChanged);
+
         Links = new LinksViewModel(_masterData.Links, _dialogs);
 
+        CoMessprotokoll?.Dispose();
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
 
         Tasks?.Dispose();
