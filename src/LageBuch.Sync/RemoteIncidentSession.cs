@@ -109,7 +109,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <param name="reconnectPolicy">Overrides the default reconnect policy (tests only).</param>
     /// <param name="cacheRoot">
     /// Folder to cache pulled attachment bytes in, keyed by incident and file id (see
-    /// <see cref="GetFileBytesAsync"/>). This project has no platform path knowledge, so callers
+    /// <see cref="GetFileStreamAsync"/>). This project has no platform path knowledge, so callers
     /// supply it (a folder under the app's data/cache dir). Null disables caching — bytes are
     /// re-fetched from the host on every call, which is correct, just not free.
     /// </param>
@@ -378,28 +378,32 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // Issue #167 P1 #2: bytes no longer ride the AddFileCommand JSON — the client generates the file
     // id, registers metadata via the usual command, then PUTs the raw bytes as a second request, so
     // the base64/JSON inflation and the host's UI-thread block (issue #167 P1 #1) both go away.
-    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes, CancellationToken cancellationToken = default)
+    public async Task AddFileAsync(string fileName, string contentType, Stream content, long sizeBytes, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(bytes);
-        if (bytes.LongLength > IncidentFile.MaxSizeBytes)
+        ArgumentNullException.ThrowIfNull(content);
+        if (sizeBytes > IncidentFile.MaxSizeBytes)
         {
             throw new ArgumentException(
-                $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.", nameof(bytes));
+                $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.", nameof(sizeBytes));
         }
 
         var fileId = Guid.NewGuid();
-        await SendAsync(new AddFileCommand(Op(), fileId, fileName, contentType, bytes.LongLength), cancellationToken);
+        await SendAsync(new AddFileCommand(Op(), fileId, fileName, contentType, sizeBytes), cancellationToken);
 
-        using var content = new ByteArrayContent(bytes);
-        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        var response = await _http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), content, cancellationToken);
+        using var body = new StreamContent(content);
+        body.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        var response = await _http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), body, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     // On-demand pull (§5): the cached incident carries only file metadata (from the snapshot), so
     // bytes are fetched from the host the first time they're needed and cached locally afterwards —
-    // mirroring how a join fetches GET /snapshot once rather than having it pushed continuously.
-    public async Task<byte[]?> GetFileBytesAsync(Guid fileId, CancellationToken cancellationToken = default)
+    // mirroring how a join fetches GET /snapshot once rather than having it pushed continuously. The
+    // caller owns and disposes the returned stream (issue #167 P1: nothing here buffers a whole
+    // attachment in memory — a cache hit opens the cached file directly, a cache miss streams the
+    // download straight to the cache file before opening it, and with caching disabled the live HTTP
+    // response stream is handed back as-is).
+    public async Task<Stream?> GetFileStreamAsync(Guid fileId, CancellationToken cancellationToken = default)
     {
         var file = _incident.Files.FirstOrDefault(f => f.Id == fileId);
         if (file is null)
@@ -410,7 +414,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         var cachePath = CachePathFor(fileId, file.FileName);
         if (cachePath is not null && File.Exists(cachePath))
         {
-            return await File.ReadAllBytesAsync(cachePath, cancellationToken);
+            return File.OpenRead(cachePath);
         }
 
         HttpResponseMessage response;
@@ -428,14 +432,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             return null;
         }
 
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-        if (cachePath is not null)
+        if (cachePath is null)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
-            await File.WriteAllBytesAsync(cachePath, bytes, cancellationToken);
+            // Caching disabled — hand the live response stream straight to the caller rather than
+            // buffering it anywhere.
+            return await response.Content.ReadAsStreamAsync(cancellationToken);
         }
 
-        return bytes;
+        Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
+        await using (var cacheStream = File.Create(cachePath))
+        {
+            await response.Content.CopyToAsync(cacheStream, cancellationToken);
+        }
+
+        return File.OpenRead(cachePath);
     }
 
     // One subfolder per incident, so a stale cache entry from a previously joined incident can

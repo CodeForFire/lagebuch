@@ -15,7 +15,7 @@ public static class FilesSection
 {
     private static readonly string[] HeaderTitles = ["Name", "Hinzugefügt von", "Datum"];
 
-    public static void Compose(IContainer container, IReadOnlyList<IncidentFile> files, IReadOnlyDictionary<Guid, byte[]> imageBytesById)
+    public static void Compose(IContainer container, IReadOnlyList<IncidentFile> files, IReadOnlyDictionary<Guid, string> imagePathsById)
     {
         container.Column(column =>
         {
@@ -55,13 +55,13 @@ public static class FilesSection
 
             foreach (var file in files)
             {
-                if (!imageBytesById.TryGetValue(file.Id, out var bytes))
+                if (!imagePathsById.TryGetValue(file.Id, out var path))
                 {
                     continue;
                 }
 
                 column.Item().PaddingTop(6).Text(file.DisplayName).SemiBold().FontSize(9);
-                column.Item().MaxHeight(400).Image(bytes).FitArea();
+                column.Item().MaxHeight(400).Image(path).FitArea();
             }
         });
     }

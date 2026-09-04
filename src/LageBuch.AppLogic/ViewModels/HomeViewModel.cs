@@ -35,7 +35,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // is null-guarded, so the feature is simply inert rather than required.
     private readonly ILastSaveFolderStore? _lastSaveFolder;
 
-    // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
+    // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileStreamAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
 

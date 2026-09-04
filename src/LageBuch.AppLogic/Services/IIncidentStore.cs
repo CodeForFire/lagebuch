@@ -26,29 +26,18 @@ public interface IIncidentStore
     IncidentState? TryReadState(string path);
 
     /// <summary>
-    /// Writes an attached file's bytes to storage alongside the incident at <paramref name="path"/>,
-    /// keyed by <paramref name="storageFileName"/> (see <c>IncidentFile.StorageFileName</c>). Kept
-    /// out of <see cref="Save"/>'s SQLite tables — see <c>LageBuch.Persistence.IncidentFileStore</c>
-    /// for why. Genuinely async (real disk I/O, not queued like <see cref="Save"/>) — see issue #167
-    /// P1 #1: unlike <see cref="Save"/>, a file write has no ordering dependency on other writes, so
-    /// real async I/O is enough to free the caller without a second queuing mechanism.
-    /// </summary>
-    Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Streams an attached file's bytes straight to storage without materializing the whole payload
-    /// in memory first — see <c>LageBuch.Persistence.IIncidentFileStore.SaveStreamAsync</c> (issue
-    /// #167 P1 #2).
+    /// in memory first (issue #167 P1 #2). Genuinely async (real disk I/O, not queued like
+    /// <see cref="Save"/>) — see issue #167 P1 #1: unlike <see cref="Save"/>, a file write has no
+    /// ordering dependency on other writes, so real async I/O is enough to free the caller without a
+    /// second queuing mechanism. See <c>LageBuch.Persistence.IIncidentFileStore.SaveStreamAsync</c>.
     /// </summary>
     Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default);
 
-    /// <summary>Null when the bytes are unavailable (never written, or storage unreachable) —
-    /// never throws, so a caller degrades quietly.</summary>
-    Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);
-
     /// <summary>The real path on disk for an attached file, for APIs that require a file path
-    /// rather than bytes (QuestPDF's <c>DocumentOperation</c> — see issue #167 P1 #3). Does not
-    /// guarantee the file exists.</summary>
+    /// rather than bytes (QuestPDF's <c>DocumentOperation</c> and <c>Image</c> — see issue #167
+    /// P1 #3). Does not guarantee the file exists — callers check <see cref="File.Exists"/> or open
+    /// it for read and handle absence themselves.</summary>
     string ResolveFileDiskPath(string path, string storageFileName);
 
     /// <summary>

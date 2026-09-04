@@ -59,14 +59,8 @@ public class HomeOpenErrorTests
 
         public IncidentState? TryReadState(string path) => null;
 
-        public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-
         public Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
-
-        public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
-            Task.FromResult<byte[]?>(null);
 
         public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 

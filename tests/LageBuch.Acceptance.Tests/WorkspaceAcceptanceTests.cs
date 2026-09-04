@@ -26,6 +26,10 @@ internal sealed class FakeStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _d = new();
 
+    // A thin real-disk mirror (a per-instance temp folder) so ResolveFileDiskPath hands back a real,
+    // readable path — LocalIncidentSession.GetFileStreamAsync opens it directly, bypassing this store.
+    private readonly string _diskDir = Directory.CreateTempSubdirectory("lagebuch-workspace-fakestore-").FullName;
+
     public int SaveCount { get; private set; }
 
     public void Save(string path, Incident incident)
@@ -40,25 +44,13 @@ internal sealed class FakeStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => _d.TryGetValue(path, out var i) ? i.State : null;
 
-    private readonly Dictionary<string, byte[]> _files = new();
-
-    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
-    {
-        _files[$"{path}/{storageFileName}"] = bytes;
-        return Task.CompletedTask;
-    }
-
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default)
     {
-        using var ms = new MemoryStream();
-        await source.CopyToAsync(ms, cancellationToken);
-        await SaveFileBytesAsync(path, storageFileName, ms.ToArray(), cancellationToken);
+        await using var dest = File.Create(Path.Combine(_diskDir, storageFileName));
+        await source.CopyToAsync(dest, cancellationToken);
     }
 
-    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
-
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(_diskDir, storageFileName);
 
     public event Action<Exception>? SaveFailed
     {

@@ -9,23 +9,23 @@ namespace LageBuch.Documents;
 public sealed class IncidentReportDocument : IDocument
 {
     private readonly Incident _incident;
-    private readonly IReadOnlyDictionary<Guid, byte[]> _imageBytesById;
+    private readonly IReadOnlyDictionary<Guid, string> _imagePathsById;
 
     /// <param name="incident">The incident to render.</param>
-    /// <param name="fileBytes">
-    /// Bytes for entries in <see cref="Incident.Files"/>, keyed by <c>IncidentFile.Id</c> —
+    /// <param name="filePaths">
+    /// Disk paths for entries in <see cref="Incident.Files"/>, keyed by <c>IncidentFile.Id</c> —
     /// resolved by the caller (this project stays filesystem-free). Every attached file is listed
-    /// by name regardless of whether bytes were supplied; only image entries with bytes present
+    /// by name regardless of whether a path was supplied; only image entries with a path present
     /// are additionally rendered inline (see <see cref="Sections.FilesSection"/>).
     /// </param>
-    public IncidentReportDocument(Incident incident, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null)
+    public IncidentReportDocument(Incident incident, IReadOnlyDictionary<Guid, string>? filePaths = null)
     {
         ArgumentNullException.ThrowIfNull(incident);
         _incident = incident;
-        _imageBytesById = incident.Files
+        _imagePathsById = incident.Files
             .Where(f => f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            .Where(f => fileBytes is not null && fileBytes.ContainsKey(f.Id))
-            .ToDictionary(f => f.Id, f => fileBytes![f.Id]);
+            .Where(f => filePaths is not null && filePaths.ContainsKey(f.Id))
+            .ToDictionary(f => f.Id, f => filePaths![f.Id]);
     }
 
     public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
@@ -53,7 +53,7 @@ public sealed class IncidentReportDocument : IDocument
                 column.Item().Element(c => TasksSection.Compose(c, _incident));
                 column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
                 column.Item().Element(c => CoMessprotokollSection.Compose(c, _incident));
-                column.Item().Element(c => FilesSection.Compose(c, _incident.Files, _imageBytesById));
+                column.Item().Element(c => FilesSection.Compose(c, _incident.Files, _imagePathsById));
             });
 
             page.Footer().AlignCenter().Text(t =>

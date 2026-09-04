@@ -130,8 +130,8 @@ public sealed partial class FilesViewModel : ObservableObject
         IsUploading = true;
         try
         {
-            var bytes = await File.ReadAllBytesAsync(path);
-            await _session.AddFileAsync(Path.GetFileName(path), ContentTypeFor(path), bytes);
+            await using var stream = File.OpenRead(path);
+            await _session.AddFileAsync(Path.GetFileName(path), ContentTypeFor(path), stream, stream.Length);
             _onChanged(); // Changed already ran Sync(); this only refreshes LastSavedAt et al.
         }
         catch (Exception ex)
@@ -150,15 +150,19 @@ public sealed partial class FilesViewModel : ObservableObject
     private async Task OpenFileAsync(IncidentFileRow row)
     {
         ErrorMessage = null;
-        var bytes = await _session.GetFileBytesAsync(row.Id);
-        if (bytes is null)
+        await using var source = await _session.GetFileStreamAsync(row.Id);
+        if (source is null)
         {
             ErrorMessage = $"„{row.DisplayName}“ ist nicht verfügbar.";
             return;
         }
 
         var tempPath = Path.Combine(Path.GetTempPath(), row.FileName);
-        await File.WriteAllBytesAsync(tempPath, bytes);
+        await using (var dest = File.Create(tempPath))
+        {
+            await source.CopyToAsync(dest);
+        }
+
         await _dialogs.OpenFileAsync(tempPath);
     }
 

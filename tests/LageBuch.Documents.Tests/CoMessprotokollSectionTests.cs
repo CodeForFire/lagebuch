@@ -22,7 +22,7 @@ public class CoMessprotokollSectionTests
     public void Pdf_Contains_CO_Section_With_Buildings()
     {
         var incident = CreateIncidentWithBuilding();
-        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var pdf = IncidentPdf.Generate(incident);
 
         Assert.True(pdf.Length > 1000);
         Assert.Equal(0x25, pdf[0]); // '%'
@@ -33,7 +33,7 @@ public class CoMessprotokollSectionTests
     {
         var op = new SessionOperator("Test", null);
         var incident = Incident.Start(Clock, op);
-        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var pdf = IncidentPdf.Generate(incident);
 
         Assert.True(pdf.Length > 1000);
         Assert.Equal(0x25, pdf[0]); // '%'

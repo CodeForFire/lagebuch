@@ -1,16 +1,15 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace LageBuch.Persistence;
 
 /// <summary>
 /// Stores an attached file's bytes on disk in a sibling folder next to its <c>.fwincident</c>
 /// file, keeping large binary content out of <see cref="IncidentRepository"/>'s full-rewrite-
 /// per-save SQLite tables. Only the metadata row (see <c>incident_files</c>) lives in SQLite.
+/// Every read/write here is stream-based (issue #167 P1 file-ops slimdown) — a caller that needs
+/// bytes in memory (e.g. QuestPDF image embedding) opens its own stream via
+/// <see cref="ResolveDiskPath"/> rather than this store ever materializing a whole attachment.
 /// </summary>
 public interface IIncidentFileStore
 {
-    Task SaveBytesAsync(string incidentPath, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Writes <paramref name="source"/> straight to disk without ever materializing the whole
     /// attachment in memory (issue #167 P1 #2) — used for a joined client's upload, whose bytes arrive
@@ -18,24 +17,13 @@ public interface IIncidentFileStore
     /// </summary>
     Task SaveStreamAsync(string incidentPath, string storageFileName, Stream source, CancellationToken cancellationToken = default);
 
-    /// <summary>Null on any failure (missing file, unreadable folder) — never throws, so a
-    /// caller degrades quietly, matching <see cref="IncidentRepository.TryReadState"/>.</summary>
-    Task<byte[]?> TryReadBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default);
-
     /// <summary>The real path on disk, for APIs that require a file path rather than bytes
-    /// (QuestPDF's <c>DocumentOperation</c>). Does not guarantee the file exists.</summary>
+    /// (QuestPDF's <c>DocumentOperation</c> and <c>Image</c>). Does not guarantee the file exists.</summary>
     string ResolveDiskPath(string incidentPath, string storageFileName);
 }
 
 public sealed class IncidentFileStore : IIncidentFileStore
 {
-    public async Task SaveBytesAsync(string incidentPath, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
-    {
-        var folder = FolderFor(incidentPath);
-        Directory.CreateDirectory(folder);
-        await File.WriteAllBytesAsync(Path.Combine(folder, storageFileName), bytes, cancellationToken);
-    }
-
     public async Task SaveStreamAsync(string incidentPath, string storageFileName, Stream source, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -53,23 +41,6 @@ public sealed class IncidentFileStore : IIncidentFileStore
         }
 
         File.Move(tempPath, path, overwrite: true);
-    }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Try-read: an unreadable attachment degrades to null, never fails incident load.")]
-    public async Task<byte[]?> TryReadBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var path = ResolveDiskPath(incidentPath, storageFileName);
-            return File.Exists(path) ? await File.ReadAllBytesAsync(path, cancellationToken) : null;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     public string ResolveDiskPath(string incidentPath, string storageFileName) =>

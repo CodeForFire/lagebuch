@@ -126,13 +126,17 @@ public interface IIncidentSession
     /// Attaches a file. Unlike every mutation above, this is genuinely awaited rather than
     /// fire-and-forget: a multi-MB upload is neither instant nor safe to fail silently, so the
     /// caller needs to show a spinner and surface a thrown exception (closed incident, unsupported
-    /// type, over the size cap, or — on a joined client — a network failure).
+    /// type, over the size cap, or — on a joined client — a network failure). <paramref name="content"/>
+    /// is streamed straight through without ever being fully materialized in memory (issue #167 P1);
+    /// <paramref name="sizeBytes"/> is required upfront (rather than read from the stream) so the
+    /// size cap can be enforced before a single byte is transferred.
     /// </summary>
-    Task AddFileAsync(string fileName, string contentType, byte[] bytes, CancellationToken cancellationToken = default);
+    Task AddFileAsync(string fileName, string contentType, Stream content, long sizeBytes, CancellationToken cancellationToken = default);
 
-    /// <summary>Null when the bytes are unavailable — never throws, so a caller (a file-row "open"
-    /// action, or the PDF exporter) degrades quietly rather than crashing on a missing attachment.</summary>
-    Task<byte[]?> GetFileBytesAsync(Guid fileId, CancellationToken cancellationToken = default);
+    /// <summary>Null when the file is unavailable — never throws, so a caller (a file-row "open"
+    /// action, or the PDF exporter) degrades quietly rather than crashing on a missing attachment.
+    /// The caller owns and disposes the returned stream.</summary>
+    Task<Stream?> GetFileStreamAsync(Guid fileId, CancellationToken cancellationToken = default);
 
     /// <summary>Corrects a file's display label. Silent — no ETB entry, matching UpdateForceUnit's
     /// Bemerkung field. Null/blank resets the label back to the file's original name.</summary>

@@ -112,37 +112,25 @@ public sealed class LocalIncidentSession : IIncidentSession
     }
 
     // Export is host-only (IncidentWorkspaceViewModel.CanExport gates on _local being non-null), and
-    // every attached file's bytes land in this device's own sibling folder the moment it's added —
-    // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
-    // network pull, only IIncidentStore.
-    public async Task<byte[]> ExportPdfAsync()
+    // every attached file lands in this device's own sibling folder the moment it's added — whether
+    // typed here or uploaded by a joined client via AddFileCommand — so this never needs a network
+    // pull, only IIncidentStore. Every entry (image or PDF) is resolved to its disk path rather than
+    // read into memory (issue #167 P1) — QuestPDF's Image() and DocumentOperation.MergeFile() both
+    // accept a path directly, so nothing here ever materializes a whole attachment.
+    public Task<byte[]> ExportPdfAsync()
     {
-        var fileBytes = new Dictionary<Guid, byte[]>();
-        var pdfAttachmentPaths = new Dictionary<Guid, string>();
+        var filePaths = new Dictionary<Guid, string>();
         foreach (var file in Incident.Files)
         {
             var storageFileName = IncidentFile.StorageFileName(file.Id, file.FileName);
-            if (file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
+            var diskPath = _store.ResolveFileDiskPath(Path, storageFileName);
+            if (File.Exists(diskPath))
             {
-                // Merged straight from disk (see issue #167 P1 #3) — never loaded into fileBytes,
-                // which would otherwise round-trip every PDF attachment through memory twice.
-                var diskPath = _store.ResolveFileDiskPath(Path, storageFileName);
-                if (File.Exists(diskPath))
-                {
-                    pdfAttachmentPaths[file.Id] = diskPath;
-                }
-
-                continue;
-            }
-
-            var bytes = await _store.TryReadFileBytesAsync(Path, storageFileName);
-            if (bytes is not null)
-            {
-                fileBytes[file.Id] = bytes;
+                filePaths[file.Id] = diskPath;
             }
         }
 
-        return IncidentPdf.Generate(Incident, fileBytes, pdfAttachmentPaths);
+        return Task.FromResult(IncidentPdf.Generate(Incident, filePaths));
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
@@ -240,11 +228,11 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning) =>
         Mutate(() => Incident.UpsertTimer(key, cycleAnchor, intervalMinutes, recurringIntervalMinutes, isRunning));
 
-    public async Task AddFileAsync(string fileName, string contentType, byte[] bytes, CancellationToken cancellationToken = default)
+    public async Task AddFileAsync(string fileName, string contentType, Stream content, long sizeBytes, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(bytes);
-        var file = Incident.AddFile(_clock, RequireOperator(), fileName, contentType, bytes.LongLength);
-        await _store.SaveFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), bytes, cancellationToken);
+        ArgumentNullException.ThrowIfNull(content);
+        var file = Incident.AddFile(_clock, RequireOperator(), fileName, contentType, sizeBytes);
+        await _store.SaveFileStreamAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), content, cancellationToken);
         Save();
         Changed?.Invoke();
     }
@@ -260,10 +248,16 @@ public sealed class LocalIncidentSession : IIncidentSession
     public Task SaveFileStreamAsync(string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
         _store.SaveFileStreamAsync(Path, storageFileName, source, cancellationToken);
 
-    public async Task<byte[]?> GetFileBytesAsync(Guid fileId, CancellationToken cancellationToken = default)
+    public Task<Stream?> GetFileStreamAsync(Guid fileId, CancellationToken cancellationToken = default)
     {
         var file = Incident.Files.FirstOrDefault(f => f.Id == fileId);
-        return file is null ? null : await _store.TryReadFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
+        if (file is null)
+        {
+            return Task.FromResult<Stream?>(null);
+        }
+
+        var diskPath = _store.ResolveFileDiskPath(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
+        return Task.FromResult<Stream?>(File.Exists(diskPath) ? File.OpenRead(diskPath) : null);
     }
 
     public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));

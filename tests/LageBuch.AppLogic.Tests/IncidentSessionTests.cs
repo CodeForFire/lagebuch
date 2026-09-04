@@ -76,12 +76,16 @@ public class IncidentSessionTests
         var savesBefore = store.SaveCount;
 
         var bytes = new byte[] { 1, 2, 3 };
-        await session.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new MemoryStream(bytes), bytes.Length);
 
         var file = Assert.Single(session.Incident.Files);
         Assert.Equal("brand.jpg", file.FileName);
         Assert.True(store.SaveCount > savesBefore);
-        Assert.Equal(bytes, await session.GetFileBytesAsync(file.Id));
+        await using var read = await session.GetFileStreamAsync(file.Id);
+        Assert.NotNull(read);
+        using var readMs = new MemoryStream();
+        await read.CopyToAsync(readMs);
+        Assert.Equal(bytes, readMs.ToArray());
     }
 
     [Fact]
@@ -100,7 +104,7 @@ public class IncidentSessionTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        var addTask = session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        var addTask = session.AddFileAsync("brand.jpg", "image/jpeg", new MemoryStream(new byte[] { 1, 2, 3 }), 3);
 
         Assert.False(addTask.IsCompleted); // still awaiting the (currently stuck) file write
         release.SetResult();
@@ -110,7 +114,7 @@ public class IncidentSessionTests
     }
 
     [Fact]
-    public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
+    public async Task GetFileStreamAsync_returns_null_for_an_unknown_file()
     {
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(
@@ -121,7 +125,7 @@ public class IncidentSessionTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        Assert.Null(await session.GetFileBytesAsync(Guid.NewGuid()));
+        Assert.Null(await session.GetFileStreamAsync(Guid.NewGuid()));
     }
 
     [Fact]
@@ -138,7 +142,7 @@ public class IncidentSessionTests
         var raised = false;
         session.Changed += () => raised = true;
 
-        await session.AddFileAsync("bericht.pdf", "application/pdf", new byte[] { 1 });
+        await session.AddFileAsync("bericht.pdf", "application/pdf", new MemoryStream(new byte[] { 1 }), 1);
 
         Assert.True(raised);
     }
@@ -338,7 +342,7 @@ public class IncidentSessionTests
         var withoutAttachment = await session.ExportPdfAsync();
 
         // Any valid PDF stands in for "an attached PDF" — the export itself already produces one.
-        await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
+        await session.AddFileAsync("bericht.pdf", "application/pdf", new MemoryStream(withoutAttachment), withoutAttachment.Length);
 
         var withAttachment = await session.ExportPdfAsync();
 
@@ -371,23 +375,11 @@ internal sealed class FakeStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 
-    private readonly Dictionary<string, byte[]> _files = new();
-
-    public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
-    {
-        _files[$"{path}/{storageFileName}"] = bytes;
-        await File.WriteAllBytesAsync(Path.Combine(_diskDir, storageFileName), bytes, cancellationToken);
-    }
-
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default)
     {
-        using var ms = new MemoryStream();
-        await source.CopyToAsync(ms, cancellationToken);
-        await SaveFileBytesAsync(path, storageFileName, ms.ToArray(), cancellationToken);
+        await using var dest = File.Create(Path.Combine(_diskDir, storageFileName));
+        await source.CopyToAsync(dest, cancellationToken);
     }
-
-    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(_diskDir, storageFileName);
 
@@ -398,7 +390,7 @@ internal sealed class FakeStore : IIncidentStore
     }
 }
 
-// SaveFileBytesAsync doesn't complete until the caller-supplied gate task does — lets a test prove
+// SaveFileStreamAsync doesn't complete until the caller-supplied gate task does — lets a test prove
 // its caller isn't blocked synchronously waiting on the write (issue #167 P1 #1).
 internal sealed class DelayedFileWriteStore : IIncidentStore
 {
@@ -415,14 +407,8 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 
-    public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
-        await _gate;
-
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
         await _gate;
-
-    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
-        Task.FromResult<byte[]?>(null);
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 

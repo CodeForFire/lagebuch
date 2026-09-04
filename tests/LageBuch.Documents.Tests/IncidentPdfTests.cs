@@ -115,16 +115,27 @@ public class IncidentPdfTests
         var incident = Incident.Start(clock, op);
         var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", TinyJpeg.Length);
 
-        var withoutImage = IncidentPdf.Generate(incident);
-        var withImage = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]> { [file.Id] = TinyJpeg });
+        // Images are embedded straight from a disk path too (issue #167 P1), same as PDF
+        // attachments — write the stand-in image to a temp file to exercise that path.
+        var imagePath = Path.Combine(Path.GetTempPath(), $"lagebuch-incident-pdf-test-{Guid.NewGuid():N}.jpg");
+        File.WriteAllBytes(imagePath, TinyJpeg);
+        try
+        {
+            var withoutImage = IncidentPdf.Generate(incident);
+            var withImage = IncidentPdf.Generate(incident, new Dictionary<Guid, string> { [file.Id] = imagePath });
 
-        PdfAssert.IsPdf(withImage);
+            PdfAssert.IsPdf(withImage);
 
-        // Embedding a real image adds real bytes to the stream — a cheap, dependency-free proxy for
-        // "the section actually rendered something" without parsing PDF content streams.
-        Assert.True(
-            withImage.Length > withoutImage.Length,
-            $"Expected embedding the image to grow the PDF (without={withoutImage.Length}, with={withImage.Length}).");
+            // Embedding a real image adds real bytes to the stream — a cheap, dependency-free proxy for
+            // "the section actually rendered something" without parsing PDF content streams.
+            Assert.True(
+                withImage.Length > withoutImage.Length,
+                $"Expected embedding the image to grow the PDF (without={withoutImage.Length}, with={withImage.Length}).");
+        }
+        finally
+        {
+            File.Delete(imagePath);
+        }
     }
 
     [Fact]
@@ -159,7 +170,7 @@ public class IncidentPdfTests
         incident.AddFile(new Clock(), new SessionOperator("Müller"), "brand.jpg", "image/jpeg", 123);
 
         // No entry for the file's id in the dictionary — simulates a moved/missing sibling folder.
-        var bytes = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var bytes = IncidentPdf.Generate(incident, new Dictionary<Guid, string>());
 
         PdfAssert.IsPdf(bytes);
     }
@@ -191,7 +202,7 @@ public class IncidentPdfTests
         {
             var withAttachment = IncidentPdf.Generate(
                 incident,
-                pdfAttachmentPaths: new Dictionary<Guid, string> { [file.Id] = attachmentPath });
+                filePaths: new Dictionary<Guid, string> { [file.Id] = attachmentPath });
 
             PdfAssert.IsPdf(withAttachment);
             Assert.Equal(reportPages + PdfAssert.CountPages(attachmentPdf), PdfAssert.CountPages(withAttachment));

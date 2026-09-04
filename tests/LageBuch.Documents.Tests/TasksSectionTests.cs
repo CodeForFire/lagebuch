@@ -16,7 +16,7 @@ public class TasksSectionTests
         incident.SetTaskCompleted(incident.Tasks[0].Id, true, clock, op);
         incident.AddTask(clock, op, "Nachfordern", null, TaskImportance.Low, TaskUrgency.Low, 30);
 
-        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var pdf = IncidentPdf.Generate(incident);
 
         Assert.True(pdf.Length > 1000);
         Assert.Equal(0x25, pdf[0]); // '%'

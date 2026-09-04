@@ -120,7 +120,7 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new MemoryStream(new byte[] { 9, 9, 9 }), 3);
         var dialogs = new FakeDialogs();
         var vm = new FilesViewModel(session, dialogs, () => { });
         var row = Assert.Single(vm.Files);

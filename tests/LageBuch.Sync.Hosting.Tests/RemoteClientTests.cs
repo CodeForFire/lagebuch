@@ -93,7 +93,7 @@ public class RemoteClientTests
         var uploaderChange = NextChange(uploader);
         var observerChange = NextChange(observer);
         var bytes = new byte[] { 9, 8, 7, 6 };
-        await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+        await uploader.AddFileAsync("brand.jpg", "image/jpeg", new MemoryStream(bytes), bytes.Length);
         await Task.WhenAll(uploaderChange, observerChange);
 
         var uploaderFile = Assert.Single(uploader.Incident.Files);
@@ -102,7 +102,11 @@ public class RemoteClientTests
         Assert.Equal("A (RUF 1)", observerFile.AddedBy);
 
         // The metadata above arrived via the ordinary broadcast; bytes are a separate, on-demand pull.
-        Assert.Equal(bytes, await observer.GetFileBytesAsync(observerFile.Id));
+        await using var pulled = await observer.GetFileStreamAsync(observerFile.Id);
+        Assert.NotNull(pulled);
+        using var pulledMs = new MemoryStream();
+        await pulled.CopyToAsync(pulledMs);
+        Assert.Equal(bytes, pulledMs.ToArray());
     }
 
     [Fact]
@@ -119,7 +123,7 @@ public class RemoteClientTests
 
         var renamerAdded = NextChange(renamer);
         var observerAdded = NextChange(observer);
-        await renamer.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1 });
+        await renamer.AddFileAsync("brand.jpg", "image/jpeg", new MemoryStream(new byte[] { 1 }), 1);
         await Task.WhenAll(renamerAdded, observerAdded);
         var fileId = Assert.Single(renamer.Incident.Files).Id;
 
@@ -133,7 +137,7 @@ public class RemoteClientTests
     }
 
     [Fact]
-    public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
+    public async Task GetFileStreamAsync_returns_null_for_an_unknown_file()
     {
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
@@ -141,7 +145,7 @@ public class RemoteClientTests
         await using var client = await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
 
-        Assert.Null(await client.GetFileBytesAsync(Guid.NewGuid()));
+        Assert.Null(await client.GetFileStreamAsync(Guid.NewGuid()));
     }
 
     [Fact]
@@ -153,13 +157,13 @@ public class RemoteClientTests
         await using var client = await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
 
-        var tooBig = new byte[LageBuch.Domain.Files.IncidentFile.MaxSizeBytes + 1];
-        await Assert.ThrowsAsync<ArgumentException>(() => client.AddFileAsync("huge.pdf", "application/pdf", tooBig));
+        var tooBig = LageBuch.Domain.Files.IncidentFile.MaxSizeBytes + 1;
+        await Assert.ThrowsAsync<ArgumentException>(() => client.AddFileAsync("huge.pdf", "application/pdf", Stream.Null, tooBig));
         Assert.Empty(client.Incident.Files);
     }
 
     [Fact]
-    public async Task GetFileBytesAsync_caches_pulled_bytes_to_disk_when_a_cache_root_is_supplied()
+    public async Task GetFileStreamAsync_caches_pulled_bytes_to_disk_when_a_cache_root_is_supplied()
     {
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
@@ -171,7 +175,7 @@ public class RemoteClientTests
                 "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
             var bytes = new byte[] { 1, 2, 3 };
             var uploaderChange = NextChange(uploader);
-            await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+            await uploader.AddFileAsync("brand.jpg", "image/jpeg", new MemoryStream(bytes), bytes.Length);
             await uploaderChange; // AddFileAsync's HTTP response can outrace the self-broadcast
             var fileId = Assert.Single(uploader.Incident.Files).Id;
 
@@ -183,7 +187,8 @@ public class RemoteClientTests
                 TestHost.DefaultPin,
                 port,
                 cacheRoot: cacheRoot);
-            await puller.GetFileBytesAsync(fileId);
+            await using var pulled = await puller.GetFileStreamAsync(fileId);
+            Assert.NotNull(pulled);
 
             var cached = Directory.EnumerateFiles(cacheRoot, "*", SearchOption.AllDirectories).ToList();
             var cachedFile = Assert.Single(cached);

@@ -179,14 +179,14 @@ public sealed class IncidentHost : IAsyncDisposable
     // against already-persisted state, so it doesn't need the UI-thread dispatch HandleCommand uses.
     private async Task<IResult> HandleGetFile(Guid id)
     {
-        var bytes = await _session.GetFileBytesAsync(id);
-        if (bytes is null)
+        var stream = await _session.GetFileStreamAsync(id);
+        if (stream is null)
         {
             return Results.NotFound();
         }
 
         var file = _session.Incident.Files.FirstOrDefault(f => f.Id == id);
-        return Results.Bytes(bytes, file?.ContentType ?? IncidentFile.DefaultMimeType, fileDownloadName: file?.FileName);
+        return Results.Stream(stream, file?.ContentType ?? IncidentFile.DefaultMimeType, fileDownloadName: file?.FileName);
     }
 
     // The other half of the metadata/bytes split (issue #167 P1 #2): a client PUTs the raw attachment

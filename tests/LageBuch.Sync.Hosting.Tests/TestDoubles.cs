@@ -19,6 +19,11 @@ internal sealed class InMemoryStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _byPath = new();
 
+    // A thin real-disk mirror (a per-instance temp folder) so ResolveFileDiskPath hands back a real,
+    // readable path — LocalIncidentSession.GetFileStreamAsync (and the host's file-download route)
+    // open it directly, bypassing this store.
+    private readonly string _diskDir = Directory.CreateTempSubdirectory("lagebuch-hosting-inmemorystore-").FullName;
+
     public void Save(string path, Incident incident) => _byPath[path] = incident;
 
     public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -27,25 +32,13 @@ internal sealed class InMemoryStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => _byPath.TryGetValue(path, out var i) ? i.State : null;
 
-    private readonly Dictionary<string, byte[]> _files = new();
-
-    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
-    {
-        _files[$"{path}/{storageFileName}"] = bytes;
-        return Task.CompletedTask;
-    }
-
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default)
     {
-        using var ms = new MemoryStream();
-        await source.CopyToAsync(ms, cancellationToken);
-        await SaveFileBytesAsync(path, storageFileName, ms.ToArray(), cancellationToken);
+        await using var dest = File.Create(Path.Combine(_diskDir, storageFileName));
+        await source.CopyToAsync(dest, cancellationToken);
     }
 
-    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
-        Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
-
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(_diskDir, storageFileName);
 
     public event Action<Exception>? SaveFailed
     {
@@ -299,14 +292,8 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public IncidentState? TryReadState(string path) => _saved.TryGetValue(path, out var i) ? i.State : null;
 
-    public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
-        await _gate;
-
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
         await _gate;
-
-    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
-        Task.FromResult<byte[]?>(null);
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
