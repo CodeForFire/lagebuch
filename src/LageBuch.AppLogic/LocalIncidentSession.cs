@@ -118,16 +118,31 @@ public sealed class LocalIncidentSession : IIncidentSession
     public async Task<byte[]> ExportPdfAsync()
     {
         var fileBytes = new Dictionary<Guid, byte[]>();
+        var pdfAttachmentPaths = new Dictionary<Guid, string>();
         foreach (var file in Incident.Files)
         {
-            var bytes = await _store.TryReadFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
+            var storageFileName = IncidentFile.StorageFileName(file.Id, file.FileName);
+            if (file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                // Merged straight from disk (see issue #167 P1 #3) — never loaded into fileBytes,
+                // which would otherwise round-trip every PDF attachment through memory twice.
+                var diskPath = _store.ResolveFileDiskPath(Path, storageFileName);
+                if (File.Exists(diskPath))
+                {
+                    pdfAttachmentPaths[file.Id] = diskPath;
+                }
+
+                continue;
+            }
+
+            var bytes = await _store.TryReadFileBytesAsync(Path, storageFileName);
             if (bytes is not null)
             {
                 fileBytes[file.Id] = bytes;
             }
         }
 
-        return IncidentPdf.Generate(Incident, fileBytes);
+        return IncidentPdf.Generate(Incident, fileBytes, pdfAttachmentPaths);
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---

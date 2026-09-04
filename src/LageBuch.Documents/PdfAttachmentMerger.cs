@@ -11,16 +11,27 @@ public static class PdfAttachmentMerger
 {
     /// <summary>
     /// Appends every attachment's pages, in order, after <paramref name="baseReport"/>'s own pages.
-    /// QuestPDF's <c>DocumentOperation</c> works on file paths only (no in-memory overload), so both
-    /// the base report and each attachment are round-tripped through a temp file.
+    /// QuestPDF's <c>DocumentOperation</c> works on file paths only (no in-memory overload), so the
+    /// base report is round-tripped through a temp file, but attachments are merged straight from
+    /// <paramref name="pdfAttachmentPaths"/> — every attachment already lives on disk (see issue
+    /// #167 P1 #3), so there is no need to load it into memory and write it back out to a temp copy
+    /// first.
     /// </summary>
-    public static byte[] Append(byte[] baseReport, IReadOnlyList<byte[]> pdfAttachments)
+    public static byte[] Append(byte[] baseReport, IReadOnlyList<string> pdfAttachmentPaths)
     {
         ArgumentNullException.ThrowIfNull(baseReport);
-        ArgumentNullException.ThrowIfNull(pdfAttachments);
-        if (pdfAttachments.Count == 0)
+        ArgumentNullException.ThrowIfNull(pdfAttachmentPaths);
+        if (pdfAttachmentPaths.Count == 0)
         {
             return baseReport;
+        }
+
+        foreach (var path in pdfAttachmentPaths)
+        {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException($"PDF-Anhang nicht gefunden: {path}", path);
+            }
         }
 
         var workDir = Path.Combine(Path.GetTempPath(), $"lagebuch-pdf-merge-{Guid.NewGuid():N}");
@@ -31,10 +42,8 @@ public static class PdfAttachmentMerger
             File.WriteAllBytes(basePath, baseReport);
 
             var operation = DocumentOperation.LoadFile(basePath, password: null);
-            for (var i = 0; i < pdfAttachments.Count; i++)
+            foreach (var attachmentPath in pdfAttachmentPaths)
             {
-                var attachmentPath = Path.Combine(workDir, $"attachment-{i}.pdf");
-                File.WriteAllBytes(attachmentPath, pdfAttachments[i]);
                 operation = operation.MergeFile(attachmentPath, pageSelector: null);
             }
 
