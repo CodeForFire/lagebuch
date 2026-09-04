@@ -199,6 +199,55 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task GetFileBytesAsync_evicts_the_oldest_cached_files_once_the_cache_exceeds_its_cap()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        var cacheRoot = Path.Combine(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(cacheRoot);
+        try
+        {
+            // An unrelated, older cache entry — e.g. left over from a previously joined incident —
+            // that eviction should reclaim once the cache exceeds its cap.
+            var staleFile = Path.Combine(cacheRoot, "stale.bin");
+            await File.WriteAllBytesAsync(staleFile, new byte[10]);
+            File.SetLastWriteTimeUtc(staleFile, DateTime.UtcNow.AddDays(-1));
+
+            await using var uploader = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            var bytes = new byte[] { 1, 2, 3 };
+            var uploaderChange = NextChange(uploader);
+            await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+            await uploaderChange; // AddFileAsync's HTTP response can outrace the self-broadcast
+            var fileId = Assert.Single(uploader.Incident.Files).Id;
+
+            await using var puller = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("B"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                TestHost.DefaultPin,
+                port,
+                cacheRoot: cacheRoot,
+                cacheMaxBytes: 5); // smaller than stale (10) + new (3) combined — forces eviction
+            await puller.GetFileBytesAsync(fileId);
+
+            Assert.False(File.Exists(staleFile), "the older, unrelated cache entry should have been evicted");
+            var remaining = Directory.EnumerateFiles(cacheRoot, "*", SearchOption.AllDirectories).ToList();
+            var totalRemaining = remaining.Sum(f => new FileInfo(f).Length);
+            Assert.True(totalRemaining <= 5, $"expected the cache to be back under its cap, but it holds {totalRemaining} bytes");
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Connect_refuses_a_version_mismatch()
     {
         var clock = new FixedClock();
