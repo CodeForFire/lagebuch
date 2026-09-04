@@ -44,6 +44,18 @@ public class JsonRecentFilesStoreTests : IDisposable
     }
 
     [Fact]
+    public void GetRecent_after_the_first_call_does_not_re_read_the_file()
+    {
+        new JsonRecentFilesStore(_path).Add("/a.fwincident");
+        var reader = new JsonRecentFilesStore(_path);
+        var first = reader.GetRecent(); // warms the in-memory cache from disk
+
+        File.Delete(_path);
+
+        Assert.Equal(first, reader.GetRecent());
+    }
+
+    [Fact]
     public void List_is_capped_at_ten()
     {
         var store = new JsonRecentFilesStore(_path);

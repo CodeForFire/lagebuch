@@ -30,4 +30,16 @@ public class JsonLastSaveFolderStoreTests : IDisposable
         new JsonLastSaveFolderStore(_path).SetLastFolder("/einsaetze/2027");
         Assert.Equal("/einsaetze/2027", new JsonLastSaveFolderStore(_path).GetLastFolder());
     }
+
+    [Fact]
+    public void GetLastFolder_after_the_first_call_does_not_re_read_the_file()
+    {
+        new JsonLastSaveFolderStore(_path).SetLastFolder("/einsaetze/2026");
+        var reader = new JsonLastSaveFolderStore(_path);
+        var first = reader.GetLastFolder(); // warms the in-memory cache from disk
+
+        File.Delete(_path);
+
+        Assert.Equal(first, reader.GetLastFolder());
+    }
 }

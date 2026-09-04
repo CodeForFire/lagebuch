@@ -6,26 +6,11 @@ public sealed class JsonRecentFilesStore : IRecentFilesStore
 {
     private const int MaxEntries = 10;
     private readonly string _path;
+    private List<string>? _cached;
 
     public JsonRecentFilesStore(string path) => _path = path;
 
-    public IReadOnlyList<string> GetRecent()
-    {
-        if (!File.Exists(_path))
-        {
-            return Array.Empty<string>();
-        }
-
-        try
-        {
-            var json = File.ReadAllText(_path);
-            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
-        }
-        catch (JsonException)
-        {
-            return Array.Empty<string>();
-        }
-    }
+    public IReadOnlyList<string> GetRecent() => _cached ??= LoadFromDisk();
 
     public void Add(string path)
     {
@@ -38,5 +23,24 @@ public sealed class JsonRecentFilesStore : IRecentFilesStore
         }
 
         File.WriteAllText(_path, JsonSerializer.Serialize(list));
+        _cached = list;
+    }
+
+    private List<string> LoadFromDisk()
+    {
+        if (!File.Exists(_path))
+        {
+            return new List<string>();
+        }
+
+        try
+        {
+            var json = File.ReadAllText(_path);
+            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch (JsonException)
+        {
+            return new List<string>();
+        }
     }
 }
