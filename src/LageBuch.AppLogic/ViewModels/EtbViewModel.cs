@@ -11,7 +11,7 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-public sealed partial class EtbViewModel : ObservableObject
+public sealed partial class EtbViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -68,6 +68,8 @@ public sealed partial class EtbViewModel : ObservableObject
     /// swapping in a replacement wherever the edit count no longer matches -- O(n) total per
     /// Sync() call, not O(n²), since Sync() runs on every incident change from every device.
     /// </summary>
+    public void Dispose() => _session.Changed -= Sync;
+
     public void Sync()
     {
         var journal = _session.Incident.Journal;

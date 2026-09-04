@@ -91,7 +91,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     private void BeginTransfer() => _onTransfer(this);
 }
 
-public sealed partial class RolesViewModel : ObservableObject
+public sealed partial class RolesViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -119,6 +119,8 @@ public sealed partial class RolesViewModel : ObservableObject
         RefreshRoles();
         _session.Changed += RefreshRoles;
     }
+
+    public void Dispose() => _session.Changed -= RefreshRoles;
 
     // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
     private void RefreshRoles()

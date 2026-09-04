@@ -175,7 +175,7 @@ public sealed partial class ForceRow : ObservableObject
         }).ToArray();
 }
 
-public sealed partial class ForcesViewModel : ObservableObject
+public sealed partial class ForcesViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -200,6 +200,8 @@ public sealed partial class ForcesViewModel : ObservableObject
         TotalScba = session.Incident.TotalScba;
         _session.Changed += RefreshForces;
     }
+
+    public void Dispose() => _session.Changed -= RefreshForces;
 
     // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
     private void RefreshForces()
