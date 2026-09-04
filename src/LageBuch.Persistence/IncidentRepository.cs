@@ -17,50 +17,115 @@ public sealed class IncidentRepository
         Migrations.Migrate(cn);
         using var tx = cn.BeginTransaction();
 
-        foreach (var table in new[]
-                 {
-                    "incident_meta", "checklist_items", "etb_entries", "etb_entry_edits",
-                    "role_assignments", "force_units", "scba_trupps",
-                    "scba_trupp_members", "scba_pressure_readings", "audit_events",
-                    "incident_timers", "incident_files", "incident_tasks",
-                    "co_buildings", "co_dwellings",
-                 })
+        UpsertMeta(cn, tx, incident);
+        UpsertChecklistItems(cn, tx, incident.ChecklistAufbau, incident.ChecklistAbbau);
+        UpsertJournal(cn, tx, incident.Journal);
+        UpsertRoles(cn, tx, incident.Roles);
+        UpsertForces(cn, tx, incident.Forces);
+        UpsertScbaTrupps(cn, tx, incident.ScbaTrupps);
+        AppendAuditEvents(cn, tx, incident.Audit);
+        UpsertTimers(cn, tx, incident.Timers);
+        UpsertFiles(cn, tx, incident.Files);
+        UpsertBuildings(cn, tx, incident.Buildings);
+        UpsertDwellings(cn, tx, incident.Dwellings);
+        UpsertTasks(cn, tx, incident.Tasks);
+
+        tx.Commit();
+    }
+
+    private const string UpsertMetaSql =
+        "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by) " +
+        "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy) " +
+        "ON CONFLICT(id) DO UPDATE SET started_at=excluded.started_at, state=excluded.state, incident_number=excluded.incident_number, " +
+        "ils_number=excluded.ils_number, keyword=excluded.keyword, street=excluded.street, district=excluded.district, " +
+        "status=excluded.status, closed_at=excluded.closed_at, closed_by=excluded.closed_by;";
+
+    // Single-row table (id never changes for a given incident), so there's nothing to remove —
+    // just keep it current.
+    private static void UpsertMeta(SqliteConnection cn, SqliteTransaction tx, Incident incident) => Run(
+        cn,
+        tx,
+        UpsertMetaSql,
+        p =>
         {
-            Exec(cn, tx, $"DELETE FROM {table};");
-        }
+            p("$id", incident.Id.ToString());
+            p("$started", incident.StartedAt.ToString(Iso));
+            p("$state", (int)incident.State);
+            p("$num", (object?)incident.IncidentNumber?.Value ?? DBNull.Value);
 
-        Run(
-            cn,
-            tx,
-            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy);",
-            p =>
-            {
-                p("$id", incident.Id.ToString());
-                p("$started", incident.StartedAt.ToString(Iso));
-                p("$state", (int)incident.State);
-                p("$num", (object?)incident.IncidentNumber?.Value ?? DBNull.Value);
+            // ils_number is retired: the complete Einsatznummer lives in incident_number now.
+            // The column is kept (dormant) so the schema is unchanged; always written null.
+            p("$ils", DBNull.Value);
+            p("$kw", (object?)incident.Keyword ?? DBNull.Value);
+            p("$street", (object?)incident.Street ?? DBNull.Value);
+            p("$district", (object?)incident.District ?? DBNull.Value);
+            p("$status", (object?)incident.Status ?? DBNull.Value);
+            p("$closedAt", (object?)incident.ClosedAt?.ToString(Iso) ?? DBNull.Value);
+            p("$closedBy", (object?)incident.ClosedBy ?? DBNull.Value);
+        });
 
-                // ils_number is retired: the complete Einsatznummer lives in incident_number now.
-                // The column is kept (dormant) so the schema is unchanged; always written null.
-                p("$ils", DBNull.Value);
-                p("$kw", (object?)incident.Keyword ?? DBNull.Value);
-                p("$street", (object?)incident.Street ?? DBNull.Value);
-                p("$district", (object?)incident.District ?? DBNull.Value);
-                p("$status", (object?)incident.Status ?? DBNull.Value);
-                p("$closedAt", (object?)incident.ClosedAt?.ToString(Iso) ?? DBNull.Value);
-                p("$closedBy", (object?)incident.ClosedBy ?? DBNull.Value);
-            });
+    private static void UpsertChecklistItems(
+        SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.ChecklistItem> aufbau, IReadOnlyList<Domain.ChecklistItem> abbau)
+    {
+        var currentIds = aufbau.Select(c => c.Id.ToString()).Concat(abbau.Select(c => c.Id.ToString())).ToHashSet();
+        DeleteMissing(cn, tx, "checklist_items", "id", currentIds);
+        UpsertChecklistKind(cn, tx, aufbau, kind: 0);
+        UpsertChecklistKind(cn, tx, abbau, kind: 1);
+    }
 
-        WriteChecklist(cn, tx, incident.ChecklistAufbau, kind: 0);
-        WriteChecklist(cn, tx, incident.ChecklistAbbau, kind: 1);
+    private const string UpsertChecklistItemSql =
+        "INSERT INTO checklist_items (id, ordinal, text, is_done, note, is_mandatory, kind) VALUES ($id,$o,$t,$d,$n,$m,$k) " +
+        "ON CONFLICT(id) DO UPDATE SET ordinal=excluded.ordinal, text=excluded.text, is_done=excluded.is_done, " +
+        "note=excluded.note, is_mandatory=excluded.is_mandatory, kind=excluded.kind;";
 
-        for (var i = 0; i < incident.Journal.Count; i++)
+    private static void UpsertChecklistKind(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.ChecklistItem> items, int kind)
+    {
+        for (var i = 0; i < items.Count; i++)
         {
-            var e = incident.Journal[i];
+            var c = items[i];
             Run(
                 cn,
                 tx,
-                "INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by) VALUES ($id,$o,$ts,$dir,$from,$to,$txt,$by);",
+                UpsertChecklistItemSql,
+                p =>
+                {
+                    p("$id", c.Id.ToString());
+                    p("$o", i);
+                    p("$t", c.Text);
+                    p("$d", c.IsDone ? 1 : 0);
+                    p("$n", (object?)c.Note ?? DBNull.Value);
+                    p("$m", c.IsMandatory ? 1 : 0);
+                    p("$k", kind);
+                });
+        }
+    }
+
+    private const string UpsertEtbEntrySql =
+        "INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by) VALUES ($id,$o,$ts,$dir,$from,$to,$txt,$by) " +
+        "ON CONFLICT(id) DO UPDATE SET ordinal=excluded.ordinal, timestamp=excluded.timestamp, direction=excluded.direction, " +
+        "from_party=excluded.from_party, to_party=excluded.to_party, text=excluded.text, entered_by=excluded.entered_by;";
+
+    private const string InsertEtbEntryEditSql =
+        "INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at) VALUES ($id,$eid,$o,$txt,$by,$at);";
+
+    private static void UpsertJournal(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.Etb.EtbEntry> journal)
+    {
+        var currentIds = journal.Select(e => e.Id.ToString()).ToHashSet();
+        DeleteMissing(cn, tx, "etb_entries", "id", currentIds);
+
+        // etb_entry_edits' own id column is a fresh Guid assigned on every save — EtbEntryEdit
+        // carries no persisted identity of its own (Load never reads it back), so it can't drive an
+        // upsert. Edits are append-only per entry, so only the ones beyond what's already stored
+        // need writing; one aggregate query up front beats one COUNT per entry.
+        var existingEditCounts = ReadCounts(cn, tx, "etb_entry_edits", "entry_id");
+
+        for (var i = 0; i < journal.Count; i++)
+        {
+            var e = journal[i];
+            Run(
+                cn,
+                tx,
+                UpsertEtbEntrySql,
                 p =>
                 {
                     p("$id", e.Id.ToString());
@@ -73,13 +138,14 @@ public sealed class IncidentRepository
                     p("$by", e.EnteredBy);
                 });
 
-            for (var j = 0; j < e.Edits.Count; j++)
+            var alreadyWritten = existingEditCounts.GetValueOrDefault(e.Id.ToString());
+            for (var j = alreadyWritten; j < e.Edits.Count; j++)
             {
                 var edit = e.Edits[j];
                 Run(
                     cn,
                     tx,
-                    "INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at) VALUES ($id,$eid,$o,$txt,$by,$at);",
+                    InsertEtbEntryEditSql,
                     p =>
                     {
                         p("$id", Guid.NewGuid().ToString());
@@ -91,14 +157,25 @@ public sealed class IncidentRepository
                     });
             }
         }
+    }
 
-        for (var i = 0; i < incident.Roles.Count; i++)
+    private const string UpsertRoleSql =
+        "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph) " +
+        "ON CONFLICT(id) DO UPDATE SET ordinal=excluded.ordinal, role=excluded.role, person_name=excluded.person_name, " +
+        "call_sign=excluded.call_sign, from_time=excluded.from_time, to_time=excluded.to_time, section=excluded.section, phone=excluded.phone;";
+
+    private static void UpsertRoles(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.RoleAssignment> roles)
+    {
+        var currentIds = roles.Select(r => r.Id.ToString()).ToHashSet();
+        DeleteMissing(cn, tx, "role_assignments", "id", currentIds);
+
+        for (var i = 0; i < roles.Count; i++)
         {
-            var r = incident.Roles[i];
+            var r = roles[i];
             Run(
                 cn,
                 tx,
-                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph);",
+                UpsertRoleSql,
                 p =>
                 {
                     p("$id", r.Id.ToString());
@@ -112,14 +189,33 @@ public sealed class IncidentRepository
                     p("$ph", (object?)r.Phone ?? DBNull.Value);
                 });
         }
+    }
 
-        for (var i = 0; i < incident.Forces.Count; i++)
+    private const string UpsertForceUnitSql =
+        "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc) " +
+        "ON CONFLICT(id) DO UPDATE SET ordinal=excluded.ordinal, brigade=excluded.brigade, call_sign=excluded.call_sign, " +
+        "personnel_count=excluded.personnel_count, scba_count=excluded.scba_count, status=excluded.status, notes=excluded.notes, officer_count=excluded.officer_count;";
+
+    private const string InsertForceUnitEditSql =
+        "INSERT INTO force_unit_edits (id, unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at) " +
+        "VALUES ($id,$uid,$o,$poc,$ppc,$psc,$by,$at);";
+
+    private static void UpsertForces(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.ForceUnit> forces)
+    {
+        var currentIds = forces.Select(f => f.Id.ToString()).ToHashSet();
+        DeleteMissing(cn, tx, "force_units", "id", currentIds);
+
+        // Same unstable-id situation as etb_entry_edits (see there) — force_unit_edits' id is
+        // synthetic and never read back, so tail-append by aggregate count instead of upserting.
+        var existingEditCounts = ReadCounts(cn, tx, "force_unit_edits", "unit_id");
+
+        for (var i = 0; i < forces.Count; i++)
         {
-            var f = incident.Forces[i];
+            var f = forces[i];
             Run(
                 cn,
                 tx,
-                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc);",
+                UpsertForceUnitSql,
                 p =>
                 {
                     p("$id", f.Id.ToString());
@@ -133,13 +229,14 @@ public sealed class IncidentRepository
                     p("$oc", f.OfficerCount);
                 });
 
-            for (var j = 0; j < f.Edits.Count; j++)
+            var alreadyWritten = existingEditCounts.GetValueOrDefault(f.Id.ToString());
+            for (var j = alreadyWritten; j < f.Edits.Count; j++)
             {
                 var edit = f.Edits[j];
                 Run(
                     cn,
                     tx,
-                    "INSERT INTO force_unit_edits (id, unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at) " + "VALUES ($id,$uid,$o,$poc,$ppc,$psc,$by,$at);",
+                    InsertForceUnitEditSql,
                     p =>
                     {
                         p("$id", Guid.NewGuid().ToString());
@@ -153,14 +250,38 @@ public sealed class IncidentRepository
                     });
             }
         }
+    }
 
-        for (var i = 0; i < incident.ScbaTrupps.Count; i++)
+    private const string UpsertScbaTruppSql =
+        "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time) " +
+        "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit) " +
+        "ON CONFLICT(id) DO UPDATE SET ordinal=excluded.ordinal, trupp_number=excluded.trupp_number, designation=excluded.designation, " +
+        "call_sign=excluded.call_sign, task=excluded.task, registered_at=excluded.registered_at, start_time=excluded.start_time, " +
+        "entry_pressure=excluded.entry_pressure, withdraw_time=excluded.withdraw_time, max_duration_minutes=excluded.max_duration_minutes, " +
+        "return_pressure_bar=excluded.return_pressure_bar, pressure_control_interval_minutes=excluded.pressure_control_interval_minutes, exit_time=excluded.exit_time;";
+
+    private const string InsertScbaTruppMemberSql =
+        "INSERT INTO scba_trupp_members (trupp_id, ordinal, role, name) VALUES ($tid,$o,$role,$name);";
+
+    private const string InsertScbaPressureReadingSql =
+        "INSERT INTO scba_pressure_readings (id, trupp_id, ordinal, reading_time, bar) VALUES ($id,$tid,$o,$time,$bar);";
+
+    private static void UpsertScbaTrupps(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.Atemschutz.AtemschutzTrupp> trupps)
+    {
+        var currentIds = trupps.Select(t => t.Id.ToString()).ToHashSet();
+        var existingTruppIds = DeleteMissing(cn, tx, "scba_trupps", "id", currentIds);
+
+        // scba_pressure_readings has the same unstable-id situation as etb_entry_edits (see there).
+        var existingReadingCounts = ReadCounts(cn, tx, "scba_pressure_readings", "trupp_id");
+
+        for (var i = 0; i < trupps.Count; i++)
         {
-            var t = incident.ScbaTrupps[i];
+            var t = trupps[i];
+            var isNewTrupp = !existingTruppIds.Contains(t.Id.ToString());
             Run(
                 cn,
                 tx,
-                "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time) " + "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit);",
+                UpsertScbaTruppSql,
                 p =>
                 {
                     p("$id", t.Id.ToString());
@@ -179,29 +300,37 @@ public sealed class IncidentRepository
                     p("$exit", (object?)t.ExitTime?.ToString(Iso) ?? DBNull.Value);
                 });
 
-            for (var j = 0; j < t.Members.Count; j++)
+            // Members are fixed at trupp creation — there's no API to add/remove one afterward — so
+            // they only ever need writing the first time this trupp is persisted. The table also
+            // carries no id/unique constraint at all (see Migrations.cs), so re-inserting on every
+            // save would just duplicate rows rather than being a harmless no-op.
+            if (isNewTrupp)
             {
-                var member = t.Members[j];
-                Run(
-                    cn,
-                    tx,
-                    "INSERT INTO scba_trupp_members (trupp_id, ordinal, role, name) VALUES ($tid,$o,$role,$name);",
-                    p =>
-                    {
-                        p("$tid", t.Id.ToString());
-                        p("$o", j);
-                        p("$role", (int)member.Role);
-                        p("$name", member.Name);
-                    });
+                for (var j = 0; j < t.Members.Count; j++)
+                {
+                    var member = t.Members[j];
+                    Run(
+                        cn,
+                        tx,
+                        InsertScbaTruppMemberSql,
+                        p =>
+                        {
+                            p("$tid", t.Id.ToString());
+                            p("$o", j);
+                            p("$role", (int)member.Role);
+                            p("$name", member.Name);
+                        });
+                }
             }
 
-            for (var j = 0; j < t.PressureReadings.Count; j++)
+            var alreadyWritten = existingReadingCounts.GetValueOrDefault(t.Id.ToString());
+            for (var j = alreadyWritten; j < t.PressureReadings.Count; j++)
             {
                 var reading = t.PressureReadings[j];
                 Run(
                     cn,
                     tx,
-                    "INSERT INTO scba_pressure_readings (id, trupp_id, ordinal, reading_time, bar) VALUES ($id,$tid,$o,$time,$bar);",
+                    InsertScbaPressureReadingSql,
                     p =>
                     {
                         p("$id", Guid.NewGuid().ToString());
@@ -212,10 +341,16 @@ public sealed class IncidentRepository
                     });
             }
         }
+    }
 
-        for (var i = 0; i < incident.Audit.Count; i++)
+    // Pure append-only log, keyed by ordinal (its actual primary key) — never edited or removed
+    // once written, so only the tail beyond what's already on disk needs inserting at all.
+    private static void AppendAuditEvents(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.AuditEvent> audit)
+    {
+        var alreadyWritten = ReadScalarInt(cn, tx, "SELECT COUNT(*) FROM audit_events;");
+        for (var i = alreadyWritten; i < audit.Count; i++)
         {
-            var a = incident.Audit[i];
+            var a = audit[i];
             Run(
                 cn,
                 tx,
@@ -228,13 +363,24 @@ public sealed class IncidentRepository
                     p("$by", a.By);
                 });
         }
+    }
 
-        foreach (var t in incident.Timers)
+    private const string UpsertTimerSql =
+        "INSERT INTO incident_timers (key, cycle_anchor, interval_minutes, recurring_interval_minutes, is_running) VALUES ($k,$a,$i,$r,$run) " +
+        "ON CONFLICT(key) DO UPDATE SET cycle_anchor=excluded.cycle_anchor, interval_minutes=excluded.interval_minutes, " +
+        "recurring_interval_minutes=excluded.recurring_interval_minutes, is_running=excluded.is_running;";
+
+    private static void UpsertTimers(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.Time.IncidentTimerState> timers)
+    {
+        var currentKeys = timers.Select(t => t.Key).ToHashSet();
+        DeleteMissing(cn, tx, "incident_timers", "key", currentKeys);
+
+        foreach (var t in timers)
         {
             Run(
                 cn,
                 tx,
-                "INSERT INTO incident_timers (key, cycle_anchor, interval_minutes, recurring_interval_minutes, is_running) VALUES ($k,$a,$i,$r,$run);",
+                UpsertTimerSql,
                 p =>
                 {
                     p("$k", t.Key);
@@ -244,14 +390,25 @@ public sealed class IncidentRepository
                     p("$run", t.IsRunning ? 1 : 0);
                 });
         }
+    }
 
-        for (var i = 0; i < incident.Files.Count; i++)
+    private const string UpsertFileSql =
+        "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by, display_name) VALUES ($id,$o,$fn,$ct,$sz,$at,$by,$dn) " +
+        "ON CONFLICT(id) DO UPDATE SET ordinal=excluded.ordinal, file_name=excluded.file_name, content_type=excluded.content_type, " +
+        "size_bytes=excluded.size_bytes, added_at=excluded.added_at, added_by=excluded.added_by, display_name=excluded.display_name;";
+
+    private static void UpsertFiles(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.Files.IncidentFile> files)
+    {
+        var currentIds = files.Select(f => f.Id.ToString()).ToHashSet();
+        DeleteMissing(cn, tx, "incident_files", "id", currentIds);
+
+        for (var i = 0; i < files.Count; i++)
         {
-            var f = incident.Files[i];
+            var f = files[i];
             Run(
                 cn,
                 tx,
-                "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by, display_name) VALUES ($id,$o,$fn,$ct,$sz,$at,$by,$dn);",
+                UpsertFileSql,
                 p =>
                 {
                     p("$id", f.Id.ToString());
@@ -264,16 +421,27 @@ public sealed class IncidentRepository
                     p("$dn", f.DisplayName);
                 });
         }
+    }
 
-        for (var i = 0; i < incident.Buildings.Count; i++)
+    private const string UpsertBuildingSql =
+        "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels) VALUES ($id,$name,$fc,$apf,$fd,$o,$al) " +
+        "ON CONFLICT(id) DO UPDATE SET name=excluded.name, floor_count=excluded.floor_count, apartments_per_floor=excluded.apartments_per_floor, " +
+        "floor_descriptions=excluded.floor_descriptions, ordinal=excluded.ordinal, apartment_labels=excluded.apartment_labels;";
+
+    private static void UpsertBuildings(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.CoMeasurement.Building> buildings)
+    {
+        var currentIds = buildings.Select(b => b.Id.ToString()).ToHashSet();
+        DeleteMissing(cn, tx, "co_buildings", "id", currentIds);
+
+        for (var i = 0; i < buildings.Count; i++)
         {
-            var b = incident.Buildings[i];
+            var b = buildings[i];
             var descriptionsJson = System.Text.Json.JsonSerializer.Serialize(b.FloorDescriptions);
             var apartmentLabelsJson = System.Text.Json.JsonSerializer.Serialize(b.ApartmentLabels);
             Run(
                 cn,
                 tx,
-                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels) VALUES ($id,$name,$fc,$apf,$fd,$o,$al);",
+                UpsertBuildingSql,
                 p =>
                 {
                     p("$id", b.Id.ToString());
@@ -285,14 +453,25 @@ public sealed class IncidentRepository
                     p("$al", apartmentLabelsJson);
                 });
         }
+    }
 
-        for (var i = 0; i < incident.Dwellings.Count; i++)
+    private const string UpsertDwellingSql =
+        "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$cv) " +
+        "ON CONFLICT(id) DO UPDATE SET building_id=excluded.building_id, floor_ordinal=excluded.floor_ordinal, " +
+        "apartment_number=excluded.apartment_number, resident_name=excluded.resident_name, status=excluded.status, " +
+        "key_available=excluded.key_available, co_value=excluded.co_value;";
+
+    private static void UpsertDwellings(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.CoMeasurement.Dwelling> dwellings)
+    {
+        var currentIds = dwellings.Select(d => d.Id.ToString()).ToHashSet();
+        DeleteMissing(cn, tx, "co_dwellings", "id", currentIds);
+
+        foreach (var d in dwellings)
         {
-            var d = incident.Dwellings[i];
             Run(
                 cn,
                 tx,
-                "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$cv);",
+                UpsertDwellingSql,
                 p =>
                 {
                     p("$id", d.Id.ToString());
@@ -305,14 +484,27 @@ public sealed class IncidentRepository
                     p("$cv", (object?)d.CoValue ?? DBNull.Value);
                 });
         }
+    }
 
-        for (var i = 0; i < incident.Tasks.Count; i++)
+    private const string UpsertTaskSql =
+        "INSERT INTO incident_tasks (id, ordinal, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by) " +
+        "VALUES ($id,$o,$txt,$asg,$imp,$urg,$by,$cat,$due,$coat,$coby) " +
+        "ON CONFLICT(id) DO UPDATE SET ordinal=excluded.ordinal, text=excluded.text, assignee=excluded.assignee, " +
+        "importance=excluded.importance, urgency=excluded.urgency, created_by=excluded.created_by, created_at=excluded.created_at, " +
+        "due_at=excluded.due_at, completed_at=excluded.completed_at, completed_by=excluded.completed_by;";
+
+    private static void UpsertTasks(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.Tasks.IncidentTask> tasks)
+    {
+        var currentIds = tasks.Select(t => t.Id.ToString()).ToHashSet();
+        DeleteMissing(cn, tx, "incident_tasks", "id", currentIds);
+
+        for (var i = 0; i < tasks.Count; i++)
         {
-            var t = incident.Tasks[i];
+            var t = tasks[i];
             Run(
                 cn,
                 tx,
-                "INSERT INTO incident_tasks (id, ordinal, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by) " + "VALUES ($id,$o,$txt,$asg,$imp,$urg,$by,$cat,$due,$coat,$coby);",
+                UpsertTaskSql,
                 p =>
                 {
                     p("$id", t.Id.ToString());
@@ -328,30 +520,76 @@ public sealed class IncidentRepository
                     p("$coby", (object?)t.CompletedBy ?? DBNull.Value);
                 });
         }
-
-        tx.Commit();
     }
 
-    private static void WriteChecklist(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.ChecklistItem> items, int kind)
+    /// <summary>
+    /// Deletes rows from <paramref name="table"/> whose <paramref name="keyColumn"/> value isn't in
+    /// <paramref name="currentKeys"/> (an entity removed from the in-memory aggregate since the last
+    /// save — e.g. RemoveForceUnit/RemoveCoBuilding), and returns the keys that existed before this
+    /// call so callers can tell an already-persisted row from a brand-new one without a second query.
+    /// </summary>
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: table/keyColumn come only from compile-time constants at call sites in this file; values are always bound parameters.")]
+    private static HashSet<string> DeleteMissing(
+        SqliteConnection cn, SqliteTransaction tx, string table, string keyColumn, HashSet<string> currentKeys)
     {
-        for (var i = 0; i < items.Count; i++)
+        var existing = new HashSet<string>();
+        using (var cmd = cn.CreateCommand())
         {
-            var c = items[i];
-            Run(
-                cn,
-                tx,
-                "INSERT INTO checklist_items (id, ordinal, text, is_done, note, is_mandatory, kind) VALUES ($id,$o,$t,$d,$n,$m,$k);",
-                p =>
-                {
-                    p("$id", c.Id.ToString());
-                    p("$o", i);
-                    p("$t", c.Text);
-                    p("$d", c.IsDone ? 1 : 0);
-                    p("$n", (object?)c.Note ?? DBNull.Value);
-                    p("$m", c.IsMandatory ? 1 : 0);
-                    p("$k", kind);
-                });
+            cmd.Transaction = tx;
+            cmd.CommandText = $"SELECT {keyColumn} FROM {table};";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                existing.Add(r.GetString(0));
+            }
         }
+
+        foreach (var key in existing)
+        {
+            if (!currentKeys.Contains(key))
+            {
+                Run(cn, tx, $"DELETE FROM {table} WHERE {keyColumn} = $k;", p => p("$k", key));
+            }
+        }
+
+        return existing;
+    }
+
+    /// <summary>Existing row count per <paramref name="groupColumn"/> value — one query instead of
+    /// one per parent entity, for the append-only child tables whose own id can't drive an upsert
+    /// (see the callers' comments).</summary>
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: table/groupColumn come only from compile-time constants at call sites in this file.")]
+    private static Dictionary<string, int> ReadCounts(SqliteConnection cn, SqliteTransaction tx, string table, string groupColumn)
+    {
+        var counts = new Dictionary<string, int>();
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = $"SELECT {groupColumn}, COUNT(*) FROM {table} GROUP BY {groupColumn};";
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            counts[r.GetString(0)] = r.GetInt32(1);
+        }
+
+        return counts;
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: SQL is built from compile-time schema constants at call sites; values use bound parameters.")]
+    private static int ReadScalarInt(SqliteConnection cn, SqliteTransaction tx, string sql)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = sql;
+        return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -707,18 +945,6 @@ public sealed class IncidentRepository
         cmd.Transaction = tx;
         cmd.CommandText = sql;
         bind((name, value) => cmd.Parameters.AddWithValue(name, value));
-        cmd.ExecuteNonQuery();
-    }
-
-    [SuppressMessage(
-        "Security",
-        "CA2100",
-        Justification = "Audited: SQL is built from compile-time schema constants at call sites; values use bound parameters.")]
-    private static void Exec(SqliteConnection cn, SqliteTransaction tx, string sql)
-    {
-        using var cmd = cn.CreateCommand();
-        cmd.Transaction = tx;
-        cmd.CommandText = sql;
         cmd.ExecuteNonQuery();
     }
 }
