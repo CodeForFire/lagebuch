@@ -19,7 +19,12 @@ public class DispatcherTimerTickerTests
             {
                 for (var i = 0; i < 2000; i++)
                 {
-                    var subscription = ticker.Subscribe(() => { });
+                    // Capture a fresh per-iteration local so the compiler can't collapse this
+                    // into the single cached static delegate it uses for non-capturing lambdas —
+                    // Unsubscribe removes by delegate identity, so a shared delegate here would
+                    // let the test pass even if Unsubscribe started removing the wrong entry.
+                    var iterationId = i;
+                    var subscription = ticker.Subscribe(() => _ = iterationId);
                     subscription.Dispose();
                 }
             }
