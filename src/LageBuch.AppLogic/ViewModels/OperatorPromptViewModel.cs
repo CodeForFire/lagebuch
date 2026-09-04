@@ -55,7 +55,13 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     // Set while a join attempt is in flight (#182), so Confirm can't be double-clicked mid-request.
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    [NotifyPropertyChangedFor(nameof(CancelLabel))]
     private bool _isBusy;
+
+    // #196: the Cancel button's own label needs to say which of its two very different effects it
+    // currently has -- "ABBRECHEN" alone reads as "close this dialog", which is wrong while busy,
+    // where it only aborts the connection attempt and leaves the dialog (and every typed field) up.
+    public string CancelLabel => IsBusy ? "VERBINDUNG ABBRECHEN" : "ABBRECHEN";
 
     // The failed join's message, shown inline so the dialog can stay open for a retry instead of
     // closing and losing every field the operator already typed (#182).
@@ -101,9 +107,9 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     public event EventHandler? Cancelled;
 
     // Raised instead of Cancelled while a join is in flight (#196): there is a connection attempt
-    // to abort, not just an overlay to dismiss. The dialog stays up until HomeViewModel.JoinDeviceAsync
-    // actually unwinds from the cancellation (IsBusy flips false), at which point the host closes the
-    // prompt through the normal post-join path (see MainWindowViewModel.ConfirmOperatorAsync).
+    // to abort, not the dialog to dismiss. Once HomeViewModel.JoinDeviceAsync unwinds from the
+    // cancellation, IsBusy flips back to false but the prompt itself stays up -- every typed field
+    // survives so the operator can retry immediately (see MainWindowViewModel.ConfirmOperatorAsync).
     public event EventHandler? CancelJoinRequested;
 
     [RelayCommand]

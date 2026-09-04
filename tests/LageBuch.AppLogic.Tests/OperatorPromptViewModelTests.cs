@@ -188,6 +188,21 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
+    public void Cancel_label_says_close_dialog_when_idle_and_abort_connection_when_busy()
+    {
+        // #196: the same button drives both effects, so its label must say which one currently
+        // applies -- plain "ABBRECHEN" reads as "close this dialog", which would be wrong while busy.
+        var vm = new OperatorPromptViewModel(collectHost: true);
+        Assert.Equal("ABBRECHEN", vm.CancelLabel);
+
+        vm.IsBusy = true;
+        Assert.Equal("VERBINDUNG ABBRECHEN", vm.CancelLabel);
+
+        vm.IsBusy = false;
+        Assert.Equal("ABBRECHEN", vm.CancelLabel);
+    }
+
+    [Fact]
     public void Cancel_command_raises_Cancelled_when_idle()
     {
         var vm = new OperatorPromptViewModel();

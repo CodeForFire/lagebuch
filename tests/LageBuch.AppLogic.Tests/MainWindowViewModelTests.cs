@@ -68,8 +68,13 @@ public class MainWindowViewModelTests
     // #196: the join dialog's own Cancel button -- not a Home-page banner behind it -- must be able
     // to abort a stuck connect attempt. A bare TCP listener accepts the connection but never drives
     // the socket, hanging the TLS handshake exactly like a host that's reachable but unresponsive.
+    //
+    // Aborting the attempt must not also close the dialog: a cancelled join and a successful one both
+    // leave HomeViewModel.JoinError null, so ConfirmOperatorAsync cannot tell them apart from that
+    // alone -- it needs to know the abort was user-requested (via CancelJoinCommand) and keep the
+    // prompt (and everything the operator already typed) up for a retry with adjusted Host/PIN.
     [Fact]
-    public async Task CancelJoin_aborts_a_stuck_connection_attempt_and_closes_the_dialog()
+    public async Task CancelJoin_aborts_a_stuck_connection_attempt_without_closing_the_dialog()
     {
         using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
@@ -95,7 +100,13 @@ public class MainWindowViewModelTests
         vm.CancelJoinCommand.Execute(null);
         await confirming;
 
-        Assert.Null(vm.PendingPrompt);
+        var prompt = vm.PendingPrompt;
+        Assert.NotNull(prompt); // dialog stays up -- only the connection attempt was aborted
+        Assert.False(prompt!.IsBusy);
+        Assert.Null(prompt.ErrorMessage); // a user-initiated cancel is not a failure
+        Assert.Equal($"127.0.0.1:{port}", prompt.Host); // fields survive for an immediate retry
+        Assert.Equal("0000", prompt.Pin);
+        Assert.Equal("Client", prompt.OperatorName);
         Assert.IsType<HomeViewModel>(vm.CurrentView);
     }
 

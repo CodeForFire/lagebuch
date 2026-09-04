@@ -19,6 +19,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly string _appVersion;
     private PendingAction _pending = PendingAction.None;
 
+    // Set by CancelJoin() and consumed by ConfirmOperatorAsync (#196): a cancelled join leaves
+    // HomeViewModel.JoinError null exactly like a successful one, so "JoinError is null" alone can't
+    // tell the two apart. This flag is the only way ConfirmOperatorAsync knows the abort was
+    // user-requested and must keep the dialog open, rather than closing it as if the join had won.
+    private bool _joinCancelledByUser;
+
     public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor, IFileDialogService dialogs, string appVersion)
     {
         _home = home;
@@ -124,6 +130,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await _home.JoinDeviceCommand.ExecuteAsync(new JoinRequest(op, prompt.Host, prompt.Pin));
         prompt.IsBusy = false;
 
+        if (_joinCancelledByUser)
+        {
+            // #196: the operator aborted the connection attempt itself (CancelJoin) — only that
+            // attempt is dead, not the dialog. Stay put with every field exactly as typed so they
+            // can adjust Host/PIN and retry immediately, instead of losing the whole prompt.
+            _joinCancelledByUser = false;
+            return;
+        }
+
         if (_home.JoinError is null)
         {
             PendingPrompt = null;
@@ -161,11 +176,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     // #196: the join dialog's own Cancel button raises this (instead of CancelOperator) while a
-    // connection attempt is in flight. It only aborts the attempt — the dialog stays up, and
-    // ConfirmOperatorAsync's already-awaited JoinDeviceCommand unwinds from the cancellation and
-    // closes the prompt itself once IsBusy clears.
+    // connection attempt is in flight. It only aborts the attempt — the dialog stays up (see the
+    // _joinCancelledByUser check in ConfirmOperatorAsync, which is what actually keeps it open once
+    // the already-awaited JoinDeviceCommand unwinds from the cancellation).
     [RelayCommand]
-    private void CancelJoin() => _home.JoinDeviceCancelCommand.Execute(null);
+    private void CancelJoin()
+    {
+        _joinCancelledByUser = true;
+        _home.JoinDeviceCancelCommand.Execute(null);
+    }
 
     [RelayCommand]
     private void GoHome() => NavigateAway(() => CurrentView = _home);

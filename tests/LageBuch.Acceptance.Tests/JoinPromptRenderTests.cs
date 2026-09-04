@@ -98,6 +98,7 @@ public class JoinPromptRenderTests
         var cancelButton = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CancelButton");
         Assert.True(cancelButton.IsVisible);
         Assert.True(cancelButton.IsEnabled);
+        Assert.Equal("ABBRECHEN", cancelButton.Content); // idle: this closes the dialog
 
         var banner = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ConnectingBanner");
         Assert.False(banner.IsVisible); // idle: no connection attempt in flight yet
@@ -106,6 +107,10 @@ public class JoinPromptRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(banner.IsVisible);
+
+        // #196: while busy, the same button only aborts the attempt (dialog stays up) -- its label
+        // must say so, since a bare "ABBRECHEN" would misleadingly read as "close this dialog".
+        Assert.Equal("VERBINDUNG ABBRECHEN", cancelButton.Content);
         Assert.True(cancelButton.IsEnabled); // still abortable while connecting
         Capture(window, "join-prompt-connecting.png");
     }

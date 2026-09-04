@@ -100,7 +100,7 @@
             </StackPanel>
           </Border>
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+            <Button x:Name="CancelButton" Content="{Binding CancelLabel}" Command="{Binding CancelCommand}" />
             <Button x:Name="ConfirmButton" Classes="signal" Content="BESTÄTIGEN" Command="{Binding ConfirmCommand}" />
           </StackPanel>
         </StackPanel>
