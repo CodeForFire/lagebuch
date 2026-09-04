@@ -12,15 +12,19 @@ public sealed class DispatcherTimerTicker : ITicker
 {
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly List<Action> _subscribers = new();
+    private readonly object _gate = new();
 
     public DispatcherTimerTicker() => _timer.Tick += (_, _) => Notify();
 
     public IDisposable Subscribe(Action onTick)
     {
-        _subscribers.Add(onTick);
-        if (!_timer.IsEnabled)
+        lock (_gate)
         {
-            _timer.Start();
+            _subscribers.Add(onTick);
+            if (!_timer.IsEnabled)
+            {
+                _timer.Start();
+            }
         }
 
         return new Subscription(this, onTick);
@@ -28,7 +32,13 @@ public sealed class DispatcherTimerTicker : ITicker
 
     private void Notify()
     {
-        foreach (var s in _subscribers.ToArray())
+        Action[] subscribers;
+        lock (_gate)
+        {
+            subscribers = _subscribers.ToArray();
+        }
+
+        foreach (var s in subscribers)
         {
             s();
         }
@@ -36,10 +46,13 @@ public sealed class DispatcherTimerTicker : ITicker
 
     private void Unsubscribe(Action onTick)
     {
-        _subscribers.Remove(onTick);
-        if (_subscribers.Count == 0)
+        lock (_gate)
         {
-            _timer.Stop();
+            _subscribers.Remove(onTick);
+            if (_subscribers.Count == 0)
+            {
+                _timer.Stop();
+            }
         }
     }
 
