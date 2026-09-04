@@ -13,7 +13,7 @@ namespace LageBuch.App.Services;
 /// player is missing, so a build with no voice clip yet — or a host without the CLI player —
 /// simply stays quiet rather than crashing.
 /// </summary>
-internal sealed class SystemAlarmService : IAlarmService
+internal sealed class SystemAlarmService : IAlarmService, IDisposable
 {
     private const uint SndNodefault = 0x0002; // no default beep if it fails
     private const uint SndMemory = 0x0004;  // pszSound points to in-memory WAV
@@ -104,7 +104,7 @@ internal sealed class SystemAlarmService : IAlarmService
         "Design",
         "CA1031",
         Justification = "Best-effort temp cache: a failure falls back to silent alarm.")]
-    private string? TempFileFor(AlarmSound sound, byte[] bytes)
+    internal string? TempFileFor(AlarmSound sound, byte[] bytes)
     {
         if (_voiceTempFiles.TryGetValue(sound, out var cached))
         {
@@ -140,6 +140,25 @@ internal sealed class SystemAlarmService : IAlarmService
         catch
         {
             return null; // asset not bundled — that cue stays silent
+        }
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Best-effort temp cleanup on shutdown: a failed delete must not stop the app from exiting.")]
+    public void Dispose()
+    {
+        foreach (var path in _voiceTempFiles.Values)
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            {
+                // Best-effort: the OS reclaims the temp directory eventually regardless.
+            }
         }
     }
 
