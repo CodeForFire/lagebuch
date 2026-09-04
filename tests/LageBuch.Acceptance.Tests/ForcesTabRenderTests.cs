@@ -1,7 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -37,6 +39,32 @@ public class ForcesTabRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return (window, vm);
+    }
+
+    private static ForcesView HostForcesView(out IncidentWorkspaceViewModel vm, out Window window)
+    {
+        // Hosted directly (same idiom as the duplicate test below): the workspace shell's
+        // ViewLocator content does not materialize under the headless host.
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
+        var view = new ForcesView { DataContext = vm.Forces };
+        window = new Window { Content = view, Width = 1920, Height = 1032 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return view;
     }
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
@@ -143,6 +171,39 @@ public class ForcesTabRenderTests
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Einheit entfernt: FFB Wache 1");
 
         Capture(window, "forces-row-removed.png");
+    }
+
+    // Both row actions used to be Unicode text (✎ / ✕) on a Button, which defaults to Oswald —
+    // a font that carries neither codepoint, so the glyph only ever appeared if the OS happened
+    // to supply a fallback. The ✕ was worse still: its 44px column left 12px after the cell's
+    // 12,0 padding and the button's own margin, far short of the ~25px the button needed, so the
+    // content was squeezed to zero width and the button rendered as an empty pill. Both are now
+    // PathIcons like the ETB grid's, so the affordance is drawn from bundled vector data.
+    [AvaloniaFact]
+    public void Both_row_action_buttons_render_a_laid_out_icon()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewMannschaftCount = 6;
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        window.Measure(new Size(1920, 1032));
+        window.Arrange(new Rect(0, 0, 1920, 1032));
+        Dispatcher.UIThread.RunJobs();
+
+        var grid = view.GetControl<DataGrid>("ForcesGrid");
+        var actions = grid.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Content is not string text || text != "Verlauf")
+            .ToList();
+        Assert.Equal(2, actions.Count);
+
+        foreach (var action in actions)
+        {
+            var icon = Assert.Single(action.GetVisualDescendants().OfType<PathIcon>());
+            Assert.True(
+                icon.Bounds.Width > 0,
+                $"the icon in the {action.GetValue(ToolTip.TipProperty)} button has zero width — nothing is drawn");
+        }
     }
 
     [AvaloniaFact]

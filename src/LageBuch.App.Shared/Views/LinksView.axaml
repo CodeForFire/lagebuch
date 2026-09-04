@@ -13,7 +13,9 @@
             CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
             IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
       <Grid ColumnDefinitions="Auto,*">
-        <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Top" Margin="0,0,12,0" />
+        <PathIcon Grid.Column="0" Width="15" Height="15" VerticalAlignment="Top" Margin="0,0,12,0"
+                  Foreground="{StaticResource AmberBrush}"
+                  Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
         <TextBlock Grid.Column="1" x:Name="ErrorMessageText" Text="{Binding ErrorMessage}"
                    FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{StaticResource AmberBrush}" />
       </Grid>

@@ -132,6 +132,23 @@ public class HomeOpenErrorTests
         Assert.Equal(3, window.GetVisualDescendants().OfType<ListBox>().First().ItemCount);
     }
 
+    // Issue #197: the ⚠ error banner and the "↩ Doppelklick zum Öffnen" hint used to be Unicode
+    // text on a TextBlock, which defaults to Barlow -- a font that carries neither codepoint. Now
+    // PathIcons like the ETB grid's row actions, so the icons come from bundled vector data.
+    [AvaloniaFact]
+    public void Error_banner_and_recent_files_hint_render_laid_out_icons()
+    {
+        var (window, _) = ShowHome(triggerError: true);
+
+        var banner = Banner(window);
+        var bannerIcon = Assert.Single(banner.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(bannerIcon.Bounds.Width > 0, "the error banner icon has zero width -- nothing is drawn");
+
+        var hint = window.GetVisualDescendants().OfType<StackPanel>().Single(s => s.Name == "RecentFilesHint");
+        var hintIcon = Assert.Single(hint.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(hintIcon.Bounds.Width > 0, "the recent-files hint icon has zero width -- nothing is drawn");
+    }
+
     [AvaloniaFact]
     public void The_message_wraps_inside_the_content_column()
     {

@@ -109,7 +109,12 @@
               <DataTemplate x:DataType="vm:ForceRow">
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,4" VerticalAlignment="Center">
                   <TextBlock Text="{Binding StrengthText}" VerticalAlignment="Center" />
-                  <Button Content="✎" Padding="6,2" IsVisible="{Binding !IsReadOnly}">
+                  <!-- Vector icon, not a Unicode glyph: the button font (Oswald) carries neither
+                       ✎ nor ✕, so a text affordance only appeared where the OS happened to have a
+                       fallback. Same idiom as the ETB grid's row actions. -->
+                  <Button Classes="icon-btn" IsVisible="{Binding !IsReadOnly}"
+                          ToolTip.Tip="Stärke korrigieren">
+                    <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                     <Button.Flyout>
                       <Flyout Placement="BottomEdgeAlignedLeft">
                           <StackPanel Spacing="8" MinWidth="180">
@@ -176,13 +181,19 @@
           </DataGridTemplateColumn>
           <!-- Eine aufgenommene Einheit lässt sich wieder komplett zurücknehmen (#76 follow-up):
                die Zeile samt Wert-Historie verschwindet, der ETB protokolliert die Entfernung.
-               Im abgeschlossenen Einsatz ist die Spalte leer. -->
-          <DataGridTemplateColumn Width="44">
+               Im abgeschlossenen Einsatz ist die Spalte leer.
+               Auto width like the ETB grid's action column: the fixed 44px this column used to
+               carry left only 12px once DataGridCell's 12,0 padding and the button's margin were
+               taken off, so the button was squeezed to its padding and drew nothing at all. -->
+          <DataGridTemplateColumn>
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
-                <Button Content="✕" Padding="6,2" Margin="4,0"
+                <Button Classes="icon-btn" Margin="6,4"
                         IsVisible="{Binding !IsReadOnly}"
-                        Command="{Binding RemoveCommand}" />
+                        Command="{Binding RemoveCommand}"
+                        ToolTip.Tip="Einheit entfernen">
+                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>

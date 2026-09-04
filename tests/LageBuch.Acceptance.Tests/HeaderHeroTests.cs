@@ -99,6 +99,35 @@ public class HeaderHeroTests
         Assert.False(addButton.IsVisible);
     }
 
+    // Issue #197: the ✎/✓/✕ affordances around the Einsatznummer chip used to be Unicode text on
+    // Buttons, which default to Oswald -- a font that carries none of the three codepoints. Now
+    // PathIcons like the ETB grid's row actions, so the icons come from bundled vector data.
+    [AvaloniaFact]
+    public void Incident_number_edit_affordances_render_laid_out_icons()
+    {
+        var vm = BuildWorkspace("B3P");
+        var window = Show(vm);
+
+        var chip = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "IncidentNumberChip");
+        vm.BeginEditIncidentNumberCommand.Execute(null);
+        vm.IncidentNumberEditInput = "B 1.2 260715 123";
+        vm.ConfirmIncidentNumberCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var chipIcon = Assert.Single(chip.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(chipIcon.Bounds.Width > 0, "the chip's edit icon has zero width -- nothing is drawn");
+
+        vm.BeginEditIncidentNumberCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var confirmButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "ConfirmIncidentNumberButton");
+        var cancelButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "CancelIncidentNumberButton");
+        var confirmIcon = Assert.Single(confirmButton.GetVisualDescendants().OfType<PathIcon>());
+        var cancelIcon = Assert.Single(cancelButton.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(confirmIcon.Bounds.Width > 0, "the confirm button's icon has zero width -- nothing is drawn");
+        Assert.True(cancelIcon.Bounds.Width > 0, "the cancel button's icon has zero width -- nothing is drawn");
+    }
+
     [AvaloniaFact]
     public void Cancelling_the_edit_returns_to_the_add_affordance()
     {

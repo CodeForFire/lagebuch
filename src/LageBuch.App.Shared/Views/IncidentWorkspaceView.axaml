@@ -33,7 +33,8 @@
                       Command="{Binding BeginEditIncidentNumberCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Classes="mono" Text="{Binding IncidentNumberInput}" />
-                  <TextBlock Text="✎" />
+                  <PathIcon Width="13" Height="13" VerticalAlignment="Center"
+                            Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                 </StackPanel>
               </Button>
 
@@ -50,10 +51,15 @@
                     <KeyBinding Gesture="Escape" Command="{Binding CancelEditIncidentNumberCommand}" />
                   </TextBox.KeyBindings>
                 </TextBox>
-                <Button x:Name="ConfirmIncidentNumberButton" Classes="ghost" Content="✓"
-                        Command="{Binding ConfirmIncidentNumberCommand}" />
-                <Button x:Name="CancelIncidentNumberButton" Classes="ghost" Content="✕"
-                        Command="{Binding CancelEditIncidentNumberCommand}" />
+                <Button x:Name="ConfirmIncidentNumberButton" Classes="ghost"
+                        Command="{Binding ConfirmIncidentNumberCommand}" ToolTip.Tip="Übernehmen">
+                  <PathIcon Width="13" Height="13" Data="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </Button>
+                <Button x:Name="CancelIncidentNumberButton" Classes="ghost"
+                        Command="{Binding CancelEditIncidentNumberCommand}" ToolTip.Tip="Abbrechen">
+                  <PathIcon Width="13" Height="13"
+                            Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
               </StackPanel>
             </StackPanel>
 
@@ -118,8 +124,9 @@
                   CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
                   IsVisible="{Binding !IsConnected}">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <TextBlock Grid.Column="0" Text="⚠" FontSize="15" VerticalAlignment="Center" Margin="0,0,12,0"
-                         Foreground="{StaticResource AmberBrush}" />
+              <PathIcon Grid.Column="0" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,12,0"
+                        Foreground="{StaticResource AmberBrush}"
+                        Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
               <TextBlock Grid.Column="1" Text="Verbindung getrennt — verbinde neu…" FontWeight="SemiBold"
                          Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
               <Button Grid.Column="2" x:Name="LeaveToHomeButton" Content="ZUR STARTSEITE"
@@ -133,7 +140,9 @@
                   CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
                   IsVisible="{Binding IsReadOnly}">
             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <TextBlock Text="🔒" FontSize="15" VerticalAlignment="Center" />
+              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
+                        Foreground="{StaticResource AmberBrush}"
+                        Data="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
               <TextBlock Text="{Binding ReadOnlyReason}" FontWeight="SemiBold"
                          Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
               <Button x:Name="ContinueEditingButton" Content="WEITER BEARBEITEN"
@@ -149,8 +158,9 @@
                   IsVisible="{Binding HasReminder}">
             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
                         DataContext="{Binding Reminder}">
-              <TextBlock Text="⏱" FontSize="15" VerticalAlignment="Center"
-                         Foreground="{StaticResource IncomingBrush}" />
+              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
+                        Foreground="{StaticResource IncomingBrush}"
+                        Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
               <TextBlock Text="RÜCKMELDUNG AN ILS" Classes="overline" FontSize="10"
                          Foreground="{StaticResource IncomingBrush}" VerticalAlignment="Center" />
 
@@ -190,8 +200,9 @@
                   IsVisible="{Binding Scba.HasControlReminder}">
             <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
                         DataContext="{Binding Scba}">
-              <TextBlock Text="⏱" FontSize="15" VerticalAlignment="Center"
-                         Foreground="{StaticResource AmberBrush}" />
+              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
+                        Foreground="{StaticResource AmberBrush}"
+                        Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
               <TextBlock Text="ATEMSCHUTZ" Classes="overline" FontSize="10"
                          Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
               <TextBlock x:Name="ScbaControlText" Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
@@ -212,7 +223,9 @@
                   BoxShadow="0 0 22 -2 #CCFF3D2E"
                   IsVisible="{Binding Scba.IsAnyAlarm}">
             <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Scba}">
-              <TextBlock Grid.Column="0" Text="🚨" FontSize="20" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <PathIcon Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"
+                        Foreground="#FFFFFF"
+                        Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
               <TextBlock Grid.Column="1" Text="{Binding AlarmDisplay}"
                          FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
                          LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center" />

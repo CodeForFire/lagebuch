@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -76,5 +77,22 @@ public class LinksTabRenderTests
         Assert.Equal(2, vm.Links.Links.Count);
         Assert.Contains(vm.Links.Links, l => l.Name == "Wetterdienst" && l.Url == "https://dwd.de");
         Capture(window, "links-after.png");
+    }
+
+    // Issue #197: the ⚠ error banner glyph used to be Unicode text on a TextBlock, which defaults
+    // to Barlow -- a font that doesn't carry it. Now a PathIcon like the ETB grid's row actions,
+    // so the icon is drawn from bundled vector data.
+    [AvaloniaFact]
+    public void Error_banner_renders_a_laid_out_icon()
+    {
+        var (window, vm) = ShowWorkspace();
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 8; // LINKS
+        vm.Links.ErrorMessage = "Fehler beim Öffnen.";
+        Dispatcher.UIThread.RunJobs();
+
+        var banner = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ErrorBanner");
+        var icon = Assert.Single(banner.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(icon.Bounds.Width > 0, "the error banner icon has zero width -- nothing is drawn");
     }
 }
