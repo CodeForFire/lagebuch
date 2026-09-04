@@ -85,6 +85,26 @@ public class CoMessprotokollViewModelTests
         Assert.Equal("45 ppm", cell.CoDisplay);
     }
 
+    // Every other Add/Confirm command in the app (AddForce, AddRole, ConfirmTransfer, AddTrupp,
+    // AddTask, AddEntry, ConfirmIncidentNumber...) gates on its required text field being
+    // non-empty. ConfirmAddBuildingCommand had no such gate: clicking HINZUFÜGEN with an empty
+    // Hausname called straight through to Building.Create, which throws ArgumentException and
+    // takes the whole desktop app down (unhandled on the UI thread).
+    [Fact]
+    public void ConfirmAddBuildingCommand_IsDisabled_WhenNameIsEmpty()
+    {
+        var (_, vm) = CreateVm();
+        vm.NewBuildingName = string.Empty;
+
+        Assert.False(vm.ConfirmAddBuildingCommand.CanExecute(null));
+
+        vm.NewBuildingName = "Haus B";
+        Assert.True(vm.ConfirmAddBuildingCommand.CanExecute(null));
+
+        vm.NewBuildingName = "   ";
+        Assert.False(vm.ConfirmAddBuildingCommand.CanExecute(null));
+    }
+
     [Fact]
     public void ViewModel_EmptyState_NoBuildings()
     {
