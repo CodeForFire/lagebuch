@@ -93,6 +93,8 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
 
     public bool IsReadOnly { get; }
 
+    public static string MaxFileSizeHint => $"Max. {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB pro Datei";
+
     public ObservableCollection<IncidentFileRow> Files { get; }
 
     [ObservableProperty]
