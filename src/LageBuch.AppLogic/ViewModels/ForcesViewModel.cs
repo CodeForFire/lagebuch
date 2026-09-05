@@ -340,6 +340,11 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         // Lifted comparisons: null >= 0 is false, so every operand coalesces first.
         && (NewOfficerCount ?? 0) >= 0 && (NewMannschaftCount ?? 0) >= 0 && (NewScbaCount ?? 0) >= 0
 
+        // A row with Brigade but no counted personnel reports nothing and is almost always a
+        // stray click, not an intentional entry (#220). Funkrufname stays optional on purpose --
+        // Fremdwehr headcounts without a specific vehicle are a real, supported case.
+        && (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0) > 0
+
         // Mirrors the domain rule, so an over-count disables the button instead of throwing on click.
         && (NewScbaCount ?? 0) <= (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0)
 
