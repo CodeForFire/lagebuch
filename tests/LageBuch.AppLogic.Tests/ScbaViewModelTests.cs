@@ -611,19 +611,20 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void A_hand_edited_truppNumber_is_not_clobbered_by_another_devices_registration()
+    public void NewTruppNumber_always_tracks_the_next_free_number_and_never_collides()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
         var vm = Vm(clock, session);
 
-        vm.NewTruppNumber = 9; // operator overrides the suggested number
-
-        // Another device (or this one, via a different code path) registers a Trupp, which fires
-        // session.Changed and would normally re-suggest -- but the hand edit must survive.
+        // Truppnummer is internal, not user-editable (#217): a hand-typed duplicate used to crash
+        // Incident.AddScbaTrupp. Another device (or a different code path) registering a Trupp
+        // must re-suggest the next free number rather than leave a stale, now-taken one behind.
         session.AddScbaTrupp("Wassertrupp", TruppMember.Crew("Bauer", "Klein"), entryPressure: 300);
 
-        Assert.Equal(9, vm.NewTruppNumber);
+        Assert.Equal(2, vm.NewTruppNumber);
+        var row = Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+        Assert.Equal(2, row.TruppNumber);
     }
 
     [Fact]

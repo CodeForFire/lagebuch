@@ -53,9 +53,11 @@
           <ComboBox Width="150" ItemsSource="{Binding TruppTypeOptions}"
                     SelectedItem="{Binding NewDesignation}" />
         </HeaderedContentControl>
+        <!-- Internal, not user-editable (#217): a hand-typed duplicate crashed the app, so this is
+             read-only and always shows the next free number. -->
         <HeaderedContentControl Classes="field" Header="TRUPPNUMMER">
-          <NumericUpDown Width="90" Minimum="1" Maximum="99" Value="{Binding NewTruppNumber}"
-                         FormatString="0" />
+          <TextBox Width="90" Text="{Binding NewTruppNumber, Mode=OneWay}"
+                   IsReadOnly="True" HorizontalContentAlignment="Center" />
         </HeaderedContentControl>
         <!-- One box per position rather than a single free-text field: a Trupp is two people
              (three in CSA), and the third box only appears when the type calls for it. Crew names

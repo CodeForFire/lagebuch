@@ -208,10 +208,6 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     // (#78) -- a hand-typed interval must survive a later Einsatzzeit change.
     private bool _controlIntervalUserEdited;
 
-    // Same idea for the Truppnummer, which otherwise auto-suggests the next free number: a hand
-    // edit must not be clobbered when another device's registration refreshes this device's rows.
-    private bool _truppNumberUserEdited;
-
     private bool _applyingDefault;
 
     public ScbaViewModel(IIncidentSession session, MasterDataSet masterData, IClock clock, ITicker ticker, IAlarmService alarm, Action onChanged)
@@ -299,6 +295,11 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _newCallSign;
 
+    /// <summary>
+    /// Internally assigned, never user-edited (#217): a hand-typed duplicate crashed
+    /// <see cref="Domain.Incident.AddScbaTrupp"/>, so the view shows this as read-only text and
+    /// only <see cref="AddTrupp"/>/<see cref="RefreshTrupps"/> ever set it.
+    /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
     private int _newTruppNumber;
@@ -315,14 +316,6 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private int _newControlIntervalMinutes;
-
-    partial void OnNewTruppNumberChanged(int value)
-    {
-        if (!_applyingDefault)
-        {
-            _truppNumberUserEdited = true;
-        }
-    }
 
     partial void OnNewMaxDurationMinutesChanged(int value)
     {
@@ -531,13 +524,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         NewEntryPressure = 300;
         NewReturnPressureBar = _settings.ReturnPressureBar;
 
-        // Guarded like RefreshTrupps' own re-suggestion below: this sets up the *next* Trupp's
-        // auto-suggested number and must not itself read back as a user edit.
-        _truppNumberUserEdited = false;
-        var previousApplyingDefault = _applyingDefault;
-        _applyingDefault = true;
-        NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber();
-        _applyingDefault = previousApplyingDefault;
+        NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber(); // sets up the *next* Trupp's number
         ApplyDefaultMaxDuration(); // empty designation => AGT default; also re-derives the interval
         RefreshHeader();
         _onChanged();
@@ -626,15 +613,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             Trupps.Add(CreateRow(trupp));
         }
 
-        // Another device may have just taken the suggested number -- re-suggest, but never
-        // clobber a number this device's operator already hand-typed into the form.
-        if (!_truppNumberUserEdited)
-        {
-            var previous = _applyingDefault;
-            _applyingDefault = true;
-            NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber();
-            _applyingDefault = previous;
-        }
+        // Another device may have just taken the suggested number -- re-suggest (#217: the number
+        // is never user-edited, so there is nothing to clobber).
+        NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber();
 
         RefreshHeader();
     }
