@@ -130,6 +130,12 @@ public class FilesViewModelTests
     }
 
     [Fact]
+    public void MaxFileSizeHint_reflects_the_domain_cap()
+    {
+        Assert.Equal($"Max. {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB pro Datei", FilesViewModel.MaxFileSizeHint);
+    }
+
+    [Fact]
     public void ReadOnly_session_disables_add()
     {
         var clock = new FixedClock(T0);
