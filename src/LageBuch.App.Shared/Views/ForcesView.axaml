@@ -47,15 +47,18 @@
                            Text="{Binding NewBrigade}"
                            b:EnterSubmit.Command="{Binding AddForceCommand}" />
         </HeaderedContentControl>
-        <!-- Fahrzeuge aus den Stammdaten, gefiltert auf die Wache; wählt man eines, werden
-             Funkrufname und Stärke vorbelegt (#76). -->
+        <!-- Fahrzeuge aller Wachen (#215): wählt man eines, werden Feuerwehr, Funkrufname und
+             Stärke vorbelegt, die Wache muss nicht mehr zuerst getippt werden. -->
         <HeaderedContentControl Classes="field" Header="FAHRZEUG">
-          <ComboBox x:Name="VehicleBox" Width="150"
+          <ComboBox x:Name="VehicleBox" Width="190"
                     ItemsSource="{Binding VehicleOptions}"
                     SelectedItem="{Binding SelectedVehicle}">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="md:Vehicle">
-                <TextBlock Text="{Binding CallSign}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding CallSign}" />
+                  <TextBlock Text="{Binding Wache}" Classes="secondary" />
+                </StackPanel>
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>

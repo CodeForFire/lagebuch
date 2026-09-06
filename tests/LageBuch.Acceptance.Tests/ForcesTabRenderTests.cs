@@ -97,10 +97,11 @@ public class ForcesTabRenderTests
         Tabs(window).SelectedIndex = 4; // KRÄFTE
         Dispatcher.UIThread.RunJobs();
 
-        vm.Forces.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
+        // Available across every Wache without typing anything (#215).
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
 
         vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0];
+        Assert.Equal("FFB Wache 1", vm.Forces.NewBrigade); // derived from the pick
         Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
         Assert.Equal(1, vm.Forces.NewOfficerCount);
         Assert.Equal(8, vm.Forces.NewMannschaftCount);
@@ -234,16 +235,15 @@ public class ForcesTabRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        vm.Forces.NewBrigade = "FFB Wache 1";
         vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0]; // FFB 1/40/1
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        // The taken vehicle no longer appears in the dropdown for its brigade.
-        vm.Forces.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
+        // The taken vehicle no longer appears in the dropdown, regardless of Wache (#215).
+        Assert.Equal(new[] { "FFB 1/44/1", "Aich 42/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
 
         // Free-typing the taken call sign blocks HINZUFÜGEN and shows the hint.
+        vm.Forces.NewBrigade = "FFB Wache 1"; // AddForceCommand cleared it after the first add
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.NewCallSign = "FFB 1/40/1";
         Dispatcher.UIThread.RunJobs();

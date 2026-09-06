@@ -217,6 +217,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         Forces = new ObservableCollection<ForceRow>(session.Incident.Forces.Select(ToRow));
         TotalPersonnel = session.Incident.TotalPersonnel;
         TotalScba = session.Incident.TotalScba;
+        RefreshVehicleOptions(); // no longer brigade-filtered (#215) -- populate right away
         _session.Changed += RefreshForces;
     }
 
@@ -317,29 +318,36 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private Vehicle? _selectedVehicle;
 
+    // Set while OnSelectedVehicleChanged derives NewBrigade from the picked vehicle (#215), so the
+    // resulting OnNewBrigadeChanged does not immediately clear the very selection that caused it.
+    private bool _applyingVehiclePreset;
+
     partial void OnNewBrigadeChanged(string value)
     {
-        RefreshVehicleOptions();
-        SelectedVehicle = null;
+        if (!_applyingVehiclePreset)
+        {
+            // A manual edit no longer matches whatever vehicle (if any) was picked -- clear it
+            // rather than leave the dropdown showing a vehicle from a different Wache.
+            SelectedVehicle = null;
+        }
     }
 
     /// <summary>
-    /// Fahrzeuge der Stammdaten, gefiltert auf die getippte Wache (#76). Ein bereits aufgenommenes
-    /// Fahrzeug wird nicht noch einmal angeboten (#76 follow-up) — sein Funkrufname ist vergeben,
-    /// bis seine Zeile entfernt wird. DistinctBy schützt zusätzlich vor Duplikaten in Altdaten.
+    /// Fahrzeuge aller Wachen (#215): picking one derives Feuerwehr, so there is no need to type
+    /// it first. Ein bereits aufgenommenes Fahrzeug wird nicht noch einmal angeboten (#76
+    /// follow-up) — sein Funkrufname ist vergeben, bis seine Zeile entfernt wird. DistinctBy
+    /// schützt zusätzlich vor Duplikaten in Altdaten.
     /// </summary>
     [ObservableProperty]
     private IReadOnlyList<Vehicle> _vehicleOptions = Array.Empty<Vehicle>();
 
     private void RefreshVehicleOptions()
     {
-        var brigade = NewBrigade.Trim();
         var taken = Forces
             .Select(r => r.CallSign?.Trim())
             .Where(cs => !string.IsNullOrEmpty(cs))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         VehicleOptions = _masterVehicles
-            .Where(v => string.Equals(v.Wache, brigade, StringComparison.OrdinalIgnoreCase))
             .DistinctBy(v => v.CallSign, StringComparer.OrdinalIgnoreCase)
             .Where(v => !taken.Contains(v.CallSign.Trim()))
             .ToArray();
@@ -364,6 +372,11 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     {
         if (value is null)
             return; // also fires when the form resets -- must not re-prefill then
+
+        _applyingVehiclePreset = true;
+        NewBrigade = value.Wache; // derive Feuerwehr from the picked vehicle (#215)
+        _applyingVehiclePreset = false;
+
         NewCallSign = value.CallSign;
 
         // Sitzplätze-Vorbelegung: 9 Sitze ergeben 1 Führungskraft + 8 Mannschaft (#76).
