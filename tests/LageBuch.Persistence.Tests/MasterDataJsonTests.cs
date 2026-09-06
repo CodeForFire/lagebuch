@@ -147,12 +147,38 @@ public class MasterDataJsonTests
         Assert.Empty(set.Vehicles);
     }
 
+    /// <summary>ZF vehicles are command vehicles (ELW/KdoW), not seat-derived like Officer/Mannschaft.</summary>
+    [Fact]
+    public void Parse_reads_hasZugfuehrer_and_defaults_a_missing_field_to_false()
+    {
+        var set = Parse("""
+            {
+              "vehicles": [
+                { "wache": "FFB Wache 1", "callSign": "FFB ELW 1", "seats": 4, "hasZugfuehrer": true },
+                { "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }
+              ]
+            }
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true),
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+            },
+            set.Vehicles);
+    }
+
     [Fact]
     public void Serialize_round_trips_vehicles()
     {
         var original = MasterDataSet.Empty with
         {
-            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true),
+            },
         };
 
         var reparsed = Parse(MasterDataJson.Serialize(original));

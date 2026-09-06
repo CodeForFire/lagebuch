@@ -111,6 +111,27 @@ public class MasterDataSectionTests
     }
 
     [Fact]
+    public void VehicleRow_HasZugfuehrer_change_flags_a_change()
+    {
+        var changes = 0;
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+
+        row.HasZugfuehrer = true;
+
+        Assert.Equal(1, changes);
+        Assert.True(row.HasZugfuehrer);
+    }
+
+    [Fact]
+    public void Vehicles_ToValues_round_trips_the_zugfuehrer_flag()
+    {
+        var vehicles = new[] { new Vehicle("Wache 1", "ELW 1", 4, HasZugfuehrer: true) };
+        var s = new VehiclesSection("Fahrzeuge", vehicles, Array.Empty<string>(), Array.Empty<string>(), () => { });
+
+        Assert.Equal(vehicles, s.ToValues());
+    }
+
+    [Fact]
     public void Vehicles_reorder_moves_a_row_and_flags_a_change()
     {
         var changes = 0;

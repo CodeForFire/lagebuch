@@ -367,6 +367,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         NewCallSign = value.CallSign;
 
         // Sitzplätze-Vorbelegung: 9 Sitze ergeben 1 Führungskraft + 8 Mannschaft (#76).
+        NewZugfuehrerCount = value.HasZugfuehrer ? 1 : 0;
         NewOfficerCount = Math.Min(1, value.Seats);
         NewMannschaftCount = Math.Max(value.Seats - 1, 0);
         NewScbaCount = 0;

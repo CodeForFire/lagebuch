@@ -281,10 +281,22 @@ public class ForcesViewModelTests
         Assert.Equal("FFB 1/40/1", vm.NewCallSign);
 
         // 9 seats preset as 1 Führungskraft + 8 Mannschaft.
+        Assert.Equal(0, vm.NewZugfuehrerCount);
         Assert.Equal(1, vm.NewOfficerCount);
         Assert.Equal(8, vm.NewMannschaftCount);
         Assert.Equal(0, vm.NewScbaCount);
         Assert.True(vm.AddForceCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Selecting_a_zugfuehrer_vehicle_prefills_the_zf_count()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FFB Wache 1";
+
+        vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true);
+
+        Assert.Equal(1, vm.NewZugfuehrerCount);
     }
 
     [Fact]

@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// One editable Fahrzeug entry: Wache plus Funkrufname and Sitzplätze (#76). Wache and
+/// One editable Fahrzeug entry: Wache plus Funkrufname, Sitzplätze (#76) and ZF-Flag. Wache and
 /// Funkrufname carry suggestion lists from the master data for the view's AutoCompleteBox --
 /// free text stays valid, so they are suggestions, not a closed set.
 /// </summary>
@@ -15,6 +15,7 @@ public sealed partial class VehicleRow : ObservableObject
         string wache,
         string callSign,
         int seats,
+        bool hasZugfuehrer,
         IReadOnlyList<string> wacheOptions,
         IReadOnlyList<string> callSignOptions,
         Action onChanged)
@@ -23,6 +24,7 @@ public sealed partial class VehicleRow : ObservableObject
         _wache = wache;
         _callSign = callSign;
         _seats = seats;
+        _hasZugfuehrer = hasZugfuehrer;
         WacheOptions = wacheOptions;
         CallSignOptions = callSignOptions;
     }
@@ -39,10 +41,14 @@ public sealed partial class VehicleRow : ObservableObject
     private string _callSign;
     [ObservableProperty]
     private int _seats;
+    [ObservableProperty]
+    private bool _hasZugfuehrer;
 
     partial void OnWacheChanged(string value) => _onChanged();
 
     partial void OnCallSignChanged(string value) => _onChanged();
 
     partial void OnSeatsChanged(int value) => _onChanged();
+
+    partial void OnHasZugfuehrerChanged(bool value) => _onChanged();
 }

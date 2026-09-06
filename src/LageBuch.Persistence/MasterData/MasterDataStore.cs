@@ -55,12 +55,13 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ($w,$c,$s);",
+                "INSERT INTO md_vehicles (wache, call_sign, seats, has_zugfuehrer) VALUES ($w,$c,$s,$z);",
                 p =>
                 {
                     p("$w", v.Wache);
                     p("$c", v.CallSign);
                     p("$s", v.Seats);
+                    p("$z", v.HasZugfuehrer ? 1 : 0);
                 });
         }
 
@@ -148,7 +149,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_brigades (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS md_checklist_template (
                 ordinal INTEGER PRIMARY KEY,
                 text TEXT NOT NULL,
@@ -171,6 +172,10 @@ public sealed class MasterDataStore
         // store has no version marker, so every open re-checks rather than gating on one.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "is_mandatory", "INTEGER NOT NULL DEFAULT 0");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "kind", "INTEGER NOT NULL DEFAULT 0");
+
+        // Widen a pre-existing md_vehicles that predates the ZF flag -- existing vehicles read as
+        // "no Zugführer" rather than failing to load.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "has_zugfuehrer", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private static MasterDataSet Read(SqliteConnection cn)
@@ -278,12 +283,12 @@ public sealed class MasterDataStore
     private static List<Vehicle> ReadVehicles(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT wache, call_sign, seats FROM md_vehicles;";
+        cmd.CommandText = "SELECT wache, call_sign, seats, has_zugfuehrer FROM md_vehicles;";
         using var r = cmd.ExecuteReader();
         var list = new List<Vehicle>();
         while (r.Read())
         {
-            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2)));
+            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0));
         }
 
         return list;
