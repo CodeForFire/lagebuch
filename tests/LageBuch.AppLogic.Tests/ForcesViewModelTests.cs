@@ -73,6 +73,18 @@ public class ForcesViewModelTests
         Assert.True(vm.AddForceCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void AddForce_enabled_when_only_zugfuehrer_count_is_entered()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FFB Wache 1";
+
+        // A row reporting a single Zugführer with no Führungskräfte/Mannschaft is still a real,
+        // counted entry (#220 only rules out entirely empty rows).
+        vm.NewZugfuehrerCount = 1;
+        Assert.True(vm.AddForceCommand.CanExecute(null));
+    }
+
     // --- Issue #18 ---
     [Fact]
     public void Brigade_options_come_from_master_data()
