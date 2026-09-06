@@ -223,7 +223,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         var now = _clock.Now;
         var visible = SortForDisplay(_session.Incident.Tasks)
             .Where(IsVisible)
-            .Select(t => new TaskRow(_session, t, IsReadOnly, now, _onChanged))
+            .Select(t => new TaskRow(_session, t, IsReadOnly, now, AssigneeOptions, ImportanceOptions, UrgencyOptions, _onChanged))
             .ToList();
 
         Rows.Clear();
@@ -251,25 +251,31 @@ public sealed partial class TaskRow : ObservableObject
     private readonly Guid _id;
     private readonly Action _onChanged;
 
-    public TaskRow(IIncidentSession session, IncidentTask task, bool isReadOnly, DateTimeOffset now, Action onChanged)
+    public TaskRow(
+        IIncidentSession session,
+        IncidentTask task,
+        bool isReadOnly,
+        DateTimeOffset now,
+        IReadOnlyList<string> assigneeOptions,
+        IReadOnlyList<ImportanceOption> importanceOptions,
+        IReadOnlyList<UrgencyOption> urgencyOptions,
+        Action onChanged)
     {
         ArgumentNullException.ThrowIfNull(task);
         _session = session;
         _id = task.Id;
         _onChanged = onChanged;
         IsReadOnly = isReadOnly;
-        Text = task.Text;
-        Assignee = task.Assignee;
+        AssigneeOptions = assigneeOptions;
+        ImportanceOptions = importanceOptions;
+        UrgencyOptions = urgencyOptions;
+        _text = task.Text;
+        _assignee = task.Assignee;
         CreatedDisplay = $"{Formatting.Timestamp(task.CreatedAt)} · {task.CreatedBy}";
-        ImportanceLabel = Formatting.Level(task.Importance);
-        UrgencyLabel = Formatting.Level(task.Urgency);
-        IsUrgencyHigh = task.Urgency == TaskUrgency.High;
-        IsUrgencyMedium = task.Urgency == TaskUrgency.Medium;
-        IsUrgencyLow = task.Urgency == TaskUrgency.Low;
-        IsImportanceHigh = task.Importance == TaskImportance.High;
-        IsImportanceMedium = task.Importance == TaskImportance.Medium;
-        IsImportanceLow = task.Importance == TaskImportance.Low;
+        _importance = task.Importance;
+        _urgency = task.Urgency;
         _isDone = task.IsCompleted;
+        HasTimer = task.DueAt != DateTimeOffset.MaxValue;
 
         // German short stamp for completed rows; Sync() recreates the row on completion, so a
         // static snapshot is enough. Empty while open — the view hides the label then.
@@ -282,34 +288,26 @@ public sealed partial class TaskRow : ObservableObject
 
     public Guid Id { get; }
 
-    public string Text { get; }
+    /// <summary>Suggestion list shared with the input dock (#246), so the picker wording matches.</summary>
+    public IReadOnlyList<string> AssigneeOptions { get; }
 
-    public string Assignee { get; }
+    public IReadOnlyList<ImportanceOption> ImportanceOptions { get; }
+
+    public IReadOnlyList<UrgencyOption> UrgencyOptions { get; }
 
     public string CreatedDisplay { get; }
 
-    public string ImportanceLabel { get; }
-
-    public string UrgencyLabel { get; }
-
-    public bool IsUrgencyHigh { get; }
-
-    public bool IsUrgencyMedium { get; }
-
-    public bool IsUrgencyLow { get; }
-
-    public bool IsImportanceHigh { get; }
-
-    public bool IsImportanceMedium { get; }
-
-    public bool IsImportanceLow { get; }
-
     public bool IsReadOnly { get; }
+
+    /// <summary>Whether the task carries an active due time (#246) -- a task created with TIMER=0
+    /// has none, so the "+5" quick action stays disabled for it.</summary>
+    public bool HasTimer { get; }
 
     /// <summary>"ERLEDIGT · HH:mm" once done, empty while open (completion time from the task).</summary>
     public string CompletedDisplay { get; }
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ExtendTimerCommand))]
     private bool _isDone;
 
     partial void OnIsDoneChanged(bool value)
@@ -319,6 +317,81 @@ public sealed partial class TaskRow : ObservableObject
         var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == _id);
         if (task is { } current && current.IsCompleted != value)
             _session.SetTaskCompleted(_id, value);
+        _onChanged();
+    }
+
+    // --- Editable fields (#246): typo fixes, reassignment, re-prioritizing. Each write-through
+    // mirrors ForceRow.PushStatusNotes -- silent domain edit, no ETB entry (AddTask precedent). ---
+
+    [ObservableProperty]
+    private string _text;
+
+    partial void OnTextChanged(string value) => PushEdit();
+
+    [ObservableProperty]
+    private string _assignee;
+
+    partial void OnAssigneeChanged(string value) => PushEdit();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ImportanceLabel))]
+    [NotifyPropertyChangedFor(nameof(IsImportanceHigh))]
+    [NotifyPropertyChangedFor(nameof(IsImportanceMedium))]
+    [NotifyPropertyChangedFor(nameof(IsImportanceLow))]
+    private TaskImportance _importance;
+
+    partial void OnImportanceChanged(TaskImportance value) => PushEdit();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UrgencyLabel))]
+    [NotifyPropertyChangedFor(nameof(IsUrgencyHigh))]
+    [NotifyPropertyChangedFor(nameof(IsUrgencyMedium))]
+    [NotifyPropertyChangedFor(nameof(IsUrgencyLow))]
+    private TaskUrgency _urgency;
+
+    partial void OnUrgencyChanged(TaskUrgency value) => PushEdit();
+
+    public string ImportanceLabel => Formatting.Level(Importance);
+
+    public string UrgencyLabel => Formatting.Level(Urgency);
+
+    public bool IsUrgencyHigh => Urgency == TaskUrgency.High;
+
+    public bool IsUrgencyMedium => Urgency == TaskUrgency.Medium;
+
+    public bool IsUrgencyLow => Urgency == TaskUrgency.Low;
+
+    public bool IsImportanceHigh => Importance == TaskImportance.High;
+
+    public bool IsImportanceMedium => Importance == TaskImportance.Medium;
+
+    public bool IsImportanceLow => Importance == TaskImportance.Low;
+
+    /// <summary>Bails out on a blank AUFGABE instead of throwing mid-edit -- the domain rejects
+    /// empty text, but a field the operator is still typing into must not crash the binding.</summary>
+    private void PushEdit()
+    {
+        if (IsReadOnly || string.IsNullOrWhiteSpace(Text))
+        {
+            return;
+        }
+
+        _session.UpdateTask(_id, Text, Assignee, Importance, Urgency);
+        _onChanged();
+    }
+
+    private bool CanExtendTimer => !IsReadOnly && HasTimer && !IsDone;
+
+    /// <summary>The AUFGABEN grid's "+5" quick action (#246).</summary>
+    [RelayCommand(CanExecute = nameof(CanExtendTimer))]
+    private void ExtendTimer()
+    {
+        if (!CanExtendTimer)
+        {
+            return;
+        }
+
+        _session.ExtendTaskTimer(_id, 5);
         _onChanged();
     }
 

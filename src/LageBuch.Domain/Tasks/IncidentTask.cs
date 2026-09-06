@@ -128,6 +128,47 @@ public sealed record IncidentTask
             : this with { CompletedAt = null, CompletedBy = null };
     }
 
+    /// <summary>Corrects the editable fields (#246) -- typo fixes, reassignment, re-prioritizing.
+    /// Validated the same way <see cref="Create"/> validates a new task.</summary>
+    public IncidentTask WithDetails(string text, string? assignee, TaskImportance importance, TaskUrgency urgency)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new ArgumentException("Aufgabe darf nicht leer sein.", nameof(text));
+        }
+
+        if (text.Length > MaxTextLength)
+        {
+            throw new ArgumentException($"Aufgabe ist länger als das Limit von {MaxTextLength} Zeichen.", nameof(text));
+        }
+
+        return this with
+        {
+            Text = text.Trim(),
+            Assignee = string.IsNullOrWhiteSpace(assignee) ? string.Empty : assignee.Trim(),
+            Importance = importance,
+            Urgency = urgency,
+        };
+    }
+
+    /// <summary>Adds minutes to the due time (#246 "+5" quick action). A task created with no timer
+    /// (<see cref="DueAt"/> == <see cref="DateTimeOffset.MaxValue"/>) has nothing to extend -- the
+    /// view disables the action, but this still fails loudly rather than fabricating a due time.</summary>
+    public IncidentTask WithExtendedTimer(int minutes)
+    {
+        if (minutes <= 0)
+        {
+            throw new ArgumentException("Die Verlängerung muss positiv sein.", nameof(minutes));
+        }
+
+        if (DueAt == DateTimeOffset.MaxValue)
+        {
+            throw new InvalidOperationException("Aufgabe hat keinen Timer.");
+        }
+
+        return this with { DueAt = DueAt.AddMinutes(minutes) };
+    }
+
     /// <summary>Urgency-driven default for the creation UIs' TIMER (MIN) field (#88).</summary>
     public static int DefaultTimerMinutes(TaskUrgency urgency) => urgency switch
     {
