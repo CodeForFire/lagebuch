@@ -866,6 +866,12 @@ public sealed class Incident
         return updated;
     }
 
+    /// <summary>The smallest positive Leitungsnummer not already assigned to a planned Leitung in
+    /// this incident — mirrors <see cref="NextFreeScbaTruppNumber"/> so removing a non-last Leitung
+    /// and adding a new one can't collide with a surviving one's number.</summary>
+    public int NextFreeWasserfoerderungLeitungNumber() =>
+        Enumerable.Range(1, _wasserfoerderung.Count + 1).First(n => _wasserfoerderung.All(l => l.Number != n));
+
     /// <summary>
     /// Plans and records one Förderstrecke-Leitung (#150). The pump/pressure figures are computed
     /// by <see cref="FörderstreckePlanner"/> at creation and stored on the Leitung — the PDF and
@@ -876,7 +882,7 @@ public sealed class Incident
     {
         EnsureOpen();
         var leitung = WasserfoerderungLeitung.Create(
-            number: _wasserfoerderung.Count + 1,
+            number: NextFreeWasserfoerderungLeitungNumber(),
             uebergabestelle: uebergabestelle,
             ansprechpartner: ansprechpartner,
             lengthM: lengthM,
@@ -898,7 +904,7 @@ public sealed class Incident
     {
         EnsureOpen();
         var leitung = WasserfoerderungLeitung.CreateFromRoute(
-            number: _wasserfoerderung.Count + 1,
+            number: NextFreeWasserfoerderungLeitungNumber(),
             uebergabestelle: uebergabestelle,
             ansprechpartner: ansprechpartner,
             routePoints: routePoints,
