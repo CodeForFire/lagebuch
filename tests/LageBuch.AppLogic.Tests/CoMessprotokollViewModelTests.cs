@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
@@ -141,6 +142,48 @@ public class CoMessprotokollViewModelTests
 
         var cell = vm.MatrixRows.SelectMany(r => r.Cells).First(c => c.BuildingId == houseB.Id);
         cell.CoValue = 45; // enters a ppm value, triggering a RecordCoValue round trip
+
+        Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
+    }
+
+    // Reproduces the actual live bug (confirmed by driving the real desktop app): the "HAUS"
+    // ComboBox is two-way bound to SelectedBuilding, with BuildingOptions as its ItemsSource
+    // (SelectedItem="{Binding SelectedBuilding}"). Clearing an ObservableCollection fires a Reset
+    // notification, and Avalonia's Selector reacts to that by synchronously nulling its own
+    // SelectedItem — which pushes back through the two-way binding and sets SelectedBuilding to
+    // null. A plain unit test with no live control attached to BuildingOptions can't see this at
+    // all (nothing reacts to the Reset), so this test attaches a minimal stand-in that reproduces
+    // exactly that one piece of real Selector behavior.
+    [Fact]
+    public void SelectedBuilding_StaysSelected_WhenBuildingOptionsResetsLikeARealBoundComboBox()
+    {
+        var op = new SessionOperator("Test", null);
+        var store = new FakeStore();
+        var local = LocalIncidentSession.StartNew(
+            store,
+            Clock,
+            op,
+            Path.GetTempFileName(),
+            Enumerable.Empty<(string, bool)>(),
+            Enumerable.Empty<(string, bool)>());
+        local.AddCoBuilding("Haus A", 2, 3);
+        local.AddCoBuilding("Haus B", 2, 3);
+
+        var vm = new CoMessprotokollViewModel(local, Clock, () => { });
+
+        var houseB = vm.BuildingOptions.Single(b => b.Name == "Haus B");
+        vm.SelectedBuilding = houseB;
+
+        vm.BuildingOptions.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                vm.SelectedBuilding = null;
+            }
+        };
+
+        var cell = vm.MatrixRows.SelectMany(r => r.Cells).First(c => c.BuildingId == houseB.Id);
+        cell.CoValue = 45;
 
         Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
     }
