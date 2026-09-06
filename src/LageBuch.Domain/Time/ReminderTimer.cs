@@ -79,6 +79,29 @@ public sealed class ReminderTimer
         CycleAnchor = clock.Now;
     }
 
+    /// <summary>
+    /// Silences the current due cycle without asserting a report actually happened (unlike
+    /// <see cref="Acknowledge"/>): re-anchors to now but sets the NEXT interval to the given
+    /// snooze length rather than switching to <see cref="RecurringIntervalMinutes"/>, which is
+    /// left untouched so a later Acknowledge still resumes the normal cadence.
+    /// </summary>
+    public void Snooze(IClock clock, int minutes)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        if (minutes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(minutes), "Interval must be positive.");
+        }
+
+        if (!IsRunning)
+        {
+            return;
+        }
+
+        IntervalMinutes = minutes;
+        CycleAnchor = clock.Now;
+    }
+
     public TimeSpan Remaining(DateTimeOffset now) => DueAt - now;
 
     public bool IsDue(DateTimeOffset now) => IsRunning && now >= DueAt;

@@ -21,6 +21,9 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     // close+reopen or a crash instead of restarting a fresh cycle.
     private const string TimerKey = "ils-reminder";
 
+    // "+5 MIN": a quick snooze for "nothing to report yet", offered alongside ERLEDIGT once due.
+    private const int SnoozeIntervalMinutes = 5;
+
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
@@ -101,6 +104,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(IsDue));
         AcknowledgeCommand.NotifyCanExecuteChanged();
+        SnoozeFiveMinutesCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanAcknowledge => _timer.IsDue(_clock.Now);
@@ -119,6 +123,27 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsDue));
         OnPropertyChanged(nameof(RemainingDisplay));
         AcknowledgeCommand.NotifyCanExecuteChanged();
+        SnoozeFiveMinutesCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanSnooze => _timer.IsDue(_clock.Now);
+
+    /// <summary>
+    /// "Nothing to report yet": silences the current due cycle for a fixed 5 minutes without
+    /// asserting a Rückmeldung actually happened, unlike <see cref="Acknowledge"/> (no ETB entry,
+    /// and <see cref="ReminderTimer.RecurringIntervalMinutes"/> is left untouched, so a later
+    /// Acknowledge still resumes the normal cadence).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSnooze))]
+    private void SnoozeFiveMinutes()
+    {
+        _timer.Snooze(_clock, SnoozeIntervalMinutes);
+        _lastAnnouncedAt = null;
+        PersistTimer();
+        OnPropertyChanged(nameof(IsDue));
+        OnPropertyChanged(nameof(RemainingDisplay));
+        AcknowledgeCommand.NotifyCanExecuteChanged();
+        SnoozeFiveMinutesCommand.NotifyCanExecuteChanged();
     }
 
     public void Dispose() => _subscription.Dispose();
