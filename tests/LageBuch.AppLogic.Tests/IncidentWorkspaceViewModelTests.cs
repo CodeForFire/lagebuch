@@ -129,6 +129,7 @@ public class IncidentWorkspaceViewModelTests
     public void An_entry_logged_from_the_kraefte_tab_appears_in_the_etb_immediately()
     {
         var vm = NewWorkspace(out _, out _);
+        vm.Etb.HideSystemEntries = false; // this asserts on a System entry, hidden by default (#223)
         var before = vm.Etb.Entries.Count;
 
         vm.Forces.NewBrigade = "FFB Wache 1";
@@ -145,6 +146,7 @@ public class IncidentWorkspaceViewModelTests
     public void An_entry_logged_from_the_atemschutz_tab_appears_in_the_etb_immediately()
     {
         var vm = NewWorkspace(out _, out _);
+        vm.Etb.HideSystemEntries = false; // this asserts on a System entry, hidden by default (#223)
         var before = vm.Etb.Entries.Count;
 
         vm.Scba.NewDesignation = "Angriffstrupp";
@@ -176,6 +178,7 @@ public class IncidentWorkspaceViewModelTests
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
+        vm.Etb.HideSystemEntries = false; // this asserts on a System entry, hidden by default (#223)
         var before = vm.Etb.Entries.Count;
 
         vm.ChecklistAufbau.Items[0].IsDone = true;
@@ -468,6 +471,10 @@ public class IncidentWorkspaceViewModelTests
 
         vm.PendingConfirm!.ConfirmCommand.Execute(null);
 
+        // Rebuilt by the close, so this must be set on the *new* Etb instance -- these are System
+        // entries, hidden by default (#223).
+        vm.Etb.HideSystemEntries = false;
+
         // Newest-first grid: the closing entry sits above the opening one.
         Assert.Equal("Einsatz abgeschlossen", vm.Etb.Entries[0].Text);
         Assert.Equal("Einsatz begonnen", vm.Etb.Entries[1].Text);
@@ -482,6 +489,10 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingPrompt.ConfirmCommand.Execute(null);
 
         vm.ConfirmContinueEditing();
+
+        // Rebuilt by resuming, so this must be set on the *new* Etb instance -- it's a System
+        // entry, hidden by default (#223).
+        vm.Etb.HideSystemEntries = false;
 
         Assert.Equal("Bearbeitung fortgesetzt", vm.Etb.Entries[0].Text);
         Assert.Equal("Schmidt", vm.Etb.Entries[0].EnteredBy);

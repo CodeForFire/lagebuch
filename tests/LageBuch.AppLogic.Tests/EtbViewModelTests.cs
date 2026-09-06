@@ -87,6 +87,13 @@ public class EtbViewModelTests
     }
 
     [Fact]
+    public void HideSystemEntries_defaults_to_true()
+    {
+        // A fresh incident's journal should not open showing the "Einsatz begonnen" trace (#223).
+        Assert.True(NewVm().HideSystemEntries);
+    }
+
+    [Fact]
     public void HideSystemEntries_hides_system_rows_and_keeps_human_rows()
     {
         var clock = new FixedClock(T0);
@@ -102,17 +109,18 @@ public class EtbViewModelTests
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Lagemeldung" };
         vm.AddEntryCommand.Execute(null);
 
-        Assert.Equal(2, vm.Entries.Count);
-
-        vm.HideSystemEntries = true;
-
+        // Hidden by default (#223): only the human entry shows until toggled off.
         var only = Assert.Single(vm.Entries);
         Assert.Equal("Lagemeldung", only.Text);
         Assert.Equal(EtbDirection.Incoming, only.DirectionValue);
 
-        // Toggling back restores the hidden System row.
         vm.HideSystemEntries = false;
         Assert.Equal(2, vm.Entries.Count);
+
+        // Toggling back hides the System row again.
+        vm.HideSystemEntries = true;
+        only = Assert.Single(vm.Entries);
+        Assert.Equal("Lagemeldung", only.Text);
     }
 
     [Fact]
@@ -261,7 +269,7 @@ public class EtbViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { HideSystemEntries = false };
 
         // The automatic "Einsatz begonnen" entry from StartNew is the only row at this point.
         var systemRow = Assert.Single(vm.Entries);

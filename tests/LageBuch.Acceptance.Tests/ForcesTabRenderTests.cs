@@ -167,7 +167,9 @@ public class ForcesTabRenderTests
         Assert.Equal("Aich", remaining.Brigade);
         Assert.Equal(9, vm.Forces.TotalPersonnel);
 
-        // The journal (and thus the ETB tab) names the removed unit.
+        // The journal (and thus the ETB tab) names the removed unit -- it's a System entry,
+        // hidden by default (#223).
+        vm.Etb.HideSystemEntries = false;
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Einheit entfernt: FFB Wache 1");
 
         Capture(window, "forces-row-removed.png");
