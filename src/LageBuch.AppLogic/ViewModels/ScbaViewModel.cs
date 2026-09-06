@@ -298,7 +298,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Internally assigned, never user-edited (#217): a hand-typed duplicate crashed
     /// <see cref="Domain.Incident.AddScbaTrupp"/>, so the view shows this as read-only text and
-    /// only <see cref="AddTrupp"/>/<see cref="RefreshTrupps"/> ever set it.
+    /// only the constructor, <see cref="AddTrupp"/>, and <see cref="RefreshTrupps"/> ever set it.
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
