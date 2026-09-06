@@ -208,10 +208,16 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
             BuildingOptions.Add(b);
         }
 
-        if (SelectedBuilding is null || !_session.Incident.Buildings.Contains(SelectedBuilding))
-        {
-            SelectedBuilding = BuildingOptions.FirstOrDefault();
-        }
+        // Match by Id, not object identity: a remote session replaces the whole Incident/Building
+        // object graph on every broadcast (SnapshotMapper rebuilds fresh FloorDescriptions/
+        // ApartmentLabels dictionaries each time), so Building's record equality — which falls back
+        // to reference equality for those dictionary properties — never matches the previous
+        // instance. Falling through to FirstOrDefault() then silently switched the selected Haus
+        // to the first one in the list on every unrelated edit (e.g. entering a ppm value).
+        var selectedId = SelectedBuilding?.Id;
+        SelectedBuilding = selectedId is { } id
+            ? BuildingOptions.FirstOrDefault(b => b.Id == id) ?? BuildingOptions.FirstOrDefault()
+            : BuildingOptions.FirstOrDefault();
 
         BuildMatrix();
         OnPropertyChanged(nameof(IsReadOnly));
