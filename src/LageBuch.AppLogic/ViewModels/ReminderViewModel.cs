@@ -121,5 +121,25 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         AcknowledgeCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>
+    /// Postponing is always available, distinct from ERLEDIGT: it silences the current cycle
+    /// without asserting that a Rückmeldung actually happened (#222/#224).
+    /// </summary>
+    [RelayCommand]
+    private void PostponeFiveMinutes() => Postpone(TimeSpan.FromMinutes(5));
+
+    [RelayCommand]
+    private void PostponeTenMinutes() => Postpone(TimeSpan.FromMinutes(10));
+
+    private void Postpone(TimeSpan by)
+    {
+        _timer.Postpone(by);
+        _lastAnnouncedAt = null; // a later due cycle announces immediately, not after a stale wait
+        PersistTimer();
+        OnPropertyChanged(nameof(IsDue));
+        OnPropertyChanged(nameof(RemainingDisplay));
+        AcknowledgeCommand.NotifyCanExecuteChanged();
+    }
+
     public void Dispose() => _subscription.Dispose();
 }

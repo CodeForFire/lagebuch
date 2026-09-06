@@ -209,6 +209,60 @@ public class ReminderViewModelTests
         Assert.False(reopened.IsDue);
     }
 
+    // --- Postpone (#222/#224) ------------------------------------------------------------------
+    [Fact]
+    public void Postpone_pushes_the_countdown_back_without_logging_an_ils_report()
+    {
+        var (session, clock) = NewSession();
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        vm.PostponeFiveMinutesCommand.Execute(null);
+
+        Assert.Equal("20:00", vm.RemainingDisplay);
+        Assert.DoesNotContain(session.Incident.Journal, e => e.Text == "Rückmeldung an ILS");
+    }
+
+    [Fact]
+    public void Postpone_ten_minutes_silences_an_already_due_cycle_and_stops_the_repeat()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = new ReminderViewModel(session, clock, ticker, alarm, () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+        Assert.True(vm.IsDue);
+        Assert.Single(alarm.Played);
+
+        vm.PostponeTenMinutesCommand.Execute(null);
+
+        Assert.False(vm.IsDue);
+
+        // The repeat-while-due nag (#224) does not fire again until the postponed time passes.
+        clock.Now = T0.AddMinutes(15).AddSeconds(60);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = T0.AddMinutes(25); // the postponed due time
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
+    }
+
+    [Fact]
+    public void Postpone_persists_the_new_anchor()
+    {
+        var (session, clock) = NewSession();
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        vm.PostponeFiveMinutesCommand.Execute(null);
+
+        var timer = session.Incident.FindTimer("ils-reminder");
+        Assert.NotNull(timer);
+        Assert.Equal(T0.AddMinutes(5), timer!.CycleAnchor);
+        Assert.Equal(15, timer.IntervalMinutes); // unlike Acknowledge, stays on the first cycle
+    }
+
     [Fact]
     public void Acknowledge_updates_the_persisted_timer_to_the_recurring_cadence()
     {

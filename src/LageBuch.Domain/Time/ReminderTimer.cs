@@ -79,6 +79,22 @@ public sealed class ReminderTimer
         CycleAnchor = clock.Now;
     }
 
+    /// <summary>
+    /// Pushes the due time back by the given amount without switching to the recurring interval
+    /// or counting as a report-back (#222/#224) -- unlike <see cref="Acknowledge"/>, which commits
+    /// to "reported" and starts the next cycle. For when there is nothing to report yet and the
+    /// repeating alarm while overdue is just noise to be silenced for a while.
+    /// </summary>
+    public void Postpone(TimeSpan by)
+    {
+        if (!IsRunning)
+        {
+            return;
+        }
+
+        CycleAnchor += by;
+    }
+
     public TimeSpan Remaining(DateTimeOffset now) => DueAt - now;
 
     public bool IsDue(DateTimeOffset now) => IsRunning && now >= DueAt;
