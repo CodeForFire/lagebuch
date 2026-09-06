@@ -22,5 +22,11 @@ public sealed class RegionPackCatalogService(HttpClient httpClient, string manif
         {
             return Array.Empty<RegionPackInfo>();
         }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // HttpClient's own request timeout throws this (TaskCanceledException), distinct from
+            // the caller's ct being cancelled -- which is left to propagate rather than degrading.
+            return Array.Empty<RegionPackInfo>();
+        }
     }
 }

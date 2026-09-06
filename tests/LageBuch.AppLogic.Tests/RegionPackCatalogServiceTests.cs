@@ -70,4 +70,28 @@ public class RegionPackCatalogServiceTests
 
         Assert.Empty(regions);
     }
+
+    [Fact]
+    public async Task GetAvailableRegionsAsync_returns_empty_list_on_a_request_timeout()
+    {
+        // HttpClient's own timeout throws TaskCanceledException (an OperationCanceledException),
+        // not HttpRequestException -- distinct from the caller's own token being cancelled.
+        var handler = new FakeHandler(_ => throw new TaskCanceledException("request timed out"));
+        var service = new RegionPackCatalogService(new HttpClient(handler), "https://example.org/regions.json");
+
+        var regions = await service.GetAvailableRegionsAsync();
+
+        Assert.Empty(regions);
+    }
+
+    [Fact]
+    public async Task GetAvailableRegionsAsync_propagates_the_callers_own_cancellation()
+    {
+        var handler = new FakeHandler(_ => throw new HttpRequestException("unused"));
+        var service = new RegionPackCatalogService(new HttpClient(handler), "https://example.org/regions.json");
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.GetAvailableRegionsAsync(cts.Token));
+    }
 }
