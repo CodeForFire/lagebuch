@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- alarm.wav (looping siren) plus the spoken voice-*.wav cues. -->
+    <!-- alarm.wav (a short chime, re-triggered on a cadence rather than looped) plus the spoken voice-*.wav cues. -->
     <AvaloniaResource Include="Assets\*.wav" />
   </ItemGroup>
 
