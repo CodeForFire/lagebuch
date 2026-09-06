@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 17;
+    public const int CurrentVersion = 18;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -122,6 +122,11 @@ public static class Migrations
         if (version < 17)
         {
             ApplyV17(cn, tx);
+        }
+
+        if (version < 18)
+        {
+            ApplyV18(cn, tx);
         }
 
         SetVersion(cn, tx, CurrentVersion);
@@ -592,6 +597,15 @@ public static class Migrations
         Exec(cn, tx, sql21);
         Exec(cn, tx, "DROP TABLE scba_trupps;");
         Exec(cn, tx, "ALTER TABLE scba_trupps_v17 RENAME TO scba_trupps;");
+    }
+
+    // Kräfte gain a Zugführer counter, distinct from Führungskraft (#216): Stärke becomes
+    // ZF/GF/Mannschaft/Gesamt. zugfuehrer_count is NOT NULL with default 0, exactly like
+    // officer_count's V13 backfill -- existing rows read as "kein ZF erfasst".
+    private static void ApplyV18(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "zugfuehrer_count", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "force_unit_edits", "previous_zugfuehrer_count", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

@@ -9,4 +9,8 @@ public sealed record ForceUnitStrengthEdit(
     int PreviousPersonnelCount,
     int PreviousScbaCount,
     string EditedBy,
-    DateTimeOffset EditedAt);
+    DateTimeOffset EditedAt,
+
+    // Appended last with a default so pre-#216 call sites keep compiling (same convention as
+    // ForceUnit.OfficerCount's #76 addition).
+    int PreviousZugfuehrerCount = 0);

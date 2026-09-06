@@ -67,13 +67,14 @@ public interface IIncidentSession
         string? status = null,
         string? notes = null,
         int scbaCount = 0,
-        int officerCount = 0);
+        int officerCount = 0,
+        int zugfuehrerCount = 0);
 
     void UpdateForceUnit(Guid unitId, string? status, string? notes);
 
-    /// <summary>Corrects a unit's Stärke (GF / Gesamt / davon AGT). Logs to the ETB and retains the
-    /// prior values on the unit — but only on a real change (#76).</summary>
-    void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount);
+    /// <summary>Corrects a unit's Stärke (ZF / GF / Gesamt / davon AGT). Logs to the ETB and retains
+    /// the prior values on the unit — but only on a real change (#76, #216).</summary>
+    void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount, int zugfuehrerCount = 0);
 
     /// <summary>Takes a unit back completely: row, Wert-Historie and totals go, the ETB records
     /// the removal (#76 follow-up).</summary>

@@ -12,13 +12,18 @@ public sealed record ForceUnit(
     // Appended last with a default so pre-#76 construction sites (repository, snapshot, sync) keep
     // compiling — and old rows/payloads read as "keine Führungskraft erfasst" (0/x/x) instead of
     // breaking. The total is unchanged by this field: Mannschaft is derived, not stored.
-    int OfficerCount = 0)
-{
-    /// <summary>Mannschaft = Gesamtstärke abzüglich der Führungskräfte.</summary>
-    public int MannschaftCount => PersonnelCount - OfficerCount;
+    int OfficerCount = 0,
 
-    /// <summary>The German Stärke notation: Führungskraft / Mannschaft / Gesamt ("1/1/2").</summary>
-    public string StrengthText => $"{OfficerCount}/{MannschaftCount}/{PersonnelCount}";
+    // Same convention, appended after OfficerCount for the #216 addition. Zugführer is a rank
+    // above Führungskraft (Gruppenführer) and counted separately, ahead of it in the Stärke
+    // notation: ZF/GF/Mannschaft/Gesamt.
+    int ZugfuehrerCount = 0)
+{
+    /// <summary>Mannschaft = Gesamtstärke abzüglich Zugführer und Führungskräfte.</summary>
+    public int MannschaftCount => PersonnelCount - OfficerCount - ZugfuehrerCount;
+
+    /// <summary>The German Stärke notation: Zugführer / Führungskraft / Mannschaft / Gesamt ("1/1/1/3").</summary>
+    public string StrengthText => $"{ZugfuehrerCount}/{OfficerCount}/{MannschaftCount}/{PersonnelCount}";
 
     public static ForceUnit Create(
         string brigade,
@@ -27,7 +32,8 @@ public sealed record ForceUnit(
         string? status = null,
         string? notes = null,
         int scbaCount = 0,
-        int officerCount = 0)
+        int officerCount = 0,
+        int zugfuehrerCount = 0)
     {
         if (string.IsNullOrWhiteSpace(brigade))
         {
@@ -48,13 +54,15 @@ public sealed record ForceUnit(
         }
 
         ArgumentOutOfRangeException.ThrowIfNegative(officerCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(zugfuehrerCount);
 
-        // Führungskräfte are likewise a subset of the crew (#76).
-        if (officerCount > personnelCount)
+        // Führungskräfte and Zugführer are likewise subsets of the crew (#76, #216) — together,
+        // not to exceed it.
+        if (officerCount + zugfuehrerCount > personnelCount)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(officerCount),
-                "Führungskräfte dürfen die Gesamtstärke nicht übersteigen.");
+                "Führungskräfte und Zugführer dürfen die Gesamtstärke nicht übersteigen.");
         }
 
         return new ForceUnit(
@@ -65,7 +73,8 @@ public sealed record ForceUnit(
             scbaCount,
             string.IsNullOrWhiteSpace(status) ? null : status.Trim(),
             string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
-            officerCount);
+            officerCount,
+            zugfuehrerCount);
     }
 
     /// <summary>
@@ -92,8 +101,9 @@ public sealed record ForceUnit(
         string? status,
         string? notes,
         int officerCount,
-        IEnumerable<ForceUnitStrengthEdit>? edits = null)
-        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount)
+        IEnumerable<ForceUnitStrengthEdit>? edits = null,
+        int zugfuehrerCount = 0)
+        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount, zugfuehrerCount)
         {
             Edits = (edits ?? Enumerable.Empty<ForceUnitStrengthEdit>()).ToList(),
         };
@@ -111,7 +121,8 @@ public sealed record ForceUnit(
         int personnelCount,
         int scbaCount,
         SessionOperator editor,
-        DateTimeOffset editedAt)
+        DateTimeOffset editedAt,
+        int zugfuehrerCount = 0)
     {
         ArgumentNullException.ThrowIfNull(editor);
         ArgumentOutOfRangeException.ThrowIfNegative(personnelCount);
@@ -122,25 +133,27 @@ public sealed record ForceUnit(
                 "Atemschutzgeräteträger dürfen die Gesamtstärke nicht übersteigen.");
         }
 
-        if (officerCount < 0 || officerCount > personnelCount)
+        if (officerCount < 0 || zugfuehrerCount < 0 || officerCount + zugfuehrerCount > personnelCount)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(officerCount),
-                "Führungskräfte dürfen die Gesamtstärke nicht übersteigen.");
+                "Führungskräfte und Zugführer dürfen die Gesamtstärke nicht übersteigen.");
         }
 
-        if (officerCount == OfficerCount && personnelCount == PersonnelCount && scbaCount == ScbaCount)
+        if (officerCount == OfficerCount && zugfuehrerCount == ZugfuehrerCount
+            && personnelCount == PersonnelCount && scbaCount == ScbaCount)
         {
             return this;
         }
 
         var edits = new List<ForceUnitStrengthEdit>(Edits)
         {
-            new(OfficerCount, PersonnelCount, ScbaCount, editor.Display, editedAt),
+            new(OfficerCount, PersonnelCount, ScbaCount, editor.Display, editedAt, ZugfuehrerCount),
         };
         return this with
         {
             OfficerCount = officerCount,
+            ZugfuehrerCount = zugfuehrerCount,
             PersonnelCount = personnelCount,
             ScbaCount = scbaCount,
             Edits = edits,

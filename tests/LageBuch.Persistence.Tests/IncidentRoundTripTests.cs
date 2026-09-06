@@ -66,7 +66,8 @@ public class IncidentRoundTripTests : IDisposable
             status: "Im Einsatz",
             notes: "über DLK angefordert",
             scbaCount: 6,
-            officerCount: 1);
+            officerCount: 1,
+            zugfuehrerCount: 2);
         clock.Now = clock.Now.AddMinutes(3);
         incident.UpdateForceStrength(
             clock,
@@ -74,7 +75,8 @@ public class IncidentRoundTripTests : IDisposable
             incident.Forces[0].Id,
             officerCount: 1,
             personnelCount: 14,
-            scbaCount: 7);
+            scbaCount: 7,
+            zugfuehrerCount: 3);
         clock.Now = clock.Now.AddMinutes(2);
         incident.AddTask(clock, op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
         var taskDueAt = clock.Now.AddMinutes(5);
@@ -107,8 +109,8 @@ public class IncidentRoundTripTests : IDisposable
                 "Einsatz begonnen",
                 "Meldung",
                 "Funktion EL zugewiesen: Müller",
-                "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 1/11/12, davon 6 AGT — Status: Im Einsatz",
-                "FFB (FFB 1/40/1): Stärke 1/11/12 → 1/13/14, davon AGT 6 → 7",
+                "Einheit aufgenommen: FFB (FFB 1/40/1), Stärke 2/1/9/12, davon 6 AGT — Status: Im Einsatz",
+                "FFB (FFB 1/40/1): Stärke 2/1/9/12 → 3/1/10/14, davon AGT 6 → 7",
             },
             loaded.Journal.Select(e => e.Text));
 
@@ -133,10 +135,10 @@ public class IncidentRoundTripTests : IDisposable
         var force = loaded.Forces[0];
         Assert.Equal("Im Einsatz", force.Status);
         Assert.Equal("über DLK angefordert", force.Notes);
-        Assert.Equal((1, 14, 7), (force.OfficerCount, force.PersonnelCount, force.ScbaCount));
-        Assert.Equal("1/13/14", force.StrengthText);
+        Assert.Equal((3, 1, 14, 7), (force.ZugfuehrerCount, force.OfficerCount, force.PersonnelCount, force.ScbaCount));
+        Assert.Equal("3/1/10/14", force.StrengthText);
         var strengthEdit = Assert.Single(force.Edits);
-        Assert.Equal((1, 12, 6), (strengthEdit.PreviousOfficerCount, strengthEdit.PreviousPersonnelCount, strengthEdit.PreviousScbaCount));
+        Assert.Equal((2, 1, 12, 6), (strengthEdit.PreviousZugfuehrerCount, strengthEdit.PreviousOfficerCount, strengthEdit.PreviousPersonnelCount, strengthEdit.PreviousScbaCount));
         Assert.Equal(op.Display, strengthEdit.EditedBy);
         Assert.Equal(incident.Audit.Count, loaded.Audit.Count);
         Assert.Equal(2, loaded.Tasks.Count);

@@ -61,7 +61,8 @@ public static class CommandApplier
                     c.Status,
                     c.Notes,
                     c.ScbaCount,
-                    c.OfficerCount);
+                    c.OfficerCount,
+                    c.ZugfuehrerCount);
                 break;
             case UpdateForceUnitCommand c:
                 incident.UpdateForceUnit(clock, Operator(c.Operator), c.UnitId, c.Status, c.Notes);
@@ -73,7 +74,8 @@ public static class CommandApplier
                     c.UnitId,
                     c.OfficerCount,
                     c.PersonnelCount,
-                    c.ScbaCount);
+                    c.ScbaCount,
+                    c.ZugfuehrerCount);
                 break;
             case RemoveForceUnitCommand c:
                 incident.RemoveForceUnit(clock, Operator(c.Operator), c.UnitId);

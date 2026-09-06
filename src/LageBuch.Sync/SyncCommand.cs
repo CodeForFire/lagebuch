@@ -68,17 +68,19 @@ public sealed record TransferRoleCommand(
 
 public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentId, string? Phone) : SyncCommand;
 
-// OfficerCount defaults to 0 so a pre-#76 payload (no such property on the wire) deserializes
-// as "keine Führungskraft erfasst" instead of failing the contract.
+// OfficerCount/ZugfuehrerCount default to 0 so a pre-#76/#216 payload (no such property on the
+// wire) deserializes as "keine Führungskraft/kein ZF erfasst" instead of failing the contract.
 public sealed record AddForceUnitCommand(
     OperatorDto Operator, string Brigade, int PersonnelCount,
-    string? CallSign, string? Status, string? Notes, int ScbaCount, int OfficerCount = 0) : SyncCommand;
+    string? CallSign, string? Status, string? Notes, int ScbaCount, int OfficerCount = 0,
+    int ZugfuehrerCount = 0) : SyncCommand;
 
 public sealed record UpdateForceUnitCommand(
     OperatorDto Operator, Guid UnitId, string? Status, string? Notes) : SyncCommand;
 
 public sealed record UpdateForceStrengthCommand(
-    OperatorDto Operator, Guid UnitId, int OfficerCount, int PersonnelCount, int ScbaCount) : SyncCommand;
+    OperatorDto Operator, Guid UnitId, int OfficerCount, int PersonnelCount, int ScbaCount,
+    int ZugfuehrerCount = 0) : SyncCommand;
 
 public sealed record RemoveForceUnitCommand(
     OperatorDto Operator, Guid UnitId) : SyncCommand;

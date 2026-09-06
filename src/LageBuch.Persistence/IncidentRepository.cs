@@ -119,7 +119,7 @@ public sealed class IncidentRepository
             Run(
                 cn,
                 tx,
-                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc);",
+                "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc);",
                 p =>
                 {
                     p("$id", f.Id.ToString());
@@ -131,6 +131,7 @@ public sealed class IncidentRepository
                     p("$st", (object?)f.Status ?? DBNull.Value);
                     p("$n", (object?)f.Notes ?? DBNull.Value);
                     p("$oc", f.OfficerCount);
+                    p("$zc", f.ZugfuehrerCount);
                 });
 
             for (var j = 0; j < f.Edits.Count; j++)
@@ -139,7 +140,7 @@ public sealed class IncidentRepository
                 Run(
                     cn,
                     tx,
-                    "INSERT INTO force_unit_edits (id, unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at) " + "VALUES ($id,$uid,$o,$poc,$ppc,$psc,$by,$at);",
+                    "INSERT INTO force_unit_edits (id, unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at, previous_zugfuehrer_count) " + "VALUES ($id,$uid,$o,$poc,$ppc,$psc,$by,$at,$pzc);",
                     p =>
                     {
                         p("$id", Guid.NewGuid().ToString());
@@ -150,6 +151,7 @@ public sealed class IncidentRepository
                         p("$psc", edit.PreviousScbaCount);
                         p("$by", edit.EditedBy);
                         p("$at", edit.EditedAt.ToString(Iso));
+                        p("$pzc", edit.PreviousZugfuehrerCount);
                     });
             }
         }
@@ -470,15 +472,15 @@ public sealed class IncidentRepository
 
         var strengthEditsByUnit = ReadAll(
             cn,
-            "SELECT unit_id, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at FROM force_unit_edits ORDER BY ordinal;",
+            "SELECT unit_id, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at, previous_zugfuehrer_count FROM force_unit_edits ORDER BY ordinal;",
             r => (UnitId: Guid.Parse(r.GetString(0)),
-                  Edit: new Domain.ForceUnitStrengthEdit(r.GetInt32(1), r.GetInt32(2), r.GetInt32(3), r.GetString(4), ParseDate(r.GetString(5)))))
+                  Edit: new Domain.ForceUnitStrengthEdit(r.GetInt32(1), r.GetInt32(2), r.GetInt32(3), r.GetString(4), ParseDate(r.GetString(5)), r.GetInt32(6))))
             .GroupBy(x => x.UnitId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Edit).ToList());
 
         var forces = ReadAll(
             cn,
-            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count FROM force_units ORDER BY ordinal;",
+            "SELECT id, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count FROM force_units ORDER BY ordinal;",
             r => Domain.ForceUnit.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -488,7 +490,8 @@ public sealed class IncidentRepository
                 Str(r, 5),
                 Str(r, 6),
                 r.GetInt32(7),
-                strengthEditsByUnit.TryGetValue(Guid.Parse(r.GetString(0)), out var eds) ? eds : null));
+                strengthEditsByUnit.TryGetValue(Guid.Parse(r.GetString(0)), out var eds) ? eds : null,
+                r.GetInt32(8)));
 
         var membersByTrupp = ReadAll(
             cn,
