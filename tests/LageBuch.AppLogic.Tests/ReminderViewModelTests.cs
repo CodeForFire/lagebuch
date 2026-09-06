@@ -211,14 +211,14 @@ public class ReminderViewModelTests
 
     // --- Postpone (#222/#224) ------------------------------------------------------------------
     [Fact]
-    public void Postpone_pushes_the_countdown_back_without_logging_an_ils_report()
+    public void Postpone_sets_the_countdown_to_five_minutes_from_now_without_logging_an_ils_report()
     {
         var (session, clock) = NewSession();
         var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
 
         vm.PostponeFiveMinutesCommand.Execute(null);
 
-        Assert.Equal("20:00", vm.RemainingDisplay);
+        Assert.Equal("05:00", vm.RemainingDisplay);
         Assert.DoesNotContain(session.Incident.Journal, e => e.Text == "Rückmeldung an ILS");
     }
 
@@ -278,8 +278,20 @@ public class ReminderViewModelTests
 
         var timer = session.Incident.FindTimer("ils-reminder");
         Assert.NotNull(timer);
-        Assert.Equal(T0.AddMinutes(5), timer!.CycleAnchor);
+        Assert.Equal(T0.AddMinutes(-10), timer!.CycleAnchor); // anchor such that DueAt lands at now + 5 min
         Assert.Equal(15, timer.IntervalMinutes); // unlike Acknowledge, stays on the first cycle
+    }
+
+    [Fact]
+    public void Postpone_notifies_onChanged_like_every_other_mutating_action()
+    {
+        var (session, clock) = NewSession();
+        var changed = 0;
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => changed++, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        vm.PostponeFiveMinutesCommand.Execute(null);
+
+        Assert.Equal(1, changed); // otherwise IncidentWorkspaceViewModel.LastSavedAt goes stale
     }
 
     [Fact]

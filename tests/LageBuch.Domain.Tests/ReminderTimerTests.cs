@@ -109,39 +109,39 @@ public class ReminderTimerTests
 
     // --- Postpone (#222/#224) -----------------------------------------------------------------
     [Fact]
-    public void Postpone_pushes_the_due_time_back_without_changing_the_interval()
+    public void Postpone_pushes_the_due_time_to_by_from_now()
     {
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
         timer.Start(clock, 15, 30);
 
-        timer.Postpone(TimeSpan.FromMinutes(5));
+        timer.Postpone(clock, TimeSpan.FromMinutes(5));
 
         Assert.Equal(15, timer.IntervalMinutes); // unlike Acknowledge, stays on the first cycle
-        Assert.Equal(T0.AddMinutes(5), timer.CycleAnchor);
-        Assert.Equal(T0.AddMinutes(20), timer.DueAt);
+        Assert.Equal(T0.AddMinutes(5), timer.DueAt);
     }
 
     [Fact]
-    public void Postpone_silences_an_already_due_cycle()
+    public void Postpone_silences_a_cycle_that_is_overdue_by_more_than_the_postpone_amount()
     {
         var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
         timer.Start(clock, 15, 30);
-        clock.Now = T0.AddMinutes(20); // overdue
+        clock.Now = T0.AddMinutes(25); // 10 min overdue against the 15-min DueAt
 
-        timer.Postpone(TimeSpan.FromMinutes(10));
+        timer.Postpone(clock, TimeSpan.FromMinutes(5)); // by (5) < overdue-by (10)
 
         Assert.False(timer.IsDue(clock.Now));
-        Assert.Equal(T0.AddMinutes(25), timer.DueAt);
+        Assert.Equal(clock.Now.AddMinutes(5), timer.DueAt);
     }
 
     [Fact]
     public void Postpone_when_not_running_is_noop()
     {
+        var clock = new FixedClock(T0);
         var timer = new ReminderTimer();
 
-        timer.Postpone(TimeSpan.FromMinutes(5)); // no throw
+        timer.Postpone(clock, TimeSpan.FromMinutes(5)); // no throw
 
         Assert.False(timer.IsRunning);
     }

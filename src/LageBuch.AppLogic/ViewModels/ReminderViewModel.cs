@@ -140,10 +140,11 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 
     private void Postpone(TimeSpan by)
     {
-        _timer.Postpone(by);
+        _timer.Postpone(_clock, by);
         _lastAnnouncedAt = null; // a later due cycle announces immediately, not after a stale wait
         _lastPostponedAt = _clock.Now;
         PersistTimer();
+        _onChanged();
         OnPropertyChanged(nameof(IsDue));
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(ShowPostponeConfirmation));
