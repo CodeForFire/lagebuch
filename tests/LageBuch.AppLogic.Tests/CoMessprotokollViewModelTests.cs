@@ -62,6 +62,36 @@ public class CoMessprotokollViewModelTests
         Assert.False(vm.AddUntergeschossCommand.CanExecute(null));
     }
 
+    // Untergeschosse don't show in the matrix until scrolled to, unlike ground/upper floors, so
+    // ConfirmAddBuildingCommand defaults NewBuildingUndergroundFloors to 1 rather than 0 -- a
+    // building created via the dialog already has a basement to record without a separate
+    // UG HINZUFÜGEN click.
+    [Fact]
+    public void ConfirmAddBuildingCommand_DefaultsToOneUndergroundFloor()
+    {
+        var (session, vm) = CreateVm();
+        vm.NewBuildingName = "Haus B";
+
+        vm.ConfirmAddBuildingCommand.Execute(null);
+
+        var building = session.Incident.Buildings.Single(b => b.Name == "Haus B");
+        Assert.Equal(1, building.UndergroundFloorCount);
+        Assert.Equal(1, vm.NewBuildingUndergroundFloors); // resets to the default, not 0
+    }
+
+    [Fact]
+    public void ConfirmAddBuildingCommand_UsesTheChosenUndergroundFloorCount()
+    {
+        var (session, vm) = CreateVm();
+        vm.NewBuildingName = "Haus B";
+        vm.NewBuildingUndergroundFloors = 0;
+
+        vm.ConfirmAddBuildingCommand.Execute(null);
+
+        var building = session.Incident.Buildings.Single(b => b.Name == "Haus B");
+        Assert.Equal(0, building.UndergroundFloorCount);
+    }
+
     [Fact]
     public void ViewModel_IsReadOnly_WhenSessionReadOnly()
     {

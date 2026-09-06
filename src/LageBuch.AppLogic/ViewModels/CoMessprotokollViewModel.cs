@@ -310,15 +310,22 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
     [ObservableProperty]
     private int _newBuildingApartments = 10;
 
+    /// <summary>Untergeschosse aren't visible in the matrix until scrolled to, unlike ground/upper
+    /// floors, so most Häuser have at least one at creation time (#218); UG HINZUFÜGEN still covers
+    /// adding more, or a building with none, after the fact.</summary>
+    [ObservableProperty]
+    private int _newBuildingUndergroundFloors = 1;
+
     private bool CanConfirmAddBuilding => !string.IsNullOrWhiteSpace(NewBuildingName);
 
     [RelayCommand(CanExecute = nameof(CanConfirmAddBuilding))]
     private void ConfirmAddBuilding()
     {
-        _session.AddCoBuilding(NewBuildingName, NewBuildingFloors, NewBuildingApartments);
+        _session.AddCoBuilding(NewBuildingName, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors);
         NewBuildingName = string.Empty;
         NewBuildingFloors = 8;
         NewBuildingApartments = 10;
+        NewBuildingUndergroundFloors = 1;
         IsAddBuildingDialogOpen = false;
         _onChanged();
         Refresh();
