@@ -395,11 +395,11 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void RenameFile(Guid fileId, string? displayName) => _inner.RenameFile(fileId, displayName);
 
-    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor) =>
-        _inner.AddCoBuilding(name, floorCount, apartmentsPerFloor);
+    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
+        _inner.AddCoBuilding(name, floorCount, apartmentsPerFloor, undergroundFloorCount);
 
-    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor) =>
-        _inner.UpdateCoBuildingStructure(buildingId, floorCount, apartmentsPerFloor);
+    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
+        _inner.UpdateCoBuildingStructure(buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount);
 
     public void RemoveCoBuilding(Guid buildingId) => _inner.RemoveCoBuilding(buildingId);
 
