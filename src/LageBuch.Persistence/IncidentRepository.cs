@@ -275,7 +275,7 @@ public sealed class IncidentRepository
             Run(
                 cn,
                 tx,
-                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels) VALUES ($id,$name,$fc,$apf,$fd,$o,$al);",
+                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels, underground_floor_count) VALUES ($id,$name,$fc,$apf,$fd,$o,$al,$ufc);",
                 p =>
                 {
                     p("$id", b.Id.ToString());
@@ -285,6 +285,7 @@ public sealed class IncidentRepository
                     p("$fd", descriptionsJson);
                     p("$o", i);
                     p("$al", apartmentLabelsJson);
+                    p("$ufc", b.UndergroundFloorCount);
                 });
         }
 
@@ -561,7 +562,7 @@ public sealed class IncidentRepository
 
         var buildings = ReadAll(
             cn,
-            "SELECT id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels FROM co_buildings ORDER BY ordinal;",
+            "SELECT id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels, underground_floor_count FROM co_buildings ORDER BY ordinal;",
             r =>
             {
                 var fdJson = r.GetString(4);
@@ -585,7 +586,8 @@ public sealed class IncidentRepository
                     r.GetInt32(3),
                     fdDict,
                     r.GetInt32(5),
-                    alDict);
+                    alDict,
+                    r.GetInt32(7));
             });
 
         var dwellings = ReadAll(

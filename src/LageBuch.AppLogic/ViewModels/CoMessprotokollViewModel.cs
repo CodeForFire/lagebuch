@@ -223,6 +223,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
     {
         BuildMatrix();
         OnPropertyChanged(nameof(CanRemoveBuilding));
+        AddUntergeschossCommand.NotifyCanExecuteChanged();
     }
 
     private void BuildMatrix()
@@ -240,7 +241,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
                 apt, CoMeasurementLabels.ApartmentLabel(building, apt), IsReadOnly, OnApartmentLabelChanged))
             .ToArray();
 
-        for (var floor = building.FloorCount; floor >= 0; floor--)
+        for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
         {
             var cells = Enumerable.Range(1, building.ApartmentsPerFloor)
                 .Select(apt =>
@@ -309,15 +310,22 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
     [ObservableProperty]
     private int _newBuildingApartments = 10;
 
+    /// <summary>Untergeschosse aren't visible in the matrix until scrolled to, unlike ground/upper
+    /// floors, so most Häuser have at least one at creation time (#218); UG HINZUFÜGEN still covers
+    /// adding more, or a building with none, after the fact.</summary>
+    [ObservableProperty]
+    private int _newBuildingUndergroundFloors = 1;
+
     private bool CanConfirmAddBuilding => !string.IsNullOrWhiteSpace(NewBuildingName);
 
     [RelayCommand(CanExecute = nameof(CanConfirmAddBuilding))]
     private void ConfirmAddBuilding()
     {
-        _session.AddCoBuilding(NewBuildingName, NewBuildingFloors, NewBuildingApartments);
+        _session.AddCoBuilding(NewBuildingName, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors);
         NewBuildingName = string.Empty;
         NewBuildingFloors = 8;
         NewBuildingApartments = 10;
+        NewBuildingUndergroundFloors = 1;
         IsAddBuildingDialogOpen = false;
         _onChanged();
         Refresh();
@@ -358,6 +366,28 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     [RelayCommand]
     private void CancelRemoveBuilding() => IsRemoveBuildingConfirmOpen = false;
+
+    /// <summary>Adds one Untergeschoss below the current lowest floor (#218), up to the 3-floor
+    /// cap. Reuses UpdateCoBuildingStructure, so it also creates the new floor's Wohnungen.</summary>
+    [RelayCommand(CanExecute = nameof(CanAddUntergeschoss))]
+    private void AddUntergeschoss()
+    {
+        if (SelectedBuilding is null)
+        {
+            return;
+        }
+
+        _session.UpdateCoBuildingStructure(
+            SelectedBuilding.Id,
+            SelectedBuilding.FloorCount,
+            SelectedBuilding.ApartmentsPerFloor,
+            SelectedBuilding.UndergroundFloorCount + 1);
+        _onChanged();
+        Refresh();
+    }
+
+    private bool CanAddUntergeschoss =>
+        !IsReadOnly && SelectedBuilding is not null && SelectedBuilding.UndergroundFloorCount < 3;
 
     [RelayCommand]
     private void CloseEditor()

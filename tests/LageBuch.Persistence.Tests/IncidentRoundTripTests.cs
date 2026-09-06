@@ -435,4 +435,23 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Empty(loaded.Tasks);           // old file has no tasks — loads cleanly, migrates to V14
         Assert.Equal("Brand", loaded.Keyword);
     }
+
+    [Fact]
+    public void A_building_with_underground_floors_round_trips()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, undergroundFloorCount: 2);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var building = Assert.Single(loaded.Buildings);
+        Assert.Equal(2, building.UndergroundFloorCount);
+
+        // EG, 1.OG, 2.OG, 1.UG, 2.UG = 5 floors * 3 apts
+        Assert.Equal(15, loaded.Dwellings.Count);
+        Assert.Contains(loaded.Dwellings, d => d.FloorOrdinal == -2);
+    }
 }

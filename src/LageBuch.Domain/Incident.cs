@@ -77,8 +77,10 @@ public sealed class Incident
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
 
-    private static string FloorLabel(int ordinal) =>
-        ordinal == 0 ? "EG" : $"{ordinal}. OG";
+    private static string FloorLabel(int ordinal) => CoMeasurementLabels.FloorLabel(ordinal);
+
+    private static string FloorRangeLabel(int undergroundFloorCount, int floorCount) =>
+        CoMeasurementLabels.FloorRangeLabel(undergroundFloorCount, floorCount);
 
     private Building FindBuilding(Guid buildingId) =>
         _buildings.FirstOrDefault(b => b.Id == buildingId)
@@ -873,17 +875,17 @@ public sealed class Incident
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId)
             ?? throw new KeyNotFoundException($"Atemschutz-Trupp {truppId} not found.");
 
-    public void AddCoBuilding(IClock clock, SessionOperator op, string name, int floorCount, int apartmentsPerFloor)
+    public void AddCoBuilding(IClock clock, SessionOperator op, string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
         var ordinal = _buildings.Count;
-        var building = Building.Create(name, floorCount, apartmentsPerFloor, ordinal);
+        var building = Building.Create(name, floorCount, apartmentsPerFloor, ordinal, undergroundFloorCount);
         _buildings.Add(building);
 
-        for (var floor = 0; floor <= floorCount; floor++)
+        for (var floor = -undergroundFloorCount; floor <= floorCount; floor++)
         {
             for (var apt = 1; apt <= apartmentsPerFloor; apt++)
             {
@@ -894,32 +896,53 @@ public sealed class Incident
         AppendSystemEntry(
             clock,
             op,
-            $"CO-Messprotokoll eröffnet: {building.Name} (EG–{FloorLabel(floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss)");
+            $"CO-Messprotokoll eröffnet: {building.Name} ({FloorRangeLabel(undergroundFloorCount, floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss)");
     }
 
-    public void UpdateCoBuildingStructure(IClock clock, SessionOperator op, Guid buildingId, int floorCount, int apartmentsPerFloor)
+    // Underground floor count defaults to 0 so a pre-#218 sync payload (no such property on the
+    // wire) deserializes as "keine Untergeschosse" instead of failing the contract -- same
+    // convention as #76's OfficerCount.
+    public void UpdateCoBuildingStructure(IClock clock, SessionOperator op, Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
         var building = FindBuilding(buildingId);
-        var oldFloorCount = building.FloorCount;
-        var oldApts = building.ApartmentsPerFloor;
-
-        var updated = building.WithStructure(floorCount, apartmentsPerFloor);
+        var updated = building.WithStructure(floorCount, apartmentsPerFloor, undergroundFloorCount);
         var index = _buildings.IndexOf(building);
         _buildings[index] = updated;
 
-        // Remove dwellings outside the new structure
+        // Remove dwellings outside the new structure...
         var removed = _dwellings.RemoveAll(d =>
             d.BuildingId == buildingId &&
-            (d.FloorOrdinal > floorCount || d.ApartmentNumber > apartmentsPerFloor));
+            (d.FloorOrdinal > floorCount || d.FloorOrdinal < -undergroundFloorCount || d.ApartmentNumber > apartmentsPerFloor));
 
-        var text = $"CO-Struktur geändert: {building.Name} jetzt EG–{FloorLabel(floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss";
+        // ...and add any newly covered by a grown structure (more OG/UG floors or apartments) --
+        // Dwelling.Create is idempotent-safe here since the removal pass above already cleared
+        // anything out of bounds, so no (floor, apartment) pair can already exist twice.
+        var added = 0;
+        for (var floor = -undergroundFloorCount; floor <= floorCount; floor++)
+        {
+            for (var apt = 1; apt <= apartmentsPerFloor; apt++)
+            {
+                if (!_dwellings.Any(d => d.BuildingId == buildingId && d.FloorOrdinal == floor && d.ApartmentNumber == apt))
+                {
+                    _dwellings.Add(Dwelling.Create(buildingId, floor, apt));
+                    added++;
+                }
+            }
+        }
+
+        var text = $"CO-Struktur geändert: {building.Name} jetzt {FloorRangeLabel(undergroundFloorCount, floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss";
         if (removed > 0)
         {
             text += $", {removed} Wohnungen entfernt";
+        }
+
+        if (added > 0)
+        {
+            text += $", {added} Wohnungen hinzugefügt";
         }
 
         AppendSystemEntry(clock, op, text);

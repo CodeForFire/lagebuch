@@ -35,6 +35,63 @@ public class CoMessprotokollViewModelTests
         Assert.Equal(3, vm.ApartmentColumns.Count);
     }
 
+    // --- Issue #218: Untergeschoss (UG) floors below EG --------------------------------------
+    [Fact]
+    public void AddUntergeschoss_AddsOneFloorBelowEgAndItsDwellings()
+    {
+        var (session, vm) = CreateVm();
+
+        vm.AddUntergeschossCommand.Execute(null);
+
+        var building = session.Incident.Buildings[0];
+        Assert.Equal(1, building.UndergroundFloorCount);
+        Assert.Equal(4, vm.MatrixRows.Count); // 2 OG + EG + 1 UG
+        Assert.Equal(-1, vm.MatrixRows[^1].Ordinal); // UG sorts below EG
+        Assert.Contains(session.Incident.Dwellings, d => d.FloorOrdinal == -1);
+    }
+
+    [Fact]
+    public void AddUntergeschoss_IsDisabled_AtTheThreeFloorCap()
+    {
+        var (_, vm) = CreateVm();
+
+        vm.AddUntergeschossCommand.Execute(null);
+        vm.AddUntergeschossCommand.Execute(null);
+        vm.AddUntergeschossCommand.Execute(null);
+
+        Assert.False(vm.AddUntergeschossCommand.CanExecute(null));
+    }
+
+    // Untergeschosse don't show in the matrix until scrolled to, unlike ground/upper floors, so
+    // ConfirmAddBuildingCommand defaults NewBuildingUndergroundFloors to 1 rather than 0 -- a
+    // building created via the dialog already has a basement to record without a separate
+    // UG HINZUFÜGEN click.
+    [Fact]
+    public void ConfirmAddBuildingCommand_DefaultsToOneUndergroundFloor()
+    {
+        var (session, vm) = CreateVm();
+        vm.NewBuildingName = "Haus B";
+
+        vm.ConfirmAddBuildingCommand.Execute(null);
+
+        var building = session.Incident.Buildings.Single(b => b.Name == "Haus B");
+        Assert.Equal(1, building.UndergroundFloorCount);
+        Assert.Equal(1, vm.NewBuildingUndergroundFloors); // resets to the default, not 0
+    }
+
+    [Fact]
+    public void ConfirmAddBuildingCommand_UsesTheChosenUndergroundFloorCount()
+    {
+        var (session, vm) = CreateVm();
+        vm.NewBuildingName = "Haus B";
+        vm.NewBuildingUndergroundFloors = 0;
+
+        vm.ConfirmAddBuildingCommand.Execute(null);
+
+        var building = session.Incident.Buildings.Single(b => b.Name == "Haus B");
+        Assert.Equal(0, building.UndergroundFloorCount);
+    }
+
     [Fact]
     public void ViewModel_IsReadOnly_WhenSessionReadOnly()
     {

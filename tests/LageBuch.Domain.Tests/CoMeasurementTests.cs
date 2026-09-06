@@ -213,6 +213,90 @@ public class CoMeasurementTests
     }
 
     [Fact]
+    public void Incident_UpdateCoBuildingStructure_GrowingFloorCountAddsDwellings()
+    {
+        // The removal-only pass never created dwellings for a grown structure -- an operator who
+        // raised FloorCount via a future structure edit got no new rows to fill in.
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3); // 3 floors (EG..2.OG) * 3 apts = 9
+
+        incident.UpdateCoBuildingStructure(clock, op, incident.Buildings[0].Id, 4, 3);
+
+        Assert.Equal(4, incident.Buildings[0].FloorCount);
+        Assert.Equal(15, incident.Dwellings.Count); // 5 floors * 3 apts
+        Assert.Contains(incident.Dwellings, d => d.FloorOrdinal == 4);
+    }
+
+    // --- Issue #218: Untergeschoss (UG) floors below EG ---------------------------------------
+    [Fact]
+    public void Building_Create_WithUndergroundFloors_ValidatesRange()
+    {
+        var building = Building.Create("Haus A", 2, 3, 0, undergroundFloorCount: 2);
+        Assert.Equal(2, building.UndergroundFloorCount);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Building.Create("Haus A", 2, 3, 0, undergroundFloorCount: 4));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Building.Create("Haus A", 2, 3, 0, undergroundFloorCount: -1));
+    }
+
+    [Fact]
+    public void CoMeasurementLabels_FloorLabel_UG()
+    {
+        Assert.Equal("1. UG", CoMeasurementLabels.FloorLabel(-1));
+        Assert.Equal("2. UG", CoMeasurementLabels.FloorLabel(-2));
+    }
+
+    [Fact]
+    public void Incident_AddCoBuilding_WithUndergroundFloors_CreatesUgDwellings()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, undergroundFloorCount: 1);
+
+        // EG, 1.OG, 2.OG, 1.UG = 4 floors * 3 apts
+        Assert.Equal(12, incident.Dwellings.Count);
+        Assert.Contains(incident.Dwellings, d => d.FloorOrdinal == -1);
+        Assert.Contains(
+            incident.Journal,
+            e => e.Text.Contains("1. UG–2. OG", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Incident_UpdateCoBuildingStructure_AddingUndergroundFloorsAddsDwellings()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3); // no UG yet
+
+        incident.UpdateCoBuildingStructure(clock, op, incident.Buildings[0].Id, 2, 3, undergroundFloorCount: 1);
+
+        Assert.Equal(1, incident.Buildings[0].UndergroundFloorCount);
+        Assert.Equal(12, incident.Dwellings.Count); // 4 floors * 3 apts
+        Assert.Contains(incident.Dwellings, d => d.FloorOrdinal == -1);
+    }
+
+    [Fact]
+    public void Incident_UpdateCoBuildingStructure_RemovingUndergroundFloorsRemovesDwellings()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, undergroundFloorCount: 2);
+
+        incident.UpdateCoBuildingStructure(clock, op, incident.Buildings[0].Id, 2, 3, undergroundFloorCount: 1);
+
+        Assert.Equal(1, incident.Buildings[0].UndergroundFloorCount);
+        Assert.DoesNotContain(incident.Dwellings, d => d.FloorOrdinal == -2);
+        Assert.Contains(incident.Dwellings, d => d.FloorOrdinal == -1);
+    }
+
+    [Fact]
     public void Incident_RemoveCoBuilding_RemovesAllDwellings()
     {
         var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
