@@ -28,7 +28,7 @@ public class ForceStrengthEditTests
         Assert.Equal(unit.Id, updated.Id);
         Assert.Same(updated, Assert.Single(incident.Forces));
         Assert.Equal((1, 9, 4), (updated.OfficerCount, updated.PersonnelCount, updated.ScbaCount));
-        Assert.Equal("1/8/9", updated.StrengthText);
+        Assert.Equal("0/1/8/9", updated.StrengthText);
 
         // Status/Bemerkung ride along untouched — only the counts were corrected.
         Assert.Null(updated.Status);
@@ -45,7 +45,7 @@ public class ForceStrengthEditTests
 
         var entry = Assert.Single(incident.Journal.Skip(before));
         Assert.Equal(EtbDirection.System, entry.Direction);
-        Assert.Equal("FFB Wache 1 (FFB 1/40/1): Stärke 0/6/6 → 1/8/9, davon AGT 0 → 4", entry.Text);
+        Assert.Equal("FFB Wache 1 (FFB 1/40/1): Stärke 0/0/6/6 → 0/1/8/9, davon AGT 0 → 4", entry.Text);
 
         // Same from-call-sign convention as the status transition entry (UpdateForceUnit).
         Assert.Equal("FFB 1/40/1", entry.From);

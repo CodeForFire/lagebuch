@@ -177,14 +177,15 @@ public sealed class LocalIncidentSession : IIncidentSession
         string? status = null,
         string? notes = null,
         int scbaCount = 0,
-        int officerCount = 0) =>
-        Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
+        int officerCount = 0,
+        int zugfuehrerCount = 0) =>
+        Mutate(() => Incident.AddForceUnit(_clock, RequireOperator(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
         Mutate(() => Incident.UpdateForceUnit(_clock, RequireOperator(), unitId, status, notes));
 
-    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
-        Mutate(() => Incident.UpdateForceStrength(_clock, RequireOperator(), unitId, officerCount, personnelCount, scbaCount));
+    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount, int zugfuehrerCount = 0) =>
+        Mutate(() => Incident.UpdateForceStrength(_clock, RequireOperator(), unitId, officerCount, personnelCount, scbaCount, zugfuehrerCount));
 
     public void RemoveForceUnit(Guid unitId) =>
         Mutate(() => Incident.RemoveForceUnit(_clock, RequireOperator(), unitId));

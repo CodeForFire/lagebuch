@@ -109,10 +109,10 @@ public class ForcesTabRenderTests
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        // Row renders the GF/Mann/Gesamt format; the header tile mirrors the total.
+        // Row renders the ZF/GF/Mann/Gesamt format; the header tile mirrors the total.
         var row = Assert.Single(vm.Forces.Forces);
-        Assert.Equal("1/8/9", row.StrengthText);
-        Assert.Equal("1/8/9", vm.Forces.TotalStrengthText);
+        Assert.Equal("0/1/8/9", row.StrengthText);
+        Assert.Equal("0/1/8/9", vm.Forces.TotalStrengthText);
 
         Capture(window, "forces-vehicle-preset.png");
     }
@@ -138,7 +138,7 @@ public class ForcesTabRenderTests
         var edit = Assert.Single(edited.Edits);
         Assert.Equal((0, 6, 0), (edit.PreviousOfficerCount, edit.PreviousPersonnelCount, edit.PreviousScbaCount));
         Assert.True(edited.HasHistory);
-        Assert.Contains("Stärke 0/6/6 → 1/7/8", Assert.Single(edited.EditLines), StringComparison.Ordinal);
+        Assert.Contains("Stärke 0/0/6/6 → 0/1/7/8", Assert.Single(edited.EditLines), StringComparison.Ordinal);
 
         Capture(window, "forces-strength-verlauf.png");
     }

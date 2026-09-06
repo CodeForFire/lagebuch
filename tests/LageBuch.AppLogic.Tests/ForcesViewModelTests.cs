@@ -309,8 +309,8 @@ public class ForcesViewModelTests
 
         var unit = Assert.Single(session.Incident.Forces);
         Assert.Equal((1, 9, 8), (unit.OfficerCount, unit.PersonnelCount, unit.MannschaftCount));
-        Assert.Equal("1/8/9", unit.StrengthText);
-        Assert.Contains("Stärke 1/8/9", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+        Assert.Equal("0/1/8/9", unit.StrengthText);
+        Assert.Contains("Stärke 0/1/8/9", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
     }
 
     // --- Issue #76: editable Stärke -----------------------------------------------------------
@@ -345,8 +345,56 @@ public class ForcesViewModelTests
         Assert.Equal((1, 9, 3), (unit.OfficerCount, unit.PersonnelCount, unit.ScbaCount));
         Assert.Single(unit.Edits);
         Assert.Equal(before + 1, session.Incident.Journal.Count);
-        Assert.Contains("Stärke 0/6/6 → 1/8/9", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+        Assert.Contains("Stärke 0/0/6/6 → 0/1/8/9", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
         Assert.Contains("davon AGT 0 → 3", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
+    // --- Issue #216: Zugführer is a fourth, separately counted headcount ---------------------
+    [Fact]
+    public void AddForce_records_zugfuehrer_count_and_extends_the_format()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FFB Wache 1";
+        vm.NewZugfuehrerCount = 1;
+        vm.NewOfficerCount = 2;
+        vm.NewMannschaftCount = 18;
+
+        vm.AddForceCommand.Execute(null);
+
+        var unit = Assert.Single(vm.Forces);
+        Assert.Equal(1, unit.ZugfuehrerCount);
+        Assert.Equal(21, unit.TotalCount);
+        Assert.Equal("1/2/18/21", unit.StrengthText);
+    }
+
+    [Fact]
+    public void Editing_a_rows_zugfuehrer_count_reaches_the_domain_with_an_etb_entry()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(session, clock, Md(), () => { })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewMannschaftCount = 6,
+        };
+        vm.AddForceCommand.Execute(null);
+
+        var row = Assert.Single(vm.Forces);
+        row.ZugfuehrerCount = 1;
+        row.OfficerCount = 2;
+        row.MannschaftCount = 18;
+        row.CommitStrength();
+
+        var unit = session.Incident.Forces[0];
+        Assert.Equal((1, 2, 21), (unit.ZugfuehrerCount, unit.OfficerCount, unit.PersonnelCount));
+        Assert.Equal("1/2/18/21", unit.StrengthText);
+        Assert.Contains("Stärke 0/0/6/6 → 1/2/18/21", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -465,18 +513,20 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void Header_totals_render_in_the_1_1_2_format_plus_agt()
+    public void Header_totals_render_in_the_zf_gf_mann_gesamt_format_plus_agt()
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewZugfuehrerCount = 1;
         vm.NewOfficerCount = 1;
         vm.NewMannschaftCount = 8;
         vm.NewScbaCount = 4;
         vm.AddForceCommand.Execute(null);
 
-        Assert.Equal(9, vm.TotalPersonnel);
+        Assert.Equal(10, vm.TotalPersonnel);
+        Assert.Equal(1, vm.TotalZugfuehrer);
         Assert.Equal(1, vm.TotalOfficer);
-        Assert.Equal("1/8/9", vm.TotalStrengthText);
+        Assert.Equal("1/1/8/10", vm.TotalStrengthText);
         Assert.Equal(4, vm.TotalScba);
     }
 

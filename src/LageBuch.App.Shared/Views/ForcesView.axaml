@@ -8,13 +8,21 @@
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
       <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Top" />
-      <!-- Total strength readout im 1/1/2-Format (#76), AGT-Anteil daneben -->
+      <!-- Total strength readout im ZF/GF/Mannschaft/Gesamt-Format (#76, #216), AGT-Anteil daneben.
+           Gesamt is bold+underlined by binding it as a separate TextBlock after the plain prefix
+           (see ForcesViewModel.TotalStrengthPrefixText); no Run/Inlines idiom exists here to bold
+           part of one TextBlock's text. -->
       <Border Grid.Column="1" Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" Padding="18,8">
         <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
           <TextBlock Text="GESAMTSTÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
-          <TextBlock x:Name="TotalStrengthText" Classes="metric" FontSize="26"
-                     Foreground="{StaticResource SignalBrush}" Text="{Binding TotalStrengthText}" />
+          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+            <TextBlock x:Name="TotalStrengthPrefixText" Classes="metric" FontSize="26"
+                       Foreground="{StaticResource SignalBrush}" Text="{Binding TotalStrengthPrefixText}" />
+            <TextBlock x:Name="TotalStrengthGesamtText" Classes="metric" FontSize="26" FontWeight="Bold"
+                       TextDecorations="Underline"
+                       Foreground="{StaticResource SignalBrush}" Text="{Binding TotalPersonnel}" />
+          </StackPanel>
           <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
           <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
           <TextBlock x:Name="TotalScbaText" Classes="metric" FontSize="26"
@@ -61,14 +69,16 @@
                            MinimumPrefixLength="0"
                            Text="{Binding NewCallSign}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="STÄRKE GF / MANN">
+        <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN">
           <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
                0 und lässt den Platzhalter stehen. Kein Beispiel-Platzhalter: das Label sagt bereits,
                was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden. -->
           <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBox x:Name="OfficerBox" Width="70"
+            <TextBox x:Name="ZugfuehrerBox" Width="60"
+                     Text="{Binding NewZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
+            <TextBox x:Name="OfficerBox" Width="60"
                      Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
-            <TextBox x:Name="MannschaftBox" Width="70"
+            <TextBox x:Name="MannschaftBox" Width="60"
                      Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
           </StackPanel>
         </HeaderedContentControl>
@@ -108,7 +118,14 @@
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,4" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding StrengthText}" VerticalAlignment="Center" />
+                  <!-- Gesamt split out as its own run, bold+underlined, same idiom as the header
+                       tile's TotalStrengthPrefixText/TotalPersonnel split (#233): no Run/Inlines
+                       idiom exists here to bold part of one TextBlock's text. -->
+                  <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StrengthPrefixText}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" TextDecorations="Underline"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
                   <!-- Vector icon, not a Unicode glyph: the button font (Oswald) carries neither
                        ✎ nor ✕, so a text affordance only appeared where the OS happened to have a
                        fallback. Same idiom as the ETB grid's row actions. -->
@@ -119,6 +136,9 @@
                       <Flyout Placement="BottomEdgeAlignedLeft">
                           <StackPanel Spacing="8" MinWidth="180">
                           <TextBlock Text="Stärke korrigieren" Classes="overline" />
+                          <HeaderedContentControl Classes="field" Header="ZUGFÜHRER (ZF)">
+                            <TextBox Text="{Binding ZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
+                          </HeaderedContentControl>
                           <HeaderedContentControl Classes="field" Header="FÜHRUNGSKRÄFTE (GF)">
                             <TextBox Text="{Binding OfficerCount}" b:IntegerOnly.IsEnabled="True" />
                           </HeaderedContentControl>

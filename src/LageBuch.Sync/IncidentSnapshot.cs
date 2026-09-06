@@ -76,7 +76,8 @@ public sealed record ForceUnitDto(
     string? Status,
     string? Notes,
     int OfficerCount,
-    IReadOnlyList<ForceUnitStrengthEditDto> Edits);
+    IReadOnlyList<ForceUnitStrengthEditDto> Edits,
+    int ZugfuehrerCount = 0);
 
 // Mirrors Domain.ForceUnitStrengthEdit: one prior Stärke retained on correction (#76), the
 // force-row sibling of EtbEntryEditDto.
@@ -85,7 +86,8 @@ public sealed record ForceUnitStrengthEditDto(
     int PreviousPersonnelCount,
     int PreviousScbaCount,
     string EditedBy,
-    DateTimeOffset EditedAt);
+    DateTimeOffset EditedAt,
+    int PreviousZugfuehrerCount = 0);
 
 public sealed record TruppMemberDto(TruppRole Role, string Name);
 

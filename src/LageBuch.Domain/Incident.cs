@@ -269,6 +269,9 @@ public sealed class Incident
     /// <summary>Total Führungskräfte across all units (#76).</summary>
     public int TotalOfficer => _forces.Sum(f => f.OfficerCount);
 
+    /// <summary>Total Zugführer across all units (#216).</summary>
+    public int TotalZugfuehrer => _forces.Sum(f => f.ZugfuehrerCount);
+
     /// <summary>Total Atemschutzgeräteträger across all units — how many Trupps can be formed.</summary>
     public int TotalScba => _forces.Sum(f => f.ScbaCount);
 
@@ -544,13 +547,14 @@ public sealed class Incident
         string? status = null,
         string? notes = null,
         int scbaCount = 0,
-        int officerCount = 0)
+        int officerCount = 0,
+        int zugfuehrerCount = 0)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount);
+        var unit = ForceUnit.Create(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount);
         _forces.Add(unit);
 
         // Optional clauses are omitted rather than printed empty, so a bare unit reads as
@@ -622,7 +626,8 @@ public sealed class Incident
         Guid unitId,
         int officerCount,
         int personnelCount,
-        int scbaCount)
+        int scbaCount,
+        int zugfuehrerCount = 0)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -635,7 +640,7 @@ public sealed class Incident
         }
 
         var previous = _forces[index];
-        var updated = previous.WithStrength(officerCount, personnelCount, scbaCount, op, clock.Now);
+        var updated = previous.WithStrength(officerCount, personnelCount, scbaCount, op, clock.Now, zugfuehrerCount);
         if (ReferenceEquals(updated, previous))
         {
             return previous;

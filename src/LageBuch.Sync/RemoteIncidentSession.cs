@@ -308,14 +308,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? status = null,
         string? notes = null,
         int scbaCount = 0,
-        int officerCount = 0) =>
-        Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount));
+        int officerCount = 0,
+        int zugfuehrerCount = 0) =>
+        Send(new AddForceUnitCommand(Op(), brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount));
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) =>
         Send(new UpdateForceUnitCommand(Op(), unitId, status, notes));
 
-    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
-        Send(new UpdateForceStrengthCommand(Op(), unitId, officerCount, personnelCount, scbaCount));
+    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount, int zugfuehrerCount = 0) =>
+        Send(new UpdateForceStrengthCommand(Op(), unitId, officerCount, personnelCount, scbaCount, zugfuehrerCount));
 
     public void RemoveForceUnit(Guid unitId) =>
         Send(new RemoveForceUnitCommand(Op(), unitId));
