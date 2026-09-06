@@ -46,6 +46,18 @@ public class FörderstreckePlannerTests
     }
 
     [Fact]
+    public void Plan_flat_route_shorter_than_one_hose_needs_no_Verstaerkerpumpe()
+    {
+        // Nothing upstream enforces a minimum length (CanAddLeitung only requires > 0), so a
+        // trivial flat connection shorter than a single 20m B-Schlauch must not throw.
+        var plan = FörderstreckePlanner.Plan(10, 0, Default);
+
+        Assert.Equal(1, plan.HoseCount);
+        Assert.Equal(0, plan.PumpCount);
+        Assert.Equal(new[] { 0.0 }, plan.PumpPositionsMeters);
+    }
+
+    [Fact]
     public void Plan_rejects_zero_length_and_out_of_table_flow()
     {
         Assert.Throws<ArgumentException>(() => FörderstreckePlanner.Plan(0, 0, Default));

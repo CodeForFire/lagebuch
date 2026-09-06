@@ -86,8 +86,11 @@ public static class FörderstreckePlanner
         var pos = 0.0;
         while (pos < lengthM)
         {
-            var remaining = lengthM - pos;
-            if (remaining >= hoseLen && Cost(pos, lengthM) <= budgetPerLeg)
+            // If the rest of the route fits one leg's budget, finish here -- regardless of whether
+            // what's left happens to be a whole number of hose lengths (a route shorter than one
+            // hose, e.g. a trivial flat connection, is a valid input: CanAddLeitung only requires
+            // length > 0).
+            if (Cost(pos, lengthM) <= budgetPerLeg)
             {
                 pos = lengthM;
                 break;
