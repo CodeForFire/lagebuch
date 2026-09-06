@@ -114,9 +114,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     public ObservableCollection<EtbEntryRow> Entries { get; }
 
     // System-generated lines (Kräfte, Atemschutz, Einsatz-Lebenszyklus) are usually less important
-    // than human entries, so the operator can hide them. Off by default -- the journal shows all.
+    // than human entries, so the operator can hide them. On by default (#223): a fresh incident
+    // should open on an empty-looking journal, not the "Einsatz begonnen" trace.
     [ObservableProperty]
-    private bool _hideSystemEntries;
+    private bool _hideSystemEntries = true;
 
     partial void OnHideSystemEntriesChanged(bool value)
     {

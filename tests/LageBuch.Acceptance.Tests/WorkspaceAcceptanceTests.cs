@@ -221,6 +221,7 @@ public class WorkspaceAcceptanceTests
     public void Adding_etb_entry_via_ui_updates_the_grid()
     {
         var vm = BuildWorkspace(out var session);
+        vm.Etb.HideSystemEntries = false; // asserts on the System "Einsatz begonnen" row (#223)
         var view = new EtbView { DataContext = vm.Etb };
         var window = new Window { Content = view, Width = 800, Height = 600 };
         window.Show();
@@ -307,6 +308,7 @@ public class WorkspaceAcceptanceTests
     public void System_entries_have_no_working_edit_affordance()
     {
         var vm = BuildWorkspace(out _);
+        vm.Etb.HideSystemEntries = false; // hidden by default (#223), but this asserts on it
 
         var systemRow = Assert.Single(vm.Etb.Entries, e => e.Text == "Einsatz begonnen");
 
