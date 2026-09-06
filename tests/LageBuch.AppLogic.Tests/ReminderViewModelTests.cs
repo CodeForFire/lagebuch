@@ -223,7 +223,7 @@ public class ReminderViewModelTests
     }
 
     [Fact]
-    public void Postpone_ten_minutes_silences_an_already_due_cycle_and_stops_the_repeat()
+    public void Postpone_five_minutes_silences_an_already_due_cycle_and_stops_the_repeat()
     {
         var (session, clock) = NewSession();
         var ticker = new FakeTicker();
@@ -235,7 +235,7 @@ public class ReminderViewModelTests
         Assert.True(vm.IsDue);
         Assert.Single(alarm.Played);
 
-        vm.PostponeTenMinutesCommand.Execute(null);
+        vm.PostponeFiveMinutesCommand.Execute(null);
 
         Assert.False(vm.IsDue);
 
@@ -244,7 +244,7 @@ public class ReminderViewModelTests
         ticker.Fire();
         Assert.Single(alarm.Played);
 
-        clock.Now = T0.AddMinutes(25); // the postponed due time
+        clock.Now = T0.AddMinutes(20); // the postponed due time
         ticker.Fire();
         Assert.Equal(2, alarm.Played.Count);
     }

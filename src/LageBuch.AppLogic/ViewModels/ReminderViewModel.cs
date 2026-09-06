@@ -128,9 +128,6 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void PostponeFiveMinutes() => Postpone(TimeSpan.FromMinutes(5));
 
-    [RelayCommand]
-    private void PostponeTenMinutes() => Postpone(TimeSpan.FromMinutes(10));
-
     private void Postpone(TimeSpan by)
     {
         _timer.Postpone(by);
