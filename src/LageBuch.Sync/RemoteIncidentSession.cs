@@ -34,6 +34,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private readonly IUiDispatcher _ui;
     private readonly string? _cacheRoot;
     private readonly long _cacheMaxBytes;
+    private readonly object _cacheEvictionGate = new();
     private Incident _incident;
 
     public SessionOperator? Operator { get; }
@@ -426,7 +427,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         var cachePath = CachePathFor(fileId, file.FileName);
         if (cachePath is not null && File.Exists(cachePath))
         {
-            return await File.ReadAllBytesAsync(cachePath, cancellationToken);
+            try
+            {
+                return await File.ReadAllBytesAsync(cachePath, cancellationToken);
+            }
+            catch (IOException)
+            {
+                // A concurrent eviction pass can delete this file between the Exists check and the
+                // read; fall through and re-fetch from the host instead of failing the whole call.
+            }
         }
 
         HttpResponseMessage response;
@@ -471,28 +480,34 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             return;
         }
 
-        var files = new DirectoryInfo(_cacheRoot)
-            .EnumerateFiles("*", SearchOption.AllDirectories)
-            .OrderBy(f => f.LastWriteTimeUtc)
-            .ToList();
-        var totalBytes = files.Sum(f => f.Length);
-
-        foreach (var file in files)
+        // Serialize eviction passes: concurrent downloads would otherwise each enumerate/sum the
+        // same directory tree before either deletes, letting the cap be under- or over-enforced.
+        lock (_cacheEvictionGate)
         {
-            if (totalBytes <= _cacheMaxBytes)
-            {
-                break;
-            }
+            var files = new DirectoryInfo(_cacheRoot)
+                .EnumerateFiles("*", SearchOption.AllDirectories)
+                .OrderBy(f => f.LastWriteTimeUtc)
+                .ToList();
+            var totalBytes = files.Sum(f => f.Length);
 
-            totalBytes -= file.Length;
-            try
+            foreach (var file in files)
             {
-                file.Delete();
-            }
-            catch (IOException)
-            {
-                // Best-effort: a file another process/handle is using right now just stays, and
-                // the next eviction pass gets another chance at it.
+                if (totalBytes <= _cacheMaxBytes)
+                {
+                    break;
+                }
+
+                totalBytes -= file.Length;
+                try
+                {
+                    file.Delete();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Best-effort: a file another process/handle is using right now (or one that's
+                    // read-only/ACL-restricted) just stays, and the next eviction pass gets another
+                    // chance at it.
+                }
             }
         }
     }
