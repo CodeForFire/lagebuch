@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 18;
+    public const int CurrentVersion = 19;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -127,6 +127,11 @@ public static class Migrations
         if (version < 18)
         {
             ApplyV18(cn, tx);
+        }
+
+        if (version < 19)
+        {
+            ApplyV19(cn, tx);
         }
 
         SetVersion(cn, tx, CurrentVersion);
@@ -607,6 +612,12 @@ public static class Migrations
         SchemaHelpers.AddColumnIfMissing(cn, tx, "force_units", "zugfuehrer_count", "INTEGER NOT NULL DEFAULT 0");
         SchemaHelpers.AddColumnIfMissing(cn, tx, "force_unit_edits", "previous_zugfuehrer_count", "INTEGER NOT NULL DEFAULT 0");
     }
+
+    // Building.UndergroundFloorCount (#218): Untergeschosse below EG, stored the same way as the
+    // other #76-era additive columns -- NOT NULL with a 0 default, so existing buildings read
+    // back with no basement.
+    private static void ApplyV19(SqliteConnection cn, SqliteTransaction tx) =>
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_buildings", "underground_floor_count", "INTEGER NOT NULL DEFAULT 0");
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

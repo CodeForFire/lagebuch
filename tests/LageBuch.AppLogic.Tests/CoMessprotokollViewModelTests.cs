@@ -35,6 +35,33 @@ public class CoMessprotokollViewModelTests
         Assert.Equal(3, vm.ApartmentColumns.Count);
     }
 
+    // --- Issue #218: Untergeschoss (UG) floors below EG --------------------------------------
+    [Fact]
+    public void AddUntergeschoss_AddsOneFloorBelowEgAndItsDwellings()
+    {
+        var (session, vm) = CreateVm();
+
+        vm.AddUntergeschossCommand.Execute(null);
+
+        var building = session.Incident.Buildings[0];
+        Assert.Equal(1, building.UndergroundFloorCount);
+        Assert.Equal(4, vm.MatrixRows.Count); // 2 OG + EG + 1 UG
+        Assert.Equal(-1, vm.MatrixRows[^1].Ordinal); // UG sorts below EG
+        Assert.Contains(session.Incident.Dwellings, d => d.FloorOrdinal == -1);
+    }
+
+    [Fact]
+    public void AddUntergeschoss_IsDisabled_AtTheThreeFloorCap()
+    {
+        var (_, vm) = CreateVm();
+
+        vm.AddUntergeschossCommand.Execute(null);
+        vm.AddUntergeschossCommand.Execute(null);
+        vm.AddUntergeschossCommand.Execute(null);
+
+        Assert.False(vm.AddUntergeschossCommand.CanExecute(null));
+    }
+
     [Fact]
     public void ViewModel_IsReadOnly_WhenSessionReadOnly()
     {

@@ -223,6 +223,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
     {
         BuildMatrix();
         OnPropertyChanged(nameof(CanRemoveBuilding));
+        AddUntergeschossCommand.NotifyCanExecuteChanged();
     }
 
     private void BuildMatrix()
@@ -240,7 +241,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
                 apt, CoMeasurementLabels.ApartmentLabel(building, apt), IsReadOnly, OnApartmentLabelChanged))
             .ToArray();
 
-        for (var floor = building.FloorCount; floor >= 0; floor--)
+        for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
         {
             var cells = Enumerable.Range(1, building.ApartmentsPerFloor)
                 .Select(apt =>
@@ -358,6 +359,28 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     [RelayCommand]
     private void CancelRemoveBuilding() => IsRemoveBuildingConfirmOpen = false;
+
+    /// <summary>Adds one Untergeschoss below the current lowest floor (#218), up to the 3-floor
+    /// cap. Reuses UpdateCoBuildingStructure, so it also creates the new floor's Wohnungen.</summary>
+    [RelayCommand(CanExecute = nameof(CanAddUntergeschoss))]
+    private void AddUntergeschoss()
+    {
+        if (SelectedBuilding is null)
+        {
+            return;
+        }
+
+        _session.UpdateCoBuildingStructure(
+            SelectedBuilding.Id,
+            SelectedBuilding.FloorCount,
+            SelectedBuilding.ApartmentsPerFloor,
+            SelectedBuilding.UndergroundFloorCount + 1);
+        _onChanged();
+        Refresh();
+    }
+
+    private bool CanAddUntergeschoss =>
+        !IsReadOnly && SelectedBuilding is not null && SelectedBuilding.UndergroundFloorCount < 3;
 
     [RelayCommand]
     private void CloseEditor()

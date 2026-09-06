@@ -447,11 +447,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
 
-    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor) =>
-        Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor));
+    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
+        Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor, undergroundFloorCount));
 
-    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor) =>
-        Send(new UpdateCoBuildingStructureCommand(Op(), buildingId, floorCount, apartmentsPerFloor));
+    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
+        Send(new UpdateCoBuildingStructureCommand(Op(), buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount));
 
     public void RemoveCoBuilding(Guid buildingId) =>
         Send(new RemoveCoBuildingCommand(Op(), buildingId));

@@ -8,6 +8,11 @@ public sealed record Building
 
     public int FloorCount { get; private init; }
 
+    /// <summary>Untergeschosse below EG (#218), each a negative FloorOrdinal counting down from
+    /// -1. Capped at 3 -- deeper basements are rare enough that a free-form count buys nothing
+    /// but a bigger typo blast radius.</summary>
+    public int UndergroundFloorCount { get; private init; }
+
     public int ApartmentsPerFloor { get; private init; }
 
     public IReadOnlyDictionary<int, string?> FloorDescriptions { get; private init; } =
@@ -22,7 +27,7 @@ public sealed record Building
     {
     }
 
-    public static Building Create(string name, int floorCount, int apartmentsPerFloor, int ordinal)
+    public static Building Create(string name, int floorCount, int apartmentsPerFloor, int ordinal, int undergroundFloorCount = 0)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -39,11 +44,17 @@ public sealed record Building
             throw new ArgumentOutOfRangeException(nameof(apartmentsPerFloor), "Wohnungen je Geschoss müssen zwischen 1 und 30 liegen.");
         }
 
+        if (undergroundFloorCount < 0 || undergroundFloorCount > 3)
+        {
+            throw new ArgumentOutOfRangeException(nameof(undergroundFloorCount), "Untergeschosse müssen zwischen 0 und 3 liegen.");
+        }
+
         return new Building
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
             FloorCount = floorCount,
+            UndergroundFloorCount = undergroundFloorCount,
             ApartmentsPerFloor = apartmentsPerFloor,
             Ordinal = ordinal,
         };
@@ -56,19 +67,21 @@ public sealed record Building
         int apartmentsPerFloor,
         IReadOnlyDictionary<int, string?> floorDescriptions,
         int ordinal,
-        IReadOnlyDictionary<int, string?>? apartmentLabels = null)
+        IReadOnlyDictionary<int, string?>? apartmentLabels = null,
+        int undergroundFloorCount = 0)
         => new()
         {
             Id = id,
             Name = name,
             FloorCount = floorCount,
+            UndergroundFloorCount = undergroundFloorCount,
             ApartmentsPerFloor = apartmentsPerFloor,
             FloorDescriptions = floorDescriptions,
             ApartmentLabels = apartmentLabels ?? new Dictionary<int, string?>(),
             Ordinal = ordinal,
         };
 
-    public Building WithStructure(int floorCount, int apartmentsPerFloor)
+    public Building WithStructure(int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0)
     {
         if (floorCount < 1 || floorCount > 50)
         {
@@ -80,7 +93,17 @@ public sealed record Building
             throw new ArgumentOutOfRangeException(nameof(apartmentsPerFloor));
         }
 
-        return this with { FloorCount = floorCount, ApartmentsPerFloor = apartmentsPerFloor };
+        if (undergroundFloorCount < 0 || undergroundFloorCount > 3)
+        {
+            throw new ArgumentOutOfRangeException(nameof(undergroundFloorCount));
+        }
+
+        return this with
+        {
+            FloorCount = floorCount,
+            ApartmentsPerFloor = apartmentsPerFloor,
+            UndergroundFloorCount = undergroundFloorCount,
+        };
     }
 
     public Building WithFloorDescription(int ordinal, string? description)

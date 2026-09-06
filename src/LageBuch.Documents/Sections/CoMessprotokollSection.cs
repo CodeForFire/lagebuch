@@ -26,7 +26,7 @@ public static class CoMessprotokollSection
                 column.Item().PaddingTop(8).Text(t =>
                 {
                     t.Span($"{building.Name}: ").SemiBold();
-                    t.Span($"EG–{CoMeasurementLabels.FloorLabel(building.FloorCount)}, {building.ApartmentsPerFloor} Whg./Geschoss");
+                    t.Span($"{CoMeasurementLabels.FloorRangeLabel(building.UndergroundFloorCount, building.FloorCount)}, {building.ApartmentsPerFloor} Whg./Geschoss");
                 });
 
                 column.Item().Table(table =>
@@ -53,7 +53,7 @@ public static class CoMessprotokollSection
                         header.Cell().Element(Cells.Header).Text("Lage");
                     });
 
-                    for (var floor = building.FloorCount; floor >= 0; floor--)
+                    for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
                     {
                         table.Cell().Element(Cells.Body).Text(CoMeasurementLabels.FloorLabel(floor));
 

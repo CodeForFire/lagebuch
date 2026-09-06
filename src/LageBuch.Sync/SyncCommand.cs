@@ -131,11 +131,13 @@ public sealed record AddTaskCommand(
 
 public sealed record SetTaskCompletedCommand(OperatorDto Operator, Guid TaskId, bool IsDone) : SyncCommand;
 
+// UndergroundFloorCount defaults to 0 so a pre-#218 payload deserializes as "keine
+// Untergeschosse" instead of failing the contract (same convention as #76's OfficerCount).
 public sealed record AddCoBuildingCommand(
-    OperatorDto Operator, string Name, int FloorCount, int ApartmentsPerFloor) : SyncCommand;
+    OperatorDto Operator, string Name, int FloorCount, int ApartmentsPerFloor, int UndergroundFloorCount = 0) : SyncCommand;
 
 public sealed record UpdateCoBuildingStructureCommand(
-    OperatorDto Operator, Guid BuildingId, int FloorCount, int ApartmentsPerFloor) : SyncCommand;
+    OperatorDto Operator, Guid BuildingId, int FloorCount, int ApartmentsPerFloor, int UndergroundFloorCount = 0) : SyncCommand;
 
 public sealed record RemoveCoBuildingCommand(
     OperatorDto Operator, Guid BuildingId) : SyncCommand;

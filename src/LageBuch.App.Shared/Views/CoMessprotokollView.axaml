@@ -11,9 +11,9 @@
          Margin bottom 14) — this view was missing it (#137). -->
     <TextBlock DockPanel.Dock="Top" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
 
-    <!-- Building management: selector, add and remove all live together in one dock (bottom
+    <!-- Building management: selector, add/remove and UG all live together in one dock (bottom
          gutter, matching every other tab's entry point, #221) rather than split across the top
-         and bottom: they're one job ("which Haus, and add/remove one"), not two. -->
+         and bottom: they're one job ("which Haus, and add/remove a house or a floor"). -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
@@ -37,6 +37,11 @@
         <Button Content="HAUS ENTFERNEN"
                 Command="{Binding RemoveBuildingCommand}"
                 IsEnabled="{Binding CanModify}"
+                VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        <!-- Untergeschoss (#218): reuses UpdateCoBuildingStructure, which also creates the new
+             floor's Wohnungen, capped at 3 UG floors via CanAddUntergeschoss. -->
+        <Button Content="UG HINZUFÜGEN"
+                Command="{Binding AddUntergeschossCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
       </StackPanel>
     </Border>

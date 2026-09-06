@@ -2,8 +2,19 @@ namespace LageBuch.Domain.CoMeasurement;
 
 public static class CoMeasurementLabels
 {
-    public static string FloorLabel(int ordinal) =>
-        ordinal == 0 ? "EG" : $"{ordinal}. OG";
+    public static string FloorLabel(int ordinal) => ordinal switch
+    {
+        0 => "EG",
+        > 0 => $"{ordinal}. OG",
+        < 0 => $"{-ordinal}. UG", // Untergeschoss (#218): -1 is the first floor below EG
+    };
+
+    /// <summary>The building's full floor range, e.g. "EG–3. OG" or, with Untergeschosse,
+    /// "2. UG–3. OG" (#218).</summary>
+    public static string FloorRangeLabel(int undergroundFloorCount, int floorCount) =>
+        undergroundFloorCount > 0
+            ? $"{FloorLabel(-undergroundFloorCount)}–{FloorLabel(floorCount)}"
+            : $"EG–{FloorLabel(floorCount)}";
 
     public static string ApartmentLabel(int apartmentNumber) =>
         $"Whg. {apartmentNumber}";

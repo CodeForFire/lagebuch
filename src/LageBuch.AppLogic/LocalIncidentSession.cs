@@ -269,11 +269,11 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));
 
-    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor) =>
-        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor));
+    public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
+        Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor, undergroundFloorCount));
 
-    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor) =>
-        Mutate(() => Incident.UpdateCoBuildingStructure(_clock, RequireOperator(), buildingId, floorCount, apartmentsPerFloor));
+    public void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
+        Mutate(() => Incident.UpdateCoBuildingStructure(_clock, RequireOperator(), buildingId, floorCount, apartmentsPerFloor, undergroundFloorCount));
 
     public void RemoveCoBuilding(Guid buildingId) =>
         Mutate(() => Incident.RemoveCoBuilding(_clock, RequireOperator(), buildingId));

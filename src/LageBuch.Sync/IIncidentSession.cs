@@ -139,9 +139,9 @@ public interface IIncidentSession
     /// Bemerkung field. Null/blank resets the label back to the file's original name.</summary>
     void RenameFile(Guid fileId, string? displayName);
 
-    void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor);
+    void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0);
 
-    void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor);
+    void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0);
 
     void RemoveCoBuilding(Guid buildingId);
 
