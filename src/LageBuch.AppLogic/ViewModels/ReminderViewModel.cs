@@ -34,6 +34,15 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private static readonly TimeSpan RepeatInterval = TimeSpan.FromSeconds(60);
     private DateTimeOffset? _lastAnnouncedAt;
 
+    // Brief confirmation that "+5 MIN" landed: the countdown text flashes to the "OK" accent for a
+    // couple of seconds, piggybacking on the same 1s ticker OnTick already uses to re-notify
+    // RemainingDisplay/IsDue, so no new timer plumbing is needed.
+    private static readonly TimeSpan PostponeFlashDuration = TimeSpan.FromSeconds(2);
+    private DateTimeOffset? _lastPostponedAt;
+
+    public bool ShowPostponeConfirmation =>
+        _lastPostponedAt is not null && _clock.Now - _lastPostponedAt < PostponeFlashDuration;
+
     public ReminderViewModel(
         IIncidentSession session,
         IClock clock,
@@ -100,6 +109,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(IsDue));
+        OnPropertyChanged(nameof(ShowPostponeConfirmation));
         AcknowledgeCommand.NotifyCanExecuteChanged();
     }
 
@@ -132,9 +142,11 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     {
         _timer.Postpone(by);
         _lastAnnouncedAt = null; // a later due cycle announces immediately, not after a stale wait
+        _lastPostponedAt = _clock.Now;
         PersistTimer();
         OnPropertyChanged(nameof(IsDue));
         OnPropertyChanged(nameof(RemainingDisplay));
+        OnPropertyChanged(nameof(ShowPostponeConfirmation));
         AcknowledgeCommand.NotifyCanExecuteChanged();
     }
 

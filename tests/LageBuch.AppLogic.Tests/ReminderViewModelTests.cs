@@ -250,6 +250,25 @@ public class ReminderViewModelTests
     }
 
     [Fact]
+    public void Postpone_briefly_flashes_a_confirmation_then_clears_it()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        vm.PostponeFiveMinutesCommand.Execute(null);
+        Assert.True(vm.ShowPostponeConfirmation); // immediate, no ticker fire needed
+
+        clock.Now = T0.AddSeconds(1);
+        ticker.Fire();
+        Assert.True(vm.ShowPostponeConfirmation); // still within the flash window
+
+        clock.Now = T0.AddSeconds(2);
+        ticker.Fire();
+        Assert.False(vm.ShowPostponeConfirmation); // flash window elapsed
+    }
+
+    [Fact]
     public void Postpone_persists_the_new_anchor()
     {
         var (session, clock) = NewSession();

@@ -53,6 +53,20 @@
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
   </Style>
 
+  <!-- Reminder countdown: a brief flash to the "OK" accent confirms a "+5 MIN" postpone landed —
+       the minutes digits alone changing is too subtle to notice at a glance (#229 follow-up). -->
+  <Style Selector="TextBlock.reminder-countdown">
+    <Setter Property="Foreground" Value="{StaticResource IncomingBrush}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Foreground" Duration="0:0:0.15" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="TextBlock.reminder-countdown.confirmed">
+    <Setter Property="Foreground" Value="{StaticResource ActiveBrush}" />
+  </Style>
+
   <!-- =========================================================
        BUTTONS — default = quiet outline; .signal = primary
        ========================================================= -->

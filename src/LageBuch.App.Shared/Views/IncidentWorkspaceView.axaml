@@ -174,8 +174,9 @@
                 <TextBlock Text="NOCH" Classes="overline" FontSize="9"
                            Foreground="{StaticResource TextSecondaryBrush}"
                            VerticalAlignment="Center" />
-                <TextBlock x:Name="ReminderCountdownText" Classes="mono" FontSize="21" FontWeight="Medium"
-                           Foreground="{StaticResource IncomingBrush}"
+                <TextBlock x:Name="ReminderCountdownText" Classes="mono reminder-countdown"
+                           Classes.confirmed="{Binding ShowPostponeConfirmation}"
+                           FontSize="21" FontWeight="Medium"
                            Text="{Binding RemainingDisplay}"
                            VerticalAlignment="Center" />
               </StackPanel>
