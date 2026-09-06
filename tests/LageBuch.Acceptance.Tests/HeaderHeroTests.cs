@@ -61,7 +61,7 @@ public class HeaderHeroTests
     }
 
     [AvaloniaFact]
-    public void With_no_keyword_and_no_number_the_hero_falls_back_to_a_placeholder()
+    public void With_no_keyword_and_no_number_the_hero_falls_back_to_a_placeholder_but_still_offers_the_add_affordance()
     {
         var vm = BuildWorkspace(null);
         var window = Show(vm);
@@ -69,8 +69,10 @@ public class HeaderHeroTests
         var hero = window.GetVisualDescendants().OfType<TextBlock>().Single(c => c.Name == "EinsatznummerValue");
         Assert.Equal("Unbenannter Einsatz", hero.Text);
 
+        // Regression guard for #250: without a Stichwort the Einsatznummer would otherwise have no
+        // way to ever be entered.
         var addButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "AddIncidentNumberButton");
-        Assert.False(addButton.IsVisible);
+        Assert.True(addButton.IsVisible);
     }
 
     // Empirically guards against a known Avalonia trap in this codebase: a data-bound text element
