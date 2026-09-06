@@ -269,6 +269,63 @@ public class TasksViewModelTests
     }
 
     [Fact]
+    public void Editing_row_fields_writes_through_to_the_session()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("Tür sichren", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        var vm = NewVm(session, clock);
+        var row = vm.Rows.Single();
+
+        row.Text = "Tür sichern";
+        row.Assignee = "FFB 1/44/1";
+        row.Importance = TaskImportance.High;
+        row.Urgency = TaskUrgency.High;
+
+        var task = session.Incident.Tasks[0];
+        Assert.Equal("Tür sichern", task.Text);
+        Assert.Equal("FFB 1/44/1", task.Assignee);
+        Assert.Equal(TaskImportance.High, task.Importance);
+        Assert.Equal(TaskUrgency.High, task.Urgency);
+    }
+
+    [Fact]
+    public void Blanking_the_text_field_is_a_noop_instead_of_throwing()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("Tür sichern", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        var vm = NewVm(session, clock);
+        var row = vm.Rows.Single();
+
+        row.Text = "   "; // still mid-edit; must not push through or crash the binding
+
+        Assert.Equal("Tür sichern", session.Incident.Tasks[0].Text);
+    }
+
+    [Fact]
+    public void ExtendTimer_adds_five_minutes_and_disables_once_done_or_without_a_timer()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("with-timer", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        session.AddTask("no-timer", null, TaskImportance.Low, TaskUrgency.Low, 0);
+        var vm = NewVm(session, clock);
+        vm.Filter = TaskFilterKind.All;
+        var withTimer = vm.Rows.Single(r => r.Text == "with-timer");
+        var withoutTimer = vm.Rows.Single(r => r.Text == "no-timer");
+        var dueBefore = session.Incident.Tasks.Single(t => t.Text == "with-timer").DueAt;
+
+        Assert.True(withTimer.ExtendTimerCommand.CanExecute(null));
+        Assert.False(withoutTimer.ExtendTimerCommand.CanExecute(null)); // no timer to extend
+
+        withTimer.ExtendTimerCommand.Execute(null);
+
+        Assert.Equal(dueBefore.AddMinutes(5), session.Incident.Tasks.Single(t => t.Text == "with-timer").DueAt);
+
+        var refreshed = vm.Rows.Single(r => r.Text == "with-timer"); // recreated by the write-back's Sync
+        refreshed.IsDone = true;
+        Assert.False(refreshed.ExtendTimerCommand.CanExecute(null)); // completed tasks can't be extended
+    }
+
+    [Fact]
     public void Radio_bools_write_through_to_the_filter_and_false_is_a_noop()
     {
         var (session, clock, _) = NewSession();

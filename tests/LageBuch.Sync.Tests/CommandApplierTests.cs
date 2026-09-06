@@ -244,6 +244,42 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void UpdateTask_corrects_the_editable_fields()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", null);
+        ApplyOverWire(new AddTaskCommand(op, "Tür sichren", string.Empty, TaskImportance.Low, TaskUrgency.Low, 5), incident, clock);
+        var taskId = incident.Tasks[0].Id;
+
+        ApplyOverWire(
+            new UpdateTaskCommand(taskId, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium),
+            incident,
+            clock);
+
+        var task = incident.Tasks[0];
+        Assert.Equal("Tür sichern", task.Text);
+        Assert.Equal("FFB 1/44/1", task.Assignee);
+        Assert.Equal(TaskImportance.High, task.Importance);
+        Assert.Equal(TaskUrgency.Medium, task.Urgency);
+    }
+
+    [Fact]
+    public void ExtendTaskTimer_adds_minutes_to_the_due_time()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new OperatorDto("Client", null);
+        ApplyOverWire(new AddTaskCommand(op, "X", string.Empty, TaskImportance.Low, TaskUrgency.Low, 5), incident, clock);
+        var taskId = incident.Tasks[0].Id;
+        var before = incident.Tasks[0].DueAt;
+
+        ApplyOverWire(new ExtendTaskTimerCommand(taskId, 5), incident, clock);
+
+        Assert.Equal(before.AddMinutes(5), incident.Tasks[0].DueAt);
+    }
+
+    [Fact]
     public void Apply_AddCoBuilding_CreatesBuildingAndDwellings()
     {
         var clock = new FixedClock();

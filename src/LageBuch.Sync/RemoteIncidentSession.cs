@@ -327,6 +327,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));
 
+    public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
+        Send(new UpdateTaskCommand(taskId, text, assignee ?? string.Empty, importance, urgency));
+
+    public void ExtendTaskTimer(Guid taskId, int minutes) =>
+        Send(new ExtendTaskTimerCommand(taskId, minutes));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,
