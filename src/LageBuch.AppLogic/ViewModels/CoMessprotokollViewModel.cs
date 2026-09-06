@@ -202,16 +202,28 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     private void Refresh()
     {
+        // Capture the selection BEFORE clearing BuildingOptions: the "HAUS" ComboBox is two-way
+        // bound to SelectedBuilding (SelectedItem="{Binding SelectedBuilding}") with BuildingOptions
+        // as its ItemsSource. Clearing an ObservableCollection fires a Reset, and Avalonia's Selector
+        // reacts to that by synchronously nulling its own SelectedItem — which pushes straight back
+        // through the two-way binding and sets SelectedBuilding to null right here, before this
+        // method ever reads it. Reading SelectedBuilding after the Clear/Add cycle (as before) always
+        // saw that null and fell back to BuildingOptions.FirstOrDefault(), silently switching the
+        // selected Haus to the first one in the list on every unrelated edit (e.g. entering a ppm
+        // value). Matching by Id rather than object identity/equality is still correct and needed on
+        // top of this — a remote session's Building instances aren't reference- or value-equal across
+        // a snapshot round trip either — but doesn't help if the read itself already happened too late.
+        var selectedId = SelectedBuilding?.Id;
+
         BuildingOptions.Clear();
         foreach (var b in _session.Incident.Buildings)
         {
             BuildingOptions.Add(b);
         }
 
-        if (SelectedBuilding is null || !_session.Incident.Buildings.Contains(SelectedBuilding))
-        {
-            SelectedBuilding = BuildingOptions.FirstOrDefault();
-        }
+        SelectedBuilding = selectedId is { } id
+            ? BuildingOptions.FirstOrDefault(b => b.Id == id) ?? BuildingOptions.FirstOrDefault()
+            : BuildingOptions.FirstOrDefault();
 
         BuildMatrix();
         OnPropertyChanged(nameof(IsReadOnly));
