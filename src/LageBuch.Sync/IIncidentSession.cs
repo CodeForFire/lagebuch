@@ -81,8 +81,13 @@ public interface IIncidentSession
     void RemoveForceUnit(Guid unitId);
 
     /// <summary>Records a task (#88). The timer's minutes land as DueAt relative to the owning
-    /// device's/host's clock — never sent as an absolute time over the wire.</summary>
-    void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes);
+    /// device's/host's clock — never sent as an absolute time over the wire.
+    /// <paramref name="createdAt"/> optionally anchors the timer to an existing ETB entry's
+    /// timestamp instead (#247) — that value already passed through a clock once, when the entry
+    /// was logged, so it rides the wire like any other already-recorded fact.</summary>
+    void AddTask(
+        string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes,
+        DateTimeOffset? createdAt = null);
 
     /// <summary>Stamps/clears a task's completion (#88).</summary>
     void SetTaskCompleted(Guid taskId, bool isDone);

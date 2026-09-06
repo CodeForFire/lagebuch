@@ -734,6 +734,51 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
     }
+
+    /// <summary>
+    /// #247: an already-saved ETB row's own icon must reopen the same task dialog #88 wired to the
+    /// input dock, and the resulting task's timer must anchor to that entry's own time -- not the
+    /// later moment the operator got around to clicking the icon.
+    /// </summary>
+    [Fact]
+    public void Etb_row_create_task_icon_opens_a_dialog_anchored_to_the_entrys_own_time()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        vm.Etb.NewText = "Lage erkundet";
+        vm.Etb.AddEntryCommand.Execute(null);
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lage erkundet");
+        var entryTime = row.Timestamp;
+
+        clock.Now = clock.Now.AddHours(2); // time passes before the operator revisits the entry
+        Assert.True(row.CreateTaskCommand.CanExecute(null));
+        row.CreateTaskCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingTaskDialog);
+        Assert.Equal("Lage erkundet", vm.PendingTaskDialog!.Text);
+
+        vm.PendingTaskDialog.TimerMinutes = 10;
+        vm.PendingTaskDialog.SaveCommand.Execute(null);
+
+        var task = Assert.Single(session.Incident.Tasks);
+        Assert.Equal(entryTime, task.CreatedAt);
+        Assert.Equal(entryTime.AddMinutes(10), task.DueAt);
+    }
 }
 
 internal sealed class FakeDialogs : IFileDialogService

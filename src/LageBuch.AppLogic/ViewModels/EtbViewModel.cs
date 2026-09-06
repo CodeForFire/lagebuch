@@ -18,8 +18,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     private readonly Action _onChanged;
 
     // Opens the create-task overlay pre-filled with an entry's text (#88); null where the host
-    // offers no task feature, which disables the "add & create task" dock button too.
-    private readonly Action<string>? _createTaskFromEntry;
+    // offers no task feature, which disables the "add & create task" dock button too. The
+    // timestamp is null for that dock button (a brand-new entry, so "now" is correct) and set to
+    // the entry's own timestamp when invoked from an existing row's create-task icon (#247).
+    private readonly Action<string, DateTimeOffset?>? _createTaskFromEntry;
 
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
@@ -34,7 +36,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
         IClock clock,
         MasterDataSet masterData,
         Action onChanged,
-        Action<string>? createTaskFromEntry = null)
+        Action<string, DateTimeOffset?>? createTaskFromEntry = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
@@ -172,7 +174,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
         NewFrom = null;
         NewTo = null;
         _onChanged();
-        _createTaskFromEntry?.Invoke(text);
+        _createTaskFromEntry?.Invoke(text, null); // brand-new entry: "now" is already correct
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
@@ -227,8 +229,18 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void CloseHistory() => HistoryEntry = null;
 
+    // Reopens the same overlay the dock's "add & create task" uses, pre-filled from an
+    // already-saved entry (#247) — the one thing #88 left no way back to once an entry left the
+    // input box. Drives both the icon's visibility and CreateTaskCommand's CanExecute (like
+    // WasEdited drives ShowHistoryCommand): unlike BeginEditCommand/IsEditable, there is no point
+    // showing a permanently-disabled icon here, since a read-only session can't save the task the
+    // dialog would produce either way -- so it is simply absent, not greyed out.
+    private bool CanCreateTaskFrom(EtbEntryRow row) => !IsReadOnly && _createTaskFromEntry is not null;
+
+    private void CreateTaskFrom(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text, row.Timestamp);
+
     private EtbEntryRow ToRow(EtbEntry e) =>
-        new(e, BeginEdit, CanEdit, ShowHistory);
+        new(e, BeginEdit, CanEdit, ShowHistory, CreateTaskFrom, CanCreateTaskFrom);
 }
 
 /// <summary>
@@ -241,10 +253,12 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
 public sealed class EtbEntryRow
 {
     public EtbEntryRow(
-        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
+        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory,
+        Action<EtbEntryRow> createTask, Func<EtbEntryRow, bool> canCreateTask)
     {
         ArgumentNullException.ThrowIfNull(entry);
         Id = entry.Id;
+        Timestamp = entry.Timestamp;
         Time = Formatting.Timestamp(entry.Timestamp);
         Direction = Formatting.Direction(entry.Direction);
         From = entry.From;
@@ -261,9 +275,17 @@ public sealed class EtbEntryRow
         // remotely-joined-read-only incident must still let its history be read, since that is the
         // one thing that makes an edit acceptable in the first place.
         ShowHistoryCommand = new RelayCommand(() => showHistory(this), () => WasEdited);
+
+        // CanCreateTask (#247) is fixed at construction, same as WasEdited above: both feature
+        // availability and read-only session are baked into one flag, so the icon is simply
+        // absent rather than shown greyed out (see CanCreateTaskFrom).
+        CanCreateTask = canCreateTask(this);
+        CreateTaskCommand = new RelayCommand(() => createTask(this), () => canCreateTask(this));
     }
 
     public Guid Id { get; }
+
+    public DateTimeOffset Timestamp { get; }
 
     public string Time { get; }
 
@@ -288,6 +310,10 @@ public sealed class EtbEntryRow
     public ICommand BeginEditCommand { get; }
 
     public ICommand ShowHistoryCommand { get; }
+
+    public bool CanCreateTask { get; }
+
+    public ICommand CreateTaskCommand { get; }
 }
 
 /// <summary>

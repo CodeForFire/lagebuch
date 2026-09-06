@@ -50,6 +50,29 @@ public class TaskDialogViewModelTests
         Assert.True(closed); // SPEICHERN closes the dialog
     }
 
+    /// <summary>
+    /// The dialog's entry point from an already-saved ETB row (#247): the resulting task's timer
+    /// anchors to that entry's own time, not the moment the operator opened this dialog.
+    /// </summary>
+    [Fact]
+    public void Entry_timestamp_anchors_the_saved_tasks_timer_instead_of_now()
+    {
+        var (session, clock) = NewSession();
+        var entryTime = T0.AddHours(-2);
+        clock.Now = T0.AddHours(1); // "now" -- must not leak into the task below
+        var dialog = new TaskDialogViewModel(
+            session, MasterData(), "Lage erkundet", () => { }, entryTime)
+        {
+            TimerMinutes = 10,
+        };
+
+        dialog.SaveCommand.Execute(null);
+
+        var task = Assert.Single(session.Incident.Tasks);
+        Assert.Equal(entryTime, task.CreatedAt);
+        Assert.Equal(entryTime.AddMinutes(10), task.DueAt);
+    }
+
     [Fact]
     public void Save_and_create_another_keeps_dialog_open_with_cleared_text_and_sticky_fields()
     {

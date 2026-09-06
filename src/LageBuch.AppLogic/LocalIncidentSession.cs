@@ -190,8 +190,10 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void RemoveForceUnit(Guid unitId) =>
         Mutate(() => Incident.RemoveForceUnit(_clock, RequireOperator(), unitId));
 
-    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
-        Mutate(() => Incident.AddTask(_clock, RequireOperator(), text, assignee, importance, urgency, timerMinutes));
+    public void AddTask(
+        string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes,
+        DateTimeOffset? createdAt = null) =>
+        Mutate(() => Incident.AddTask(_clock, RequireOperator(), text, assignee, importance, urgency, timerMinutes, createdAt));
 
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));

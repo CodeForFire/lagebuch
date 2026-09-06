@@ -18,12 +18,19 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
 
+    // The originating ETB entry's timestamp (#247), so a task created from an old entry anchors
+    // its timer to that entry's time rather than "now" — null (the dock's "add & create task",
+    // which has no pre-existing entry) keeps the original clock.Now behaviour.
+    private readonly DateTimeOffset? _entryTimestamp;
+
     public TaskDialogViewModel(
-        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged)
+        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged,
+        DateTimeOffset? entryTimestamp = null)
     {
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _onChanged = onChanged;
+        _entryTimestamp = entryTimestamp;
         Text = prefilledText;
         AssigneeOptions = masterData.RadioCallSigns
             .Concat(masterData.Roles)
@@ -71,7 +78,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _entryTimestamp);
         _onChanged();
         Closed?.Invoke(this, EventArgs.Empty);
     }
@@ -79,7 +86,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void SaveAndCreateAnother()
     {
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _entryTimestamp);
         _onChanged();
         Text = string.Empty; // fields besides the text stay sticky for the next entry
     }

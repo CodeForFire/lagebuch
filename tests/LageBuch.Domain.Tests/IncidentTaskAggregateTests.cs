@@ -31,6 +31,24 @@ public class IncidentTaskAggregateTests
         Assert.Single(incident.Journal);
     }
 
+    /// <summary>
+    /// A task created from an existing ETB entry (#247) anchors its timer to that entry's own
+    /// timestamp, not the moment the operator got around to opening the dialog.
+    /// </summary>
+    [Fact]
+    public void AddTask_with_an_explicit_createdAt_anchors_the_timer_there_instead_of_the_clock()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        var entryTime = T0.AddHours(-1);
+        clock.Now = T0.AddHours(3); // "now" -- must not leak into CreatedAt/DueAt below
+
+        var task = incident.AddTask(clock, op, "Nachalarmieren", null, TaskImportance.Medium, TaskUrgency.Medium, 15, entryTime);
+
+        Assert.Equal(entryTime, task.CreatedAt);
+        Assert.Equal(entryTime.AddMinutes(15), task.DueAt);
+    }
+
     [Fact]
     public void SetTaskCompleted_toggles_the_matching_task()
     {

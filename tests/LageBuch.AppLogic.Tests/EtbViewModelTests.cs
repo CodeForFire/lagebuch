@@ -342,6 +342,77 @@ public class EtbViewModelTests
     }
 
     [Fact]
+    public void CreateTaskCommand_is_hidden_when_the_host_offers_no_task_feature()
+    {
+        var vm = NewVm(); // no createTaskFromEntry callback supplied
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+
+        Assert.False(row.CanCreateTask);
+        Assert.False(row.CreateTaskCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// The one gap #247 closes: #88 only wired "create task" to the input dock, so a saved row had
+    /// no way back to it. The callback must receive the entry's own timestamp, not "now" -- the
+    /// whole point being that a task created from an old entry anchors its timer there.
+    /// </summary>
+    [Fact]
+    public void CreateTaskCommand_invokes_the_callback_with_the_entrys_own_text_and_timestamp()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddJournalEntry(EtbDirection.Incoming, "Lage erkundet");
+
+        string? capturedText = null;
+        DateTimeOffset? capturedTimestamp = null;
+        var vm = new EtbViewModel(
+            session, clock, MasterDataSet.Empty, () => { },
+            (text, timestamp) => { capturedText = text; capturedTimestamp = timestamp; });
+
+        clock.Now = clock.Now.AddHours(3); // time passes before the operator gets back to this entry
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lage erkundet");
+
+        Assert.True(row.CanCreateTask);
+        Assert.True(row.CreateTaskCommand.CanExecute(null));
+        row.CreateTaskCommand.Execute(null);
+
+        Assert.Equal("Lage erkundet", capturedText);
+        Assert.Equal(T0, capturedTimestamp); // the entry's original time, not the later "now"
+    }
+
+    [Fact]
+    public void CreateTaskCommand_is_hidden_on_a_read_only_session_even_when_the_host_offers_tasks()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
+        session.Close();
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (_, _) => { });
+
+        var row = Assert.Single(vm.Entries, r => r.Text == "Lagemeldung");
+
+        // Unlike BeginEditCommand (visible but disabled), there is no point offering a dialog whose
+        // Save can never succeed on a closed/read-only incident -- so the icon is absent, not greyed.
+        Assert.False(row.CanCreateTask);
+        Assert.False(row.CreateTaskCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void CloseHistory_clears_the_history_selection()
     {
         var vm = NewVm();
