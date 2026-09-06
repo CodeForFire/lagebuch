@@ -118,7 +118,14 @@
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ForceRow">
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,4" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding StrengthText}" VerticalAlignment="Center" />
+                  <!-- Gesamt split out as its own run, bold+underlined, same idiom as the header
+                       tile's TotalStrengthPrefixText/TotalPersonnel split (#233): no Run/Inlines
+                       idiom exists here to bold part of one TextBlock's text. -->
+                  <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding StrengthPrefixText}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" TextDecorations="Underline"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
                   <!-- Vector icon, not a Unicode glyph: the button font (Oswald) carries neither
                        ✎ nor ✕, so a text affordance only appeared where the OS happened to have a
                        fallback. Same idiom as the ETB grid's row actions. -->

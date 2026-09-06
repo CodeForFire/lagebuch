@@ -76,16 +76,19 @@ public sealed partial class ForceRow : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TotalCount))]
     [NotifyPropertyChangedFor(nameof(StrengthText))]
+    [NotifyPropertyChangedFor(nameof(StrengthPrefixText))]
     private int? _zugfuehrerCount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TotalCount))]
     [NotifyPropertyChangedFor(nameof(StrengthText))]
+    [NotifyPropertyChangedFor(nameof(StrengthPrefixText))]
     private int? _officerCount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TotalCount))]
     [NotifyPropertyChangedFor(nameof(StrengthText))]
+    [NotifyPropertyChangedFor(nameof(StrengthPrefixText))]
     private int? _mannschaftCount;
 
     [ObservableProperty]
@@ -97,6 +100,13 @@ public sealed partial class ForceRow : ObservableObject
 
     /// <summary>The #216 format: Zugführer/Führungskräfte/Mannschaft/Gesamt.</summary>
     public string StrengthText => $"{ZugfuehrerCount ?? 0}/{OfficerCount ?? 0}/{MannschaftCount ?? 0}/{TotalCount}";
+
+    /// <summary>
+    /// Everything in <see cref="StrengthText"/> up to (and including) the trailing "/" before
+    /// Gesamt, so the view can bind Gesamt as its own bold+underlined run (#233), same split as
+    /// <see cref="ForcesViewModel.TotalStrengthPrefixText"/>.
+    /// </summary>
+    public string StrengthPrefixText => $"{ZugfuehrerCount ?? 0}/{OfficerCount ?? 0}/{MannschaftCount ?? 0}/";
 
     /// <summary>
     /// Carried on the row rather than read off the parent: a DataGrid cell template binds against
