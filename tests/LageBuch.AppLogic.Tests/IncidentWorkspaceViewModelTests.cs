@@ -297,7 +297,6 @@ public class IncidentWorkspaceViewModelTests
             new NoopIncidentHostController());
 
         Assert.Equal("B3P", vm.HeroText);
-        Assert.True(vm.ShowEinsatznummerSlot);
         Assert.False(vm.HasEinsatznummer);
         Assert.True(vm.ShowAddEinsatznummerAffordance);
         Assert.False(vm.ShowEinsatznummerChip);
@@ -328,7 +327,7 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("B 1.2 260715 123", vm.HeroText);
 
         // The number is already the hero -- no redundant chip alongside it.
-        Assert.False(vm.ShowEinsatznummerSlot);
+        Assert.False(vm.ShowEinsatznummerChip);
     }
 
     [Fact]
@@ -337,7 +336,9 @@ public class IncidentWorkspaceViewModelTests
         var vm = NewWorkspace(out _, out _);
 
         Assert.Equal("Unbenannter Einsatz", vm.HeroText);
-        Assert.False(vm.ShowEinsatznummerSlot);
+
+        // #250: even without a Stichwort, the Einsatznummer must still be addable.
+        Assert.True(vm.ShowAddEinsatznummerAffordance);
     }
 
     [Fact]

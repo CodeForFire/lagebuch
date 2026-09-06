@@ -69,8 +69,10 @@ public class HeaderHeroTests
         var hero = window.GetVisualDescendants().OfType<TextBlock>().Single(c => c.Name == "EinsatznummerValue");
         Assert.Equal("Unbenannter Einsatz", hero.Text);
 
+        // #250: without a Stichwort the Einsatznummer can't hide behind the (nonexistent) hero
+        // click-to-edit -- the add affordance must still be reachable.
         var addButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "AddIncidentNumberButton");
-        Assert.False(addButton.IsVisible);
+        Assert.True(addButton.IsVisible);
     }
 
     // Empirically guards against a known Avalonia trap in this codebase: a data-bound text element
