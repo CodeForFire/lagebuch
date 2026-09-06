@@ -232,6 +232,104 @@ public class ReminderViewModelTests
         Assert.Equal(T0.AddMinutes(15), timer!.CycleAnchor);
         Assert.Equal(30, timer.IntervalMinutes); // switched to the recurring cadence, durably
     }
+
+    // --- Snooze (+5 MIN) --------------------------------------------------------------------
+    [Fact]
+    public void Snooze_is_not_available_before_the_reminder_is_due()
+    {
+        var (session, clock) = NewSession();
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        Assert.False(vm.SnoozeFiveMinutesCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Snooze_silences_the_alarm_and_sets_a_five_minute_cycle_without_logging_an_ils_report()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = new ReminderViewModel(session, clock, ticker, alarm, () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+        Assert.True(vm.IsDue);
+        Assert.Single(alarm.Played);
+
+        vm.SnoozeFiveMinutesCommand.Execute(null);
+
+        Assert.False(vm.IsDue);
+        Assert.Equal("05:00", vm.RemainingDisplay);
+        Assert.DoesNotContain(session.Incident.Journal, e => e.Text == "Rückmeldung an ILS");
+    }
+
+    [Fact]
+    public void Snooze_stops_the_repeat_alarm_until_the_new_cycle_falls_due()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = new ReminderViewModel(session, clock, ticker, alarm, () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        vm.SnoozeFiveMinutesCommand.Execute(null);
+        Assert.False(vm.IsDue);
+
+        // The repeat-while-due nag does not fire again until the postponed time passes.
+        clock.Now = T0.AddMinutes(15).AddSeconds(60);
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = T0.AddMinutes(20); // the postponed due time
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
+    }
+
+    [Fact]
+    public void Snooze_persists_the_new_anchor_and_interval()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+        vm.SnoozeFiveMinutesCommand.Execute(null);
+
+        var timer = session.Incident.FindTimer("ils-reminder");
+        Assert.NotNull(timer);
+        Assert.Equal(T0.AddMinutes(15), timer!.CycleAnchor);
+        Assert.Equal(5, timer.IntervalMinutes);
+        Assert.Equal(30, timer.RecurringIntervalMinutes); // unlike Acknowledge, untouched
+    }
+
+    [Fact]
+    public void Snooze_does_not_disturb_the_recurring_cadence_for_a_later_acknowledge()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+        vm.SnoozeFiveMinutesCommand.Execute(null); // 5-minute cycle, due again at 20
+
+        clock.Now = T0.AddMinutes(20);
+        ticker.Fire();
+        vm.AcknowledgeCommand.Execute(null); // now switches to the recurring cadence
+
+        // 29 min after ack: not yet due — the recurring interval is 30, not the earlier snooze of 5.
+        clock.Now = T0.AddMinutes(20 + 29);
+        ticker.Fire();
+        Assert.False(vm.IsDue);
+
+        clock.Now = T0.AddMinutes(20 + 30);
+        ticker.Fire();
+        Assert.True(vm.IsDue);
+    }
 }
 
 // Records Start/Stop (looping siren) and Play (one-shot spoken cues) so tests can assert the

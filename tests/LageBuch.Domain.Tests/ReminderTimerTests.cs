@@ -107,6 +107,58 @@ public class ReminderTimerTests
         Assert.False(timer.IsRunning);
     }
 
+    [Fact]
+    public void Snooze_reanchors_to_now_with_the_given_interval()
+    {
+        var clock = new FixedClock(T0);
+        var timer = new ReminderTimer();
+        timer.Start(clock, 15, 30);
+
+        clock.Now = T0.AddMinutes(20); // overdue
+        timer.Snooze(clock, 5);
+
+        Assert.False(timer.IsDue(clock.Now));
+        Assert.Equal(5, timer.IntervalMinutes);
+        Assert.Equal(T0.AddMinutes(20), timer.CycleAnchor);
+        Assert.Equal(T0.AddMinutes(25), timer.DueAt);
+    }
+
+    [Fact]
+    public void Snooze_does_not_change_the_recurring_interval()
+    {
+        var clock = new FixedClock(T0);
+        var timer = new ReminderTimer();
+        timer.Start(clock, 15, 30);
+
+        clock.Now = T0.AddMinutes(15);
+        timer.Snooze(clock, 5);
+
+        Assert.Equal(30, timer.RecurringIntervalMinutes); // unlike Acknowledge, untouched
+    }
+
+    [Fact]
+    public void Snooze_when_not_running_is_noop()
+    {
+        var clock = new FixedClock(T0);
+        var timer = new ReminderTimer();
+
+        timer.Snooze(clock, 5); // no throw
+
+        Assert.False(timer.IsRunning);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Snooze_rejects_nonpositive_interval(int minutes)
+    {
+        var clock = new FixedClock(T0);
+        var timer = new ReminderTimer();
+        timer.Start(clock, 15, 30);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => timer.Snooze(clock, minutes));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-5)]
