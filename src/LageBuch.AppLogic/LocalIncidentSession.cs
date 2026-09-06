@@ -1,5 +1,4 @@
 using LageBuch.AppLogic.Services;
-using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
@@ -115,8 +114,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     // every attached file's bytes land in this device's own sibling folder the moment it's added —
     // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
     // network pull, only IIncidentStore.
-    public async Task<byte[]> ExportPdfAsync()
+    public async Task<byte[]> ExportPdfAsync(IIncidentPdfExporter exporter)
     {
+        ArgumentNullException.ThrowIfNull(exporter);
         var fileBytes = new Dictionary<Guid, byte[]>();
         var pdfAttachmentPaths = new Dictionary<Guid, string>();
         foreach (var file in Incident.Files)
@@ -142,7 +142,7 @@ public sealed class LocalIncidentSession : IIncidentSession
             }
         }
 
-        return IncidentPdf.Generate(Incident, fileBytes, pdfAttachmentPaths);
+        return exporter.Generate(Incident, fileBytes, pdfAttachmentPaths);
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---

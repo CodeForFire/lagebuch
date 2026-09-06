@@ -1,9 +1,8 @@
 using System.Globalization;
-using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
-namespace LageBuch.Documents;
+namespace LageBuch.Domain;
 
 public static class Formatting
 {

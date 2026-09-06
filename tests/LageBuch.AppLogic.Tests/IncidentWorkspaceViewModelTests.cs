@@ -90,7 +90,8 @@ public class IncidentWorkspaceViewModelTests
             Md(),
             dialogs ?? new FakeDialogs(),
             new FakeAlarmService(),
-            new NoopIncidentHostController());
+            new NoopIncidentHostController(),
+            new TestPdfExporter());
     }
 
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
@@ -532,6 +533,39 @@ public class IncidentWorkspaceViewModelTests
         var dialogs = new FakeDialogs { ExportPath = null };
         var vm = NewWorkspace(out _, out _, dialogs);
         await vm.ExportPdfCommand.ExecuteAsync(null); // should not throw
+    }
+
+    // A platform whose exporter can't render (e.g. Android -- QuestPDF doesn't support it, see
+    // QuestPDF/QuestPDF#1432) hides the button instead of exposing one that would just throw (#184).
+    [Fact]
+    public void CanExport_is_false_when_the_platform_cannot_render_pdfs()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new NoopIncidentPdfExporter());
+
+        Assert.False(vm.CanExport);
+    }
+
+    [Fact]
+    public void CanExport_is_true_when_local_and_the_platform_can_render_pdfs()
+    {
+        var vm = NewWorkspace(out _, out _);
+        Assert.True(vm.CanExport);
     }
 
     [Fact]

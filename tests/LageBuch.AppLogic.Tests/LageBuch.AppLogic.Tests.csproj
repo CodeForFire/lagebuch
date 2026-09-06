@@ -22,6 +22,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\LageBuch.AppLogic\LageBuch.AppLogic.csproj" />
+    <!-- Test-only: exercises real PDF rendering (ExportPdfAsync) via a QuestPDF-backed
+         IIncidentPdfExporter double. Production AppLogic itself no longer references Documents,
+         which is what keeps QuestPDF out of the Android build (#184). -->
+    <ProjectReference Include="..\..\src\LageBuch.Documents\LageBuch.Documents.csproj" />
   </ItemGroup>
 
 </Project>

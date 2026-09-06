@@ -67,7 +67,8 @@ public class MainActivity : AvaloniaMainActivity
             typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
             lastSaveFolder: null,
             attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
-            trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)));
+            trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)),
+            pdfExporter: new NoopIncidentPdfExporter());
 
         base.OnCreate(savedInstanceState);
     }

@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
-using LageBuch.Documents;
+using LageBuch.Domain;
 using LageBuch.Domain.Files;
 using LageBuch.Sync;
 

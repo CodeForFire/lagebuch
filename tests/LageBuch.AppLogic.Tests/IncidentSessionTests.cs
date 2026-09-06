@@ -315,7 +315,7 @@ public class IncidentSessionTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var bytes = await session.ExportPdfAsync();
+        var bytes = await session.ExportPdfAsync(new TestPdfExporter());
         Assert.True(bytes.Length > 100);
         Assert.Equal(0x25, bytes[0]); // %
     }
@@ -335,12 +335,13 @@ public class IncidentSessionTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        var withoutAttachment = await session.ExportPdfAsync();
+        var exporter = new TestPdfExporter();
+        var withoutAttachment = await session.ExportPdfAsync(exporter);
 
         // Any valid PDF stands in for "an attached PDF" — the export itself already produces one.
         await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
 
-        var withAttachment = await session.ExportPdfAsync();
+        var withAttachment = await session.ExportPdfAsync(exporter);
 
         Assert.True(
             withAttachment.Length > withoutAttachment.Length,
