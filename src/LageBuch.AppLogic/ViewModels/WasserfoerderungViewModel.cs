@@ -284,7 +284,7 @@ public sealed partial class WasserfoerderungLeitungRow : ObservableObject
         UebergabestelleDisplay = string.IsNullOrWhiteSpace(leitung.Uebergabestelle) ? "—" : leitung.Uebergabestelle;
         AnsprechpartnerDisplay = string.IsNullOrWhiteSpace(leitung.Ansprechpartner) ? "—" : leitung.Ansprechpartner;
         LengthDisplay = Formatting.Meters(leitung.LengthMeters);
-        RiseDisplay = leitung.ElevationRiseMeters > 0 ? Formatting.Meters(leitung.ElevationRiseMeters) : "—";
+        RiseDisplay = Formatting.Meters(leitung.ElevationRiseMeters);
         BLengthsDisplay = leitung.HoseCount.ToString(CultureInfo.InvariantCulture);
         FlowDisplay = $"{leitung.FlowLMin} l/min";
         PumpDisplay = leitung.PumpCount.ToString(CultureInfo.InvariantCulture);

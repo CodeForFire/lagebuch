@@ -58,8 +58,7 @@ public static class WasserfoerderungSection
                     table.Cell().Element(BodyCell).Text(Formatting.OrDash(leitung.Ansprechpartner));
                     table.Cell().Element(BodyCell).Text(leitung.HoseCount.ToString(CultureInfo.InvariantCulture));
                     table.Cell().Element(BodyCell).Text(Formatting.Meters(leitung.LengthMeters));
-                    table.Cell().Element(BodyCell).Text(
-                        leitung.ElevationRiseMeters > 0 ? Formatting.Meters(leitung.ElevationRiseMeters) : "—");
+                    table.Cell().Element(BodyCell).Text(Formatting.Meters(leitung.ElevationRiseMeters));
                     table.Cell().Element(BodyCell).Text(leitung.PumpCount.ToString(CultureInfo.InvariantCulture));
                     table.Cell().Element(BodyCell).Text(leitung.ReservePumpCount.ToString(CultureInfo.InvariantCulture));
                 }

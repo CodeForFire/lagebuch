@@ -322,4 +322,20 @@ public class WasserfoerderungViewModelTests
         Assert.Null(leitung.RoutePoints);
         Assert.Equal(2000, leitung.LengthMeters);
     }
+
+    [Fact]
+    public void RiseDisplay_shows_a_downhill_route_instead_of_hiding_it_as_a_dash()
+    {
+        var (session, _) = NewSession();
+        var vm = new WasserfoerderungViewModel(session, () => { })
+        {
+            NewLengthMeters = 400,
+            NewElevationRiseMeters = -100,
+        };
+
+        vm.AddLeitungCommand.Execute(null);
+
+        var row = Assert.Single(vm.Rows);
+        Assert.Equal("-100 m", row.RiseDisplay);
+    }
 }
