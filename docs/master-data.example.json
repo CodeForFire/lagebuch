@@ -30,5 +30,6 @@
     "csaMaxDurationMinutes": 20,
     "lpaMaxDurationMinutes": 60,
     "returnPressureBar": 50
-  }
+  },
+  "einsatzgebiet": { "name": "Landkreis Musterstadt", "folderPath": "/regions/musterstadt" }
 }
