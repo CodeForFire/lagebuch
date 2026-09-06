@@ -2,16 +2,19 @@
 
 ## Pull requests
 
-Every PR that touches the UI must include screenshots. GitHub's pasted-image
-store has no public upload API, so the flow is:
+Every PR that touches the UI must include screenshots. The flow is:
 
 1. Render the affected view(s) to PNG using the headless Skia harness in
    `tests/LageBuch.Acceptance.Tests` (see `WorkspaceRenderHelper` +
    `Window.CaptureRenderedFrame()` — `UseHeadlessDrawing = false` so embedded
    fonts rasterize).
-2. Save the PNGs to a known path and give the user the file paths.
-3. The user pastes them into the PR body (the agent cannot attach images
-   automatically).
+2. Attach the PNGs directly with `gh`'s `--attach` flag — no manual pasting
+   needed. It uploads to `github.com/user-attachments/assets` (the same
+   pipeline the web UI's drag-and-drop uses) and rewrites any
+   `![alt](./path.png)` reference in the body to point at the uploaded asset:
+   - New PR: `gh pr create --attach './before.png#Before' --attach './after.png#After'`
+   - Existing PR body: `gh pr edit <number> --attach './screenshot.png#Alt text'`
+   - PR comment: `gh pr comment <number> --attach './screenshot.png#Alt text'`
 
 For UI changes, provide a before/after pair. The render harness files are
 diagnostic-only and should not be committed unless they double as a real test.
