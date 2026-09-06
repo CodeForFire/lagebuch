@@ -170,8 +170,12 @@
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                   IsVisible="{Binding HasBuildings}">
       <StackPanel>
-        <!-- Column headers (editable) -->
-        <StackPanel Orientation="Horizontal" Spacing="4" Margin="88,0,0,4">
+        <!-- Column headers (editable): left margin must match the row Grid's fixed 80-wide
+             floor-label column below (ColumnDefinitions="80,Auto,*", #234) so the boxes line up
+             with the cell columns; it drifted to 88 and was invisible under the old borderless
+             "quiet underline" header style, only becoming visible once the header gained real
+             box chrome. -->
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="80,0,0,4">
           <ItemsControl ItemsSource="{Binding ApartmentColumns}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>

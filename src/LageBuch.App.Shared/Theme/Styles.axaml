@@ -162,6 +162,13 @@
     <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <!-- Every other control that pairs a fixed/MinHeight with Padding (Button, TabItem) also sets
+         this, so the padding-vs-box-height gap resolves to a centered content, not top-aligned
+         (Avalonia's default). Standard Padding="11,7" against MinHeight=ControlHeight leaves that
+         gap small enough to go unnoticed, but a denser TextBox (smaller Padding/FontSize, e.g. the
+         CO-Messung apartment header, #234) exposes text sitting near the top with visible empty
+         space below. -->
+    <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBox /template/ Border#PART_BorderElement">
     <Setter Property="Transitions">
