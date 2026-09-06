@@ -14,7 +14,7 @@
     </Grid>
 
     <!-- Input dock -->
-    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
@@ -58,7 +58,7 @@
                    PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                    Text="{Binding NewPhone}" />
         </HeaderedContentControl>
-        <Button Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
+        <Button x:Name="AddRoleButton" Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
       </StackPanel>
     </Border>

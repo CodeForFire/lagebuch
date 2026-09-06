@@ -11,8 +11,11 @@
          Margin bottom 14) — this view was missing it (#137). -->
     <TextBlock DockPanel.Dock="Top" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
 
-    <!-- Header: Building selector + actions -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,14">
+    <!-- Header: Building selector + remove-current-selection. HAUS HINZUFÜGEN moved to the
+         lower-left input dock (#221) so the "start a new entry" click sits in the same place on
+         every tab; HAUS ENTFERNEN stays here since it acts on the ComboBox selection above it,
+         not on a row. -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
       <ComboBox Grid.Column="0" ItemsSource="{Binding BuildingOptions}"
                 SelectedItem="{Binding SelectedBuilding}"
                 PlaceholderText="Haus auswählen..."
@@ -23,15 +26,17 @@
           </DataTemplate>
         </ComboBox.ItemTemplate>
       </ComboBox>
-      <Button Grid.Column="1" Content="HAUS HINZUFÜGEN"
-              Command="{Binding AddBuildingCommand}"
-              IsEnabled="{Binding !IsReadOnly}"
-              Margin="8,0,0,0" />
-      <Button Grid.Column="2" Content="HAUS ENTFERNEN"
+      <Button Grid.Column="1" Content="HAUS ENTFERNEN"
               Command="{Binding RemoveBuildingCommand}"
               IsEnabled="{Binding CanModify}"
               Margin="8,0,0,0" />
     </Grid>
+
+    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <Button x:Name="AddBuildingButton" Content="HAUS HINZUFÜGEN" Classes="signal" Command="{Binding AddBuildingCommand}" />
+    </Border>
 
     <!-- Add Building Dialog -->
     <Border DockPanel.Dock="Top" 
