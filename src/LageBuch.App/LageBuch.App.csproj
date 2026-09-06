@@ -27,6 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\LageBuch.App.Shared\LageBuch.App.Shared.csproj" />
     <ProjectReference Include="..\LageBuch.AppLogic\LageBuch.AppLogic.csproj" />
+    <ProjectReference Include="..\LageBuch.Documents\LageBuch.Documents.csproj" />
     <ProjectReference Include="..\LageBuch.Sync.Hosting\LageBuch.Sync.Hosting.csproj" />
   </ItemGroup>
 

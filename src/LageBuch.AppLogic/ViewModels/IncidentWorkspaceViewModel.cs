@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
-using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -24,8 +23,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
+    private readonly IIncidentPdfExporter _pdfExporter;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -36,6 +36,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _dialogs = dialogs;
         _alarm = alarm;
         _hostController = hostController;
+        _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         IsReadOnly = session.IsReadOnly;
 
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
@@ -364,8 +365,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public void CancelContinueEditing() => PendingPrompt = null;
 
     // PDF export renders from the local .fwincident, so it belongs to the host that owns the file;
-    // a joined client (_local is null) hides the button and lets the host export instead.
-    public bool CanExport => _local is not null;
+    // a joined client (_local is null) hides the button and lets the host export instead. It also
+    // needs a platform that can actually render one -- QuestPDF doesn't support Android
+    // (QuestPDF/QuestPDF#1432), so that head supplies NoopIncidentPdfExporter and hides the button too.
+    public bool CanExport => _local is not null && _pdfExporter.CanExport;
 
     [RelayCommand(CanExecute = nameof(CanExport))]
     private async Task ExportPdfAsync()
@@ -377,7 +380,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             return;
         }
 
-        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync());
+        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync(_pdfExporter));
         await _dialogs.ShareFileAsync(path, "application/pdf");
     }
 

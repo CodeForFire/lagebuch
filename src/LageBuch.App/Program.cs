@@ -58,7 +58,8 @@ internal static class Program
             version,
             new JsonLastSaveFolderStore(AppPaths.LastSaveFolderJsonPath),
             AppPaths.AttachmentCacheDir,
-            trustStore: new JsonTrustStore(AppPaths.TrustJsonPath));
+            trustStore: new JsonTrustStore(AppPaths.TrustJsonPath),
+            pdfExporter: new QuestPdfIncidentExporter());
     }
 
     public static AppBuilder BuildAvaloniaApp() =>

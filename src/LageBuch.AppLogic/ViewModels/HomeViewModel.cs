@@ -23,6 +23,7 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly ITicker _ticker;
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
+    private readonly IIncidentPdfExporter _pdfExporter;
     private readonly string _appVersion;
 
     // Marshals a joined client's host broadcasts onto the UI thread (see IUiDispatcher). Production
@@ -45,7 +46,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // mismatch but has no store to compare against, so every first join succeeds without TOFU.
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -56,6 +57,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _ticker = ticker;
         _alarm = alarm;
         _hostController = hostController;
+        _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         _appVersion = appVersion;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         _lastSaveFolder = lastSaveFolder;
@@ -198,7 +200,7 @@ public sealed partial class HomeViewModel : ObservableObject
         }
 
         InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController);
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter);
         WorkspaceOpened?.Invoke(workspace);
     }
 
