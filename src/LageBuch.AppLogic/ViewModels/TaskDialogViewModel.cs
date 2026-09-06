@@ -18,12 +18,17 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
 
+    // Set only when the dialog was opened from an existing ETB row (#247), so the resulting task's
+    // timer anchors to that entry's own timestamp rather than the moment the dialog is saved.
+    private readonly DateTimeOffset? _createdAt;
+
     public TaskDialogViewModel(
-        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged)
+        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged, DateTimeOffset? createdAt = null)
     {
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _onChanged = onChanged;
+        _createdAt = createdAt;
         Text = prefilledText;
         AssigneeOptions = masterData.RadioCallSigns
             .Concat(masterData.Roles)
@@ -71,7 +76,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _createdAt);
         _onChanged();
         Closed?.Invoke(this, EventArgs.Empty);
     }
@@ -79,7 +84,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void SaveAndCreateAnother()
     {
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _createdAt);
         _onChanged();
         Text = string.Empty; // fields besides the text stay sticky for the next entry
     }

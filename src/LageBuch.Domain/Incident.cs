@@ -821,6 +821,10 @@ public sealed class Incident
     /// an ETB entry would just duplicate that entry. The PDF export reports tasks instead.
     /// Importance/Urgency ride the wire as integers, so out-of-range values are rejected here the
     /// same way <see cref="AddJournalEntry"/> rejects malformed directions.
+    ///
+    /// <paramref name="createdAt"/> lets a task created from an existing ETB entry (#247) anchor
+    /// its timer to that entry's own timestamp instead of the moment the operator reopens it;
+    /// null (every other caller) falls back to <paramref name="clock"/>, same as before #247.
     /// </summary>
     public IncidentTask AddTask(
         IClock clock,
@@ -829,7 +833,8 @@ public sealed class Incident
         string? assignee,
         TaskImportance importance,
         TaskUrgency urgency,
-        int timerMinutes)
+        int timerMinutes,
+        DateTimeOffset? createdAt = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -844,7 +849,7 @@ public sealed class Incident
             throw new ArgumentException("Unbekannte Dringlichkeit.", nameof(urgency));
         }
 
-        var task = IncidentTask.Create(clock.Now, text, assignee, importance, urgency, timerMinutes, op);
+        var task = IncidentTask.Create(createdAt ?? clock.Now, text, assignee, importance, urgency, timerMinutes, op);
         _tasks.Add(task);
         return task;
     }

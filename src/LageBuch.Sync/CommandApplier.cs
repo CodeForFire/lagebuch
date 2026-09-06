@@ -133,7 +133,8 @@ public static class CommandApplier
                     c.Assignee,
                     c.Importance,
                     c.Urgency,
-                    c.TimerMinutes);
+                    c.TimerMinutes,
+                    c.CreatedAt);
                 break;
             case SetTaskCompletedCommand c:
                 incident.SetTaskCompleted(c.TaskId, c.IsDone, clock, Operator(c.Operator));

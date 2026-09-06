@@ -91,6 +91,34 @@ public class TaskDialogViewModelTests
     }
 
     [Fact]
+    public void Save_anchors_the_task_to_a_supplied_createdAt_instead_of_now()
+    {
+        var (session, clock) = NewSession();
+        var entryTime = T0.AddHours(-2); // an existing ETB row from earlier in the shift (#247)
+        var dialog = new TaskDialogViewModel(
+            session, MasterData(), "Nachtrag zu altem Eintrag", () => { }, entryTime);
+
+        dialog.SaveCommand.Execute(null);
+
+        var task = Assert.Single(session.Incident.Tasks);
+        Assert.Equal(entryTime, task.CreatedAt);
+        Assert.Equal(entryTime.AddMinutes(dialog.TimerMinutes!.Value), task.DueAt);
+        Assert.NotEqual(clock.Now, task.CreatedAt); // must not silently fall back to "now"
+    }
+
+    [Fact]
+    public void Save_without_createdAt_falls_back_to_now_like_before_247()
+    {
+        var (session, clock) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Vom Eingabefeld", () => { });
+
+        dialog.SaveCommand.Execute(null);
+
+        var task = Assert.Single(session.Incident.Tasks);
+        Assert.Equal(clock.Now, task.CreatedAt);
+    }
+
+    [Fact]
     public void Save_canExecute_needs_text()
     {
         var (session, _) = NewSession();

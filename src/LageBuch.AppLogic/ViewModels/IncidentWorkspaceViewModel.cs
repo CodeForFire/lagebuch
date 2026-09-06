@@ -250,7 +250,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             _clock,
             _masterData,
             OnChanged,
-            text => OpenTaskDialog(text));
+            (text, createdAt) => OpenTaskDialog(text, createdAt));
 
         Roles?.Dispose();
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
@@ -321,10 +321,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         PendingConfirm = dialog;
     }
 
-    /// <summary>Opens the create-task overlay pre-filled from an ETB entry's text (#88).</summary>
-    private void OpenTaskDialog(string text)
+    /// <summary>Opens the create-task overlay pre-filled from an ETB entry's text (#88).
+    /// <paramref name="createdAt"/> is the entry's own timestamp when reopened from an existing
+    /// row (#247), or null for the input dock's "add &amp; create task" flow.</summary>
+    private void OpenTaskDialog(string text, DateTimeOffset? createdAt)
     {
-        var dialog = new TaskDialogViewModel(_session, _masterData, text, OnChanged);
+        var dialog = new TaskDialogViewModel(_session, _masterData, text, OnChanged, createdAt);
 
         // Clear the overlay on either outcome; Save has already added the task on confirm.
         dialog.Closed += (_, _) => PendingTaskDialog = null;

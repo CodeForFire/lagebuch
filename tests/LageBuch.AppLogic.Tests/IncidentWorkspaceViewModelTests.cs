@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
@@ -773,6 +774,37 @@ public class IncidentWorkspaceViewModelTests
         Assert.NotNull(vm.PendingTaskDialog);
         Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
+    }
+
+    /// <summary>
+    /// Reopening the create-task overlay from an already-saved ETB row (#247) -- the one path
+    /// #88 left with no way back in once an entry was saved -- must anchor the resulting task's
+    /// timer to that row's own timestamp, not the moment the operator gets around to clicking it.
+    /// </summary>
+    [Fact]
+    public void Etb_row_create_task_icon_opens_dialog_anchored_to_the_entrys_own_timestamp()
+    {
+        var vm = NewWorkspace(out _, out var clock);
+        vm.Etb.NewText = "Lage erkundet";
+        vm.Etb.AddEntryCommand.Execute(null);
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lage erkundet");
+        var entryTime = clock.Now;
+
+        clock.Now = entryTime.AddHours(1); // operator only gets to it later
+        Assert.True(row.CanCreateTask);
+        row.CreateTaskCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingTaskDialog);
+        Assert.Equal("Lage erkundet", vm.PendingTaskDialog!.Text);
+
+        vm.PendingTaskDialog!.SaveCommand.Execute(null);
+
+        var task = Assert.Single(vm.Tasks.Rows, t => t.Text == "Lage erkundet");
+        Assert.StartsWith(Formatting.Timestamp(entryTime), task.CreatedDisplay, StringComparison.Ordinal);
+
+        // Medium urgency's 15-minute default timer, anchored to entryTime, is already overdue an
+        // hour later -- proof CreatedAt used the row's own timestamp rather than clock.Now at save.
+        Assert.True(task.IsOverdue);
     }
 }
 
