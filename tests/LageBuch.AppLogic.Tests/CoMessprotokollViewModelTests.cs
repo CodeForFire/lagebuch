@@ -272,13 +272,14 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         string? status = null,
         string? notes = null,
         int scbaCount = 0,
-        int officerCount = 0) =>
-        _inner.AddForceUnit(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount);
+        int officerCount = 0,
+        int zugfuehrerCount = 0) =>
+        _inner.AddForceUnit(brigade, personnelCount, callSign, status, notes, scbaCount, officerCount, zugfuehrerCount);
 
     public void UpdateForceUnit(Guid unitId, string? status, string? notes) => _inner.UpdateForceUnit(unitId, status, notes);
 
-    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount) =>
-        _inner.UpdateForceStrength(unitId, officerCount, personnelCount, scbaCount);
+    public void UpdateForceStrength(Guid unitId, int officerCount, int personnelCount, int scbaCount, int zugfuehrerCount = 0) =>
+        _inner.UpdateForceStrength(unitId, officerCount, personnelCount, scbaCount, zugfuehrerCount);
 
     public void RemoveForceUnit(Guid unitId) => _inner.RemoveForceUnit(unitId);
 
