@@ -210,6 +210,41 @@ public class ForcesTabRenderTests
     }
 
     [AvaloniaFact]
+    public void Selecting_a_vehicle_locks_brigade_and_call_sign_and_shows_a_clear_button()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "forces-manual-entry.png"); // before: nothing picked, both fields free
+
+        var brigadeBox = view.GetControl<AutoCompleteBox>("BrigadeBox");
+        var callSignBox = view.GetControl<AutoCompleteBox>("CallSignBox");
+        var clearButton = view.GetControl<Button>("ClearVehicleButton");
+        Assert.True(brigadeBox.IsEnabled);
+        Assert.True(callSignBox.IsEnabled);
+        Assert.False(clearButton.IsVisible);
+
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0]; // FFB 1/40/1
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(brigadeBox.IsEnabled);
+        Assert.False(callSignBox.IsEnabled);
+        Assert.True(clearButton.IsVisible);
+        Capture(window, "forces-vehicle-locked.png"); // after: identity fields locked, X shown
+
+        clearButton.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(brigadeBox.IsEnabled);
+        Assert.True(callSignBox.IsEnabled);
+        Assert.False(clearButton.IsVisible);
+        Assert.Null(vm.Forces.SelectedVehicle);
+
+        // Clearing keeps the derived values -- the operator edits on instead of starting over.
+        Assert.Equal("FFB Wache 1", vm.Forces.NewBrigade);
+        Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
+    }
+
+    [AvaloniaFact]
     public void A_taken_vehicle_is_hidden_from_the_dropdown_and_a_typed_duplicate_is_blocked()
     {
         // Hosted directly (same idiom as ControlBorderConsistencyTests): the workspace shell's

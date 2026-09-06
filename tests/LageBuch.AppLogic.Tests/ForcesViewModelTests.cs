@@ -339,6 +339,38 @@ public class ForcesViewModelTests
         Assert.True(vm.AddForceCommand.CanExecute(null));
     }
 
+    // --- Two-mode Kraft entry: a vehicle pick locks the identity fields it derived ---
+    [Fact]
+    public void Selecting_a_vehicle_locks_brigade_and_call_sign()
+    {
+        var vm = NewVm();
+        Assert.False(vm.IsVehicleSelected);
+
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+
+        Assert.True(vm.IsVehicleSelected);
+        Assert.Equal("Aich", vm.NewBrigade);
+        Assert.Equal("Aich 42/1", vm.NewCallSign);
+    }
+
+    [Fact]
+    public void Clearing_the_selected_vehicle_unlocks_fields_without_wiping_them()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        var brigadeBeforeClear = vm.NewBrigade;
+        var callSignBeforeClear = vm.NewCallSign;
+        var officerCountBeforeClear = vm.NewOfficerCount;
+
+        vm.ClearVehicleCommand.Execute(null);
+
+        Assert.False(vm.IsVehicleSelected);
+        Assert.Null(vm.SelectedVehicle);
+        Assert.Equal(brigadeBeforeClear, vm.NewBrigade);
+        Assert.Equal(callSignBeforeClear, vm.NewCallSign);
+        Assert.Equal(officerCountBeforeClear, vm.NewOfficerCount);
+    }
+
     [Fact]
     public void Selecting_a_zugfuehrer_vehicle_prefills_the_zf_count()
     {
