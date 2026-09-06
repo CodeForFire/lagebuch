@@ -189,8 +189,16 @@
                      row, but that made it unrecognizable as an editable field, so crews read it
                      as a plain label. Use the app's standard TextBox chrome (box + border)
                      instead, so it reads as editable at a glance; the default already reflects
-                     "Links"/"Mitte"/"Rechts" for a 3-flat floor and is free text otherwise. -->
-                <TextBox Text="{Binding Label}" Width="148" FontSize="11" FontWeight="SemiBold"
+                     "Links"/"Mitte"/"Rechts" for a 3-flat floor and is free text otherwise.
+
+                     Same "row rebuilds on each commit" trap as #33 (see RolesView/ForcesView/
+                     FilesView): OnLabelChanged pushes straight to the session, whose Changed
+                     event rebuilds ApartmentColumns as a fresh array of fresh view models on
+                     every keystroke, so the ItemsControl tears down and recreates this exact
+                     TextBox mid-edit. UpdateSourceTrigger=LostFocus pushes once, when the
+                     operator actually leaves the field, instead of after every character. -->
+                <TextBox Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                         Width="148" FontSize="11" FontWeight="SemiBold"
                          HorizontalContentAlignment="Center" Padding="4,2"
                          IsEnabled="{Binding !IsReadOnly}" />
               </DataTemplate>
