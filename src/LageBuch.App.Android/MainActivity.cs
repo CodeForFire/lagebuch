@@ -67,7 +67,10 @@ public class MainActivity : AvaloniaMainActivity
             typeof(MainActivity).Assembly.GetName().Version?.ToString() ?? "0.0.0",
             lastSaveFolder: null,
             attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
-            trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)));
+            trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)),
+            // QuestPDF doesn't support Android (QuestPDF/QuestPDF#1432); the "Export PDF" button
+            // stays hidden here instead of pulling QuestPDF into this build (issue #184).
+            pdfExporter: new NoopIncidentPdfExporter());
 
         base.OnCreate(savedInstanceState);
     }

@@ -12,6 +12,9 @@ once we reach 1.0.
 ### Added
 - Show the 25 MB per-file attachment limit in the Files view (#213)
 
+### Fixed
+- QuestPDF no longer builds into the Android app (it doesn't support that platform); "Export PDF" is desktop-only now (#184)
+
 ## [0.4.0] - 2026-09-05
 
 TLS/TOFU sync, .NET 10 & Avalonia 12 migration, host-driven Stammdaten sync,

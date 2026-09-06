@@ -1,7 +1,6 @@
-using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 
-namespace LageBuch.Documents.Tests;
+namespace LageBuch.Domain.Tests;
 
 public class FormattingTests
 {

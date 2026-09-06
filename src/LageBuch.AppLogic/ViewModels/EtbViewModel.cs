@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LageBuch.Documents;
+using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;

@@ -305,8 +305,10 @@ public class IncidentSessionTests
     }
 
     [Fact]
-    public async Task ExportPdfAsync_returns_a_pdf()
+    public async Task ExportPdfAsync_hands_the_incident_and_resolved_file_bytes_to_the_exporter()
     {
+        // Rendering itself (real QuestPDF output) is covered by LageBuch.Documents.Tests; this only
+        // exercises LocalIncidentSession's own job of gathering the exporter's inputs.
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(
             store,
@@ -315,17 +317,23 @@ public class IncidentSessionTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var bytes = await session.ExportPdfAsync();
-        Assert.True(bytes.Length > 100);
-        Assert.Equal(0x25, bytes[0]); // %
+        await session.AddFileAsync("foto.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+        var fileId = session.Incident.Files.Single().Id;
+        var exporter = new RecordingPdfExporter();
+
+        var bytes = await session.ExportPdfAsync(exporter);
+
+        Assert.Same(session.Incident, exporter.Incident);
+        Assert.Equal(new byte[] { 1, 2, 3 }, exporter.FileBytes[fileId]);
+        Assert.Same(RecordingPdfExporter.FakeBytes, bytes);
     }
 
     [Fact]
-    public async Task ExportPdfAsync_merges_an_attached_pdfs_pages_via_its_disk_path()
+    public async Task ExportPdfAsync_resolves_an_attached_pdfs_disk_path_without_loading_its_bytes()
     {
-        // Exercises the issue #167 P1 #3 path end to end: AddFileAsync writes the attachment to
-        // disk (FakeStore's thin disk shim), and ExportPdfAsync must resolve and merge it from
-        // that real path rather than holding it in memory.
+        // Exercises the issue #167 P1 #3 path: AddFileAsync writes the attachment to disk (FakeStore's
+        // thin disk shim), and ExportPdfAsync must resolve it to a disk path for the exporter to merge
+        // (see PdfAttachmentMergerTests for the actual merge), rather than loading it into memory.
         var store = new FakeStore();
         var session = LocalIncidentSession.StartNew(
             store,
@@ -334,24 +342,43 @@ public class IncidentSessionTests
             "/y.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
+        await session.AddFileAsync("bericht.pdf", "application/pdf", new byte[] { 1, 2, 3 });
+        var fileId = session.Incident.Files.Single().Id;
+        var exporter = new RecordingPdfExporter();
 
-        var withoutAttachment = await session.ExportPdfAsync();
+        await session.ExportPdfAsync(exporter);
 
-        // Any valid PDF stands in for "an attached PDF" — the export itself already produces one.
-        await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
+        Assert.True(exporter.PdfAttachmentPaths.ContainsKey(fileId));
+        Assert.False(exporter.FileBytes.ContainsKey(fileId));
+    }
+}
 
-        var withAttachment = await session.ExportPdfAsync();
+// Captures what LocalIncidentSession.ExportPdfAsync hands the exporter, without needing QuestPDF.
+internal sealed class RecordingPdfExporter : IIncidentPdfExporter
+{
+    public static readonly byte[] FakeBytes = { 0x25, 0x50, 0x44, 0x46 };
 
-        Assert.True(
-            withAttachment.Length > withoutAttachment.Length,
-            $"Expected merging the attached PDF's pages to grow the export (without={withoutAttachment.Length}, with={withAttachment.Length}).");
+    public bool CanExport => true;
+
+    public Incident? Incident { get; private set; }
+
+    public IReadOnlyDictionary<Guid, byte[]> FileBytes { get; private set; } = new Dictionary<Guid, byte[]>();
+
+    public IReadOnlyDictionary<Guid, string> PdfAttachmentPaths { get; private set; } = new Dictionary<Guid, string>();
+
+    public byte[] Export(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths)
+    {
+        Incident = incident;
+        FileBytes = fileBytes;
+        PdfAttachmentPaths = pdfAttachmentPaths;
+        return FakeBytes;
     }
 }
 
 // In-memory fake store — no disk, deterministic. File bytes also get a thin real-disk mirror (a
-// per-instance temp folder) purely so ResolveFileDiskPath has a real path to hand to QuestPDF's
-// DocumentOperation for PDF-attachment-merge tests (see issue #167 P1 #3) — everything else about
-// this fake stays in-memory.
+// per-instance temp folder) purely so ResolveFileDiskPath has a real path to hand to the exporter
+// for PDF-attachment-merge tests (see issue #167 P1 #3) — everything else about this fake stays
+// in-memory.
 internal sealed class FakeStore : IIncidentStore
 {
     private readonly Dictionary<string, Incident> _saved = new();

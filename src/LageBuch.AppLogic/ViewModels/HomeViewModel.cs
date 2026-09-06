@@ -45,7 +45,11 @@ public sealed partial class HomeViewModel : ObservableObject
     // mismatch but has no store to compare against, so every first join succeeds without TOFU.
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null)
+    // Passed straight through to each opened IncidentWorkspaceViewModel (see IIncidentPdfExporter).
+    // Unsupplied (most tests) falls back to NoopIncidentPdfExporter, same as Android passes explicitly.
+    private readonly IIncidentPdfExporter _pdfExporter;
+
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -61,6 +65,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _lastSaveFolder = lastSaveFolder;
         _attachmentCacheRoot = attachmentCacheRoot;
         _trustStore = trustStore;
+        _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -198,7 +203,7 @@ public sealed partial class HomeViewModel : ObservableObject
         }
 
         InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController);
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter);
         WorkspaceOpened?.Invoke(workspace);
     }
 

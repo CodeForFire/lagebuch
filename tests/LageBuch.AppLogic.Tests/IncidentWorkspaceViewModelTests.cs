@@ -72,7 +72,7 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal(new[] { "EL" }, host.LastMasterData!.Roles);
     }
 
-    private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
+    private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null, IIncidentPdfExporter? pdfExporter = null)
     {
         store = new FakeStore();
         clock = new FixedClock(T0);
@@ -90,7 +90,8 @@ public class IncidentWorkspaceViewModelTests
             Md(),
             dialogs ?? new FakeDialogs(),
             new FakeAlarmService(),
-            new NoopIncidentHostController());
+            new NoopIncidentHostController(),
+            pdfExporter);
     }
 
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
@@ -516,7 +517,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
-        var vm = NewWorkspace(out _, out _, dialogs);
+        var vm = NewWorkspace(out _, out _, dialogs, new FakePdfExporter());
 
         await vm.ExportPdfCommand.ExecuteAsync(null);
 
@@ -524,6 +525,15 @@ public class IncidentWorkspaceViewModelTests
         var bytes = await File.ReadAllBytesAsync(exportPath);
         Assert.Equal(0x25, bytes[0]); // %PDF
         File.Delete(exportPath);
+    }
+
+    [Fact]
+    public void CanExport_is_false_when_the_platform_has_no_pdf_exporter()
+    {
+        // NewWorkspace's default (no exporter passed) is NoopIncidentPdfExporter — the "Export PDF"
+        // button stays hidden, e.g. on Android (issue #184).
+        var vm = NewWorkspace(out _, out _);
+        Assert.False(vm.CanExport);
     }
 
     [Fact]
@@ -734,6 +744,16 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
     }
+}
+
+// Stands in for a platform that supports export (e.g. desktop's QuestPDF-backed exporter),
+// without depending on QuestPDF itself.
+internal sealed class FakePdfExporter : IIncidentPdfExporter
+{
+    public bool CanExport => true;
+
+    public byte[] Export(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths) =>
+        new byte[] { 0x25, 0x50, 0x44, 0x46 }; // %PDF
 }
 
 internal sealed class FakeDialogs : IFileDialogService

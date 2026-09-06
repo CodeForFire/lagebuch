@@ -28,6 +28,8 @@
     <ProjectReference Include="..\LageBuch.App.Shared\LageBuch.App.Shared.csproj" />
     <ProjectReference Include="..\LageBuch.AppLogic\LageBuch.AppLogic.csproj" />
     <ProjectReference Include="..\LageBuch.Sync.Hosting\LageBuch.Sync.Hosting.csproj" />
+    <!-- QuestPDF-backed PDF export (QuestPdfIncidentExporter) is desktop-only; see issue #184. -->
+    <ProjectReference Include="..\LageBuch.Documents\LageBuch.Documents.csproj" />
   </ItemGroup>
 
   <ItemGroup>

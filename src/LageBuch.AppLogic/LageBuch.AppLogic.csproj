@@ -4,8 +4,11 @@
     <ProjectReference Include="..\LageBuch.Domain\LageBuch.Domain.csproj" />
     <ProjectReference Include="..\LageBuch.Sync\LageBuch.Sync.csproj" />
     <ProjectReference Include="..\LageBuch.Persistence\LageBuch.Persistence.csproj" />
-    <ProjectReference Include="..\LageBuch.Documents\LageBuch.Documents.csproj" />
   </ItemGroup>
+  <!-- No reference to LageBuch.Documents here: it pulls in QuestPDF, which doesn't support Android
+       (QuestPDF/QuestPDF#1432) and only produced build warnings there (issue #184). PDF rendering is
+       reached through IIncidentPdfExporter instead; only the desktop head (LageBuch.App) implements
+       it with the real QuestPDF-backed exporter. -->
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
