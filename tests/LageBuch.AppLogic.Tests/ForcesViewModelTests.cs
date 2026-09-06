@@ -153,19 +153,56 @@ public class ForcesViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
-        vm.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
 
-        // Taking a vehicle removes it from the dropdown. (Adding clears the dock, so the brigade
-        // is typed again — the same gesture an operator performs for the next unit.)
+        // All Stammdaten vehicles, across every Wache (#215) -- populated without typing anything.
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+
+        // Taking a vehicle removes it from the dropdown.
         vm.SelectedVehicle = vm.VehicleOptions[0];
         vm.AddForceCommand.Execute(null);
-        vm.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
 
-        // Removing its row makes it available again — without touching the brigade field.
+        // Removing its row makes it available again.
         vm.Forces[0].RemoveCommand.Execute(null);
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+    }
+
+    // --- Issue #215: a single Fahrzeug pick derives Feuerwehr, spanning every Wache ----------
+    [Fact]
+    public void Vehicle_options_are_not_filtered_by_brigade()
+    {
+        var vm = NewVm();
+
+        // Available before anything is typed, and unaffected by what Feuerwehr says.
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+
+        vm.NewBrigade = "does not matter";
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+    }
+
+    [Fact]
+    public void Selecting_a_vehicle_derives_the_brigade()
+    {
+        var vm = NewVm();
+        var aichVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+
+        vm.SelectedVehicle = aichVehicle;
+
+        Assert.Equal("Aich", vm.NewBrigade);
+        Assert.Equal("Aich 42/1", vm.NewCallSign);
+    }
+
+    [Fact]
+    public void Manually_editing_brigade_after_a_pick_clears_the_selected_vehicle()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        Assert.NotNull(vm.SelectedVehicle);
+
+        // A manual edit no longer matches the picked vehicle's Wache -- the pick is stale.
+        vm.NewBrigade = "Emmering";
+
+        Assert.Null(vm.SelectedVehicle);
     }
 
     [Fact]
@@ -227,21 +264,6 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void Vehicle_options_filter_by_the_typed_brigade()
-    {
-        var vm = NewVm();
-
-        vm.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
-
-        vm.NewBrigade = "aich"; // free-typed brigade: matched without case fuss
-        Assert.Equal(new[] { "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
-
-        vm.NewBrigade = "Emmering"; // mutual aid, no master data
-        Assert.Empty(vm.VehicleOptions);
-    }
-
-    [Fact]
     public void Vehicle_options_offer_each_call_sign_once_even_if_the_master_data_has_duplicates()
     {
         // Master data written before the uniqueness rule may still contain a duplicate call sign
@@ -263,8 +285,6 @@ public class ForcesViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), masterData, () => { });
-
-        vm.NewBrigade = "FFB Wache 1";
 
         // The duplicate collapses; the first occurrence's spelling is kept.
         Assert.Equal(new[] { "FFB 1/40/1", "ffb 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
