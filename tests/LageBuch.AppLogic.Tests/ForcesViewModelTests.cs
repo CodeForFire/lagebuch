@@ -54,6 +54,37 @@ public class ForcesViewModelTests
         Assert.False(vm.AddForceCommand.CanExecute(null));
     }
 
+    // --- Issue #220: a row with no counted personnel is not a real entry ---
+    [Fact]
+    public void AddForce_disabled_when_no_personnel_is_entered()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FFB Wache 1";
+
+        // Brigade alone -- Führungskräfte and Mannschaft both left blank (0) -- must not be
+        // addable: an empty unit reports nothing and is almost always a stray click (#220).
+        Assert.False(vm.AddForceCommand.CanExecute(null));
+
+        vm.NewOfficerCount = 0;
+        vm.NewMannschaftCount = 0;
+        Assert.False(vm.AddForceCommand.CanExecute(null));
+
+        vm.NewMannschaftCount = 1;
+        Assert.True(vm.AddForceCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void AddForce_enabled_when_only_zugfuehrer_count_is_entered()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FFB Wache 1";
+
+        // A row reporting a single Zugführer with no Führungskräfte/Mannschaft is still a real,
+        // counted entry (#220 only rules out entirely empty rows).
+        vm.NewZugfuehrerCount = 1;
+        Assert.True(vm.AddForceCommand.CanExecute(null));
+    }
+
     // --- Issue #18 ---
     [Fact]
     public void Brigade_options_come_from_master_data()
