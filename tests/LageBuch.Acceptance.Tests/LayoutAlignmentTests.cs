@@ -84,12 +84,54 @@ public class LayoutAlignmentTests
 
         var reminderBarLeft = Left("ReminderBar");
         var tabStripLeft = LeftInWindow(TabStrip(window), window);
-        var footerCloseLeft = Left("CloseButton");
+
+        // #221: Close/Export moved to the footer's right side so each tab's own "add entry"
+        // affordance can own the lower-left corner; the saved-status readout is what now anchors
+        // the footer's left edge.
+        var footerLeft = Left("SavedStatusPanel");
 
         Assert.Equal(Gutter, reminderBarLeft, precision: 0);
         Assert.Equal(Gutter, tabStripLeft, precision: 0);
-        Assert.Equal(Gutter, footerCloseLeft, precision: 0);
+        Assert.Equal(Gutter, footerLeft, precision: 0);
     }
+
+    // #221: the "start a new entry" input dock used to sit at the lower-left on Kräfte/
+    // Atemschutz/Funktionen but at the upper-right on Dateien/CO-Messung (as its own header
+    // button, not a dock). Each tab's content only realizes while its TabItem is selected, so
+    // this switches tabs one at a time rather than reading all five out of one snapshot. Checking
+    // the dock itself (not the add button inside it) is deliberate: the button's own x-position
+    // varies with how many fields precede it in that tab's row.
+    [AvaloniaFact]
+    public void Add_entry_docks_share_one_left_edge_across_tabs()
+    {
+        var window = ShowWorkspace();
+        var tabs = TabOf(window);
+
+        double LeftOfDockOnTab(int tabIndex)
+        {
+            tabs.SelectedIndex = tabIndex;
+            Dispatcher.UIThread.RunJobs();
+
+            // TabControl keeps every visited tab's content realized (just hidden), so searching
+            // the whole window can find a same-named control left over from an earlier tab.
+            // Scoping to SelectedContent's own subtree is unambiguous.
+            var content = (Visual)tabs.SelectedContent!;
+            return LeftInWindow(
+                content.GetVisualDescendants().OfType<Control>().First(c => c.Name == "InputDock"), window);
+        }
+
+        // The tab content area starts to the right of the nav rail, not at the window's own
+        // 24px gutter -- so the invariant here is that all five docks agree with each other, not
+        // that they match Gutter directly.
+        var funktionen = LeftOfDockOnTab(3);
+        Assert.Equal(funktionen, LeftOfDockOnTab(4), precision: 0); // Kräfte
+        Assert.Equal(funktionen, LeftOfDockOnTab(5), precision: 0); // Atemschutz
+        Assert.Equal(funktionen, LeftOfDockOnTab(6), precision: 0); // CO-Messung
+        Assert.Equal(funktionen, LeftOfDockOnTab(7), precision: 0); // Dateien
+    }
+
+    private static TabControl TabOf(Window window) =>
+        window.GetVisualDescendants().OfType<TabControl>().First();
 
     // MANNSCHAFT is the only star-sized column in the Atemschutz grid, so it absorbs the
     // content-driven growth of the eight auto-sized columns plus the fixed 300px action column.

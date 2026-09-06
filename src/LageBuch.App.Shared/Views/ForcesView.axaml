@@ -24,7 +24,7 @@
     </Grid>
 
     <!-- Input dock -->
-    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <StackPanel Orientation="Horizontal" Spacing="8">
@@ -84,7 +84,7 @@
           <!-- Freitext: kein Platzhalter, siehe #137 -->
           <TextBox x:Name="NotesBox" Width="170" Text="{Binding NewNotes}" />
         </HeaderedContentControl>
-        <Button Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
+        <Button x:Name="AddForceButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
         <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den
              Hinzufügen-Button (Freitext-Duplikat), und der Dropdown blendet Vergebene ohnehin aus. -->
