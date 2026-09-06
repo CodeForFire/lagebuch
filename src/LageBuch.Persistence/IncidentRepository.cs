@@ -203,7 +203,15 @@ public sealed class IncidentRepository
     private static void UpsertForces(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.ForceUnit> forces)
     {
         var currentIds = forces.Select(f => f.Id.ToString()).ToHashSet();
-        DeleteMissing(cn, tx, "force_units", "id", currentIds);
+        var existingUnitIds = DeleteMissing(cn, tx, "force_units", "id", currentIds);
+
+        // A removed unit's own row is gone via DeleteMissing above, but its edit history isn't --
+        // force_unit_edits is keyed by unit_id, not cleaned up by that DELETE, and would otherwise
+        // become a permanent orphan (RemoveForceUnit is the one entity removal reachable here).
+        foreach (var removedUnitId in existingUnitIds.Except(currentIds))
+        {
+            Run(cn, tx, "DELETE FROM force_unit_edits WHERE unit_id = $uid;", p => p("$uid", removedUnitId));
+        }
 
         // Same unstable-id situation as etb_entry_edits (see there) — force_unit_edits' id is
         // synthetic and never read back, so tail-append by aggregate count instead of upserting.

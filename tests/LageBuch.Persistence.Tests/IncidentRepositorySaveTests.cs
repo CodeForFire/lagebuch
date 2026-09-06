@@ -155,6 +155,28 @@ public class IncidentRepositorySaveTests : IDisposable
         Assert.Equal(1L, (long)cmd.ExecuteScalar()!);
     }
 
+    [Fact]
+    public void Removing_a_force_unit_with_strength_edits_also_deletes_its_edit_history()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        var removed = incident.AddForceUnit(clock, op, "FFB 1", 6);
+        incident.UpdateForceStrength(clock, op, removed.Id, officerCount: 1, personnelCount: 6, scbaCount: 0);
+        IncidentRepository.Save(_path, incident);
+
+        incident.RemoveForceUnit(clock, op, removed.Id);
+        IncidentRepository.Save(_path, incident);
+
+        // Otherwise force_unit_edits keeps a permanent orphan row keyed by a unit_id that no
+        // longer exists in force_units.
+        using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT count(*) FROM force_unit_edits WHERE unit_id = $uid;";
+        cmd.Parameters.AddWithValue("$uid", removed.Id.ToString());
+        Assert.Equal(0L, (long)cmd.ExecuteScalar()!);
+    }
+
     // A single larger, incrementally-saved incident, to exercise the upsert/tail-append paths at a
     // scale closer to a real multi-hour Einsatz than the handful-of-rows fixtures above.
     [Fact]
