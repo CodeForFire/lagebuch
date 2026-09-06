@@ -17,9 +17,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     private readonly IClock _clock;
     private readonly Action _onChanged;
 
-    // Opens the create-task overlay pre-filled with an entry's text (#88); null where the host
-    // offers no task feature, which disables the "add & create task" dock button too.
-    private readonly Action<string>? _createTaskFromEntry;
+    // Opens the create-task overlay pre-filled with an entry's text and anchored to its timestamp
+    // (#88, #247); null where the host offers no task feature, which disables the "add & create
+    // task" dock button and every row's create-task icon too.
+    private readonly Action<string, DateTimeOffset>? _createTaskFromEntry;
 
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
@@ -34,7 +35,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
         IClock clock,
         MasterDataSet masterData,
         Action onChanged,
-        Action<string>? createTaskFromEntry = null)
+        Action<string, DateTimeOffset>? createTaskFromEntry = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
@@ -168,11 +169,12 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     {
         _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo);
         var text = NewText;
+        var timestamp = _clock.Now;
         NewText = string.Empty;
         NewFrom = null;
         NewTo = null;
         _onChanged();
-        _createTaskFromEntry?.Invoke(text);
+        _createTaskFromEntry?.Invoke(text, timestamp);
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
@@ -227,8 +229,14 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void CloseHistory() => HistoryEntry = null;
 
+    // Hidden entirely (not just disabled) when the host offers no task feature or the incident is
+    // read-only/closed, since such a session can never save the resulting task anyway (#247).
+    private bool CanCreateTaskFromRow => !IsReadOnly && _createTaskFromEntry is not null;
+
+    private void CreateTaskFromRow(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text, row.Timestamp);
+
     private EtbEntryRow ToRow(EtbEntry e) =>
-        new(e, BeginEdit, CanEdit, ShowHistory);
+        new(e, BeginEdit, CanEdit, ShowHistory, CanCreateTaskFromRow ? CreateTaskFromRow : null);
 }
 
 /// <summary>
@@ -241,10 +249,12 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
 public sealed class EtbEntryRow
 {
     public EtbEntryRow(
-        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory)
+        EtbEntry entry, Action<EtbEntryRow> beginEdit, Func<EtbEntryRow, bool> canEdit, Action<EtbEntryRow> showHistory,
+        Action<EtbEntryRow>? createTask)
     {
         ArgumentNullException.ThrowIfNull(entry);
         Id = entry.Id;
+        Timestamp = entry.Timestamp;
         Time = Formatting.Timestamp(entry.Timestamp);
         Direction = Formatting.Direction(entry.Direction);
         From = entry.From;
@@ -261,9 +271,16 @@ public sealed class EtbEntryRow
         // remotely-joined-read-only incident must still let its history be read, since that is the
         // one thing that makes an edit acceptable in the first place.
         ShowHistoryCommand = new RelayCommand(() => showHistory(this), () => WasEdited);
+
+        // Null (rather than merely disabled) hides the icon entirely where the host offers no task
+        // feature or the incident is read-only/closed (#247) — see EtbViewModel.CanCreateTaskFromRow.
+        CanCreateTask = createTask is not null;
+        CreateTaskCommand = createTask is null ? null : new RelayCommand(() => createTask(this));
     }
 
     public Guid Id { get; }
+
+    public DateTimeOffset Timestamp { get; }
 
     public string Time { get; }
 
@@ -288,6 +305,10 @@ public sealed class EtbEntryRow
     public ICommand BeginEditCommand { get; }
 
     public ICommand ShowHistoryCommand { get; }
+
+    public bool CanCreateTask { get; }
+
+    public ICommand? CreateTaskCommand { get; }
 }
 
 /// <summary>

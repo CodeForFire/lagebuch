@@ -321,8 +321,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void RemoveForceUnit(Guid unitId) =>
         Send(new RemoveForceUnitCommand(Op(), unitId));
 
-    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
-        Send(new AddTaskCommand(Op(), text, assignee ?? string.Empty, importance, urgency, timerMinutes));
+    public void AddTask(
+        string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes,
+        DateTimeOffset? createdAt = null) =>
+        Send(new AddTaskCommand(Op(), text, assignee ?? string.Empty, importance, urgency, timerMinutes, createdAt));
 
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));

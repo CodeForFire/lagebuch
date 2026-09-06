@@ -360,6 +360,94 @@ public class EtbViewModelTests
         Assert.Null(vm.HistoryEntry);
     }
 
+    [Fact]
+    public void CreateTaskCommand_invokes_the_delegate_with_the_entrys_own_text_and_timestamp()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        string? capturedText = null;
+        DateTimeOffset? capturedTimestamp = null;
+        var vm = new EtbViewModel(
+            session, clock, MasterDataSet.Empty, () => { },
+            (text, timestamp) =>
+            {
+                capturedText = text;
+                capturedTimestamp = timestamp;
+            })
+        { NewText = "Lagemeldung" };
+        vm.AddEntryCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(30); // task created later than the entry was logged
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+
+        Assert.True(row.CanCreateTask);
+        row.CreateTaskCommand!.Execute(null);
+
+        Assert.Equal("Lagemeldung", capturedText);
+        Assert.Equal(T0, capturedTimestamp); // the entry's own timestamp, not "now"
+    }
+
+    [Fact]
+    public void CreateTaskCommand_is_absent_when_the_host_offers_no_task_feature()
+    {
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+
+        Assert.False(row.CanCreateTask);
+        Assert.Null(row.CreateTaskCommand);
+    }
+
+    [Fact]
+    public void CreateTaskCommand_is_absent_on_a_read_only_session()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
+        session.Close();
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (_, _) => { });
+
+        var row = Assert.Single(vm.Entries, r => r.Text == "Lagemeldung");
+        Assert.False(row.CanCreateTask);
+        Assert.Null(row.CreateTaskCommand);
+    }
+
+    [Fact]
+    public void AddEntryAndCreateTask_anchors_the_task_to_the_just_added_entrys_timestamp()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        DateTimeOffset? capturedTimestamp = null;
+        var vm = new EtbViewModel(
+            session, clock, MasterDataSet.Empty, () => { },
+            (_, timestamp) => capturedTimestamp = timestamp)
+        { NewText = "Lagemeldung" };
+
+        vm.AddEntryAndCreateTaskCommand.Execute(null);
+
+        Assert.Equal(T0, capturedTimestamp);
+    }
+
     private static EtbViewModel NewVm()
     {
         var clock = new FixedClock(T0);

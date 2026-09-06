@@ -820,7 +820,9 @@ public sealed class Incident
     /// system line: tasks are work management, not the operational log, and a task spawned from
     /// an ETB entry would just duplicate that entry. The PDF export reports tasks instead.
     /// Importance/Urgency ride the wire as integers, so out-of-range values are rejected here the
-    /// same way <see cref="AddJournalEntry"/> rejects malformed directions.
+    /// same way <see cref="AddJournalEntry"/> rejects malformed directions. <paramref name="createdAt"/>
+    /// anchors the task to an already-recorded ETB entry's own timestamp (#247) instead of the
+    /// clock's "now" when the operator creates the task after the entry was saved.
     /// </summary>
     public IncidentTask AddTask(
         IClock clock,
@@ -829,7 +831,8 @@ public sealed class Incident
         string? assignee,
         TaskImportance importance,
         TaskUrgency urgency,
-        int timerMinutes)
+        int timerMinutes,
+        DateTimeOffset? createdAt = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -844,7 +847,7 @@ public sealed class Incident
             throw new ArgumentException("Unbekannte Dringlichkeit.", nameof(urgency));
         }
 
-        var task = IncidentTask.Create(clock.Now, text, assignee, importance, urgency, timerMinutes, op);
+        var task = IncidentTask.Create(createdAt ?? clock.Now, text, assignee, importance, urgency, timerMinutes, op);
         _tasks.Add(task);
         return task;
     }

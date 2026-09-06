@@ -340,8 +340,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void RemoveForceUnit(Guid unitId) => _inner.RemoveForceUnit(unitId);
 
-    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
-        _inner.AddTask(text, assignee, importance, urgency, timerMinutes);
+    public void AddTask(
+        string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes,
+        DateTimeOffset? createdAt = null) =>
+        _inner.AddTask(text, assignee, importance, urgency, timerMinutes, createdAt);
 
     public void SetTaskCompleted(Guid taskId, bool isDone) => _inner.SetTaskCompleted(taskId, isDone);
 

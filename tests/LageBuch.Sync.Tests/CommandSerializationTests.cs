@@ -53,6 +53,7 @@ public class CommandSerializationTests
         new RenameFileCommand(Guid.NewGuid(), null),
         new AddTaskCommand(Op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium, 10),
         new AddTaskCommand(Op, "Nachfordern", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30),
+        new AddTaskCommand(Op, "Aus ETB-Eintrag", "FFB 1/44/1", TaskImportance.Medium, TaskUrgency.Medium, 15, DateTimeOffset.UnixEpoch),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), true),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), false),
     }.Select(c => new object[] { c });
@@ -111,6 +112,23 @@ public class CommandSerializationTests
 
         Assert.Equal(0, command.OfficerCount);
         Assert.Equal(9, command.PersonnelCount);
+    }
+
+    // A pre-#247 sender never sends createdAt; the missing property must deserialize as null so the
+    // host falls back to its own clock, exactly like the pre-#247 behavior.
+    [Fact]
+    public void Legacy_addTask_without_createdAt_deserializes_as_null()
+    {
+        const string legacyJson = """
+            {"$type":"addTask","operator":{"name":"Müller","callSign":"FFB 12/1"},
+             "text":"Tür sichern","assignee":"FFB 1/44/1","importance":"High","urgency":"Medium",
+             "timerMinutes":10}
+            """;
+
+        var command = Assert.IsType<AddTaskCommand>(SyncJson.Deserialize<SyncCommand>(legacyJson));
+
+        Assert.Null(command.CreatedAt);
+        Assert.Equal("Tür sichern", command.Text);
     }
 
     // TruppNumber is optional on the wire so the host's auto-assign path (Incident.NextFreeScbaTruppNumber)

@@ -11,19 +11,25 @@ namespace LageBuch.AppLogic.ViewModels;
 /// pre-filled, the operator adds priority/timer/assignee. "Speichern &amp; weiteren Task" keeps the
 /// dialog open with cleared text but sticky priorities — the common case is several tasks from
 /// one situation report. Closed fires on Speichern AND Abbrechen so the host clears the overlay
-/// regardless of outcome (ConfirmDialogViewModel contract).
+/// regardless of outcome (ConfirmDialogViewModel contract). <see cref="_anchorTime"/> anchors every
+/// task saved from this dialog to the triggering ETB entry's own timestamp (#247) rather than the
+/// moment the operator got around to opening the overlay; it is null for the Tasks tab's own
+/// "add task" form and the dock's "add &amp; create task" button, both of which mean "now".
 /// </summary>
 public sealed partial class TaskDialogViewModel : ObservableObject
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
+    private readonly DateTimeOffset? _anchorTime;
 
     public TaskDialogViewModel(
-        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged)
+        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged,
+        DateTimeOffset? anchorTime = null)
     {
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _onChanged = onChanged;
+        _anchorTime = anchorTime;
         Text = prefilledText;
         AssigneeOptions = masterData.RadioCallSigns
             .Concat(masterData.Roles)
@@ -71,7 +77,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _anchorTime);
         _onChanged();
         Closed?.Invoke(this, EventArgs.Empty);
     }
@@ -79,7 +85,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void SaveAndCreateAnother()
     {
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _anchorTime);
         _onChanged();
         Text = string.Empty; // fields besides the text stay sticky for the next entry
     }

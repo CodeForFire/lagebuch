@@ -228,6 +228,30 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void AddTask_with_an_explicit_createdAt_anchors_CreatedAt_and_DueAt_to_it_instead_of_the_host_clock()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var anchor = clock.Now.AddHours(-2); // an ETB entry logged two hours before this command arrives (#247)
+
+        ApplyOverWire(
+            new AddTaskCommand(
+                new OperatorDto("Client", "RUF 1"),
+                "Aus ETB-Eintrag",
+                "FFB 1/44/1",
+                TaskImportance.High,
+                TaskUrgency.Medium,
+                10,
+                anchor),
+            incident,
+            clock);
+
+        var task = Assert.Single(incident.Tasks);
+        Assert.Equal(anchor, task.CreatedAt);
+        Assert.Equal(anchor.AddMinutes(10), task.DueAt);
+    }
+
+    [Fact]
     public void SetTaskCompleted_toggles_completion_with_host_time()
     {
         var clock = new FixedClock();

@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
@@ -733,6 +734,31 @@ public class IncidentWorkspaceViewModelTests
         Assert.NotNull(vm.PendingTaskDialog);
         Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
+    }
+
+    // #247: once an ETB entry is saved, a row's own "create task" icon must still reach the
+    // overlay — the gap this issue closes — and anchor the resulting task to that entry's own,
+    // earlier timestamp rather than the moment the operator reopens the overlay.
+    [Fact]
+    public void Etb_row_create_task_icon_opens_dialog_and_anchors_the_task_to_the_entrys_timestamp()
+    {
+        var vm = NewWorkspace(out _, out var clock);
+        vm.Etb.NewText = "Lage erkundet";
+        vm.Etb.AddEntryCommand.Execute(null); // save the entry first, without creating a task yet
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lage erkundet");
+        var entryTimestamp = clock.Now;
+
+        clock.Now = T0.AddHours(1); // the operator reopens the row well after the entry was logged
+        Assert.True(row.CanCreateTask);
+        row.CreateTaskCommand!.Execute(null);
+
+        Assert.NotNull(vm.PendingTaskDialog);
+        Assert.Equal("Lage erkundet", vm.PendingTaskDialog!.Text);
+
+        vm.PendingTaskDialog.SaveCommand.Execute(null);
+        var taskRow = Assert.Single(vm.Tasks.Rows);
+        Assert.StartsWith(
+            Formatting.Timestamp(entryTimestamp), taskRow.CreatedDisplay, StringComparison.Ordinal);
     }
 }
 

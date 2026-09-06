@@ -77,6 +77,20 @@ public class TaskDialogViewModelTests
     }
 
     [Fact]
+    public void Save_with_an_anchor_time_creates_the_task_at_that_time_instead_of_now()
+    {
+        var (session, clock) = NewSession();
+        clock.Now = T0.AddHours(3); // the operator opens the dialog well after the entry was logged
+        var anchor = T0; // the ETB entry's own, earlier timestamp
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Aus altem Eintrag", () => { }, anchor);
+
+        dialog.SaveCommand.Execute(null);
+
+        var task = Assert.Single(session.Incident.Tasks);
+        Assert.Equal(anchor, task.CreatedAt);
+    }
+
+    [Fact]
     public void Cancel_closes_without_saving()
     {
         var (session, _) = NewSession();
