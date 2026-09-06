@@ -80,6 +80,47 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Vehicles_round_trip_the_zugfuehrer_flag()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true),
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+            },
+        };
+        MasterDataStore.Save(_path, set);
+
+        var reopened = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(set.Vehicles, reopened.Vehicles);
+    }
+
+    [Fact]
+    public void A_pre_zugfuehrer_flag_database_widens_in_place_and_reads_existing_vehicles_as_false()
+    {
+        // Simulate a database written before the ZF flag existed: the table exists but without
+        // has_zugfuehrer. EnsureSchema must widen it in place rather than erroring on open.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0);
+                INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ('FFB Wache 1', 'FFB 1/40/1', 9);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
+    }
+
+    [Fact]
     public void Personnel_optional_fields_round_trip_as_null()
     {
         MasterDataStore.Save(_path, MasterDataSet.Empty with

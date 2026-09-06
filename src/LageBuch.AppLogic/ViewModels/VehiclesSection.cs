@@ -27,18 +27,18 @@ public sealed partial class VehiclesSection : EditorSection
         _wacheOptions = wacheOptions;
         _callSignOptions = callSignOptions;
         Rows = new ObservableCollection<VehicleRow>(
-            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats)));
+            vehicles.Select(v => NewRow(v.Wache, v.CallSign, v.Seats, v.HasZugfuehrer)));
     }
 
     public ObservableCollection<VehicleRow> Rows { get; }
 
-    private VehicleRow NewRow(string wache, string callSign, int seats) =>
-        new(wache, callSign, seats, _wacheOptions, _callSignOptions, _onChanged);
+    private VehicleRow NewRow(string wache, string callSign, int seats, bool hasZugfuehrer) =>
+        new(wache, callSign, seats, hasZugfuehrer, _wacheOptions, _callSignOptions, _onChanged);
 
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(NewRow(string.Empty, string.Empty, 0));
+        Rows.Add(NewRow(string.Empty, string.Empty, 0, false));
         _onChanged();
     }
 
@@ -83,7 +83,7 @@ public sealed partial class VehiclesSection : EditorSection
             var callSign = row.CallSign?.Trim() ?? string.Empty;
             if (wache.Length > 0 && callSign.Length > 0)
             {
-                result.Add(new Vehicle(wache, callSign, row.Seats));
+                result.Add(new Vehicle(wache, callSign, row.Seats, row.HasZugfuehrer));
             }
         }
 

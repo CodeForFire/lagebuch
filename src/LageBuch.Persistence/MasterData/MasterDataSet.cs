@@ -121,9 +121,12 @@ public sealed record Person(string LastName, string FirstName, string? Role, str
 /// <summary>
 /// One vehicle of a Wache (#76). The Wache reference is the brigade's name as spelled in the
 /// Brigades list (a free-text list, so no id exists to point at); the seat count feeds the
-/// Stärke preset when the vehicle is picked in the Kräfte entry.
+/// Stärke preset when the vehicle is picked in the Kräfte entry. HasZugfuehrer marks a
+/// command vehicle (ELW/KdoW) that carries the Zugführer -- unlike Officer/Mannschaft, ZF is
+/// not seat-derived, since only specific vehicles carry one. Defaulted so existing call sites
+/// and older Stammdaten payloads keep working unchanged.
 /// </summary>
-public sealed record Vehicle(string Wache, string CallSign, int Seats);
+public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false);
 
 /// <summary>
 /// The single source of truth for fictional example data shown in input-field placeholders
@@ -280,7 +283,8 @@ public static class MasterDataJson
                     .Select(x => new Vehicle(
                         x.GetProperty("wache").GetString()!,
                         x.GetProperty("callSign").GetString()!,
-                        x.TryGetProperty("seats", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0))
+                        x.TryGetProperty("seats", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0,
+                        x.TryGetProperty("hasZugfuehrer", out var hz) && hz.ValueKind == JsonValueKind.True))
                     .ToList()
                 : Array.Empty<Vehicle>();
 
@@ -391,7 +395,7 @@ public static class MasterDataJson
             checklistTemplateAufbau = set.ChecklistTemplateAufbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
-            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats }),
+            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer }),
             personnel = set.Personnel.Select(p => new
             {
                 lastName = p.LastName,

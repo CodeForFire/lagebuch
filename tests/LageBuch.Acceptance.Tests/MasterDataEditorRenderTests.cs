@@ -165,6 +165,7 @@ public class MasterDataEditorRenderTests
         section.Rows[0].Wache = "FFB Wache 1";
         section.Rows[0].CallSign = "FFB 1/44/1";
         section.Rows[0].Seats = 9;
+        section.Rows[0].HasZugfuehrer = true;
         vm.SelectedSection = section;
 
         var view = new MasterDataEditorView { DataContext = vm };
@@ -186,7 +187,12 @@ public class MasterDataEditorRenderTests
             new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
             boxes.Single(b => b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder).ItemsSource);
         Assert.Contains(view.GetVisualDescendants().OfType<NumericUpDown>(), n => n.Value == 9);
-        Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9) }, section.ToValues());
+
+        // The ZF checkbox (#missing-stammdaten-field) marks a command vehicle carrying the Zugführer.
+        Assert.Contains(
+            view.GetVisualDescendants().OfType<CheckBox>(),
+            c => ToolTip.GetTip(c) as string == "Zugführerfahrzeug" && c.IsChecked == true);
+        Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9, HasZugfuehrer: true) }, section.ToValues());
 
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
