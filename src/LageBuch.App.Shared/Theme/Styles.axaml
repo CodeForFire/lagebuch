@@ -465,6 +465,20 @@
     <Setter Property="Padding" Value="12,0" />
     <Setter Property="FontSize" Value="13.5" />
   </Style>
+  <!-- Fluent's DataGridCell draws its own square "current cell" focus rectangle
+       (FocusVisualPrimary/Secondary) on top of the cell's content, independent of any inner
+       control's own focus style. Every editable control here already shows its own focus ring
+       (see ComboBox/TextBox :focus above), and the row highlights on selection below, so this
+       square overlay is redundant, and worse, it visibly clashes with a colored, rounded cell
+       border (e.g. the Aufgaben priority ComboBoxes). Suppress it app-wide. -->
+  <Style Selector="DataGridCell:focus /template/ Rectangle#FocusVisualPrimary,
+                    DataGridCell:focus-visible /template/ Rectangle#FocusVisualPrimary">
+    <Setter Property="Stroke" Value="Transparent" />
+  </Style>
+  <Style Selector="DataGridCell:focus /template/ Rectangle#FocusVisualSecondary,
+                    DataGridCell:focus-visible /template/ Rectangle#FocusVisualSecondary">
+    <Setter Property="Stroke" Value="Transparent" />
+  </Style>
   <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
     <Setter Property="Fill" Value="#14202B" />
     <Setter Property="Opacity" Value="1" />
