@@ -239,18 +239,24 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
-                  <!-- Column headers (#137): each row is unlabeled otherwise. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,Auto,Auto,Auto" Margin="0,0,0,6">
+                  <!-- Column headers (#137): each row is unlabeled otherwise.
+                       The trailing three columns use fixed widths matching the row template's
+                       icon-btn buttons (28px, plus each subsequent button's 4px left margin) —
+                       "Auto" would size to this Grid's own (empty) content instead of the row
+                       template's buttons, leaving the header and row Grids to disagree on width
+                       and dragging SITZPLÄTZE/ZF out of alignment with their columns. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,28,32,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="3" Text="ZF" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="3" Text="ZF" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Zugführerfahrzeug" />
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
-                          <Grid ColumnDefinitions="*,*,150,70,Auto,Auto,Auto" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,*,150,70,28,32,32" Margin="0,0,0,6">
                             <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                  aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
                             <AutoCompleteBox Grid.Column="0"

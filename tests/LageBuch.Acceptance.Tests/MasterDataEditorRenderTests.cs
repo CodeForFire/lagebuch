@@ -189,10 +189,18 @@ public class MasterDataEditorRenderTests
         Assert.Contains(view.GetVisualDescendants().OfType<NumericUpDown>(), n => n.Value == 9);
 
         // The ZF checkbox (#missing-stammdaten-field) marks a command vehicle carrying the Zugführer.
-        Assert.Contains(
+        var zfCheckBox = Assert.Single(
             view.GetVisualDescendants().OfType<CheckBox>(),
             c => ToolTip.GetTip(c) as string == "Zugführerfahrzeug" && c.IsChecked == true);
         Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9, HasZugfuehrer: true) }, section.ToValues());
+
+        // The header Grid and the row template's Grid are separate layout passes; the header's
+        // trailing columns used to size to "Auto" against its own (empty) content instead of the
+        // row template's buttons, so the header's star columns came out wider and dragged ZF (and
+        // SITZPLÄTZE) to the right of their actual data columns. Both Grids now share fixed pixel
+        // widths for those columns, so the header and its column line up exactly.
+        var zfHeader = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "ZF");
+        Assert.Equal(zfHeader.Bounds.X, zfCheckBox.Bounds.X, 1);
 
         var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);

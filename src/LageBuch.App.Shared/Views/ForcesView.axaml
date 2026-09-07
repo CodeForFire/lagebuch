@@ -35,87 +35,93 @@
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <!-- Fahrzeuge aller Wachen (#215): wählt man eines, werden Feuerwehr, Funkrufname und
-             Stärke vorbelegt und die beiden ersten Felder gesperrt (readonly), damit die Zeile
-             nicht vom Stammdaten-Fahrzeug abweicht. Der X-Button hebt die Auswahl wieder auf. -->
-        <HeaderedContentControl Classes="field" Header="FAHRZEUG">
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <ComboBox x:Name="VehicleBox" Width="190"
-                      ItemsSource="{Binding VehicleOptions}"
-                      SelectedItem="{Binding SelectedVehicle}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="md:Vehicle">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock Text="{Binding CallSign}" />
-                    <TextBlock Text="{Binding Wache}" Classes="secondary" />
-                  </StackPanel>
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-            <Button x:Name="ClearVehicleButton" Classes="icon-btn" IsVisible="{Binding IsVehicleSelected}"
-                    Command="{Binding ClearVehicleCommand}"
-                    ToolTip.Tip="Fahrzeugauswahl aufheben">
-              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-            </Button>
-          </StackPanel>
-        </HeaderedContentControl>
-        <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
-             must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. Readonly
-             while a Fahrzeug is selected, since its Wache derived this field (#215). -->
-        <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE">
-          <AutoCompleteBox x:Name="BrigadeBox" Width="160"
-                           IsEnabled="{Binding !IsVehicleSelected}"
-                           PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
-                           ItemsSource="{Binding BrigadeOptions}"
-                           FilterMode="ContainsOrdinal"
-                           MinimumPrefixLength="0"
-                           Text="{Binding NewBrigade}"
-                           b:EnterSubmit.Command="{Binding AddForceCommand}" />
-        </HeaderedContentControl>
-        <!-- Freitext-fähig: Fahrzeuge, die nicht in den Stammdaten stehen (Fremdwehren). Readonly
-             while a Fahrzeug is selected, same reasoning as Feuerwehr/Wache above. -->
-        <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
-          <AutoCompleteBox x:Name="CallSignBox" Width="140"
-                           IsEnabled="{Binding !IsVehicleSelected}"
-                           PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
-                           ItemsSource="{Binding CallSignOptions}"
-                           FilterMode="ContainsOrdinal"
-                           MinimumPrefixLength="0"
-                           Text="{Binding NewCallSign}" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN">
-          <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
-               0 und lässt den Platzhalter stehen. Kein Beispiel-Platzhalter: das Label sagt bereits,
-               was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden. -->
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <TextBox x:Name="ZugfuehrerBox" Width="60"
-                     Text="{Binding NewZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
-            <TextBox x:Name="OfficerBox" Width="60"
-                     Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
-            <TextBox x:Name="MannschaftBox" Width="60"
-                     Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
-          </StackPanel>
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="DAVON AGT">
-          <TextBox x:Name="ScbaBox" Width="90"
-                   Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="STATUS">
-          <ComboBox x:Name="StatusBox" Width="140"
-                    ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="BEMERKUNG">
-          <!-- Freitext: kein Platzhalter, siehe #137 -->
-          <TextBox x:Name="NotesBox" Width="170" Text="{Binding NewNotes}" />
-        </HeaderedContentControl>
-        <Button x:Name="AddForceButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
+      <!-- The duplicate-callsign hint used to sit at the end of the horizontal fields row below,
+           where a narrower-than-test-harness window would clip it; it now gets its own full-width
+           line so it always has room to wrap instead. -->
+      <StackPanel Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <!-- Fahrzeuge aller Wachen (#215): wählt man eines, werden Feuerwehr, Funkrufname und
+               Stärke vorbelegt und die beiden ersten Felder gesperrt (readonly), damit die Zeile
+               nicht vom Stammdaten-Fahrzeug abweicht. Der X-Button hebt die Auswahl wieder auf. -->
+          <HeaderedContentControl Classes="field" Header="FAHRZEUG">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <ComboBox x:Name="VehicleBox" Width="190"
+                        ItemsSource="{Binding VehicleOptions}"
+                        SelectedItem="{Binding SelectedVehicle}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="md:Vehicle">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding CallSign}" />
+                      <TextBlock Text="{Binding Wache}" Classes="secondary" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <Button x:Name="ClearVehicleButton" Classes="icon-btn" IsVisible="{Binding IsVehicleSelected}"
+                      Command="{Binding ClearVehicleCommand}"
+                      ToolTip.Tip="Fahrzeugauswahl aufheben">
+                <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+              </Button>
+            </StackPanel>
+          </HeaderedContentControl>
+          <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
+               must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. Readonly
+               while a Fahrzeug is selected, since its Wache derived this field (#215). -->
+          <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE">
+            <AutoCompleteBox x:Name="BrigadeBox" Width="160"
+                             IsEnabled="{Binding !IsVehicleSelected}"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
+                             ItemsSource="{Binding BrigadeOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding NewBrigade}"
+                             b:EnterSubmit.Command="{Binding AddForceCommand}" />
+          </HeaderedContentControl>
+          <!-- Freitext-fähig: Fahrzeuge, die nicht in den Stammdaten stehen (Fremdwehren). Readonly
+               while a Fahrzeug is selected, same reasoning as Feuerwehr/Wache above. -->
+          <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+            <AutoCompleteBox x:Name="CallSignBox" Width="140"
+                             IsEnabled="{Binding !IsVehicleSelected}"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding NewCallSign}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN">
+            <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
+                 0 und lässt den Platzhalter stehen. Kein Beispiel-Platzhalter: das Label sagt bereits,
+                 was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden. -->
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBox x:Name="ZugfuehrerBox" Width="60"
+                       Text="{Binding NewZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
+              <TextBox x:Name="OfficerBox" Width="60"
+                       Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
+              <TextBox x:Name="MannschaftBox" Width="60"
+                       Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
+            </StackPanel>
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="DAVON AGT">
+            <TextBox x:Name="ScbaBox" Width="90"
+                     Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="STATUS">
+            <ComboBox x:Name="StatusBox" Width="140"
+                      ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="BEMERKUNG">
+            <!-- Freitext: kein Platzhalter, siehe #137 -->
+            <TextBox x:Name="NotesBox" Width="170" Text="{Binding NewNotes}" />
+          </HeaderedContentControl>
+          <Button x:Name="AddForceButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
+                  ToolTip.Tip="{Binding AddDisabledReason}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        </StackPanel>
         <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den
              Hinzufügen-Button (Freitext-Duplikat), und der Dropdown blendet Vergebene ohnehin aus. -->
         <TextBlock x:Name="DuplicateHint" Text="Fahrzeug ist bereits aufgenommen"
                    FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
-                   VerticalAlignment="Bottom" TextWrapping="Wrap" MaxWidth="150"
+                   TextWrapping="Wrap"
                    IsVisible="{Binding IsDuplicateCallSign}" />
       </StackPanel>
     </Border>

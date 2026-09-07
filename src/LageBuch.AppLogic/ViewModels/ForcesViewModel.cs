@@ -199,16 +199,29 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
+    private readonly Action<string, Action> _requestConfirm;
     private readonly IReadOnlyList<Vehicle> _masterVehicles;
 
+    /// <summary>
+    /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action before
+    /// running it (message, then the action to run on confirmation) — mirrors
+    /// <c>IncidentWorkspaceViewModel.CloseIncident</c>'s ConfirmDialogViewModel overlay. Defaults
+    /// to running the action immediately, so tests that don't care about the confirmation step
+    /// don't need to supply one.
+    /// </summary>
     public ForcesViewModel(
-        IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
+        IIncidentSession session,
+        IClock clock,
+        MasterDataSet masterData,
+        Action onChanged,
+        Action<string, Action>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
+        _requestConfirm = requestConfirm ?? ((_, onConfirmed) => onConfirmed());
         _masterVehicles = masterData.Vehicles;
         IsReadOnly = session.IsReadOnly;
         BrigadeOptions = masterData.Brigades;
@@ -240,6 +253,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         TotalStrengthText = $"{TotalZugfuehrer}/{TotalOfficer}/{total - TotalOfficer - TotalZugfuehrer}/{total}";
         RefreshVehicleOptions(); // taken vehicles reappear once their row is gone
         OnPropertyChanged(nameof(IsDuplicateCallSign));
+        OnPropertyChanged(nameof(AddDisabledReason));
         AddForceCommand.NotifyCanExecuteChanged();
     }
 
@@ -287,6 +301,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private string _newBrigade = string.Empty;
 
     [ObservableProperty]
@@ -295,18 +310,22 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     /// <summary>Nullable: an empty field means 0 and keeps the placeholder visible.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newZugfuehrerCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newOfficerCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newMannschaftCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newScbaCount;
 
     [ObservableProperty]
@@ -379,6 +398,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     partial void OnNewCallSignChanged(string? value)
     {
         OnPropertyChanged(nameof(IsDuplicateCallSign));
+        OnPropertyChanged(nameof(AddDisabledReason));
         AddForceCommand.NotifyCanExecuteChanged();
     }
 
@@ -421,6 +441,45 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         // Ein Fahrzeug ist einzig — sein Funkrufname darf nicht schon in der Liste stehen.
         && !IsDuplicateCallSign;
 
+    /// <summary>
+    /// Explains a disabled HINZUFÜGEN in the same priority order as <see cref="CanAddForce"/>,
+    /// so a blocked add is never a silent guess — bound to the button's tooltip. Null (not an
+    /// empty string) once every condition is satisfied, so no empty tooltip pops up while the
+    /// button is enabled.
+    /// </summary>
+    public string? AddDisabledReason
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(NewBrigade))
+            {
+                return "Wache eingeben";
+            }
+
+            var zf = NewZugfuehrerCount ?? 0;
+            var gf = NewOfficerCount ?? 0;
+            var mann = NewMannschaftCount ?? 0;
+            var agt = NewScbaCount ?? 0;
+
+            if (zf < 0 || gf < 0 || mann < 0 || agt < 0)
+            {
+                return "Stärke darf nicht negativ sein";
+            }
+
+            if (zf + gf + mann == 0)
+            {
+                return "Mindestens eine Person eintragen";
+            }
+
+            if (agt > zf + gf + mann)
+            {
+                return "AGT darf die Stärke nicht überschreiten";
+            }
+
+            return IsDuplicateCallSign ? "Funkrufname ist bereits vergeben" : null;
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddForce))]
     private void AddForce()
     {
@@ -461,7 +520,14 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
             },
             () =>
             {
-                _session.RemoveForceUnit(f.Id); // Changed → RefreshForces drops the row
-                _onChanged();
+                // Irreversible during a live Einsatz, same as closing it — confirm first (#UX).
+                var label = string.IsNullOrWhiteSpace(f.CallSign) ? f.Brigade : $"{f.Brigade} {f.CallSign}";
+                _requestConfirm(
+                    $"„{label}“ aus der Kräfteübersicht entfernen. Fortfahren?",
+                    () =>
+                    {
+                        _session.RemoveForceUnit(f.Id); // Changed → RefreshForces drops the row
+                        _onChanged();
+                    });
             });
 }

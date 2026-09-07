@@ -159,9 +159,13 @@ public class ForcesTabRenderTests
         Assert.Equal(2, vm.Forces.Forces.Count);
 
         // The ✕ column takes the unit back completely: row and totals shrink, the ETB logs it.
+        // Removal is destructive, so it goes through the same confirm overlay as CloseIncident.
         var row = vm.Forces.Forces.Single(r => r.Brigade == "FFB Wache 1");
         Assert.True(row.RemoveCommand.CanExecute(null));
         row.RemoveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotNull(vm.PendingConfirm);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
         var remaining = Assert.Single(vm.Forces.Forces);
@@ -308,6 +312,14 @@ public class ForcesTabRenderTests
         Assert.False(vm.Forces.AddForceCommand.CanExecute(null));
         var hint = view.GetControl<TextBlock>("DuplicateHint"); // the view owns the name scope
         Assert.True(hint.IsVisible);
+
+        // The hint used to sit at the end of the fields' horizontal StackPanel, where a window
+        // narrower than this test's 1920px could clip it off the right edge. It now renders on
+        // its own line below the fields, so it always has the full row width to wrap into.
+        var addButton = view.GetControl<Button>("AddForceButton");
+        Assert.True(
+            hint.Bounds.Y >= addButton.Bounds.Bottom,
+            $"DuplicateHint (y={hint.Bounds.Y}) should render below the fields row (button bottom={addButton.Bounds.Bottom}), not beside it");
 
         Capture(window, "forces-duplicate-blocked.png");
     }

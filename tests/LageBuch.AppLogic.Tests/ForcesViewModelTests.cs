@@ -85,6 +85,33 @@ public class ForcesViewModelTests
         Assert.True(vm.AddForceCommand.CanExecute(null));
     }
 
+    // --- AddDisabledReason mirrors CanAddForce so a blocked HINZUFÜGEN is never a silent guess
+    // (#UX) ---
+    [Fact]
+    public void AddDisabledReason_explains_each_blocking_condition_in_priority_order()
+    {
+        var vm = NewVm();
+        Assert.Equal("Wache eingeben", vm.AddDisabledReason);
+
+        vm.NewBrigade = "FFB Wache 1";
+        Assert.Equal("Mindestens eine Person eintragen", vm.AddDisabledReason);
+
+        vm.NewMannschaftCount = 6;
+        vm.NewScbaCount = 7;
+        Assert.Equal("AGT darf die Stärke nicht überschreiten", vm.AddDisabledReason);
+
+        vm.NewScbaCount = 2;
+        vm.NewCallSign = "FFB 1/40/1";
+        vm.AddForceCommand.Execute(null);
+        vm.NewBrigade = "FFB Wache 1";
+        vm.NewMannschaftCount = 6;
+        vm.NewCallSign = "FFB 1/40/1";
+        Assert.Equal("Funkrufname ist bereits vergeben", vm.AddDisabledReason);
+
+        vm.NewCallSign = "Some other name";
+        Assert.Null(vm.AddDisabledReason);
+    }
+
     // --- Issue #18 ---
     [Fact]
     public void Brigade_options_come_from_master_data()
@@ -531,6 +558,45 @@ public class ForcesViewModelTests
         Assert.Equal(9, vm.TotalPersonnel);
         Assert.Equal(3, changes); // two adds + the removal
         Assert.Contains("Einheit entfernt: FFB Wache 1 (FFB 1/40/1)", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
+    // --- Removing a unit is destructive, so it goes through the same confirm gate as
+    // CloseIncident (#UX) ---
+    [Fact]
+    public void Removing_a_row_asks_for_confirmation_before_touching_the_session()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        string? confirmMessage = null;
+        Action? confirmAction = null;
+        var vm = new ForcesViewModel(session, clock, Md(), () => { }, (message, onConfirmed) =>
+        {
+            confirmMessage = message;
+            confirmAction = onConfirmed;
+        })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewMannschaftCount = 6,
+            NewCallSign = "FFB 1/40/1",
+        };
+        vm.AddForceCommand.Execute(null);
+
+        vm.Forces[0].RemoveCommand.Execute(null);
+
+        // Nothing happened yet — the host only recorded the request.
+        Assert.Single(vm.Forces);
+        Assert.Contains("FFB Wache 1", confirmMessage, StringComparison.Ordinal);
+        Assert.Contains("FFB 1/40/1", confirmMessage, StringComparison.Ordinal);
+
+        confirmAction!();
+
+        Assert.Empty(vm.Forces);
     }
 
     [Fact]
