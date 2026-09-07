@@ -163,7 +163,7 @@
               <DataTemplate x:DataType="vm:TaskRow">
                 <StackPanel Orientation="Vertical" Margin="6,4" Spacing="1">
                   <!-- Committing per keystroke would rewrite the whole incident file on every
-                       character (#33 precedent) -- LostFocus pushes once, on leaving the field. -->
+                       character (#33 precedent) — LostFocus pushes once, on leaving the field. -->
                   <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                            IsEnabled="{Binding !IsReadOnly}" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding CreatedDisplay}" Classes="overline" FontSize="9"

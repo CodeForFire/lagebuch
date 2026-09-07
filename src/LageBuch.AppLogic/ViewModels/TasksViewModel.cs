@@ -322,7 +322,6 @@ public sealed partial class TaskRow : ObservableObject
 
     // --- Editable fields (#246): typo fixes, reassignment, re-prioritizing. Each write-through
     // mirrors ForceRow.PushStatusNotes -- silent domain edit, no ETB entry (AddTask precedent). ---
-
     [ObservableProperty]
     private string _text;
 
