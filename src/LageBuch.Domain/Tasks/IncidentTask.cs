@@ -151,10 +151,13 @@ public sealed record IncidentTask
         };
     }
 
-    /// <summary>Adds minutes to the due time (#246 "+5" quick action). A task created with no timer
+    /// <summary>Adds minutes to the due time (#246 "+5 min" quick action). A task created with no timer
     /// (<see cref="DueAt"/> == <see cref="DateTimeOffset.MaxValue"/>) has nothing to extend -- the
-    /// view disables the action, but this still fails loudly rather than fabricating a due time.</summary>
-    public IncidentTask WithExtendedTimer(int minutes)
+    /// view disables the action, but this still fails loudly rather than fabricating a due time.
+    /// An overdue task rebases to <paramref name="now"/> instead of stacking onto the already-passed
+    /// due time, so the action always yields a due time in the future; a task not yet due keeps
+    /// stacking onto its existing <see cref="DueAt"/>.</summary>
+    public IncidentTask WithExtendedTimer(int minutes, DateTimeOffset now)
     {
         if (minutes <= 0)
         {
@@ -166,7 +169,8 @@ public sealed record IncidentTask
             throw new InvalidOperationException("Aufgabe hat keinen Timer.");
         }
 
-        return this with { DueAt = DueAt.AddMinutes(minutes) };
+        var baseline = DueAt > now ? DueAt : now;
+        return this with { DueAt = baseline.AddMinutes(minutes) };
     }
 
     /// <summary>Urgency-driven default for the creation UIs' TIMER (MIN) field (#88).</summary>

@@ -200,7 +200,7 @@ public sealed class LocalIncidentSession : IIncidentSession
         Mutate(() => Incident.UpdateTask(taskId, text, assignee, importance, urgency));
 
     public void ExtendTaskTimer(Guid taskId, int minutes) =>
-        Mutate(() => Incident.ExtendTaskTimer(taskId, minutes));
+        Mutate(() => Incident.ExtendTaskTimer(taskId, minutes, _clock));
 
     public void AddScbaTrupp(
         string designation,

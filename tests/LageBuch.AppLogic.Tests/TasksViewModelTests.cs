@@ -326,6 +326,20 @@ public class TasksViewModelTests
     }
 
     [Fact]
+    public void ExtendTimer_on_overdue_task_rebases_to_now_plus_five_minutes()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("overdue", null, TaskImportance.High, TaskUrgency.High, 5); // due at T0+5
+        var vm = NewVm(session, clock);
+        var row = vm.Rows.Single(r => r.Text == "overdue");
+
+        clock.Now = T0.AddMinutes(30); // well past the due time
+        row.ExtendTimerCommand.Execute(null);
+
+        Assert.Equal(clock.Now.AddMinutes(5), session.Incident.Tasks.Single(t => t.Text == "overdue").DueAt);
+    }
+
+    [Fact]
     public void Radio_bools_write_through_to_the_filter_and_false_is_a_noop()
     {
         var (session, clock, _) = NewSession();

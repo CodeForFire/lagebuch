@@ -900,18 +900,19 @@ public sealed class Incident
         return updated;
     }
 
-    /// <summary>Adds minutes to a task's due time (#246 "+5" quick action). Silent like
+    /// <summary>Adds minutes to a task's due time (#246 "+5 min" quick action). Silent like
     /// <see cref="UpdateTask"/>. Unknown ids throw so a replayed command fails loudly.</summary>
-    public IncidentTask ExtendTaskTimer(Guid taskId, int minutes)
+    public IncidentTask ExtendTaskTimer(Guid taskId, int minutes, IClock clock)
     {
         EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
         var index = _tasks.FindIndex(t => t.Id == taskId);
         if (index < 0)
         {
             throw new KeyNotFoundException($"Aufgabe {taskId} nicht gefunden.");
         }
 
-        var updated = _tasks[index].WithExtendedTimer(minutes);
+        var updated = _tasks[index].WithExtendedTimer(minutes, clock.Now);
         _tasks[index] = updated;
         return updated;
     }
