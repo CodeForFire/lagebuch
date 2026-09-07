@@ -138,7 +138,7 @@ make package-linux    # build a local .deb
 Pushing a tag triggers the release workflow:
 
 ```bash
-git tag v0.3.0 && git push origin v0.3.0
+git tag v0.4.1 && git push origin v0.4.1
 ```
 
 ## Master data
