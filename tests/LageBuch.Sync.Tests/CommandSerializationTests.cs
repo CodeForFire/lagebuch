@@ -55,6 +55,8 @@ public class CommandSerializationTests
         new AddTaskCommand(Op, "Nachfordern", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), true),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), false),
+        new AddUndergroundUnitCommand(Op, Guid.NewGuid(), -1),
+        new RemoveUndergroundUnitCommand(Op, Guid.NewGuid(), -2, 7),
     }.Select(c => new object[] { c });
 
     [Theory]

@@ -42,7 +42,9 @@ and [QuestPDF](https://www.questpdf.com/) report generation.
   and a Rückzugsalarm siren
 - **CO-Messprotokoll** — building/floor/apartment search grid with per-dwelling
   status (not searched / searched / affected), CO ppm value, resident name and
-  key-availability marker, mirroring the real-world door-marking convention
+  key-availability marker, mirroring the real-world door-marking convention;
+  Untergeschosse are a free-form list instead — add and remove as many units as
+  the basement actually has, each named by owner or Kellerabteil number
 - **Checklisten** — Aufbau/Abbau checklists from your own master data, mandatory
   items highlighted, completion logged to the ETB
 - **Dateien** — attach photos and PDFs to an incident; they are merged into the
