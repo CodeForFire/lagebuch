@@ -380,6 +380,12 @@ public class ForcesViewModelTests
         vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true);
 
         Assert.Equal(1, vm.NewZugfuehrerCount);
+
+        // The Zugführer occupies one of the vehicle's seats -- the preset total must not exceed
+        // Seats (#260), so Officer/Mannschaft are split from the remaining 3, not from all 4.
+        Assert.Equal(1, vm.NewOfficerCount);
+        Assert.Equal(2, vm.NewMannschaftCount);
+        Assert.Equal(4, vm.NewZugfuehrerCount + vm.NewOfficerCount + vm.NewMannschaftCount);
     }
 
     [Fact]

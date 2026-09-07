@@ -210,6 +210,29 @@ public class ForcesTabRenderTests
     }
 
     [AvaloniaFact]
+    public void Vehicle_selection_with_zugfuehrer_presets_within_seat_capacity()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        vm.Forces.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true);
+        Dispatcher.UIThread.RunJobs();
+
+        // The Zugführer occupies one of the vehicle's 4 seats -- the preset must not exceed the
+        // seat count (#260), so Officer/Mannschaft split the remaining 3, not all 4.
+        Assert.Equal(1, vm.Forces.NewZugfuehrerCount);
+        Assert.Equal(1, vm.Forces.NewOfficerCount);
+        Assert.Equal(2, vm.Forces.NewMannschaftCount);
+        Assert.Equal(4, vm.Forces.NewZugfuehrerCount + vm.Forces.NewOfficerCount + vm.Forces.NewMannschaftCount);
+
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Forces.Forces);
+        Assert.Equal("1/1/2/4", row.StrengthText);
+
+        Capture(window, "forces-zf-seat-preset.png");
+    }
+
+    [AvaloniaFact]
     public void Selecting_a_vehicle_locks_brigade_and_call_sign_and_shows_a_clear_button()
     {
         var view = HostForcesView(out var vm, out var window);
