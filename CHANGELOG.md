@@ -11,6 +11,7 @@ once we reach 1.0.
 
 ### Added
 - Show the 25 MB per-file attachment limit in the Files view (#213)
+- Create a task from an already-saved ETB entry via a row icon (#247)
 
 ## [0.4.0] - 2026-09-05
 

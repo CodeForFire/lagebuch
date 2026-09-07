@@ -774,6 +774,35 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
     }
+
+    /// <summary>
+    /// Reopening the create-task overlay from an already-saved ETB row (#247) -- the one path
+    /// #88 left with no way back in once an entry was saved -- must anchor the resulting task's
+    /// timer to "now", not that row's own (possibly much older) timestamp, or a stale entry would
+    /// spawn a task that is overdue on arrival.
+    /// </summary>
+    [Fact]
+    public void Etb_row_create_task_icon_opens_dialog_anchored_to_now()
+    {
+        var vm = NewWorkspace(out _, out var clock);
+        vm.Etb.NewText = "Lage erkundet";
+        vm.Etb.AddEntryCommand.Execute(null);
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lage erkundet");
+
+        clock.Now = clock.Now.AddHours(1); // operator only gets to it later
+        var clickTime = clock.Now;
+        Assert.True(row.CanCreateTask);
+        row.CreateTaskCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingTaskDialog);
+        Assert.Equal("Lage erkundet", vm.PendingTaskDialog!.Text);
+
+        vm.PendingTaskDialog!.SaveCommand.Execute(null);
+
+        var task = Assert.Single(vm.Tasks.Rows, t => t.Text == "Lage erkundet");
+        Assert.StartsWith(Formatting.Timestamp(clickTime), task.CreatedDisplay, StringComparison.Ordinal);
+        Assert.False(task.IsOverdue); // anchored to now, so a fresh 15-minute timer is not overdue
+    }
 }
 
 internal sealed class FakeDialogs : IFileDialogService
