@@ -518,6 +518,19 @@ public class IncidentWorkspaceViewModelTests
         Assert.True(vm.CloseIncidentCommand.CanExecute(null));
     }
 
+    // ExportPdfCommand is synchronous -- it only opens the section-selection dialog (#262); the
+    // actual generate/write/share work is the dialog's own awaitable ExportCommand.
+    [Fact]
+    public void ExportPdf_opens_the_section_selection_dialog()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.ExportPdfCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingPdfExportOptions);
+        Assert.All(vm.PendingPdfExportOptions!.Items, i => Assert.True(i.IsSelected));
+    }
+
     [Fact]
     public async Task ExportPdf_writes_file_when_path_chosen()
     {
@@ -525,20 +538,173 @@ public class IncidentWorkspaceViewModelTests
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var vm = NewWorkspace(out _, out _, dialogs);
 
-        await vm.ExportPdfCommand.ExecuteAsync(null);
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
 
         Assert.True(File.Exists(exportPath));
         var bytes = await File.ReadAllBytesAsync(exportPath);
         Assert.Equal(0x25, bytes[0]); // %PDF
+        Assert.Null(vm.PendingPdfExportOptions); // overlay closes once the export completes
+        Assert.Contains(exportPath, vm.ExportStatus, StringComparison.Ordinal);
+        File.Delete(exportPath);
+    }
+
+    // Nothing in the app today lets a stale dialog outlive its slot, but PdfExportOptionsViewModel
+    // is the first overlay whose Closed can fire well after a newer one has replaced it in
+    // PendingPdfExportOptions (its Export command awaits real async work). The Closed handler must
+    // only clear the overlay it was registered for.
+    [Fact]
+    public void A_stale_dialogs_close_does_not_clear_a_newer_dialog()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.ExportPdfCommand.Execute(null);
+        var dialog1 = vm.PendingPdfExportOptions;
+
+        vm.ExportPdfCommand.Execute(null); // orphans dialog1, opens dialog2 in its place
+        var dialog2 = vm.PendingPdfExportOptions;
+        Assert.NotSame(dialog1, dialog2);
+
+        dialog1!.CancelCommand.Execute(null); // the orphaned dialog belatedly closes
+
+        Assert.Same(dialog2, vm.PendingPdfExportOptions);
+    }
+
+    [Fact]
+    public async Task ExportPdf_does_nothing_when_the_save_dialog_is_cancelled()
+    {
+        var dialogs = new FakeDialogs { ExportPath = null };
+        var vm = NewWorkspace(out _, out _, dialogs);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null); // should not throw
+
+        Assert.Null(vm.ExportStatus);
+    }
+
+    [Fact]
+    public async Task ExportPdf_omits_deselected_sections()
+    {
+        var dialogs = new FakeDialogs();
+        var vm = NewWorkspace(out _, out _, dialogs);
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewMannschaftCount = 9;
+        vm.Forces.AddForceCommand.Execute(null);
+
+        var pathAll = Path.Combine(Path.GetTempPath(), $"export-all-{Guid.NewGuid():N}.pdf");
+        dialogs.ExportPath = pathAll;
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        var pathReduced = Path.Combine(Path.GetTempPath(), $"export-reduced-{Guid.NewGuid():N}.pdf");
+        dialogs.ExportPath = pathReduced;
+        vm.ExportPdfCommand.Execute(null);
+        vm.PendingPdfExportOptions!.Items.Single(i => i.Section == IncidentPdfSections.Forces).IsSelected = false;
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        try
+        {
+            var allBytes = await File.ReadAllBytesAsync(pathAll);
+            var reducedBytes = await File.ReadAllBytesAsync(pathReduced);
+            Assert.True(
+                reducedBytes.Length < allBytes.Length,
+                $"Expected deselecting Kräfte to shrink the PDF (all={allBytes.Length}, reduced={reducedBytes.Length}).");
+        }
+        finally
+        {
+            File.Delete(pathAll);
+            File.Delete(pathReduced);
+        }
+    }
+
+    [Fact]
+    public async Task A_failing_exporter_surfaces_in_ExportStatus_and_does_not_throw()
+    {
+        var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var dialogs = new FakeDialogs { ExportPath = exportPath };
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs,
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new ThrowingPdfExporter());
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null); // must not throw
+
+        Assert.Contains("Datenträger voll", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.False(File.Exists(exportPath));
+        Assert.Null(vm.PendingPdfExportOptions); // overlay still closes on failure
+    }
+
+    [Fact]
+    public async Task Exported_path_and_time_are_persisted_via_ILastPdfExportStore()
+    {
+        var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var dialogs = new FakeDialogs { ExportPath = exportPath };
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var lastExportStore = new FakeLastPdfExportStore();
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs,
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter(),
+            lastExportStore);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        Assert.Equal(exportPath, lastExportStore.SetPath);
+        Assert.Equal(T0, lastExportStore.SetAt);
         File.Delete(exportPath);
     }
 
     [Fact]
-    public async Task ExportPdf_does_nothing_when_cancelled()
+    public void ExportStatus_is_seeded_from_the_last_persisted_export_on_open()
     {
-        var dialogs = new FakeDialogs { ExportPath = null };
-        var vm = NewWorkspace(out _, out _, dialogs);
-        await vm.ExportPdfCommand.ExecuteAsync(null); // should not throw
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var lastExportStore = new FakeLastPdfExportStore(new LastPdfExport("/einsaetze/alt.pdf", T0.AddHours(-1)));
+
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter(),
+            lastExportStore);
+
+        Assert.Contains("/einsaetze/alt.pdf", vm.ExportStatus, StringComparison.Ordinal);
     }
 
     // A platform whose exporter can't render (e.g. Android -- QuestPDF doesn't support it, see
@@ -802,6 +968,36 @@ public class IncidentWorkspaceViewModelTests
         var task = Assert.Single(vm.Tasks.Rows, t => t.Text == "Lage erkundet");
         Assert.StartsWith(Formatting.Timestamp(clickTime), task.CreatedDisplay, StringComparison.Ordinal);
         Assert.False(task.IsOverdue); // anchored to now, so a fresh 15-minute timer is not overdue
+    }
+}
+
+// Simulates a generation failure (e.g. disk full) so ExportPdf's try/catch can be exercised
+// without relying on an actual I/O failure.
+internal sealed class ThrowingPdfExporter : IIncidentPdfExporter
+{
+    public bool CanExport => true;
+
+    public byte[] Generate(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
+        throw new InvalidOperationException("Datenträger voll");
+}
+
+internal sealed class FakeLastPdfExportStore : ILastPdfExportStore
+{
+    private LastPdfExport? _seed;
+
+    public FakeLastPdfExportStore(LastPdfExport? seed = null) => _seed = seed;
+
+    public string? SetPath { get; private set; }
+
+    public DateTimeOffset? SetAt { get; private set; }
+
+    public LastPdfExport? GetLastExport() => _seed;
+
+    public void SetLastExport(string path, DateTimeOffset exportedAt)
+    {
+        SetPath = path;
+        SetAt = exportedAt;
+        _seed = new LastPdfExport(path, exportedAt);
     }
 }
 

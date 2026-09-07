@@ -36,6 +36,10 @@ public sealed partial class HomeViewModel : ObservableObject
     // is null-guarded, so the feature is simply inert rather than required.
     private readonly ILastSaveFolderStore? _lastSaveFolder;
 
+    // Threaded straight into every IncidentWorkspaceViewModel this opens (#262); null (most tests
+    // and every remote/joined workspace) just means "no last-export status to seed or persist".
+    private readonly ILastPdfExportStore? _lastPdfExport;
+
     // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
@@ -46,7 +50,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // mismatch but has no store to compare against, so every first join succeeds without TOFU.
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -63,6 +67,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _lastSaveFolder = lastSaveFolder;
         _attachmentCacheRoot = attachmentCacheRoot;
         _trustStore = trustStore;
+        _lastPdfExport = lastPdfExport;
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -200,7 +205,7 @@ public sealed partial class HomeViewModel : ObservableObject
         }
 
         InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter);
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport);
         WorkspaceOpened?.Invoke(workspace);
     }
 

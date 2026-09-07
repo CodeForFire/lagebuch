@@ -14,7 +14,7 @@ public interface IIncidentPdfExporter
     /// <summary>Whether this platform can export at all (false hides the button).</summary>
     bool CanExport { get; }
 
-    byte[] Generate(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths);
+    byte[] Generate(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All);
 }
 
 /// <summary>No-op exporter for heads that cannot render PDFs; the button stays hidden (<see cref="CanExport"/> is false).</summary>
@@ -22,6 +22,6 @@ public sealed class NoopIncidentPdfExporter : IIncidentPdfExporter
 {
     public bool CanExport => false;
 
-    public byte[] Generate(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths) =>
+    public byte[] Generate(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
         throw new NotSupportedException("PDF export is not available on this platform.");
 }
