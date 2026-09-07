@@ -6,14 +6,19 @@
              x:Class="LageBuch.App.Shared.Views.TasksView"
              x:DataType="vm:TasksViewModel">
   <UserControl.Styles>
-    <Style Selector="TextBlock.prio-high">
-      <Setter Property="Foreground" Value="#FF3D2E" />
+    <!-- WICHTIG/DRINGL. are editable ComboBoxes (#246), not plain TextBlocks: color the control
+         itself (text + border) rather than just the text, since a colored word alone reads as a
+         weaker signal once it sits inside a bordered, chevron-decorated control. -->
+    <Style Selector="ComboBox.prio-high">
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="TextBlock.prio-medium">
+    <Style Selector="ComboBox.prio-medium">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
     </Style>
-    <Style Selector="TextBlock.prio-low">
+    <Style Selector="ComboBox.prio-low">
       <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
     </Style>
     <Style Selector="TextBlock.due">
