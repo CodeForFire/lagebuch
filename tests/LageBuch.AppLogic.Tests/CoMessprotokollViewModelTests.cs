@@ -68,6 +68,33 @@ public class CoMessprotokollViewModelTests
         Assert.False(vm.AddUntergeschossCommand.CanExecute(null));
     }
 
+    // --- Issue #258: Obergeschoss (OG) floors above the current top floor -------------------
+    [Fact]
+    public void AddObergeschoss_AddsOneFloorAboveTopAndItsDwellings()
+    {
+        var (session, vm) = CreateVm();
+
+        vm.AddObergeschossCommand.Execute(null);
+
+        var building = session.Incident.Buildings[0];
+        Assert.Equal(3, building.FloorCount);
+        Assert.Equal(4, vm.MatrixRows.Count); // 3 OG + EG
+        Assert.Equal(3, vm.MatrixRows[0].Ordinal); // new OG sorts above the previous top floor
+        Assert.Contains(session.Incident.Dwellings, d => d.FloorOrdinal == 3);
+    }
+
+    [Fact]
+    public void AddObergeschoss_IsDisabled_AtTheFiftyFloorCap()
+    {
+        var (_, vm) = CreateVm();
+        vm.NewBuildingName = "Haus B";
+        vm.NewBuildingFloors = 50;
+        vm.ConfirmAddBuildingCommand.Execute(null);
+        vm.SelectedBuilding = vm.BuildingOptions.Single(b => b.Name == "Haus B");
+
+        Assert.False(vm.AddObergeschossCommand.CanExecute(null));
+    }
+
     // Untergeschosse don't show in the matrix until scrolled to, unlike ground/upper floors, so
     // ConfirmAddBuildingCommand defaults NewBuildingUndergroundFloors to 1 rather than 0 -- a
     // building created via the dialog already has a basement to record without a separate
