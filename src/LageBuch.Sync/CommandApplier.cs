@@ -162,12 +162,6 @@ public static class CommandApplier
             case SetApartmentLabelCommand c:
                 incident.SetApartmentLabel(c.BuildingId, c.ApartmentNumber, c.Label);
                 break;
-            case AddUndergroundUnitCommand c:
-                incident.AddUndergroundUnit(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal);
-                break;
-            case RemoveUndergroundUnitCommand c:
-                incident.RemoveUndergroundUnit(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumber);
-                break;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(command),

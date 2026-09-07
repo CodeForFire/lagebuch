@@ -293,12 +293,6 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
         Mutate(() => Incident.SetApartmentLabel(buildingId, apartmentNumber, label));
 
-    public void AddUndergroundUnit(Guid buildingId, int floorOrdinal) =>
-        Mutate(() => Incident.AddUndergroundUnit(_clock, RequireOperator(), buildingId, floorOrdinal));
-
-    public void RemoveUndergroundUnit(Guid buildingId, int floorOrdinal, int apartmentNumber) =>
-        Mutate(() => Incident.RemoveUndergroundUnit(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber));
-
     public void Close()
     {
         if (IsReadOnly)

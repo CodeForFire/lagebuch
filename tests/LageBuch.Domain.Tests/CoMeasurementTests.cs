@@ -97,19 +97,6 @@ public class CoMeasurementTests
     }
 
     [Fact]
-    public void CoMeasurementLabels_DwellingLocation_UndergroundFloor_IgnoresSharedApartmentLabel()
-    {
-        // UG units (#265) are a free-form list, not a shared grid column, so a custom label set
-        // for OG apartment 2 (e.g. "Müller") must never leak onto a same-numbered UG unit.
-        var building = Building.Create("Haus A", 8, 10, 0, undergroundFloorCount: 1)
-            .WithApartmentLabel(2, "Müller");
-
-        Assert.Equal(
-            "Haus A, 1. UG, Einheit 2",
-            CoMeasurementLabels.DwellingLocation(building, -1, 2));
-    }
-
-    [Fact]
     public void Building_WithStructure_UpdatesCounts()
     {
         var building = Building.Create("Haus A", 8, 10, 0);
@@ -333,68 +320,6 @@ public class CoMeasurementTests
 
         Assert.Throws<IncidentClosedException>(() =>
             incident.AddCoBuilding(clock, op, "Haus A", 2, 3));
-    }
-
-    // --- Issue #265: UG free-form unit list (Option A) --------------------------------------
-    [Fact]
-    public void Incident_AddUndergroundUnit_AppendsUnitWithNextApartmentNumber()
-    {
-        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(clock, op);
-        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, undergroundFloorCount: 1); // 1.UG seeded with 3 units
-
-        incident.AddUndergroundUnit(clock, op, incident.Buildings[0].Id, -1);
-
-        var ugDwellings = incident.Dwellings.Where(d => d.FloorOrdinal == -1).ToList();
-        Assert.Equal(4, ugDwellings.Count);
-        Assert.Contains(ugDwellings, d => d.ApartmentNumber == 4);
-        Assert.Contains(incident.Journal, e => e.Text.Contains("UG-Einheit hinzugefügt", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Incident_AddUndergroundUnit_NonUndergroundFloor_Throws()
-    {
-        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(clock, op);
-        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, undergroundFloorCount: 1);
-
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            incident.AddUndergroundUnit(clock, op, incident.Buildings[0].Id, 0));
-    }
-
-    [Fact]
-    public void Incident_RemoveUndergroundUnit_RemovesOnlyThatUnit()
-    {
-        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(clock, op);
-        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, undergroundFloorCount: 1);
-
-        incident.RemoveUndergroundUnit(clock, op, incident.Buildings[0].Id, -1, 2);
-
-        var ugDwellings = incident.Dwellings.Where(d => d.FloorOrdinal == -1).ToList();
-        Assert.Equal(2, ugDwellings.Count);
-        Assert.DoesNotContain(ugDwellings, d => d.ApartmentNumber == 2);
-        Assert.Contains(incident.Journal, e => e.Text.Contains("UG-Einheit entfernt", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Incident_UpdateCoBuildingStructure_PreservesExtraUndergroundUnits()
-    {
-        // A UG floor's unit count is independent of apartmentsPerFloor (#265) -- growing the
-        // building's OG/EG structure must not silently delete units a crew already added there.
-        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(clock, op);
-        incident.AddCoBuilding(clock, op, "Haus A", 2, 3, undergroundFloorCount: 1);
-        incident.AddUndergroundUnit(clock, op, incident.Buildings[0].Id, -1);
-        incident.AddUndergroundUnit(clock, op, incident.Buildings[0].Id, -1);
-
-        incident.UpdateCoBuildingStructure(clock, op, incident.Buildings[0].Id, 3, 3, undergroundFloorCount: 1);
-
-        Assert.Equal(5, incident.Dwellings.Count(d => d.FloorOrdinal == -1));
     }
 
     [Fact]

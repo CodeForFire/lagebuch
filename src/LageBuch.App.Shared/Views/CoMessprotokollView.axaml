@@ -152,10 +152,9 @@
                          FormatString="0" PlaceholderText="Kein Messwert" />
         </StackPanel>
 
-        <!-- Resident Name: doubles as a UG unit's free-text identity (#265), so the label swaps
-             based on SelectedCell.IsUnderground rather than always reading "Bewohner". -->
+        <!-- Resident Name -->
         <StackPanel Spacing="2">
-          <TextBlock Text="{Binding ResidentFieldLabel}" Classes="overline" FontSize="10" />
+          <TextBlock Text="NAME DER BEWOHNER (OPTIONAL)" Classes="overline" FontSize="10" />
           <TextBox Text="{Binding SelectedCell.ResidentName}"
                    PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}" />
         </StackPanel>
@@ -222,7 +221,7 @@
               <Grid ColumnDefinitions="80,Auto,*">
                 <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
                            VerticalAlignment="Center" Margin="0,0,8,0" />
-                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}" IsVisible="{Binding !IsUnderground}">
+                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                       <UniformGrid Rows="1" ColumnSpacing="4" />
@@ -265,67 +264,6 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-
-                <!-- UG free-form list (#265): Untergeschosse rarely line up 1:1 with the flats
-                     above, so instead of the shared-column grid, each UG floor gets its own
-                     variable-length list of unit cards (free-text identity via the resident-name
-                     field, doubling per ResidentFieldLabel above) with per-card remove and a
-                     trailing "add" affordance: deliberately a different interaction than the
-                     EG/OG grid, since a shared column index has no meaning here. -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsUnderground}">
-                  <ItemsControl ItemsSource="{Binding Cells}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel ItemSpacing="4" LineSpacing="4" />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:DwellingCellViewModel">
-                        <Border Width="148" CornerRadius="6"
-                                BorderBrush="{Binding StatusBrush}" BorderThickness="1"
-                                Background="{StaticResource SurfaceRaisedBrush}"
-                                ClipToBounds="True">
-                          <Grid ColumnDefinitions="4,*">
-                            <Border Grid.Column="0" Background="{Binding StatusBrush}" />
-                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"
-                                  Margin="8,6">
-                              <TextBlock Grid.Row="0" Grid.Column="0"
-                                         Text="{Binding DisplayLabel}"
-                                         FontSize="11" FontWeight="SemiBold"
-                                         Foreground="{StaticResource TextPrimaryBrush}"
-                                         TextTrimming="CharacterEllipsis" MaxWidth="90" />
-                              <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Content="✕"
-                                      FontSize="10" Padding="4,2" Background="Transparent"
-                                      BorderThickness="0" VerticalAlignment="Top"
-                                      Foreground="{StaticResource TextSecondaryBrush}"
-                                      Command="{Binding RemoveCommand}"
-                                      ToolTip.Tip="Einheit entfernen" />
-                              <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="5">
-                                <TextBlock Text="{Binding StatusGlyph}" FontFamily="{StaticResource MonoFont}"
-                                           FontWeight="Bold" FontSize="13"
-                                           Foreground="{Binding StatusBrush}" />
-                                <TextBlock Text="{Binding CoDisplay}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"
-                                           TextTrimming="CharacterEllipsis" />
-                              </StackPanel>
-                              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="11"
-                                         Margin="6,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
-                              <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Content="BEARBEITEN"
-                                      FontSize="9" Padding="0" Margin="0,4,0,0" Background="Transparent"
-                                      BorderThickness="0" HorizontalContentAlignment="Left"
-                                      Foreground="{StaticResource TextSecondaryBrush}"
-                                      Command="{Binding OpenEditorCommand}" />
-                            </Grid>
-                          </Grid>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <Button Content="+ EINHEIT" FontSize="11" VerticalAlignment="Top"
-                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.AddUndergroundUnitCommand}"
-                          CommandParameter="{Binding Ordinal}" />
-                </StackPanel>
-
                 <TextBlock Grid.Column="2" Text="{Binding Description}"
                            VerticalAlignment="Center" Margin="8,0,0,0"
                            Width="200" TextWrapping="Wrap" />

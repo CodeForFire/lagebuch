@@ -43,13 +43,7 @@ public static class CoMeasurementLabels
     public static string DwellingLocation(Building building, int floorOrdinal, int apartmentNumber)
     {
         ArgumentNullException.ThrowIfNull(building);
-
-        // UG units (#265) are a free-form list, not a shared grid column: ApartmentLabels is
-        // keyed only by apartment number and shared across every EG/OG floor, so reusing it here
-        // would leak an unrelated OG column's custom label (e.g. "Müller") onto a same-numbered
-        // UG unit that has nothing to do with it.
-        var unit = floorOrdinal < 0 ? $"Einheit {apartmentNumber}" : ApartmentLabel(building, apartmentNumber);
-        return $"{building.Name}, {FloorLabel(floorOrdinal)}, {unit}";
+        return $"{building.Name}, {FloorLabel(floorOrdinal)}, {ApartmentLabel(building, apartmentNumber)}";
     }
 
     public static string StatusText(DwellingStatus status) => status switch

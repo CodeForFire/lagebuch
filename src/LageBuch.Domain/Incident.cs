@@ -913,20 +913,16 @@ public sealed class Incident
         var index = _buildings.IndexOf(building);
         _buildings[index] = updated;
 
-        // Remove dwellings on floors that no longer exist at all, regardless of EG/OG vs. UG.
+        // Remove dwellings outside the new structure...
         var removed = _dwellings.RemoveAll(d =>
             d.BuildingId == buildingId &&
-            (d.FloorOrdinal > floorCount || d.FloorOrdinal < -undergroundFloorCount));
+            (d.FloorOrdinal > floorCount || d.FloorOrdinal < -undergroundFloorCount || d.ApartmentNumber > apartmentsPerFloor));
 
-        // EG/OG floors (#218) still track a uniform column count shared across the building: trim
-        // or grow them to match apartmentsPerFloor. Dwelling.Create is idempotent-safe here since
-        // the removal pass above already cleared anything out of bounds, so no (floor, apartment)
-        // pair can already exist twice.
-        removed += _dwellings.RemoveAll(d =>
-            d.BuildingId == buildingId && d.FloorOrdinal >= 0 && d.ApartmentNumber > apartmentsPerFloor);
-
+        // ...and add any newly covered by a grown structure (more OG/UG floors or apartments) --
+        // Dwelling.Create is idempotent-safe here since the removal pass above already cleared
+        // anything out of bounds, so no (floor, apartment) pair can already exist twice.
         var added = 0;
-        for (var floor = 0; floor <= floorCount; floor++)
+        for (var floor = -undergroundFloorCount; floor <= floorCount; floor++)
         {
             for (var apt = 1; apt <= apartmentsPerFloor; apt++)
             {
@@ -935,25 +931,6 @@ public sealed class Incident
                     _dwellings.Add(Dwelling.Create(buildingId, floor, apt));
                     added++;
                 }
-            }
-        }
-
-        // UG floors (#265) are a free-form list managed independently via AddUndergroundUnit /
-        // RemoveUndergroundUnit -- their unit count isn't tied to apartmentsPerFloor, since a
-        // basement's Kellerabteile/Technikräume rarely line up 1:1 with the flats above. A brand
-        // new UG floor still starts seeded with apartmentsPerFloor units so there's something to
-        // edit; an already-populated UG floor keeps whatever units the crew has added or removed.
-        for (var floor = -1; floor >= -undergroundFloorCount; floor--)
-        {
-            if (_dwellings.Any(d => d.BuildingId == buildingId && d.FloorOrdinal == floor))
-            {
-                continue;
-            }
-
-            for (var apt = 1; apt <= apartmentsPerFloor; apt++)
-            {
-                _dwellings.Add(Dwelling.Create(buildingId, floor, apt));
-                added++;
             }
         }
 
@@ -1058,54 +1035,5 @@ public sealed class Incident
         var updated = building.WithApartmentLabel(apartmentNumber, label);
         var index = _buildings.IndexOf(building);
         _buildings[index] = updated;
-    }
-
-    // UG units (#265) are a free-form list, not a shared grid column -- ApartmentNumber here is
-    // just a stable identity for the (BuildingId, FloorOrdinal) pair, never rendered or shared
-    // with the EG/OG header, so unlike AddCoBuilding/UpdateCoBuildingStructure it doesn't need to
-    // fit inside apartmentsPerFloor.
-    public void AddUndergroundUnit(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal)
-    {
-        EnsureOpen();
-        ArgumentNullException.ThrowIfNull(clock);
-        ArgumentNullException.ThrowIfNull(op);
-
-        var building = FindBuilding(buildingId);
-        if (floorOrdinal >= 0 || floorOrdinal < -building.UndergroundFloorCount)
-        {
-            throw new ArgumentOutOfRangeException(nameof(floorOrdinal), "Nur für Untergeschosse verfügbar.");
-        }
-
-        var nextApartment = _dwellings
-            .Where(d => d.BuildingId == buildingId && d.FloorOrdinal == floorOrdinal)
-            .Select(d => d.ApartmentNumber)
-            .DefaultIfEmpty(0)
-            .Max() + 1;
-
-        _dwellings.Add(Dwelling.Create(buildingId, floorOrdinal, nextApartment));
-
-        AppendSystemEntry(
-            clock,
-            op,
-            $"UG-Einheit hinzugefügt: {CoMeasurementLabels.DwellingLocation(building, floorOrdinal, nextApartment)}");
-    }
-
-    public void RemoveUndergroundUnit(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int apartmentNumber)
-    {
-        EnsureOpen();
-        ArgumentNullException.ThrowIfNull(clock);
-        ArgumentNullException.ThrowIfNull(op);
-
-        var building = FindBuilding(buildingId);
-        if (floorOrdinal >= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(floorOrdinal), "Nur für Untergeschosse verfügbar.");
-        }
-
-        var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
-        var location = CoMeasurementLabels.DwellingLocation(building, floorOrdinal, apartmentNumber);
-        _dwellings.Remove(dwelling);
-
-        AppendSystemEntry(clock, op, $"UG-Einheit entfernt: {location}");
     }
 }

@@ -29,10 +29,6 @@ public static class CoMessprotokollSection
                     t.Span($"{CoMeasurementLabels.FloorRangeLabel(building.UndergroundFloorCount, building.FloorCount)}, {building.ApartmentsPerFloor} Whg./Geschoss");
                 });
 
-                // EG/OG floors (#218) share one column per Wohnung across the building, so they
-                // fit a single grid. UG floors (#265) are a free-form per-floor list -- their unit
-                // count doesn't match apartmentsPerFloor, so they can't share this table's fixed
-                // columns and are listed separately below instead.
                 column.Item().Table(table =>
                 {
                     table.ColumnsDefinition(columns =>
@@ -57,7 +53,7 @@ public static class CoMessprotokollSection
                         header.Cell().Element(Cells.Header).Text("Lage");
                     });
 
-                    for (var floor = building.FloorCount; floor >= 0; floor--)
+                    for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
                     {
                         table.Cell().Element(Cells.Body).Text(CoMeasurementLabels.FloorLabel(floor));
 
@@ -86,34 +82,6 @@ public static class CoMessprotokollSection
                         table.Cell().Element(Cells.Body).Text(description ?? "—");
                     }
                 });
-
-                for (var floor = -1; floor >= -building.UndergroundFloorCount; floor--)
-                {
-                    var units = incident.Dwellings
-                        .Where(d => d.BuildingId == building.Id && d.FloorOrdinal == floor)
-                        .OrderBy(d => d.ApartmentNumber)
-                        .ToList();
-
-                    column.Item().PaddingTop(4).Text($"{CoMeasurementLabels.FloorLabel(floor)} — Einheiten").SemiBold().FontSize(9);
-                    if (units.Count == 0)
-                    {
-                        column.Item().Text("— keine Einheiten erfasst —").Italic().FontSize(8).FontColor(Colors.Grey.Medium);
-                        continue;
-                    }
-
-                    foreach (var unit in units)
-                    {
-                        var identity = string.IsNullOrWhiteSpace(unit.ResidentName) ? "Ohne Bezeichnung" : unit.ResidentName;
-                        var co = unit.CoValue is { } v ? $"{v} ppm" : "kein Messwert";
-                        var key = unit.KeyAvailable is true ? "ja" : unit.KeyAvailable is false ? "nein" : "—";
-                        column.Item().Text(t =>
-                        {
-                            t.Span($"• {identity}: ").FontSize(8);
-                            t.Span($"{co}, Schlüssel: {key}, {CoMeasurementLabels.StatusText(unit.Status)}")
-                                .FontSize(8).FontColor(GetColor(unit.Status));
-                        });
-                    }
-                }
             }
 
             var affected = incident.Dwellings.Where(d => d.Status == DwellingStatus.Affected).ToList();

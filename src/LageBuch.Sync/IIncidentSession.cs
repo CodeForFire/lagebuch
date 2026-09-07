@@ -154,8 +154,4 @@ public interface IIncidentSession
     void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description);
 
     void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label);
-
-    void AddUndergroundUnit(Guid buildingId, int floorOrdinal);
-
-    void RemoveUndergroundUnit(Guid buildingId, int floorOrdinal, int apartmentNumber);
 }
