@@ -34,13 +34,13 @@
         <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
              a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
              ComboBox, mirroring ForcesView's Brigade field. -->
-        <HeaderedContentControl Classes="field" Header="VON">
+        <HeaderedContentControl Classes="field suggest" Header="VON">
           <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                            ItemsSource="{Binding CallSignOptions}"
                            FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                            Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="AN">
+        <HeaderedContentControl Classes="field suggest" Header="AN">
           <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                            ItemsSource="{Binding CallSignOptions}"
                            FilterMode="ContainsOrdinal" MinimumPrefixLength="0"

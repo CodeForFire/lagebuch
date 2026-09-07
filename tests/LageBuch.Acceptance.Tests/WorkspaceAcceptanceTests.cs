@@ -750,8 +750,9 @@ public class WorkspaceAcceptanceTests
         var summary = view.GetControl<TextBlock>("TransferSummaryText");
         Assert.DoesNotContain("→", summary.Text, StringComparison.Ordinal);
 
-        var panel = view.GetControl<Border>("TransferPanel");
-        var icon = Assert.Single(panel.GetVisualDescendants().OfType<PathIcon>());
+        // Named rather than the panel's only PathIcon (#259 added a chevron overlay on the
+        // transfer panel's own suggestion fields, so the arrow is no longer unique there).
+        var icon = view.GetControl<PathIcon>("TransferArrowIcon");
         Assert.True(icon.Bounds.Width > 0, "the transfer summary's arrow icon has zero width -- nothing is drawn");
     }
 }

@@ -67,7 +67,7 @@
           <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
                must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. Readonly
                while a Fahrzeug is selected, since its Wache derived this field (#215). -->
-          <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE">
+          <HeaderedContentControl Classes="field suggest" Header="FEUERWEHR / WACHE">
             <AutoCompleteBox x:Name="BrigadeBox" Width="160"
                              IsEnabled="{Binding !IsVehicleSelected}"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
@@ -79,7 +79,7 @@
           </HeaderedContentControl>
           <!-- Freitext-fähig: Fahrzeuge, die nicht in den Stammdaten stehen (Fremdwehren). Readonly
                while a Fahrzeug is selected, same reasoning as Feuerwehr/Wache above. -->
-          <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+          <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
             <AutoCompleteBox x:Name="CallSignBox" Width="140"
                              IsEnabled="{Binding !IsVehicleSelected}"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
