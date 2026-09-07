@@ -80,4 +80,28 @@ public class CoMessprotokollRenderTests
 
         Capture(window, "co-messung.png");
     }
+
+    [AvaloniaFact]
+    public void CoMessprotokoll_PerFloorApartmentCount_RendersIndependently()
+    {
+        var (window, vm, session) = ShowWorkspace();
+
+        session.AddCoBuilding("Mehrfamilienhaus A", 2, 3);
+        Dispatcher.UIThread.RunJobs();
+
+        var building = session.Incident.Buildings[0];
+        session.SetApartmentCount(building.Id, 0, 6);
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 6; // CO-MESSUNG
+        Dispatcher.UIThread.RunJobs();
+
+        var egRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 0);
+        var ogRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 1);
+        Assert.Equal(6, egRow.Cells.Count);
+        Assert.Equal(3, ogRow.Cells.Count); // untouched floor keeps the building's default (#265)
+
+        Capture(window, "co-messung-per-floor-count.png");
+    }
 }

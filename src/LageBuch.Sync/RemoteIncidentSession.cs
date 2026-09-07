@@ -468,8 +468,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
         Send(new SetFloorDescriptionCommand(buildingId, floorOrdinal, description));
 
-    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
-        Send(new SetApartmentLabelCommand(buildingId, apartmentNumber, label));
+    public void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label) =>
+        Send(new SetApartmentLabelCommand(buildingId, floorOrdinal, apartmentNumber, label));
+
+    public void SetApartmentCount(Guid buildingId, int floorOrdinal, int count) =>
+        Send(new SetApartmentCountCommand(Op(), buildingId, floorOrdinal, count));
 
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 
