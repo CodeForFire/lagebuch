@@ -471,6 +471,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
         Send(new SetApartmentLabelCommand(buildingId, apartmentNumber, label));
 
+    public void AddUndergroundUnit(Guid buildingId, int floorOrdinal) =>
+        Send(new AddUndergroundUnitCommand(Op(), buildingId, floorOrdinal));
+
+    public void RemoveUndergroundUnit(Guid buildingId, int floorOrdinal, int apartmentNumber) =>
+        Send(new RemoveUndergroundUnitCommand(Op(), buildingId, floorOrdinal, apartmentNumber));
+
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 
     // Fire-and-forget: the command is POSTed; the host's broadcast (or a rejection the host swallows)

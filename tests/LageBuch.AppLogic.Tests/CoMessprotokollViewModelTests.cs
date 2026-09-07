@@ -444,4 +444,10 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
         _inner.SetApartmentLabel(buildingId, apartmentNumber, label);
+
+    public void AddUndergroundUnit(Guid buildingId, int floorOrdinal) =>
+        _inner.AddUndergroundUnit(buildingId, floorOrdinal);
+
+    public void RemoveUndergroundUnit(Guid buildingId, int floorOrdinal, int apartmentNumber) =>
+        _inner.RemoveUndergroundUnit(buildingId, floorOrdinal, apartmentNumber);
 }

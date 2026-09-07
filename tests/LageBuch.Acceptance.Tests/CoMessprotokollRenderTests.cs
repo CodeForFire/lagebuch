@@ -80,4 +80,34 @@ public class CoMessprotokollRenderTests
 
         Capture(window, "co-messung.png");
     }
+
+    [AvaloniaFact]
+    public void CoMessprotokoll_UndergroundList_RendersFreeFormUnits()
+    {
+        var (window, vm, session) = ShowWorkspace();
+
+        session.AddCoBuilding("Mehrfamilienhaus A", 2, 3, undergroundFloorCount: 1);
+        Dispatcher.UIThread.RunJobs();
+
+        var building = session.Incident.Buildings[0];
+        session.AddUndergroundUnit(building.Id, -1);
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 6; // CO-MESSUNG
+        Dispatcher.UIThread.RunJobs();
+
+        var ugRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == -1);
+        Assert.True(ugRow.IsUnderground);
+
+        // Seeded with 3 (apartmentsPerFloor) + 1 added via AddUndergroundUnit, independent of the
+        // EG/OG grid's 3-column width (#265).
+        Assert.Equal(4, ugRow.Cells.Count);
+
+        var ogRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 0);
+        Assert.False(ogRow.IsUnderground);
+        Assert.Equal(3, ogRow.Cells.Count);
+
+        Capture(window, "co-messung-ug.png");
+    }
 }

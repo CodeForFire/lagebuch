@@ -45,6 +45,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(UpdateDwellingDetailsCommand), "updateDwellingDetails")]
 [JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
 [JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
+[JsonDerivedType(typeof(AddUndergroundUnitCommand), "addUndergroundUnit")]
+[JsonDerivedType(typeof(RemoveUndergroundUnitCommand), "removeUndergroundUnit")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -159,3 +161,11 @@ public sealed record SetFloorDescriptionCommand(
 // No operator (silent)
 public sealed record SetApartmentLabelCommand(
     Guid BuildingId, int ApartmentNumber, string? Label) : SyncCommand;
+
+// UG units (#265): a free-form list per Untergeschoss, added/removed independently of
+// apartmentsPerFloor -- see Incident.AddUndergroundUnit/RemoveUndergroundUnit.
+public sealed record AddUndergroundUnitCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal) : SyncCommand;
+
+public sealed record RemoveUndergroundUnitCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int ApartmentNumber) : SyncCommand;
