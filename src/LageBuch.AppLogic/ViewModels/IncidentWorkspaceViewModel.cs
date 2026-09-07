@@ -102,17 +102,19 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         : !string.IsNullOrWhiteSpace(IncidentNumberInput) ? IncidentNumberInput
         : "Unbenannter Einsatz";
 
-    // The Einsatznummer slot (chip / add-affordance / edit row) only shows when the Einsatznummer
-    // isn't already occupying the hero slot itself -- i.e. whenever a Stichwort is the hero instead.
-    public bool ShowEinsatznummerSlot => !string.IsNullOrWhiteSpace(KeywordDisplay);
-
     public bool HasEinsatznummer => !string.IsNullOrWhiteSpace(IncidentNumberInput);
 
-    public bool ShowEinsatznummerChip => ShowEinsatznummerSlot && HasEinsatznummer && !IsEditingIncidentNumber;
+    // The Einsatznummer is already occupying the hero slot when there's no Stichwort to show
+    // instead -- the chip would then be a redundant repeat of the hero text.
+    private bool IsEinsatznummerShownAsHero => string.IsNullOrWhiteSpace(KeywordDisplay) && HasEinsatznummer;
 
-    public bool ShowAddEinsatznummerAffordance => ShowEinsatznummerSlot && !HasEinsatznummer && !IsEditingIncidentNumber;
+    public bool ShowEinsatznummerChip => HasEinsatznummer && !IsEinsatznummerShownAsHero && !IsEditingIncidentNumber;
 
-    public bool ShowEinsatznummerEdit => ShowEinsatznummerSlot && IsEditingIncidentNumber;
+    // Always offered when there's no Einsatznummer yet, regardless of whether a Stichwort is set --
+    // otherwise an incident created without either would have no way to add one (#250).
+    public bool ShowAddEinsatznummerAffordance => !HasEinsatznummer && !IsEditingIncidentNumber;
+
+    public bool ShowEinsatznummerEdit => IsEditingIncidentNumber;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
