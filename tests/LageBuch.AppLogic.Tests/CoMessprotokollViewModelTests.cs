@@ -345,6 +345,11 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void SetTaskCompleted(Guid taskId, bool isDone) => _inner.SetTaskCompleted(taskId, isDone);
 
+    public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
+        _inner.UpdateTask(taskId, text, assignee, importance, urgency);
+
+    public void ExtendTaskTimer(Guid taskId, int minutes) => _inner.ExtendTaskTimer(taskId, minutes);
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,
