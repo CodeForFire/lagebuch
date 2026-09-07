@@ -110,6 +110,7 @@
           <TextBox x:Name="NotesBox" Width="170" Text="{Binding NewNotes}" />
         </HeaderedContentControl>
         <Button x:Name="AddForceButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
+                ToolTip.Tip="{Binding AddDisabledReason}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
         <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den
              Hinzufügen-Button (Freitext-Duplikat), und der Dropdown blendet Vergebene ohnehin aus. -->

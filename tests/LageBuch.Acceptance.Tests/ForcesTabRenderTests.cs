@@ -159,9 +159,13 @@ public class ForcesTabRenderTests
         Assert.Equal(2, vm.Forces.Forces.Count);
 
         // The ✕ column takes the unit back completely: row and totals shrink, the ETB logs it.
+        // Removal is destructive, so it goes through the same confirm overlay as CloseIncident.
         var row = vm.Forces.Forces.Single(r => r.Brigade == "FFB Wache 1");
         Assert.True(row.RemoveCommand.CanExecute(null));
         row.RemoveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotNull(vm.PendingConfirm);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
         var remaining = Assert.Single(vm.Forces.Forces);

@@ -256,7 +256,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
         Forces?.Dispose();
-        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
+        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
         Scba?.Dispose();
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
@@ -299,6 +299,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(Tasks));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
+    }
+
+    /// <summary>
+    /// Generic confirm-before-acting hook for children (e.g. ForcesViewModel removing a unit) that
+    /// need the same destructive-action guard as <see cref="CloseIncident"/> without each owning
+    /// its own ConfirmDialogViewModel wiring.
+    /// </summary>
+    private void RequestConfirm(string message, Action onConfirmed)
+    {
+        var dialog = new ConfirmDialogViewModel("Bestätigen", message, "ENTFERNEN", onConfirmed);
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
     }
 
     private bool CanClose => !IsReadOnly;
