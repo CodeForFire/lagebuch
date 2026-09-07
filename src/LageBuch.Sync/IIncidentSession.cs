@@ -153,5 +153,7 @@ public interface IIncidentSession
 
     void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description);
 
-    void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label);
+    void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label);
+
+    void SetApartmentCount(Guid buildingId, int floorOrdinal, int count);
 }

@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 19;
+    public const int CurrentVersion = 20;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -132,6 +132,11 @@ public static class Migrations
         if (version < 19)
         {
             ApplyV19(cn, tx);
+        }
+
+        if (version < 20)
+        {
+            ApplyV20(cn, tx);
         }
 
         SetVersion(cn, tx, CurrentVersion);
@@ -618,6 +623,11 @@ public static class Migrations
     // back with no basement.
     private static void ApplyV19(SqliteConnection cn, SqliteTransaction tx) =>
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_buildings", "underground_floor_count", "INTEGER NOT NULL DEFAULT 0");
+
+    // Per-floor Wohnungen-count overrides (#265): a floor with no entry here still uses
+    // apartments_per_floor, so existing buildings read back unchanged.
+    private static void ApplyV20(SqliteConnection cn, SqliteTransaction tx) =>
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "co_buildings", "apartment_counts", "TEXT NOT NULL DEFAULT '{}'");
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

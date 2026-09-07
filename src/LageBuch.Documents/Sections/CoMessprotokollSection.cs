@@ -26,62 +26,43 @@ public static class CoMessprotokollSection
                 column.Item().PaddingTop(8).Text(t =>
                 {
                     t.Span($"{building.Name}: ").SemiBold();
-                    t.Span($"{CoMeasurementLabels.FloorRangeLabel(building.UndergroundFloorCount, building.FloorCount)}, {building.ApartmentsPerFloor} Whg./Geschoss");
+                    t.Span(CoMeasurementLabels.FloorRangeLabel(building.UndergroundFloorCount, building.FloorCount));
                 });
 
-                column.Item().Table(table =>
+                // Every floor lists its own units (#265): floors -- especially Untergeschosse --
+                // rarely share one Wohnungen count anymore, so a single fixed-column table can no
+                // longer represent every floor of a building at once.
+                for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
                 {
-                    table.ColumnsDefinition(columns =>
-                    {
-                        columns.ConstantColumn(60);
-                        for (var apt = 1; apt <= building.ApartmentsPerFloor; apt++)
-                        {
-                            columns.ConstantColumn(65);
-                        }
+                    var units = incident.Dwellings
+                        .Where(d => d.BuildingId == building.Id && d.FloorOrdinal == floor)
+                        .OrderBy(d => d.ApartmentNumber)
+                        .ToList();
 
-                        columns.RelativeColumn(2);
+                    var description = building.FloorDescriptions.TryGetValue(floor, out var d2) ? d2 : null;
+                    column.Item().PaddingTop(4).Text(t =>
+                    {
+                        t.Span($"{CoMeasurementLabels.FloorLabel(floor)}").SemiBold().FontSize(9);
+                        if (!string.IsNullOrWhiteSpace(description))
+                        {
+                            t.Span($" — {description}").FontSize(9).Italic();
+                        }
                     });
 
-                    table.Header(header =>
+                    foreach (var unit in units)
                     {
-                        header.Cell().Element(Cells.Header).Text("Geschoss");
-                        for (var apt = 1; apt <= building.ApartmentsPerFloor; apt++)
+                        var label = CoMeasurementLabels.ApartmentLabel(building, floor, unit.ApartmentNumber);
+                        var co = unit.CoValue is { } v ? $"{v} ppm" : "kein Messwert";
+                        var key = unit.KeyAvailable is true ? "ja" : unit.KeyAvailable is false ? "nein" : "—";
+                        var resident = string.IsNullOrWhiteSpace(unit.ResidentName) ? null : $", {unit.ResidentName}";
+                        column.Item().Text(t =>
                         {
-                            header.Cell().Element(Cells.Header).Text(CoMeasurementLabels.ApartmentLabel(building, apt));
-                        }
-
-                        header.Cell().Element(Cells.Header).Text("Lage");
-                    });
-
-                    for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
-                    {
-                        table.Cell().Element(Cells.Body).Text(CoMeasurementLabels.FloorLabel(floor));
-
-                        for (var apt = 1; apt <= building.ApartmentsPerFloor; apt++)
-                        {
-                            var dwelling = incident.Dwellings.FirstOrDefault(d =>
-                                d.BuildingId == building.Id &&
-                                d.FloorOrdinal == floor &&
-                                d.ApartmentNumber == apt);
-
-                            if (dwelling?.CoValue is { } coVal)
-                            {
-                                table.Cell().Element(c => c
-                                    .Background(GetColor(dwelling.Status))
-                                    .Padding(2))
-                                    .Text($"{coVal} ppm")
-                                    .FontSize(8);
-                            }
-                            else
-                            {
-                                table.Cell().Element(Cells.Body).Text("—");
-                            }
-                        }
-
-                        var description = building.FloorDescriptions.TryGetValue(floor, out var d) ? d : null;
-                        table.Cell().Element(Cells.Body).Text(description ?? "—");
+                            t.Span($"• {label}{resident}: ").FontSize(8);
+                            t.Span($"{co}, Schlüssel: {key}, {CoMeasurementLabels.StatusText(unit.Status)}")
+                                .FontSize(8).FontColor(GetColor(unit.Status));
+                        });
                     }
-                });
+                }
             }
 
             var affected = incident.Dwellings.Where(d => d.Status == DwellingStatus.Affected).ToList();

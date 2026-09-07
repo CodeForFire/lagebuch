@@ -152,6 +152,14 @@
                          FormatString="0" PlaceholderText="Kein Messwert" />
         </StackPanel>
 
+        <!-- Bezeichnung (#265): every unit's own label now, instead of a header shared with every
+             other floor's same-numbered column: defaults to "Whg. N" (or "Links/Mitte/Rechts"
+             for a 3-flat floor), always user-editable, shown directly on the tile. -->
+        <StackPanel Spacing="2">
+          <TextBlock Text="BEZEICHNUNG" Classes="overline" FontSize="10" />
+          <TextBox Text="{Binding SelectedCell.Label}" />
+        </StackPanel>
+
         <!-- Resident Name -->
         <StackPanel Spacing="2">
           <TextBlock Text="NAME DER BEWOHNER (OPTIONAL)" Classes="overline" FontSize="10" />
@@ -175,41 +183,9 @@
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                   IsVisible="{Binding HasBuildings}">
       <StackPanel>
-        <!-- Column headers (editable): left margin must match the row Grid's fixed 80-wide
-             floor-label column below (ColumnDefinitions="80,Auto,*", #234) so the boxes line up
-             with the cell columns; it drifted to 88 and was invisible under the old borderless
-             "quiet underline" header style, only becoming visible once the header gained real
-             box chrome. -->
-        <StackPanel Orientation="Horizontal" Spacing="4" Margin="80,0,0,4">
-          <ItemsControl ItemsSource="{Binding ApartmentColumns}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <UniformGrid Rows="1" ColumnSpacing="4" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:ApartmentColumnViewModel">
-                <!-- #219/#234: this used to be styled as a quiet underline (transparent
-                     background, bottom hairline only) to stay unobtrusive in the dense header
-                     row, but that made it unrecognizable as an editable field, so crews read it
-                     as a plain label. Use the app's standard TextBox chrome (box + border)
-                     instead, so it reads as editable at a glance; the default already reflects
-                     "Links"/"Mitte"/"Rechts" for a 3-flat floor and is free text otherwise.
-
-                     Same "row rebuilds on each commit" trap as #33 (see RolesView/ForcesView/
-                     FilesView): OnLabelChanged pushes straight to the session, whose Changed
-                     event rebuilds ApartmentColumns as a fresh array of fresh view models on
-                     every keystroke, so the ItemsControl tears down and recreates this exact
-                     TextBox mid-edit. UpdateSourceTrigger=LostFocus pushes once, when the
-                     operator actually leaves the field, instead of after every character. -->
-                <TextBox Text="{Binding Label, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                         Width="148" FontSize="11" FontWeight="SemiBold"
-                         HorizontalContentAlignment="Center" Padding="4,2"
-                         IsEnabled="{Binding !IsReadOnly}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
+        <!-- No shared column header (#265): each floor keeps its own Wohnungen count and each
+             tile carries its own label now, so a header shared across every floor's same-numbered
+             column no longer means anything: a floor's count is edited on its own row below. -->
         <ItemsControl ItemsSource="{Binding MatrixRows}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -218,13 +194,18 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:FloorRowViewModel">
-              <Grid ColumnDefinitions="80,Auto,*">
+              <Grid ColumnDefinitions="80,60,Auto,*">
                 <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
                            VerticalAlignment="Center" Margin="0,0,8,0" />
-                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                <!-- Per-floor Wohnungen count (#265): each floor now owns its own count instead
+                     of sharing one across the whole building. -->
+                <NumericUpDown Grid.Column="1" Minimum="1" Maximum="30" FormatString="0"
+                                Value="{Binding ApartmentCount}" IsEnabled="{Binding !IsReadOnly}"
+                                VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ItemsControl Grid.Column="2" ItemsSource="{Binding Cells}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <UniformGrid Rows="1" ColumnSpacing="4" />
+                      <WrapPanel ItemSpacing="4" LineSpacing="4" />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
@@ -241,9 +222,17 @@
                                 ClipToBounds="True">
                           <Grid ColumnDefinitions="4,*">
                             <Border Grid.Column="0" Background="{Binding StatusBrush}" />
-                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"
                                   Margin="8,6">
-                              <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="5">
+                              <!-- Label (#265): every tile carries its own identity now: this
+                                   used to be the only place a column's Label was ever rendered
+                                   (the shared header above the grid), the tile itself never showed
+                                   it. -->
+                              <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                                         Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         TextTrimming="CharacterEllipsis" MaxWidth="112" />
+                              <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="5">
                                 <TextBlock Text="{Binding StatusGlyph}" FontFamily="{StaticResource MonoFont}"
                                            FontWeight="Bold" FontSize="13"
                                            Foreground="{Binding StatusBrush}" />
@@ -251,9 +240,9 @@
                                            FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis" />
                               </StackPanel>
-                              <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="11"
+                              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="11"
                                          Margin="6,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
-                              <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                              <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                                          Text="{Binding ResidentName}" FontSize="10"
                                          Foreground="{StaticResource TextSecondaryBrush}"
                                          TextTrimming="CharacterEllipsis" MaxWidth="112" />
@@ -264,7 +253,7 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Grid.Column="2" Text="{Binding Description}"
+                <TextBlock Grid.Column="3" Text="{Binding Description}"
                            VerticalAlignment="Center" Margin="8,0,0,0"
                            Width="200" TextWrapping="Wrap" />
               </Grid>

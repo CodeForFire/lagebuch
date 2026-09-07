@@ -272,10 +272,11 @@ public sealed class IncidentRepository
             var b = incident.Buildings[i];
             var descriptionsJson = System.Text.Json.JsonSerializer.Serialize(b.FloorDescriptions);
             var apartmentLabelsJson = System.Text.Json.JsonSerializer.Serialize(b.ApartmentLabels);
+            var apartmentCountsJson = System.Text.Json.JsonSerializer.Serialize(b.ApartmentCounts);
             Run(
                 cn,
                 tx,
-                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels, underground_floor_count) VALUES ($id,$name,$fc,$apf,$fd,$o,$al,$ufc);",
+                "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels, underground_floor_count, apartment_counts) VALUES ($id,$name,$fc,$apf,$fd,$o,$al,$ufc,$ac);",
                 p =>
                 {
                     p("$id", b.Id.ToString());
@@ -286,6 +287,7 @@ public sealed class IncidentRepository
                     p("$o", i);
                     p("$al", apartmentLabelsJson);
                     p("$ufc", b.UndergroundFloorCount);
+                    p("$ac", apartmentCountsJson);
                 });
         }
 
@@ -562,7 +564,7 @@ public sealed class IncidentRepository
 
         var buildings = ReadAll(
             cn,
-            "SELECT id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels, underground_floor_count FROM co_buildings ORDER BY ordinal;",
+            "SELECT id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels, underground_floor_count, apartment_counts FROM co_buildings ORDER BY ordinal;",
             r =>
             {
                 var fdJson = r.GetString(4);
@@ -575,10 +577,18 @@ public sealed class IncidentRepository
                 // apartment_labels is null on rows written before this column existed.
                 var alJson = Str(r, 6);
                 var alDict = alJson is null
-                    ? new Dictionary<int, string?>()
-                    : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(alJson)
-                        ?? new Dictionary<string, string?>())
+                    ? new Dictionary<string, string?>()
+                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(alJson)
+                        ?? new Dictionary<string, string?>();
+
+                // apartment_counts is null on rows written before this column existed (#265).
+                var acJson = Str(r, 8);
+                var acDict = acJson is null
+                    ? new Dictionary<int, int>()
+                    : (System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, int>>(acJson)
+                        ?? new Dictionary<string, int>())
                         .ToDictionary(kv => int.Parse(kv.Key, CultureInfo.InvariantCulture), kv => kv.Value);
+
                 return Domain.CoMeasurement.Building.Rehydrate(
                     Guid.Parse(r.GetString(0)),
                     r.GetString(1),
@@ -587,7 +597,8 @@ public sealed class IncidentRepository
                     fdDict,
                     r.GetInt32(5),
                     alDict,
-                    r.GetInt32(7));
+                    r.GetInt32(7),
+                    acDict);
             });
 
         var dwellings = ReadAll(

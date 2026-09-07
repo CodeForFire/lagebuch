@@ -22,6 +22,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         Action<Guid, int, int> onOpenEditor)
     {
         ArgumentNullException.ThrowIfNull(dwelling);
+        ArgumentNullException.ThrowIfNull(building);
         Id = dwelling.Id;
         BuildingId = dwelling.BuildingId;
         FloorOrdinal = dwelling.FloorOrdinal;
@@ -34,6 +35,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         _coValue = dwelling.CoValue;
         _residentName = dwelling.ResidentName;
         _keyAvailable = dwelling.KeyAvailable;
+        _label = CoMeasurementLabels.ApartmentLabel(building, dwelling.FloorOrdinal, dwelling.ApartmentNumber);
         StatusBrush = GetStatusBrush(dwelling.Status);
     }
 
@@ -62,9 +64,13 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     [ObservableProperty]
     private string _statusBrush;
 
-    public string CoDisplay => CoValue is { } v ? $"{v} ppm" : "Kein Messwert";
+    /// <summary>#265: every unit's identity now lives on the tile itself, independent of every
+    /// other floor's same-numbered unit -- edited in the editor sidebar and persisted, batched
+    /// with ResidentName/KeyAvailable, when the sidebar closes (see PersistSelectedCellDetails).</summary>
+    [ObservableProperty]
+    private string _label;
 
-    public string Label => CoMeasurementLabels.ApartmentLabel(ApartmentNumber);
+    public string CoDisplay => CoValue is { } v ? $"{v} ppm" : "Kein Messwert";
 
     public string KeyDisplay => KeyAvailable switch
     {
@@ -113,40 +119,26 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     private void OpenEditor() => _onOpenEditor(BuildingId, FloorOrdinal, ApartmentNumber);
 }
 
-public sealed partial class ApartmentColumnViewModel : ObservableObject
-{
-    private readonly Action<int, string?> _onLabelChanged;
-
-    public ApartmentColumnViewModel(int apartmentNumber, string label, bool isReadOnly, Action<int, string?> onLabelChanged)
-    {
-        ApartmentNumber = apartmentNumber;
-        IsReadOnly = isReadOnly;
-        _label = label;
-        _onLabelChanged = onLabelChanged;
-    }
-
-    public int ApartmentNumber { get; }
-
-    public bool IsReadOnly { get; }
-
-    [ObservableProperty]
-    private string _label;
-
-    partial void OnLabelChanged(string value)
-    {
-        if (!IsReadOnly)
-            _onLabelChanged(ApartmentNumber, value);
-    }
-}
-
 public sealed partial class FloorRowViewModel : ObservableObject
 {
-    public FloorRowViewModel(int ordinal, string label, IReadOnlyList<DwellingCellViewModel> cells, string? description)
+    private readonly Action<int, int> _onApartmentCountChanged;
+
+    public FloorRowViewModel(
+        int ordinal,
+        string label,
+        IReadOnlyList<DwellingCellViewModel> cells,
+        string? description,
+        int apartmentCount,
+        bool isReadOnly,
+        Action<int, int> onApartmentCountChanged)
     {
         Ordinal = ordinal;
         Label = label;
         Cells = cells;
         Description = description;
+        IsReadOnly = isReadOnly;
+        _apartmentCount = apartmentCount;
+        _onApartmentCountChanged = onApartmentCountChanged;
     }
 
     public int Ordinal { get; }
@@ -156,6 +148,19 @@ public sealed partial class FloorRowViewModel : ObservableObject
     public IReadOnlyList<DwellingCellViewModel> Cells { get; }
 
     public string? Description { get; }
+
+    public bool IsReadOnly { get; }
+
+    /// <summary>#265: this floor's own Wohnungen count, independent of every other floor's --
+    /// edited directly on the row, growing/trimming its Cells.</summary>
+    [ObservableProperty]
+    private int _apartmentCount;
+
+    partial void OnApartmentCountChanged(int value)
+    {
+        if (!IsReadOnly)
+            _onApartmentCountChanged(Ordinal, value);
+    }
 }
 
 public sealed partial class CoMessprotokollViewModel : ObservableObject, IDisposable
@@ -190,9 +195,6 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     [ObservableProperty]
     private ObservableCollection<FloorRowViewModel> _matrixRows = new();
-
-    [ObservableProperty]
-    private IReadOnlyList<ApartmentColumnViewModel> _apartmentColumns = Array.Empty<ApartmentColumnViewModel>();
 
     [ObservableProperty]
     private DwellingCellViewModel? _selectedCell;
@@ -244,19 +246,15 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         MatrixRows.Clear();
         if (SelectedBuilding is null)
         {
-            ApartmentColumns = Array.Empty<ApartmentColumnViewModel>();
             return;
         }
 
         var building = SelectedBuilding;
-        ApartmentColumns = Enumerable.Range(1, building.ApartmentsPerFloor)
-            .Select(apt => new ApartmentColumnViewModel(
-                apt, CoMeasurementLabels.ApartmentLabel(building, apt), IsReadOnly, OnApartmentLabelChanged))
-            .ToArray();
 
         for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
         {
-            var cells = Enumerable.Range(1, building.ApartmentsPerFloor)
+            var apartmentCount = building.ApartmentsFor(floor);
+            var cells = Enumerable.Range(1, apartmentCount)
                 .Select(apt =>
                 {
                     var dwelling = _session.Incident.Dwellings.FirstOrDefault(d =>
@@ -270,7 +268,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
                 .ToList();
 
             var description = building.FloorDescriptions.TryGetValue(floor, out var d) ? d : null;
-            MatrixRows.Add(new FloorRowViewModel(floor, CoMeasurementLabels.FloorLabel(floor), cells, description));
+            MatrixRows.Add(new FloorRowViewModel(floor, CoMeasurementLabels.FloorLabel(floor), cells, description, apartmentCount, IsReadOnly, OnApartmentCountChanged));
         }
     }
 
@@ -286,15 +284,16 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         _onChanged();
     }
 
-    private void OnApartmentLabelChanged(int apartmentNumber, string? label)
+    private void OnApartmentCountChanged(int floorOrdinal, int count)
     {
         if (SelectedBuilding is null)
         {
             return;
         }
 
-        _session.SetApartmentLabel(SelectedBuilding.Id, apartmentNumber, label);
+        _session.SetApartmentCount(SelectedBuilding.Id, floorOrdinal, count);
         _onChanged();
+        Refresh();
     }
 
     private void OnOpenEditor(Guid buildingId, int floorOrdinal, int apartmentNumber)
@@ -472,5 +471,10 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
             SelectedCell.ApartmentNumber,
             SelectedCell.ResidentName,
             SelectedCell.KeyAvailable);
+        _session.SetApartmentLabel(
+            SelectedCell.BuildingId,
+            SelectedCell.FloorOrdinal,
+            SelectedCell.ApartmentNumber,
+            SelectedCell.Label);
     }
 }

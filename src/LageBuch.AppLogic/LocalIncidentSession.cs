@@ -290,8 +290,11 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
         Mutate(() => Incident.SetFloorDescription(buildingId, floorOrdinal, description));
 
-    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
-        Mutate(() => Incident.SetApartmentLabel(buildingId, apartmentNumber, label));
+    public void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label) =>
+        Mutate(() => Incident.SetApartmentLabel(buildingId, floorOrdinal, apartmentNumber, label));
+
+    public void SetApartmentCount(Guid buildingId, int floorOrdinal, int count) =>
+        Mutate(() => Incident.SetApartmentCount(_clock, RequireOperator(), buildingId, floorOrdinal, count));
 
     public void Close()
     {

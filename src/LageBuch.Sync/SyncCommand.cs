@@ -45,6 +45,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(UpdateDwellingDetailsCommand), "updateDwellingDetails")]
 [JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
 [JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
+[JsonDerivedType(typeof(SetApartmentCountCommand), "setApartmentCount")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -158,4 +159,9 @@ public sealed record SetFloorDescriptionCommand(
 
 // No operator (silent)
 public sealed record SetApartmentLabelCommand(
-    Guid BuildingId, int ApartmentNumber, string? Label) : SyncCommand;
+    Guid BuildingId, int FloorOrdinal, int ApartmentNumber, string? Label) : SyncCommand;
+
+// #265: a floor's Wohnungen count, independent of the building's default -- attributed/logged
+// like UpdateCoBuildingStructure, since it changes structure rather than just a label.
+public sealed record SetApartmentCountCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int Count) : SyncCommand;
