@@ -21,7 +21,7 @@
         <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
              enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
              make editable) — mirrors PersonNameBox below. -->
-        <HeaderedContentControl Classes="field" Header="FUNKTION">
+        <HeaderedContentControl Classes="field suggest" Header="FUNKTION">
           <AutoCompleteBox x:Name="RoleBox" Width="120"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
                            ItemsSource="{Binding RoleOptions}"
@@ -29,7 +29,7 @@
                            MinimumPrefixLength="0"
                            Text="{Binding NewRole}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="NAME">
+        <HeaderedContentControl Classes="field suggest" Header="NAME">
           <AutoCompleteBox x:Name="PersonNameBox" Width="200"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
                            ItemsSource="{Binding PersonOptions}"
@@ -45,7 +45,7 @@
         </HeaderedContentControl>
         <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
              enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). -->
-        <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+        <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
           <AutoCompleteBox Width="150"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                            ItemsSource="{Binding CallSignOptions}"
@@ -80,12 +80,12 @@
               </MultiBinding>
             </TextBlock.Text>
           </TextBlock>
-          <PathIcon Width="11" Height="11" VerticalAlignment="Center"
+          <PathIcon x:Name="TransferArrowIcon" Width="11" Height="11" VerticalAlignment="Center"
                     Foreground="{StaticResource TextMutedBrush}"
                     Data="M16.01 11H4v2h12.01v3L20 12l-3.99-4z" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <HeaderedContentControl Classes="field" Header="NAME">
+          <HeaderedContentControl Classes="field suggest" Header="NAME">
             <AutoCompleteBox x:Name="TransferPersonNameBox" Width="200"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
                              ItemsSource="{Binding PersonOptions}"
@@ -94,7 +94,7 @@
                              Text="{Binding TransferPersonName}"
                              b:EnterSubmit.Command="{Binding ConfirmTransferCommand}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+          <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
             <AutoCompleteBox x:Name="TransferCallSignBox" Width="150"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                              ItemsSource="{Binding CallSignOptions}"

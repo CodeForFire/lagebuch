@@ -259,16 +259,27 @@
                           <Grid ColumnDefinitions="*,*,150,70,28,32,32" Margin="0,0,0,6">
                             <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                  aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
-                            <AutoCompleteBox Grid.Column="0"
-                                             PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
-                                             ItemsSource="{Binding WacheOptions}"
-                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                             Text="{Binding Wache}" Margin="0,0,6,0" />
-                            <AutoCompleteBox Grid.Column="1"
-                                             PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                                             ItemsSource="{Binding CallSignOptions}"
-                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                             Text="{Binding CallSign}" Margin="0,0,6,0" />
+                            <Grid Grid.Column="0" Margin="0,0,6,0">
+                              <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
+                                               ItemsSource="{Binding WacheOptions}"
+                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                               Text="{Binding Wache}" />
+                              <!-- Chevron affordance (#259), see OperatorPromptView for rationale. -->
+                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,9,0" IsHitTestVisible="False"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Grid>
+                            <Grid Grid.Column="1" Margin="0,0,6,0">
+                              <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                               ItemsSource="{Binding CallSignOptions}"
+                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                               Text="{Binding CallSign}" />
+                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,9,0" IsHitTestVisible="False"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Grid>
                             <NumericUpDown Grid.Column="2" Width="90" Minimum="0" Maximum="99" Increment="1"
                                            FormatString="0" Value="{Binding Seats}" VerticalAlignment="Center" />
                             <!-- Marks a command vehicle (ELW/KdoW) that carries the Zugführer: unlike

@@ -41,7 +41,7 @@
         <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
              enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). This is the
              vehicle/unit the Trupp rides with, hence leading the form (#78). -->
-        <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+        <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
           <AutoCompleteBox Width="140"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                            ItemsSource="{Binding CallSignOptions}"
@@ -63,7 +63,7 @@
              (three in CSA), and the third box only appears when the type calls for it. Crew names
              use the ad-hoc "whoever is entering data right now" persona, not the Stammdaten roster
              persona (#137). -->
-        <HeaderedContentControl Classes="field" Header="TRUPPFÜHRER">
+        <HeaderedContentControl Classes="field suggest" Header="TRUPPFÜHRER">
           <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                            ItemsSource="{Binding PersonOptions}"
@@ -71,7 +71,7 @@
                            Text="{Binding NewTruppfuehrer}"
                            b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="TRUPPMANN">
+        <HeaderedContentControl Classes="field suggest" Header="TRUPPMANN">
           <AutoCompleteBox x:Name="TruppmannBox" Width="170"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderAlt}"
                            ItemsSource="{Binding PersonOptions}"
@@ -79,7 +79,7 @@
                            Text="{Binding NewTruppmann}"
                            b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="2. TRUPPMANN (CSA)" IsVisible="{Binding RequiresThirdMember}">
+        <HeaderedContentControl Classes="field suggest" Header="2. TRUPPMANN (CSA)" IsVisible="{Binding RequiresThirdMember}">
           <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderThird}"
                            ItemsSource="{Binding PersonOptions}"
