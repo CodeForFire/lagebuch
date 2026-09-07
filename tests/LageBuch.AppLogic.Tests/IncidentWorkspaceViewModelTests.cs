@@ -1,6 +1,5 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
-using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
