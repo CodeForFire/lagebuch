@@ -12,6 +12,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     private readonly Action<Guid, int, int, DwellingStatus> _onStatusChanged;
     private readonly Action<Guid, int, int, int?> _onCoValueChanged;
     private readonly Action<Guid, int, int> _onOpenEditor;
+    private readonly Action<Guid, int, int>? _onRemove;
 
     public DwellingCellViewModel(
         Dwelling dwelling,
@@ -19,7 +20,8 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         bool isReadOnly,
         Action<Guid, int, int, DwellingStatus> onStatusChanged,
         Action<Guid, int, int, int?> onCoValueChanged,
-        Action<Guid, int, int> onOpenEditor)
+        Action<Guid, int, int> onOpenEditor,
+        Action<Guid, int, int>? onRemove = null)
     {
         ArgumentNullException.ThrowIfNull(dwelling);
         Id = dwelling.Id;
@@ -30,6 +32,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         _onStatusChanged = onStatusChanged;
         _onCoValueChanged = onCoValueChanged;
         _onOpenEditor = onOpenEditor;
+        _onRemove = onRemove;
         _status = dwelling.Status;
         _coValue = dwelling.CoValue;
         _residentName = dwelling.ResidentName;
@@ -46,6 +49,10 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     public int ApartmentNumber { get; }
 
     public bool IsReadOnly { get; }
+
+    // UG dwellings (#265) are a free-form list with their own remove affordance on the card; EG/OG
+    // dwellings are fixed grid cells tied to apartmentsPerFloor and can't be removed individually.
+    public bool IsUnderground => FloorOrdinal < 0;
 
     [ObservableProperty]
     private DwellingStatus _status;
@@ -65,6 +72,10 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     public string CoDisplay => CoValue is { } v ? $"{v} ppm" : "Kein Messwert";
 
     public string Label => CoMeasurementLabels.ApartmentLabel(ApartmentNumber);
+
+    // UG card's primary identity label (#265): falls back to a placeholder so an unlabeled unit
+    // still reads as a distinct card instead of blank space.
+    public string DisplayLabel => string.IsNullOrWhiteSpace(ResidentName) ? "Ohne Bezeichnung" : ResidentName!;
 
     public string KeyDisplay => KeyAvailable switch
     {
@@ -109,8 +120,15 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 
     partial void OnKeyAvailableChanged(bool? value) => OnPropertyChanged(nameof(KeyDisplay));
 
+    partial void OnResidentNameChanged(string? value) => OnPropertyChanged(nameof(DisplayLabel));
+
     [RelayCommand]
     private void OpenEditor() => _onOpenEditor(BuildingId, FloorOrdinal, ApartmentNumber);
+
+    [RelayCommand(CanExecute = nameof(CanRemove))]
+    private void Remove() => _onRemove?.Invoke(BuildingId, FloorOrdinal, ApartmentNumber);
+
+    private bool CanRemove => !IsReadOnly;
 }
 
 public sealed partial class ApartmentColumnViewModel : ObservableObject
@@ -156,6 +174,10 @@ public sealed partial class FloorRowViewModel : ObservableObject
     public IReadOnlyList<DwellingCellViewModel> Cells { get; }
 
     public string? Description { get; }
+
+    // UG floors (#265) render as a free-form list (add/remove units) instead of the fixed
+    // EG/OG grid columns.
+    public bool IsUnderground => Ordinal < 0;
 }
 
 public sealed partial class CoMessprotokollViewModel : ObservableObject, IDisposable
@@ -231,12 +253,15 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(CanModify));
     }
 
+    partial void OnSelectedCellChanged(DwellingCellViewModel? value) => OnPropertyChanged(nameof(ResidentFieldLabel));
+
     partial void OnSelectedBuildingChanged(Building? value)
     {
         BuildMatrix();
         OnPropertyChanged(nameof(CanRemoveBuilding));
         AddUntergeschossCommand.NotifyCanExecuteChanged();
         AddObergeschossCommand.NotifyCanExecuteChanged();
+        AddUndergroundUnitCommand.NotifyCanExecuteChanged();
     }
 
     private void BuildMatrix()
@@ -256,20 +281,34 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
         for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
         {
-            var cells = Enumerable.Range(1, building.ApartmentsPerFloor)
-                .Select(apt =>
-                {
-                    var dwelling = _session.Incident.Dwellings.FirstOrDefault(d =>
-                        d.BuildingId == building.Id && d.FloorOrdinal == floor && d.ApartmentNumber == apt);
-                    return dwelling is not null
-                        ? new DwellingCellViewModel(dwelling, building, IsReadOnly, OnStatusChanged, OnCoValueChanged, OnOpenEditor)
-                        : null;
-                })
-                .Where(c => c is not null)
-                .Cast<DwellingCellViewModel>()
-                .ToList();
+            List<DwellingCellViewModel> cells;
+            if (floor < 0)
+            {
+                // UG floors (#265): a free-form list, so render exactly the dwellings that exist
+                // for this floor rather than a fixed Range(1, apartmentsPerFloor) grid.
+                cells = _session.Incident.Dwellings
+                    .Where(d => d.BuildingId == building.Id && d.FloorOrdinal == floor)
+                    .OrderBy(d => d.ApartmentNumber)
+                    .Select(d => new DwellingCellViewModel(d, building, IsReadOnly, OnStatusChanged, OnCoValueChanged, OnOpenEditor, OnRemoveUndergroundUnit))
+                    .ToList();
+            }
+            else
+            {
+                cells = Enumerable.Range(1, building.ApartmentsPerFloor)
+                    .Select(apt =>
+                    {
+                        var dwelling = _session.Incident.Dwellings.FirstOrDefault(d =>
+                            d.BuildingId == building.Id && d.FloorOrdinal == floor && d.ApartmentNumber == apt);
+                        return dwelling is not null
+                            ? new DwellingCellViewModel(dwelling, building, IsReadOnly, OnStatusChanged, OnCoValueChanged, OnOpenEditor)
+                            : null;
+                    })
+                    .Where(c => c is not null)
+                    .Cast<DwellingCellViewModel>()
+                    .ToList();
+            }
 
-            var description = building.FloorDescriptions.TryGetValue(floor, out var d) ? d : null;
+            var description = building.FloorDescriptions.TryGetValue(floor, out var d2) ? d2 : null;
             MatrixRows.Add(new FloorRowViewModel(floor, CoMeasurementLabels.FloorLabel(floor), cells, description));
         }
     }
@@ -303,6 +342,34 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
             .SelectMany(r => r.Cells)
             .FirstOrDefault(c => c.BuildingId == buildingId && c.FloorOrdinal == floorOrdinal && c.ApartmentNumber == apartmentNumber);
         IsEditorOpen = SelectedCell is not null;
+    }
+
+    /// <summary>Editor sidebar's free-text field doubles as a UG unit's identity (#265: number,
+    /// owner name, ...) rather than an actual resident name, so it needs a different label there.</summary>
+    public string ResidentFieldLabel => SelectedCell?.IsUnderground == true
+        ? "BEZEICHNUNG (NR., NAME EIGENTÜMER, ...)"
+        : "NAME DER BEWOHNER (OPTIONAL)";
+
+    [RelayCommand(CanExecute = nameof(CanModifyBuilding))]
+    private void AddUndergroundUnit(int floorOrdinal)
+    {
+        if (SelectedBuilding is null)
+        {
+            return;
+        }
+
+        _session.AddUndergroundUnit(SelectedBuilding.Id, floorOrdinal);
+        _onChanged();
+        Refresh();
+    }
+
+    private bool CanModifyBuilding(int floorOrdinal) => CanModify;
+
+    private void OnRemoveUndergroundUnit(Guid buildingId, int floorOrdinal, int apartmentNumber)
+    {
+        _session.RemoveUndergroundUnit(buildingId, floorOrdinal, apartmentNumber);
+        _onChanged();
+        Refresh();
     }
 
     [RelayCommand(CanExecute = nameof(CanAddBuilding))]
