@@ -91,26 +91,14 @@ public class TaskDialogViewModelTests
     }
 
     [Fact]
-    public void Save_anchors_the_task_to_a_supplied_createdAt_instead_of_now()
+    public void Save_anchors_the_task_to_now_even_when_opened_from_an_older_etb_row()
     {
         var (session, clock) = NewSession();
-        var entryTime = T0.AddHours(-2); // an existing ETB row from earlier in the shift (#247)
-        var dialog = new TaskDialogViewModel(
-            session, MasterData(), "Nachtrag zu altem Eintrag", () => { }, entryTime);
 
-        dialog.SaveCommand.Execute(null);
-
-        var task = Assert.Single(session.Incident.Tasks);
-        Assert.Equal(entryTime, task.CreatedAt);
-        Assert.Equal(entryTime.AddMinutes(dialog.TimerMinutes!.Value), task.DueAt);
-        Assert.NotEqual(clock.Now, task.CreatedAt); // must not silently fall back to "now"
-    }
-
-    [Fact]
-    public void Save_without_createdAt_falls_back_to_now_like_before_247()
-    {
-        var (session, clock) = NewSession();
-        var dialog = new TaskDialogViewModel(session, MasterData(), "Vom Eingabefeld", () => { });
+        // Reopened from an ETB row logged well before now (#247) -- the timer must still start
+        // from "now", not that row's own timestamp, or a long-past entry would spawn a task that
+        // is overdue on arrival.
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Nachtrag zu altem Eintrag", () => { });
 
         dialog.SaveCommand.Execute(null);
 

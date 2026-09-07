@@ -17,10 +17,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     private readonly IClock _clock;
     private readonly Action _onChanged;
 
-    // Opens the create-task overlay pre-filled with an entry's text and (when known) that entry's
-    // own timestamp (#88, #247); null where the host offers no task feature, which disables the
-    // "add & create task" dock button and hides every row's create-task icon too.
-    private readonly Action<string, DateTimeOffset?>? _createTaskFromEntry;
+    // Opens the create-task overlay pre-filled with an entry's text (#88, #247); null where the
+    // host offers no task feature, which disables the "add & create task" dock button and hides
+    // every row's create-task icon too.
+    private readonly Action<string>? _createTaskFromEntry;
 
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
@@ -35,7 +35,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
         IClock clock,
         MasterDataSet masterData,
         Action onChanged,
-        Action<string, DateTimeOffset?>? createTaskFromEntry = null)
+        Action<string>? createTaskFromEntry = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
@@ -173,7 +173,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
         NewFrom = null;
         NewTo = null;
         _onChanged();
-        _createTaskFromEntry?.Invoke(text, null); // "now", same as before #247 introduced createdAt
+        _createTaskFromEntry?.Invoke(text);
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
@@ -228,9 +228,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void CloseHistory() => HistoryEntry = null;
 
-    // Reopens the same overlay #88 wired to the input dock's "add & create task" button, this time
-    // anchored to the row's own timestamp (#247) rather than "now".
-    private void CreateTaskFromRow(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text, row.Timestamp);
+    // Reopens the same overlay #88 wired to the input dock's "add & create task" button (#247),
+    // pre-filled from the row's text; the timer still starts from "now", same as the dock button,
+    // since anchoring it to a possibly much older entry's timestamp would be misleading.
+    private void CreateTaskFromRow(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text);
 
     private bool CanCreateTaskFromRow(EtbEntryRow row) => !IsReadOnly && _createTaskFromEntry is not null;
 
@@ -258,7 +259,6 @@ public sealed class EtbEntryRow
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(canCreateTask);
         Id = entry.Id;
-        Timestamp = entry.Timestamp;
         Time = Formatting.Timestamp(entry.Timestamp);
         Direction = Formatting.Direction(entry.Direction);
         From = entry.From;
@@ -284,8 +284,6 @@ public sealed class EtbEntryRow
     }
 
     public Guid Id { get; }
-
-    public DateTimeOffset Timestamp { get; }
 
     public string Time { get; }
 

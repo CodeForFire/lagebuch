@@ -374,7 +374,7 @@ public class EtbViewModelTests
     }
 
     [Fact]
-    public void CreateTaskCommand_invokes_the_delegate_with_the_row_text_and_its_own_timestamp()
+    public void CreateTaskCommand_invokes_the_delegate_with_the_row_text()
     {
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(
@@ -385,12 +385,7 @@ public class EtbViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         string? capturedText = null;
-        DateTimeOffset? capturedTimestamp = null;
-        void CaptureCreateTask(string text, DateTimeOffset? createdAt)
-        {
-            capturedText = text;
-            capturedTimestamp = createdAt;
-        }
+        void CaptureCreateTask(string text) => capturedText = text;
 
         var vm = new EtbViewModel(
             session,
@@ -402,15 +397,10 @@ public class EtbViewModelTests
         vm.AddEntryCommand.Execute(null);
         var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
 
-        // An entry logged well after the incident started -- the row must carry its own timestamp,
-        // not "now", so the resulting task's timer anchors to when the entry actually happened.
-        clock.Now = T0.AddHours(3);
-
         Assert.True(row.CanCreateTask);
         row.CreateTaskCommand.Execute(null);
 
         Assert.Equal("Lagemeldung", capturedText);
-        Assert.Equal(T0, capturedTimestamp); // the row's own timestamp, not clock.Now at click time
     }
 
     [Fact]
@@ -426,7 +416,7 @@ public class EtbViewModelTests
             Array.Empty<(string, bool)>());
         session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
         session.Close();
-        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, (_, _) => { });
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, _ => { });
 
         var row = Assert.Single(vm.Entries, r => r.Text == "Lagemeldung");
         Assert.False(row.CanCreateTask);

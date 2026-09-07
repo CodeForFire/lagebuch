@@ -124,13 +124,10 @@ public sealed record AddFileCommand(OperatorDto Operator, Guid FileId, string Fi
 public sealed record RenameFileCommand(Guid FileId, string? DisplayName) : SyncCommand;
 
 // TimerMinutes travels instead of an absolute DueAt: the host stamps the anchor with its own
-// authoritative clock on apply, like every timestamped command. CreatedAt defaults to null so a
-// pre-#247 sender's payload still deserializes -- the host then falls back to its own clock,
-// same as before #247; a non-null value anchors the task to an existing ETB entry's own timestamp.
+// authoritative clock on apply, like every timestamped command.
 public sealed record AddTaskCommand(
     OperatorDto Operator, string Text, string Assignee,
-    TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes,
-    DateTimeOffset? CreatedAt = null) : SyncCommand;
+    TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes) : SyncCommand;
 
 public sealed record SetTaskCompletedCommand(OperatorDto Operator, Guid TaskId, bool IsDone) : SyncCommand;
 

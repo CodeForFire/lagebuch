@@ -778,18 +778,19 @@ public class IncidentWorkspaceViewModelTests
     /// <summary>
     /// Reopening the create-task overlay from an already-saved ETB row (#247) -- the one path
     /// #88 left with no way back in once an entry was saved -- must anchor the resulting task's
-    /// timer to that row's own timestamp, not the moment the operator gets around to clicking it.
+    /// timer to "now", not that row's own (possibly much older) timestamp, or a stale entry would
+    /// spawn a task that is overdue on arrival.
     /// </summary>
     [Fact]
-    public void Etb_row_create_task_icon_opens_dialog_anchored_to_the_entrys_own_timestamp()
+    public void Etb_row_create_task_icon_opens_dialog_anchored_to_now()
     {
         var vm = NewWorkspace(out _, out var clock);
         vm.Etb.NewText = "Lage erkundet";
         vm.Etb.AddEntryCommand.Execute(null);
         var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lage erkundet");
-        var entryTime = clock.Now;
 
-        clock.Now = entryTime.AddHours(1); // operator only gets to it later
+        clock.Now = clock.Now.AddHours(1); // operator only gets to it later
+        var clickTime = clock.Now;
         Assert.True(row.CanCreateTask);
         row.CreateTaskCommand.Execute(null);
 
@@ -799,11 +800,8 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingTaskDialog!.SaveCommand.Execute(null);
 
         var task = Assert.Single(vm.Tasks.Rows, t => t.Text == "Lage erkundet");
-        Assert.StartsWith(Formatting.Timestamp(entryTime), task.CreatedDisplay, StringComparison.Ordinal);
-
-        // Medium urgency's 15-minute default timer, anchored to entryTime, is already overdue an
-        // hour later -- proof CreatedAt used the row's own timestamp rather than clock.Now at save.
-        Assert.True(task.IsOverdue);
+        Assert.StartsWith(Formatting.Timestamp(clickTime), task.CreatedDisplay, StringComparison.Ordinal);
+        Assert.False(task.IsOverdue); // anchored to now, so a fresh 15-minute timer is not overdue
     }
 }
 
