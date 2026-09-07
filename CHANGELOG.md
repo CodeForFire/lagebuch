@@ -9,9 +9,30 @@ once we reach 1.0.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-07
+
 ### Added
 - Show the 25 MB per-file attachment limit in the Files view (#213)
 - Create a task from an already-saved ETB entry via a row icon (#247)
+- Add a Zugführer headcount to Kräfte (#233)
+- Support Untergeschoss (UG) floors in CO-Messung (#235)
+- Add a +5 minute snooze for the ILS reminder (#244)
+- Add a Zugführer flag to vehicle master data (#248)
+- Derive the Feuerwehr automatically from a single Fahrzeug pick (#231)
+- Lock the brigade and call sign once a Fahrzeug is picked (#251)
+
+### Changed
+- Unify the "add entry" button placement across tabs (#236)
+
+### Fixed
+- Hide ETB system messages by default (#230)
+- Keep the selected Haus after entering a ppm value in CO-Messung (#238)
+- Make the apartment header field look editable in CO-Messung (#234)
+- Make Truppnummer an internal, auto-assigned SCBA field (#226)
+- Stop the Aufgabe alarm from clipping (#228)
+- Disable HINZUFÜGEN until a Kraft row has counted personnel (#227)
+- Stop bundling QuestPDF into the Android build (#252)
+- Allow adding an Einsatznummer even without a Stichwort (#253)
 
 ## [0.4.0] - 2026-09-05
 
@@ -115,7 +136,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/CodeForFire/lagebuch/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/CodeForFire/lagebuch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/CodeForFire/lagebuch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/CodeForFire/lagebuch/compare/v0.1.0...v0.2.0
