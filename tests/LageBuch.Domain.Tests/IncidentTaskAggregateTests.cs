@@ -100,9 +100,38 @@ public class IncidentTaskAggregateTests
         incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.High, TaskUrgency.High, 5);
         var before = incident.Tasks[0].DueAt;
 
-        var updated = incident.ExtendTaskTimer(incident.Tasks[0].Id, 5);
+        // Not yet due: extension stacks onto the existing due time, not "now".
+        var updated = incident.ExtendTaskTimer(incident.Tasks[0].Id, 5, clock);
 
         Assert.Equal(before.AddMinutes(5), updated.DueAt);
+    }
+
+    [Fact]
+    public void ExtendTaskTimer_on_overdue_task_rebases_to_now()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        // Task is now well overdue -- extension must not just add 5 minutes onto the stale due
+        // time (which would still be in the past), it must give 5 minutes from now.
+        clock.Now = T0.AddMinutes(30);
+        var updated = incident.ExtendTaskTimer(incident.Tasks[0].Id, 5, clock);
+
+        Assert.Equal(clock.Now.AddMinutes(5), updated.DueAt);
+    }
+
+    [Fact]
+    public void ExtendTaskTimer_exactly_at_due_time_rebases_to_now()
+    {
+        var (incident, clock) = NewIncident();
+        var op = new SessionOperator("Müller");
+        incident.AddTask(clock, op, "Schlauche kappen", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        clock.Now = T0.AddMinutes(5); // exactly DueAt: counts as overdue (matches ComputeIsOverdue's <=)
+        var updated = incident.ExtendTaskTimer(incident.Tasks[0].Id, 5, clock);
+
+        Assert.Equal(clock.Now.AddMinutes(5), updated.DueAt);
     }
 
     [Fact]
@@ -113,14 +142,14 @@ public class IncidentTaskAggregateTests
         incident.AddTask(clock, op, "Kein Timer", null, TaskImportance.Low, TaskUrgency.Low, 0);
 
         Assert.Throws<InvalidOperationException>(
-            () => incident.ExtendTaskTimer(incident.Tasks[0].Id, 5));
+            () => incident.ExtendTaskTimer(incident.Tasks[0].Id, 5, clock));
     }
 
     [Fact]
     public void ExtendTaskTimer_unknown_id_throws()
     {
-        var (incident, _) = NewIncident();
-        Assert.Throws<KeyNotFoundException>(() => incident.ExtendTaskTimer(Guid.NewGuid(), 5));
+        var (incident, clock) = NewIncident();
+        Assert.Throws<KeyNotFoundException>(() => incident.ExtendTaskTimer(Guid.NewGuid(), 5, clock));
     }
 
     [Fact]
@@ -137,7 +166,7 @@ public class IncidentTaskAggregateTests
         Assert.Throws<IncidentClosedException>(
             () => incident.UpdateTask(id, "Y", null, TaskImportance.Low, TaskUrgency.Low));
         Assert.Throws<IncidentClosedException>(
-            () => incident.ExtendTaskTimer(id, 5));
+            () => incident.ExtendTaskTimer(id, 5, clock));
     }
 
     [Fact]

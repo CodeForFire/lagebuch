@@ -130,7 +130,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="TIMER" Width="140">
+          <DataGridTemplateColumn Header="TIMER" Width="160">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <StackPanel Orientation="Horizontal" Spacing="4" Margin="6,4" VerticalAlignment="Center">
@@ -138,7 +138,7 @@
                              Classes.due="{Binding IsOverdue}" />
                   <!-- Quick "+5 min" action (#246); disabled once done or for a task created
                        without a timer via CanExtendTimer. -->
-                  <Button Padding="6,2" FontSize="11" Content="+5"
+                  <Button Padding="6,2" FontSize="11" Content="+5 min"
                           IsVisible="{Binding !IsReadOnly}"
                           Command="{Binding ExtendTimerCommand}"
                           ToolTip.Tip="5 Minuten hinzufügen" />
