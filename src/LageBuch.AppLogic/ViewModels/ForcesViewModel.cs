@@ -316,7 +316,21 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     private string? _newNotes;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsVehicleSelected))]
     private Vehicle? _selectedVehicle;
+
+    /// <summary>
+    /// Drives the view's readonly lock on Feuerwehr/Funkrufname: once a vehicle derived them, they
+    /// must not silently drift from the Stammdaten vehicle the row represents. Personnel counts
+    /// stay editable regardless -- the real crew can differ from the vehicle's nominal seats.
+    /// </summary>
+    public bool IsVehicleSelected => SelectedVehicle is not null;
+
+    /// <summary>Drops back to manual entry (e.g. a wrong pick, or a Fremdwehr unit with no
+    /// matching vehicle) without wiping whatever Feuerwehr/Funkrufname/Stärke are currently
+    /// filled in -- the operator edits on from there instead of starting over.</summary>
+    [RelayCommand]
+    private void ClearVehicle() => SelectedVehicle = null;
 
     // Set while OnSelectedVehicleChanged derives NewBrigade from the picked vehicle (#215), so the
     // resulting OnNewBrigadeChanged does not immediately clear the very selection that caused it.
