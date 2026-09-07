@@ -140,34 +140,55 @@ jobs:
     # Publish the Windows + Linux installers to the release for the pushed tag.
     if: github.event_name == 'push'
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
+      - name: Extract changelog section
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 { found=1; next }
+            found && index($0, "## [") == 1 { exit }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' -e '${/^$/d}' > changelog-section.md
+          if [ ! -s changelog-section.md ]; then
+            echo "_No changelog entry found for v${VERSION}; see CHANGELOG.md._" > changelog-section.md
+          fi
+      - name: Build release notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cat changelog-section.md > release-notes.md
+          cat >> release-notes.md <<EOF
+
+          Getaggter Release-Build.
+
+          | Plattform | Datei |
+          |-----------|-------|
+          | Windows   | \`lagebuch-${VERSION}-x64.msi\` |
+          | Linux     | \`lagebuch_${VERSION}_amd64.deb\` |
+          | Android   | \`lagebuch-${VERSION}.apk\` |
+
+          Ein macOS-Build (Apple Silicon, \`.dmg\`) wird auf Anfrage bereitgestellt und dann hier
+          angehängt.
+
+          **Die Pakete sind nicht signiert.** Beim ersten Start:
+          - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
+          - **Linux**: \`sudo dpkg -i lagebuch_*.deb\` (oder \`sudo apt install ./lagebuch_*.deb\`).
+          - **Android**: aktiviere einmalig *Installation aus unbekannten Quellen* für den
+            Browser/Dateimanager, mit dem die APK geöffnet wird.
+          - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
+            oder \`xattr -dr com.apple.quarantine /Applications/Lagebuch.app\`.
+          EOF
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ needs.version.outputs.version }}
           name: Lagebuch v${{ needs.version.outputs.version }}
           prerelease: true
           files: dist/**/*
-          body: |
-            Getaggter Release-Build.
-
-            | Plattform | Datei |
-            |-----------|-------|
-            | Windows   | `lagebuch-${{ needs.version.outputs.version }}-x64.msi` |
-            | Linux     | `lagebuch_${{ needs.version.outputs.version }}_amd64.deb` |
-            | Android   | `lagebuch-${{ needs.version.outputs.version }}.apk` |
-
-            Ein macOS-Build (Apple Silicon, `.dmg`) wird auf Anfrage bereitgestellt und dann hier
-            angehängt.
-
-            **Die Pakete sind nicht signiert.** Beim ersten Start:
-            - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
-            - **Linux**: `sudo dpkg -i lagebuch_*.deb` (oder `sudo apt install ./lagebuch_*.deb`).
-            - **Android**: aktiviere einmalig *Installation aus unbekannten Quellen* für den
-              Browser/Dateimanager, mit dem die APK geöffnet wird.
-            - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
-              oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`.
+          body_path: release-notes.md
 
   # macOS carries the 10x minute multiplier, so it is not built on every tag. Run this workflow
   # manually (workflow_dispatch) with the version of an existing release to add the .dmg to it.
