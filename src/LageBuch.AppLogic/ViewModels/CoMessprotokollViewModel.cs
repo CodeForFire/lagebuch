@@ -236,6 +236,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         BuildMatrix();
         OnPropertyChanged(nameof(CanRemoveBuilding));
         AddUntergeschossCommand.NotifyCanExecuteChanged();
+        AddObergeschossCommand.NotifyCanExecuteChanged();
     }
 
     private void BuildMatrix()
@@ -400,6 +401,29 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     private bool CanAddUntergeschoss =>
         !IsReadOnly && SelectedBuilding is not null && SelectedBuilding.UndergroundFloorCount < 3;
+
+    /// <summary>Adds one Obergeschoss above the current highest floor (#258), mirroring
+    /// AddUntergeschoss: reuses UpdateCoBuildingStructure, so it also creates the new floor's
+    /// Wohnungen, capped at Building's 50-floor limit.</summary>
+    [RelayCommand(CanExecute = nameof(CanAddObergeschoss))]
+    private void AddObergeschoss()
+    {
+        if (SelectedBuilding is null)
+        {
+            return;
+        }
+
+        _session.UpdateCoBuildingStructure(
+            SelectedBuilding.Id,
+            SelectedBuilding.FloorCount + 1,
+            SelectedBuilding.ApartmentsPerFloor,
+            SelectedBuilding.UndergroundFloorCount);
+        _onChanged();
+        Refresh();
+    }
+
+    private bool CanAddObergeschoss =>
+        !IsReadOnly && SelectedBuilding is not null && SelectedBuilding.FloorCount < 50;
 
     [RelayCommand]
     private void CloseEditor()

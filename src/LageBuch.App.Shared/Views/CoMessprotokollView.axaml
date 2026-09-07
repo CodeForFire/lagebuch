@@ -42,6 +42,11 @@
         <Button Content="UG HINZUFÜGEN"
                 Command="{Binding AddUntergeschossCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        <!-- Obergeschoss (#258): mirrors UG HINZUFÜGEN for the top of the building, so an
+             under-estimated floor count can be corrected upward too, not just downward. -->
+        <Button Content="OG HINZUFÜGEN"
+                Command="{Binding AddObergeschossCommand}"
+                VerticalAlignment="Bottom" Margin="0,0,0,1" />
         <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
         <Button x:Name="AddBuildingButton" Classes="signal" Content="HAUS HINZUFÜGEN"
                 Command="{Binding AddBuildingCommand}"
