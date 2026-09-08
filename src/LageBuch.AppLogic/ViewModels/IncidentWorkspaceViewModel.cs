@@ -431,7 +431,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Justification = "Export can fail in several ways (disk full, exporter throwing, etc.); surfaces in the status line.")]
     private async Task RunExportAsync(IncidentPdfSections sections)
     {
-        var suggested = (_session.Incident.IncidentNumber?.Value ?? "Einsatz") + ".pdf";
+        // Reuse the incident's own name -- its .fwincident file's base name (date+time+Stichwort,
+        // see HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually
+        // still unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf".
+        var suggested = Path.GetFileNameWithoutExtension(_local!.Path) + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
         {

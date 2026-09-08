@@ -531,6 +531,21 @@ public class IncidentWorkspaceViewModelTests
         Assert.All(vm.PendingPdfExportOptions!.Items, i => Assert.True(i.IsSelected));
     }
 
+    // The Einsatznummer is usually unknown until ILS calls back (#69), so falling back to it for
+    // the suggested export name meant most exports proposed the literal "Einsatz.pdf" -- the
+    // incident already has a name (its own .fwincident file), so the export should reuse that.
+    [Fact]
+    public async Task ExportPdf_suggests_the_incidents_own_file_name()
+    {
+        var dialogs = new FakeDialogs { ExportPath = null };
+        var vm = NewWorkspace(out _, out _, dialogs);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        Assert.Equal("x.pdf", dialogs.LastSuggestedExportName);
+    }
+
     [Fact]
     public async Task ExportPdf_writes_file_when_path_chosen()
     {
@@ -1011,11 +1026,17 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public string? LastOpenedUrl { get; private set; }
 
+    public string? LastSuggestedExportName { get; private set; }
+
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
 
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
-    public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(ExportPath);
+    public Task<string?> PickExportPdfAsync(string suggestedFileName)
+    {
+        LastSuggestedExportName = suggestedFileName;
+        return Task.FromResult(ExportPath);
+    }
 
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
 
