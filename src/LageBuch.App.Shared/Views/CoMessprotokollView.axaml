@@ -2,21 +2,36 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              xmlns:dom="clr-namespace:LageBuch.Domain.CoMeasurement;assembly=LageBuch.Domain"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.CoMessprotokollView"
              x:DataType="vm:CoMessprotokollViewModel">
+  <UserControl.Styles>
+    <!-- Active filter chip. Deliberately NOT Button.signal: that class is the red accent, and red
+         already means "Person(en) betroffen" on every tile below. Reusing it here would put the
+         most alarming color in the app on a chip that only says "this list is filtered". A raised
+         surface plus brighter text carries "selected" without borrowing a status color. -->
+    <Style Selector="Button.chipon /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.chipon">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+  </UserControl.Styles>
+
   <DockPanel>
     <!-- Title: every other tab leads with one at this same position (DockPanel.Dock="Top",
          Margin bottom 14) — this view was missing it (#137). -->
     <TextBlock DockPanel.Dock="Top" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
 
-    <!-- Building management: selector, add/remove and UG all live together in one dock (bottom
-         gutter, matching every other tab's entry point, #221) rather than split across the top
-         and bottom: they're one job ("which Haus, and add/remove a house or a floor"). Within
-         that dock, HAUS auswählen/ENTFERNEN/UG HINZUFÜGEN all act on the selected Haus and sit
-         together; HAUS HINZUFÜGEN doesn't depend on a selection at all, so it's set apart after
-         a divider rather than sandwiched between them. -->
+    <!-- Building management: which Haus, and add/remove a Haus (bottom gutter, matching every
+         other tab's entry point, #221). HAUS auswählen/ENTFERNEN act on the selected Haus and sit
+         together; HAUS HINZUFÜGEN doesn't depend on a selection at all, so it's set apart after a
+         divider rather than sandwiched between them. Adding a *floor* is not a building-level
+         action but structure editing, so UG/OG HINZUFÜGEN moved out of here and into the STRUKTUR
+         toolbar alongside the per-floor Wohnungen counts (#265). -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
@@ -36,16 +51,6 @@
         <Button Content="HAUS ENTFERNEN"
                 Command="{Binding RemoveBuildingCommand}"
                 IsEnabled="{Binding CanModify}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        <!-- Untergeschoss (#218): reuses UpdateCoBuildingStructure, which also creates the new
-             floor's Wohnungen, capped at 3 UG floors via CanAddUntergeschoss. -->
-        <Button Content="UG HINZUFÜGEN"
-                Command="{Binding AddUntergeschossCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        <!-- Obergeschoss (#258): mirrors UG HINZUFÜGEN for the top of the building, so an
-             under-estimated floor count can be corrected upward too, not just downward. -->
-        <Button Content="OG HINZUFÜGEN"
-                Command="{Binding AddObergeschossCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
         <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
         <Button x:Name="AddBuildingButton" Classes="signal" Content="HAUS HINZUFÜGEN"
@@ -179,73 +184,173 @@
       </StackPanel>
     </Border>
 
-    <!-- Matrix -->
-    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+    <!-- Building summary strip: the "how far are we" answer that scanning tiles can't give quickly
+         on a large building, plus the status filter. Sits above the matrix because it's read first
+         and read most. -->
+    <Border DockPanel.Dock="Top" IsVisible="{Binding HasBuildings}" Margin="0,0,0,14">
+      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <StackPanel Grid.Column="0" Spacing="6">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="{Binding SelectedBuildingName}" FontWeight="SemiBold" FontSize="14"
+                       Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding SummaryLine}" FontSize="12"
+                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+          </StackPanel>
+          <!-- Segmented, not a single percentage: "wie viel ist erledigt" and "wie viel ist
+               betroffen" are different questions and the red segment must never be mistaken for
+               progress. -->
+          <StackPanel Orientation="Horizontal" Height="6">
+            <Border Width="{Binding SearchedBarWidth}" Background="#92D050" CornerRadius="3,0,0,3" />
+            <Border Width="{Binding AffectedBarWidth}" Background="#FF0000" />
+            <Border Width="{Binding OpenBarWidth}" Background="#2A3444" CornerRadius="0,3,3,0" />
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button Content="ALLE" FontSize="11" Command="{Binding ShowAllCommand}"
+                  Classes.chipon="{Binding IsFilterAll}" />
+          <Button Content="OFFEN" FontSize="11" Command="{Binding ShowOpenCommand}"
+                  Classes.chipon="{Binding IsFilterOpen}" />
+          <Button Content="BETROFFEN" FontSize="11" Command="{Binding ShowAffectedCommand}"
+                  Classes.chipon="{Binding IsFilterAffected}" />
+          <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
+          <!-- Structure editing is a setup job, not a measuring job: the per-floor count spinners
+               only appear while this is on, so they aren't sitting between the crew and the tiles
+               for the rest of the incident. -->
+          <ToggleButton Content="STRUKTUR" FontSize="11" IsChecked="{Binding IsStructureMode}"
+                        IsEnabled="{Binding CanModify}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Structure toolbar: only while STRUKTUR is on, next to the per-floor Wohnungen counts that
+         appear in the same mode. Adding a floor and setting a floor's unit count are the same job
+         (describing the building), done once at the start; keeping them out of the way for the
+         rest of the incident is the whole point of the mode. -->
+    <Border DockPanel.Dock="Top" IsVisible="{Binding IsStructureMode}" Margin="0,0,0,12"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="12,10">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="GESCHOSSE" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                   Margin="0,0,4,0" />
+        <!-- Obergeschoss (#258): mirrors UG HINZUFÜGEN for the top of the building, so an
+             under-estimated floor count can be corrected upward too, not just downward. -->
+        <Button Content="OG HINZUFÜGEN" Command="{Binding AddObergeschossCommand}" />
+        <!-- Untergeschoss (#218): reuses UpdateCoBuildingStructure, which also creates the new
+             floor's Wohnungen, capped at 3 UG floors via CanAddUntergeschoss. -->
+        <Button Content="UG HINZUFÜGEN" Command="{Binding AddUntergeschossCommand}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Matrix: one band per floor, top floor first, so the column of floor labels still reads as a
+         cross-section of the building. Tiles wrap inside their band instead of extending the row,
+         which is what decouples the layout from the unit count: a 2-unit penthouse floor and a
+         14-unit Kellergeschoss both fit the same width without clipping or wasted space (#265). -->
+    <!-- AllowAutoHide="False": Avalonia's default floats the vertical scrollbar over the content
+         without reserving layout space for it (viewport width stays equal to the ScrollViewer's),
+         so once the tiles started filling the line edge to edge the bar sat on top of the
+         rightmost unit of every floor. Reserving the 16px keeps the tiles clear of it. -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                  AllowAutoHide="False"
                   IsVisible="{Binding HasBuildings}">
-      <StackPanel>
-        <!-- No shared column header (#265): each floor keeps its own Wohnungen count and each
-             tile carries its own label now, so a header shared across every floor's same-numbered
-             column no longer means anything: a floor's count is edited on its own row below. -->
-        <ItemsControl ItemsSource="{Binding MatrixRows}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <StackPanel Spacing="4" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:FloorRowViewModel">
-              <Grid ColumnDefinitions="80,60,Auto,*">
-                <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="SemiBold"
-                           VerticalAlignment="Center" Margin="0,0,8,0" />
-                <!-- Per-floor Wohnungen count (#265): each floor now owns its own count instead
-                     of sharing one across the whole building. -->
-                <NumericUpDown Grid.Column="1" Minimum="1" Maximum="30" FormatString="0"
-                                Value="{Binding ApartmentCount}" IsEnabled="{Binding !IsReadOnly}"
-                                VerticalAlignment="Center" Margin="0,0,8,0" />
-                <ItemsControl Grid.Column="2" ItemsSource="{Binding Cells}">
+      <ItemsControl ItemsSource="{Binding MatrixRows}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="2" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:FloorRowViewModel">
+            <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
+                    Padding="0,8,0,10">
+              <Grid ColumnDefinitions="104,*">
+                <!-- Floor gutter: label, its Nutzung (FloorDescriptions) and this floor's own
+                     progress. Fixed width so every floor label sits on one left edge. -->
+                <StackPanel Grid.Column="0" Spacing="1" Margin="0,0,10,0">
+                  <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13"
+                             Foreground="{StaticResource TextPrimaryBrush}" />
+                  <!-- TextSecondary, not TextMuted: muted is a semi-transparent token meant for
+                       disabled text, and the floor's Nutzung ("Läden", "Kellerabteile") is the
+                       context that tells a crew what kind of units they're looking at. -->
+                  <TextBlock Text="{Binding Description}" FontSize="10"
+                             Foreground="{StaticResource TextSecondaryBrush}"
+                             TextTrimming="CharacterEllipsis" />
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="{Binding ProgressLabel}" FontSize="11"
+                               FontFamily="{StaticResource MonoFont}"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="&#x2713;" FontSize="11" Foreground="#92D050"
+                               IsVisible="{Binding IsComplete}" />
+                    <TextBlock Text="&#x2297;" FontSize="11" Foreground="#FF0000"
+                               IsVisible="{Binding HasAffected}" />
+                  </StackPanel>
+                  <NumericUpDown Minimum="1" Maximum="30" FormatString="0" FontSize="11"
+                                 Value="{Binding ApartmentCount}" IsEnabled="{Binding !IsReadOnly}"
+                                 IsVisible="{ReflectionBinding $parent[ItemsControl].DataContext.IsStructureMode}"
+                                 Margin="0,4,0,0" />
+                </StackPanel>
+
+                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                      <!-- Equal-width columns filling the line, so every floor spans the same
+                           width and the matrix reads as a cross-section of the building: the two
+                           Penthäuser on 4.OG are together as wide as the four Wohnungen below
+                           them. Wraps rather than shrinking past 96px, which is where a 14-unit
+                           floor in a narrow window would start trimming its ppm readings away. -->
+                      <ctrl:EqualWidthWrapPanel MinItemWidth="96" ItemSpacing="5" LineSpacing="5" />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:DwellingCellViewModel">
+                      <!-- HorizontalAlignment="Stretch" is load-bearing: without it the Button
+                           sizes to its content and sits at the left of the column the panel gave
+                           it, so the columns line up but the tiles don't fill them. -->
                       <Button Background="Transparent" BorderThickness="0" Padding="0" Height="NaN"
+                              HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                              ToolTip.Tip="{Binding TileTooltip}"
                               Command="{Binding OpenEditorCommand}">
-                        <!-- Door-mark card: dark tile, colored accent stripe + a slash/X/circled-X
+                        <!-- Door-mark tile: dark ground, colored accent stripe + a slash/X/circled-X
                              glyph mirror the spray-marked search convention crews already read on
-                             scene, instead of a solid traffic-light fill. -->
-                        <Border Width="148" CornerRadius="6"
+                             scene, instead of a solid traffic-light fill. Sized down to 104x46 from
+                             148x90: identity, status and ppm are all it needs to carry; resident,
+                             key and full status wording moved to the tooltip and the editor, so a
+                             14-unit floor fits one line instead of running off screen. 46px keeps
+                             the tap target above the 44px floor for gloved hands. -->
+                        <!-- No fixed Width: EqualWidthWrapPanel owns it so the row fills the line. -->
+                        <Border x:Name="UnitTile" Height="62" CornerRadius="5" HorizontalAlignment="Stretch"
                                 BorderBrush="{Binding StatusBrush}" BorderThickness="1"
                                 Background="{StaticResource SurfaceRaisedBrush}"
                                 ClipToBounds="True">
-                          <Grid ColumnDefinitions="4,*">
+                          <Grid ColumnDefinitions="3,*">
                             <Border Grid.Column="0" Background="{Binding StatusBrush}" />
                             <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"
-                                  Margin="8,6">
-                              <!-- Label (#265): every tile carries its own identity now: this
-                                   used to be the only place a column's Label was ever rendered
-                                   (the shared header above the grid), the tile itself never showed
-                                   it. -->
+                                  Margin="6,4">
                               <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
-                                         Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
+                                         Text="{Binding Label}" FontSize="10" FontWeight="SemiBold"
                                          Foreground="{StaticResource TextPrimaryBrush}"
-                                         TextTrimming="CharacterEllipsis" MaxWidth="112" />
-                              <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="5">
+                                         TextTrimming="CharacterEllipsis" />
+                              <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="4">
                                 <TextBlock Text="{Binding StatusGlyph}" FontFamily="{StaticResource MonoFont}"
-                                           FontWeight="Bold" FontSize="13"
+                                           FontWeight="Bold" FontSize="12"
                                            Foreground="{Binding StatusBrush}" />
-                                <TextBlock Text="{Binding CoDisplay}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"
+                                <!-- Empty when unmeasured (CoCompact, not CoDisplay): "Kein Messwert"
+                                     on every unstarted tile is the same non-information repeated
+                                     dozens of times, and it buries the values that do exist. -->
+                                <TextBlock Text="{Binding CoCompact}" FontFamily="{StaticResource MonoFont}"
+                                           FontSize="11" Foreground="{StaticResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis" />
                               </StackPanel>
-                              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="11"
-                                         Margin="6,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
-                              <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                              <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="10"
+                                         Margin="4,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
+                              <!-- Who lives there. Belongs on the tile, not only in the tooltip:
+                                   the crew reads the whole matrix at a glance, and a name that
+                                   needs a hover to reveal is not displayed at all for that job. -->
+                              <TextBlock x:Name="UnitResident" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                                          Text="{Binding ResidentName}" FontSize="10"
                                          Foreground="{StaticResource TextSecondaryBrush}"
-                                         TextTrimming="CharacterEllipsis" MaxWidth="112" />
+                                         TextTrimming="CharacterEllipsis" />
                             </Grid>
                           </Grid>
                         </Border>
@@ -253,14 +358,11 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Grid.Column="3" Text="{Binding Description}"
-                           VerticalAlignment="Center" Margin="8,0,0,0"
-                           Width="200" TextWrapping="Wrap" />
               </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </ScrollViewer>
 
   </DockPanel>
