@@ -163,10 +163,6 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
     private bool CanAddFile => !IsReadOnly && !IsUploading;
 
     [RelayCommand(CanExecute = nameof(CanAddFile))]
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Domain guards, IO and network failures are heterogeneous; all surface as one error line.")]
     private async Task AddFileAsync()
     {
         var path = await _dialogs.PickAttachmentAsync();
@@ -175,32 +171,83 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
             return;
         }
 
-        ErrorMessage = null;
+        await AddFilesAsync(new[] { path });
+    }
 
-        var sizeBytes = new FileInfo(path).Length;
-        if (sizeBytes > IncidentFile.MaxSizeBytes)
+    /// <summary>
+    /// Uploads any number of local paths in one batch — the shared core both the file-picker command
+    /// above and the Files tab's drag-and-drop drop handler (code-behind, #262 UX follow-up) call
+    /// into. The body guard also covers a programmatic call, which bypasses AddFileCommand's
+    /// CanExecute — mirrors IncidentFileRow.Remove.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Domain guards, IO and network failures are heterogeneous; all surface as one error line.")]
+    public async Task AddFilesAsync(IReadOnlyList<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        if (paths.Count == 0 || !CanAddFile)
         {
-            ErrorMessage = $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.";
             return;
         }
 
+        ErrorMessage = null;
         IsUploading = true;
+        var failures = new List<(string FileName, string Reason)>();
         try
         {
-            var bytes = await File.ReadAllBytesAsync(path);
-            await _session.AddFileAsync(Path.GetFileName(path), ContentTypeFor(path), bytes);
+            foreach (var path in paths)
+            {
+                var sizeBytes = new FileInfo(path).Length;
+                if (sizeBytes > IncidentFile.MaxSizeBytes)
+                {
+                    failures.Add((Path.GetFileName(path), $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB."));
+                    continue;
+                }
+
+                try
+                {
+                    var bytes = await File.ReadAllBytesAsync(path);
+                    await _session.AddFileAsync(Path.GetFileName(path), ContentTypeFor(path), bytes);
+                }
+                catch (Exception ex)
+                {
+                    // Domain guards (closed incident, unsupported type, over the size cap) and — once
+                    // joined-client upload lands — network failures all surface here rather than crashing.
+                    failures.Add((Path.GetFileName(path), ex.Message));
+                }
+            }
+
             _onChanged(); // Changed already ran Sync(); this only refreshes LastSavedAt et al.
-        }
-        catch (Exception ex)
-        {
-            // Domain guards (closed incident, unsupported type, over the size cap) and — once
-            // joined-client upload lands — network failures all surface here rather than crashing.
-            ErrorMessage = ex.Message;
         }
         finally
         {
             IsUploading = false;
         }
+
+        ErrorMessage = ComposeErrorMessage(paths.Count, failures);
+    }
+
+    // A single dropped/picked file keeps the plain historical wording; the "„name“: reason" framing
+    // and "N von M" summary only kick in once more than one file was involved, so a multi-file drop's
+    // batch report doesn't leave the reader guessing which file a bare reason refers to.
+    private static string? ComposeErrorMessage(int total, List<(string FileName, string Reason)> failures)
+    {
+        if (failures.Count == 0)
+        {
+            return null;
+        }
+
+        if (total == 1)
+        {
+            return failures[0].Reason;
+        }
+
+        var lines = failures.Select(f => $"„{f.FileName}“: {f.Reason}");
+        return failures.Count == total
+            ? "Keine Datei hinzugefügt:\n" + string.Join("\n", lines)
+            : $"{total - failures.Count} von {total} Dateien hinzugefügt. Fehler:\n" + string.Join("\n", lines);
     }
 
     [SuppressMessage(

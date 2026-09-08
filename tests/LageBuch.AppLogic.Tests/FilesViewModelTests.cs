@@ -129,6 +129,230 @@ public class FilesViewModelTests
         }
     }
 
+    // --- AddFilesAsync is the batch-capable core AddFileCommand now delegates into; drag-and-drop
+    // (#262 UX follow-up) calls it directly from code-behind with however many files were dropped ---
+    [Fact]
+    public async Task AddFiles_uploads_multiple_valid_files_in_one_batch()
+    {
+        var changes = 0;
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path1 = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var path2 = Path.Combine(Path.GetTempPath(), $"lage-{Guid.NewGuid():N}.pdf");
+        await File.WriteAllBytesAsync(path1, new byte[] { 1, 2, 3 });
+        await File.WriteAllBytesAsync(path2, new byte[] { 4, 5, 6 });
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => changes++);
+
+            await vm.AddFilesAsync(new[] { path1, path2 });
+
+            Assert.Equal(2, session.Incident.Files.Count);
+            Assert.Equal(2, vm.Files.Count);
+            Assert.Equal(1, changes); // one Changed notification for the whole batch, not per file
+            Assert.Null(vm.ErrorMessage);
+            Assert.False(vm.IsUploading);
+        }
+        finally
+        {
+            File.Delete(path1);
+            File.Delete(path2);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_reports_every_failure_when_all_dropped_files_are_rejected()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path1 = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
+        var path2 = Path.Combine(Path.GetTempPath(), $"mehr-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(path1, "hello");
+        await File.WriteAllTextAsync(path2, "world");
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            await vm.AddFilesAsync(new[] { path1, path2 });
+
+            Assert.Empty(session.Incident.Files);
+            Assert.Empty(vm.Files);
+            Assert.NotNull(vm.ErrorMessage);
+            Assert.Contains(Path.GetFileName(path1), vm.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains(Path.GetFileName(path2), vm.ErrorMessage, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path1);
+            File.Delete(path2);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_partial_failure_uploads_the_valid_file_and_reports_the_rejected_one()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var goodPath = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var badPath = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
+        await File.WriteAllBytesAsync(goodPath, new byte[] { 1, 2, 3 });
+        await File.WriteAllTextAsync(badPath, "hello");
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            await vm.AddFilesAsync(new[] { goodPath, badPath });
+
+            var file = Assert.Single(session.Incident.Files);
+            Assert.Equal(Path.GetFileName(goodPath), file.FileName);
+            Assert.NotNull(vm.ErrorMessage);
+            Assert.Contains(Path.GetFileName(badPath), vm.ErrorMessage, StringComparison.Ordinal);
+            Assert.DoesNotContain(Path.GetFileName(goodPath), vm.ErrorMessage, StringComparison.Ordinal);
+            Assert.False(vm.IsUploading);
+        }
+        finally
+        {
+            File.Delete(goodPath);
+            File.Delete(badPath);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_rejects_oversized_files_in_a_batch_without_reading_them_into_memory()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path1 = Path.Combine(Path.GetTempPath(), $"riesig1-{Guid.NewGuid():N}.jpg");
+        var path2 = Path.Combine(Path.GetTempPath(), $"riesig2-{Guid.NewGuid():N}.jpg");
+        foreach (var p in new[] { path1, path2 })
+        {
+            using var fs = new FileStream(p, FileMode.CreateNew);
+            fs.SetLength(IncidentFile.MaxSizeBytes + 1); // sparse — no real disk write, so the test stays fast
+        }
+
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+            await vm.AddFilesAsync(new[] { path1, path2 });
+            var allocatedDuring = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+
+            Assert.Empty(session.Incident.Files);
+            Assert.NotNull(vm.ErrorMessage);
+            Assert.True(
+                allocatedDuring < 10 * 1024 * 1024,
+                $"expected both oversized files to be rejected without reading them into memory, but the call allocated {allocatedDuring} bytes");
+        }
+        finally
+        {
+            File.Delete(path1);
+            File.Delete(path2);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_is_a_noop_with_an_empty_list()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+        await vm.AddFilesAsync(Array.Empty<string>());
+
+        Assert.Empty(session.Incident.Files);
+        Assert.Empty(vm.Files);
+    }
+
+    [Fact]
+    public async Task AddFiles_is_a_noop_on_a_readonly_session()
+    {
+        // Guards a programmatic call that bypasses AddFileCommand's CanExecute — the drag-and-drop
+        // handler in code-behind calls AddFilesAsync directly, with no command to gate it
+        // (#262 UX follow-up).
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Close();
+        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            await vm.AddFilesAsync(new[] { path });
+
+            Assert.Empty(vm.Files);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_is_a_noop_while_already_uploading()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { }) { IsUploading = true };
+
+            await vm.AddFilesAsync(new[] { path });
+
+            Assert.Empty(session.Incident.Files);
+            Assert.Empty(vm.Files);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void MaxFileSizeHint_reflects_the_domain_cap()
     {
