@@ -107,7 +107,7 @@ public class PdfExportStatusRenderTests
     }
 
     [AvaloniaFact]
-    public async Task After_a_successful_export_the_status_line_shows_the_path()
+    public async Task After_a_successful_export_the_status_line_shows_the_file_name_and_the_full_path_as_a_tooltip()
     {
         var (window, vm, exportPath) = ShowWorkspace();
 
@@ -117,10 +117,17 @@ public class PdfExportStatusRenderTests
 
         try
         {
-            Assert.Contains(exportPath, vm.ExportStatus, StringComparison.Ordinal);
+            // Only the file name is shown -- the full path made this line too wide for the footer
+            // (a previous version rendered the whole path on its own row). The full path is still
+            // available, as a tooltip, via ExportStatusDetail.
+            var fileName = Path.GetFileName(exportPath);
+            Assert.Contains(fileName, vm.ExportStatus, StringComparison.Ordinal);
+            Assert.DoesNotContain(Path.GetTempPath(), vm.ExportStatus, StringComparison.Ordinal);
+            Assert.Equal(exportPath, vm.ExportStatusDetail);
+
             var statusText = window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "ExportStatusText");
             Assert.True(statusText.IsVisible);
-            Assert.Contains(exportPath, statusText.Text, StringComparison.Ordinal);
+            Assert.Contains(fileName, statusText.Text, StringComparison.Ordinal);
             Capture(window, "pdf-export-status-after.png");
         }
         finally

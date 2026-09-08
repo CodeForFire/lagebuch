@@ -560,7 +560,12 @@ public class IncidentWorkspaceViewModelTests
         var bytes = await File.ReadAllBytesAsync(exportPath);
         Assert.Equal(0x25, bytes[0]); // %PDF
         Assert.Null(vm.PendingPdfExportOptions); // overlay closes once the export completes
-        Assert.Contains(exportPath, vm.ExportStatus, StringComparison.Ordinal);
+
+        // The status line shows just the file name -- the full path is too long for the footer
+        // (#262 follow-up) and lives in ExportStatusDetail (a tooltip) instead.
+        Assert.Contains(Path.GetFileName(exportPath), vm.ExportStatus, StringComparison.Ordinal);
+        Assert.DoesNotContain(Path.GetTempPath(), vm.ExportStatus, StringComparison.Ordinal);
+        Assert.Equal(exportPath, vm.ExportStatusDetail);
         File.Delete(exportPath);
     }
 
@@ -660,6 +665,7 @@ public class IncidentWorkspaceViewModelTests
         Assert.Contains("Datenträger voll", vm.ExportStatus, StringComparison.Ordinal);
         Assert.False(File.Exists(exportPath));
         Assert.Null(vm.PendingPdfExportOptions); // overlay still closes on failure
+        Assert.Null(vm.ExportStatusDetail); // nothing to point a tooltip at -- the export failed
     }
 
     [Fact]
@@ -719,7 +725,9 @@ public class IncidentWorkspaceViewModelTests
             new TestPdfExporter(),
             lastExportStore);
 
-        Assert.Contains("/einsaetze/alt.pdf", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.Contains("alt.pdf", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.DoesNotContain("/einsaetze", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.Equal("/einsaetze/alt.pdf", vm.ExportStatusDetail);
     }
 
     // A platform whose exporter can't render (e.g. Android -- QuestPDF doesn't support it, see

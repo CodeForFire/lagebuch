@@ -43,9 +43,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
         // Seed the export status line from the last persisted export (#262), so reopening the
         // incident still shows "zuletzt exportiert" without requiring a fresh export this session.
+        // Only the file name is shown -- the full path is too long for the footer and lives in
+        // ExportStatusDetail (a tooltip) instead.
         if (_lastPdfExportStore?.GetLastExport() is { } lastExport)
         {
-            _exportStatus = $"Zuletzt exportiert: {lastExport.Path} um {lastExport.ExportedAt:HH:mm}";
+            _exportStatus = $"Zuletzt exportiert: {Path.GetFileName(lastExport.Path)} um {lastExport.ExportedAt:HH:mm}";
+            _exportStatusDetail = lastExport.Path;
         }
 
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
@@ -399,10 +402,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     // (QuestPDF/QuestPDF#1432), so that head supplies NoopIncidentPdfExporter and hides the button too.
     public bool CanExport => _local is not null && _pdfExporter.CanExport;
 
-    // The one-line export outcome, shown under the Export button: a fresh success/failure message,
-    // or (before any export this session) seeded from ILastPdfExportStore in the constructor.
+    // The one-line export outcome: a fresh success/failure message, or (before any export this
+    // session) seeded from ILastPdfExportStore in the constructor. Shows only the file name --
+    // the full path made this line too wide for the footer -- with the full path (when known)
+    // available via ExportStatusDetail for a tooltip.
     [ObservableProperty]
     private string? _exportStatus;
+
+    [ObservableProperty]
+    private string? _exportStatusDetail;
 
     // Opens the section-selection overlay (#262); the actual generate/write/share work is the
     // overlay's own awaitable ExportCommand (RunExportAsync below), so this stays synchronous.
@@ -446,12 +454,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             var bytes = await _local!.ExportPdfAsync(_pdfExporter, sections);
             await File.WriteAllBytesAsync(path, bytes);
             await _dialogs.ShareFileAsync(path, "application/pdf");
-            ExportStatus = $"PDF exportiert: {path}";
+            ExportStatus = $"PDF exportiert: {Path.GetFileName(path)}";
+            ExportStatusDetail = path;
             _lastPdfExportStore?.SetLastExport(path, _clock.Now);
         }
         catch (Exception ex)
         {
             ExportStatus = $"Export fehlgeschlagen: {ex.Message}";
+            ExportStatusDetail = null; // nothing to point a tooltip at -- the export failed
         }
     }
 
