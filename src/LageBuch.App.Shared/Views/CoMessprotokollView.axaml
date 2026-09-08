@@ -314,13 +314,13 @@
                              14-unit floor fits one line instead of running off screen. 46px keeps
                              the tap target above the 44px floor for gloved hands. -->
                         <!-- No fixed Width: EqualWidthWrapPanel owns it so the row fills the line. -->
-                        <Border x:Name="UnitTile" Height="46" CornerRadius="5" HorizontalAlignment="Stretch"
+                        <Border x:Name="UnitTile" Height="62" CornerRadius="5" HorizontalAlignment="Stretch"
                                 BorderBrush="{Binding StatusBrush}" BorderThickness="1"
                                 Background="{StaticResource SurfaceRaisedBrush}"
                                 ClipToBounds="True">
                           <Grid ColumnDefinitions="3,*">
                             <Border Grid.Column="0" Background="{Binding StatusBrush}" />
-                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                            <Grid Grid.Column="1" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"
                                   Margin="6,4">
                               <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
                                          Text="{Binding Label}" FontSize="10" FontWeight="SemiBold"
@@ -339,6 +339,13 @@
                               </StackPanel>
                               <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="10"
                                          Margin="4,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />
+                              <!-- Who lives there. Belongs on the tile, not only in the tooltip:
+                                   the crew reads the whole matrix at a glance, and a name that
+                                   needs a hover to reveal is not displayed at all for that job. -->
+                              <TextBlock x:Name="UnitResident" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                         Text="{Binding ResidentName}" FontSize="10"
+                                         Foreground="{StaticResource TextSecondaryBrush}"
+                                         TextTrimming="CharacterEllipsis" />
                             </Grid>
                           </Grid>
                         </Border>

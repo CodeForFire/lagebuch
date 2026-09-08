@@ -84,6 +84,11 @@ public class CoMessprotokollMixedBuildingTests
 
         session.SetDwellingStatus(id, 0, 1, DwellingStatus.Searched);
         session.RecordCoValue(id, 0, 1, 0);
+
+        // Who lives there: the optional free-text note beside the unit's Bezeichnung. Fictional
+        // names per CONTRIBUTING — screenshots must never carry real personnel data.
+        session.SetDwellingDetails(id, 2, 2, "Fam. Bergmann", true);
+        session.SetDwellingDetails(id, 3, 1, "Fam. Kellner", null);
         Dispatcher.UIThread.RunJobs();
 
         var tabs = ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
@@ -219,6 +224,24 @@ public class CoMessprotokollMixedBuildingTests
         var flatWidth = flats[0].Bounds.Width;
         var uneven = $"penthouse {penthouseWidth:F0}px vs. flat {flatWidth:F0}px — not a clean subdivision.";
         Assert.True(Math.Abs(penthouseWidth - ((flatWidth * 2) + 5)) <= 1, uneven);
+    }
+
+    [AvaloniaFact]
+    public void A_units_residents_are_shown_on_its_tile_not_only_in_a_tooltip()
+    {
+        var (window, _) = Scenario();
+
+        // The crew reads the matrix at a glance across every unit; a name reachable only by
+        // hovering one tile at a time isn't displayed at all for that job.
+        var residents = window.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Where(t => t.Name == "UnitResident")
+            .Select(t => t.Text)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .ToList();
+
+        Assert.Contains("Fam. Bergmann", residents);
+        Assert.Contains("Fam. Kellner", residents);
     }
 
     [AvaloniaFact]
