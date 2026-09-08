@@ -306,6 +306,32 @@ public class FilesViewModelTests
     }
 
     [Fact]
+    public void Removing_a_renamed_row_uses_the_renamed_name_in_the_confirm_message()
+    {
+        // Regression: the confirm-closure used to capture the IncidentFile record from ToRow's
+        // construction time, so a rename (which replaces that record in the domain but — by design
+        // — never rebuilds the untouched row) left the confirm text showing the pre-rename name.
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        string? confirmMessage = null;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (message, _) => confirmMessage = message);
+        var row = Assert.Single(vm.Files);
+
+        row.DisplayName = "Küchenbrand";
+        row.RemoveCommand.Execute(null);
+
+        Assert.Contains("Küchenbrand", confirmMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("brand.jpg", confirmMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Removing_a_row_without_an_injected_confirm_runs_immediately()
     {
         var clock = new FixedClock(T0);

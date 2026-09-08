@@ -237,19 +237,31 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         await _dialogs.OpenFileAsync(tempPath);
     }
 
-    private IncidentFileRow ToRow(IncidentFile f) => new(
-        f.Id,
-        f.FileName,
-        f.DisplayName,
-        FormatSize(f.SizeBytes),
-        Formatting.Timestamp(f.AddedAt),
-        f.AddedBy,
-        f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase),
-        IsReadOnly,
-        displayName => _session.RenameFile(f.Id, displayName),
-        () => _requestConfirm(
-            $"„{f.DisplayName}“ entfernen. Fortfahren?",
-            () => _ = RemoveFileAsync(f.Id)));
+    // A block body, not the expression-bodied `new(...)` this used to be: the remove-confirm
+    // closure below needs to read the *current* display name at click time, not the DisplayName
+    // captured from `f` at construction -- Sync() deliberately never rebuilds an untouched row just
+    // because its name changed (that's the point of id-based reconciliation), so `f.DisplayName`
+    // would otherwise go stale the moment the row is renamed. `row` is assigned before the
+    // constructor call it's captured in returns, but the closure only reads it later, once Remove()
+    // actually runs -- by then `row` is set.
+    private IncidentFileRow ToRow(IncidentFile f)
+    {
+        IncidentFileRow row = null!;
+        row = new IncidentFileRow(
+            f.Id,
+            f.FileName,
+            f.DisplayName,
+            FormatSize(f.SizeBytes),
+            Formatting.Timestamp(f.AddedAt),
+            f.AddedBy,
+            f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase),
+            IsReadOnly,
+            displayName => _session.RenameFile(f.Id, displayName),
+            () => _requestConfirm(
+                $"„{row.DisplayName}“ entfernen. Fortfahren?",
+                () => _ = RemoveFileAsync(f.Id)));
+        return row;
+    }
 
     private static string FormatSize(long bytes) => bytes switch
     {
