@@ -1,6 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -119,6 +121,92 @@ public class FilesTabRenderTests
         Assert.Empty(vm.Files.Files);
         Assert.Contains(session.Incident.Journal, e => e.Text == "Datei entfernt: einsatzstelle.jpg");
         Capture(window, "files-remove-after.png");
+    }
+
+    // #262 UX follow-up: files can now be dropped onto the panel, not just picked via the button.
+    // Drag-enter shows the highlighted drop zone (screenshot #1) before anything lands; the drop
+    // itself hands the file straight to FilesViewModel.AddFilesAsync, same as the picker path.
+    [AvaloniaFact]
+    public async Task Dropping_a_file_on_dateien_highlights_the_zone_then_uploads_it()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 7; // DATEIEN
+        Dispatcher.UIThread.RunJobs();
+
+        var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
+        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
+        try
+        {
+            var storageFile = await window.StorageProvider.TryGetFileFromPathAsync(new Uri(path));
+            Assert.NotNull(storageFile);
+            var transfer = new DataTransfer();
+            transfer.Add(DataTransferItem.CreateFile(storageFile!));
+
+            dropZone.RaiseEvent(new DragEventArgs(DragDrop.DragEnterEvent, transfer, dropZone, new Point(10, 10), KeyModifiers.None));
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Contains("drag-over", dropZone.Classes);
+            Assert.Empty(vm.Files.Files);
+            Capture(window, "files-dragover.png");
+
+            dropZone.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, transfer, dropZone, new Point(10, 10), KeyModifiers.None));
+            await WaitUntilAsync(() => vm.Files.Files.Count == 1);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.DoesNotContain("drag-over", dropZone.Classes);
+            var row = Assert.Single(vm.Files.Files);
+            Assert.Equal(Path.GetFileName(path), row.FileName);
+            Assert.Single(session.Incident.Files);
+            Capture(window, "files-drop-after.png");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_readonly_incident_does_not_accept_drops()
+    {
+        var store = new FakeStore();
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>());
+        seed.Close();
+        var vm = new IncidentWorkspaceViewModel(
+            LocalIncidentSession.OpenReadOnly(store, new FixedClock(), "/x.fwincident"),
+            new FixedClock(),
+            new NoopTicker(),
+            WorkspaceRenderHelper.MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 7; // DATEIEN
+        Dispatcher.UIThread.RunJobs();
+
+        var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
+
+        Assert.False(DragDrop.GetAllowDrop(dropZone));
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(5);
+        }
     }
 
     // Issue #197: the ⚠ error banner glyph used to be Unicode text on a TextBlock, which defaults
