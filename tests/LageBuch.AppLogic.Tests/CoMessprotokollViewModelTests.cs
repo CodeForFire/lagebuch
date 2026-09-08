@@ -57,15 +57,17 @@ public class CoMessprotokollViewModelTests
         Assert.Equal(5, session.Incident.Buildings[0].ApartmentsFor(0));
     }
 
+    // #242: this used to assert the label persisted on CloseEditor (ABBRECHEN) -- back when cancel
+    // and confirm ran the same persist. FERTIG is the commit point now.
     [Fact]
-    public void EditingLabel_InTheEditor_PersistsOnClose()
+    public void EditingLabel_InTheEditor_PersistsOnConfirm()
     {
         var (session, vm) = CreateVm();
         var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[1];
 
         cell.OpenEditorCommand.Execute(null);
-        vm.SelectedCell!.Label = "Müller";
-        vm.CloseEditorCommand.Execute(null);
+        vm.Editor!.Label = "Müller";
+        vm.ConfirmEditorCommand.Execute(null);
 
         var building = session.Incident.Buildings[0];
         Assert.Equal("Müller", CoMeasurementLabels.ApartmentLabel(building, 0, cell.ApartmentNumber));
@@ -183,7 +185,7 @@ public class CoMessprotokollViewModelTests
         var building = Building.Create("Haus A", 2, 3, 0);
         var dwelling = Dwelling.Create(building.Id, 0, 1);
 
-        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _, _) => { }, (_, _, _, _) => { }, (_, _, _) => { });
+        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _) => { });
 
         Assert.Equal("#FFC000", cell.StatusBrush); // NotSearched = Gelb
 
@@ -200,7 +202,7 @@ public class CoMessprotokollViewModelTests
         var building = Building.Create("Haus A", 2, 3, 0);
         var dwelling = Dwelling.Create(building.Id, 0, 1);
 
-        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _, _) => { }, (_, _, _, _) => { }, (_, _, _) => { });
+        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _) => { });
 
         Assert.Equal("Kein Messwert", cell.CoDisplay);
 
@@ -257,8 +259,11 @@ public class CoMessprotokollViewModelTests
         var houseB = vm.BuildingOptions.Single(b => b.Name == "Haus B");
         vm.SelectedBuilding = houseB;
 
+        // #242: a ppm value now reaches the session only via the sidebar's FERTIG.
         var cell = vm.MatrixRows.SelectMany(r => r.Cells).First(c => c.BuildingId == houseB.Id);
-        cell.CoValue = 45; // enters a ppm value, triggering a RecordCoValue round trip
+        cell.OpenEditorCommand.Execute(null);
+        vm.Editor!.CoValue = 45;
+        vm.ConfirmEditorCommand.Execute(null); // triggers a RecordCoValue round trip
 
         Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
     }
@@ -300,7 +305,9 @@ public class CoMessprotokollViewModelTests
         };
 
         var cell = vm.MatrixRows.SelectMany(r => r.Cells).First(c => c.BuildingId == houseB.Id);
-        cell.CoValue = 45;
+        cell.OpenEditorCommand.Execute(null);
+        vm.Editor!.CoValue = 45;
+        vm.ConfirmEditorCommand.Execute(null);
 
         Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
     }
@@ -323,6 +330,227 @@ public class CoMessprotokollViewModelTests
         Assert.False(vm.CanModify);
         Assert.Empty(vm.BuildingOptions);
         Assert.Empty(vm.MatrixRows);
+    }
+
+    // --- Issue #242: ABBRECHEN must discard, FERTIG must commit ------------------------------
+    // Before this, ABBRECHEN and FERTIG ran the same PersistSelectedCellDetails(), and Status and
+    // CO-Wert were written straight through on every click/keystroke -- so there was no way to
+    // discard an edit, and every intermediate ppm value was already in the Einsatztagebuch.
+    private static DwellingCellViewModel Cell(CoMessprotokollViewModel vm, int floor, int apartment) =>
+        vm.MatrixRows.SelectMany(r => r.Cells)
+            .First(c => c.FloorOrdinal == floor && c.ApartmentNumber == apartment);
+
+    private static DwellingEditorViewModel OpenEditor(CoMessprotokollViewModel vm, int floor, int apartment)
+    {
+        Cell(vm, floor, apartment).OpenEditorCommand.Execute(null);
+        return vm.Editor!;
+    }
+
+    private static Dwelling DwellingOf(LocalIncidentSession session, Guid buildingId, int floor, int apartment) =>
+        session.Incident.Dwellings.First(d =>
+            d.BuildingId == buildingId && d.FloorOrdinal == floor && d.ApartmentNumber == apartment);
+
+    [Fact]
+    public void CancelEditor_DiscardsEveryField()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        var editor = OpenEditor(vm, 0, 1);
+
+        vm.SetEditorStatusAffectedCommand.Execute(null);
+        editor.CoValue = 120;
+        editor.ResidentName = "Musterfrau";
+        editor.KeyAvailable = true;
+        editor.Label = "Hinterhaus";
+
+        vm.CloseEditorCommand.Execute(null);
+
+        var dwelling = DwellingOf(session, buildingId, 0, 1);
+        Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
+        Assert.Null(dwelling.CoValue);
+        Assert.Null(dwelling.ResidentName);
+        Assert.Null(dwelling.KeyAvailable);
+        Assert.Equal("Links", CoMeasurementLabels.ApartmentLabel(session.Incident.Buildings[0], 0, 1));
+        Assert.False(vm.IsEditorOpen);
+        Assert.Null(vm.Editor);
+    }
+
+    [Fact]
+    public void CancelEditor_WritesNoJournalEntry()
+    {
+        var (session, vm) = CreateVm();
+        var before = session.Incident.Journal.Count;
+        var editor = OpenEditor(vm, 0, 1);
+
+        vm.SetEditorStatusAffectedCommand.Execute(null);
+        editor.CoValue = 120;
+        vm.CloseEditorCommand.Execute(null);
+
+        Assert.Equal(before, session.Incident.Journal.Count);
+    }
+
+    [Fact]
+    public void ConfirmEditor_CommitsEveryField()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        var editor = OpenEditor(vm, 0, 1);
+
+        vm.SetEditorStatusAffectedCommand.Execute(null);
+        editor.CoValue = 120;
+        editor.ResidentName = "Musterfrau";
+        editor.KeyAvailable = true;
+        editor.Label = "Hinterhaus";
+
+        vm.ConfirmEditorCommand.Execute(null);
+
+        var dwelling = DwellingOf(session, buildingId, 0, 1);
+        Assert.Equal(DwellingStatus.Affected, dwelling.Status);
+        Assert.Equal(120, dwelling.CoValue);
+        Assert.Equal("Musterfrau", dwelling.ResidentName);
+        Assert.True(dwelling.KeyAvailable);
+        Assert.Equal("Hinterhaus", CoMeasurementLabels.ApartmentLabel(session.Incident.Buildings[0], 0, 1));
+        Assert.False(vm.IsEditorOpen);
+        Assert.Null(vm.Editor);
+    }
+
+    // The reason the buffer exists: the journal records the reading the crew settled on, once,
+    // not every number they passed through on the way there.
+    [Fact]
+    public void ConfirmEditor_LogsOneJournalEntryPerChangedField()
+    {
+        var (session, vm) = CreateVm();
+        var before = session.Incident.Journal.Count;
+        var editor = OpenEditor(vm, 0, 1);
+
+        vm.SetEditorStatusSearchedCommand.Execute(null);
+        editor.CoValue = 8;
+        editor.CoValue = 80; // typo, corrected before FERTIG
+        editor.CoValue = 45;
+        editor.ResidentName = "Musterfrau"; // details are silent -- no journal entry
+
+        vm.ConfirmEditorCommand.Execute(null);
+
+        var added = session.Incident.Journal.Skip(before).Select(e => e.Text).ToList();
+        Assert.Equal(2, added.Count);
+        Assert.Contains(added, t => t.StartsWith("Whg.-Status", StringComparison.Ordinal));
+        Assert.Contains(added, t => t.EndsWith("45 ppm", StringComparison.Ordinal));
+        Assert.DoesNotContain(added, t => t.Contains("8 ppm", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ConfirmEditor_WithNothingChanged_WritesNothing()
+    {
+        var (session, vm) = CreateVm();
+        OpenEditor(vm, 0, 1);
+        var before = session.Incident.Journal.Count;
+        var changes = 0;
+        session.Changed += () => changes++;
+
+        vm.ConfirmEditorCommand.Execute(null);
+
+        Assert.Equal(before, session.Incident.Journal.Count);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void OpenEditor_SeedsTheBufferFromTheDwelling()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        session.SetDwellingStatus(buildingId, 1, 2, DwellingStatus.Affected);
+        session.RecordCoValue(buildingId, 1, 2, 300);
+
+        var editor = OpenEditor(vm, 1, 2);
+
+        Assert.True(vm.IsEditorOpen);
+        Assert.Equal(DwellingStatus.Affected, editor.Status);
+        Assert.Equal(300, editor.CoValue);
+        Assert.Equal("Mitte", editor.Label); // 3 units per floor => Links/Mitte/Rechts
+    }
+
+    // The sidebar buffers, but the crew still needs to see the door mark change as they work.
+    [Fact]
+    public void PendingEdit_PreviewsOnTheTile_AndRevertsOnCancel()
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+
+        vm.SetEditorStatusAffectedCommand.Execute(null);
+        editor.CoValue = 120;
+
+        var pending = Cell(vm, 0, 1);
+        Assert.Equal(DwellingStatus.Affected, pending.Status);
+        Assert.Equal("#FF0000", pending.StatusBrush);
+        Assert.Equal("120 ppm", pending.CoDisplay);
+
+        vm.CloseEditorCommand.Execute(null);
+
+        var reverted = Cell(vm, 0, 1);
+        Assert.Equal(DwellingStatus.NotSearched, reverted.Status);
+        Assert.Equal("Kein Messwert", reverted.CoDisplay);
+    }
+
+    // BuildMatrix throws away and recreates every tile VM on each session change, so an unrelated
+    // (or, on a joined device, remote) edit landing mid-edit would otherwise wipe the preview.
+    [Fact]
+    public void PendingEdit_SurvivesAnUnrelatedSessionChange()
+    {
+        var (session, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+        vm.SetEditorStatusAffectedCommand.Execute(null);
+
+        session.AddCoBuilding("Haus B", 1, 2);
+
+        Assert.True(vm.IsEditorOpen);
+        Assert.Equal(DwellingStatus.Affected, editor.Status);
+        Assert.Equal(DwellingStatus.Affected, Cell(vm, 0, 1).Status);
+    }
+
+    [Fact]
+    public void SwitchingBuilding_DiscardsThePendingEdit()
+    {
+        var (session, vm) = CreateVm();
+        var hausA = session.Incident.Buildings[0].Id;
+        session.AddCoBuilding("Haus B", 1, 2);
+        OpenEditor(vm, 0, 1);
+        vm.SetEditorStatusAffectedCommand.Execute(null);
+
+        vm.SelectedBuilding = vm.BuildingOptions.Single(b => b.Name == "Haus B");
+
+        Assert.False(vm.IsEditorOpen);
+        Assert.Null(vm.Editor);
+        Assert.Equal(DwellingStatus.NotSearched, DwellingOf(session, hausA, 0, 1).Status);
+    }
+
+    // A closed incident's session throws on any mutation, so FERTIG must not reach it at all --
+    // the guard used to live on the tile VM's write-through, which is gone.
+    [Fact]
+    public void ConfirmEditor_OnReadOnlySession_WritesNothingAndDoesNotThrow()
+    {
+        var op = new SessionOperator("Test", null);
+        var store = new FakeStore();
+        var path = Path.GetTempFileName();
+        var writable = LocalIncidentSession.StartNew(
+            store,
+            Clock,
+            op,
+            path,
+            Enumerable.Empty<(string, bool)>(),
+            Enumerable.Empty<(string, bool)>());
+        writable.AddCoBuilding("Haus A", 2, 3);
+        var session = LocalIncidentSession.OpenReadOnly(store, Clock, path);
+        var vm = new CoMessprotokollViewModel(session, Clock, () => { });
+        var buildingId = session.Incident.Buildings[0].Id;
+
+        var editor = OpenEditor(vm, 0, 1);
+        editor.CoValue = 45;
+        editor.Status = DwellingStatus.Affected;
+        vm.ConfirmEditorCommand.Execute(null);
+
+        var dwelling = DwellingOf(session, buildingId, 0, 1);
+        Assert.Null(dwelling.CoValue);
+        Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
     }
 }
 

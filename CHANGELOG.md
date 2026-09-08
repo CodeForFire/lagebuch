@@ -9,6 +9,12 @@ once we reach 1.0.
 
 ## [Unreleased]
 
+### Changed
+- CO-Messung: ABBRECHEN in the Wohnung editor now actually discards. Status, CO-Wert,
+  Bezeichnung, Bewohnername and Schlüssel are buffered until FERTIG, so an intermediate or
+  mistyped ppm reading no longer lands in the Einsatztagebuch. The tile previews the pending
+  state while the sidebar is open. (#242)
+
 ## [0.4.1] - 2026-09-07
 
 ### Added
