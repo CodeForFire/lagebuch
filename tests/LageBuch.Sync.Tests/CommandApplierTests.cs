@@ -145,6 +145,27 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void RemoveFileCommand_removes_the_file_and_returns_it_with_the_commands_operator_attributed()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var addOp = new OperatorDto("Client", "RUF 1");
+        var file = CommandApplier.Apply(
+            new AddFileCommand(addOp, Guid.NewGuid(), "brand.jpg", "image/jpeg", 3), incident, clock)!;
+        var before = incident.Journal.Count;
+
+        var removeOp = new OperatorDto("Other", "RUF 2");
+        var removed = CommandApplier.Apply(new RemoveFileCommand(removeOp, file.Id), incident, clock);
+
+        Assert.Empty(incident.Files);
+        Assert.Equal(file.Id, removed!.Id);
+        var entry = incident.Journal.Last();
+        Assert.Equal(before + 1, incident.Journal.Count);
+        Assert.Equal("Datei entfernt: brand.jpg", entry.Text);
+        Assert.Equal("Other (RUF 2)", entry.EnteredBy);
+    }
+
+    [Fact]
     public void A_command_against_a_closed_incident_is_rejected_by_the_domain_guard()
     {
         var clock = new FixedClock();

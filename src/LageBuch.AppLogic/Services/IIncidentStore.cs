@@ -52,6 +52,13 @@ public interface IIncidentStore
     string ResolveFileDiskPath(string path, string storageFileName);
 
     /// <summary>
+    /// Deletes an attached file's bytes, best-effort — see
+    /// <c>LageBuch.Persistence.IIncidentFileStore.DeleteBytesAsync</c>. Never blocks or fails the
+    /// metadata removal (<c>Incident.RemoveFile</c>) that already happened.
+    /// </summary>
+    Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Raised on the background writer thread when a queued <see cref="Save"/> throws (the queue
     /// keeps serving later writes regardless). Fires off the UI thread — marshal it yourself (e.g.
     /// via <c>IUiDispatcher</c>) before touching UI-bound state from a handler.

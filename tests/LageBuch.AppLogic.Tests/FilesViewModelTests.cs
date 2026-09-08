@@ -266,4 +266,128 @@ public class FilesViewModelTests
         var row = Assert.Single(vm.Files);
         Assert.Equal("vorab.pdf", row.FileName);
     }
+
+    // --- Removing an attachment is destructive, so it goes through the same confirm gate as
+    // ForcesViewModel's unit removal (#262 UX follow-up) ---
+    [Fact]
+    public async Task Removing_a_row_asks_for_confirmation_before_touching_the_session()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        string? confirmMessage = null;
+        Action? confirmAction = null;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (message, onConfirmed) =>
+        {
+            confirmMessage = message;
+            confirmAction = onConfirmed;
+        });
+        var row = Assert.Single(vm.Files);
+
+        row.RemoveCommand.Execute(null);
+
+        // Nothing happened yet — the host only recorded the request.
+        Assert.Single(vm.Files);
+        Assert.Single(session.Incident.Files);
+        Assert.Contains("brand.jpg", confirmMessage, StringComparison.Ordinal);
+
+        confirmAction!();
+        await WaitUntilAsync(() => vm.Files.Count == 0);
+
+        Assert.Empty(vm.Files);
+        Assert.Empty(session.Incident.Files);
+        Assert.Contains("Datei entfernt: brand.jpg", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Removing_a_row_without_an_injected_confirm_runs_immediately()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }); // no requestConfirm supplied
+        var row = Assert.Single(vm.Files);
+
+        row.RemoveCommand.Execute(null);
+        await WaitUntilAsync(() => vm.Files.Count == 0);
+
+        Assert.Empty(vm.Files);
+        Assert.Empty(session.Incident.Files);
+    }
+
+    [Fact]
+    public void Rows_of_a_readonly_incident_cannot_remove_themselves()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        seed.Incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 10);
+        seed.Close();
+
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var vm = new FilesViewModel(ro, new FakeDialogs(), () => { });
+
+        var row = Assert.Single(vm.Files);
+        Assert.False(row.RemoveCommand.CanExecute(null));
+        row.RemoveCommand.Execute(null); // inert, not throwing
+        Assert.Single(ro.Incident.Files);
+    }
+
+    // Regression test for the append-only-to-reconciliation change: a file removed by another
+    // client (simulated by mutating the domain directly, the same way a host broadcast lands)
+    // must disappear from this ViewModel's rows once Sync() runs, not just newly-added ones show up.
+    [Fact]
+    public void Sync_drops_a_row_removed_by_another_client()
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var kept = session.Incident.AddFile(clock, op, "vorab.pdf", "application/pdf", 10);
+        var removedElsewhere = session.Incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 10);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+        Assert.Equal(2, vm.Files.Count);
+
+        // Another client's RemoveFileCommand landed and the host broadcast a new snapshot — here
+        // stood in for by mutating the domain directly and raising Changed, same shape as
+        // RemoteIncidentSession.OnSnapshot.
+        session.Incident.RemoveFile(clock, op, removedElsewhere.Id);
+        vm.Sync();
+
+        var row = Assert.Single(vm.Files);
+        Assert.Equal(kept.Id, row.Id);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(5);
+        }
+    }
 }

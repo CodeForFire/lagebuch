@@ -455,6 +455,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void RenameFile(Guid fileId, string? displayName) => _inner.RenameFile(fileId, displayName);
 
+    public Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default) =>
+        _inner.RemoveFileAsync(fileId, cancellationToken);
+
     public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         _inner.AddCoBuilding(name, floorCount, apartmentsPerFloor, undergroundFloorCount);
 

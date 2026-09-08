@@ -269,6 +269,24 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));
 
+    public async Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default)
+    {
+        var file = Incident.RemoveFile(_clock, RequireOperator(), fileId);
+        await _store.DeleteFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
+        Save();
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Deletes an attachment's bytes only, without touching the domain — used by the host (see
+    /// <c>LageBuch.Sync.Hosting.IncidentHost</c>) after applying a joined client's
+    /// <c>RemoveFileCommand</c> via <see cref="LageBuch.Sync.CommandApplier"/>, whose metadata
+    /// mutation already ran on the UI thread; this best-effort disk cleanup runs off it, mirroring
+    /// <see cref="SaveFileStreamAsync"/>'s split for <c>AddFileCommand</c>'s upload half.
+    /// </summary>
+    public Task DeleteFileBytesAsync(string storageFileName, CancellationToken cancellationToken = default) =>
+        _store.DeleteFileBytesAsync(Path, storageFileName, cancellationToken);
+
     public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor, undergroundFloorCount));
 

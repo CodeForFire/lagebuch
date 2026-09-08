@@ -25,6 +25,13 @@ public interface IIncidentFileStore
     /// <summary>The real path on disk, for APIs that require a file path rather than bytes
     /// (QuestPDF's <c>DocumentOperation</c>). Does not guarantee the file exists.</summary>
     string ResolveDiskPath(string incidentPath, string storageFileName);
+
+    /// <summary>
+    /// Best-effort: swallows any I/O failure (missing file, unreadable folder) rather than
+    /// throwing. An orphaned blob left on disk is an acceptable degradation -- it must never block
+    /// the metadata removal (<see cref="LageBuch.Domain.Incident.RemoveFile"/>) that already happened.
+    /// </summary>
+    Task DeleteBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default);
 }
 
 public sealed class IncidentFileStore : IIncidentFileStore
@@ -74,6 +81,24 @@ public sealed class IncidentFileStore : IIncidentFileStore
 
     public string ResolveDiskPath(string incidentPath, string storageFileName) =>
         Path.Combine(FolderFor(incidentPath), storageFileName);
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Best-effort delete: an orphaned blob on disk is an acceptable degradation, never blocking the metadata removal that already happened.")]
+    public Task DeleteBytesAsync(string incidentPath, string storageFileName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            File.Delete(ResolveDiskPath(incidentPath, storageFileName));
+        }
+        catch
+        {
+            // Swallow -- see the doc comment on IIncidentFileStore.DeleteBytesAsync.
+        }
+
+        return Task.CompletedTask;
+    }
 
     private static string FolderFor(string incidentPath)
     {

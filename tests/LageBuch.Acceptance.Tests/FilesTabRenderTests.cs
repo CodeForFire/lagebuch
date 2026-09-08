@@ -86,6 +86,41 @@ public class FilesTabRenderTests
         Capture(window, "files-after.png");
     }
 
+    // #262 UX follow-up: deleting an attachment goes through the same ConfirmDialogView overlay as
+    // Kraft-unit removal — this finding is specifically about the *existence* of a confirm step, so
+    // the middle screenshot (the overlay open, nothing removed yet) is the point of this test.
+    [AvaloniaFact]
+    public void Removing_a_file_confirms_then_deletes_the_row_and_logs_the_etb()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        session.Incident.AddFile(new FixedClock(), session.Operator!, "einsatzstelle.jpg", "image/jpeg", 1_200_000);
+        vm.Files.Sync();
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 7; // DATEIEN
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Files.Files);
+        Capture(window, "files-remove-before.png");
+
+        row.RemoveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        // The overlay opened — nothing removed yet.
+        Assert.NotNull(vm.PendingConfirm);
+        Assert.Single(vm.Files.Files);
+        Capture(window, "files-remove-confirm.png");
+
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Null(vm.PendingConfirm);
+        Assert.Empty(vm.Files.Files);
+        Assert.Contains(session.Incident.Journal, e => e.Text == "Datei entfernt: einsatzstelle.jpg");
+        Capture(window, "files-remove-after.png");
+    }
+
     // Issue #197: the ⚠ error banner glyph used to be Unicode text on a TextBlock, which defaults
     // to Barlow -- a font that doesn't carry it. Now a PathIcon like the ETB grid's row actions,
     // so the icon is drawn from bundled vector data.

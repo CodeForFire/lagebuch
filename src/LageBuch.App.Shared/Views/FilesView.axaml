@@ -47,6 +47,7 @@
             <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
             <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
             <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
           </Grid.ColumnDefinitions>
           <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
           <TextBlock Grid.Column="1" Text="GRÖSSE" Classes="overline" FontSize="10" Margin="10,0" />
@@ -64,6 +65,7 @@
                   <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
                   <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
                   <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
                 </Grid.ColumnDefinitions>
                 <!-- Committing per keystroke saved the whole incident file on every character
                      typed (#33). UpdateSourceTrigger=LostFocus pushes once, when the operator
@@ -83,6 +85,16 @@
                 <Button Grid.Column="4" Content="ÖFFNEN"
                         Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenFileCommand}"
                         CommandParameter="{Binding}" />
+                <!-- The delete affordance (#262 UX): row identity lives on IncidentFileRow itself,
+                     so — unlike ÖFFNEN above — this binds its own RemoveCommand directly, no
+                     ReflectionBinding needed. Same icon-btn/cross-glyph idiom as ForcesView's
+                     remove button. -->
+                <Button Grid.Column="5" Classes="icon-btn" Margin="6,0,0,0"
+                        IsVisible="{Binding !IsReadOnly}"
+                        Command="{Binding RemoveCommand}"
+                        ToolTip.Tip="Datei entfernen">
+                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

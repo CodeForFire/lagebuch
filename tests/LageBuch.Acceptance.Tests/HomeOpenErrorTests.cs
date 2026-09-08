@@ -70,6 +70,9 @@ public class HomeOpenErrorTests
 
         public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+        public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
         public event Action<Exception>? SaveFailed
         {
             add { }
