@@ -124,7 +124,8 @@
                Margin="0,20,0,0" HorizontalAlignment="Center" />
 
     <!-- Editor Sidebar (right) -->
-    <Border DockPanel.Dock="Right"
+    <Border x:Name="DwellingEditor"
+            DockPanel.Dock="Right"
             IsVisible="{Binding IsEditorOpen}"
             Background="#0F141D"
             BorderBrush="{StaticResource HairlineBrush}"
@@ -133,7 +134,9 @@
             Padding="16"
             IsEnabled="{Binding !IsReadOnly}">
       <StackPanel Spacing="12">
-        <!-- ABBRECHEN below already closes the editor; no separate close affordance needed. -->
+        <!-- #242: every field below edits a buffer (Editor), not the incident. ABBRECHEN discards
+             it, FERTIG is the single commit point; the tile behind the sidebar previews the pending
+             state meanwhile, so the door mark still updates as the crew works. -->
         <TextBlock Text="WOHNUNG BEARBEITEN" Classes="overline" />
 
         <!-- Status buttons -->
@@ -153,7 +156,7 @@
         <!-- CO Value -->
         <StackPanel Spacing="2">
           <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
-          <NumericUpDown Minimum="0" Maximum="9999" Value="{Binding SelectedCell.CoValue}"
+          <NumericUpDown Minimum="0" Maximum="9999" Value="{Binding Editor.CoValue}"
                          FormatString="0" PlaceholderText="Kein Messwert" />
         </StackPanel>
 
@@ -162,19 +165,19 @@
              for a 3-flat floor), always user-editable, shown directly on the tile. -->
         <StackPanel Spacing="2">
           <TextBlock Text="BEZEICHNUNG" Classes="overline" FontSize="10" />
-          <TextBox Text="{Binding SelectedCell.Label}" />
+          <TextBox Text="{Binding Editor.Label}" />
         </StackPanel>
 
         <!-- Resident Name -->
         <StackPanel Spacing="2">
           <TextBlock Text="NAME DER BEWOHNER (OPTIONAL)" Classes="overline" FontSize="10" />
-          <TextBox Text="{Binding SelectedCell.ResidentName}"
+          <TextBox Text="{Binding Editor.ResidentName}"
                    PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}" />
         </StackPanel>
 
         <!-- Key Available: label lives on the CheckBox itself (Content), matching RolesView's
              "Alle Funktionen" checkbox, so the label and glyph share one baseline. -->
-        <CheckBox Content="Schlüssel vorhanden" IsChecked="{Binding SelectedCell.KeyAvailable}" />
+        <CheckBox Content="Schlüssel vorhanden" IsChecked="{Binding Editor.KeyAvailable}" />
 
         <!-- Action buttons -->
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
