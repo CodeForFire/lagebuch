@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Controls;
@@ -21,7 +23,7 @@ namespace LageBuch.Acceptance.Tests;
 /// </summary>
 public class CoMessprotokollMixedBuildingTests
 {
-    private static (Window Window, IncidentWorkspaceViewModel Vm) Scenario(double width = 1920)
+    private static (Window Window, IncidentWorkspaceViewModel Vm) Scenario(double width = 1920, double height = 1032)
     {
         var session = LocalIncidentSession.StartNew(
             new FakeStore(),
@@ -38,7 +40,7 @@ public class CoMessprotokollMixedBuildingTests
             new FakeDialogs(),
             new NoopAlarmService(),
             new NoopIncidentHostController());
-        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = 1032 };
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = height };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -242,6 +244,28 @@ public class CoMessprotokollMixedBuildingTests
 
         Assert.Contains("Fam. Bergmann", residents);
         Assert.Contains("Fam. Kellner", residents);
+    }
+
+    [AvaloniaFact]
+    public void Tiles_never_run_under_the_vertical_scrollbar()
+    {
+        // Short enough that the six floors don't fit and the vertical scrollbar appears.
+        var (window, _) = Scenario(height: 560);
+
+        var scroller = window.GetVisualDescendants().OfType<ScrollViewer>()
+            .First(s => s.GetVisualDescendants().OfType<EqualWidthWrapPanel>().Any());
+        var bar = scroller.GetVisualDescendants().OfType<ScrollBar>()
+            .Single(b => b.Orientation == Orientation.Vertical);
+        Assert.True(bar.IsEffectivelyVisible, "the matrix should be scrolling for this test to mean anything.");
+
+        var barLeft = bar.TranslatePoint(new Point(0, 0), scroller)!.Value.X;
+        var tiles = scroller.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "UnitTile");
+        var rightmost = tiles.Max(t => t.TranslatePoint(new Point(t.Bounds.Width, 0), scroller)!.Value.X);
+
+        // Avalonia's default AllowAutoHide floats the scrollbar over the content instead of
+        // reserving layout space for it, so full-width tiles run underneath it.
+        var overlap = $"tiles reach {rightmost:F2}px but the scrollbar starts at {barLeft:F2}px (viewport {scroller.Viewport.Width:F2}) — it covers them.";
+        Assert.True(rightmost <= barLeft + 0.5, overlap);
     }
 
     [AvaloniaFact]

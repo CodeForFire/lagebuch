@@ -100,15 +100,32 @@ public sealed class EqualWidthWrapPanel : Panel
         {
             var column = i % columns;
             var row = i / columns;
+
+            // Snap every column edge to a whole pixel here rather than arranging each child at
+            // column * (itemWidth + spacing) with a fractional itemWidth. Avalonia's layout
+            // rounding would otherwise round each position and each width independently, and for
+            // any width that doesn't divide evenly (1556 over 4 columns is 385.25) the last
+            // column lands a pixel past the panel — enough to slide under the scrollbar. Deriving
+            // both edges from the same rounded grid makes the columns tile the width exactly; the
+            // leftover pixel is absorbed as a 1px difference between columns instead.
+            var left = ColumnEdge(column, columns, finalSize.Width);
+            var right = ColumnEdge(column + 1, columns, finalSize.Width) - ItemSpacing;
+
             Children[i].Arrange(new Rect(
-                column * (itemWidth + ItemSpacing),
+                left,
                 row * (rowHeight + LineSpacing),
-                itemWidth,
+                Math.Max(0, right - left),
                 rowHeight));
         }
 
         return finalSize;
     }
+
+    /// <summary>The left edge of column <paramref name="index"/> on a whole-pixel grid, where
+    /// column <c>columns</c> is the panel's right edge plus one trailing gutter. Every edge comes
+    /// from the same rounded sequence, so the columns tile <paramref name="width"/> exactly.</summary>
+    private double ColumnEdge(int index, int columns, double width) =>
+        Math.Round(index * (width + ItemSpacing) / columns, MidpointRounding.AwayFromZero);
 
     private int ColumnsFor(double availableWidth, int count)
     {

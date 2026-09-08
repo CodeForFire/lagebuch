@@ -246,7 +246,12 @@
          cross-section of the building. Tiles wrap inside their band instead of extending the row,
          which is what decouples the layout from the unit count: a 2-unit penthouse floor and a
          14-unit Kellergeschoss both fit the same width without clipping or wasted space (#265). -->
+    <!-- AllowAutoHide="False": Avalonia's default floats the vertical scrollbar over the content
+         without reserving layout space for it (viewport width stays equal to the ScrollViewer's),
+         so once the tiles started filling the line edge to edge the bar sat on top of the
+         rightmost unit of every floor. Reserving the 16px keeps the tiles clear of it. -->
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                  AllowAutoHide="False"
                   IsVisible="{Binding HasBuildings}">
       <ItemsControl ItemsSource="{Binding MatrixRows}">
         <ItemsControl.ItemsPanel>
