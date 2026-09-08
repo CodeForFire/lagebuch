@@ -19,6 +19,7 @@ once we reach 1.0.
 
 ### Added
 - Show the 25 MB per-file attachment limit in the Files view (#213)
+- Search box on the Links tab, and ÖFFNEN now shows and says that it opens the system browser (#262)
 - Create a task from an already-saved ETB entry via a row icon (#247)
 - Add a Zugführer headcount to Kräfte (#233)
 - Support Untergeschoss (UG) floors in CO-Messung (#235)

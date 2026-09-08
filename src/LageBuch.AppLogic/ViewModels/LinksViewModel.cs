@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -20,12 +21,63 @@ public sealed partial class LinksViewModel : ObservableObject
     {
         _dialogs = dialogs;
         Links = links;
+        VisibleLinks = new ObservableCollection<Link>(links);
     }
 
     public IReadOnlyList<Link> Links { get; }
 
+    /// <summary>
+    /// The subset of <see cref="Links"/> matching <see cref="FilterText"/>, and what the view
+    /// renders. <see cref="Links"/> deliberately stays the full set so "Keine Links hinterlegt"
+    /// (nothing in the Stammdaten) stays distinguishable from "nothing matched what you typed" —
+    /// two different situations for the operator. Same _all/visible split as
+    /// <see cref="RolesViewModel"/> and <see cref="EtbViewModel"/>.
+    /// </summary>
+    public ObservableCollection<Link> VisibleLinks { get; }
+
     [ObservableProperty]
     private string? _errorMessage;
+
+    /// <summary>
+    /// Live search over the Links tab (#262): a Wehr with more than a handful of Stammdaten-Links
+    /// otherwise has to scan the whole flat list while working an Einsatz.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFiltered))]
+    [NotifyPropertyChangedFor(nameof(NoMatchesMessage))]
+    private string _filterText = string.Empty;
+
+    /// <summary>
+    /// Whether a search term is active — drives the clear button, so it follows the typed text and
+    /// not the result count: a term that happens to match every link is still an active filter.
+    /// </summary>
+    public bool IsFiltered => !string.IsNullOrWhiteSpace(FilterText);
+
+    public string NoMatchesMessage => $"Kein Link passt zu „{FilterText.Trim()}“.";
+
+    partial void OnFilterTextChanged(string value) => ApplyFilter();
+
+    /// <summary>
+    /// Ordinal rather than culture-aware matching: a URL is not culture text, and this mirrors the
+    /// <c>FilterMode="ContainsOrdinal"</c> the AutoCompleteBoxes elsewhere in the app already use.
+    /// </summary>
+    private void ApplyFilter()
+    {
+        var term = FilterText.Trim();
+        VisibleLinks.Clear();
+        foreach (var link in Links)
+        {
+            if (term.Length == 0
+                || link.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || link.Url.Contains(term, StringComparison.OrdinalIgnoreCase))
+            {
+                VisibleLinks.Add(link);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void ClearFilter() => FilterText = string.Empty;
 
     /// <summary>
     /// Refuses anything but http(s) before it reaches the OS: on desktop, OpenUrlAsync ultimately
