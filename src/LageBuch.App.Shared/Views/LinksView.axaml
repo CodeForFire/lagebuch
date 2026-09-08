@@ -5,7 +5,27 @@
              x:Class="LageBuch.App.Shared.Views.LinksView"
              x:DataType="vm:LinksViewModel">
   <DockPanel>
-    <TextBlock DockPanel.Dock="Top" Text="LINKS" Classes="overline" Margin="0,0,0,14" />
+    <!-- Search sits on the section header line rather than in a band of its own, the way the ETB
+         tab's "Systemmeldungen ausblenden" toggle does (#262); a separate row would push the
+         list down by a control height on a tab whose whole point is at-a-glance scanning. -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <TextBlock Grid.Column="0" Text="LINKS" Classes="overline" VerticalAlignment="Center" />
+      <!-- Only worth offering once there is something to search: with empty Stammdaten the
+           "Keine Links hinterlegt." hint below is the whole story. -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                  IsVisible="{Binding Links.Count}">
+        <TextBox x:Name="LinkSearchBox" Width="260" Text="{Binding FilterText}"
+                 PlaceholderText="Name oder Adresse suchen">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button x:Name="ClearLinkSearchButton" Classes="icon-btn" ToolTip.Tip="Suche zurücksetzen"
+                Command="{Binding ClearFilterCommand}" IsVisible="{Binding IsFiltered}">
+          <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+        </Button>
+      </StackPanel>
+    </Grid>
 
     <!-- Open failure banner: same shape as Files' ErrorBanner -->
     <Border DockPanel.Dock="Top" x:Name="ErrorBanner" Background="#241608" Margin="0,0,0,14"
@@ -29,23 +49,41 @@
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14"
             IsVisible="{Binding Links.Count}">
       <ScrollViewer>
-        <ItemsControl x:Name="LinksList" ItemsSource="{Binding Links}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="md:Link">
-              <Grid ColumnDefinitions="*,*,Auto" Margin="0,0,0,10">
-                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Url}" Margin="10,0"
-                           VerticalAlignment="Center" />
-                <!-- ReflectionBinding: OpenCommand lives on the parent ItemsControl's DataContext
-                     (LinksViewModel), whose static type is object under compiled bindings, so a
-                     compiled $parent cast path won't resolve. -->
-                <Button Grid.Column="2" Content="ÖFFNEN"
-                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenCommand}"
-                        CommandParameter="{Binding}" />
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <Panel>
+          <!-- Distinct from EmptyText above: Stammdaten do hold links, this search just found
+               none. Lives inside the panel so the frame doesn't collapse mid-keystroke. -->
+          <TextBlock x:Name="NoMatchesText" Text="{Binding NoMatchesMessage}"
+                     Foreground="{StaticResource TextMutedBrush}"
+                     IsVisible="{Binding !VisibleLinks.Count}" />
+          <ItemsControl x:Name="LinksList" ItemsSource="{Binding VisibleLinks}"
+                        IsVisible="{Binding VisibleLinks.Count}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="md:Link">
+                <Grid ColumnDefinitions="*,*,Auto" Margin="0,0,0,10">
+                  <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Url}" Margin="10,0"
+                             VerticalAlignment="Center" />
+                  <!-- ReflectionBinding: OpenCommand lives on the parent ItemsControl's DataContext
+                       (LinksViewModel), whose static type is object under compiled bindings, so a
+                       compiled $parent cast path won't resolve. -->
+                  <!-- The glyph, not just the tooltip, carries "this leaves Lagebuch" (#262):
+                       on Android there is no hover, so a tooltip alone reaches nobody. -->
+                  <Button Grid.Column="2"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenCommand}"
+                          CommandParameter="{Binding}"
+                          ToolTip.Tip="Im Standard-Browser des Geräts öffnen — verlässt Lagebuch">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="ÖFFNEN" VerticalAlignment="Center" />
+                      <PathIcon Width="12" Height="12" VerticalAlignment="Center"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
       </ScrollViewer>
     </Border>
   </DockPanel>
