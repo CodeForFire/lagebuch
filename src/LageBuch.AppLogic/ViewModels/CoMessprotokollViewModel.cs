@@ -7,6 +7,15 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
+/// <summary>Which units the matrix shows. Narrowing to the open or affected ones is how a crew
+/// answers "what's left" on a large building without scanning every tile.</summary>
+public enum CoUnitFilter
+{
+    All,
+    Open,
+    Affected,
+}
+
 public sealed partial class DwellingCellViewModel : ObservableObject
 {
     private readonly Action<Guid, int, int, DwellingStatus> _onStatusChanged;
@@ -72,6 +81,34 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 
     public string CoDisplay => CoValue is { } v ? $"{v} ppm" : "Kein Messwert";
 
+    /// <summary>The tile's ppm readout. Empty rather than "Kein Messwert" when nothing is measured:
+    /// unmeasured is the resting state of every unit in a fresh building, so spelling it out on each
+    /// tile prints the same non-information dozens of times and buries the values that do exist.
+    /// The status glyph already says the unit is unsearched.</summary>
+    public string CoCompact => CoValue is { } v ? $"{v} ppm" : string.Empty;
+
+    /// <summary>Detail the compact tile deliberately drops (resident, key, full status wording),
+    /// surfaced on hover so nothing is lost -- the tile carries identity + status + ppm only.</summary>
+    public string TileTooltip
+    {
+        get
+        {
+            var parts = new List<string> { Label, CoMeasurementLabels.StatusText(Status), CoDisplay };
+            if (!string.IsNullOrWhiteSpace(ResidentName))
+            {
+                parts.Add(ResidentName!);
+            }
+
+            parts.Add(KeyAvailable switch
+            {
+                true => "Schlüssel vorhanden",
+                false => "Kein Schlüssel",
+                _ => "Schlüssel unbekannt",
+            });
+            return string.Join(" · ", parts);
+        }
+    }
+
     public string KeyDisplay => KeyAvailable switch
     {
         true => "\uD83D\uDD11",
@@ -102,6 +139,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     {
         StatusBrush = GetStatusBrush(value);
         OnPropertyChanged(nameof(StatusGlyph));
+        OnPropertyChanged(nameof(TileTooltip));
         if (!IsReadOnly)
             _onStatusChanged(BuildingId, FloorOrdinal, ApartmentNumber, value);
     }
@@ -109,11 +147,21 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     partial void OnCoValueChanged(int? value)
     {
         OnPropertyChanged(nameof(CoDisplay));
+        OnPropertyChanged(nameof(CoCompact));
+        OnPropertyChanged(nameof(TileTooltip));
         if (!IsReadOnly)
             _onCoValueChanged(BuildingId, FloorOrdinal, ApartmentNumber, value);
     }
 
-    partial void OnKeyAvailableChanged(bool? value) => OnPropertyChanged(nameof(KeyDisplay));
+    partial void OnKeyAvailableChanged(bool? value)
+    {
+        OnPropertyChanged(nameof(KeyDisplay));
+        OnPropertyChanged(nameof(TileTooltip));
+    }
+
+    partial void OnResidentNameChanged(string? value) => OnPropertyChanged(nameof(TileTooltip));
+
+    partial void OnLabelChanged(string value) => OnPropertyChanged(nameof(TileTooltip));
 
     [RelayCommand]
     private void OpenEditor() => _onOpenEditor(BuildingId, FloorOrdinal, ApartmentNumber);
@@ -130,13 +178,17 @@ public sealed partial class FloorRowViewModel : ObservableObject
         string? description,
         int apartmentCount,
         bool isReadOnly,
-        Action<int, int> onApartmentCountChanged)
+        Action<int, int> onApartmentCountChanged,
+        int searchedCount = 0,
+        int affectedCount = 0)
     {
         Ordinal = ordinal;
         Label = label;
         Cells = cells;
         Description = description;
         IsReadOnly = isReadOnly;
+        SearchedCount = searchedCount;
+        AffectedCount = affectedCount;
         _apartmentCount = apartmentCount;
         _onApartmentCountChanged = onApartmentCountChanged;
     }
@@ -150,6 +202,22 @@ public sealed partial class FloorRowViewModel : ObservableObject
     public string? Description { get; }
 
     public bool IsReadOnly { get; }
+
+    /// <summary>Counted across the floor's whole population, not its visible Cells, so the band
+    /// header keeps telling the truth while a status filter is narrowing what's on screen.</summary>
+    public int SearchedCount { get; }
+
+    public int AffectedCount { get; }
+
+    public int ProcessedCount => SearchedCount + AffectedCount;
+
+    /// <summary>"9/14" -- the one number a crew working a floor actually wants, and the reason the
+    /// band header exists at all.</summary>
+    public string ProgressLabel => $"{ProcessedCount}/{ApartmentCount}";
+
+    public bool IsComplete => ApartmentCount > 0 && ProcessedCount >= ApartmentCount;
+
+    public bool HasAffected => AffectedCount > 0;
 
     /// <summary>#265: this floor's own Wohnungen count, independent of every other floor's --
     /// edited directly on the row, growing/trimming its Cells.</summary>
@@ -165,6 +233,9 @@ public sealed partial class FloorRowViewModel : ObservableObject
 
 public sealed partial class CoMessprotokollViewModel : ObservableObject, IDisposable
 {
+    /// <summary>Pixel width of the summary progress track (see SearchedBarWidth).</summary>
+    private const double ProgressTrackWidth = 420;
+
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
@@ -201,6 +272,79 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     [ObservableProperty]
     private bool _isEditorOpen;
+
+    /// <summary>Structure editing (each floor's Wohnungen count) is a setup job done once when the
+    /// building is first described; measuring is what the view is for the rest of the incident.
+    /// Keeping the count spinners permanently in the grid puts an edit control between the crew and
+    /// every tile they need to read, so they live behind this toggle instead.</summary>
+    [ObservableProperty]
+    private bool _isStructureMode;
+
+    /// <summary>Under pressure the question is "what's left", not "what exists". Filtering to the
+    /// open or affected units collapses a 29-unit building to the handful that still need work.</summary>
+    [ObservableProperty]
+    private CoUnitFilter _filter = CoUnitFilter.All;
+
+    public bool IsFilterAll => Filter == CoUnitFilter.All;
+
+    public bool IsFilterOpen => Filter == CoUnitFilter.Open;
+
+    public bool IsFilterAffected => Filter == CoUnitFilter.Affected;
+
+    public int TotalUnits { get; private set; }
+
+    public int SearchedUnits { get; private set; }
+
+    public int AffectedUnits { get; private set; }
+
+    public int OpenUnits => TotalUnits - SearchedUnits - AffectedUnits;
+
+    /// <summary>The one-line answer to "how far are we", which no amount of scanning tiles gives
+    /// you quickly on a 29-unit building.</summary>
+    public string SummaryLine =>
+        $"{TotalUnits} Einheiten · {SearchedUnits} durchsucht · {AffectedUnits} betroffen · {OpenUnits} offen";
+
+    public string SelectedBuildingName => SelectedBuilding?.Name ?? string.Empty;
+
+    // Segmented progress bar widths. Computed as pixels against a fixed track rather than star-sized
+    // grid columns so the bar needs no value converter and stays readable at a glance.
+    public double SearchedBarWidth => BarWidth(SearchedUnits);
+
+    public double AffectedBarWidth => BarWidth(AffectedUnits);
+
+    public double OpenBarWidth => ProgressTrackWidth - SearchedBarWidth - AffectedBarWidth;
+
+    private double BarWidth(int count) =>
+        TotalUnits <= 0 ? 0 : Math.Round(ProgressTrackWidth * count / (double)TotalUnits, 1);
+
+    [RelayCommand]
+    private void ShowAll() => Filter = CoUnitFilter.All;
+
+    [RelayCommand]
+    private void ShowOpen() => Filter = CoUnitFilter.Open;
+
+    [RelayCommand]
+    private void ShowAffected() => Filter = CoUnitFilter.Affected;
+
+    partial void OnFilterChanged(CoUnitFilter value)
+    {
+        OnPropertyChanged(nameof(IsFilterAll));
+        OnPropertyChanged(nameof(IsFilterOpen));
+        OnPropertyChanged(nameof(IsFilterAffected));
+        BuildMatrix();
+    }
+
+    partial void OnIsStructureModeChanged(bool value)
+    {
+        // Editing counts against a filtered view would show a floor "3/8" while three tiles are on
+        // screen; structure work needs the whole floor visible.
+        if (value)
+        {
+            Filter = CoUnitFilter.All;
+        }
+
+        BuildMatrix();
+    }
 
     private void Refresh()
     {
@@ -244,8 +388,13 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
     private void BuildMatrix()
     {
         MatrixRows.Clear();
+        TotalUnits = 0;
+        SearchedUnits = 0;
+        AffectedUnits = 0;
+
         if (SelectedBuilding is null)
         {
+            NotifySummaryChanged();
             return;
         }
 
@@ -254,7 +403,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
         {
             var apartmentCount = building.ApartmentsFor(floor);
-            var cells = Enumerable.Range(1, apartmentCount)
+            var all = Enumerable.Range(1, apartmentCount)
                 .Select(apt =>
                 {
                     var dwelling = _session.Incident.Dwellings.FirstOrDefault(d =>
@@ -267,9 +416,55 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
                 .Cast<DwellingCellViewModel>()
                 .ToList();
 
+            // Tally over the floor's whole population before filtering, so both the band header and
+            // the building summary keep counting what exists rather than what's currently on screen.
+            var searched = all.Count(c => c.Status == DwellingStatus.Searched);
+            var affected = all.Count(c => c.Status == DwellingStatus.Affected);
+            TotalUnits += all.Count;
+            SearchedUnits += searched;
+            AffectedUnits += affected;
+
+            var cells = Filter switch
+            {
+                CoUnitFilter.Open => all.Where(c => c.Status == DwellingStatus.NotSearched).ToList(),
+                CoUnitFilter.Affected => all.Where(c => c.Status == DwellingStatus.Affected).ToList(),
+                _ => all,
+            };
+
+            // A filtered-out floor is dropped entirely rather than left as an empty band: the point
+            // of the filter is to shrink the view down to what still needs work.
+            if (cells.Count == 0 && Filter != CoUnitFilter.All)
+            {
+                continue;
+            }
+
             var description = building.FloorDescriptions.TryGetValue(floor, out var d) ? d : null;
-            MatrixRows.Add(new FloorRowViewModel(floor, CoMeasurementLabels.FloorLabel(floor), cells, description, apartmentCount, IsReadOnly, OnApartmentCountChanged));
+            MatrixRows.Add(new FloorRowViewModel(
+                floor,
+                CoMeasurementLabels.FloorLabel(floor),
+                cells,
+                description,
+                apartmentCount,
+                IsReadOnly,
+                OnApartmentCountChanged,
+                searched,
+                affected));
         }
+
+        NotifySummaryChanged();
+    }
+
+    private void NotifySummaryChanged()
+    {
+        OnPropertyChanged(nameof(TotalUnits));
+        OnPropertyChanged(nameof(SearchedUnits));
+        OnPropertyChanged(nameof(AffectedUnits));
+        OnPropertyChanged(nameof(OpenUnits));
+        OnPropertyChanged(nameof(SummaryLine));
+        OnPropertyChanged(nameof(SelectedBuildingName));
+        OnPropertyChanged(nameof(SearchedBarWidth));
+        OnPropertyChanged(nameof(AffectedBarWidth));
+        OnPropertyChanged(nameof(OpenBarWidth));
     }
 
     private void OnStatusChanged(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status)
