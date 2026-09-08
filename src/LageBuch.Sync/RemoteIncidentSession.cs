@@ -447,6 +447,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
 
+    // Genuinely awaited, like AddFileAsync — not the fire-and-forget Send() used elsewhere in this
+    // file — so the caller can catch a rejection (closed incident, unknown id) and surface it.
+    public Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default) =>
+        SendAsync(new RemoveFileCommand(Op(), fileId), cancellationToken);
+
     public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         Send(new AddCoBuildingCommand(Op(), name, floorCount, apartmentsPerFloor, undergroundFloorCount));
 

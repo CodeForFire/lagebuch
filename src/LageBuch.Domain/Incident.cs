@@ -816,6 +816,33 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Takes an attachment back completely (#262 UX follow-up): row goes, and the ETB records the
+    /// removal like any other reportable event -- mirrors <see cref="RemoveForceUnit"/>, but
+    /// returns the removed record rather than void, because the caller (<c>LocalIncidentSession</c>,
+    /// <c>IncidentHost</c>) still needs its <see cref="IncidentFile.FileName"/> afterwards to delete
+    /// the attachment's bytes, which never pass through the domain. Logs the immutable
+    /// <see cref="IncidentFile.FileName"/>, not the editable <see cref="IncidentFile.DisplayName"/>,
+    /// so the add/remove pair stays greppable regardless of renames in between.
+    /// </summary>
+    public IncidentFile RemoveFile(IClock clock, SessionOperator op, Guid fileId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _files.FindIndex(f => f.Id == fileId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Datei {fileId} nicht gefunden.");
+        }
+
+        var file = _files[index];
+        _files.RemoveAt(index);
+        AppendSystemEntry(clock, op, $"Datei entfernt: {file.FileName}");
+        return file;
+    }
+
+    /// <summary>
     /// Records a task (#88). Deliberately silent — unlike <see cref="AddForceUnit"/>, no ETB
     /// system line: tasks are work management, not the operational log, and a task spawned from
     /// an ETB entry would just duplicate that entry. The PDF export reports tasks instead.

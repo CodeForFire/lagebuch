@@ -145,13 +145,13 @@ public sealed class IncidentHost : IAsyncDisposable
         // Incident is only ever mutated there (matching solo mode) and the Changed it raises reaches
         // the host's own Avalonia-bound views — which reject an off-thread mutation. An AddFileCommand
         // carries metadata only (issue #167 P1 #2) — the attachment's bytes arrive separately via
-        // HandleUploadFile, so applying this command is a pure UI-bound domain mutation like any other,
-        // with no off-thread byte write to sequence around it.
+        // HandleUploadFile — and a RemoveFileCommand's byte cleanup below runs the same way, off the
+        // UI thread, once the metadata mutation and the broadcasted snapshot have already landed.
         try
         {
-            await _ui.InvokeAsync(() => CommandApplier.Apply(command, _session.Incident, _clock));
+            var removedFile = await _ui.InvokeAsync(() => CommandApplier.Apply(command, _session.Incident, _clock));
 
-            return await _ui.InvokeAsync(() =>
+            var result = await _ui.InvokeAsync(() =>
             {
                 // Enqueue persist + raise the session's Changed, which refreshes the host's own UI and,
                 // through OnSessionChanged, broadcasts the new snapshot to every client — the same path
@@ -162,6 +162,19 @@ public sealed class IncidentHost : IAsyncDisposable
                 _session.SaveExternalChange();
                 return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
             });
+
+            // The other half of RemoveFile's metadata/bytes split: CommandApplier only removed the
+            // domain record, so the attachment's bytes are cleaned up here — a pure disk delete
+            // against already-persisted state, like HandleUploadFile/HandleGetFile, so it doesn't
+            // need the UI-thread dispatch the mutation above uses. Best-effort (see
+            // IIncidentFileStore.DeleteBytesAsync) — never blocks or fails the metadata removal that
+            // already landed.
+            if (command is RemoveFileCommand && removedFile is not null)
+            {
+                await _session.DeleteFileBytesAsync(IncidentFile.StorageFileName(removedFile.Id, removedFile.FileName));
+            }
+
+            return result;
         }
         catch (Exception ex) when (ex is IncidentClosedException or ArgumentException or InvalidOperationException
                                        or KeyNotFoundException)

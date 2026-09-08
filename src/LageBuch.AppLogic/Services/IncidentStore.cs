@@ -82,6 +82,9 @@ public sealed class IncidentStore : IIncidentStore
     public string ResolveFileDiskPath(string path, string storageFileName) =>
         _fileStore.ResolveDiskPath(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        _fileStore.DeleteBytesAsync(path, storageFileName, cancellationToken);
+
     private void RunWriter()
     {
         foreach (var work in _writeQueue.GetConsumingEnumerable())

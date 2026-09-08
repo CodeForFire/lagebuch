@@ -100,6 +100,50 @@ public class FilesTests
     }
 
     [Fact]
+    public void RemoveFile_removes_the_file_and_logs_to_the_journal()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 1024);
+
+        var removed = incident.RemoveFile(clock, op, file.Id);
+
+        Assert.Same(file, removed);
+        Assert.Empty(incident.Files);
+        Assert.Equal("Datei entfernt: brand.jpg", incident.Journal[^1].Text);
+        Assert.Equal(Etb.EtbDirection.System, incident.Journal[^1].Direction);
+    }
+
+    [Fact]
+    public void RemoveFile_on_a_closed_incident_throws()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 1024);
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(() => incident.RemoveFile(clock, op, file.Id));
+    }
+
+    [Fact]
+    public void RemoveFile_with_an_unknown_id_throws()
+    {
+        var incident = NewIncident(out var clock, out var op);
+
+        Assert.Throws<KeyNotFoundException>(() => incident.RemoveFile(clock, op, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void RemoveFile_logs_the_original_file_name_even_after_a_rename()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 1024);
+        incident.RenameFile(file.Id, "Küchenbrand, Erdgeschoss");
+
+        incident.RemoveFile(clock, op, file.Id);
+
+        Assert.Equal("Datei entfernt: brand.jpg", incident.Journal[^1].Text);
+    }
+
+    [Fact]
     public void Create_rejects_unsupported_content_type()
     {
         var ex = Assert.Throws<ArgumentException>(() =>

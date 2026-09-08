@@ -35,6 +35,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(CloseIncidentCommand), "close")]
 [JsonDerivedType(typeof(AddFileCommand), "addFile")]
 [JsonDerivedType(typeof(RenameFileCommand), "renameFile")]
+[JsonDerivedType(typeof(RemoveFileCommand), "removeFile")]
 [JsonDerivedType(typeof(AddTaskCommand), "addTask")]
 [JsonDerivedType(typeof(SetTaskCompletedCommand), "setTaskCompleted")]
 [JsonDerivedType(typeof(AddCoBuildingCommand), "addCoBuilding")]
@@ -123,6 +124,9 @@ public sealed record AddFileCommand(OperatorDto Operator, Guid FileId, string Fi
 // No operator on the wire: renaming is a silent label correction (no ETB entry), unlike every
 // attributed command above.
 public sealed record RenameFileCommand(Guid FileId, string? DisplayName) : SyncCommand;
+
+// Attributed (unlike RenameFileCommand): removal logs an ETB entry, so the operator travels with it.
+public sealed record RemoveFileCommand(OperatorDto Operator, Guid FileId) : SyncCommand;
 
 // TimerMinutes travels instead of an absolute DueAt: the host stamps the anchor with its own
 // authoritative clock on apply, like every timestamped command.

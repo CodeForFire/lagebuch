@@ -278,7 +278,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
         Files?.Dispose();
-        Files = new FilesViewModel(_session, _dialogs, OnChanged);
+        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
 
