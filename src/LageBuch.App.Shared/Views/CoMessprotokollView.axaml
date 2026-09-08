@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              xmlns:dom="clr-namespace:LageBuch.Domain.CoMeasurement;assembly=LageBuch.Domain"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.CoMessprotokollView"
@@ -25,12 +26,12 @@
          Margin bottom 14) — this view was missing it (#137). -->
     <TextBlock DockPanel.Dock="Top" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
 
-    <!-- Building management: selector, add/remove and UG all live together in one dock (bottom
-         gutter, matching every other tab's entry point, #221) rather than split across the top
-         and bottom: they're one job ("which Haus, and add/remove a house or a floor"). Within
-         that dock, HAUS auswählen/ENTFERNEN/UG HINZUFÜGEN all act on the selected Haus and sit
-         together; HAUS HINZUFÜGEN doesn't depend on a selection at all, so it's set apart after
-         a divider rather than sandwiched between them. -->
+    <!-- Building management: which Haus, and add/remove a Haus (bottom gutter, matching every
+         other tab's entry point, #221). HAUS auswählen/ENTFERNEN act on the selected Haus and sit
+         together; HAUS HINZUFÜGEN doesn't depend on a selection at all, so it's set apart after a
+         divider rather than sandwiched between them. Adding a *floor* is not a building-level
+         action but structure editing, so UG/OG HINZUFÜGEN moved out of here and into the STRUKTUR
+         toolbar alongside the per-floor Wohnungen counts (#265). -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
@@ -50,16 +51,6 @@
         <Button Content="HAUS ENTFERNEN"
                 Command="{Binding RemoveBuildingCommand}"
                 IsEnabled="{Binding CanModify}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        <!-- Untergeschoss (#218): reuses UpdateCoBuildingStructure, which also creates the new
-             floor's Wohnungen, capped at 3 UG floors via CanAddUntergeschoss. -->
-        <Button Content="UG HINZUFÜGEN"
-                Command="{Binding AddUntergeschossCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        <!-- Obergeschoss (#258): mirrors UG HINZUFÜGEN for the top of the building, so an
-             under-estimated floor count can be corrected upward too, not just downward. -->
-        <Button Content="OG HINZUFÜGEN"
-                Command="{Binding AddObergeschossCommand}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
         <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
         <Button x:Name="AddBuildingButton" Classes="signal" Content="HAUS HINZUFÜGEN"
@@ -232,6 +223,25 @@
       </Grid>
     </Border>
 
+    <!-- Structure toolbar: only while STRUKTUR is on, next to the per-floor Wohnungen counts that
+         appear in the same mode. Adding a floor and setting a floor's unit count are the same job
+         (describing the building), done once at the start; keeping them out of the way for the
+         rest of the incident is the whole point of the mode. -->
+    <Border DockPanel.Dock="Top" IsVisible="{Binding IsStructureMode}" Margin="0,0,0,12"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="12,10">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="GESCHOSSE" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                   Margin="0,0,4,0" />
+        <!-- Obergeschoss (#258): mirrors UG HINZUFÜGEN for the top of the building, so an
+             under-estimated floor count can be corrected upward too, not just downward. -->
+        <Button Content="OG HINZUFÜGEN" Command="{Binding AddObergeschossCommand}" />
+        <!-- Untergeschoss (#218): reuses UpdateCoBuildingStructure, which also creates the new
+             floor's Wohnungen, capped at 3 UG floors via CanAddUntergeschoss. -->
+        <Button Content="UG HINZUFÜGEN" Command="{Binding AddUntergeschossCommand}" />
+      </StackPanel>
+    </Border>
+
     <!-- Matrix: one band per floor, top floor first, so the column of floor labels still reads as a
          cross-section of the building. Tiles wrap inside their band instead of extending the row,
          which is what decouples the layout from the unit count: a 2-unit penthouse floor and a
@@ -278,12 +288,21 @@
                 <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                      <WrapPanel ItemSpacing="5" LineSpacing="5" />
+                      <!-- Equal-width columns filling the line, so every floor spans the same
+                           width and the matrix reads as a cross-section of the building: the two
+                           Penthäuser on 4.OG are together as wide as the four Wohnungen below
+                           them. Wraps rather than shrinking past 96px, which is where a 14-unit
+                           floor in a narrow window would start trimming its ppm readings away. -->
+                      <ctrl:EqualWidthWrapPanel MinItemWidth="96" ItemSpacing="5" LineSpacing="5" />
                     </ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:DwellingCellViewModel">
+                      <!-- HorizontalAlignment="Stretch" is load-bearing: without it the Button
+                           sizes to its content and sits at the left of the column the panel gave
+                           it, so the columns line up but the tiles don't fill them. -->
                       <Button Background="Transparent" BorderThickness="0" Padding="0" Height="NaN"
+                              HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                               ToolTip.Tip="{Binding TileTooltip}"
                               Command="{Binding OpenEditorCommand}">
@@ -294,7 +313,8 @@
                              key and full status wording moved to the tooltip and the editor, so a
                              14-unit floor fits one line instead of running off screen. 46px keeps
                              the tap target above the 44px floor for gloved hands. -->
-                        <Border Width="104" Height="46" CornerRadius="5"
+                        <!-- No fixed Width: EqualWidthWrapPanel owns it so the row fills the line. -->
+                        <Border x:Name="UnitTile" Height="46" CornerRadius="5" HorizontalAlignment="Stretch"
                                 BorderBrush="{Binding StatusBrush}" BorderThickness="1"
                                 Background="{StaticResource SurfaceRaisedBrush}"
                                 ClipToBounds="True">

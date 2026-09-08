@@ -1,7 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using LageBuch.App.Shared.Controls;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -18,7 +21,7 @@ namespace LageBuch.Acceptance.Tests;
 /// </summary>
 public class CoMessprotokollMixedBuildingTests
 {
-    private static (Window Window, IncidentWorkspaceViewModel Vm) Scenario()
+    private static (Window Window, IncidentWorkspaceViewModel Vm) Scenario(double width = 1920)
     {
         var session = LocalIncidentSession.StartNew(
             new FakeStore(),
@@ -35,7 +38,7 @@ public class CoMessprotokollMixedBuildingTests
             new FakeDialogs(),
             new NoopAlarmService(),
             new NoopIncidentHostController());
-        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -160,6 +163,95 @@ public class CoMessprotokollMixedBuildingTests
 
         Capture(window, "co-messung-filter-open.png");
     }
+
+    [AvaloniaTheory]
+    [InlineData(1280)]
+    [InlineData(1400)]
+    [InlineData(1920)]
+    public void Every_floor_fills_the_line_without_shrinking_a_tile_below_legibility(double width)
+    {
+        var (window, _) = Scenario(width);
+
+        var panels = Panels(window);
+        Assert.Equal(6, panels.Count);
+
+        foreach (var panel in panels)
+        {
+            var tiles = Tiles(panel);
+            Assert.NotEmpty(tiles);
+
+            foreach (var tile in tiles)
+            {
+                var tooNarrow = $"a tile shrank to {tile.Bounds.Width:F0}px at a window width of {width}px, below MinItemWidth: the ppm reading trims away there.";
+                Assert.True(tile.Bounds.Width >= panel.MinItemWidth - 0.5, tooNarrow);
+            }
+
+            var used = tiles.Max(t => RightEdgeIn(t, panel));
+            var overflows = $"a floor's tiles need {used:F0}px in a {panel.Bounds.Width:F0}px band — the row overflows.";
+            Assert.True(used <= panel.Bounds.Width + 1, overflows);
+        }
+
+        Capture(window, $"co-messung-{width:F0}.png");
+    }
+
+    [AvaloniaFact]
+    public void Two_penthouses_span_the_same_width_as_the_four_flats_below_them()
+    {
+        var (window, _) = Scenario();
+
+        var panels = Panels(window);
+        var penthouses = Tiles(panels[0]);  // 4.OG, 2 units
+        var flats = Tiles(panels[1]);       // 3.OG, 4 units
+
+        Assert.Equal(2, penthouses.Count);
+        Assert.Equal(4, flats.Count);
+
+        // The point of the equal-width columns: a floor's row is the building's footprint, so
+        // both rows end on the same right edge however many units subdivide them.
+        var penthouseEdge = penthouses.Max(t => RightEdgeIn(t, panels[0]));
+        var flatEdge = flats.Max(t => RightEdgeIn(t, panels[1]));
+        var ragged = $"4.OG ends at {penthouseEdge:F0}px but 3.OG at {flatEdge:F0}px — floors don't line up.";
+        Assert.True(Math.Abs(penthouseEdge - flatEdge) <= 1, ragged);
+
+        // ...and each penthouse is correspondingly twice a flat's width, plus the spacing the
+        // flats' extra gutter would have taken.
+        var penthouseWidth = penthouses[0].Bounds.Width;
+        var flatWidth = flats[0].Bounds.Width;
+        var uneven = $"penthouse {penthouseWidth:F0}px vs. flat {flatWidth:F0}px — not a clean subdivision.";
+        Assert.True(Math.Abs(penthouseWidth - ((flatWidth * 2) + 5)) <= 1, uneven);
+    }
+
+    [AvaloniaFact]
+    public void Floor_buttons_only_appear_in_structure_mode()
+    {
+        var (window, vm) = Scenario();
+
+        Assert.False(FloorButton(window, "OG HINZUFÜGEN").IsEffectivelyVisible);
+        Assert.False(FloorButton(window, "UG HINZUFÜGEN").IsEffectivelyVisible);
+
+        vm.CoMessprotokoll.IsStructureMode = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(FloorButton(window, "OG HINZUFÜGEN").IsEffectivelyVisible);
+        Assert.True(FloorButton(window, "UG HINZUFÜGEN").IsEffectivelyVisible);
+    }
+
+    private static List<EqualWidthWrapPanel> Panels(Window window) =>
+        window.GetVisualDescendants().OfType<EqualWidthWrapPanel>().ToList();
+
+    /// <summary>The visible tile Borders, not the panel's item containers. Measuring the containers
+    /// hides the bug where the column stretches but the tile inside it sits narrow at the left.</summary>
+    private static List<Border> Tiles(EqualWidthWrapPanel panel) =>
+        panel.GetVisualDescendants().OfType<Border>().Where(b => b.Name == "UnitTile").ToList();
+
+    /// <summary>A tile's right edge in its panel's coordinate space. Control.Bounds is relative to
+    /// the immediate parent (here the item container), so comparing raw Bounds.Right across floors
+    /// compares tile widths, not positions.</summary>
+    private static double RightEdgeIn(Visual tile, Visual panel) =>
+        tile.TranslatePoint(new Point(tile.Bounds.Width, 0), panel)?.X ?? double.NaN;
+
+    private static Button FloorButton(Window window, string content) =>
+        window.GetVisualDescendants().OfType<Button>().Single(b => (b.Content as string) == content);
 
     [AvaloniaFact]
     public void Structure_mode_clears_an_active_filter_so_counts_are_edited_against_whole_floors()
