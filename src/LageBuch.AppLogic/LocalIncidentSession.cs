@@ -114,7 +114,7 @@ public sealed class LocalIncidentSession : IIncidentSession
     // every attached file's bytes land in this device's own sibling folder the moment it's added —
     // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
     // network pull, only IIncidentStore.
-    public async Task<byte[]> ExportPdfAsync(IIncidentPdfExporter exporter)
+    public async Task<byte[]> ExportPdfAsync(IIncidentPdfExporter exporter, IncidentPdfSections sections = IncidentPdfSections.All)
     {
         ArgumentNullException.ThrowIfNull(exporter);
         var fileBytes = new Dictionary<Guid, byte[]>();
@@ -142,7 +142,7 @@ public sealed class LocalIncidentSession : IIncidentSession
             }
         }
 
-        return exporter.Generate(Incident, fileBytes, pdfAttachmentPaths);
+        return exporter.Generate(Incident, fileBytes, pdfAttachmentPaths, sections);
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---

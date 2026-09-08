@@ -10,6 +10,7 @@ public sealed class IncidentReportDocument : IDocument
 {
     private readonly Incident _incident;
     private readonly IReadOnlyDictionary<Guid, byte[]> _imageBytesById;
+    private readonly IncidentPdfSections _sections;
 
     /// <param name="incident">The incident to render.</param>
     /// <param name="fileBytes">
@@ -18,14 +19,24 @@ public sealed class IncidentReportDocument : IDocument
     /// by name regardless of whether bytes were supplied; only image entries with bytes present
     /// are additionally rendered inline (see <see cref="Sections.FilesSection"/>).
     /// </param>
-    public IncidentReportDocument(Incident incident, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null)
+    /// <param name="sections">
+    /// Which of the 8 body sections to render (#262); defaults to all of them. The header and
+    /// footer are always rendered regardless of this selection.
+    /// </param>
+    public IncidentReportDocument(Incident incident, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null, IncidentPdfSections sections = IncidentPdfSections.All)
     {
         ArgumentNullException.ThrowIfNull(incident);
         _incident = incident;
-        _imageBytesById = incident.Files
-            .Where(f => f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            .Where(f => fileBytes is not null && fileBytes.ContainsKey(f.Id))
-            .ToDictionary(f => f.Id, f => fileBytes![f.Id]);
+        _sections = sections;
+
+        // Skipped entirely when Files is deselected -- FilesSection.Compose (the only consumer)
+        // won't run below, so copying every attached image's bytes here would be wasted work.
+        _imageBytesById = sections.HasFlag(IncidentPdfSections.Files)
+            ? incident.Files
+                .Where(f => f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                .Where(f => fileBytes is not null && fileBytes.ContainsKey(f.Id))
+                .ToDictionary(f => f.Id, f => fileBytes![f.Id])
+            : new Dictionary<Guid, byte[]>();
     }
 
     public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
@@ -46,14 +57,45 @@ public sealed class IncidentReportDocument : IDocument
             page.Content().PaddingVertical(10).Column(column =>
             {
                 column.Spacing(14);
-                column.Item().Element(c => ChecklistSection.Compose(c, _incident));
-                column.Item().Element(c => EtbSection.Compose(c, _incident));
-                column.Item().Element(c => RolesSection.Compose(c, _incident));
-                column.Item().Element(c => ForcesSection.Compose(c, _incident));
-                column.Item().Element(c => TasksSection.Compose(c, _incident));
-                column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
-                column.Item().Element(c => CoMessprotokollSection.Compose(c, _incident));
-                column.Item().Element(c => FilesSection.Compose(c, _incident.Files, _imageBytesById));
+                if (_sections.HasFlag(IncidentPdfSections.Checklist))
+                {
+                    column.Item().Element(c => ChecklistSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.Etb))
+                {
+                    column.Item().Element(c => EtbSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.Roles))
+                {
+                    column.Item().Element(c => RolesSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.Forces))
+                {
+                    column.Item().Element(c => ForcesSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.Tasks))
+                {
+                    column.Item().Element(c => TasksSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.Atemschutz))
+                {
+                    column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.CoMessprotokoll))
+                {
+                    column.Item().Element(c => CoMessprotokollSection.Compose(c, _incident));
+                }
+
+                if (_sections.HasFlag(IncidentPdfSections.Files))
+                {
+                    column.Item().Element(c => FilesSection.Compose(c, _incident.Files, _imageBytesById));
+                }
             });
 
             page.Footer().AlignCenter().Text(t =>

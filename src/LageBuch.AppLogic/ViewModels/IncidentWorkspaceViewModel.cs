@@ -24,8 +24,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
+    private readonly ILastPdfExportStore? _lastPdfExportStore;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -37,7 +38,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _alarm = alarm;
         _hostController = hostController;
         _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
+        _lastPdfExportStore = lastPdfExport;
         IsReadOnly = session.IsReadOnly;
+
+        // Seed the export status line from the last persisted export (#262), so reopening the
+        // incident still shows "zuletzt exportiert" without requiring a fresh export this session.
+        // Only the file name is shown -- the full path is too long for the footer and lives in
+        // ExportStatusDetail (a tooltip) instead.
+        if (_lastPdfExportStore?.GetLastExport() is { } lastExport)
+        {
+            _exportStatus = $"Zuletzt exportiert: {Path.GetFileName(lastExport.Path)} um {lastExport.ExportedAt:HH:mm}";
+            _exportStatusDetail = lastExport.Path;
+        }
 
         // Seed the backing field directly so initialization doesn't trigger a write-back/save.
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
@@ -79,6 +91,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     // The create-task overlay behind an ETB row's button (#88); null while no dialog is open.
     [ObservableProperty]
     private TaskDialogViewModel? _pendingTaskDialog;
+
+    // The PDF section-selection overlay (#262); null while no export is in flight.
+    [ObservableProperty]
+    private PdfExportOptionsViewModel? _pendingPdfExportOptions;
 
     // The Stichwort, captured once at creation (#69) and never edited afterward -- unlike the
     // Einsatznummer below, which the header lets you add/edit later.
@@ -386,18 +402,67 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     // (QuestPDF/QuestPDF#1432), so that head supplies NoopIncidentPdfExporter and hides the button too.
     public bool CanExport => _local is not null && _pdfExporter.CanExport;
 
+    // The one-line export outcome: a fresh success/failure message, or (before any export this
+    // session) seeded from ILastPdfExportStore in the constructor. Shows only the file name --
+    // the full path made this line too wide for the footer -- with the full path (when known)
+    // available via ExportStatusDetail for a tooltip.
+    [ObservableProperty]
+    private string? _exportStatus;
+
+    [ObservableProperty]
+    private string? _exportStatusDetail;
+
+    // Opens the section-selection overlay (#262); the actual generate/write/share work is the
+    // overlay's own awaitable ExportCommand (RunExportAsync below), so this stays synchronous.
     [RelayCommand(CanExecute = nameof(CanExport))]
-    private async Task ExportPdfAsync()
+    private void ExportPdf()
     {
-        var suggested = (_session.Incident.IncidentNumber?.Value ?? "Einsatz") + ".pdf";
+        var dialog = new PdfExportOptionsViewModel(RunExportAsync);
+
+        // Guards against a stale dialog's Closed firing after a newer one has already replaced it
+        // in PendingPdfExportOptions -- Export() awaits real async work while the dialog stays up,
+        // so (unlike the app's other Closed-clears-overlay dialogs) this one's Closed can in
+        // principle arrive well after this dialog stopped being "the" pending one.
+        dialog.Closed += (_, _) =>
+        {
+            if (PendingPdfExportOptions == dialog)
+            {
+                PendingPdfExportOptions = null;
+            }
+        };
+        PendingPdfExportOptions = dialog;
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Export can fail in several ways (disk full, exporter throwing, etc.); surfaces in the status line.")]
+    private async Task RunExportAsync(IncidentPdfSections sections)
+    {
+        // Reuse the incident's own name -- its .fwincident file's base name (date+time+Stichwort,
+        // see HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually
+        // still unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf".
+        var suggested = Path.GetFileNameWithoutExtension(_local!.Path) + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
         {
-            return;
+            return; // cancelled -- no status change, dialog still closes normally
         }
 
-        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync(_pdfExporter));
-        await _dialogs.ShareFileAsync(path, "application/pdf");
+        try
+        {
+            var bytes = await _local!.ExportPdfAsync(_pdfExporter, sections);
+            await File.WriteAllBytesAsync(path, bytes);
+            await _dialogs.ShareFileAsync(path, "application/pdf");
+            ExportStatus = $"PDF exportiert: {Path.GetFileName(path)}";
+            ExportStatusDetail = path;
+            _lastPdfExportStore?.SetLastExport(path, _clock.Now);
+        }
+        catch (Exception ex)
+        {
+            ExportStatus = $"Export fehlgeschlagen: {ex.Message}";
+            ExportStatusDetail = null; // nothing to point a tooltip at -- the export failed
+        }
     }
 
     // ===== Multi-device hosting (#52): flip "Im Netzwerk freigeben" to expose this open incident. =====

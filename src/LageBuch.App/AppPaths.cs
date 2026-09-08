@@ -11,6 +11,8 @@ internal static class AppPaths
 
     public static string LastSaveFolderJsonPath => Path.Combine(Root, "last-save-folder.json");
 
+    public static string LastPdfExportJsonPath => Path.Combine(Root, "last-pdf-export.json");
+
     public static string AttachmentCacheDir => Path.Combine(Root, "attachment-cache");
 
     public static string TrustJsonPath => Path.Combine(Root, "trust.json");

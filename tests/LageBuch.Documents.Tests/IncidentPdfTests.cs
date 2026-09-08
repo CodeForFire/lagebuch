@@ -172,6 +172,74 @@ public class IncidentPdfTests
         PdfAssert.IsPdf(bytes);
     }
 
+    [Fact]
+    public void Generate_with_a_section_deselected_produces_a_smaller_pdf_than_all_sections()
+    {
+        // BuildFullIncident populates every section, so excluding one (ETB, which has real
+        // journal content) must shrink the output relative to rendering all of them.
+        var incident = BuildFullIncident();
+        var withAll = IncidentPdf.Generate(incident, sections: IncidentPdfSections.All);
+        var withoutEtb = IncidentPdf.Generate(incident, sections: IncidentPdfSections.All & ~IncidentPdfSections.Etb);
+
+        PdfAssert.IsPdf(withoutEtb);
+        Assert.True(
+            withoutEtb.Length < withAll.Length,
+            $"Expected omitting the ETB section to shrink the PDF (all={withAll.Length}, withoutEtb={withoutEtb.Length}).");
+    }
+
+    [Fact]
+    public void Generate_with_no_sections_selected_still_produces_a_valid_but_minimal_pdf()
+    {
+        var incident = BuildFullIncident();
+        var withAll = IncidentPdf.Generate(incident, sections: IncidentPdfSections.All);
+        var withNone = IncidentPdf.Generate(incident, sections: IncidentPdfSections.None);
+
+        PdfAssert.IsPdf(withNone);
+        Assert.True(
+            withNone.Length < withAll.Length,
+            $"Expected an empty section selection to produce a smaller PDF (all={withAll.Length}, none={withNone.Length}).");
+    }
+
+    [Fact]
+    public void Generate_defaults_to_all_sections_when_none_specified()
+    {
+        var incident = BuildFullIncident();
+        var withDefault = IncidentPdf.Generate(incident);
+        var withAllExplicit = IncidentPdf.Generate(incident, sections: IncidentPdfSections.All);
+
+        Assert.Equal(PdfAssert.CountPages(withAllExplicit), PdfAssert.CountPages(withDefault));
+    }
+
+    [Fact]
+    public void Generate_with_Files_deselected_also_omits_the_merged_pdf_attachment_pages()
+    {
+        var incident = BuildFullIncident();
+        var withoutAttachment = IncidentPdf.Generate(incident, sections: IncidentPdfSections.All & ~IncidentPdfSections.Files);
+        var basePages = PdfAssert.CountPages(withoutAttachment);
+
+        var attachmentPdf = IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")));
+        var file = incident.AddFile(new Clock(), new SessionOperator("Müller"), "bericht.pdf", "application/pdf", attachmentPdf.Length);
+        var attachmentPath = Path.Combine(Path.GetTempPath(), $"lagebuch-incident-pdf-test-{Guid.NewGuid():N}.pdf");
+        File.WriteAllBytes(attachmentPath, attachmentPdf);
+        try
+        {
+            var withFilesDeselected = IncidentPdf.Generate(
+                incident,
+                pdfAttachmentPaths: new Dictionary<Guid, string> { [file.Id] = attachmentPath },
+                sections: IncidentPdfSections.All & ~IncidentPdfSections.Files);
+
+            PdfAssert.IsPdf(withFilesDeselected);
+
+            // The merged attachment pages must NOT be appended when Files is deselected, even
+            // though a path was supplied for it.
+            Assert.Equal(basePages, PdfAssert.CountPages(withFilesDeselected));
+        }
+        finally
+        {
+            File.Delete(attachmentPath);
+        }
+    }
+
     // Needs the native qpdf library (see PdfAttachmentMergerTests' remarks).
     [Fact]
     public void Generate_appends_an_attached_pdfs_pages_after_the_report()
