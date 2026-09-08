@@ -38,7 +38,40 @@ public class CoMessprotokollViewModelTests
         Assert.Single(vm.BuildingOptions);
         Assert.Equal("Haus A", vm.BuildingOptions[0].Name);
         Assert.Equal(3, vm.MatrixRows.Count); // 2 OG + EG
-        Assert.Equal(3, vm.ApartmentColumns.Count);
+        Assert.All(vm.MatrixRows, r => Assert.Equal(3, r.Cells.Count));
+    }
+
+    // --- Issue #265: per-floor Wohnungen counts and labels (Option B) ------------------------
+    [Fact]
+    public void ChangingApartmentCount_OnOneFloor_RebuildsOnlyThatRow()
+    {
+        var (session, vm) = CreateVm();
+        var egRow = vm.MatrixRows.Single(r => r.Ordinal == 0);
+
+        egRow.ApartmentCount = 5;
+
+        var updatedEgRow = vm.MatrixRows.Single(r => r.Ordinal == 0);
+        Assert.Equal(5, updatedEgRow.Cells.Count);
+        var ogRow = vm.MatrixRows.Single(r => r.Ordinal == 1);
+        Assert.Equal(3, ogRow.Cells.Count); // untouched floor
+        Assert.Equal(5, session.Incident.Buildings[0].ApartmentsFor(0));
+    }
+
+    [Fact]
+    public void EditingLabel_InTheEditor_PersistsOnClose()
+    {
+        var (session, vm) = CreateVm();
+        var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[1];
+
+        cell.OpenEditorCommand.Execute(null);
+        vm.SelectedCell!.Label = "Müller";
+        vm.CloseEditorCommand.Execute(null);
+
+        var building = session.Incident.Buildings[0];
+        Assert.Equal("Müller", CoMeasurementLabels.ApartmentLabel(building, 0, cell.ApartmentNumber));
+
+        // A same-numbered unit on a different floor is untouched (#265's whole point).
+        Assert.NotEqual("Müller", CoMeasurementLabels.ApartmentLabel(building, 1, cell.ApartmentNumber));
     }
 
     // --- Issue #218: Untergeschoss (UG) floors below EG --------------------------------------
@@ -442,6 +475,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
         _inner.SetFloorDescription(buildingId, floorOrdinal, description);
 
-    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
-        _inner.SetApartmentLabel(buildingId, apartmentNumber, label);
+    public void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label) =>
+        _inner.SetApartmentLabel(buildingId, floorOrdinal, apartmentNumber, label);
+
+    public void SetApartmentCount(Guid buildingId, int floorOrdinal, int count) =>
+        _inner.SetApartmentCount(buildingId, floorOrdinal, count);
 }

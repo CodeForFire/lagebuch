@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace LageBuch.Domain.CoMeasurement;
 
 public static class CoMeasurementLabels
@@ -32,18 +34,56 @@ public static class CoMeasurementLabels
             }
             : ApartmentLabel(apartmentNumber);
 
-    public static string ApartmentLabel(Building building, int apartmentNumber)
+    /// <summary>#265: every floor labels its own units independently -- ApartmentLabels is keyed
+    /// by <see cref="ApartmentLabelKey"/> (floor + apartment number), not apartment number alone,
+    /// so a custom label on one floor never leaks onto a same-numbered unit on another floor.</summary>
+    public static string ApartmentLabel(Building building, int floorOrdinal, int apartmentNumber)
     {
         ArgumentNullException.ThrowIfNull(building);
-        return building.ApartmentLabels.TryGetValue(apartmentNumber, out var custom) && !string.IsNullOrWhiteSpace(custom)
+        var key = ApartmentLabelKey(floorOrdinal, apartmentNumber);
+        return building.ApartmentLabels.TryGetValue(key, out var custom) && !string.IsNullOrWhiteSpace(custom)
             ? custom!
-            : DefaultApartmentLabel(apartmentNumber, building.ApartmentsPerFloor);
+            : DefaultApartmentLabel(apartmentNumber, building.ApartmentsFor(floorOrdinal));
+    }
+
+    public static string ApartmentLabelKey(int floorOrdinal, int apartmentNumber) =>
+        $"{floorOrdinal.ToString(CultureInfo.InvariantCulture)}:{apartmentNumber.ToString(CultureInfo.InvariantCulture)}";
+
+    /// <summary>Pre-#265 saved incidents keyed ApartmentLabels by apartment number alone (one
+    /// label shared across every floor's same-numbered column, e.g. "2" → "Müller"). #265 makes
+    /// labels per-floor, so an old label needs to fan out across every floor that existed when it
+    /// was saved -- otherwise it silently disappears from a Haus a crew already labeled.</summary>
+    public static IReadOnlyDictionary<string, string?> MigrateLegacyApartmentLabels(
+        IReadOnlyDictionary<string, string?> raw, int floorCount, int undergroundFloorCount)
+    {
+        ArgumentNullException.ThrowIfNull(raw);
+        var result = new Dictionary<string, string?>();
+        foreach (var (key, value) in raw)
+        {
+            if (key.Contains(':', StringComparison.Ordinal))
+            {
+                result[key] = value;
+                continue;
+            }
+
+            if (!int.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out var apartmentNumber))
+            {
+                continue;
+            }
+
+            for (var floor = -undergroundFloorCount; floor <= floorCount; floor++)
+            {
+                result[ApartmentLabelKey(floor, apartmentNumber)] = value;
+            }
+        }
+
+        return result;
     }
 
     public static string DwellingLocation(Building building, int floorOrdinal, int apartmentNumber)
     {
         ArgumentNullException.ThrowIfNull(building);
-        return $"{building.Name}, {FloorLabel(floorOrdinal)}, {ApartmentLabel(building, apartmentNumber)}";
+        return $"{building.Name}, {FloorLabel(floorOrdinal)}, {ApartmentLabel(building, floorOrdinal, apartmentNumber)}";
     }
 
     public static string StatusText(DwellingStatus status) => status switch

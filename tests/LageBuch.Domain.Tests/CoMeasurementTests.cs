@@ -335,4 +335,111 @@ public class CoMeasurementTests
 
         Assert.Equal(journalCountBefore, incident.Journal.Count);
     }
+
+    // --- Issue #265: per-floor Wohnungen counts and labels (Option B) -------------------------
+    [Fact]
+    public void Building_ApartmentsFor_UsesDefaultUntilOverridden()
+    {
+        var building = Building.Create("Haus A", 2, 3, 0);
+        Assert.Equal(3, building.ApartmentsFor(0));
+        Assert.Equal(3, building.ApartmentsFor(1));
+
+        var updated = building.WithApartmentCount(1, 7);
+        Assert.Equal(7, updated.ApartmentsFor(1));
+        Assert.Equal(3, updated.ApartmentsFor(0)); // untouched floor keeps the default
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(31)]
+    public void Building_WithApartmentCount_InvalidCount_Throws(int count)
+    {
+        var building = Building.Create("Haus A", 2, 3, 0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => building.WithApartmentCount(0, count));
+    }
+
+    [Fact]
+    public void Building_WithApartmentLabel_IsIsolatedPerFloor()
+    {
+        // Same apartment number (2), two different floors: labeling one must not affect the other
+        // — the whole point of #265's per-floor keying.
+        var building = Building.Create("Haus A", 2, 3, 0)
+            .WithApartmentLabel(0, 2, "Müller")
+            .WithApartmentLabel(1, 2, "Schmidt");
+
+        Assert.Equal("Müller", CoMeasurementLabels.ApartmentLabel(building, 0, 2));
+        Assert.Equal("Schmidt", CoMeasurementLabels.ApartmentLabel(building, 1, 2));
+        Assert.Equal("Mitte", CoMeasurementLabels.ApartmentLabel(building, 2, 2)); // never labeled, defaults for a 3-flat floor
+    }
+
+    [Fact]
+    public void CoMeasurementLabels_MigrateLegacyApartmentLabels_FansOutAcrossFloors()
+    {
+        // Pre-#265 saved incidents keyed ApartmentLabels by apartment number alone, meaning
+        // "this label applies to every floor's column 2" — loading one must not silently lose it.
+        var legacy = new Dictionary<string, string?> { ["2"] = "Müller" };
+
+        var migrated = CoMeasurementLabels.MigrateLegacyApartmentLabels(legacy, floorCount: 1, undergroundFloorCount: 1);
+
+        Assert.Equal("Müller", migrated[CoMeasurementLabels.ApartmentLabelKey(-1, 2)]);
+        Assert.Equal("Müller", migrated[CoMeasurementLabels.ApartmentLabelKey(0, 2)]);
+        Assert.Equal("Müller", migrated[CoMeasurementLabels.ApartmentLabelKey(1, 2)]);
+    }
+
+    [Fact]
+    public void CoMeasurementLabels_MigrateLegacyApartmentLabels_LeavesNewFormatKeysAlone()
+    {
+        var alreadyMigrated = new Dictionary<string, string?> { [CoMeasurementLabels.ApartmentLabelKey(0, 2)] = "Müller" };
+
+        var migrated = CoMeasurementLabels.MigrateLegacyApartmentLabels(alreadyMigrated, floorCount: 2, undergroundFloorCount: 0);
+
+        Assert.Equal("Müller", Assert.Single(migrated).Value);
+    }
+
+    [Fact]
+    public void Incident_SetApartmentCount_GrowsAndTrimsOnlyThatFloor()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3); // EG,1.OG,2.OG × 3 = 9
+
+        incident.SetApartmentCount(clock, op, incident.Buildings[0].Id, 0, 5);
+
+        Assert.Equal(5, incident.Buildings[0].ApartmentsFor(0));
+        Assert.Equal(3, incident.Buildings[0].ApartmentsFor(1)); // other floors untouched
+        Assert.Equal(5, incident.Dwellings.Count(d => d.FloorOrdinal == 0));
+        Assert.Equal(3, incident.Dwellings.Count(d => d.FloorOrdinal == 1));
+        Assert.Contains(incident.Journal, e => e.Text.Contains("jetzt 5 Wohnungen", StringComparison.Ordinal));
+
+        incident.SetApartmentCount(clock, op, incident.Buildings[0].Id, 0, 2);
+        Assert.Equal(2, incident.Dwellings.Count(d => d.FloorOrdinal == 0));
+    }
+
+    [Fact]
+    public void Incident_SetApartmentCount_NonExistentFloor_Throws()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            incident.SetApartmentCount(clock, op, incident.Buildings[0].Id, 5, 4));
+    }
+
+    [Fact]
+    public void Incident_SetApartmentLabel_DoesNotLogToETB()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var journalCountBefore = incident.Journal.Count;
+
+        incident.SetApartmentLabel(incident.Buildings[0].Id, 0, 1, "Müller");
+
+        Assert.Equal(journalCountBefore, incident.Journal.Count);
+        Assert.Equal("Müller", CoMeasurementLabels.ApartmentLabel(incident.Buildings[0], 0, 1));
+    }
 }

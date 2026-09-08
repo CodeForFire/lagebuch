@@ -138,7 +138,8 @@ public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,
     Dictionary<string, string?> FloorDescriptions, int Ordinal,
     Dictionary<string, string?>? ApartmentLabels = null,
-    int UndergroundFloorCount = 0);
+    int UndergroundFloorCount = 0,
+    Dictionary<string, int>? ApartmentCounts = null);
 
 public sealed record DwellingDto(
     Guid Id, Guid BuildingId, int FloorOrdinal, int ApartmentNumber,

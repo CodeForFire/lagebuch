@@ -160,7 +160,10 @@ public static class CommandApplier
                 incident.SetFloorDescription(c.BuildingId, c.FloorOrdinal, c.Description);
                 break;
             case SetApartmentLabelCommand c:
-                incident.SetApartmentLabel(c.BuildingId, c.ApartmentNumber, c.Label);
+                incident.SetApartmentLabel(c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.Label);
+                break;
+            case SetApartmentCountCommand c:
+                incident.SetApartmentCount(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.Count);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(

@@ -13,13 +13,25 @@ public sealed record Building
     /// but a bigger typo blast radius.</summary>
     public int UndergroundFloorCount { get; private init; }
 
+    /// <summary>Default Wohnungen-per-floor for a floor with no <see cref="ApartmentCounts"/>
+    /// override -- what a newly added floor is seeded with. #265: real buildings' floors,
+    /// especially Untergeschosse, rarely share one column count, so this is a starting point, not
+    /// a building-wide constraint anymore.</summary>
     public int ApartmentsPerFloor { get; private init; }
+
+    /// <summary>Per-floor overrides of <see cref="ApartmentsPerFloor"/> (#265), keyed by
+    /// FloorOrdinal. A floor absent here uses the default.</summary>
+    public IReadOnlyDictionary<int, int> ApartmentCounts { get; private init; } =
+        new Dictionary<int, int>();
 
     public IReadOnlyDictionary<int, string?> FloorDescriptions { get; private init; } =
         new Dictionary<int, string?>();
 
-    public IReadOnlyDictionary<int, string?> ApartmentLabels { get; private init; } =
-        new Dictionary<int, string?>();
+    /// <summary>Custom unit labels (#265), keyed by <see cref="CoMeasurementLabels.ApartmentLabelKey"/>
+    /// (FloorOrdinal + ApartmentNumber) -- every floor now labels its own units independently
+    /// rather than sharing one column index across the whole building.</summary>
+    public IReadOnlyDictionary<string, string?> ApartmentLabels { get; private init; } =
+        new Dictionary<string, string?>();
 
     public int Ordinal { get; private init; }
 
@@ -67,8 +79,9 @@ public sealed record Building
         int apartmentsPerFloor,
         IReadOnlyDictionary<int, string?> floorDescriptions,
         int ordinal,
-        IReadOnlyDictionary<int, string?>? apartmentLabels = null,
-        int undergroundFloorCount = 0)
+        IReadOnlyDictionary<string, string?>? apartmentLabels = null,
+        int undergroundFloorCount = 0,
+        IReadOnlyDictionary<int, int>? apartmentCounts = null)
         => new()
         {
             Id = id,
@@ -77,7 +90,9 @@ public sealed record Building
             UndergroundFloorCount = undergroundFloorCount,
             ApartmentsPerFloor = apartmentsPerFloor,
             FloorDescriptions = floorDescriptions,
-            ApartmentLabels = apartmentLabels ?? new Dictionary<int, string?>(),
+            ApartmentLabels = CoMeasurementLabels.MigrateLegacyApartmentLabels(
+                apartmentLabels ?? new Dictionary<string, string?>(), floorCount, undergroundFloorCount),
+            ApartmentCounts = apartmentCounts ?? new Dictionary<int, int>(),
             Ordinal = ordinal,
         };
 
@@ -121,16 +136,33 @@ public sealed record Building
         return this with { FloorDescriptions = dict };
     }
 
-    public Building WithApartmentLabel(int apartmentNumber, string? label)
+    /// <summary>The Wohnungen count for a specific floor (#265): the per-floor override if one was
+    /// ever set, otherwise the building's default.</summary>
+    public int ApartmentsFor(int floorOrdinal) =>
+        ApartmentCounts.TryGetValue(floorOrdinal, out var count) ? count : ApartmentsPerFloor;
+
+    public Building WithApartmentCount(int floorOrdinal, int count)
     {
-        var dict = new Dictionary<int, string?>(ApartmentLabels.ToDictionary(kv => kv.Key, kv => kv.Value));
+        if (count < 1 || count > 30)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count), "Wohnungen je Geschoss müssen zwischen 1 und 30 liegen.");
+        }
+
+        var dict = new Dictionary<int, int>(ApartmentCounts) { [floorOrdinal] = count };
+        return this with { ApartmentCounts = dict };
+    }
+
+    public Building WithApartmentLabel(int floorOrdinal, int apartmentNumber, string? label)
+    {
+        var dict = new Dictionary<string, string?>(ApartmentLabels);
+        var key = CoMeasurementLabels.ApartmentLabelKey(floorOrdinal, apartmentNumber);
         if (string.IsNullOrWhiteSpace(label))
         {
-            dict.Remove(apartmentNumber);
+            dict.Remove(key);
         }
         else
         {
-            dict[apartmentNumber] = label.Trim();
+            dict[key] = label.Trim();
         }
 
         return this with { ApartmentLabels = dict };
