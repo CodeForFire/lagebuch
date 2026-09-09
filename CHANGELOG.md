@@ -18,6 +18,11 @@ once we reach 1.0.
   mistyped ppm reading no longer lands in the Einsatztagebuch. The tile previews the pending
   state while the sidebar is open. (#242)
 
+### Fixed
+- Stop a Kraft's Stärke-Historie from duplicating on every save: each save was re-inserting
+  the whole edit history on top of what was already on disk, so a file saved N times held N
+  copies of every correction. Existing files are deduplicated the next time they are opened. (#279)
+
 ### Security
 - Harden CI workflows: `ci.yml` now runs with read-only `contents` permission and enforces
   `dotnet format` in CI; `claude.yml` only responds to `@claude` mentions from repo owners,
