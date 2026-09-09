@@ -109,7 +109,7 @@
                 <Button Grid.Column="5" Classes="icon-btn" Margin="6,0,0,0"
                         IsVisible="{Binding !IsReadOnly}"
                         Command="{Binding RemoveCommand}"
-                        ToolTip.Tip="Datei entfernen">
+                        ToolTip.Tip="Datei entfernen" AutomationProperties.Name="Datei entfernen">
                   <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
                 </Button>
               </Grid>
