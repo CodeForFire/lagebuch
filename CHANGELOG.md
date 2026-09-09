@@ -22,6 +22,8 @@ once we reach 1.0.
 - Stop a Kraft's Stärke-Historie from duplicating on every save: each save was re-inserting
   the whole edit history on top of what was already on disk, so a file saved N times held N
   copies of every correction. Existing files are deduplicated the next time they are opened. (#279)
+- Surface a failed background save (disk full, read-only, locked/corrupt DB) as a persistent
+  red banner in the Einsatz workspace instead of silently leaving the incident unsaved (#280)
 
 ### Security
 - Harden CI workflows: `ci.yml` now runs with read-only `contents` permission and enforces

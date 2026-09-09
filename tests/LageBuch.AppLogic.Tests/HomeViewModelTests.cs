@@ -459,6 +459,12 @@ internal sealed class ThrowingStore : IIncidentStore
         add { }
         remove { }
     }
+
+    public event Action? SaveSucceeded
+    {
+        add { }
+        remove { }
+    }
 }
 
 // Loads what was saved; anything else throws — lets one test fail an open, then succeed.
@@ -490,6 +496,12 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
         Task.CompletedTask;
 
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }
@@ -533,6 +545,12 @@ internal sealed class CountingStore : IIncidentStore
         Task.CompletedTask;
 
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }

@@ -38,6 +38,8 @@ public sealed class IncidentStore : IIncidentStore
 
     public event Action<Exception>? SaveFailed;
 
+    public event Action? SaveSucceeded;
+
     [SuppressMessage(
         "Design",
         "CA1031",
@@ -50,6 +52,7 @@ public sealed class IncidentStore : IIncidentStore
             try
             {
                 _write(path, SnapshotMapper.FromSnapshot(snapshot));
+                SaveSucceeded?.Invoke();
             }
             catch (Exception ex)
             {

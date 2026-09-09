@@ -71,6 +71,12 @@ internal sealed class FakeStore : IIncidentStore
         add { }
         remove { }
     }
+
+    public event Action? SaveSucceeded
+    {
+        add { }
+        remove { }
+    }
 }
 
 internal sealed class FakeDialogs : IFileDialogService

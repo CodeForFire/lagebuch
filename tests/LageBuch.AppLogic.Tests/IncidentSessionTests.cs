@@ -398,11 +398,15 @@ internal sealed class FakeStore : IIncidentStore
         return Task.CompletedTask;
     }
 
-    public event Action<Exception>? SaveFailed
-    {
-        add { }
-        remove { }
-    }
+    // Real events, not the usual no-op double: IncidentWorkspaceViewModelTests raises these
+    // directly to exercise the PersistenceError wiring without a real background writer thread.
+    public event Action<Exception>? SaveFailed;
+
+    public event Action? SaveSucceeded;
+
+    public void RaiseSaveFailed(Exception ex) => SaveFailed?.Invoke(ex);
+
+    public void RaiseSaveSucceeded() => SaveSucceeded?.Invoke();
 }
 
 // SaveFileBytesAsync doesn't complete until the caller-supplied gate task does — lets a test prove
@@ -437,6 +441,12 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
         Task.CompletedTask;
 
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }

@@ -78,6 +78,12 @@ public class HomeOpenErrorTests
             add { }
             remove { }
         }
+
+        public event Action? SaveSucceeded
+        {
+            add { }
+            remove { }
+        }
     }
 
     private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null)

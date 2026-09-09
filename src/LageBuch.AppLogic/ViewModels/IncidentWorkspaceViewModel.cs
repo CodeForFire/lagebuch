@@ -26,7 +26,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly ILastPdfExportStore? _lastPdfExportStore;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null)
+    // The same app-lifetime store the session persists through (issue #167 review follow-up):
+    // its background writer's SaveFailed/SaveSucceeded never reached the UI before this, so a
+    // disk-full/locked/corrupt-DB write silently failed while the screen kept saying "gespeichert".
+    // Null for a joined client's remote workspace (RemoteIncidentSession writes nothing through
+    // this store), which is why both this and the dispatcher stay optional.
+    private readonly IIncidentStore? _store;
+    private readonly IUiDispatcher _uiDispatcher;
+
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -39,7 +47,19 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _hostController = hostController;
         _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         _lastPdfExportStore = lastPdfExport;
+        _store = store;
+        _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         IsReadOnly = session.IsReadOnly;
+
+        // SaveFailed/SaveSucceeded fire on the store's background writer thread -- marshal onto
+        // the UI thread before touching PersistenceError. Unsubscribed in LeaveAsync, the one
+        // teardown path every caller already goes through, so this workspace doesn't outlive its
+        // own subscription to the app-lifetime store singleton.
+        if (_store is not null)
+        {
+            _store.SaveFailed += OnStoreSaveFailed;
+            _store.SaveSucceeded += OnStoreSaveSucceeded;
+        }
 
         // Seed the export status line from the last persisted export (#262), so reopening the
         // incident still shows "zuletzt exportiert" without requiring a fresh export this session.
@@ -81,6 +101,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     [ObservableProperty]
     private DateTimeOffset? _lastSavedAt;
+
+    // Null = healthy. Set from IIncidentStore.SaveFailed (background writer thread, marshalled via
+    // IUiDispatcher) and stays visible -- unlike the export/share status lines -- until a later
+    // save actually succeeds (SaveSucceeded), because a save that silently never reached disk is
+    // exactly what an incident logbook must never let the operator miss.
+    [ObservableProperty]
+    private string? _persistenceError;
 
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
@@ -217,15 +244,29 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     /// <summary>
     /// Called by the shell when this workspace is being left. Tears down a joined client's
-    /// SignalR/HTTP connection; a local session owns no such resources and is a no-op.
+    /// SignalR/HTTP connection; a local session owns no such resources and is a no-op. Also drops
+    /// this workspace's subscription to the (app-lifetime, singleton) store, so a closed workspace
+    /// doesn't keep reacting to saves it can no longer show.
     /// </summary>
     public async ValueTask LeaveAsync()
     {
+        if (_store is not null)
+        {
+            _store.SaveFailed -= OnStoreSaveFailed;
+            _store.SaveSucceeded -= OnStoreSaveSucceeded;
+        }
+
         if (_session is IAsyncDisposable disposable)
         {
             await disposable.DisposeAsync();
         }
     }
+
+    private void OnStoreSaveFailed(Exception ex) =>
+        _uiDispatcher.Post(() => PersistenceError = $"Speichern fehlgeschlagen: {ex.Message} — Änderungen werden NICHT gesichert.");
+
+    private void OnStoreSaveSucceeded() =>
+        _uiDispatcher.Post(() => PersistenceError = null);
 
     // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
     // incident, or someone adds the Einsatznummer from another device); keep the header live and

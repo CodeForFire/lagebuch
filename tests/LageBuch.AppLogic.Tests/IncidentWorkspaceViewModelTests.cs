@@ -992,6 +992,76 @@ public class IncidentWorkspaceViewModelTests
         Assert.StartsWith(Formatting.Timestamp(clickTime), task.CreatedDisplay, StringComparison.Ordinal);
         Assert.False(task.IsOverdue); // anchored to now, so a fresh 15-minute timer is not overdue
     }
+
+    // --- Persistence failure banner ----------------------------------------------------------
+    // IncidentStore's background writer raises SaveFailed on a disk-full/locked/corrupt-DB write
+    // (issue #167 P0 #1), but nothing in src/ used to subscribe to it -- the UI kept showing
+    // "gespeichert" while nothing reached disk. The workspace now surfaces it as PersistenceError,
+    // via the same store the session persists through (passed in here as `store:`).
+    private static IncidentWorkspaceViewModel WorkspaceWithStore(FakeStore store, out FixedClock clock)
+    {
+        clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        return new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            store: store);
+    }
+
+    [Fact]
+    public void A_failed_background_save_sets_a_German_persistence_error()
+    {
+        var store = new FakeStore();
+        var vm = WorkspaceWithStore(store, out _);
+
+        Assert.Null(vm.PersistenceError);
+
+        store.RaiseSaveFailed(new InvalidOperationException("Datenträger voll"));
+
+        Assert.Equal(
+            "Speichern fehlgeschlagen: Datenträger voll — Änderungen werden NICHT gesichert.",
+            vm.PersistenceError);
+    }
+
+    [Fact]
+    public void A_later_successful_save_clears_the_persistence_error()
+    {
+        var store = new FakeStore();
+        var vm = WorkspaceWithStore(store, out _);
+        store.RaiseSaveFailed(new InvalidOperationException("Datenträger voll"));
+        Assert.NotNull(vm.PersistenceError);
+
+        store.RaiseSaveSucceeded();
+
+        Assert.Null(vm.PersistenceError);
+    }
+
+    // Task 3 (a sibling PR) makes the workspace IDisposable; until then LeaveAsync is the one
+    // teardown path every caller already goes through (HomeViewModel navigates away via it), so
+    // that is where the store subscription comes off -- a closed workspace must not keep the
+    // app-lifetime store singleton reacting on its behalf.
+    [Fact]
+    public async Task Leaving_the_workspace_unsubscribes_from_the_store()
+    {
+        var store = new FakeStore();
+        var vm = WorkspaceWithStore(store, out _);
+
+        await vm.LeaveAsync();
+        store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
+
+        Assert.Null(vm.PersistenceError);
+    }
 }
 
 // Simulates a generation failure (e.g. disk full) so ExportPdf's try/catch can be exercised

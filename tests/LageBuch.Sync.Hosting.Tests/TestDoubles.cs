@@ -58,6 +58,12 @@ internal sealed class InMemoryStore : IIncidentStore
         add { }
         remove { }
     }
+
+    public event Action? SaveSucceeded
+    {
+        add { }
+        remove { }
+    }
 }
 
 internal sealed class FakeTimeProvider : TimeProvider
@@ -320,6 +326,12 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
         Task.CompletedTask;
 
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }
