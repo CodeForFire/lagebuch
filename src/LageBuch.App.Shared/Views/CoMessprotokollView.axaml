@@ -181,7 +181,15 @@
                that also closes the sidebar (like FERTIG) would defeat that warning's whole point,
                since typing a value and hitting Enter is one fluid motion: the sidebar would vanish
                in the same instant the warning appeared, before anyone could actually read it. -->
-          <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" Value="{Binding Editor.CoValue}"
+          <!-- ClipValueToMinMax="True" is load-bearing, not decorative: Avalonia's NumericUpDown
+               defaults it to false, which means typing anything above Maximum (e.g. a fat-fingered
+               "111111111") throws inside the control's own text-to-value conversion, that exception
+               is swallowed internally, and Value silently never updates: no warning, no color, no
+               feedback at all. Exactly the typo this field exists to catch, met with total silence.
+               Clipping instead lands the value at 9999, which is comfortably inside both the Lethal
+               and implausible-value bands below, so a wild typo still gets a visible reaction. -->
+          <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" ClipValueToMinMax="True"
+                         Value="{Binding Editor.CoValue}"
                          FormatString="0" PlaceholderText="Kein Messwert" />
           <!-- Caution about a likely typo (e.g. 9999 vs 999), not a severity warning; deliberately
                non-blocking: a real fire scene can genuinely produce extreme ppm values, so FERTIG

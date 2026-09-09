@@ -84,6 +84,28 @@ public class CoMessprotokollCoValueInputTests
     }
 
     [AvaloniaFact]
+    public void Typing_a_value_above_Maximum_still_registers_and_warns()
+    {
+        // Reported: typing "111111111" (a 9-digit fat-finger typo -- exactly the scenario the
+        // plausibility warning exists to catch) did nothing at all. Root cause: NumericUpDown's
+        // ClipValueToMinMax defaults to false, so a parsed value above Maximum throws inside the
+        // control's own conversion, the exception is swallowed internally, and Value never updates.
+        // ClipValueToMinMax="True" on the control clips it to Maximum (9999) instead, which still
+        // lands well inside the Lethal/implausible bands -- silence replaced with a real reaction.
+        var (window, view, vm, _) = ShowEditor();
+        var input = view.GetControl<NumericUpDown>("CoValueInput");
+
+        input.Focus();
+        window.KeyTextInput("111111111");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotNull(vm.Editor);
+        Assert.Equal(9999, vm.Editor!.CoValue);
+        Assert.True(vm.Editor!.IsCoLethal);
+        Assert.True(vm.Editor!.IsCoImplausible);
+    }
+
+    [AvaloniaFact]
     public void Clicking_FERTIG_after_typing_commits_the_value()
     {
         var (window, view, vm, session) = ShowEditor();
