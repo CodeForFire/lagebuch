@@ -8,23 +8,30 @@
     <!-- Search sits on the section header line rather than in a band of its own, the way the ETB
          tab's "Systemmeldungen ausblenden" toggle does (#262); a separate row would push the
          list down by a control height on a tab whose whole point is at-a-glance scanning. -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="0,0,0,14">
       <TextBlock Grid.Column="0" Text="LINKS" Classes="overline" VerticalAlignment="Center" />
-      <!-- Only worth offering once there is something to search: with empty Stammdaten the
-           "Keine Links hinterlegt." hint below is the whole story. -->
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                  IsVisible="{Binding Links.Count}">
-        <TextBox x:Name="LinkSearchBox" Width="260" Text="{Binding FilterText}"
-                 PlaceholderText="Name oder Adresse suchen">
-          <TextBox.KeyBindings>
-            <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
-        <Button x:Name="ClearLinkSearchButton" Classes="icon-btn" ToolTip.Tip="Suche zurücksetzen"
-                Command="{Binding ClearFilterCommand}" IsVisible="{Binding IsFiltered}">
-          <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-        </Button>
-      </StackPanel>
+      <!-- Star column with MaxWidth rather than a fixed Width in an Auto column: an Auto column
+           never shrinks, so a pinned width runs off the right edge on a phone-width window (#146
+           treats that as a bug). Only worth offering once there is something to search: with
+           empty Stammdaten the "Keine Links hinterlegt." hint below is the whole story. -->
+      <TextBox Grid.Column="1" x:Name="LinkSearchBox" MinWidth="130" MaxWidth="260" Margin="16,0,0,0"
+               HorizontalAlignment="Right" VerticalAlignment="Center"
+               Text="{Binding FilterText}"
+               PlaceholderText="Name oder Adresse suchen"
+               IsVisible="{Binding Links.Count}">
+        <!-- InnerRightContent, not a sibling: as a sibling the button's appearance widens the
+             row and shoves the focused box ~34px left under the operator's caret on the first
+             keystroke. Inside the box that space is already reserved. -->
+        <TextBox.InnerRightContent>
+          <Button x:Name="ClearLinkSearchButton" Classes="icon-btn" ToolTip.Tip="Suche zurücksetzen"
+                  Command="{Binding ClearFilterCommand}" IsVisible="{Binding IsFiltered}">
+            <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+          </Button>
+        </TextBox.InnerRightContent>
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
     </Grid>
 
     <!-- Open failure banner: same shape as Files' ErrorBanner -->

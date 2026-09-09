@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -170,6 +171,53 @@ public class LinksTabRenderTests
         // enclosing panel is -- only the effective flag answers "can the operator see it".
         Assert.False(Named<TextBox>(window, "LinkSearchBox").IsEffectivelyVisible);
         Assert.True(Named<TextBlock>(window, "EmptyText").IsEffectivelyVisible);
+    }
+
+    /// <summary>
+    /// Drives the box itself rather than the view model, so the Text binding and the Escape
+    /// KeyBinding are covered: every other test here sets FilterText directly, and would still
+    /// pass with the binding dropped from the XAML -- leaving the feature dead in the app.
+    /// </summary>
+    [AvaloniaFact]
+    public void Typing_in_the_search_box_filters_and_escape_clears_it()
+    {
+        var (window, vm) = ShowLinksTab();
+        var box = Named<TextBox>(window, "LinkSearchBox");
+        box.Focus();
+        Dispatcher.UIThread.RunJobs();
+
+        window.KeyTextInput("wetter");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("wetter", vm.Links.FilterText);
+        Assert.Equal(1, Named<ItemsControl>(window, "LinksList").ItemCount);
+
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(string.Empty, vm.Links.FilterText);
+        Assert.Equal(string.Empty, box.Text);
+        Assert.Equal(2, Named<ItemsControl>(window, "LinksList").ItemCount);
+    }
+
+    /// <summary>
+    /// The search box must flex rather than sit at a pinned width: an Auto column never shrinks,
+    /// so a fixed width runs off the right edge of a phone-width window with no horizontal
+    /// scroller anywhere above it to rescue it (the #146 contract).
+    /// </summary>
+    [AvaloniaFact]
+    public void The_search_box_stays_inside_a_phone_width_window()
+    {
+        var (window, _) = ShowWorkspace();
+        window.Width = 411;
+        window.Height = 872;
+        Tabs(window).SelectedIndex = 8; // LINKS
+        Dispatcher.UIThread.RunJobs();
+
+        var box = Named<TextBox>(window, "LinkSearchBox");
+        var right = box.TranslatePoint(new Point(box.Bounds.Width, 0), window)!.Value.X;
+
+        Assert.True(right <= 411, $"the search box runs {right - 411}px past the right edge");
     }
 
     /// <summary>
