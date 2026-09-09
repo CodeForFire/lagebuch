@@ -177,7 +177,7 @@
           <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
           <!-- Enter commits like FERTIG: still an explicit action (the #242 buffer/commit model
                stays intact), just without reaching for the mouse right after typing the value. -->
-          <NumericUpDown Minimum="0" Maximum="9999" Value="{Binding Editor.CoValue}"
+          <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" Value="{Binding Editor.CoValue}"
                          FormatString="0" PlaceholderText="Kein Messwert">
             <NumericUpDown.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding ConfirmEditorCommand}" />

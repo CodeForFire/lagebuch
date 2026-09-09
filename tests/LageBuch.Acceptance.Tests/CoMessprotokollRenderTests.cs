@@ -87,6 +87,30 @@ public class CoMessprotokollRenderTests
     }
 
     [AvaloniaFact]
+    public void CoMessprotokoll_ImplausibleValue_ShowsWarningInEditor()
+    {
+        var (window, vm, session) = ShowWorkspace();
+
+        session.AddCoBuilding("Mehrfamilienhaus A", 1, 1);
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 6; // CO-MESSUNG
+        Dispatcher.UIThread.RunJobs();
+
+        var cell = vm.CoMessprotokoll.MatrixRows[0].Cells[0];
+        cell.OpenEditorCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        vm.CoMessprotokoll.Editor!.CoValue = 2500;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(vm.CoMessprotokoll.Editor!.IsCoImplausible);
+
+        Capture(window, "co-messung-implausible-warning.png");
+    }
+
+    [AvaloniaFact]
     public void CoMessprotokoll_PerFloorApartmentCount_RendersIndependently()
     {
         var (window, vm, session) = ShowWorkspace();
