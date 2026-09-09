@@ -175,14 +175,14 @@
         <!-- CO Value -->
         <StackPanel Spacing="2">
           <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
-          <!-- Enter commits like FERTIG: still an explicit action (the #242 buffer/commit model
-               stays intact), just without reaching for the mouse right after typing the value. -->
+          <!-- No Enter-to-commit here on purpose: NumericUpDown already live-updates Editor.CoValue
+               per keystroke (it syncs Text to Value on every TextBox.TextChanged), which is what
+               drives the implausible-value warning below as the operator types. An Enter shortcut
+               that also closes the sidebar (like FERTIG) would defeat that warning's whole point,
+               since typing a value and hitting Enter is one fluid motion: the sidebar would vanish
+               in the same instant the warning appeared, before anyone could actually read it. -->
           <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" Value="{Binding Editor.CoValue}"
-                         FormatString="0" PlaceholderText="Kein Messwert">
-            <NumericUpDown.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding ConfirmEditorCommand}" />
-            </NumericUpDown.KeyBindings>
-          </NumericUpDown>
+                         FormatString="0" PlaceholderText="Kein Messwert" />
           <!-- Caution about a likely typo (e.g. 9999 vs 999), not a severity warning; deliberately
                non-blocking: a real fire scene can genuinely produce extreme ppm values, so FERTIG
                still commits it. -->

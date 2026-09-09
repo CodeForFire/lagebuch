@@ -12,8 +12,14 @@ using LageBuch.Domain.CoMeasurement;
 namespace LageBuch.Acceptance.Tests;
 
 // Drives the real CO-WERT NumericUpDown via headless keyboard input (not by setting Editor.CoValue
-// directly, as the VM-level tests do) to confirm the implausible-value warning and the #278
-// Enter-to-commit KeyBinding both work end-to-end through the actual control.
+// directly, as the VM-level tests do) to confirm the implausible-value warning actually renders as
+// the operator types.
+//
+// There used to be an Enter-to-commit KeyBinding here (closing the sidebar like FERTIG). It was
+// removed: typing a value and pressing Enter is one fluid motion, so the sidebar would close in
+// the same instant the warning appeared -- defeating the warning's whole point of giving the
+// operator a moment to notice and double-check. Pinning that Enter must NOT close the editor is
+// exactly what would catch a regression of that mistake.
 public class CoMessprotokollCoValueInputTests
 {
     private static (Window Window, CoMessprotokollView View, CoMessprotokollViewModel Vm, LocalIncidentSession Session) ShowEditor()
@@ -42,7 +48,7 @@ public class CoMessprotokollCoValueInputTests
         session.Incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
 
     [AvaloniaFact]
-    public void Typing_an_implausible_value_shows_the_warning_before_committing()
+    public void Typing_an_implausible_value_shows_the_warning_live()
     {
         var (window, view, vm, _) = ShowEditor();
         var input = view.GetControl<NumericUpDown>("CoValueInput");
@@ -57,8 +63,12 @@ public class CoMessprotokollCoValueInputTests
     }
 
     [AvaloniaFact]
-    public void Pressing_Enter_after_typing_commits_the_value()
+    public void Pressing_Enter_does_not_close_the_editor()
     {
+        // Regression pin for the bug reported after the first version of this PR: an Enter-to-commit
+        // shortcut closed the sidebar the instant Enter was pressed, so the warning above was never
+        // actually visible to a human typing-then-Enter in one motion. Enter must be a no-op here;
+        // only FERTIG/ABBRECHEN may close the editor.
         var (window, view, vm, session) = ShowEditor();
         var input = view.GetControl<NumericUpDown>("CoValueInput");
 
@@ -68,25 +78,25 @@ public class CoMessprotokollCoValueInputTests
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Null(vm.Editor);
-        Assert.Equal(2500, EgDwelling(session).CoValue);
+        Assert.NotNull(vm.Editor);
+        Assert.True(vm.Editor!.IsCoImplausible);
+        Assert.Null(EgDwelling(session).CoValue); // FERTIG was never clicked -- nothing committed
     }
 
     [AvaloniaFact]
-    public void Typing_a_plausible_value_shows_no_warning_and_commits_on_Enter()
+    public void Clicking_FERTIG_after_typing_commits_the_value()
     {
         var (window, view, vm, session) = ShowEditor();
         var input = view.GetControl<NumericUpDown>("CoValueInput");
 
         input.Focus();
-        window.KeyTextInput("45");
+        window.KeyTextInput("2500");
         Dispatcher.UIThread.RunJobs();
 
-        Assert.False(vm.Editor!.IsCoImplausible);
-
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        vm.ConfirmEditorCommand.Execute(null); // what the FERTIG Button invokes
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(45, EgDwelling(session).CoValue);
+        Assert.Null(vm.Editor);
+        Assert.Equal(2500, EgDwelling(session).CoValue);
     }
 }
