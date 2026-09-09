@@ -442,4 +442,64 @@ public class CoMeasurementTests
         Assert.Equal(journalCountBefore, incident.Journal.Count);
         Assert.Equal("Müller", CoMeasurementLabels.ApartmentLabel(incident.Buildings[0], 0, 1));
     }
+
+    [Fact]
+    public void CoSeverityClassifier_SeverityOf_Null_IsNormal()
+    {
+        Assert.Equal(CoSeverity.Normal, CoSeverityClassifier.SeverityOf(null));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(29)]
+    public void CoSeverityClassifier_SeverityOf_BelowElevatedThreshold_IsNormal(int ppm)
+    {
+        Assert.Equal(CoSeverity.Normal, CoSeverityClassifier.SeverityOf(ppm));
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(199)]
+    public void CoSeverityClassifier_SeverityOf_InElevatedRange_IsElevated(int ppm)
+    {
+        Assert.Equal(CoSeverity.Elevated, CoSeverityClassifier.SeverityOf(ppm));
+    }
+
+    [Theory]
+    [InlineData(200)]
+    [InlineData(799)]
+    public void CoSeverityClassifier_SeverityOf_InDangerousRange_IsDangerous(int ppm)
+    {
+        Assert.Equal(CoSeverity.Dangerous, CoSeverityClassifier.SeverityOf(ppm));
+    }
+
+    [Theory]
+    [InlineData(800)]
+    [InlineData(9999)]
+    public void CoSeverityClassifier_SeverityOf_AtOrAboveLethalThreshold_IsLethal(int ppm)
+    {
+        Assert.Equal(CoSeverity.Lethal, CoSeverityClassifier.SeverityOf(ppm));
+    }
+
+    [Fact]
+    public void CoSeverityClassifier_IsImplausible_Null_IsFalse()
+    {
+        Assert.False(CoSeverityClassifier.IsImplausible(null));
+    }
+
+    [Theory]
+    [InlineData(2000)]
+    [InlineData(800)]
+    public void CoSeverityClassifier_IsImplausible_AtOrBelowThreshold_IsFalse(int ppm)
+    {
+        Assert.False(CoSeverityClassifier.IsImplausible(ppm));
+    }
+
+    [Theory]
+    [InlineData(2001)]
+    [InlineData(9999)]
+    public void CoSeverityClassifier_IsImplausible_AboveThreshold_IsTrue(int ppm)
+    {
+        Assert.True(CoSeverityClassifier.IsImplausible(ppm));
+    }
 }

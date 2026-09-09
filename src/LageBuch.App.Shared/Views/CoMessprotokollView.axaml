@@ -19,6 +19,25 @@
     <Style Selector="Button.chipon">
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     </Style>
+
+    <!-- ppm danger coloring: independent of Status (search progress), so a lethal reading must
+         read as lethal whether or not the unit has been searched yet. Mirrors ScbaView's
+         TextBlock.scbaStatus.alarm pattern. Dangerous reuses SignalHotBrush rather than
+         SignalBrush so it's visibly a step below Lethal, which gets the full alarm red plus
+         weight. -->
+    <Style Selector="TextBlock.coValue">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.coValue.elevated">
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+    </Style>
+    <Style Selector="TextBlock.coValue.dangerous">
+      <Setter Property="Foreground" Value="{StaticResource SignalHotBrush}" />
+    </Style>
+    <Style Selector="TextBlock.coValue.lethal">
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
   </UserControl.Styles>
 
   <DockPanel>
@@ -156,8 +175,29 @@
         <!-- CO Value -->
         <StackPanel Spacing="2">
           <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
-          <NumericUpDown Minimum="0" Maximum="9999" Value="{Binding Editor.CoValue}"
+          <!-- No Enter-to-commit here on purpose: NumericUpDown already live-updates Editor.CoValue
+               per keystroke (it syncs Text to Value on every TextBox.TextChanged), which is what
+               drives the implausible-value warning below as the operator types. An Enter shortcut
+               that also closes the sidebar (like FERTIG) would defeat that warning's whole point,
+               since typing a value and hitting Enter is one fluid motion: the sidebar would vanish
+               in the same instant the warning appeared, before anyone could actually read it. -->
+          <!-- ClipValueToMinMax="True" is load-bearing, not decorative: Avalonia's NumericUpDown
+               defaults it to false, which means typing anything above Maximum (e.g. a fat-fingered
+               "111111111") throws inside the control's own text-to-value conversion, that exception
+               is swallowed internally, and Value silently never updates: no warning, no color, no
+               feedback at all. Exactly the typo this field exists to catch, met with total silence.
+               Clipping instead lands the value at 9999, which is comfortably inside both the Lethal
+               and implausible-value bands below, so a wild typo still gets a visible reaction. -->
+          <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" ClipValueToMinMax="True"
+                         Value="{Binding Editor.CoValue}"
                          FormatString="0" PlaceholderText="Kein Messwert" />
+          <!-- Caution about a likely typo (e.g. 9999 vs 999), not a severity warning; deliberately
+               non-blocking: a real fire scene can genuinely produce extreme ppm values, so FERTIG
+               still commits it. -->
+          <TextBlock Text="⚠ Ungewöhnlich hoher Wert – bitte auf Tippfehler prüfen"
+                     FontSize="10" TextWrapping="Wrap"
+                     Foreground="{StaticResource AmberBrush}"
+                     IsVisible="{Binding Editor.IsCoImplausible}" />
         </StackPanel>
 
         <!-- Bezeichnung (#265): every unit's own label now, instead of a header shared with every
@@ -341,9 +381,18 @@
                                 <!-- Empty when unmeasured (CoCompact, not CoDisplay): "Kein Messwert"
                                      on every unstarted tile is the same non-information repeated
                                      dozens of times, and it buries the values that do exist. -->
+                                <!-- No local Foreground here on purpose: a local value would outrank the
+                                     TextBlock.coValue style setters below, and none of the severity
+                                     colors would ever show (Avalonia gives local values higher
+                                     precedence than style setters). The base TextBlock.coValue rule
+                                     carries the plain/Normal color instead. -->
                                 <TextBlock Text="{Binding CoCompact}" FontFamily="{StaticResource MonoFont}"
-                                           FontSize="11" Foreground="{StaticResource TextPrimaryBrush}"
-                                           TextTrimming="CharacterEllipsis" />
+                                           FontSize="11"
+                                           TextTrimming="CharacterEllipsis"
+                                           Classes="coValue"
+                                           Classes.elevated="{Binding IsCoElevated}"
+                                           Classes.dangerous="{Binding IsCoDangerous}"
+                                           Classes.lethal="{Binding IsCoLethal}" />
                               </StackPanel>
                               <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding KeyDisplay}" FontSize="10"
                                          Margin="4,0,0,0" Foreground="{StaticResource TextSecondaryBrush}" />

@@ -55,10 +55,21 @@ public static class CoMessprotokollSection
                         var co = unit.CoValue is { } v ? $"{v} ppm" : "kein Messwert";
                         var key = unit.KeyAvailable is true ? "ja" : unit.KeyAvailable is false ? "nein" : "—";
                         var resident = string.IsNullOrWhiteSpace(unit.ResidentName) ? null : $", {unit.ResidentName}";
+
+                        // ppm severity is its own span, colored independently of Status (search
+                        // progress): a lethal reading must read as lethal in print too, matching
+                        // the app view's Classes.elevated/dangerous/lethal on the tile.
+                        var severityColor = GetSeverityColor(CoSeverityClassifier.SeverityOf(unit.CoValue));
                         column.Item().Text(t =>
                         {
                             t.Span($"• {label}{resident}: ").FontSize(8);
-                            t.Span($"{co}, Schlüssel: {key}, {CoMeasurementLabels.StatusText(unit.Status)}")
+                            var coSpan = t.Span(co).FontSize(8);
+                            if (severityColor is not null)
+                            {
+                                coSpan.FontColor(severityColor);
+                            }
+
+                            t.Span($", Schlüssel: {key}, {CoMeasurementLabels.StatusText(unit.Status)}")
                                 .FontSize(8).FontColor(GetColor(unit.Status));
                         });
                     }
@@ -104,6 +115,16 @@ public static class CoMessprotokollSection
         DwellingStatus.Searched => HexColor("#92D050"),
         DwellingStatus.Affected => HexColor("#FF0000"),
         _ => Colors.White,
+    };
+
+    // Same hex values as the AXAML AmberBrush/SignalHotBrush/SignalBrush resources, kept in sync
+    // by hand since this project has no Avalonia resource to share with.
+    private static string? GetSeverityColor(CoSeverity severity) => severity switch
+    {
+        CoSeverity.Elevated => HexColor("#FFB23E"),
+        CoSeverity.Dangerous => HexColor("#FF5A3C"),
+        CoSeverity.Lethal => HexColor("#FF3D2E"),
+        _ => null,
     };
 
     private static string HexColor(string hex) => hex;

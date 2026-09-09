@@ -67,6 +67,11 @@ public class CoMessprotokollRenderTests
         session.SetDwellingStatus(buildingA.Id, 2, 2, Domain.CoMeasurement.DwellingStatus.Searched);
         session.RecordCoValue(buildingA.Id, 1, 1, 8);
         session.SetDwellingStatus(buildingA.Id, 1, 1, Domain.CoMeasurement.DwellingStatus.Searched);
+
+        // ppm danger coloring is independent of Status: these two stay NotSearched so the render
+        // shows the Dangerous/Lethal ppm coloring on tiles that haven't been marked yet either.
+        session.RecordCoValue(buildingA.Id, 2, 3, 250);
+        session.RecordCoValue(buildingA.Id, 2, 4, 900);
         Dispatcher.UIThread.RunJobs();
 
         var tabs = Tabs(window);
@@ -79,6 +84,30 @@ public class CoMessprotokollRenderTests
         Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);
 
         Capture(window, "co-messung.png");
+    }
+
+    [AvaloniaFact]
+    public void CoMessprotokoll_ImplausibleValue_ShowsWarningInEditor()
+    {
+        var (window, vm, session) = ShowWorkspace();
+
+        session.AddCoBuilding("Mehrfamilienhaus A", 1, 1);
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = Tabs(window);
+        tabs.SelectedIndex = 6; // CO-MESSUNG
+        Dispatcher.UIThread.RunJobs();
+
+        var cell = vm.CoMessprotokoll.MatrixRows[0].Cells[0];
+        cell.OpenEditorCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        vm.CoMessprotokoll.Editor!.CoValue = 2500;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(vm.CoMessprotokoll.Editor!.IsCoImplausible);
+
+        Capture(window, "co-messung-implausible-warning.png");
     }
 
     [AvaloniaFact]
