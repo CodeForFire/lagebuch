@@ -156,6 +156,12 @@
                     <Button.Flyout>
                       <Flyout Placement="BottomEdgeAlignedLeft">
                           <StackPanel Spacing="8" MinWidth="180">
+                          <!-- One KeyBinding covers all four fields below: Avalonia checks a
+                               control's KeyBindings while the KeyDown bubbles up from whichever
+                               descendant has focus, so this doesn't need repeating per TextBox. -->
+                          <StackPanel.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding ApplyStrengthEditCommand}" />
+                          </StackPanel.KeyBindings>
                           <TextBlock Text="Stärke korrigieren" Classes="overline" />
                           <HeaderedContentControl Classes="field" Header="ZUGFÜHRER (ZF)">
                             <TextBox Text="{Binding ZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
@@ -177,8 +183,12 @@
                   </Button>
                   <Button Content="Verlauf" Padding="6,2" IsVisible="{Binding HasHistory}">
                     <Button.Flyout>
-                      <Flyout Placement="BottomEdgeAlignedLeft">
-                        <ItemsControl ItemsSource="{Binding EditLines}" Margin="4">
+                      <!-- Opened: nothing in this read-only list is focusable, so without
+                           grabbing focus here, Escape's built-in Flyout light-dismiss has no
+                           focused element inside the popup to route the key press through, and
+                           the flyout is stuck open until a click outside it. -->
+                      <Flyout Placement="BottomEdgeAlignedLeft" Opened="OnHistoryFlyoutOpened">
+                        <ItemsControl ItemsSource="{Binding EditLines}" Margin="4" Focusable="True">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
                               <TextBlock Text="{Binding}" Margin="0,2" />
