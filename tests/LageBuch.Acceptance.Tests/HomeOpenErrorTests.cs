@@ -155,6 +155,33 @@ public class HomeOpenErrorTests
         Assert.True(hintIcon.Bounds.Width > 0, "the recent-files hint icon has zero width -- nothing is drawn");
     }
 
+    // #262 UX: a visible "ÖFFNEN" affordance alongside the pre-existing double-click, following
+    // the same ReflectionBinding-to-parent-DataContext pattern as FilesView/LinksView's row
+    // ÖFFNEN buttons (OpenRecentCommand lives on HomeViewModel, not on the row's own DataContext).
+    [AvaloniaFact]
+    public void Recent_row_exposes_an_open_button_bound_to_OpenRecentCommand()
+    {
+        var (window, vm) = ShowHome(triggerError: false, renderTo: "home-open-button-after.png");
+
+        var buttons = window.GetVisualDescendants().OfType<Button>()
+            .Where(b => (b.Content as string) == "ÖFFNEN")
+            .ToList();
+
+        // One button per recent-incident row, each with its own resolved command -- proves the
+        // ReflectionBinding actually found OpenRecentCommand rather than silently no-op'ing.
+        Assert.Equal(vm.RecentFiles.Count, buttons.Count);
+        Assert.All(buttons, b => Assert.NotNull(b.Command));
+
+        var target = vm.RecentFiles[0];
+        var button = Assert.Single(buttons, b => Equals(b.CommandParameter, target.Path));
+
+        button.Command!.Execute(button.CommandParameter);
+
+        // BrokenStore fails to load any path, so a successful invocation is observable the same
+        // way the existing double-click-driven failure is (see A_failed_open_shows_the_banner...).
+        Assert.NotNull(vm.OpenError);
+    }
+
     [AvaloniaFact]
     public void The_message_wraps_inside_the_content_column()
     {

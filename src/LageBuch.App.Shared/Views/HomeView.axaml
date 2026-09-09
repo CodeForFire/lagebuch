@@ -81,7 +81,7 @@
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:RecentFileItem">
                   <!-- Fixed lock gutter so filenames line up whether or not the incident is closed -->
-                  <Grid ColumnDefinitions="22,*">
+                  <Grid ColumnDefinitions="22,*,Auto">
                     <PathIcon Grid.Column="0" Width="13" Height="13"
                               VerticalAlignment="Center" HorizontalAlignment="Left"
                               Foreground="{StaticResource TextSecondaryBrush}"
@@ -94,6 +94,13 @@
                                  Foreground="{StaticResource TextSecondaryBrush}"
                                  Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
+                    <!-- ReflectionBinding: OpenRecentCommand lives on the parent ListBox's
+                         DataContext (HomeViewModel), whose static type is object under compiled
+                         bindings, so a compiled $parent cast path won't resolve (#262 UX: a
+                         visible open affordance alongside the existing double-click). -->
+                    <Button Grid.Column="2" Content="ÖFFNEN" Margin="10,0,0,0" VerticalAlignment="Center"
+                            Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenRecentCommand}"
+                            CommandParameter="{Binding Path}" />
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>
@@ -107,7 +114,7 @@
               <PathIcon Width="11" Height="11" VerticalAlignment="Center"
                         Foreground="{StaticResource TextSecondaryBrush}"
                         Data="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
-              <TextBlock Classes="secondary mono" FontSize="11" Text="Doppelklick zum Öffnen" />
+              <TextBlock Classes="secondary mono" FontSize="11" Text="Doppelklick oder ÖFFNEN" />
             </StackPanel>
           </StackPanel>
         </Border>
