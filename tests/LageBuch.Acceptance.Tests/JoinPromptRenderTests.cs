@@ -48,8 +48,46 @@ public class JoinPromptRenderTests
         var pinBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "PinBox");
         Assert.True(pinBox.IsVisible);
         Assert.Equal(4, pinBox.MaxLength);
+        Assert.True(LageBuch.App.Shared.Behaviors.IntegerOnly.GetIsEnabled(pinBox));
         Assert.True(vm.ConfirmCommand.CanExecute(null)); // host + PIN + name all present
         Capture(window, "join-prompt.png");
+    }
+
+    // #262 UX: the PIN field was a plain unmasked TextBox with no digit-only filtering, easy to
+    // mistype under time pressure. IntegerOnly (already used for Forces' count fields, #76) refuses
+    // any input containing a non-digit character wholesale rather than mutilating it.
+    [AvaloniaTheory]
+    [InlineData("12a4")]
+    [InlineData("12.4")]
+    [InlineData("abcd")]
+    public void Non_digit_characters_are_refused_in_the_pin_field(string typed)
+    {
+        var (window, vm) = ShowJoinPrompt();
+        var pinBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "PinBox");
+
+        pinBox.Focus();
+        pinBox.SelectAll();
+        window.KeyTextInput(typed);
+        Dispatcher.UIThread.RunJobs();
+
+        // Refused wholesale -- the original PIN stands rather than a mutilated mix.
+        Assert.Equal("1234", pinBox.Text);
+        Assert.Equal("1234", vm.Pin);
+    }
+
+    [AvaloniaFact]
+    public void Digit_entry_still_goes_through_the_pin_field()
+    {
+        var (window, vm) = ShowJoinPrompt();
+        var pinBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "PinBox");
+
+        pinBox.Focus();
+        pinBox.SelectAll();
+        window.KeyTextInput("5678");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("5678", pinBox.Text);
+        Assert.Equal("5678", vm.Pin);
     }
 
     // #182: a failed join now reports its error inline instead of closing the dialog.

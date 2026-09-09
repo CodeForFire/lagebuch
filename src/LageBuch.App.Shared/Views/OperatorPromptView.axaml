@@ -30,7 +30,8 @@
             </TextBox>
             <!-- The 4-digit PIN the hosting device shows; required to join (#64). -->
             <TextBlock Text="PIN" Classes="overline" FontSize="10" Margin="0,8,0,3" />
-            <TextBox x:Name="PinBox" PlaceholderText="4-stellig" MaxLength="4" Text="{Binding Pin}">
+            <TextBox x:Name="PinBox" PlaceholderText="4-stellig" MaxLength="4" Text="{Binding Pin}"
+                     b:IntegerOnly.IsEnabled="True">
               <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
               </TextBox.KeyBindings>
