@@ -252,6 +252,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     {
         if (_store is not null)
         {
+            // IncidentStore is an app-lifetime singleton and its SaveFailed/SaveSucceeded carry no
+            // incident identity -- unsubscribing before every write queued by THIS workspace has
+            // landed would either drop a genuine late failure on the floor, or (worse) let it
+            // surface as the NEXT incident's PersistenceError once someone reuses the store. A
+            // local session shouldn't be left with writes in flight when leaving anyway, so
+            // draining here is free.
+            await _store.FlushAsync();
             _store.SaveFailed -= OnStoreSaveFailed;
             _store.SaveSucceeded -= OnStoreSaveSucceeded;
         }
@@ -265,8 +272,21 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private void OnStoreSaveFailed(Exception ex) =>
         _uiDispatcher.Post(() => PersistenceError = $"Speichern fehlgeschlagen: {ex.Message} — Änderungen werden NICHT gesichert.");
 
-    private void OnStoreSaveSucceeded() =>
-        _uiDispatcher.Post(() => PersistenceError = null);
+    // Marshalling only when there's actually something to clear skips a pointless dispatcher hop
+    // on every ordinary successful save -- the overwhelmingly common case. Reading PersistenceError
+    // off the writer thread here is safe (reference-type reads are atomic, and clearing an
+    // already-null value is a no-op) even though the authoritative write to it happens later, on
+    // the UI thread. A Post queued by a handler that ran during LeaveAsync's FlushAsync (just
+    // before the unsubscribe above) can still be sitting in the UI dispatcher's queue when
+    // LeaveAsync returns -- harmless, since by then the shell has already navigated away and
+    // nothing reads this now-orphaned VM's PersistenceError again.
+    private void OnStoreSaveSucceeded()
+    {
+        if (PersistenceError is not null)
+        {
+            _uiDispatcher.Post(() => PersistenceError = null);
+        }
+    }
 
     // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
     // incident, or someone adds the Einsatznummer from another device); keep the header live and

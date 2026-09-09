@@ -998,7 +998,7 @@ public class IncidentWorkspaceViewModelTests
     // (issue #167 P0 #1), but nothing in src/ used to subscribe to it -- the UI kept showing
     // "gespeichert" while nothing reached disk. The workspace now surfaces it as PersistenceError,
     // via the same store the session persists through (passed in here as `store:`).
-    private static IncidentWorkspaceViewModel WorkspaceWithStore(FakeStore store, out FixedClock clock)
+    private static IncidentWorkspaceViewModel WorkspaceWithStore(IIncidentStore store, out FixedClock clock)
     {
         clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(
@@ -1062,6 +1062,87 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.Null(vm.PersistenceError);
     }
+
+    // Review fix round 1: IncidentStore is an app-lifetime singleton and its events carry no
+    // incident identity -- unsubscribing before every write queued by THIS workspace has actually
+    // landed would either drop a genuine late failure, or (worse) let it surface as the NEXT
+    // incident's PersistenceError once someone reuses the store. LeaveAsync must therefore await
+    // FlushAsync before unsubscribing. OrderRecordingStore lets this test hold FlushAsync's task
+    // pending to observe both halves of that ordering.
+    [Fact]
+    public async Task LeaveAsync_drains_the_store_before_unsubscribing()
+    {
+        var store = new OrderRecordingStore();
+        var vm = WorkspaceWithStore(store, out _);
+
+        var leaving = vm.LeaveAsync().AsTask();
+
+        // FlushAsync was called, but its task is still pending -- LeaveAsync must not have
+        // unsubscribed yet, so a write that was already queued before Leave (and only finishes
+        // now, as part of draining) still reaches this workspace's own PersistenceError.
+        Assert.Equal(new[] { "FlushAsync" }, store.Calls);
+        store.RaiseSaveFailed(new InvalidOperationException("Datenträger voll"));
+        Assert.Equal(
+            "Speichern fehlgeschlagen: Datenträger voll — Änderungen werden NICHT gesichert.",
+            vm.PersistenceError);
+
+        store.CompleteFlush();
+        await leaving;
+
+        // Unsubscribed only now: an event belonging to whatever incident reuses this app-lifetime
+        // store next must not bleed into this already-left, dead workspace.
+        vm.PersistenceError = null;
+        store.RaiseSaveFailed(new InvalidOperationException("gehört zum nächsten Einsatz"));
+        Assert.Null(vm.PersistenceError);
+    }
+}
+
+// Controls exactly when FlushAsync's task completes, and records call order, so
+// LeaveAsync_drains_the_store_before_unsubscribing can prove LeaveAsync drains the queue (and any
+// event a still-in-flight write raises) before it unsubscribes.
+internal sealed class OrderRecordingStore : IIncidentStore
+{
+    private readonly TaskCompletionSource _flushGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public List<string> Calls { get; } = new();
+
+    public void Save(string path, Incident incident)
+    {
+    }
+
+    public Task FlushAsync(CancellationToken cancellationToken = default)
+    {
+        Calls.Add("FlushAsync");
+        return _flushGate.Task;
+    }
+
+    public void CompleteFlush() => _flushGate.TrySetResult();
+
+    public Incident Load(string path) => throw new NotSupportedException();
+
+    public IncidentState? TryReadState(string path) => null;
+
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
+
+    public string ResolveFileDiskPath(string path, string storageFileName) => path;
+
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public event Action<Exception>? SaveFailed;
+
+    public event Action? SaveSucceeded;
+
+    public void RaiseSaveFailed(Exception ex) => SaveFailed?.Invoke(ex);
+
+    public void RaiseSaveSucceeded() => SaveSucceeded?.Invoke();
 }
 
 // Simulates a generation failure (e.g. disk full) so ExportPdf's try/catch can be exercised
