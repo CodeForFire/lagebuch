@@ -210,6 +210,64 @@ public class CoMessprotokollViewModelTests
         Assert.Equal("45 ppm", cell.CoDisplay);
     }
 
+    [Fact]
+    public void DwellingCellVM_CoSeverityFlags_MatchThresholds()
+    {
+        var building = Building.Create("Haus A", 2, 3, 0);
+        var dwelling = Dwelling.Create(building.Id, 0, 1);
+        var cell = new DwellingCellViewModel(dwelling, building, false, (_, _, _) => { });
+
+        AssertNoSeverityFlag(cell);
+
+        cell.CoValue = 30;
+        Assert.True(cell.IsCoElevated);
+        Assert.False(cell.IsCoDangerous);
+        Assert.False(cell.IsCoLethal);
+
+        cell.CoValue = 200;
+        Assert.False(cell.IsCoElevated);
+        Assert.True(cell.IsCoDangerous);
+        Assert.False(cell.IsCoLethal);
+
+        cell.CoValue = 800;
+        Assert.False(cell.IsCoElevated);
+        Assert.False(cell.IsCoDangerous);
+        Assert.True(cell.IsCoLethal);
+
+        static void AssertNoSeverityFlag(DwellingCellViewModel cell)
+        {
+            Assert.False(cell.IsCoElevated);
+            Assert.False(cell.IsCoDangerous);
+            Assert.False(cell.IsCoLethal);
+        }
+    }
+
+    [Fact]
+    public void DwellingEditorVM_IsCoImplausible_FlagsOnlyValuesAboveThreshold()
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+
+        editor.CoValue = 2000;
+        Assert.False(editor.IsCoImplausible);
+
+        editor.CoValue = 2001;
+        Assert.True(editor.IsCoImplausible);
+    }
+
+    [Fact]
+    public void DwellingEditorVM_IsCoLethal_ReflectsLiveEdit()
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+
+        editor.CoValue = 799;
+        Assert.False(editor.IsCoLethal);
+
+        editor.CoValue = 800;
+        Assert.True(editor.IsCoLethal);
+    }
+
     // Every other Add/Confirm command in the app (AddForce, AddRole, ConfirmTransfer, AddTrupp,
     // AddTask, AddEntry, ConfirmIncidentNumber...) gates on its required text field being
     // non-empty. ConfirmAddBuildingCommand had no such gate: clicking HINZUFÜGEN with an empty

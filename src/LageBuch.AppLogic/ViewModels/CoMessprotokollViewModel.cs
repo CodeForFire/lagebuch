@@ -86,6 +86,15 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     /// The status glyph already says the unit is unsearched.</summary>
     public string CoCompact => CoValue is { } v ? $"{v} ppm" : string.Empty;
 
+    // ppm severity is independent of Status (search progress): a lethal reading on an unsearched
+    // tile must still read as lethal. Drives Classes.elevated/dangerous/lethal on the tile's ppm
+    // TextBlock in CoMessprotokollView.axaml, mirroring ScbaView's Classes.alarm pattern.
+    public bool IsCoElevated => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Elevated;
+
+    public bool IsCoDangerous => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Dangerous;
+
+    public bool IsCoLethal => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Lethal;
+
     /// <summary>Detail the compact tile deliberately drops (resident, key, full status wording),
     /// surfaced on hover so nothing is lost -- the tile carries identity + status + ppm only.</summary>
     public string TileTooltip
@@ -146,6 +155,9 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         OnPropertyChanged(nameof(CoDisplay));
         OnPropertyChanged(nameof(CoCompact));
         OnPropertyChanged(nameof(TileTooltip));
+        OnPropertyChanged(nameof(IsCoElevated));
+        OnPropertyChanged(nameof(IsCoDangerous));
+        OnPropertyChanged(nameof(IsCoLethal));
     }
 
     partial void OnKeyAvailableChanged(bool? value)
@@ -233,8 +245,30 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     public bool HasLabelChange => Normalize(Label) != Normalize(OriginalLabel);
 
+    // Same severity signal as the tile (DwellingCellViewModel), shown live while typing so the
+    // operator sees danger coloring before committing, not only after FERTIG.
+    public bool IsCoElevated => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Elevated;
+
+    public bool IsCoDangerous => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Dangerous;
+
+    public bool IsCoLethal => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Lethal;
+
+    /// <summary>A caution about a likely *typo* (e.g. 9999 vs 999), distinct from severity: a real
+    /// fire scene can genuinely produce extreme ppm values, so this never blocks FERTIG -- it only
+    /// asks the operator to double-check what they typed.</summary>
+    public bool IsCoImplausible => CoSeverityClassifier.IsImplausible(CoValue);
+
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    partial void OnCoValueChanged(int? value)
+    {
+        OnPropertyChanged(nameof(HasCoValueChange));
+        OnPropertyChanged(nameof(IsCoElevated));
+        OnPropertyChanged(nameof(IsCoDangerous));
+        OnPropertyChanged(nameof(IsCoLethal));
+        OnPropertyChanged(nameof(IsCoImplausible));
+    }
 }
 
 public sealed partial class FloorRowViewModel : ObservableObject

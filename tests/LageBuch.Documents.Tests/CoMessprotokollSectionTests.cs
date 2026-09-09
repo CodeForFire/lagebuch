@@ -45,6 +45,26 @@ public class CoMessprotokollSectionTests
     }
 
     [Fact]
+    public void Pdf_Contains_CO_Section_With_EveryPpmSeverityBand()
+    {
+        // ppm severity coloring is a separate span from the status color (see
+        // CoMessprotokollSection.GetSeverityColor) -- must render without throwing across every
+        // band, including a value at/above the implausible-value threshold.
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(Clock, op);
+        incident.AddCoBuilding(Clock, op, "Haus A", 1, 4);
+        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 1, 5); // Normal
+        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 2, 30); // Elevated
+        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 3, 200); // Dangerous
+        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 4, 2001); // Lethal + implausible
+
+        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+
+        Assert.True(pdf.Length > 1000);
+        Assert.Equal(0x25, pdf[0]); // '%'
+    }
+
+    [Fact]
     public void Pdf_Contains_CO_Section_EmptyState()
     {
         var op = new SessionOperator("Test", null);

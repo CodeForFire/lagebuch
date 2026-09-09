@@ -67,6 +67,11 @@ public class CoMessprotokollRenderTests
         session.SetDwellingStatus(buildingA.Id, 2, 2, Domain.CoMeasurement.DwellingStatus.Searched);
         session.RecordCoValue(buildingA.Id, 1, 1, 8);
         session.SetDwellingStatus(buildingA.Id, 1, 1, Domain.CoMeasurement.DwellingStatus.Searched);
+
+        // ppm danger coloring is independent of Status: these two stay NotSearched so the render
+        // shows the Dangerous/Lethal ppm coloring on tiles that haven't been marked yet either.
+        session.RecordCoValue(buildingA.Id, 2, 3, 250);
+        session.RecordCoValue(buildingA.Id, 2, 4, 900);
         Dispatcher.UIThread.RunJobs();
 
         var tabs = Tabs(window);
