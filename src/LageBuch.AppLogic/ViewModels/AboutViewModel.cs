@@ -23,12 +23,8 @@ public sealed partial class AboutViewModel : ObservableObject
         Version = version;
     }
 
-    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
-    public string AppName => "Lagebuch";
-
-    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
-    public string Descriptor => "Einsatzdokumentation";
-
+    // No AppName/Descriptor here: the About card shows the project badge, which carries the
+    // wordmark and the slogan as artwork (see AboutView.axaml).
     public string Version { get; }
 
     [SuppressMessage("Design", "CA1056", Justification = "RepositoryUrl is a display/launch string handed to IFileDialogService.OpenUrlAsync; System.Uri would add parse/validation behavior with no benefit here.")]

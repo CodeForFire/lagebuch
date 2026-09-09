@@ -6,15 +6,6 @@ namespace LageBuch.AppLogic.Tests;
 public class AboutViewModelTests
 {
     [Fact]
-    public void Shows_the_app_name_and_descriptor()
-    {
-        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0");
-
-        Assert.Equal("Lagebuch", vm.AppName);
-        Assert.Equal("Einsatzdokumentation", vm.Descriptor);
-    }
-
-    [Fact]
     public void Shows_the_passed_app_version()
     {
         var vm = new AboutViewModel(new FakeDialogs(), "0.1.0");

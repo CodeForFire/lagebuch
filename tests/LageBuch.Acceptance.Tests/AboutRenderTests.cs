@@ -12,9 +12,9 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// The About dialog (flame logo, CodeForFire publisher mark with repository link, MIT license and
-// copyright) and its ÜBER entry point in the command bar. Pins the rendered content and doubles
-// as the PR screenshot capture (set RENDER_OUT to a directory to emit PNGs).
+// The About dialog (project badge, CodeForFire publisher mark with repository link, MIT license
+// and copyright) and its ÜBER entry point in the command bar. Pins the rendered content and
+// doubles as the PR screenshot capture (set RENDER_OUT to a directory to emit PNGs).
 public class AboutRenderTests
 {
     private static void Capture(Window window, string name)
@@ -38,13 +38,18 @@ public class AboutRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        // Both brand marks render as real bitmaps: the flame and the CodeForFire org avatar.
-        var images = window.GetVisualDescendants().OfType<Image>().Select(i => i.Source).ToArray();
+        // Both brand marks render as real bitmaps: the project badge and the CodeForFire avatar.
+        var images = window.GetVisualDescendants().OfType<Image>().ToArray();
         Assert.Equal(2, images.Length);
-        Assert.All(images, s => Assert.IsType<Bitmap>(s));
+        Assert.All(images, i => Assert.IsType<Bitmap>(i.Source));
+
+        // The badge carries the wordmark and the slogan as artwork rather than as TextBlocks, so
+        // assert it is actually laid out — a missing asset or a zero-width brand block would
+        // otherwise leave the card looking empty with every text assertion below still passing.
+        var badge = images.Single(i => i.Name == "BrandBadge");
+        Assert.True(badge.Bounds.Width > 0, "the About badge has zero width -- nothing is drawn");
 
         var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
-        Assert.Contains("Lagebuch", texts);
         Assert.Contains(vm.RepositoryUrl, texts);
         Assert.Contains(texts, t => t!.Contains("MIT", StringComparison.Ordinal));
         Assert.Contains(texts, t => t!.Contains("Thomas Müller", StringComparison.Ordinal));
@@ -63,7 +68,9 @@ public class AboutRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var icon = Assert.Single(window.GetVisualDescendants().OfType<PathIcon>());
+        // By name, not by Single(): the card scrolls when the window is short, and the scroll
+        // bar's own template contributes PathIcons of its own.
+        var icon = window.GetVisualDescendants().OfType<PathIcon>().Single(i => i.Name == "ErrorIcon");
         Assert.True(icon.Bounds.Width > 0, "the error banner icon has zero width -- nothing is drawn");
     }
 

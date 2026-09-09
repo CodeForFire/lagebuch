@@ -16,6 +16,7 @@
     <AvaloniaResource Include="Assets\Fonts\*.ttf" />
     <AvaloniaResource Include="Assets\icon-1024.png" />
     <AvaloniaResource Include="Assets\codeforfire.png" />
+    <AvaloniaResource Include="Assets\lagebuch-logo.png" />
   </ItemGroup>
 
   <ItemGroup>
