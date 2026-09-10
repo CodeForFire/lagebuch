@@ -25,3 +25,34 @@ updates:
     ignore:
       - dependency-name: "xunit.v3"
         update-types: ["version-update:semver-major"]
+
+  # The Android head has its own Directory.Packages.props and is not covered
+  # by the root entry above.
+  - package-ecosystem: nuget
+    directory: /src/LageBuch.App.Android
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      avalonia:
+        patterns:
+          - "Avalonia*"
+
+  # The acceptance test project has its own Directory.Packages.props and is
+  # not covered by the root entry above.
+  - package-ecosystem: nuget
+    directory: /tests/LageBuch.Acceptance.Tests
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      avalonia:
+        patterns:
+          - "Avalonia*"
+    # xunit.v3 4.0.0 removes the TestIntrospectionHelper.GetTestCaseDetails()
+    # overload that Avalonia.Headless.XUnit 12.1.1 still calls, breaking all
+    # acceptance tests (AvaloniaUI/Avalonia#22072). Drop this ignore once
+    # Avalonia ships a compatible package.
+    ignore:
+      - dependency-name: "xunit.v3"
+        update-types: ["version-update:semver-major"]

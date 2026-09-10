@@ -285,7 +285,7 @@ public class RemoteClientTests
         // from this IP. The first wrong PIN is refused with 401 (and records a failure), the second
         // inside the backoff window is refused with 429; after two failures the window is 2s wide.
         using (var h = new HttpClient(TestHost.InsecureTrustAllHandler())
-               { BaseAddress = new Uri($"https://127.0.0.1:{port}") })
+        { BaseAddress = new Uri($"https://127.0.0.1:{port}") })
         {
             for (var i = 0; i < 2; i++)
             {
