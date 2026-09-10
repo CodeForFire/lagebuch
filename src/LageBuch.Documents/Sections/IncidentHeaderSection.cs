@@ -9,6 +9,17 @@ public static class IncidentHeaderSection
 {
     public static void Compose(IContainer container, Incident incident)
     {
+        // The mark sits beside the title rather than above it so the header keeps its height —
+        // it repeats on every page, so any vertical growth here costs space in the whole report.
+        container.Row(header =>
+        {
+            header.ConstantItem(46).AlignTop().Image(Branding.GetMark());
+            header.RelativeItem().PaddingLeft(12).Element(c => ComposeTitleBlock(c, incident));
+        });
+    }
+
+    private static void ComposeTitleBlock(IContainer container, Incident incident)
+    {
         container.Column(column =>
         {
             column.Spacing(4);

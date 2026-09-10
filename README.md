@@ -1,14 +1,23 @@
-# Lagebuch
+<p align="center">
+  <img src="docs/logo/lagebuch-logo.png" width="200" alt="Lagebuch" />
+</p>
 
-[![CI](https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/CodeForFire/lagebuch)](../../releases)
+<p align="center">
+  <strong>Einsatzdokumentation für den ELW.</strong><br />
+  Offline. Robust. Open Source.
+</p>
+
+<p align="center">
+  <a href="https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml"><img src="https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="../../releases"><img src="https://img.shields.io/github/v/release/CodeForFire/lagebuch" alt="Release" /></a>
+</p>
 
 Offline-first incident documentation (**Einsatzdokumentation**) for fire brigades.
 Lagebuch ("log book") is one robust desktop application for the command vehicle
 (ELW), cross-platform and fully offline, with optional multi-device sync and PDF
 reports.
 
-Built with .NET 8 + Avalonia (desktop & Android), SQLite storage, SignalR sync
+Built with .NET 10 + Avalonia (desktop & Android), SQLite storage, SignalR sync
 and [QuestPDF](https://www.questpdf.com/) report generation.
 
 | | | | |

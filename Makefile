@@ -54,7 +54,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
         android-image android-image-rebuild apk emulator install run-android \
-        logcat uninstall package-linux
+        logcat uninstall package-linux logo-assets
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -183,3 +183,6 @@ package-linux: ## Build a local .deb (VERSION=x.y.z)
 	$(DOTNET) publish $(APP) -r linux-x64 $(PUBLISH_FLAGS) -p:Version=$(VERSION) -o publish
 	packaging/linux/build-deb.sh "$(VERSION)" publish \
 	  src/LageBuch.App.Shared/Assets/icon-1024.png dist
+
+logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
+	packaging/logo/build-logo-assets.sh
