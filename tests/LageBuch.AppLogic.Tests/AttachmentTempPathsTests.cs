@@ -191,13 +191,18 @@ public class AttachmentTempPathsTests
         }
     }
 
-    // Path.GetFullPath throws on a NUL byte or an over-long path — a gate must answer "no", not
-    // blow up in the caller's face.
-    [Theory]
-    [InlineData("\0evil.png")]
-    [InlineData("relative/but/unresolvable.png")]
-    public void IsOpenableAttachment_refuses_a_path_the_platform_cannot_even_resolve(string path)
+    // Path.GetFullPath throws on a NUL byte (and on an over-long path) — a gate must answer "no",
+    // not blow up in the caller's face.
+    [Fact]
+    public void IsOpenableAttachment_refuses_a_path_the_platform_cannot_even_resolve()
     {
-        Assert.False(AttachmentTempPaths.IsOpenableAttachment(path));
+        Assert.False(AttachmentTempPaths.IsOpenableAttachment("\0evil.png"));
+    }
+
+    // Resolved against the working directory, so it lands nowhere near the root.
+    [Fact]
+    public void IsOpenableAttachment_refuses_a_relative_path()
+    {
+        Assert.False(AttachmentTempPaths.IsOpenableAttachment("relative/but/elsewhere.png"));
     }
 }

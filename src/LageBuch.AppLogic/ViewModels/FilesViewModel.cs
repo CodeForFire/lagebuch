@@ -278,6 +278,15 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         ErrorMessage = null;
         try
         {
+            // A row that predates the extension/content-type rule (Rehydrate deliberately lets one
+            // load) would be refused by the launcher anyway — say so here instead of writing a temp
+            // copy and leaving the button looking dead.
+            if (!IncidentFile.MimeTypesByExtension.ContainsKey(Path.GetExtension(row.FileName)))
+            {
+                ErrorMessage = $"„{row.DisplayName}“ kann nicht geöffnet werden.";
+                return;
+            }
+
             var bytes = await _session.GetFileBytesAsync(row.Id);
             if (bytes is null)
             {

@@ -480,6 +480,73 @@ public class FilesViewModelTests
         }
     }
 
+    // A row that predates the extension/content-type rule (or arrived from a patched peer) still
+    // loads — Rehydrate deliberately never throws — but must not be opened. The desktop launcher
+    // refuses it, so without this guard ÖFFNEN would look like a dead button and still leave a temp
+    // copy of the bytes behind.
+    [Fact]
+    public async Task OpenFile_refuses_a_rehydrated_row_whose_extension_is_not_an_attachment_type()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        store.Save("/x.fwincident", IncidentWithFile(IncidentFile.Rehydrate(
+            Guid.NewGuid(), "Einsatzplan.hta", "Einsatzplan", "image/png", 3, T0, "Müller")));
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var dialogs = new FakeDialogs();
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row);
+
+        Assert.Equal("„Einsatzplan“ kann nicht geöffnet werden.", vm.ErrorMessage);
+        Assert.Null(dialogs.LastOpenedPath); // never handed to the launcher
+        Assert.Empty(TempCopiesNamed("Einsatzplan.hta")); // and no temp copy written
+    }
+
+    private static Incident IncidentWithFile(IncidentFile file) => Incident.Rehydrate(
+        Guid.NewGuid(),
+        T0,
+        IncidentState.Open,
+        null,
+        "Brand",
+        null,
+        null,
+        null,
+        null,
+        null,
+        Array.Empty<ChecklistItem>(),
+        Array.Empty<ChecklistItem>(),
+        Array.Empty<Domain.Etb.EtbEntry>(),
+        Array.Empty<RoleAssignment>(),
+        Array.Empty<ForceUnit>(),
+        Array.Empty<Domain.Atemschutz.AtemschutzTrupp>(),
+        Array.Empty<AuditEvent>(),
+        Array.Empty<Domain.Time.IncidentTimerState>(),
+        new[] { file },
+        Array.Empty<Domain.Tasks.IncidentTask>(),
+        Array.Empty<Domain.CoMeasurement.Building>(),
+        Array.Empty<Domain.CoMeasurement.Dwelling>());
+
+    // Any per-open copy of this name anywhere under the temp root. Tolerates another test's
+    // directory disappearing mid-scan — the suite runs classes in parallel.
+    private static string[] TempCopiesNamed(string fileName)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+        try
+        {
+            return Directory.Exists(root)
+                ? Directory.GetFiles(
+                    root,
+                    fileName,
+                    new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+                : Array.Empty<string>();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
     // Copying to disk or launching the viewer can fail (full disk, no registered handler); like
     // AddFileAsync and RemoveFileAsync, that belongs in ErrorMessage rather than escaping an async
     // command as an unobserved exception.
