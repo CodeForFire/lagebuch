@@ -96,6 +96,7 @@ public class MasterDataSyncTests
             new SessionOperator("Client"),
             "1.0.0",
             new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
             TestHost.DefaultPin,
             port);
 

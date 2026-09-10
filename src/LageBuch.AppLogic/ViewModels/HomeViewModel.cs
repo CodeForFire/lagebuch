@@ -46,8 +46,9 @@ public sealed partial class HomeViewModel : ObservableObject
 
     // Remembers the TLS thumbprint of each host a device first joined (Trust-on-First-Use), so a
     // re-join that presents a different certificate can be flagged as a potential MITM/duplicate.
-    // Null (most tests) means "trust nothing and never record" -- the join then fails on any cert
-    // mismatch but has no store to compare against, so every first join succeeds without TOFU.
+    // Null (most tests, which never join a device) just means "join is unavailable" -- JoinDeviceAsync
+    // refuses to connect rather than falling back to an unpinned connection (there is no accept-any
+    // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
     public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null)
@@ -237,6 +238,17 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand(IncludeCancelCommand = true)]
     private async Task JoinDeviceAsync(JoinRequest request, CancellationToken cancellationToken)
     {
+        // Unreachable in production (both app heads always construct this view model with a real
+        // JsonTrustStore) -- only a misconfigured caller (or a test that never meant to join) ends up
+        // here. RemoteIncidentSession.ConnectAsync has no accept-any fallback any more, so this must
+        // fail the same graceful way as every other join precondition, not throw and take the app down.
+        if (_trustStore is not { } trustStore)
+        {
+            JoinError = "Kein Trust Store konfiguriert — Verbindung zu anderen Geräten ist nicht möglich.";
+            ClearCertificateChangedHost();
+            return;
+        }
+
         var (host, port) = ParseHost(request.Host);
         try
         {
@@ -245,10 +257,10 @@ public sealed partial class HomeViewModel : ObservableObject
                 request.Operator,
                 _appVersion,
                 _uiDispatcher,
+                trustStore,
                 request.Pin,
                 port,
                 cacheRoot: _attachmentCacheRoot,
-                trustStore: _trustStore,
                 ct: cancellationToken);
 
             // The host is the Stammdaten master (#183): the workspace is built from the host's set,
