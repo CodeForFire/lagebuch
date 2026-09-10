@@ -10,6 +10,12 @@ on:
       - synchronize
       - reopened
 
+# This workflow builds and tests untrusted pull_request code; the token only
+# needs to read the repository to check it out, so keep it read-only
+# regardless of the org/repo default permissions.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     strategy:
@@ -36,6 +42,11 @@ jobs:
 
       - name: Restore
         run: dotnet restore
+
+      - name: Format check
+        run: |
+          dotnet format whitespace LageBuch.Desktop.slnf --verify-no-changes
+          dotnet format style LageBuch.Desktop.slnf --verify-no-changes
 
       - name: Build
         run: dotnet build --configuration Release --no-restore

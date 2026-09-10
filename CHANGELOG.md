@@ -18,6 +18,12 @@ once we reach 1.0.
   mistyped ppm reading no longer lands in the Einsatztagebuch. The tile previews the pending
   state while the sidebar is open. (#242)
 
+### Security
+- Harden CI workflows: `ci.yml` now runs with read-only `contents` permission and enforces
+  `dotnet format` in CI; `claude.yml` only responds to `@claude` mentions from repo owners,
+  members and collaborators; Dependabot now tracks the Android and acceptance-test projects'
+  own `Directory.Packages.props` files in addition to the root one.
+
 ## [0.4.1] - 2026-09-07
 
 ### Added
