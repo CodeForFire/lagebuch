@@ -480,6 +480,37 @@ public class FilesViewModelTests
         }
     }
 
+    // Copying to disk or launching the viewer can fail (full disk, no registered handler); like
+    // AddFileAsync and RemoveFileAsync, that belongs in ErrorMessage rather than escaping an async
+    // command as an unobserved exception.
+    [Fact]
+    public async Task OpenFile_surfaces_a_failure_as_an_error_message()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
+        var dialogs = new FakeDialogs { OpenFileFailure = new InvalidOperationException("kein Programm registriert") };
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row); // must not throw
+
+        try
+        {
+            Assert.Equal("kein Programm registriert", vm.ErrorMessage);
+        }
+        finally
+        {
+            DeleteOpenDirectory(dialogs.LastOpenedPath);
+        }
+    }
+
     // Removes the per-open directory the view model created — guarded so a regression that writes
     // straight into the system temp directory fails an assertion instead of deleting /tmp.
     private static void DeleteOpenDirectory(string? openedPath)

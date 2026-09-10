@@ -1,3 +1,4 @@
+using System.Net;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
@@ -162,6 +163,31 @@ public class RemoteClientTests
         Assert.Equal("evil.png", Assert.Single(attacker.Incident.Files).FileName);
         Assert.Equal("evil.png", Assert.Single(observer.Incident.Files).FileName); // via the snapshot
         Assert.Equal("evil.png", Assert.Single(observer.Incident.Files).DisplayName);
+    }
+
+    // Sanitising cannot save an attachment whose *extension* is the payload: the OS launches
+    // "Lageplan.hta" with mshta whatever the declared content type says. The domain guard rejects
+    // the command, and HandleCommand maps that ArgumentException to 400.
+    [Fact]
+    public async Task A_file_whose_extension_contradicts_its_content_type_is_rejected_with_400()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        await using var attacker = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+
+        var rejected = await Assert.ThrowsAsync<HttpRequestException>(() => attacker.SendAsync(new AddFileCommand(
+            new OperatorDto("A", "RUF 1"),
+            Guid.NewGuid(),
+            "Lageplan.hta",
+            "image/png",
+            4)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        Assert.Empty(hostSession.Incident.Files);
     }
 
     [Fact]

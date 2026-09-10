@@ -9,13 +9,6 @@ once we reach 1.0.
 
 ## [Unreleased]
 
-### Security
-- Attachment names from a joined device can no longer escape the temp directory. A file name is
-  reduced to its last path segment on the way into the domain (and on load, so a name already in a
-  snapshot or file is neutralised too), ÖFFNEN copies the bytes into a fresh private directory under
-  the app's own temp root instead of the shared system temp directory, and the desktop launcher
-  refuses anything that is not a regular file inside that root.
-
 ### Added
 - Search box on the Links tab, and ÖFFNEN now shows and says that it opens the system browser (#262)
 
@@ -43,6 +36,12 @@ once we reach 1.0.
   `dotnet format` in CI; `claude.yml` only responds to `@claude` mentions from repo owners,
   members and collaborators; Dependabot now tracks the Android and acceptance-test projects'
   own `Directory.Packages.props` files in addition to the root one.
+- Attachment names from a joined device can no longer escape the temp directory or smuggle in an
+  executable type. A file name is reduced to its last path segment and capped at 255 bytes on the
+  way into the domain (and on load, so a name already in a snapshot or file is neutralised too),
+  its extension must match the declared file type, ÖFFNEN copies the bytes into a fresh private
+  directory under the app's own temp root instead of the shared system temp directory, and the
+  desktop launcher refuses anything that is not a regular image or PDF file inside that root. (#285)
 
 ## [0.4.1] - 2026-09-07
 

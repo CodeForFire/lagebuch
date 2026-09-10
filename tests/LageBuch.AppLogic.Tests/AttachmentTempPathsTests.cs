@@ -144,4 +144,60 @@ public class AttachmentTempPathsTests
     {
         Assert.False(AttachmentTempPaths.IsOpenableAttachment(blank));
     }
+
+    // Location alone is not enough: the OS launches by extension, so a legacy or hostile row that
+    // names an executable type must not reach the launcher even from inside our own directory.
+    [Theory]
+    [InlineData("Lageplan.hta")]
+    [InlineData("Lageplan.desktop")]
+    [InlineData("Lageplan.exe")]
+    [InlineData("Lageplan")]
+    public void IsOpenableAttachment_refuses_an_extension_that_is_not_an_allowed_attachment_type(string name)
+    {
+        var dir = AttachmentTempPaths.CreateOpenDirectory();
+        try
+        {
+            var path = Path.Combine(dir, name);
+            File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
+
+            Assert.False(AttachmentTempPaths.IsOpenableAttachment(path));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("brand.jpg")]
+    [InlineData("brand.JPEG")]
+    [InlineData("brand.png")]
+    [InlineData("brand.gif")]
+    [InlineData("brand.webp")]
+    [InlineData("bericht.pdf")]
+    public void IsOpenableAttachment_accepts_every_allowed_attachment_extension(string name)
+    {
+        var dir = AttachmentTempPaths.CreateOpenDirectory();
+        try
+        {
+            var path = Path.Combine(dir, name);
+            File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
+
+            Assert.True(AttachmentTempPaths.IsOpenableAttachment(path));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    // Path.GetFullPath throws on a NUL byte or an over-long path — a gate must answer "no", not
+    // blow up in the caller's face.
+    [Theory]
+    [InlineData("\0evil.png")]
+    [InlineData("relative/but/unresolvable.png")]
+    public void IsOpenableAttachment_refuses_a_path_the_platform_cannot_even_resolve(string path)
+    {
+        Assert.False(AttachmentTempPaths.IsOpenableAttachment(path));
+    }
 }

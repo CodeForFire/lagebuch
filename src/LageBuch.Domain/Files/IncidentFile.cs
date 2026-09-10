@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace LageBuch.Domain.Files;
 
 public sealed record IncidentFile
@@ -96,6 +98,18 @@ public sealed record IncidentFile
 
         var safeName = SanitizeFileName(fileName)
             ?? throw new ArgumentException($"Dateiname '{fileName}' ist ungültig.", nameof(fileName));
+
+        // The extension — not the declared content type — is what the OS launches when a peer
+        // presses ÖFFNEN, so the two must agree and the extension must be one we allow. Otherwise a
+        // client could declare "Lageplan.hta" as image/png and have every peer feed the bytes to
+        // mshta (.js/.wsf/.lnk/.vbs likewise, .desktop on Linux).
+        if (!MimeTypesByExtension.TryGetValue(Path.GetExtension(safeName), out var mappedType)
+            || !string.Equals(mappedType, contentType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"Dateiendung von '{safeName}' passt nicht zum Dateityp '{contentType}'.", nameof(fileName));
+        }
+
         return new IncidentFile
         {
             Id = id,
@@ -153,6 +167,13 @@ public sealed record IncidentFile
     private const string FallbackFileName = "anhang";
 
     /// <summary>
+    /// The per-name byte budget virtually every filesystem enforces (ext4, APFS, NTFS components).
+    /// A longer name would fail the write on a peer that opens the file, so it is capped here, once,
+    /// where every device sees the same result.
+    /// </summary>
+    private const int MaxFileNameBytes = 255;
+
+    /// <summary>
     /// Characters that must not appear in a <see cref="FileName"/>. The OS-specific set is only a
     /// starting point: on Linux it is just <c>\0</c> and <c>/</c>, so the Windows-invalid set is
     /// added unconditionally — the same attachment travels between a Windows host and a Linux
@@ -176,6 +197,11 @@ public sealed record IncidentFile
     /// end up with the same file, so both separators (and the Windows-invalid character set) apply
     /// everywhere.
     /// </para>
+    /// <para>
+    /// The result is capped at <see cref="MaxFileNameBytes"/> UTF-8 bytes — the limit almost every
+    /// filesystem enforces — by shortening the stem and keeping the extension, which is what
+    /// decides the viewer a peer's ÖFFNEN launches.
+    /// </para>
     /// </summary>
     private static string? SanitizeFileName(string? fileName)
     {
@@ -191,6 +217,36 @@ public sealed record IncidentFile
             .ToArray()).Trim();
 
         // "." and ".." are directory references, not names — and an all-dots name is no better.
-        return cleaned.Length == 0 || cleaned.All(c => c == '.') ? null : cleaned;
+        return cleaned.Length == 0 || cleaned.All(c => c == '.') ? null : CapToByteLimit(cleaned);
+    }
+
+    /// <summary>
+    /// Shortens the stem until the whole name fits <see cref="MaxFileNameBytes"/> UTF-8 bytes,
+    /// keeping the extension. Cuts on a character boundary (the encoder stops at the last whole
+    /// one), so a multi-byte name never ends in half a character.
+    /// </summary>
+    private static string CapToByteLimit(string name)
+    {
+        if (Encoding.UTF8.GetByteCount(name) <= MaxFileNameBytes)
+        {
+            return name;
+        }
+
+        var extension = Path.GetExtension(name);
+        var extensionBytes = Encoding.UTF8.GetByteCount(extension);
+        if (extensionBytes >= MaxFileNameBytes)
+        {
+            // Pathological: an "extension" that fills the budget on its own leaves no stem to keep.
+            extension = string.Empty;
+            extensionBytes = 0;
+        }
+
+        var stem = name[..^extension.Length];
+        var buffer = new byte[MaxFileNameBytes - extensionBytes];
+
+        // flush: false — a trailing high surrogate that has no room for its pair stays unconsumed
+        // rather than being encoded as a replacement character.
+        Encoding.UTF8.GetEncoder().Convert(stem, buffer, flush: false, out var charsUsed, out _, out _);
+        return string.Concat(stem.AsSpan(0, charsUsed), extension);
     }
 }

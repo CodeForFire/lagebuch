@@ -268,23 +268,34 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         }
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Pull, temp-write and launcher failures are heterogeneous; all surface as one error line, matching AddFileAsync/RemoveFileAsync.")]
     [RelayCommand]
     private async Task OpenFileAsync(IncidentFileRow row)
     {
         ErrorMessage = null;
-        var bytes = await _session.GetFileBytesAsync(row.Id);
-        if (bytes is null)
+        try
         {
-            ErrorMessage = $"„{row.DisplayName}“ ist nicht verfügbar.";
-            return;
-        }
+            var bytes = await _session.GetFileBytesAsync(row.Id);
+            if (bytes is null)
+            {
+                ErrorMessage = $"„{row.DisplayName}“ ist nicht verfügbar.";
+                return;
+            }
 
-        // A private directory per open, never the shared system temp directory: the name comes from
-        // whichever device added the file (a joined client picks it), and two incidents carrying the
-        // same file name used to overwrite each other's copy here.
-        var tempPath = Path.Combine(AttachmentTempPaths.CreateOpenDirectory(), row.FileName);
-        await File.WriteAllBytesAsync(tempPath, bytes);
-        await _dialogs.OpenFileAsync(tempPath);
+            // A private directory per open, never the shared system temp directory: the name comes
+            // from whichever device added the file (a joined client picks it), and two incidents
+            // carrying the same file name used to overwrite each other's copy here.
+            var tempPath = Path.Combine(AttachmentTempPaths.CreateOpenDirectory(), row.FileName);
+            await File.WriteAllBytesAsync(tempPath, bytes);
+            await _dialogs.OpenFileAsync(tempPath);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
     }
 
     // A block body, not the expression-bodied `new(...)` this used to be: the remove-confirm
