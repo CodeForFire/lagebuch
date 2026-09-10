@@ -952,6 +952,92 @@ public class IncidentWorkspaceViewModelTests
         return handler?.GetInvocationList().Length ?? 0;
     }
 
+    // #279 P1 finding: the workspace itself was never IDisposable, so navigating away only ever
+    // disposed children inside BuildChildren (on a rebuild), never on final teardown -- the ticker
+    // subscriptions (Scba/Tasks/Reminder) and every child's _session.Changed handler outlived the
+    // workspace, ticking and appending to a journal nobody was looking at anymore.
+    [Fact]
+    public void Dispose_stops_the_ticker_and_unsubscribes_every_child_from_session_changed()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var ticker = new FakeTicker();
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            ticker,
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        vm.Dispose();
+
+        Assert.Equal(0, ticker.SubscriberCount);
+        Assert.Equal(0, ChangedSubscriberCount(session));
+    }
+
+    [Fact]
+    public void Dispose_is_idempotent()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.Dispose();
+        var exception = Record.Exception(() => vm.Dispose());
+
+        Assert.Null(exception);
+    }
+
+    // Every BuildChildren rebuild (ctor, continue-editing, close) already disposes the outgoing
+    // children before replacing them (#167 P2) -- Dispose() must only tear down the *current* set
+    // once more, not double-dispose every generation that ever existed.
+    [Fact]
+    public void Dispose_after_rebuilding_children_multiple_times_disposes_only_the_current_set()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ticker = new FakeTicker();
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            ticker,
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        vm.ContinueEditingCommand.Execute(null); // rebuild #2
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmContinueEditing();
+
+        vm.CloseIncidentCommand.Execute(null); // rebuild #3
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        vm.Dispose();
+
+        Assert.Equal(0, ticker.SubscriberCount);
+        Assert.Equal(0, ChangedSubscriberCount(session));
+
+        var exception = Record.Exception(() => vm.Dispose());
+        Assert.Null(exception);
+    }
+
     [Fact]
     public void Etb_add_and_create_task_opens_prefilled_task_dialog()
     {

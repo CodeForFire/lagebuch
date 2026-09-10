@@ -51,6 +51,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private object? _currentView;
 
+    // #304 P0 finding: every navigate-away path funnels through this setter, so disposing the
+    // outgoing workspace here (rather than duplicating a Dispose() call at each call site) is what
+    // guarantees it happens exactly once, wherever CurrentView moves on to next -- Home via GoHome
+    // or GoHomeRequested, the master-data editor, or a freshly opened/joined workspace replacing it.
+    // The async remote-session teardown (LeaveAsync) still has to run *before* this fires, since it
+    // is what triggers the CurrentView reassignment in the first place (see ShowWorkspace/GoHome).
+    partial void OnCurrentViewChanged(object? oldValue, object? newValue)
+    {
+        if (oldValue is IncidentWorkspaceViewModel outgoing)
+        {
+            outgoing.Dispose();
+        }
+    }
+
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
 
