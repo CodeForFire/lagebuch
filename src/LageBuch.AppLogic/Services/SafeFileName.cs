@@ -10,7 +10,8 @@ namespace LageBuch.AppLogic.Services;
 /// </summary>
 public static class SafeFileName
 {
-    private const string DefaultFallback = "anhang";
+    /// <summary>The fallback name used when sanitising leaves nothing usable behind.</summary>
+    public const string DefaultFallback = "anhang";
 
     public static string Sanitize(string? name, string fallback = DefaultFallback)
     {

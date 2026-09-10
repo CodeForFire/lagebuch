@@ -29,12 +29,15 @@ internal static class AndroidAppPaths
         System.IO.Path.Combine(CacheDir(context), "attachment-cache");
 
     /// <summary>
-    /// The only subtree the <c>FileProvider</c> grants a URI into (see <c>file_paths.xml</c>'s
-    /// "shared" entry). Every file handed to <see cref="AndroidFileDialogService.ShareFileAsync"/>
-    /// or <see cref="AndroidFileDialogService.OpenFileAsync"/> — PDF/JSON export temp files
-    /// included — must live here, never directly under <see cref="CacheDir"/>, so a granted URI
-    /// can never address the whole cache dir (which also holds picked attachments and
-    /// <c>import.json</c>).
+    /// One of the two subtrees the <c>FileProvider</c> grants a URI into (see
+    /// <c>file_paths.xml</c>'s "shared" entry; the other is the attachments root a sibling PR
+    /// writes into). PDF/JSON export write straight here. <see cref="AndroidFileDialogService"/>'s
+    /// private <c>EnsureShareable</c> is the structural guarantee behind that: it is the sole
+    /// path <see cref="AndroidFileDialogService.ShareFileAsync"/> and
+    /// <see cref="AndroidFileDialogService.OpenFileAsync"/> hand a file to the provider through,
+    /// and it copies anything not already under this directory (or the attachments root) into a
+    /// fresh subfolder here before ever calling <c>FileProvider.GetUriForFile</c> — so a caller
+    /// handing either method a path outside both exposed roots cannot crash the provider.
     /// </summary>
     public static string SharedDir(Context context)
     {

@@ -146,13 +146,19 @@ public sealed class AndroidFileDialogService : IFileDialogService
             }
         }
 
-        return SafeFileName.Sanitize(null);
+        return SafeFileName.DefaultFallback;
     }
 
     public Task ShareFileAsync(string path, string mimeType)
     {
+        var shareablePath = EnsureShareable(path);
+        if (shareablePath is null)
+        {
+            return Task.CompletedTask;
+        }
+
         var authority = $"{_activity.PackageName}.fileprovider";
-        var uri = FileProvider.GetUriForFile(_activity, authority, new Java.IO.File(path));
+        var uri = FileProvider.GetUriForFile(_activity, authority, new Java.IO.File(shareablePath));
         var intent = new Intent(Intent.ActionSend);
         intent.SetType(mimeType);
         intent.PutExtra(Intent.ExtraStream, uri);
@@ -165,13 +171,59 @@ public sealed class AndroidFileDialogService : IFileDialogService
     // type, exactly like a desktop double-click.
     public Task OpenFileAsync(string path)
     {
+        var shareablePath = EnsureShareable(path);
+        if (shareablePath is null)
+        {
+            return Task.CompletedTask;
+        }
+
         var authority = $"{_activity.PackageName}.fileprovider";
-        var uri = FileProvider.GetUriForFile(_activity, authority, new Java.IO.File(path));
+        var uri = FileProvider.GetUriForFile(_activity, authority, new Java.IO.File(shareablePath));
         var intent = new Intent(Intent.ActionView);
-        intent.SetDataAndType(uri, MimeTypeOf(path));
+        intent.SetDataAndType(uri, MimeTypeOf(shareablePath));
         intent.AddFlags(ActivityFlags.GrantReadUriPermission);
         _activity.StartActivity(intent);
         return Task.CompletedTask;
+    }
+
+    // The sole choke point between a filesystem path and the FileProvider: this is a structural
+    // guarantee, not caller convention. Neither ShareFileAsync nor OpenFileAsync ever calls
+    // FileProvider.GetUriForFile directly on a caller-supplied path -- both route through here
+    // first. A path already under SharedDir (every export writes straight there) or under the
+    // "lagebuch" attachments root a sibling PR writes into (see file_paths.xml's "attachments"
+    // entry) passes through untouched -- no second copy. Anything else (e.g. today,
+    // FilesViewModel.OpenFileAsync's tempPath under the bare cache root, until that sibling PR
+    // relocates it) is copied into a fresh SharedDir subfolder first, so
+    // FileProvider.GetUriForFile can never throw IllegalArgumentException for an unconfigured
+    // root no matter what a caller passes in. Returns null (callers then no-op rather than
+    // launch anything) when the source is not an existing regular file.
+    private string? EnsureShareable(string path)
+    {
+        if (!System.IO.File.Exists(path))
+        {
+            return null;
+        }
+
+        var fullPath = System.IO.Path.GetFullPath(path);
+        var sharedDir = AndroidAppPaths.SharedDir(_activity);
+        var attachmentsDir = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), "lagebuch");
+
+        if (IsUnder(fullPath, sharedDir) || IsUnder(fullPath, attachmentsDir))
+        {
+            return fullPath;
+        }
+
+        var destDir = System.IO.Path.Combine(sharedDir, Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(destDir);
+        var destPath = System.IO.Path.Combine(destDir, System.IO.Path.GetFileName(fullPath));
+        System.IO.File.Copy(fullPath, destPath, overwrite: true);
+        return destPath;
+    }
+
+    private static bool IsUnder(string fullPath, string dir)
+    {
+        var normalizedDir = System.IO.Path.GetFullPath(dir) + System.IO.Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(normalizedDir, StringComparison.Ordinal);
     }
 
     // Unlike OpenFileAsync, this is a remote http(s) URL, not a local file -- no FileProvider
