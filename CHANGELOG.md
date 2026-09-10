@@ -24,6 +24,9 @@ once we reach 1.0.
   copies of every correction. Existing files are deduplicated the next time they are opened. (#279)
 - Surface a failed background save (disk full, read-only, locked/corrupt DB) as a persistent
   red banner in the Einsatz workspace instead of silently leaving the incident unsaved (#280)
+- Leaving an open Einsatz via the top command bar (ÜBERSICHT, STAMMDATEN, ÖFFNEN, NEUER EINSATZ,
+  VERBINDEN) instead of the workspace's own "ZUR STARTSEITE" no longer leaks its subscription to
+  the background save-failure store (#280)
 
 ### Security
 - Harden CI workflows: `ci.yml` now runs with read-only `contents` permission and enforces
