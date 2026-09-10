@@ -40,10 +40,10 @@ public sealed class AndroidFileDialogService : IFileDialogService
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
     public Task<string?> PickExportPdfAsync(string suggestedFileName) =>
-        Task.FromResult<string?>(System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), suggestedFileName));
+        Task.FromResult<string?>(System.IO.Path.Combine(AndroidAppPaths.SharedDir(_activity), suggestedFileName));
 
     public Task<string?> PickExportJsonAsync(string suggestedFileName) =>
-        Task.FromResult<string?>(System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), suggestedFileName));
+        Task.FromResult<string?>(System.IO.Path.Combine(AndroidAppPaths.SharedDir(_activity), suggestedFileName));
 
     private TaskCompletionSource<string?>? _pendingImport;
 
@@ -77,7 +77,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             return;
         }
 
-        var destPath = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), "import.json");
+        var destPath = System.IO.Path.Combine(AndroidAppPaths.PickedDir(_activity), "import.json");
         using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
         using (var output = System.IO.File.Create(destPath))
         {
@@ -121,7 +121,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             return;
         }
 
-        var destPath = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), DisplayNameOf(uri));
+        var destPath = System.IO.Path.Combine(AndroidAppPaths.PickedDir(_activity), DisplayNameOf(uri));
         using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
         using (var output = System.IO.File.Create(destPath))
         {
@@ -131,6 +131,9 @@ public sealed class AndroidFileDialogService : IFileDialogService
         pending.SetResult(destPath);
     }
 
+    // A content provider fully controls DISPLAY_NAME -- a hostile one can return "../../evil" to
+    // escape PickedDir, so SafeFileName.Sanitize reduces it to a bare, harmless file name before
+    // it ever reaches Path.Combine.
     private string DisplayNameOf(global::Android.Net.Uri uri)
     {
         using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
@@ -139,15 +142,11 @@ public sealed class AndroidFileDialogService : IFileDialogService
             var index = cursor.GetColumnIndex(global::Android.Provider.IOpenableColumns.DisplayName);
             if (index >= 0)
             {
-                var name = cursor.GetString(index);
-                if (!string.IsNullOrWhiteSpace(name))
-                {
-                    return name;
-                }
+                return SafeFileName.Sanitize(cursor.GetString(index));
             }
         }
 
-        return "anhang";
+        return SafeFileName.Sanitize(null);
     }
 
     public Task ShareFileAsync(string path, string mimeType)
