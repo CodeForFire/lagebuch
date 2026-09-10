@@ -94,12 +94,13 @@ public sealed record IncidentFile
 
         ArgumentException.ThrowIfNullOrWhiteSpace(addedBy);
 
-        var trimmedName = fileName.Trim();
+        var safeName = SanitizeFileName(fileName)
+            ?? throw new ArgumentException($"Dateiname '{fileName}' ist ungültig.", nameof(fileName));
         return new IncidentFile
         {
             Id = id,
-            FileName = trimmedName,
-            DisplayName = trimmedName,
+            FileName = safeName,
+            DisplayName = safeName,
             ContentType = contentType,
             SizeBytes = sizeBytes,
             AddedAt = addedAt,
@@ -107,12 +108,22 @@ public sealed record IncidentFile
         };
     }
 
+    /// <summary>
+    /// The load path (SQLite, and a host's snapshot via <c>SnapshotMapper.FromSnapshot</c>), so it
+    /// sanitises exactly like <c>Create</c> — a hostile name written by an older or patched
+    /// peer is neutralised on the way in — but never throws: an existing attachment must still
+    /// open, so a name with nothing usable left falls back to the storage-style
+    /// <c>{id}{extension}</c>. <paramref name="displayName"/> is a free-form label that never
+    /// reaches the filesystem and is kept verbatim.
+    /// </summary>
     public static IncidentFile Rehydrate(
         Guid id, string fileName, string displayName, string contentType, long sizeBytes, DateTimeOffset addedAt, string addedBy)
         => new()
         {
             Id = id,
-            FileName = fileName,
+            FileName = SanitizeFileName(fileName)
+                ?? SanitizeFileName(StorageFileName(id, fileName))
+                ?? FallbackFileName,
             DisplayName = displayName,
             ContentType = contentType,
             SizeBytes = sizeBytes,
@@ -137,4 +148,49 @@ public sealed record IncidentFile
     /// <see cref="Id"/> and the original extension, never persisted separately.
     /// </summary>
     public static string StorageFileName(Guid id, string fileName) => $"{id}{Path.GetExtension(fileName)}";
+
+    /// <summary>Last resort when not even the storage-style name survives sanitising.</summary>
+    private const string FallbackFileName = "anhang";
+
+    /// <summary>
+    /// Characters that must not appear in a <see cref="FileName"/>. The OS-specific set is only a
+    /// starting point: on Linux it is just <c>\0</c> and <c>/</c>, so the Windows-invalid set is
+    /// added unconditionally — the same attachment travels between a Windows host and a Linux
+    /// client (and back) and has to end up with the same name on both.
+    /// </summary>
+    private static readonly char[] InvalidFileNameChars =
+        [.. Path.GetInvalidFileNameChars(), .. "<>:\"|?*\\/"];
+
+    /// <summary>Both path separators, whatever the platform thinks of them.</summary>
+    private static readonly char[] SeparatorChars = ['/', '\\'];
+
+    /// <summary>
+    /// Reduces an attachment name to a bare, traversal-free file name, or returns <c>null</c> when
+    /// nothing usable is left. Attachment names are attacker-controlled — a joined client picks the
+    /// name in <c>AddFileCommand</c> and every peer later writes those bytes to a temp file under
+    /// that name before handing it to the OS — so a name like <c>..\..\Startup\x.png</c> must never
+    /// survive: only the last path segment is kept.
+    /// <para>
+    /// Deliberately hand-rolled rather than <see cref="Path.GetFileName(string)"/>, whose idea of a
+    /// separator is the platform's: a Windows host and a Linux client sync the same name and must
+    /// end up with the same file, so both separators (and the Windows-invalid character set) apply
+    /// everywhere.
+    /// </para>
+    /// </summary>
+    private static string? SanitizeFileName(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        var trimmed = fileName.Trim();
+        var lastSegment = trimmed[(trimmed.LastIndexOfAny(SeparatorChars) + 1)..];
+        var cleaned = new string(lastSegment
+            .Where(c => !char.IsControl(c) && Array.IndexOf(InvalidFileNameChars, c) < 0)
+            .ToArray()).Trim();
+
+        // "." and ".." are directory references, not names — and an all-dots name is no better.
+        return cleaned.Length == 0 || cleaned.All(c => c == '.') ? null : cleaned;
+    }
 }

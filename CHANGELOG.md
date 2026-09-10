@@ -9,6 +9,13 @@ once we reach 1.0.
 
 ## [Unreleased]
 
+### Security
+- Attachment names from a joined device can no longer escape the temp directory. A file name is
+  reduced to its last path segment on the way into the domain (and on load, so a name already in a
+  snapshot or file is neutralised too), ÖFFNEN copies the bytes into a fresh private directory under
+  the app's own temp root instead of the shared system temp directory, and the desktop launcher
+  refuses anything that is not a regular file inside that root.
+
 ### Added
 - Search box on the Links tab, and ÖFFNEN now shows and says that it opens the system browser (#262)
 

@@ -132,6 +132,38 @@ public class RemoteClientTests
         Assert.Equal("Küchenbrand", Assert.Single(observer.Incident.Files).DisplayName);
     }
 
+    // A patched client can put anything in AddFileCommand.FileName, and every peer later writes the
+    // bytes to a temp file under that name — so the host must neutralise it (accept the file, keep
+    // only the last path segment) before it ever reaches its own state or another device.
+    [Fact]
+    public async Task A_hostile_file_name_from_a_client_is_sanitised_before_it_reaches_the_host_or_a_peer()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        await using var attacker = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+        await using var observer = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+
+        var attackerChange = NextChange(attacker);
+        var observerChange = NextChange(observer);
+        await attacker.SendAsync(new AddFileCommand(
+            new OperatorDto("A", "RUF 1"),
+            Guid.NewGuid(),
+            "../../../.config/autostart/evil.png",
+            "image/png",
+            4));
+        await Task.WhenAll(attackerChange, observerChange);
+
+        Assert.Equal("evil.png", Assert.Single(hostSession.Incident.Files).FileName);
+        Assert.Equal("evil.png", Assert.Single(attacker.Incident.Files).FileName);
+        Assert.Equal("evil.png", Assert.Single(observer.Incident.Files).FileName); // via the snapshot
+        Assert.Equal("evil.png", Assert.Single(observer.Incident.Files).DisplayName);
+    }
+
     [Fact]
     public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
     {

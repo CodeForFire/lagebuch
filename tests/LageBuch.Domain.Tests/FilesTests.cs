@@ -159,6 +159,98 @@ public class FilesTests
         Assert.Equal("sizeBytes", ex.ParamName);
     }
 
+    // A joined sync client picks the file name (AddFileCommand), and every peer later writes those
+    // bytes to a temp file under that name before handing it to the OS — so a name carrying path
+    // segments must never survive the domain.
+    [Theory]
+    [InlineData("../../evil.png", "evil.png")]
+    [InlineData("..\\evil.png", "evil.png")]
+    [InlineData("dir/evil.png", "evil.png")]
+    [InlineData("/etc/cron.d/evil.png", "evil.png")]
+    [InlineData("..\\..\\..\\Startup\\evil.png", "evil.png")]
+    [InlineData("  ../evil.png  ", "evil.png")]
+    public void Create_keeps_only_the_last_path_segment_of_a_hostile_file_name(string hostile, string expected)
+    {
+        var file = IncidentFile.Create(hostile, "image/png", 1024, T0, "Müller");
+
+        Assert.Equal(expected, file.FileName);
+        Assert.Equal(expected, file.DisplayName);
+    }
+
+    // The host may run Windows and the client Linux (or the other way round): the same name has to
+    // come out the same on both, so the Windows-invalid set is stripped regardless of the OS.
+    [Fact]
+    public void Create_strips_characters_that_are_invalid_in_a_file_name_on_any_platform()
+    {
+        var file = IncidentFile.Create("br<a>n:d\"|?*.jpg", "image/jpeg", 1024, T0, "Müller");
+
+        Assert.Equal("brand.jpg", file.FileName);
+    }
+
+    // A Windows drive-relative name: Path.GetFileName would answer differently on Windows than on
+    // Linux, so the colon is stripped like any other Windows-invalid character instead — the host
+    // and every joined client end up with the same name whatever they run.
+    [Fact]
+    public void Create_treats_a_drive_relative_name_the_same_on_every_platform()
+    {
+        var file = IncidentFile.Create("C:evil.png", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal("Cevil.png", file.FileName);
+    }
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData("..")]
+    [InlineData("../..")]
+    [InlineData("..\\")]
+    [InlineData("<>|?*")]
+    public void Create_rejects_a_file_name_that_leaves_nothing_usable(string hostile)
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            IncidentFile.Create(hostile, "image/png", 1024, T0, "Müller"));
+        Assert.Equal("fileName", ex.ParamName);
+    }
+
+    // Rehydrate is the load path (SQLite and a host's snapshot), so it sanitises the same way but
+    // must never throw — a hostile name already on disk still has to open.
+    [Theory]
+    [InlineData("../../evil.png", "evil.png")]
+    [InlineData("..\\evil.png", "evil.png")]
+    [InlineData("dir/evil.png", "evil.png")]
+    public void Rehydrate_sanitises_a_hostile_file_name(string hostile, string expected)
+    {
+        var file = IncidentFile.Rehydrate(
+            Guid.NewGuid(), hostile, "Küchenbrand", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal(expected, file.FileName);
+        Assert.Equal("Küchenbrand", file.DisplayName); // a free-form label, left alone
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData("../..")]
+    [InlineData("<>|?*")]
+    [InlineData("  ")]
+    public void Rehydrate_falls_back_to_the_storage_style_name_instead_of_throwing(string hostile)
+    {
+        var id = Guid.NewGuid();
+
+        var file = IncidentFile.Rehydrate(id, hostile, "Küchenbrand", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal($"{id}", file.FileName); // StorageFileName's shape — no extension left to keep
+    }
+
+    // Stripping the invalid characters can leave a bare extension; that is a usable, traversal-free
+    // name, so it is kept rather than replaced by the fallback.
+    [Fact]
+    public void Rehydrate_keeps_a_name_that_strips_down_to_a_bare_extension()
+    {
+        var file = IncidentFile.Rehydrate(
+            Guid.NewGuid(), "../../<>|.png", "Küchenbrand", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal(".png", file.FileName);
+    }
+
     [Fact]
     public void WithDisplayName_returns_a_new_instance_leaving_the_original_untouched()
     {
