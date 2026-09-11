@@ -48,6 +48,11 @@ once we reach 1.0.
   a crash mid-write can no longer leave a corrupt `trust.json` behind. Joining another device's
   incident no longer has an "accept any certificate" fallback — a trust store is required, so a
   join is always TLS-pinned. (#286)
+- Android: the `FileProvider` now grants access to only its `shared/` and `lagebuch/`
+  subdirectories, not the whole cache directory — `import.json`, picked attachments and the
+  synced-attachment cache are no longer reachable through a shared or opened URI. A malicious
+  content provider's `DISPLAY_NAME` for a picked attachment can no longer escape the app's cache
+  directory via `../` path traversal; it is now sanitised to a bare file name with a safe fallback. (#303)
 
 ## [0.4.1] - 2026-09-07
 
