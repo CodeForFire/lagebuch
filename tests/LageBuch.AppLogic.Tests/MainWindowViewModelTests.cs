@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -210,6 +211,78 @@ public class MainWindowViewModelTests
         Assert.Null(vm.PendingPrompt);
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
         Assert.True(workspace.IsReadOnly);
+    }
+
+    // #279 P1 finding: neither navigate-home path disposed the outgoing workspace, so its ticker
+    // subscriptions (Scba/Tasks/Reminder) and every child's _session.Changed handler outlived the
+    // navigation -- an abandoned workspace kept ticking, and a stray session mutation kept reaching
+    // view models nobody could see anymore.
+    private static (MainWindowViewModel Vm, FakeTicker Ticker) NewWithTicker()
+    {
+        var ticker = new FakeTicker();
+        var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), ticker, new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+        return (vm, ticker);
+    }
+
+    private static IncidentWorkspaceViewModel OpenNewIncident(MainWindowViewModel vm)
+    {
+        vm.RequestNewIncidentCommand.Execute(null);
+        vm.PendingPrompt!.OperatorName = "Müller";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmOperatorCommand.Execute(null);
+        return Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+    }
+
+    // The workspace keeps its session private; reaching in here is what lets these tests raise
+    // Changed the same way a remote host broadcast (or another local module) would -- directly on
+    // the session, not through a child's own command (which also calls back into the workspace's
+    // OnChanged and would render regardless of subscription state, defeating the point of the test).
+    private static LocalIncidentSession GetSession(IncidentWorkspaceViewModel workspace)
+    {
+        var field = typeof(IncidentWorkspaceViewModel).GetField(
+            "_session", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        return (LocalIncidentSession)field!.GetValue(workspace)!;
+    }
+
+    [Fact]
+    public void GoHome_disposes_the_outgoing_workspace()
+    {
+        var (vm, ticker) = NewWithTicker();
+        var workspace = OpenNewIncident(vm);
+        var session = GetSession(workspace);
+        var etb = workspace.Etb;
+        var entriesBefore = etb.Entries.Count;
+
+        vm.GoHomeCommand.Execute(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+        Assert.Equal(0, ticker.SubscriberCount); // Scba/Tasks/Reminder unsubscribed
+
+        // The workspace is gone, but its children live on until GC -- a session mutation must no
+        // longer reach them (Sync() would otherwise render the new entry).
+        session.AddJournalEntry(EtbDirection.System, "Nach dem Verlassen erfasst");
+        Assert.Equal(entriesBefore, etb.Entries.Count);
+    }
+
+    [Fact]
+    public void LeaveToHome_from_the_workspace_disposes_it_too()
+    {
+        var (vm, ticker) = NewWithTicker();
+        var workspace = OpenNewIncident(vm);
+        var session = GetSession(workspace);
+        var etb = workspace.Etb;
+        var entriesBefore = etb.Entries.Count;
+
+        // LeaveToHomeCommand is what the workspace's own "leave" affordance invokes -- it raises
+        // GoHomeRequested, the same path a joined client's Ended host event drives.
+        workspace.LeaveToHomeCommand.Execute(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+        Assert.Equal(0, ticker.SubscriberCount);
+
+        session.AddJournalEntry(EtbDirection.System, "Nach dem Verlassen erfasst");
+        Assert.Equal(entriesBefore, etb.Entries.Count);
     }
 
     [Fact]

@@ -27,6 +27,9 @@ once we reach 1.0.
 - Leaving an open Einsatz via the top command bar (ÜBERSICHT, STAMMDATEN, ÖFFNEN, NEUER EINSATZ,
   VERBINDEN) instead of the workspace's own "ZUR STARTSEITE" no longer leaks its subscription to
   the background save-failure store (#280)
+- Navigating home no longer leaves the incident workspace running in the background: closing it
+  now stops its once-a-second ticker (Atemschutz, Aufgaben, ILS-Erinnerung) and unsubscribes it
+  from further changes, and a joined client also drops its host-connection event handlers. (#284)
 
 ### Security
 - Harden CI workflows: `ci.yml` now runs with read-only `contents` permission and enforces

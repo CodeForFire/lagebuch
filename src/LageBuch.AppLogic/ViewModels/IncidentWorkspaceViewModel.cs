@@ -10,7 +10,7 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-public sealed partial class IncidentWorkspaceViewModel : ObservableObject
+public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
 
@@ -33,6 +33,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     // this store), which is why both this and the dispatcher stay optional.
     private readonly IIncidentStore? _store;
     private readonly IUiDispatcher _uiDispatcher;
+    private bool _disposed;
 
     public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null)
     {
@@ -84,11 +85,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         if (session is RemoteIncidentSession remote)
         {
             remote.Changed += OnRemoteLifecycle;
-            remote.Disconnected += () => IsConnected = false;
-            remote.Reconnected += () => IsConnected = true;
-            remote.Ended += () => GoHomeRequested?.Invoke();
+            remote.Disconnected += OnRemoteDisconnected;
+            remote.Reconnected += OnRemoteReconnected;
+            remote.Ended += OnRemoteEnded;
         }
     }
+
+    private void OnRemoteDisconnected() => IsConnected = false;
+
+    private void OnRemoteReconnected() => IsConnected = true;
+
+    private void OnRemoteEnded() => GoHomeRequested?.Invoke();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanContinueEditing))]
@@ -288,6 +295,34 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// The single synchronous teardown point for everything this workspace owns: every child tab
+    /// view model (and, through them, the ticker subscriptions Scba/Tasks/Reminder each hold) and
+    /// the four remote-session lifecycle events wired up in the constructor. Idempotent, since the
+    /// shell can reach it from more than one navigate-away path for the same workspace instance.
+    /// LeaveAsync above stays the async remote-session teardown; the shell calls both, in that
+    /// order, when leaving to Home.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        if (_session is RemoteIncidentSession remote)
+        {
+            remote.Changed -= OnRemoteLifecycle;
+            remote.Disconnected -= OnRemoteDisconnected;
+            remote.Reconnected -= OnRemoteReconnected;
+            remote.Ended -= OnRemoteEnded;
+        }
+
+        DisposeChildren();
+    }
+
     // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
     // incident, or someone adds the Einsatznummer from another device); keep the header live and
     // flip the whole workspace to read-only when the lifecycle itself changes.
@@ -310,18 +345,32 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         LastSavedAt = _clock.Now;
     }
 
+    // Every child subscribes to _session.Changed (and Scba/Tasks/Reminder additionally to _ticker)
+    // in its own constructor; disposing the outgoing instance is what unsubscribes the old handler.
+    // Shared by BuildChildren (issue #167 P2 finding — replacing children used to be uneven, leaking
+    // stale subscriptions on every rebuild) and by Dispose (issue #279 P1 finding — the workspace
+    // itself was never torn down on navigate-home, so the *last* generation of children outlived it).
+    private void DisposeChildren()
+    {
+        ChecklistAufbau?.Dispose();
+        ChecklistAbbau?.Dispose();
+        Etb?.Dispose();
+        Roles?.Dispose();
+        Forces?.Dispose();
+        Scba?.Dispose();
+        Files?.Dispose();
+        CoMessprotokoll?.Dispose();
+        Tasks?.Dispose();
+        Reminder?.Dispose();
+    }
+
     private void BuildChildren()
     {
-        // Every child below subscribes to _session.Changed in its own constructor; disposing the
-        // outgoing instance before replacing it is what unsubscribes the old handler (issue #167 P2
-        // finding — this used to be uneven, leaking stale subscriptions on every rebuild).
-        ChecklistAufbau?.Dispose();
-        ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
+        DisposeChildren();
 
-        ChecklistAbbau?.Dispose();
+        ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
         ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
 
-        Etb?.Dispose();
         Etb = new EtbViewModel(
             _session,
             _clock,
@@ -329,27 +378,19 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
             OnChanged,
             OpenTaskDialog);
 
-        Roles?.Dispose();
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
-        Forces?.Dispose();
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
-        Scba?.Dispose();
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
-        Files?.Dispose();
         Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
 
-        CoMessprotokoll?.Dispose();
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
 
-        Tasks?.Dispose();
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
-
-        Reminder?.Dispose();
 
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.

@@ -205,6 +205,38 @@ public class WorkspaceCollaborationTests
         await wentHome.Task.WaitAsync(TimeSpan.FromSeconds(10)); // reconnect gave up → back to Home
     }
 
+    // #279 P1 finding: IncidentWorkspaceViewModel subscribed all four RemoteIncidentSession lifecycle
+    // events (Changed, Disconnected, Reconnected, Ended) in its constructor with no matching -=, so a
+    // joined client's workspace kept reacting (and its children kept re-rendering off Changed) even
+    // after the shell navigated away from it.
+    [Fact]
+    public async Task Disposing_the_workspace_unsubscribes_from_every_remote_session_event()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        clientWs.Dispose();
+
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Changed))); // workspace + every child
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Disconnected)));
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Reconnected)));
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Ended)));
+    }
+
+    private static int RemoteEventSubscriberCount(RemoteIncidentSession session, string eventName)
+    {
+        var field = typeof(RemoteIncidentSession).GetField(
+            eventName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var handler = (Delegate?)field!.GetValue(session);
+        return handler?.GetInvocationList().Length ?? 0;
+    }
+
     // A joined client's view only updates if the host broadcast is marshalled onto the UI thread:
     // EtbViewModel mutates an Avalonia-bound ObservableCollection, which Avalonia rejects off-thread.
     // The other tests here pass because a headless xUnit run has no UI thread to reject the mutation;

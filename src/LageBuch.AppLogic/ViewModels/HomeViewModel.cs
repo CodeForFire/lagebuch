@@ -195,6 +195,10 @@ public sealed partial class HomeViewModel : ObservableObject
         }
     }
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "Ownership transfers to WorkspaceOpened's subscriber (MainWindowViewModel.ShowWorkspace), which disposes the outgoing workspace itself once CurrentView moves away from it.")]
     private void OpenWorkspace(LocalIncidentSession session, string path, Persistence.MasterData.MasterDataSet md)
     {
         _recent.Add(path);
@@ -368,6 +372,10 @@ public sealed partial class HomeViewModel : ObservableObject
 
     // The remote workspace can't host (a client isn't hostable) and has no local file, so it gets a
     // no-op host controller — the "Im Netzwerk freigeben" toggle and PDF export stay hidden.
+    [SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "Ownership transfers to WorkspaceOpened's subscriber (MainWindowViewModel.ShowWorkspace), which disposes the outgoing workspace itself once CurrentView moves away from it.")]
     private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md)
     {
         var workspace = new IncidentWorkspaceViewModel(
