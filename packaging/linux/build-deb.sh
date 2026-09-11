@@ -30,16 +30,29 @@ chmod +x "$ROOT/usr/bin/$PKG"
 
 install -Dm644 "$ICON_PNG" "$ROOT/usr/share/icons/hicolor/512x512/apps/$PKG.png"
 
+# StartupWMClass must equal the window's WM_CLASS, which Avalonia derives from the assembly name
+# (verified with xprop: "LageBuch.App"). Without it the desktop cannot tie the running window to
+# this entry, so the dock/task switcher shows a generic icon next to a separate, unnamed group.
+# StartupNotify is deliberately false, not true: Avalonia 12 never sends the startup-notification
+# "remove" message (no _NET_STARTUP_ID in the binary), so claiming support would leave the busy
+# cursor spinning until the desktop times out. False tells the desktop to use its own heuristics —
+# i.e. the StartupWMClass match above — instead of waiting for a message that never arrives.
+# One main category only: Office;Utility; made the app show up twice in the menu.
 install -d "$ROOT/usr/share/applications"
 cat > "$ROOT/usr/share/applications/$PKG.desktop" <<DESKTOP
 [Desktop Entry]
+Version=1.5
 Type=Application
 Name=Lagebuch
-Comment=Einsatzdokumentation für die Feuerwehr
+GenericName=Einsatzdokumentation
+Comment=Einsatztagebuch, Atemschutzüberwachung und Einsatzberichte für den ELW
 Exec=$PKG
 Icon=$PKG
 Terminal=false
-Categories=Office;Utility;
+StartupNotify=false
+StartupWMClass=LageBuch.App
+Categories=Office;
+Keywords=Einsatz;Einsatztagebuch;ETB;Feuerwehr;ELW;Atemschutz;Einsatzdokumentation;Lagedarstellung;
 DESKTOP
 
 # --- control metadata ------------------------------------------------------------------------
