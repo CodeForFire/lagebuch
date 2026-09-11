@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 20;
+    public const int CurrentVersion = 21;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -137,6 +137,11 @@ public static class Migrations
         if (version < 20)
         {
             ApplyV20(cn, tx);
+        }
+
+        if (version < 21)
+        {
+            ApplyV21(cn, tx);
         }
 
         SetVersion(cn, tx, CurrentVersion);
@@ -628,6 +633,14 @@ public static class Migrations
     // apartments_per_floor, so existing buildings read back unchanged.
     private static void ApplyV20(SqliteConnection cn, SqliteTransaction tx) =>
         SchemaHelpers.AddColumnIfMissing(cn, tx, "co_buildings", "apartment_counts", "TEXT NOT NULL DEFAULT '{}'");
+
+    // Save's DELETE list omitted "force_unit_edits" until now, so every save re-inserted the
+    // unit's whole Wert-Historie on top of what was already on disk (fix accompanying this
+    // migration) -- a file saved N times carries N copies of every edit. Keep the earliest-rowid
+    // row per (unit_id, ordinal), which is the original write; later rowids are the duplicates
+    // stacked up by repeated saves.
+    private static void ApplyV21(SqliteConnection cn, SqliteTransaction tx) =>
+        Exec(cn, tx, "DELETE FROM force_unit_edits WHERE rowid NOT IN (SELECT MIN(rowid) FROM force_unit_edits GROUP BY unit_id, ordinal);");
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

@@ -102,4 +102,28 @@ public class IncidentRepositorySaveTests : IDisposable
         cmd.CommandText = "SELECT count(*) FROM incident_meta;";
         Assert.Equal(1L, (long)cmd.ExecuteScalar()!);
     }
+
+    [Fact]
+    public void Save_does_not_duplicate_force_unit_edits_on_repeated_saves()
+    {
+        // Regression for the missing "force_unit_edits" entry in Save's DELETE list: without it,
+        // every save re-INSERTs the unit's whole Wert-Historie on top of what is already there, so
+        // resaving the same incident N times leaves N copies of every edit.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        var unit = incident.AddForceUnit(clock, op, "FFB", 6);
+        incident.UpdateForceStrength(clock, op, unit.Id, officerCount: 1, personnelCount: 5, scbaCount: 2);
+        incident.UpdateForceStrength(clock, op, unit.Id, officerCount: 1, personnelCount: 6, scbaCount: 2);
+
+        IncidentRepository.Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
+
+        using var cn = SqliteConnectionFactory.OpenReadOnly(_path);
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT count(*) FROM force_unit_edits;";
+        Assert.Equal(2L, (long)cmd.ExecuteScalar()!);
+
+        Assert.Equal(2, IncidentRepository.Load(_path).Forces.Single().Edits.Count);
+    }
 }

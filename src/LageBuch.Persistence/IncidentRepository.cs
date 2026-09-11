@@ -20,7 +20,7 @@ public sealed class IncidentRepository
         foreach (var table in new[]
                  {
                     "incident_meta", "checklist_items", "etb_entries", "etb_entry_edits",
-                    "role_assignments", "force_units", "scba_trupps",
+                    "role_assignments", "force_units", "force_unit_edits", "scba_trupps",
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
                     "co_buildings", "co_dwellings",
