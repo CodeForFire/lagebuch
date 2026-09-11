@@ -9,14 +9,34 @@ once we reach 1.0.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-11
+
+Attachment handling, PDF export control, more depth in CO-Messung and accessibility —
+plus every P0/P1 fix from the 2026-09 architecture, security and performance review (#304).
+
 ### Added
-- Search box on the Links tab, and ÖFFNEN now shows and says that it opens the system browser (#262)
+- Drag and drop attachments onto the Dateien tab (#273)
+- Delete an attachment, with a confirmation prompt (#271)
+- PDF export: pick which sections go in, with progress and status feedback, and the incident
+  remembers where it was last exported to (#269)
+- CO-Messung: colour-coded ppm danger severity and a warning on implausible readings (#278)
+- CO-Messung: per-floor unit counts and labels (#268)
+- CO-Messung: an OG HINZUFÜGEN button to add upper floors (#263)
+- A visible ÖFFNEN button on each recent-incidents row (#276)
+- Search box on the Links tab, and ÖFFNEN now shows and says that it opens the system browser (#262, #275)
+- Accessibility: AutomationProperties labelling and keyboard navigation for the Kräfte flyouts (#283)
+- The project logo and slogan (#281)
 
 ### Changed
 - CO-Messung: ABBRECHEN in the Wohnung editor now actually discards. Status, CO-Wert,
   Bezeichnung, Bewohnername and Schlüssel are buffered until FERTIG, so an intermediate or
   mistyped ppm reading no longer lands in the Einsatztagebuch. The tile previews the pending
   state while the sidebar is open. (#242)
+- The PIN field on the join screen accepts digits only (#277)
+- Removing a unit asks for confirmation first, and Kräfte/Stammdaten explain why a control is
+  disabled or a label abbreviated (#257)
+- Release notes are generated from this file's section for the tag being built (#261)
+- Dependency updates across Avalonia, Microsoft.Data.Sqlite, the SignalR client and the test SDK
 
 ### Fixed
 - Stop a Kraft's Stärke-Historie from duplicating on every save: each save was re-inserting
@@ -30,6 +50,8 @@ once we reach 1.0.
 - Navigating home no longer leaves the incident workspace running in the background: closing it
   now stops its once-a-second ticker (Atemschutz, Aufgaben, ILS-Erinnerung) and unsubscribes it
   from further changes, and a joined client also drops its host-connection event handlers. (#284)
+- Funktionen: the Rolle suggestions now open on focus and on click, not only while typing (#266)
+- Kräfte: the Zugführer flag no longer adds a seat on top of the vehicle's own capacity (#264)
 
 ### Security
 - Harden CI workflows: `ci.yml` now runs with read-only `contents` permission and enforces
@@ -181,7 +203,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/CodeForFire/lagebuch/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/CodeForFire/lagebuch/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/CodeForFire/lagebuch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/CodeForFire/lagebuch/compare/v0.2.0...v0.3.0
