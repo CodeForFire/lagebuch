@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -211,6 +212,36 @@ public class ForcesTabRenderTests
                 icon.Bounds.Width > 0,
                 $"the icon in the {action.GetValue(ToolTip.TipProperty)} button has zero width — nothing is drawn");
         }
+    }
+
+    // #262 (UX review, "No accessibility support"): the Stärke korrigieren button sits inside a
+    // DataGridTemplateColumn cell, one layer deeper than a plain grid cell -- whether Tab reaches
+    // it at all was an open question, not an assumption (see the plan's decision on DataGrid
+    // keyboard reachability). It does, in a single Tab from the grid.
+    [AvaloniaFact]
+    public void Tab_from_the_grid_reaches_the_strength_correction_button()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewMannschaftCount = 6;
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        window.Measure(new Size(1920, 1032));
+        window.Arrange(new Rect(0, 0, 1920, 1032));
+        Dispatcher.UIThread.RunJobs();
+
+        var grid = view.GetControl<DataGrid>("ForcesGrid");
+        var strengthButton = grid.GetVisualDescendants().OfType<Button>()
+            .Single(b => (ToolTip.GetTip(b) as string) == "Stärke korrigieren");
+
+        grid.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(
+            strengthButton.IsKeyboardFocusWithin,
+            "Tab from the Forces grid no longer reaches the Stärke korrigieren button in one press.");
     }
 
     [AvaloniaFact]

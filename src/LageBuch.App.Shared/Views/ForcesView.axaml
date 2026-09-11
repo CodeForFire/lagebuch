@@ -59,7 +59,7 @@
               </ComboBox>
               <Button x:Name="ClearVehicleButton" Classes="icon-btn" IsVisible="{Binding IsVehicleSelected}"
                       Command="{Binding ClearVehicleCommand}"
-                      ToolTip.Tip="Fahrzeugauswahl aufheben">
+                      ToolTip.Tip="Fahrzeugauswahl aufheben" AutomationProperties.Name="Fahrzeugauswahl aufheben">
                 <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
               </Button>
             </StackPanel>
@@ -151,11 +151,17 @@
                        ✎ nor ✕, so a text affordance only appeared where the OS happened to have a
                        fallback. Same idiom as the ETB grid's row actions. -->
                   <Button Classes="icon-btn" IsVisible="{Binding !IsReadOnly}"
-                          ToolTip.Tip="Stärke korrigieren">
+                          ToolTip.Tip="Stärke korrigieren" AutomationProperties.Name="Stärke korrigieren">
                     <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                     <Button.Flyout>
                       <Flyout Placement="BottomEdgeAlignedLeft">
                           <StackPanel Spacing="8" MinWidth="180">
+                          <!-- One KeyBinding covers all four fields below: Avalonia checks a
+                               control's KeyBindings while the KeyDown bubbles up from whichever
+                               descendant has focus, so this doesn't need repeating per TextBox. -->
+                          <StackPanel.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding ApplyStrengthEditCommand}" />
+                          </StackPanel.KeyBindings>
                           <TextBlock Text="Stärke korrigieren" Classes="overline" />
                           <HeaderedContentControl Classes="field" Header="ZUGFÜHRER (ZF)">
                             <TextBox Text="{Binding ZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
@@ -177,8 +183,12 @@
                   </Button>
                   <Button Content="Verlauf" Padding="6,2" IsVisible="{Binding HasHistory}">
                     <Button.Flyout>
-                      <Flyout Placement="BottomEdgeAlignedLeft">
-                        <ItemsControl ItemsSource="{Binding EditLines}" Margin="4">
+                      <!-- Opened: nothing in this read-only list is focusable, so without
+                           grabbing focus here, Escape's built-in Flyout light-dismiss has no
+                           focused element inside the popup to route the key press through, and
+                           the flyout is stuck open until a click outside it. -->
+                      <Flyout Placement="BottomEdgeAlignedLeft" Opened="OnHistoryFlyoutOpened">
+                        <ItemsControl ItemsSource="{Binding EditLines}" Margin="4" Focusable="True">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
                               <TextBlock Text="{Binding}" Margin="0,2" />
@@ -232,7 +242,7 @@
                 <Button Classes="icon-btn" Margin="6,4"
                         IsVisible="{Binding !IsReadOnly}"
                         Command="{Binding RemoveCommand}"
-                        ToolTip.Tip="Einheit entfernen">
+                        ToolTip.Tip="Einheit entfernen" AutomationProperties.Name="Einheit entfernen">
                   <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
                 </Button>
               </DataTemplate>
