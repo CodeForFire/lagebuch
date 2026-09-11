@@ -25,6 +25,7 @@ namespace LageBuch.Sync;
 public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 {
     private readonly HttpClient _http;
+    private readonly HttpClientHandler _handler;
     private readonly HubConnection _hub;
     private readonly IUiDispatcher _ui;
     private readonly string? _cacheRoot;
@@ -74,6 +75,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     private RemoteIncidentSession(
         HttpClient http,
+        HttpClientHandler handler,
         HubConnection hub,
         IUiDispatcher ui,
         SessionOperator op,
@@ -82,6 +84,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string hostMasterDataJson)
     {
         _http = http;
+        _handler = handler;
         _hub = hub;
         _ui = ui;
         Operator = op;
@@ -104,6 +107,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <param name="op">This device's operator, attributed on every command it sends.</param>
     /// <param name="localVersion">This device's app version, compared against the host's.</param>
     /// <param name="ui">Dispatcher used to marshal SignalR callbacks onto the UI thread.</param>
+    /// <param name="trustStore">
+    /// Store of trusted TLS thumbprints, keyed by host address, driving Trust-on-First-Use: on first
+    /// contact the presented certificate's thumbprint is saved and accepted; on a later connect the
+    /// host's certificate is accepted only if its thumbprint still matches the saved one, otherwise
+    /// <see cref="CertificateChangedException"/> is thrown. Required — every caller must supply one
+    /// (both app heads always do via <c>JsonTrustStore</c>); there is no "accept any certificate"
+    /// fallback, so a joined session is never unpinned.
+    /// </param>
     /// <param name="pin">The host's share PIN, if it requires one.</param>
     /// <param name="port">The host's port — <see cref="SyncProtocol.Port"/> unless overridden (tests).</param>
     /// <param name="reconnectPolicy">Overrides the default reconnect policy (tests only).</param>
@@ -113,67 +124,56 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// supply it (a folder under the app's data/cache dir). Null disables caching — bytes are
     /// re-fetched from the host on every call, which is correct, just not free.
     /// </param>
-    /// <param name="trustStore">
-    /// Optional store of trusted TLS thumbprints, keyed by host address, driving Trust-on-First-Use:
-    /// on first contact the presented certificate's thumbprint is saved and accepted; on a later
-    /// connect the host's certificate is accepted only if its thumbprint still matches the saved one,
-    /// otherwise <see cref="CertificateChangedException"/> is thrown. When null the host's (self-signed)
-    /// certificate is accepted as-is, preserving the pre-TOFU behavior.
-    /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
     public static async Task<RemoteIncidentSession> ConnectAsync(
         string host,
         SessionOperator op,
         string localVersion,
         IUiDispatcher ui,
+        ITrustStore trustStore,
         string? pin = null,
         int port = SyncProtocol.Port,
         IRetryPolicy? reconnectPolicy = null,
         string? cacheRoot = null,
-        ITrustStore? trustStore = null,
         CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(trustStore);
+
         var baseUri = new Uri($"https://{host}:{port}");
 
         // A single handler backs both the HttpClient and the SignalR hub connection, so they agree on
-        // TLS validation. With a trust store, pin the presented cert via Trust-on-First-Use; without
-        // one, accept any cert (the host serves a fresh self-signed cert per share session, so it is
-        // never in the OS trust store — accepting it is what keeps the pre-TOFU path working). A
-        // certificate that differs from the previously-trusted one throws CertificateChangedException
-        // from inside the callback; the connect await surfaces it (§ P0 #2).
-#pragma warning disable CA2000 // The handler's lifetime is taken on by the HttpClient below (disposed in DisposeAsync after the hub), so an unconditional using would dispose it while the hub's long-lived transport was still using it.
+        // TLS validation: pin the presented cert via Trust-on-First-Use. A certificate that differs
+        // from the previously-trusted one throws CertificateChangedException from inside the callback;
+        // the connect await surfaces it (§ P0 #2).
         var handler = new HttpClientHandler { CheckCertificateRevocationList = true };
-        if (trustStore is not null)
+        handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
         {
-            handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
+            if (cert is null)
             {
-                if (cert is null)
-                {
-                    return false;
-                }
+                return false;
+            }
 
-                var thumbprint = Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256));
-                var known = trustStore.GetThumbprint(host);
-                if (known is null)
-                {
-                    trustStore.SaveThumbprint(host, thumbprint);
-                    return true;
-                }
+            var thumbprint = Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256));
+            var known = trustStore.GetThumbprint(host);
+            if (known is null)
+            {
+                trustStore.SaveThumbprint(host, thumbprint);
+                return true;
+            }
 
-                if (string.Equals(known, thumbprint, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
+            if (string.Equals(known, thumbprint, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
 
-                throw new CertificateChangedException(host);
-            };
-        }
-        else
-        {
-            handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-        }
-#pragma warning restore CA2000
-        var http = new HttpClient(handler) { BaseAddress = baseUri };
+            throw new CertificateChangedException(host);
+        };
+
+        // disposeHandler: false — this class owns the handler explicitly (DisposeAsync disposes it
+        // after the hub, since the hub's long-lived transport also uses it via HttpMessageHandlerFactory
+        // below) rather than relying on HttpClient's default cascade, so ownership is one clear line
+        // instead of implicit via a constructor flag.
+        var http = new HttpClient(handler, disposeHandler: false) { BaseAddress = baseUri };
         if (!string.IsNullOrEmpty(pin))
         {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
@@ -242,7 +242,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, hub, ui, op, initial, cacheRoot, hostMasterDataJson);
+            var session = new RemoteIncidentSession(http, handler, hub, ui, op, initial, cacheRoot, hostMasterDataJson);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -271,6 +271,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         catch
         {
             http.Dispose();
+            handler.Dispose();
             throw;
         }
     }
@@ -527,8 +528,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // The hub's transport uses _handler (via HttpMessageHandlerFactory) for as long as it's
+        // running, so it must be torn down first; only then are the HttpClient and the handler it
+        // doesn't own (disposeHandler: false, above) both disposed here explicitly.
         await _hub.DisposeAsync();
         _http.Dispose();
+        _handler.Dispose();
     }
 
     // SignalR's default policy gives up after ~30s; on a callout a device's mobile data can blip for

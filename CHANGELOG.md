@@ -42,6 +42,12 @@ once we reach 1.0.
   its extension must match the declared file type, ÖFFNEN copies the bytes into a fresh private
   directory under the app's own temp root instead of the shared system temp directory, and the
   desktop launcher refuses anything that is not a regular image or PDF file inside that root. (#285)
+- `JsonTrustStore` now takes its lock for reads too, closing a race where the TLS
+  certificate-pin check on a join could read the trusted-thumbprint cache while another
+  handshake was writing it; the trust file is also now written via a temp file plus rename, so
+  a crash mid-write can no longer leave a corrupt `trust.json` behind. Joining another device's
+  incident no longer has an "accept any certificate" fallback — a trust store is required, so a
+  join is always TLS-pinned. (#286)
 
 ## [0.4.1] - 2026-09-07
 

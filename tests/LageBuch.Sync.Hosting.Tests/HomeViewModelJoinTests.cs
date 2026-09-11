@@ -14,6 +14,9 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// </summary>
 public class HomeViewModelJoinTests
 {
+    // trust defaults to a fresh InMemoryTrustStore rather than null: RemoteIncidentSession.ConnectAsync
+    // requires a trust store (there is no accept-any fallback any more), so every join test needs a
+    // real one -- passing an explicit instance is only necessary for tests asserting on its contents.
     private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null) =>
         new(
             new InMemoryStore(),
@@ -25,7 +28,7 @@ public class HomeViewModelJoinTests
             new NoAlarm(),
             new NoopIncidentHostController(),
             "1.0.0",
-            trustStore: trust);
+            trustStore: trust ?? new InMemoryTrustStore());
 
     private static LocalIncidentSession HostSession(FixedClock clock) =>
         LocalIncidentSession.StartNew(

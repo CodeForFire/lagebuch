@@ -3,6 +3,7 @@ using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
+using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -12,9 +13,15 @@ public class MainWindowViewModelTests
     // parameterless new FixedClock() does not compile against it.
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
+    // A trust store is required here (not just cosmetic): CancelJoin_aborts_a_stuck_connection_attempt
+    // below drives a real RemoteIncidentSession.ConnectAsync against a loopback listener, and
+    // ConnectAsync has no accept-any fallback -- it needs a real ITrustStore to even attempt the TLS
+    // handshake it's cancelling. A fresh temp-backed JsonTrustStore per HomeViewModel keeps every
+    // test's TOFU state isolated from the others.
     private static MainWindowViewModel New(IFileDialogService? dialogs = null)
     {
-        var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var trustStore = new JsonTrustStore(Path.Combine(Path.GetTempPath(), $"trust-{Guid.NewGuid():N}.json"));
+        var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", trustStore: trustStore);
         return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), dialogs ?? new FakeDialogs(), "0.1.0");
     }
 
