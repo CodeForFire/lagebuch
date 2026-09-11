@@ -1,3 +1,4 @@
+using System.Text;
 using LageBuch.Domain.Files;
 
 namespace LageBuch.Domain.Tests;
@@ -157,6 +158,166 @@ public class FilesTests
         var ex = Assert.Throws<ArgumentException>(() =>
             IncidentFile.Create("x.pdf", "application/pdf", IncidentFile.MaxSizeBytes + 1, T0, "Müller"));
         Assert.Equal("sizeBytes", ex.ParamName);
+    }
+
+    // A joined sync client picks the file name (AddFileCommand), and every peer later writes those
+    // bytes to a temp file under that name before handing it to the OS — so a name carrying path
+    // segments must never survive the domain.
+    [Theory]
+    [InlineData("../../evil.png", "evil.png")]
+    [InlineData("..\\evil.png", "evil.png")]
+    [InlineData("dir/evil.png", "evil.png")]
+    [InlineData("/etc/cron.d/evil.png", "evil.png")]
+    [InlineData("..\\..\\..\\Startup\\evil.png", "evil.png")]
+    [InlineData("  ../evil.png  ", "evil.png")]
+    [InlineData("..evil.png", "..evil.png")] // leading dots are not a traversal on their own
+    public void Create_keeps_only_the_last_path_segment_of_a_hostile_file_name(string hostile, string expected)
+    {
+        var file = IncidentFile.Create(hostile, "image/png", 1024, T0, "Müller");
+
+        Assert.Equal(expected, file.FileName);
+        Assert.Equal(expected, file.DisplayName);
+    }
+
+    // The host may run Windows and the client Linux (or the other way round): the same name has to
+    // come out the same on both, so the Windows-invalid set is stripped regardless of the OS.
+    [Fact]
+    public void Create_strips_characters_that_are_invalid_in_a_file_name_on_any_platform()
+    {
+        var file = IncidentFile.Create("br<a>n:d\"|?*.jpg", "image/jpeg", 1024, T0, "Müller");
+
+        Assert.Equal("brand.jpg", file.FileName);
+    }
+
+    // A Windows drive-relative name: Path.GetFileName would answer differently on Windows than on
+    // Linux, so the colon is stripped like any other Windows-invalid character instead — the host
+    // and every joined client end up with the same name whatever they run.
+    [Fact]
+    public void Create_treats_a_drive_relative_name_the_same_on_every_platform()
+    {
+        var file = IncidentFile.Create("C:evil.png", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal("Cevil.png", file.FileName);
+    }
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData("..")]
+    [InlineData("../..")]
+    [InlineData("..\\")]
+    [InlineData("<>|?*")]
+    [InlineData(".<.")] // strips down to ".."
+    public void Create_rejects_a_file_name_that_leaves_nothing_usable(string hostile)
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            IncidentFile.Create(hostile, "image/png", 1024, T0, "Müller"));
+        Assert.Equal("fileName", ex.ParamName);
+    }
+
+    // The extension decides what the OS launches when a peer presses ÖFFNEN, so it — not just the
+    // declared content type — has to be one of the allowed ones, and the two must agree. Without
+    // this a client could send "Lageplan.hta" declared as image/png and have every peer hand the
+    // bytes to mshta (.js/.wsf/.url/.lnk/.vbs on Windows, .desktop on Linux, likewise).
+    [Theory]
+    [InlineData("Lageplan.hta", "image/png")]
+    [InlineData("Lageplan.desktop", "image/png")]
+    [InlineData("Lageplan.png.exe", "image/png")]
+    [InlineData("Lageplan", "image/png")] // no extension at all
+    [InlineData("brand.png", "image/jpeg")] // allowed extension, but not this content type
+    public void Create_rejects_a_file_name_whose_extension_does_not_match_the_content_type(
+        string fileName, string contentType)
+    {
+        var ex = Assert.Throws<ArgumentException>(() =>
+            IncidentFile.Create(fileName, contentType, 1024, T0, "Müller"));
+        Assert.Equal("fileName", ex.ParamName);
+    }
+
+    [Theory]
+    [InlineData("brand.jpg", "image/jpeg")]
+    [InlineData("brand.JPG", "image/jpeg")] // the extension match is case-insensitive
+    [InlineData("brand.jpeg", "image/jpeg")]
+    [InlineData("brand.png", "image/png")]
+    [InlineData("brand.gif", "image/gif")]
+    [InlineData("brand.webp", "image/webp")]
+    [InlineData("bericht.pdf", "application/pdf")]
+    public void Create_accepts_every_allowed_extension_with_its_own_content_type(
+        string fileName, string contentType)
+    {
+        Assert.Equal(fileName, IncidentFile.Create(fileName, contentType, 1024, T0, "Müller").FileName);
+    }
+
+    // Legacy rows must keep loading: Rehydrate never applies the extension/content-type rule.
+    [Fact]
+    public void Rehydrate_keeps_a_name_whose_extension_does_not_match_the_content_type()
+    {
+        var file = IncidentFile.Rehydrate(
+            Guid.NewGuid(), "Lageplan.hta", "Lageplan", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal("Lageplan.hta", file.FileName);
+    }
+
+    // Most filesystems cap a name at 255 bytes; a longer one would fail the write (or, once
+    // truncated by the OS, lose the extension that decides which viewer opens it).
+    [Fact]
+    public void Create_caps_a_long_file_name_at_255_bytes_and_keeps_the_extension()
+    {
+        var file = IncidentFile.Create(new string('a', 300) + ".png", "image/png", 1024, T0, "Müller");
+
+        Assert.True(Encoding.UTF8.GetByteCount(file.FileName) <= 255);
+        Assert.Equal(".png", Path.GetExtension(file.FileName));
+        Assert.StartsWith("aaaa", file.FileName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_caps_a_long_multibyte_file_name_without_splitting_a_character()
+    {
+        var file = IncidentFile.Create(new string('ä', 300) + ".png", "image/png", 1024, T0, "Müller");
+
+        Assert.True(Encoding.UTF8.GetByteCount(file.FileName) <= 255);
+        Assert.Equal(".png", Path.GetExtension(file.FileName));
+
+        // Every remaining stem character is a whole 'ä' — no half-written UTF-8 sequence.
+        Assert.All(file.FileName[..^4], c => Assert.Equal('ä', c));
+    }
+
+    // Rehydrate is the load path (SQLite and a host's snapshot), so it sanitises the same way but
+    // must never throw — a hostile name already on disk still has to open.
+    [Theory]
+    [InlineData("../../evil.png", "evil.png")]
+    [InlineData("..\\evil.png", "evil.png")]
+    [InlineData("dir/evil.png", "evil.png")]
+    public void Rehydrate_sanitises_a_hostile_file_name(string hostile, string expected)
+    {
+        var file = IncidentFile.Rehydrate(
+            Guid.NewGuid(), hostile, "Küchenbrand", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal(expected, file.FileName);
+        Assert.Equal("Küchenbrand", file.DisplayName); // a free-form label, left alone
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData("../..")]
+    [InlineData("<>|?*")]
+    [InlineData("  ")]
+    public void Rehydrate_falls_back_to_the_storage_style_name_instead_of_throwing(string hostile)
+    {
+        var id = Guid.NewGuid();
+
+        var file = IncidentFile.Rehydrate(id, hostile, "Küchenbrand", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal($"{id}", file.FileName); // StorageFileName's shape — no extension left to keep
+    }
+
+    // Stripping the invalid characters can leave a bare extension; that is a usable, traversal-free
+    // name, so it is kept rather than replaced by the fallback.
+    [Fact]
+    public void Rehydrate_keeps_a_name_that_strips_down_to_a_bare_extension()
+    {
+        var file = IncidentFile.Rehydrate(
+            Guid.NewGuid(), "../../<>|.png", "Küchenbrand", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal(".png", file.FileName);
     }
 
     [Fact]

@@ -402,10 +402,197 @@ public class FilesViewModelTests
         }
         finally
         {
-            if (dialogs.LastOpenedPath is not null)
-            {
-                File.Delete(dialogs.LastOpenedPath);
-            }
+            DeleteOpenDirectory(dialogs.LastOpenedPath);
+        }
+    }
+
+    // The copy must land in a private per-open directory under the app's own temp root: the file
+    // name comes from a peer's AddFileCommand, and the shared temp directory was both writable
+    // from that name and overwritten across incidents.
+    [Fact]
+    public async Task OpenFile_copies_into_a_private_per_open_directory_under_the_lagebuch_temp_root()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
+        var dialogs = new FakeDialogs();
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row);
+        var first = dialogs.LastOpenedPath;
+        await vm.OpenFileCommand.ExecuteAsync(row);
+        var second = dialogs.LastOpenedPath;
+        try
+        {
+            Assert.NotNull(first);
+            Assert.NotNull(second);
+            var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+            Assert.StartsWith(root + Path.DirectorySeparatorChar, first, StringComparison.Ordinal);
+            Assert.Equal("brand.jpg", Path.GetFileName(first));
+            Assert.Equal(root, Path.GetDirectoryName(Path.GetDirectoryName(first))); // one level down
+            Assert.NotEqual(first, second); // a fresh directory per open, never a shared temp name
+        }
+        finally
+        {
+            DeleteOpenDirectory(first);
+            DeleteOpenDirectory(second);
+        }
+    }
+
+    // The domain already stripped the path segments off the peer-supplied name; this pins that the
+    // view model hands the dialog service that sanitised name and nothing else.
+    [Fact]
+    public async Task OpenFile_uses_the_sanitised_file_name_of_a_hostile_attachment()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("../../evil.png", "image/png", new byte[] { 9, 9, 9 });
+        var dialogs = new FakeDialogs();
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row);
+        try
+        {
+            Assert.NotNull(dialogs.LastOpenedPath);
+            Assert.Equal("evil.png", Path.GetFileName(dialogs.LastOpenedPath));
+            Assert.StartsWith(
+                Path.Combine(Path.GetTempPath(), "lagebuch") + Path.DirectorySeparatorChar,
+                dialogs.LastOpenedPath,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteOpenDirectory(dialogs.LastOpenedPath);
+        }
+    }
+
+    // A row that predates the extension/content-type rule (or arrived from a patched peer) still
+    // loads — Rehydrate deliberately never throws — but must not be opened. The desktop launcher
+    // refuses it, so without this guard ÖFFNEN would look like a dead button and still leave a temp
+    // copy of the bytes behind.
+    [Fact]
+    public async Task OpenFile_refuses_a_rehydrated_row_whose_extension_is_not_an_attachment_type()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        store.Save("/x.fwincident", IncidentWithFile(IncidentFile.Rehydrate(
+            Guid.NewGuid(), "Einsatzplan.hta", "Einsatzplan", "image/png", 3, T0, "Müller")));
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var dialogs = new FakeDialogs();
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row);
+
+        Assert.Equal("„Einsatzplan“ kann nicht geöffnet werden.", vm.ErrorMessage);
+        Assert.Null(dialogs.LastOpenedPath); // never handed to the launcher
+        Assert.Empty(TempCopiesNamed("Einsatzplan.hta")); // and no temp copy written
+    }
+
+    private static Incident IncidentWithFile(IncidentFile file) => Incident.Rehydrate(
+        Guid.NewGuid(),
+        T0,
+        IncidentState.Open,
+        null,
+        "Brand",
+        null,
+        null,
+        null,
+        null,
+        null,
+        Array.Empty<ChecklistItem>(),
+        Array.Empty<ChecklistItem>(),
+        Array.Empty<Domain.Etb.EtbEntry>(),
+        Array.Empty<RoleAssignment>(),
+        Array.Empty<ForceUnit>(),
+        Array.Empty<Domain.Atemschutz.AtemschutzTrupp>(),
+        Array.Empty<AuditEvent>(),
+        Array.Empty<Domain.Time.IncidentTimerState>(),
+        new[] { file },
+        Array.Empty<Domain.Tasks.IncidentTask>(),
+        Array.Empty<Domain.CoMeasurement.Building>(),
+        Array.Empty<Domain.CoMeasurement.Dwelling>());
+
+    // Any per-open copy of this name anywhere under the temp root. Tolerates another test's
+    // directory disappearing mid-scan — the suite runs classes in parallel.
+    private static string[] TempCopiesNamed(string fileName)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+        try
+        {
+            return Directory.Exists(root)
+                ? Directory.GetFiles(
+                    root,
+                    fileName,
+                    new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+                : Array.Empty<string>();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    // Copying to disk or launching the viewer can fail (full disk, no registered handler); like
+    // AddFileAsync and RemoveFileAsync, that belongs in ErrorMessage rather than escaping an async
+    // command as an unobserved exception.
+    [Fact]
+    public async Task OpenFile_surfaces_a_failure_as_an_error_message()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
+        var dialogs = new FakeDialogs { OpenFileFailure = new InvalidOperationException("kein Programm registriert") };
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row); // must not throw
+
+        try
+        {
+            Assert.Equal("kein Programm registriert", vm.ErrorMessage);
+        }
+        finally
+        {
+            DeleteOpenDirectory(dialogs.LastOpenedPath);
+        }
+    }
+
+    // Removes the per-open directory the view model created — guarded so a regression that writes
+    // straight into the system temp directory fails an assertion instead of deleting /tmp.
+    private static void DeleteOpenDirectory(string? openedPath)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+        if (openedPath is not null
+            && Path.GetDirectoryName(openedPath) is { } dir
+            && dir.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            && Directory.Exists(dir))
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+        else if (openedPath is not null && File.Exists(openedPath))
+        {
+            File.Delete(openedPath);
         }
     }
 

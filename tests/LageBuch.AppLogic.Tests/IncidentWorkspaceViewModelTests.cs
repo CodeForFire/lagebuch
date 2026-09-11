@@ -1289,10 +1289,13 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public Task<string?> PickAttachmentAsync() => Task.FromResult(AttachmentPath);
 
+    /// <summary>Set to make <see cref="OpenFileAsync"/> fail, standing in for a launcher that throws.</summary>
+    public Exception? OpenFileFailure { get; set; }
+
     public Task OpenFileAsync(string path)
     {
         LastOpenedPath = path;
-        return Task.CompletedTask;
+        return OpenFileFailure is null ? Task.CompletedTask : Task.FromException(OpenFileFailure);
     }
 
     public Task OpenUrlAsync(string url)
