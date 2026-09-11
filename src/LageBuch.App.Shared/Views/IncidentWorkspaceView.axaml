@@ -120,6 +120,25 @@
             </StackPanel>
           </Grid>
 
+          <!-- Persistence failure banner (issue #167 review follow-up): IncidentStore's background
+               writer can silently fail a queued write (disk full, read-only, locked/corrupt DB),
+               and nothing used to surface that, so the screen kept saying "gespeichert" while
+               nothing reached disk. Stays up (unlike the export/share status lines) until a later
+               save actually succeeds. Red, not the amber used for the read-only/disconnect states
+               below, because unlike those this means data loss is actively happening right now. -->
+          <Border x:Name="PersistenceErrorBanner" Background="#2A1013"
+                  BorderBrush="#F87171" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
+                  IsVisible="{Binding PersistenceError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
+                        Foreground="#F87171"
+                        Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+              <TextBlock x:Name="PersistenceErrorText" Text="{Binding PersistenceError}" FontWeight="SemiBold"
+                         TextWrapping="Wrap" Foreground="#F87171" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+
           <!-- Joined-client disconnect banner (#52 §7): auto-reconnect is running; input is greyed
                out until it succeeds. "Zur Startseite" lets the user give up without waiting. -->
           <Border x:Name="DisconnectedBanner" Background="#241608"
@@ -250,9 +269,24 @@
              each tab's own "add entry" affordance without a stray click landing on either. -->
         <Grid ColumnDefinitions="Auto,*,Auto">
           <StackPanel x:Name="SavedStatusPanel" Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <Ellipse Width="7" Height="7" Fill="{StaticResource ActiveBrush}" VerticalAlignment="Center" />
-            <TextBlock Classes="mono" FontSize="12" VerticalAlignment="Center"
-                       Text="{Binding LastSavedAt, StringFormat='gespeichert {0:HH:mm:ss}'}" />
+            <!-- Healthy: green dot + last-saved timestamp. LastSavedAt is set when Save() is
+                 *called*, not when the queued write actually lands, so this must NOT show at the
+                 same time as PersistenceError, which would flatly contradict the red banner above.
+                 That contradiction is exactly the bug this pair of mutually exclusive panels fixes. -->
+            <StackPanel x:Name="SavedStatus" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                        IsVisible="{Binding PersistenceError, Converter={x:Static ObjectConverters.IsNull}}">
+              <Ellipse Width="7" Height="7" Fill="{StaticResource ActiveBrush}" VerticalAlignment="Center" />
+              <TextBlock Classes="mono" FontSize="12" VerticalAlignment="Center"
+                         Text="{Binding LastSavedAt, StringFormat='gespeichert {0:HH:mm:ss}'}" />
+            </StackPanel>
+            <!-- Failed: same red brushes as PersistenceErrorBanner above, so the footer and the
+                 banner read as one consistent statement rather than two disagreeing ones. -->
+            <StackPanel x:Name="NotSavedStatus" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                        IsVisible="{Binding PersistenceError, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <Ellipse Width="7" Height="7" Fill="#F87171" VerticalAlignment="Center" />
+              <TextBlock Classes="mono" FontSize="12" VerticalAlignment="Center" Foreground="#F87171"
+                         Text="nicht gespeichert" />
+            </StackPanel>
             <!-- Export outcome (#262): a fresh success/failure message, or the last export this
                  incident remembers, seeded before any export happens this session. Inline next to
                  the save status (same idiom as the header's ShareStatus), not its own row: a

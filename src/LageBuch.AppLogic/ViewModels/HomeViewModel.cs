@@ -205,7 +205,11 @@ public sealed partial class HomeViewModel : ObservableObject
         }
 
         InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport);
+
+        // The local workspace's own saves flow through this same _store singleton, so wiring it
+        // through here (issue #167 review follow-up) lets it surface a failed background write
+        // that would otherwise leave the operator believing the incident is safely persisted.
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport, _store, _uiDispatcher);
         WorkspaceOpened?.Invoke(workspace);
     }
 

@@ -57,9 +57,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private AboutViewModel? _pendingAbout;
 
-    // Every path that leaves the editor goes through here, so unsaved Stammdaten edits prompt first.
-    // When the editor is not the current view, or has no unsaved changes, navigation is immediate.
-    private void NavigateAway(Action proceed)
+    // Every path that leaves the editor or an open workspace goes through here. Unsaved Stammdaten
+    // edits prompt first; leaving an open IncidentWorkspaceViewModel drains and unsubscribes it from
+    // the app-lifetime IIncidentStore singleton first (review follow-up to #280) -- otherwise the top
+    // command bar's ÜBERSICHT/STAMMDATEN/ÖFFNEN/NEUER EINSATZ/VERBINDEN buttons (unlike the
+    // workspace's own "ZUR STARTSEITE", which already routes through GoHomeRequested -> LeaveAsync)
+    // would drop the old workspace from CurrentView while it stayed subscribed forever.
+    private async Task NavigateAwayAsync(Action proceed)
     {
         if (ReferenceEquals(CurrentView, _editor))
         {
@@ -69,15 +73,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             _editor.ConfirmDiscardThen(proceed);
+            return;
         }
-        else
+
+        if (CurrentView is IncidentWorkspaceViewModel ws)
         {
-            proceed();
+            await ws.LeaveAsync();
         }
+
+        proceed();
     }
 
     [RelayCommand]
-    private void RequestNewIncident() => NavigateAway(() =>
+    private Task RequestNewIncident() => NavigateAwayAsync(() =>
     {
         _pending = PendingAction.New;
         PendingPrompt = new OperatorPromptViewModel(
@@ -87,12 +95,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
     [RelayCommand]
-    private void RequestOpenFile() => NavigateAway(() => _home.OpenFileCommand.Execute(null));
+    private Task RequestOpenFile() => NavigateAwayAsync(() => _home.OpenFileCommand.Execute(null));
 
     // Joining another device's hosted incident (§6): one prompt collects the host address and who
     // documents on this device, then HomeViewModel.JoinDeviceAsync connects.
     [RelayCommand]
-    private void RequestJoinDevice() => NavigateAway(() =>
+    private Task RequestJoinDevice() => NavigateAwayAsync(() =>
     {
         _pending = PendingAction.Join;
         PendingPrompt = new OperatorPromptViewModel(
@@ -101,7 +109,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     });
 
     [RelayCommand]
-    private void ShowMasterData() => NavigateAway(() => CurrentView = _editor);
+    private Task ShowMasterData() => NavigateAwayAsync(() => CurrentView = _editor);
 
     [RelayCommand]
     private async Task ConfirmOperatorAsync()
@@ -187,10 +195,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void GoHome() => NavigateAway(() => CurrentView = _home);
+    private Task GoHome() => NavigateAwayAsync(() => CurrentView = _home);
 
     // The About overlay sits on top of whatever view is current and navigates nowhere, so it is
-    // deliberately not routed through NavigateAway — no discard prompt should block it.
+    // deliberately not routed through NavigateAwayAsync — no discard prompt should block it.
     [RelayCommand]
     private void ShowAbout()
     {
@@ -199,5 +207,5 @@ public sealed partial class MainWindowViewModel : ObservableObject
         PendingAbout = about;
     }
 
-    public void OpenRecent(string path) => NavigateAway(() => _home.OpenRecentCommand.Execute(path));
+    public Task OpenRecent(string path) => NavigateAwayAsync(() => _home.OpenRecentCommand.Execute(path));
 }

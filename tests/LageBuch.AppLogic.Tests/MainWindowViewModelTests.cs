@@ -126,8 +126,78 @@ public class MainWindowViewModelTests
         Assert.True(workspace.IsReadOnly);
     }
 
+    // Review follow-up to #280: IncidentWorkspaceViewModel subscribes to the app-lifetime
+    // IIncidentStore singleton's SaveFailed/SaveSucceeded in its constructor and previously only
+    // unsubscribed via its own "ZUR STARTSEITE" -> LeaveAsync path. The top command bar's ÜBERSICHT
+    // button reaches GoHomeCommand directly, bypassing that -- without NavigateAwayAsync draining the
+    // outgoing workspace first, it would keep reacting to the store forever after being dropped.
     [Fact]
-    public void OpenRecent_opens_readonly_without_prompt()
+    public async Task GoHome_from_an_open_workspace_unsubscribes_it_from_the_store()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+
+        vm.RequestOpenFileCommand.Execute(null);
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+        store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
+        Assert.Null(workspace.PersistenceError); // left workspace must not react to the store anymore
+    }
+
+    // Same gap, reached via the top bar's STAMMDATEN button instead of ÜBERSICHT.
+    [Fact]
+    public async Task ShowMasterData_from_an_open_workspace_unsubscribes_it_from_the_store()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+
+        vm.RequestOpenFileCommand.Execute(null);
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+        store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
+        Assert.Null(workspace.PersistenceError);
+    }
+
+    // And via ÖFFNEN/NEUER EINSATZ/VERBINDEN: opening a different incident while one is already open,
+    // instead of leaving through the current workspace's own affordance first.
+    [Fact]
+    public async Task Opening_a_second_incident_drains_and_unsubscribes_the_first_workspace_from_the_store()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        LocalIncidentSession.StartNew(store, clock, new SessionOperator("Schmidt"), "/y.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new OpenPathDialogs("/y.fwincident"), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+
+        await vm.OpenRecent("/x.fwincident");
+        var firstWorkspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+
+        await vm.RequestOpenFileCommand.ExecuteAsync(null);
+        var secondWorkspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        Assert.NotSame(firstWorkspace, secondWorkspace);
+
+        store.RaiseSaveFailed(new InvalidOperationException("veraltet"));
+        Assert.Null(firstWorkspace.PersistenceError); // old workspace no longer reacts
+        Assert.Equal(
+            "Speichern fehlgeschlagen: veraltet — Änderungen werden NICHT gesichert.",
+            secondWorkspace.PersistenceError);
+    }
+
+    [Fact]
+    public async Task OpenRecent_opens_readonly_without_prompt()
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
@@ -135,7 +205,7 @@ public class MainWindowViewModelTests
         var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
         var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
 
-        vm.OpenRecent("/x.fwincident");
+        await vm.OpenRecent("/x.fwincident");
 
         Assert.Null(vm.PendingPrompt);
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
@@ -267,9 +337,13 @@ internal sealed class MvFakeMasterData : IMasterDataProvider
 
 internal sealed class OpenPathDialogs : IFileDialogService
 {
-    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
+    private readonly string _path;
 
-    public Task<string?> PickOpenAsync() => Task.FromResult<string?>("/x.fwincident");
+    public OpenPathDialogs(string path = "/x.fwincident") => _path = path;
+
+    public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>(_path);
+
+    public Task<string?> PickOpenAsync() => Task.FromResult<string?>(_path);
 
     public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
 

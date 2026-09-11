@@ -68,4 +68,15 @@ public interface IIncidentStore
         "CA1003",
         Justification = "A plain Exception payload doesn't warrant a bespoke EventArgs type; matches this codebase's other events (e.g. IIncidentSession.Changed), which favor plain delegates over the sender/EventArgs pattern.")]
     event Action<Exception>? SaveFailed;
+
+    /// <summary>
+    /// Raised on the background writer thread after a queued <see cref="Save"/> completes without
+    /// throwing — lets a subscriber that showed a <see cref="SaveFailed"/> message clear it once
+    /// persistence is healthy again. Fires off the UI thread, same caveat as <see cref="SaveFailed"/>.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1003",
+        Justification = "A parameterless signal doesn't warrant a bespoke EventArgs type; matches this codebase's other events (e.g. SaveFailed above, IIncidentSession.Changed).")]
+    event Action? SaveSucceeded;
 }
