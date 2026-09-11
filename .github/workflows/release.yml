@@ -186,7 +186,10 @@ jobs:
         with:
           tag_name: v${{ needs.version.outputs.version }}
           name: Lagebuch v${{ needs.version.outputs.version }}
-          prerelease: true
+          # Full release from 0.5.0 on. Still pre-1.0 (see CHANGELOG.md — breaking changes may
+          # land in any release until then), but no longer flagged as a prerelease: brigades run
+          # these builds on real Einsätze, so the download should be the obvious one.
+          prerelease: false
           files: dist/**/*
           body_path: release-notes.md
 
