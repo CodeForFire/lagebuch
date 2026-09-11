@@ -168,6 +168,23 @@ public class WorkspaceCollaborationTests
         Assert.Equal("Tür sichern", task.Text);
         Assert.Equal(clock.Now.AddMinutes(5), task.DueAt);
 
+        // Client corrects a typo and reassigns -> the host's aggregate picks up the edit (#246).
+        var edited = NextChange(client);
+        client.UpdateTask(task.Id, "Tür sichern (Rückseite)", "FFB 2/44/1", TaskImportance.Medium, TaskUrgency.Medium);
+        await edited;
+
+        var updated = Assert.Single(hostSession.Incident.Tasks);
+        Assert.Equal("Tür sichern (Rückseite)", updated.Text);
+        Assert.Equal("FFB 2/44/1", updated.Assignee);
+
+        // Client extends the timer by 5 minutes (#246 "+5" quick action).
+        var extended = NextChange(client);
+        var dueBefore = updated.DueAt;
+        client.ExtendTaskTimer(task.Id, 5);
+        await extended;
+
+        Assert.Equal(dueBefore.AddMinutes(5), Assert.Single(hostSession.Incident.Tasks).DueAt);
+
         // Client completes -> the host's own aggregate flips too, attributed to the client device.
         var roundTrip = NextChange(client);
         client.SetTaskCompleted(task.Id, true);

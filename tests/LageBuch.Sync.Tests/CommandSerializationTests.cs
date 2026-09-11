@@ -55,6 +55,8 @@ public class CommandSerializationTests
         new AddTaskCommand(Op, "Nachfordern", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), true),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), false),
+        new UpdateTaskCommand(Guid.NewGuid(), "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium),
+        new ExtendTaskTimerCommand(Guid.NewGuid(), 5),
     }.Select(c => new object[] { c });
 
     [Theory]
