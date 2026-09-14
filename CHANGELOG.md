@@ -25,6 +25,11 @@ once we reach 1.0.
   used to open on focus only re-offered what the Fahrzeug picker already lists. Enter in
   either field adds the row.
 
+### Fixed
+- The sync server only bound IPv4 (`0.0.0.0`), so a device reachable only over IPv6 could never
+  join a hosted incident. It now binds dual-stack, accepting both IPv4 and IPv6 on the same
+  socket, and falls back to IPv4-only itself if the platform doesn't support IPv6.
+
 ## [0.5.0] - 2026-09-11
 
 Attachment handling, PDF export control, more depth in CO-Messung and accessibility —
