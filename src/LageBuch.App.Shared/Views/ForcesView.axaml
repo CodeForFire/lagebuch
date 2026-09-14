@@ -64,29 +64,32 @@
               </Button>
             </StackPanel>
           </HeaderedContentControl>
-          <!-- Suggestion list, not a closed set: mutual-aid brigades from outside the Landkreis
-               must stay enterable, so this is an AutoCompleteBox rather than a ComboBox. Readonly
-               while a Fahrzeug is selected, since its Wache derived this field (#215). -->
-          <HeaderedContentControl Classes="field suggest" Header="FEUERWEHR / WACHE">
-            <AutoCompleteBox x:Name="BrigadeBox" Width="160"
-                             IsEnabled="{Binding !IsVehicleSelected}"
-                             PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
-                             ItemsSource="{Binding BrigadeOptions}"
-                             FilterMode="ContainsOrdinal"
-                             MinimumPrefixLength="0"
-                             Text="{Binding NewBrigade}"
-                             b:EnterSubmit.Command="{Binding AddForceCommand}" />
+          <!-- Plain text on purpose: vehicles from the Stammdaten are picked via FAHRZEUG above,
+               so these two fields only serve vehicles that are NOT in the master data (Fremdwehren,
+               mutual aid from outside the Landkreis). A suggestion list here would just re-offer
+               what the dropdown already has. Readonly while a Fahrzeug is selected, since its Wache
+               derived this field (#215). -->
+          <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE">
+            <TextBox x:Name="BrigadeBox" Width="160"
+                     IsEnabled="{Binding !IsVehicleSelected}"
+                     PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
+                     Text="{Binding NewBrigade}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding AddForceCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
           </HeaderedContentControl>
-          <!-- Freitext-fähig: Fahrzeuge, die nicht in den Stammdaten stehen (Fremdwehren). Readonly
-               while a Fahrzeug is selected, same reasoning as Feuerwehr/Wache above. -->
-          <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
-            <AutoCompleteBox x:Name="CallSignBox" Width="140"
-                             IsEnabled="{Binding !IsVehicleSelected}"
-                             PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
-                             ItemsSource="{Binding CallSignOptions}"
-                             FilterMode="ContainsOrdinal"
-                             MinimumPrefixLength="0"
-                             Text="{Binding NewCallSign}" />
+          <!-- Same reasoning as Feuerwehr/Wache above: free text for vehicles outside the Stammdaten,
+               readonly while a Fahrzeug is selected. -->
+          <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+            <TextBox x:Name="CallSignBox" Width="140"
+                     IsEnabled="{Binding !IsVehicleSelected}"
+                     PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
+                     Text="{Binding NewCallSign}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding AddForceCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN">
             <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
