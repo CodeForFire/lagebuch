@@ -18,10 +18,31 @@ permissions:
 
 jobs:
   build-test:
+    # Pin the display name to just the OS. GitHub derives a matrix job's name
+    # from *every* matrix key, so without this the extra `solution`/`android`
+    # keys below would rename the checks to e.g.
+    # "build-test (ubuntu-latest, LageBuch.sln, true)" and the contexts
+    # required by branch protection -- "build-test (ubuntu-latest)" and
+    # "build-test (windows-latest)" -- would never be reported.
+    name: build-test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          # Linux builds the full solution, Android head included -- it is also
+          # the runner release.yml publishes the APK from.
+          - os: ubuntu-latest
+            solution: LageBuch.sln
+            android: true
+          # Windows only needs the desktop projects. It never ships an Android
+          # artifact, and paying for one there is expensive: `dotnet workload
+          # install android` takes ~4min on windows-latest because it goes down
+          # the MSI installer path *and* syncs the image's VS-registered
+          # maui/ios/wasm-tools workloads (only ~25% of that time is Android).
+          # Building the Android head then costs another ~90s on top.
+          - os: windows-latest
+            solution: LageBuch.Desktop.slnf
+            android: false
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,16 +53,18 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Setup JDK
+        if: matrix.android
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Install Android workload
+        if: matrix.android
         run: dotnet workload install android
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore ${{ matrix.solution }}
 
       - name: Format check
         run: |
@@ -49,7 +72,7 @@ jobs:
           dotnet format style LageBuch.Desktop.slnf --verify-no-changes
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build ${{ matrix.solution }} --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal
+        run: dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
