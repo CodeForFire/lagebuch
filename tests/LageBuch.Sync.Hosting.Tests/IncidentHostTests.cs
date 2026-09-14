@@ -57,6 +57,32 @@ public class IncidentHostTests
     }
 
     [Fact]
+    public async Task Host_bound_to_IPv6Any_still_accepts_IPv4_connections()
+    {
+        // Proves the dual-stack path (StartAsync -> ListenAnyIP for a wildcard address): a socket
+        // bound only to IPv6Any accepts an IPv4 connection solely because DualMode is on. Asserting
+        // via 127.0.0.1 rather than ::1 keeps this test independent of whether the CI/sandbox
+        // network namespace has IPv6 loopback configured at all -- IPv4 loopback always is.
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.IPv6Any, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var version = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute)));
+        Assert.Equal("1.2.3", version.Version);
+    }
+
+    [Fact]
     public async Task Host_applies_an_edit_journal_entry_command_and_broadcasts_it()
     {
         var clock = new FixedClock();

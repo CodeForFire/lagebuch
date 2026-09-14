@@ -73,7 +73,21 @@ public sealed class IncidentHost : IAsyncDisposable
         // Serve TLS with a fresh self-signed cert minted per share session; the client pins it via
         // Trust-on-First-Use (§ P0 #2) rather than the OS trust store.
         (_cert, _) = SyncCertificate.Generate();
-        builder.WebHost.UseKestrel(o => o.Listen(bindAddress, port, l => l.UseHttps(_cert)));
+        builder.WebHost.UseKestrel(o =>
+        {
+            // "Bind everything" is requested as either wildcard depending on caller history/tests;
+            // ListenAnyIP binds a dual-stack (IPv4+IPv6) socket and falls back to IPv4-only itself
+            // if the platform doesn't support IPv6, so callers don't need their own retry logic.
+            // A specific address (e.g. loopback, used by every test) still binds exactly that.
+            if (bindAddress.Equals(IPAddress.Any) || bindAddress.Equals(IPAddress.IPv6Any))
+            {
+                o.ListenAnyIP(port, l => l.UseHttps(_cert));
+            }
+            else
+            {
+                o.Listen(bindAddress, port, l => l.UseHttps(_cert));
+            }
+        });
 
         // Keep the hub's JSON aligned with SyncJson: enums as strings, web (camelCase) naming.
         builder.Services.AddSignalR().AddJsonProtocol(o =>
