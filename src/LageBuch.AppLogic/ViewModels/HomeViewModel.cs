@@ -110,14 +110,11 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
-        // Date + time + Stichwort, e.g. "20260819-2217-B3P.fwincident" -- the Einsatznummer is
-        // unknown at creation (#69) and no longer part of the filename; it can be added later from
-        // the workspace header. No Stichwort at all just leaves the timestamp alone.
+        // Date + time, e.g. "20260819-2217.fwincident". Neither the Einsatznummer (#69) nor the
+        // Stichwort is known at creation -- both are entered later through the workspace's
+        // Einsatzdaten dialog -- so nothing but the timestamp is available to name the file.
         var timestamp = _clock.Now.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
-        var stem = string.IsNullOrWhiteSpace(request.Keyword)
-            ? timestamp
-            : $"{timestamp}-{StripInvalidFileNameChars(request.Keyword.Trim())}";
-        var suggestedName = $"{stem}.fwincident";
+        var suggestedName = $"{timestamp}.fwincident";
         var path = await _dialogs.PickSaveAsync(suggestedName, _lastSaveFolder?.GetLastFolder());
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -138,18 +135,8 @@ public sealed partial class HomeViewModel : ObservableObject
             path,
             md.ChecklistTemplateAufbau.Select(i => (i.Text, i.IsMandatory)),
             md.ChecklistTemplateAbbau.Select(i => (i.Text, i.IsMandatory)),
-            incidentNumber: null,
-            keyword: request.Keyword);
+            incidentNumber: null);
         OpenWorkspace(session, path, md);
-    }
-
-    // Filesystem-invalid characters differ per platform; Path.GetInvalidFileNameChars() reflects
-    // whichever OS is running, so this drops only what that platform actually rejects and
-    // otherwise preserves the input verbatim, spaces included.
-    private static string StripInvalidFileNameChars(string value)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        return new string(value.Where(c => Array.IndexOf(invalid, c) < 0).ToArray());
     }
 
     // Opening is always read-only and prompt-free. The workspace offers "Weiter bearbeiten"

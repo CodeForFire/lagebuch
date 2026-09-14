@@ -32,7 +32,9 @@ and [QuestPDF](https://www.questpdf.com/) report generation.
 **Incident workspace** — one window per Einsatz, keyboard-first:
 
 - **Einsatzkopf** — Stichwort as the header hero, complete Bavarian-format
-  Einsatznummer (`B 1.2 <JJMMTT> <lfd.Nr.>`), ILS number addable later
+  Einsatznummer (`B 1.2 <JJMMTT> <lfd.Nr.>`) and the Einsatzadresse (Straße,
+  Ortsteil); all of it entered and changed later through one Einsatzdaten
+  dialog, since none of it is reliably known when the incident starts
 - **ETB** (Einsatztagebuch) — manual entries with incoming/outgoing direction,
   automatic lifecycle logging (open, close, reopen), later editing that keeps a
   full history

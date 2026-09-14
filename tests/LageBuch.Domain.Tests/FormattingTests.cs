@@ -36,4 +36,16 @@ public class FormattingTests
         Assert.Equal("—", Formatting.OrDash("  "));
         Assert.Equal("EL", Formatting.OrDash("EL"));
     }
+
+    [Theory]
+    [InlineData("Hauptstr. 12", "FFB", "Hauptstr. 12, FFB")]
+    [InlineData("Hauptstr. 12", null, "Hauptstr. 12")]
+    [InlineData(null, "FFB", "FFB")]
+    [InlineData("  ", "FFB", "FFB")]
+    [InlineData(null, null, null)]
+    [InlineData(" ", "", null)]
+    public void Address_joins_the_non_blank_parts_and_is_null_when_both_are_blank(string? street, string? district, string? expected)
+    {
+        Assert.Equal(expected, Formatting.Address(street, district));
+    }
 }
