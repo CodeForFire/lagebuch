@@ -87,7 +87,7 @@ public class ForcesNotesFocusTests
         }
 
         // Blur the field the way an operator tabbing away would.
-        view.GetControl<AutoCompleteBox>("BrigadeBox").Focus();
+        view.GetControl<TextBox>("BrigadeBox").Focus();
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("Alarm", session.Incident.Forces[0].Notes);

@@ -20,6 +20,10 @@ once we reach 1.0.
   Einsatzdaten dialog, like the Einsatznummer always was. New files are therefore named by date
   and time only (`20260819-2217.fwincident`), and the header's inline "+ ILS-Nr. hinzufügen"
   editor is replaced by that dialog.
+- Kräfte tab: "Feuerwehr / Wache" and "Funkrufname" in the entry dock are plain text fields.
+  They exist for vehicles that are not in the Stammdaten, so the suggestion dropdown they
+  used to open on focus only re-offered what the Fahrzeug picker already lists. Enter in
+  either field adds the row.
 
 ## [0.5.0] - 2026-09-11
 
