@@ -38,10 +38,14 @@ install -Dm644 "$ICON_PNG" "$ROOT/usr/share/icons/hicolor/512x512/apps/$PKG.png"
 # cursor spinning until the desktop times out. False tells the desktop to use its own heuristics —
 # i.e. the StartupWMClass match above — instead of waiting for a message that never arrives.
 # One main category only: Office;Utility; made the app show up twice in the menu.
+# Version is the Desktop Entry spec version this entry targets, not the app version. 1.1 is the
+# newest spec that added a key used here (Keywords); everything else predates it. Declaring 1.5
+# would be a hard error in desktop-file-validate <= 0.26 (Debian 12, Ubuntu 22.04), which knows
+# no version above 1.4 and fails on anything it does not recognise.
 install -d "$ROOT/usr/share/applications"
 cat > "$ROOT/usr/share/applications/$PKG.desktop" <<DESKTOP
 [Desktop Entry]
-Version=1.5
+Version=1.1
 Type=Application
 Name=Lagebuch
 GenericName=Einsatzdokumentation
@@ -68,7 +72,7 @@ Architecture: amd64
 Maintainer: CodeForFire <noreply@github.com>
 Installed-Size: $SIZE_KB
 Description: Lagebuch — Einsatzdokumentation
- Digitales Einsatztagebuch und Lagedarstellung für die Feuerwehr.
+ Einsatztagebuch, Atemschutzüberwachung und Einsatzberichte für den ELW.
  Self-contained; no .NET runtime required.
 CONTROL
 
