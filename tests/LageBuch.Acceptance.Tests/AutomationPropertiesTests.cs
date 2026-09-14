@@ -35,7 +35,7 @@ public class AutomationPropertiesTests
 
     private sealed class NoFiles : IMasterDataFileService
     {
-        public MasterDataSet Read(string path) => MasterDataSet.Empty;
+        public MasterDataImportResult Read(string path) => new(MasterDataSet.Empty, Array.Empty<string>());
 
         public void Write(string path, MasterDataSet set)
         {
@@ -91,7 +91,11 @@ public class AutomationPropertiesTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.AddForceUnit("FFB Wache 1", 9, null, "Alarmiert", null);
-        var md = MasterDataSet.Empty with { Brigades = new[] { "FFB Wache 1" }, UnitStatus = new[] { "Alarmiert" } };
+        var md = MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+            UnitStatus = new[] { "Alarmiert" },
+        };
         return new ForcesViewModel(session, new FixedClock(), md, () => { });
     }
 

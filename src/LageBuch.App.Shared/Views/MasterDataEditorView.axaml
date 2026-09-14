@@ -21,6 +21,14 @@
                   IsVisible="{Binding FileError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding FileError}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
           </Border>
+          <!-- Hinweis, kein Fehler: Wachen/Funkrufnamen aus einer älteren Datei, zu denen kein
+               Fahrzeug und keine Person gehört, werden nicht übernommen und hier benannt. -->
+          <Border x:Name="FileNoticeBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#241608" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding FileNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding FileNotice}" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap" MaxWidth="520" />
+          </Border>
           <!-- Fahrzeuge sind eindeutig (#76 follow-up): doppelte Funkrufnamen blockieren das
                Speichern, die Meldung nennt die Konflikte. -->
           <Border x:Name="VehicleConflictsBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"

@@ -393,7 +393,7 @@ public class MainWindowViewModelTests
 // ReminderViewModelTests.cs — all internal and already visible project-wide in this assembly.
 internal sealed class NoFiles : IMasterDataFileService
 {
-    public MasterDataSet Read(string path) => MasterDataSet.Empty;
+    public MasterDataImportResult Read(string path) => new(MasterDataSet.Empty, Array.Empty<string>());
 
     public void Write(string path, MasterDataSet set)
     {
@@ -409,7 +409,7 @@ internal sealed class MvFakeMasterData : IMasterDataProvider
         Roles = new[] { "EL" },
         ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
         TruppTypes = new[] { "Angriffstrupp" },
-        RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
+        Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), new Vehicle("Aich", "Aich 42/1", 6) },
     };
 
     public void Save(MasterDataSet set)

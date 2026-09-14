@@ -31,8 +31,6 @@ public sealed class MasterDataStore
 
         ReplaceList(cn, tx, "md_roles", set.Roles);
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
-        ReplaceList(cn, tx, "md_call_signs", set.RadioCallSigns);
-        ReplaceList(cn, tx, "md_brigades", set.Brigades);
         ReplaceList(cn, tx, "md_trupp_types", set.TruppTypes);
 
         Run(cn, tx, "DELETE FROM md_links;", _ => { });
@@ -145,8 +143,6 @@ public sealed class MasterDataStore
     {
         const string schema = """
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_call_signs (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_brigades (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0);
@@ -176,6 +172,11 @@ public sealed class MasterDataStore
         // Widen a pre-existing md_vehicles that predates the ZF flag -- existing vehicles read as
         // "no Zugführer" rather than failing to load.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "has_zugfuehrer", "INTEGER NOT NULL DEFAULT 0");
+
+        // Wachen and Funkrufnamen used to be lists of their own; they are derived from md_vehicles
+        // (and md_personnel) now. Drop the stale tables a pre-change store still carries -- their
+        // rows were never more than the names already on the vehicles, and nothing reads them.
+        Exec(cn, "DROP TABLE IF EXISTS md_call_signs; DROP TABLE IF EXISTS md_brigades;");
     }
 
     private static MasterDataSet Read(SqliteConnection cn)
@@ -183,8 +184,6 @@ public sealed class MasterDataStore
         var (checklistAufbau, checklistAbbau) = ReadChecklistTemplate(cn);
         return new(
             ReadColumn(cn, "SELECT value FROM md_roles;"),
-            ReadColumn(cn, "SELECT value FROM md_call_signs;"),
-            ReadColumn(cn, "SELECT value FROM md_brigades;"),
             ReadColumn(cn, "SELECT value FROM md_unit_status;"),
             ReadLinks(cn),
             checklistAufbau,

@@ -70,13 +70,9 @@ public class ForcesTabRenderTests
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
-        Brigades = new[] { AnonymizedExampleData.Brigade, AnonymizedExampleData.SecondBrigade },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
-        RadioCallSigns = new[]
-        {
-            AnonymizedExampleData.CallSign, AnonymizedExampleData.SecondCallSign,
-            AnonymizedExampleData.OtherBrigadeCallSign,
-        },
+
+        // Wachen and Funkrufnamen suggestions derive from these vehicles.
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 

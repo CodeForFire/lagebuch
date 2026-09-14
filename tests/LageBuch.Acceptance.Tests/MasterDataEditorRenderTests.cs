@@ -18,9 +18,15 @@ public class MasterDataEditorRenderTests
         {
             Roles = new[] { "EL", "EAL", "ZF", "GF" },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
-            Brigades = new[] { "FFB Wache 1", "Aich", "Puch" },
-            RadioCallSigns = new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
             TruppTypes = new[] { "Angriffstrupp", "Wassertrupp", "CSA-Trupp" },
+
+            // Wachen and Funkrufnamen derive from these rows (plus the roster's "Land 1").
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/10/1", 9),
+                new Vehicle("Aich", "Aich 42/1", 6),
+                new Vehicle("Puch", "Puch 40/1", 9),
+            },
             ChecklistTemplateAufbau = new[]
             {
                 new ChecklistTemplateItem("Aufstellort ELW frei?", true),
@@ -46,7 +52,7 @@ public class MasterDataEditorRenderTests
 
     private sealed class NoFiles : IMasterDataFileService
     {
-        public MasterDataSet Read(string path) => MasterDataSet.Empty;
+        public MasterDataImportResult Read(string path) => new(MasterDataSet.Empty, Array.Empty<string>());
 
         public void Write(string path, MasterDataSet set)
         {
@@ -64,8 +70,8 @@ public class MasterDataEditorRenderTests
 
         var list = view.GetControl<ListBox>("CategoryList");
 
-        // 10 categories plus #76's Fahrzeuge.
-        Assert.Equal(11, list.ItemCount);
+        // 8 categories plus #76's Fahrzeuge, which also supply the Wachen and Funkrufnamen.
+        Assert.Equal(9, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
@@ -161,7 +167,6 @@ public class MasterDataEditorRenderTests
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         var section = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
-        section.AddCommand.Execute(null);
         section.Rows[0].Wache = "FFB Wache 1";
         section.Rows[0].CallSign = "FFB 1/44/1";
         section.Rows[0].Seats = 9;
@@ -180,19 +185,20 @@ public class MasterDataEditorRenderTests
         Assert.Contains(boxes, b => b.Text == "FFB Wache 1" && b.PlaceholderText == AnonymizedExampleData.BrigadePlaceholder);
         Assert.Contains(boxes, b => b.Text == "FFB 1/44/1" && b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder);
 
-        // The suggestions come from the master data lists; free text stays possible.
-        var wacheBox = boxes.Single(b => b.PlaceholderText == AnonymizedExampleData.BrigadePlaceholder);
+        // The suggestions are derived from the vehicles and roster as loaded; free text stays possible.
+        var wacheBox = boxes.First(b => b.PlaceholderText == AnonymizedExampleData.BrigadePlaceholder);
         Assert.Equal(new[] { "FFB Wache 1", "Aich", "Puch" }, wacheBox.ItemsSource);
         Assert.Equal(
-            new[] { "FFB 1/10/1", "Aich 42/1", "Land 1" },
-            boxes.Single(b => b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder).ItemsSource);
+            new[] { "FFB 1/10/1", "Aich 42/1", "Puch 40/1", "Land 1" },
+            boxes.First(b => b.PlaceholderText == AnonymizedExampleData.CallSignPlaceholder).ItemsSource);
         Assert.Contains(view.GetVisualDescendants().OfType<NumericUpDown>(), n => n.Value == 9);
 
         // The ZF checkbox (#missing-stammdaten-field) marks a command vehicle carrying the Zugführer.
         var zfCheckBox = Assert.Single(
             view.GetVisualDescendants().OfType<CheckBox>(),
             c => ToolTip.GetTip(c) as string == "Zugführerfahrzeug" && c.IsChecked == true);
-        Assert.Equal(new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 9, HasZugfuehrer: true) }, section.ToValues());
+        Assert.Equal(new Vehicle("FFB Wache 1", "FFB 1/44/1", 9, HasZugfuehrer: true), section.ToValues()[0]);
+        Assert.Equal(3, section.ToValues().Count);
 
         // The header Grid and the row template's Grid are separate layout passes; the header's
         // trailing columns used to size to "Auto" against its own (empty) content instead of the

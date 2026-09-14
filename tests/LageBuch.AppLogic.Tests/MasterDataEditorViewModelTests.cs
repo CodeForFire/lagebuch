@@ -62,12 +62,14 @@ public class MasterDataEditorViewModelTests
     private sealed class FakeFileService : IMasterDataFileService
     {
         private readonly MasterDataSet? _read;
+        private readonly IReadOnlyList<string> _dropped;
         private readonly Exception? _readError;
 
-        public FakeFileService(MasterDataSet? read = null, Exception? readError = null)
+        public FakeFileService(MasterDataSet? read = null, Exception? readError = null, IReadOnlyList<string>? dropped = null)
         {
             _read = read;
             _readError = readError;
+            _dropped = dropped ?? Array.Empty<string>();
         }
 
         public string? WrittenPath { get; private set; }
@@ -76,8 +78,8 @@ public class MasterDataEditorViewModelTests
 
         public bool WriteThrows { get; set; }
 
-        public MasterDataSet Read(string path) =>
-            _readError is not null ? throw _readError : _read ?? MasterDataSet.Empty;
+        public MasterDataImportResult Read(string path) =>
+            _readError is not null ? throw _readError : new MasterDataImportResult(_read ?? MasterDataSet.Empty, _dropped);
 
         public void Write(string path, MasterDataSet set)
         {
@@ -117,27 +119,40 @@ public class MasterDataEditorViewModelTests
         vm.Sections.OfType<VehiclesSection>().Single();
 
     [Fact]
-    public void Fahrzeuge_rows_suggest_brigades_and_callsigns_from_the_master_data()
+    public void Fahrzeuge_rows_suggest_the_waches_and_callsigns_derived_from_the_master_data()
     {
-        // Dropdown-Vorschläge (#76): Wache aus den Wachen, Funkrufname aus den Funkrufnamen --
-        // Freitext bleibt trotzdem möglich (Fremdwehren), daher AutoCompleteBox im View.
+        // Dropdown-Vorschläge (#76): Wachen und Funkrufnamen sind aus den Fahrzeugen (und dem
+        // Personal) abgeleitet -- Freitext bleibt trotzdem möglich (Fremdwehren), daher
+        // AutoCompleteBox im View.
         var set = MasterDataSet.Empty with
         {
-            Brigades = new[] { "FFB Wache 1", "Aich" },
-            RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
-            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                new Vehicle("Aich", "Aich 42/1", 6),
+            },
+            Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", null) },
         };
         var vm = Vm(new InMemoryProvider(set));
         var section = Vehicles(vm);
 
-        var row = Assert.Single(section.Rows);
+        var row = section.Rows[0];
         Assert.Equal(new[] { "FFB Wache 1", "Aich" }, row.WacheOptions);
-        Assert.Equal(new[] { "FFB 1/40/1", "Aich 42/1" }, row.CallSignOptions);
+        Assert.Equal(new[] { "FFB 1/40/1", "Aich 42/1", "Land 1" }, row.CallSignOptions);
 
         // A freshly added row carries the same suggestions.
         section.AddCommand.Execute(null);
-        Assert.Equal(row.WacheOptions, section.Rows[1].WacheOptions);
-        Assert.Equal(row.CallSignOptions, section.Rows[1].CallSignOptions);
+        Assert.Equal(row.WacheOptions, section.Rows[2].WacheOptions);
+        Assert.Equal(row.CallSignOptions, section.Rows[2].CallSignOptions);
+    }
+
+    [Fact]
+    public void There_is_no_separate_Wachen_or_Funkrufnamen_section()
+    {
+        // Maintaining the Fahrzeuge alone must be sufficient: the two lists are derived.
+        var vm = Vm(new InMemoryProvider());
+
+        Assert.DoesNotContain(vm.Sections, s => s.Title is "Wachen" or "Funkrufnamen");
     }
 
     [Fact]
@@ -145,8 +160,8 @@ public class MasterDataEditorViewModelTests
     {
         var vm = Vm(new InMemoryProvider());
 
-        // 10 categories plus #76's Fahrzeuge.
-        Assert.Equal(11, vm.Sections.Count);
+        // 8 categories plus #76's Fahrzeuge (which also supplies the Wachen and Funkrufnamen).
+        Assert.Equal(9, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
@@ -157,7 +172,7 @@ public class MasterDataEditorViewModelTests
             new[]
             {
                 "Einstellungen", "Checkliste Aufbau", "Checkliste Abbau", "Einheiten-Status",
-                "Fahrzeuge", "Funkrufnamen", "Links", "Personal", "Rollen", "Trupp-Typen", "Wachen",
+                "Fahrzeuge", "Links", "Personal", "Rollen", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
     }
@@ -249,10 +264,7 @@ public class MasterDataEditorViewModelTests
     [Fact]
     public void Save_maps_every_category_to_its_own_list_in_BuildSet()
     {
-        var listTitles = new[]
-        {
-            "Rollen", "Einheiten-Status", "Wachen", "Funkrufnamen", "Trupp-Typen",
-        };
+        var listTitles = new[] { "Rollen", "Einheiten-Status", "Trupp-Typen" };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var vm = Vm(provider);
@@ -281,14 +293,22 @@ public class MasterDataEditorViewModelTests
         links.Rows[^1].Name = "MARK-Links";
         links.Rows[^1].Url = "https://example.org/mark";
 
+        var vehicles = Vehicles(vm);
+        vehicles.AddCommand.Execute(null);
+        vehicles.Rows[^1].Wache = "MARK-Wache";
+        vehicles.Rows[^1].CallSign = "MARK-Funkrufname";
+
         vm.SaveCommand.Execute(null);
 
         var set = provider.Get();
         Assert.Contains("MARK-Rollen", set.Roles);
         Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
-        Assert.Contains("MARK-Wachen", set.Brigades);
-        Assert.Contains("MARK-Funkrufnamen", set.RadioCallSigns);
         Assert.Contains("MARK-Trupp-Typen", set.TruppTypes);
+        Assert.Contains(set.Vehicles, v => v.Wache == "MARK-Wache" && v.CallSign == "MARK-Funkrufname");
+
+        // The vehicle row is the one place Wachen and Funkrufnamen are maintained.
+        Assert.Contains("MARK-Wache", set.Brigades);
+        Assert.Contains("MARK-Funkrufname", set.RadioCallSigns);
         Assert.Contains(set.ChecklistTemplateAufbau, i => i.Text == "MARK-ChecklisteAufbau");
         Assert.Contains(set.ChecklistTemplateAbbau, i => i.Text == "MARK-ChecklisteAbbau");
         Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
@@ -415,6 +435,42 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
+    public async Task Import_names_legacy_entries_that_were_not_taken_over()
+    {
+        // An older export still carries "brigades"/"radioCallSigns". Entries no vehicle or person
+        // covers are not imported; the notice names them so the user can add a Fahrzeug first.
+        var vm = Vm(
+            new InMemoryProvider(MasterDataSet.Empty),
+            new FakeDialogs { ImportPath = "/alt.json" },
+            new FakeFileService(
+                read: MasterDataSet.Empty with { Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) } },
+                dropped: new[] { "Alt-Wache", "Leitstelle" }));
+
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        Assert.Null(vm.FileError);
+        Assert.Equal("Nicht übernommen (kein Fahrzeug / keine Person dazu): Alt-Wache, Leitstelle", vm.FileNotice);
+        Assert.True(vm.IsDirty);
+
+        // The notice is informational: it must not outlive the next reload.
+        vm.DiscardCommand.Execute(null);
+        Assert.Null(vm.FileNotice);
+    }
+
+    [Fact]
+    public async Task Import_of_a_current_format_file_shows_no_notice()
+    {
+        var vm = Vm(
+            new InMemoryProvider(MasterDataSet.Empty),
+            new FakeDialogs { ImportPath = "/neu.json" },
+            new FakeFileService(read: MasterDataSet.Empty with { Roles = new[] { "EL" } }));
+
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        Assert.Null(vm.FileNotice);
+    }
+
+    [Fact]
     public async Task A_failed_import_surfaces_an_error_and_writes_nothing()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty);
@@ -478,7 +534,6 @@ public class MasterDataEditorViewModelTests
     // statt still dedupliziert zu werden.
     private static MasterDataSet SetWithVehicles(params Vehicle[] vehicles) => MasterDataSet.Empty with
     {
-        Brigades = new[] { "FFB Wache 1", "Aich" },
         Vehicles = vehicles,
     };
 

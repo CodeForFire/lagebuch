@@ -18,6 +18,10 @@ once we reach 1.0.
   prefills it (selected, ready to overwrite) instead of starting empty every time.
 
 ### Changed
+- Wachen and Funkrufnamen are derived from the Fahrzeuge (plus the Personal roster's call
+  signs) instead of being maintained as separate Stammdaten lists. Their editor sections and
+  the `brigades` / `radioCallSigns` JSON keys are gone; importing an older file names any
+  entry that no vehicle or person covers.
 - The new-incident dialog no longer asks for a Stichwort; it is entered afterwards in the
   Einsatzdaten dialog, like the Einsatznummer always was. New files are therefore named by date
   and time only (`20260819-2217.fwincident`), and the header's inline "+ ILS-Nr. hinzufügen"

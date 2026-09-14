@@ -41,7 +41,7 @@ public class RolesTabRenderTests
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
         Roles = new[] { AnonymizedExampleData.RoleExample, "ZF" },
-        RadioCallSigns = AnonymizedExampleData.RadioCallSigns,
+        Vehicles = AnonymizedExampleData.Vehicles,
     };
 
     private static TabControl Tabs(Window window) =>
