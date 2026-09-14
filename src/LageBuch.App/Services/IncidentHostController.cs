@@ -11,8 +11,9 @@ namespace LageBuch.App.Services;
 
 /// <summary>
 /// Desktop implementation of <see cref="IIncidentHostController"/>: drives the embedded
-/// <see cref="IncidentHost"/>, binding it to every interface (<see cref="IPAddress.Any"/>) so it is
-/// reachable over loopback, the LAN, and a tailnet at once. Lives in the desktop head so ASP.NET
+/// <see cref="IncidentHost"/>, binding it to every interface (<see cref="IPAddress.Any"/>, which
+/// <see cref="IncidentHost.StartAsync"/> turns into a dual-stack IPv4+IPv6 bind) so it is reachable
+/// over loopback, the LAN (v4 or v6), and a tailnet at once. Lives in the desktop head so ASP.NET
 /// Core stays out of the cross-platform AppLogic/Android build.
 /// </summary>
 internal sealed class IncidentHostController : IIncidentHostController
