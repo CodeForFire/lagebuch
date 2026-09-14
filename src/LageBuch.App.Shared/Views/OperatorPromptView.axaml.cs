@@ -19,9 +19,16 @@ public partial class OperatorPromptView : UserControl
         // dropped and nothing ends up focused. Deferring one dispatcher cycle lets it land.
         AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() =>
         {
-            if (DataContext is OperatorPromptViewModel { CollectsHost: true })
+            if (DataContext is OperatorPromptViewModel { CollectsHost: true } vm)
             {
                 HostBox.Focus();
+
+                // A prefilled host (from the last successful join) is selected so typing straight
+                // away replaces it, instead of appending to or landing mid-string.
+                if (!string.IsNullOrEmpty(vm.Host))
+                {
+                    HostBox.SelectAll();
+                }
             }
             else
             {

@@ -152,4 +152,36 @@ public class JoinPromptRenderTests
         Assert.True(cancelButton.IsEnabled); // still abortable while connecting
         Capture(window, "join-prompt-connecting.png");
     }
+
+    // The join dialog remembers the host last used for a successful join, so it opens prefilled
+    // instead of empty every time -- the host rarely changes once set up. Prefilled text is
+    // selected so typing replaces it outright, rather than appending to or landing mid-string.
+    [AvaloniaFact]
+    public void Join_prompt_opens_empty_when_no_host_was_ever_joined()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true, callSignOptions: new[] { "FFB 1/40/1" });
+        var window = new Window { Content = new OperatorPromptView { DataContext = vm }, Width = 640, Height = 560 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var hostBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "HostBox");
+        Assert.Equal(string.Empty, hostBox.Text);
+        Capture(window, "join-prompt-host-empty.png");
+    }
+
+    [AvaloniaFact]
+    public void Join_prompt_prefills_and_selects_the_last_used_host()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true, callSignOptions: new[] { "FFB 1/40/1" })
+        {
+            Host = "elw-1:5859",
+        };
+        var window = new Window { Content = new OperatorPromptView { DataContext = vm }, Width = 640, Height = 560 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var hostBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "HostBox");
+        Assert.Equal("elw-1:5859", hostBox.SelectedText);
+        Capture(window, "join-prompt-host-prefilled.png");
+    }
 }

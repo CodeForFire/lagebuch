@@ -60,4 +60,7 @@ internal static class AndroidAppPaths
 
     public static string TrustJsonPath(Context context) =>
         System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "trust.json");
+
+    public static string LastJoinHostJsonPath(Context context) =>
+        System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "last-join-host.json");
 }

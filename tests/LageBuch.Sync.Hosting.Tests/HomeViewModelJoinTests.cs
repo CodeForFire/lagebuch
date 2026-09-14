@@ -17,7 +17,7 @@ public class HomeViewModelJoinTests
     // trust defaults to a fresh InMemoryTrustStore rather than null: RemoteIncidentSession.ConnectAsync
     // requires a trust store (there is no accept-any fallback any more), so every join test needs a
     // real one -- passing an explicit instance is only necessary for tests asserting on its contents.
-    private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null) =>
+    private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null, ILastJoinHostStore? lastJoinHost = null) =>
         new(
             new InMemoryStore(),
             masterData ?? new EmptyMasterData(),
@@ -28,7 +28,8 @@ public class HomeViewModelJoinTests
             new NoAlarm(),
             new NoopIncidentHostController(),
             "1.0.0",
-            trustStore: trust ?? new InMemoryTrustStore());
+            trustStore: trust ?? new InMemoryTrustStore(),
+            lastJoinHost: lastJoinHost);
 
     private static LocalIncidentSession HostSession(FixedClock clock) =>
         LocalIncidentSession.StartNew(
@@ -225,6 +226,27 @@ public class HomeViewModelJoinTests
     }
 
     [Fact]
+    public async Task Successful_join_remembers_the_host_for_next_time()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var lastJoinHost = new InMemoryLastJoinHostStore();
+        var vm = Home(lastJoinHost: lastJoinHost);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        var request = new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
+        await vm.JoinDeviceCommand.ExecuteAsync(request);
+
+        Assert.Null(vm.JoinError);
+        Assert.Equal(request.Host, lastJoinHost.GetLastHost());
+        Assert.Equal(request.Host, vm.LastJoinHost);
+        await opened!.LeaveAsync();
+    }
+
+    [Fact]
     public async Task Wrong_pin_shows_a_banner_and_opens_nothing()
     {
         var clock = new FixedClock();
@@ -240,6 +262,23 @@ public class HomeViewModelJoinTests
 
         Assert.False(opened);
         Assert.Equal("Falsche PIN.", vm.JoinError);
+    }
+
+    [Fact]
+    public async Task A_failed_join_does_not_remember_the_host()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        var lastJoinHost = new InMemoryLastJoinHostStore();
+        var vm = Home(lastJoinHost: lastJoinHost);
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "9999"));
+
+        Assert.NotNull(vm.JoinError);
+        Assert.Null(lastJoinHost.GetLastHost());
     }
 
     [Fact]
@@ -327,6 +366,28 @@ public class HomeViewModelJoinTests
         Assert.Equal($"127.0.0.1:{port}", prompt.Host); // Host/Name kept, not lost
         Assert.Equal("Client", prompt.OperatorName);
         Assert.Null(home.JoinError); // ownership moved to the dialog -- no duplicate Home banner
+    }
+
+    [Fact]
+    public void RequestJoinDevice_prefills_the_last_used_host()
+    {
+        var lastJoinHost = new InMemoryLastJoinHostStore();
+        lastJoinHost.SetLastHost("elw-1:5859");
+        var vm = MainWindowVm(Home(lastJoinHost: lastJoinHost));
+
+        vm.RequestJoinDeviceCommand.Execute(null);
+
+        Assert.Equal("elw-1:5859", vm.PendingPrompt!.Host);
+    }
+
+    [Fact]
+    public void RequestJoinDevice_starts_empty_when_nothing_was_ever_joined()
+    {
+        var vm = MainWindowVm(Home(lastJoinHost: new InMemoryLastJoinHostStore()));
+
+        vm.RequestJoinDeviceCommand.Execute(null);
+
+        Assert.Equal(string.Empty, vm.PendingPrompt!.Host);
     }
 
     [Fact]

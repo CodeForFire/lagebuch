@@ -117,7 +117,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _pending = PendingAction.Join;
         PendingPrompt = new OperatorPromptViewModel(
             collectHost: true,
-            callSignOptions: _home.CallSignOptions);
+            callSignOptions: _home.CallSignOptions)
+        {
+            // The host address rarely changes once set up (a station's ELW, a fixed Tailscale
+            // node) -- prefill last time's so the operator doesn't retype it every join.
+            Host = _home.LastJoinHost ?? string.Empty,
+        };
     });
 
     [RelayCommand]

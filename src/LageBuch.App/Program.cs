@@ -60,7 +60,8 @@ internal static class Program
             AppPaths.AttachmentCacheDir,
             trustStore: new JsonTrustStore(AppPaths.TrustJsonPath),
             pdfExporter: new QuestPdfIncidentExporter(),
-            lastPdfExport: new JsonLastPdfExportStore(AppPaths.LastPdfExportJsonPath));
+            lastPdfExport: new JsonLastPdfExportStore(AppPaths.LastPdfExportJsonPath),
+            lastJoinHost: new JsonLastJoinHostStore(AppPaths.LastJoinHostJsonPath));
     }
 
     public static AppBuilder BuildAvaloniaApp() =>
