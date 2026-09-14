@@ -18,6 +18,13 @@ permissions:
 
 jobs:
   build-test:
+    # Pin the display name to just the OS. GitHub derives a matrix job's name
+    # from *every* matrix key, so without this the extra `solution`/`android`
+    # keys below would rename the checks to e.g.
+    # "build-test (ubuntu-latest, LageBuch.sln, true)" and the contexts
+    # required by branch protection -- "build-test (ubuntu-latest)" and
+    # "build-test (windows-latest)" -- would never be reported.
+    name: build-test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
