@@ -85,17 +85,6 @@
                       Foreground="{StaticResource TextMutedBrush}"
                       Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
           </Grid>
-          <!-- The Einsatznummer is unknown at the start of most incidents and not worth blocking on
-               (#69), so the Stichwort (dispatch's short keyword, e.g. "B3P") is collected here
-               instead. The Einsatznummer itself can be added later, from the workspace header. -->
-          <StackPanel IsVisible="{Binding CollectsKeyword}" Spacing="3">
-            <TextBlock Text="STICHWORT" Classes="overline" FontSize="10" Margin="0,8,0,3" />
-            <TextBox x:Name="KeywordBox" PlaceholderText="optional, z. B. B3P" Text="{Binding Keyword}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
-          </StackPanel>
           <!-- Join-in-progress status (#196): a stuck/slow connect attempt otherwise has no way out
                but to wait for the network layer's own timeout — the Cancel button below aborts it
                without leaving this dialog. -->

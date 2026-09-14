@@ -199,7 +199,7 @@ public class AutomationPropertiesTests
     }
 
     [AvaloniaFact]
-    public async Task Incident_number_confirm_cancel_and_share_toggle_buttons_are_named_for_automation()
+    public async Task Einsatzdaten_pencil_and_share_toggle_buttons_are_named_for_automation()
     {
         var session = LocalIncidentSession.StartNew(
             new FakeStore(),
@@ -207,7 +207,8 @@ public class AutomationPropertiesTests
             new SessionOperator("Müller", "FFB 12/1"),
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
-            Array.Empty<(string, bool)>());
+            Array.Empty<(string, bool)>(),
+            keyword: "B3P");
         var vm = new IncidentWorkspaceViewModel(
             session,
             new FixedClock(),
@@ -221,18 +222,14 @@ public class AutomationPropertiesTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        Dispatcher.UIThread.RunJobs();
-
-        var confirm = view.GetControl<Button>("ConfirmIncidentNumberButton");
-        var cancel = view.GetControl<Button>("CancelIncidentNumberButton");
-        Assert.Equal("Übernehmen", Name(confirm));
-        Assert.Equal("Abbrechen", Name(cancel));
+        // The icon-only pencil that opens the Einsatzdaten dialog has no text of its own.
+        var pencil = view.GetControl<Button>("EditIncidentDataButton");
+        Assert.Equal("Einsatzdaten bearbeiten", Name(pencil));
 
         // The share-toggle button's Name mirrors its ToolTip binding, so both sharing states
         // must carry the right label, not just whichever rendered first.
         var shareButton = view.GetVisualDescendants().OfType<Button>()
-            .Single(b => b.Classes.Contains("icon-btn") && b != confirm && b != cancel);
+            .Single(b => b.Classes.Contains("icon-btn") && b != pencil);
         var beforeName = Name(shareButton);
         Assert.False(string.IsNullOrWhiteSpace(beforeName));
 

@@ -11,8 +11,9 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// The workspace header's Stichwort hero + Einsatznummer add-later affordance (#69). FakeStore,
-// FakeDialogs, FixedClock, NoopTicker, NoopAlarmService are shared from WorkspaceAcceptanceTests.cs.
+// The workspace header's Stichwort hero, Einsatznummer chip, address line and the Einsatzdaten
+// edit affordance (#69, now a dialog instead of an inline editor). FakeStore, FakeDialogs,
+// FixedClock, NoopTicker, NoopAlarmService are shared from WorkspaceAcceptanceTests.cs.
 public class HeaderHeroTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
@@ -45,107 +46,106 @@ public class HeaderHeroTests
         return window;
     }
 
+    private static T Find<T>(Window window, string name)
+        where T : Control =>
+        window.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
+
+    // Fills the dialog the way an operator would and saves it.
+    private static void SaveViaDialog(IncidentWorkspaceViewModel vm, string? number = null, string? street = null, string? district = null)
+    {
+        vm.EditIncidentDataCommand.Execute(null);
+        var dialog = vm.PendingIncidentDataDialog!;
+        dialog.IncidentNumber = number ?? dialog.IncidentNumber;
+        dialog.Street = street ?? dialog.Street;
+        dialog.District = district ?? dialog.District;
+        dialog.SaveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     [AvaloniaFact]
-    public void With_a_keyword_and_no_number_the_hero_is_the_keyword_and_the_add_affordance_shows()
+    public void With_a_keyword_and_no_number_the_hero_is_the_keyword_and_the_pencil_shows()
     {
         var vm = BuildWorkspace("B3P");
         var window = Show(vm);
 
-        var hero = window.GetVisualDescendants().OfType<TextBlock>().Single(c => c.Name == "EinsatznummerValue");
-        Assert.Equal("B3P", hero.Text);
-
-        var addButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "AddIncidentNumberButton");
-        Assert.True(addButton.IsVisible);
-        var chip = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "IncidentNumberChip");
-        Assert.False(chip.IsVisible);
+        Assert.Equal("B3P", Find<TextBlock>(window, "EinsatznummerValue").Text);
+        Assert.True(Find<Button>(window, "EditIncidentDataButton").IsVisible);
+        Assert.False(Find<Button>(window, "AddIncidentDataButton").IsVisible);
+        Assert.False(Find<TextBlock>(window, "IncidentNumberChip").IsVisible);
+        Assert.False(Find<TextBlock>(window, "AddressLine").IsVisible);
     }
 
     [AvaloniaFact]
-    public void With_no_keyword_and_no_number_the_hero_falls_back_to_a_placeholder_but_still_offers_the_add_affordance()
+    public void With_no_head_data_at_all_the_hero_falls_back_to_a_placeholder_and_offers_the_add_affordance()
     {
         var vm = BuildWorkspace(null);
         var window = Show(vm);
 
-        var hero = window.GetVisualDescendants().OfType<TextBlock>().Single(c => c.Name == "EinsatznummerValue");
-        Assert.Equal("Unbenannter Einsatz", hero.Text);
+        Assert.Equal("Unbenannter Einsatz", Find<TextBlock>(window, "EinsatznummerValue").Text);
 
-        // Regression guard for #250: without a Stichwort the Einsatznummer would otherwise have no
-        // way to ever be entered.
-        var addButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "AddIncidentNumberButton");
-        Assert.True(addButton.IsVisible);
+        // Regression guard for #250: without any head data there must still be an obvious way in.
+        Assert.True(Find<Button>(window, "AddIncidentDataButton").IsVisible);
+        Assert.False(Find<Button>(window, "EditIncidentDataButton").IsVisible);
     }
 
     // Empirically guards against a known Avalonia trap in this codebase: a data-bound text element
     // stranded inside an IsVisible-collapsed container measures to zero width the first time the
     // container un-collapses if its content changes in the same update (see the sharing row's
-    // ShareStatus/SharePin fix). Adding the Einsatznummer flips the chip from collapsed to visible
-    // in the very same command that also sets its text, so this is exactly that risk.
+    // ShareStatus/SharePin fix). Saving the dialog flips the chip and the address line from
+    // collapsed to visible in the very same update that sets their text, so this is exactly that risk.
     [AvaloniaFact]
-    public void Adding_the_einsatznummer_shows_a_correctly_sized_chip_not_a_zero_width_one()
+    public void Saving_the_dialog_shows_a_correctly_sized_chip_and_address_line_not_zero_width_ones()
     {
         var vm = BuildWorkspace("B3P");
         var window = Show(vm);
 
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        vm.IncidentNumberEditInput = "B 1.2 260715 123";
-        vm.ConfirmIncidentNumberCommand.Execute(null);
-        Dispatcher.UIThread.RunJobs();
+        SaveViaDialog(vm, number: "B 1.2 260715 123", street: "Hauptstr. 12", district: "FFB");
 
-        var chip = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "IncidentNumberChip");
+        var chip = Find<TextBlock>(window, "IncidentNumberChip");
         Assert.True(chip.IsVisible);
         Assert.True(
             chip.Bounds.Width > 20,
             $"the Einsatznummer chip rendered at {chip.Bounds.Width:F0}px wide — looks like the collapsed-ancestor zero-width trap.");
 
-        var addButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "AddIncidentNumberButton");
-        Assert.False(addButton.IsVisible);
+        var address = Find<TextBlock>(window, "AddressLine");
+        Assert.True(address.IsVisible);
+        Assert.Equal("Hauptstr. 12, FFB", address.Text);
+        Assert.True(
+            address.Bounds.Width > 20,
+            $"the address line rendered at {address.Bounds.Width:F0}px wide — looks like the collapsed-ancestor zero-width trap.");
+
+        Assert.Null(vm.PendingIncidentDataDialog);
     }
 
-    // Issue #197: the ✎/✓/✕ affordances around the Einsatznummer chip used to be Unicode text on
-    // Buttons, which default to Oswald -- a font that carries none of the three codepoints. Now
-    // PathIcons like the ETB grid's row actions, so the icons come from bundled vector data.
+    // Issue #197: the ✎ affordance used to be Unicode text on a Button, which defaults to Oswald --
+    // a font that carries none of those codepoints. Now a PathIcon like the ETB grid's row actions,
+    // so the icon comes from bundled vector data.
     [AvaloniaFact]
-    public void Incident_number_edit_affordances_render_laid_out_icons()
+    public void The_edit_affordance_renders_a_laid_out_icon()
     {
         var vm = BuildWorkspace("B3P");
         var window = Show(vm);
 
-        var chip = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "IncidentNumberChip");
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        vm.IncidentNumberEditInput = "B 1.2 260715 123";
-        vm.ConfirmIncidentNumberCommand.Execute(null);
-        Dispatcher.UIThread.RunJobs();
-
-        var chipIcon = Assert.Single(chip.GetVisualDescendants().OfType<PathIcon>());
-        Assert.True(chipIcon.Bounds.Width > 0, "the chip's edit icon has zero width -- nothing is drawn");
-
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        Dispatcher.UIThread.RunJobs();
-
-        var confirmButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "ConfirmIncidentNumberButton");
-        var cancelButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "CancelIncidentNumberButton");
-        var confirmIcon = Assert.Single(confirmButton.GetVisualDescendants().OfType<PathIcon>());
-        var cancelIcon = Assert.Single(cancelButton.GetVisualDescendants().OfType<PathIcon>());
-        Assert.True(confirmIcon.Bounds.Width > 0, "the confirm button's icon has zero width -- nothing is drawn");
-        Assert.True(cancelIcon.Bounds.Width > 0, "the cancel button's icon has zero width -- nothing is drawn");
+        var pencil = Find<Button>(window, "EditIncidentDataButton");
+        var icon = Assert.Single(pencil.GetVisualDescendants().OfType<PathIcon>());
+        Assert.True(icon.Bounds.Width > 0, "the edit button's icon has zero width -- nothing is drawn");
     }
 
     [AvaloniaFact]
-    public void Cancelling_the_edit_returns_to_the_add_affordance()
+    public void The_edit_affordance_opens_the_dialog_overlay_and_cancel_closes_it()
     {
         var vm = BuildWorkspace("B3P");
         var window = Show(vm);
 
-        vm.BeginEditIncidentNumberCommand.Execute(null);
+        vm.EditIncidentDataCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
-        var editRow = window.GetVisualDescendants().OfType<StackPanel>().Single(c => c.Name == "IncidentNumberEditRow");
-        Assert.True(editRow.IsVisible);
+        var dialogView = Assert.Single(window.GetVisualDescendants().OfType<IncidentDataDialogView>());
+        Assert.True(dialogView.IsVisible);
 
-        vm.CancelEditIncidentNumberCommand.Execute(null);
+        vm.PendingIncidentDataDialog!.CancelCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.False(editRow.IsVisible);
-        var addButton = window.GetVisualDescendants().OfType<Button>().Single(c => c.Name == "AddIncidentNumberButton");
-        Assert.True(addButton.IsVisible);
+        Assert.Empty(window.GetVisualDescendants().OfType<IncidentDataDialogView>());
+        Assert.True(Find<Button>(window, "EditIncidentDataButton").IsVisible);
     }
 }

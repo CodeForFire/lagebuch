@@ -235,8 +235,8 @@ public class IncidentWorkspaceViewModelTests
     public void Setting_IncidentNumberInput_directly_does_not_write_back()
     {
         // IncidentNumberInput is a display projection; the only write-back path is the
-        // ConfirmIncidentNumberCommand flow below (#69) -- assigning the bound property directly
-        // (as a plain data-bound control would) must not autosave or mutate the domain.
+        // Einsatzdaten dialog below (#69) -- assigning the bound property directly (as a plain
+        // data-bound control would) must not autosave or mutate the domain.
         var vm = NewWorkspace(out var store, out _);
         var before = store.SaveCount;
 
@@ -274,11 +274,11 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("B 99", vm.IncidentNumberInput);
     }
 
-    // --- Header hero + Einsatznummer add-later (#69) -----------------------------------------
-    [Fact]
-    public void HeroText_shows_the_keyword_when_set()
+    // --- Header hero + Einsatzdaten dialog (#69) ---------------------------------------------
+    private static IncidentWorkspaceViewModel WorkspaceWith(
+        out FakeStore store, string? keyword = null, Domain.ValueObjects.IncidentNumber? number = null)
     {
-        var store = new FakeStore();
+        store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(
             store,
@@ -287,8 +287,9 @@ public class IncidentWorkspaceViewModelTests
             "/x.fwincident",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>(),
-            keyword: "B3P");
-        var vm = new IncidentWorkspaceViewModel(
+            number,
+            keyword: keyword);
+        return new IncidentWorkspaceViewModel(
             session,
             clock,
             new FakeTicker(),
@@ -296,41 +297,30 @@ public class IncidentWorkspaceViewModelTests
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
+    }
+
+    [Fact]
+    public void HeroText_shows_the_keyword_when_set()
+    {
+        var vm = WorkspaceWith(out _, keyword: "B3P");
 
         Assert.Equal("B3P", vm.HeroText);
         Assert.False(vm.HasEinsatznummer);
-        Assert.True(vm.ShowAddEinsatznummerAffordance);
         Assert.False(vm.ShowEinsatznummerChip);
+        Assert.True(vm.HasIncidentData);
     }
 
     [Fact]
     public void HeroText_falls_back_to_the_einsatznummer_when_there_is_no_keyword()
     {
-        var store = new FakeStore();
-        var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
-            store,
-            clock,
-            new SessionOperator("Müller"),
-            "/x.fwincident",
-            new[] { ("A?", false) },
-            Array.Empty<(string, bool)>(),
-            incidentNumber: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
-        var vm = new IncidentWorkspaceViewModel(
-            session,
-            clock,
-            new FakeTicker(),
-            Md(),
-            new FakeDialogs(),
-            new FakeAlarmService(),
-            new NoopIncidentHostController());
+        var vm = WorkspaceWith(out _, number: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
 
         Assert.Equal("B 1.2 260715 123", vm.HeroText);
 
         // The number is already the hero -- no redundant chip alongside it.
         Assert.True(vm.HasEinsatznummer);
         Assert.False(vm.ShowEinsatznummerChip);
-        Assert.False(vm.ShowAddEinsatznummerAffordance);
+        Assert.True(vm.HasIncidentData);
     }
 
     [Fact]
@@ -340,28 +330,41 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.Equal("Unbenannter Einsatz", vm.HeroText);
 
-        // Neither Stichwort nor Einsatznummer is known -- still offer the add affordance so the
-        // number isn't permanently un-enterable (#250).
+        // Nothing known yet -- the header offers the "add" affordance instead of the pencil so
+        // the data isn't permanently un-enterable (#250).
         Assert.False(vm.HasEinsatznummer);
-        Assert.True(vm.ShowAddEinsatznummerAffordance);
         Assert.False(vm.ShowEinsatznummerChip);
+        Assert.False(vm.HasIncidentData);
+        Assert.False(vm.ShowAddressLine);
     }
 
     [Fact]
-    public void Begin_confirm_flow_sets_the_einsatznummer_persists_it_and_shows_the_chip()
+    public void Chip_shows_when_both_keyword_and_number_are_set()
+    {
+        var vm = WorkspaceWith(out _, keyword: "B3P", number: new Domain.ValueObjects.IncidentNumber("B 99"));
+
+        Assert.Equal("B3P", vm.HeroText);
+        Assert.True(vm.ShowEinsatznummerChip);
+        Assert.Equal("B 99", vm.IncidentNumberInput);
+    }
+
+    [Fact]
+    public void Address_line_is_seeded_from_the_incident_and_joins_street_and_district()
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var seed = LocalIncidentSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
             "/x.fwincident",
             new[] { ("A?", false) },
-            Array.Empty<(string, bool)>(),
-            keyword: "B3P");
+            Array.Empty<(string, bool)>());
+        seed.SetAddress("Hauptstr. 12", "FFB");
+        var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
+
         var vm = new IncidentWorkspaceViewModel(
-            session,
+            reopened,
             clock,
             new FakeTicker(),
             Md(),
@@ -369,73 +372,66 @@ public class IncidentWorkspaceViewModelTests
             new FakeAlarmService(),
             new NoopIncidentHostController());
 
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        Assert.True(vm.IsEditingIncidentNumber);
-        Assert.True(vm.ShowEinsatznummerEdit);
-        Assert.False(vm.ShowAddEinsatznummerAffordance);
+        Assert.Equal("Hauptstr. 12, FFB", vm.AddressDisplay);
+        Assert.True(vm.ShowAddressLine);
+        Assert.True(vm.HasIncidentData);
+    }
 
-        vm.IncidentNumberEditInput = "B 1.2 260715 123";
-        vm.ConfirmIncidentNumberCommand.Execute(null);
+    [Fact]
+    public void EditIncidentData_opens_the_dialog_seeded_from_the_incident()
+    {
+        var vm = WorkspaceWith(out _, keyword: "B3P");
 
-        Assert.False(vm.IsEditingIncidentNumber);
+        vm.EditIncidentDataCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingIncidentDataDialog);
+        Assert.Equal("B3P", vm.PendingIncidentDataDialog!.Keyword);
+    }
+
+    [Fact]
+    public void Saving_the_dialog_refreshes_the_header_and_closes_the_overlay()
+    {
+        var vm = WorkspaceWith(out var store, keyword: "B3P");
+
+        vm.EditIncidentDataCommand.Execute(null);
+        var dialog = vm.PendingIncidentDataDialog!;
+        dialog.Keyword = "B4";
+        dialog.IncidentNumber = "B 1.2 260715 123";
+        dialog.Street = "Hauptstr. 12";
+        dialog.District = "FFB";
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Null(vm.PendingIncidentDataDialog);
+        Assert.Equal("B4", vm.HeroText);
         Assert.Equal("B 1.2 260715 123", vm.IncidentNumberInput);
-        Assert.True(vm.HasEinsatznummer);
         Assert.True(vm.ShowEinsatznummerChip);
+        Assert.Equal("Hauptstr. 12, FFB", vm.AddressDisplay);
+        Assert.True(vm.ShowAddressLine);
+        Assert.NotNull(vm.LastSavedAt);
         Assert.Equal("B 1.2 260715 123", store.Load("/x.fwincident").IncidentNumber!.Value);
     }
 
     [Fact]
-    public void Cancel_edit_discards_without_mutating()
+    public void Cancelling_the_dialog_closes_it_without_mutating()
     {
-        var store = new FakeStore();
-        var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
-            store,
-            clock,
-            new SessionOperator("Müller"),
-            "/x.fwincident",
-            new[] { ("A?", false) },
-            Array.Empty<(string, bool)>(),
-            keyword: "B3P");
-        var vm = new IncidentWorkspaceViewModel(
-            session,
-            clock,
-            new FakeTicker(),
-            Md(),
-            new FakeDialogs(),
-            new FakeAlarmService(),
-            new NoopIncidentHostController());
+        var vm = WorkspaceWith(out var store, keyword: "B3P");
 
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        vm.IncidentNumberEditInput = "B 1.2 260715 123";
-        vm.CancelEditIncidentNumberCommand.Execute(null);
+        vm.EditIncidentDataCommand.Execute(null);
+        vm.PendingIncidentDataDialog!.Keyword = "B4";
+        vm.PendingIncidentDataDialog!.CancelCommand.Execute(null);
 
-        Assert.False(vm.IsEditingIncidentNumber);
-        Assert.False(vm.HasEinsatznummer);
-        Assert.Null(store.Load("/x.fwincident").IncidentNumber);
+        Assert.Null(vm.PendingIncidentDataDialog);
+        Assert.Equal("B3P", vm.HeroText);
+        Assert.Equal("B3P", store.Load("/x.fwincident").Keyword);
     }
 
     [Fact]
-    public void Confirm_is_disabled_until_the_edit_input_is_non_blank()
-    {
-        var vm = NewWorkspace(out _, out _);
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        Assert.False(vm.ConfirmIncidentNumberCommand.CanExecute(null));
-
-        vm.IncidentNumberEditInput = "   ";
-        Assert.False(vm.ConfirmIncidentNumberCommand.CanExecute(null));
-
-        vm.IncidentNumberEditInput = "B 1";
-        Assert.True(vm.ConfirmIncidentNumberCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void Editing_the_einsatznummer_is_blocked_on_a_readonly_workspace()
+    public void Editing_the_einsatzdaten_is_blocked_on_a_readonly_workspace()
     {
         var vm = ReadOnlyWorkspace(out _, closed: true);
 
-        Assert.False(vm.CanEditIncidentNumber);
-        Assert.False(vm.BeginEditIncidentNumberCommand.CanExecute(null));
+        Assert.False(vm.CanEditIncidentData);
+        Assert.False(vm.EditIncidentDataCommand.CanExecute(null));
     }
 
     [Fact]

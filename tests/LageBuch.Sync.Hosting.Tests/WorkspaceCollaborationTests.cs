@@ -144,6 +144,65 @@ public class WorkspaceCollaborationTests
     }
 
     [Fact]
+    public async Task Client_header_reflects_einsatzdaten_edited_on_the_host()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+        Assert.Equal("Unbenannter Einsatz", clientWs.HeroText);
+
+        var change = NextChange(client);
+        hostSession.SetKeyword("B3P");
+        await change;
+        change = NextChange(client);
+        hostSession.SetAddress("Hauptstr. 12", "FFB");
+        await change;
+
+        // The header is a projection refreshed on every host broadcast, not only for the number.
+        Assert.Equal("B3P", clientWs.HeroText);
+        Assert.Equal("Hauptstr. 12, FFB", clientWs.AddressDisplay);
+    }
+
+    [Fact]
+    public async Task Host_header_reflects_einsatzdaten_saved_in_a_clients_dialog()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var hostWs = Workspace(hostSession, clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        clientWs.EditIncidentDataCommand.Execute(null);
+        var dialog = clientWs.PendingIncidentDataDialog!;
+        dialog.IncidentNumber = "B 1.2 260715 123";
+        dialog.Street = "Hauptstr. 12";
+
+        // Save sends two commands (number, address); wait until both broadcasts have round-tripped.
+        var first = NextChange(client);
+        dialog.SaveCommand.Execute(null);
+        await first;
+        if (hostSession.Incident.Street is null)
+        {
+            await NextChange(client);
+        }
+
+        Assert.Equal("B 1.2 260715 123", hostSession.Incident.IncidentNumber!.Value);
+        Assert.Equal("Hauptstr. 12", hostSession.Incident.Street);
+        Assert.Equal("B 1.2 260715 123", hostWs.HeroText);
+        Assert.Equal("Hauptstr. 12", hostWs.AddressDisplay);
+        Assert.Equal("B 1.2 260715 123", clientWs.HeroText);
+    }
+
+    [Fact]
     public async Task Tasks_converge_between_host_and_client()
     {
         var clock = new FixedClock();

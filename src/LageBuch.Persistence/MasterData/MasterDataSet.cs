@@ -198,7 +198,7 @@ public static class AnonymizedExampleData
     public const string LinkUrlPlaceholder = "z. B. " + LinkUrl;
 
     // A field that is genuinely optional reuses this idiom rather than inventing a second
-    // convention for the same idea (see OperatorPromptView's KeywordBox).
+    // convention for the same idea.
     public const string OptionalCallSignPlaceholder = "optional, z. B. " + CallSign;
 
     // Ready-built collections for fixtures that need a fuller MasterDataSet (render/PR-screenshot
