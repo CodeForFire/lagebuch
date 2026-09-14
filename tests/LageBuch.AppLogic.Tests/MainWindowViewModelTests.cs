@@ -34,12 +34,14 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void RequestNewIncident_shows_operator_prompt_collecting_keyword()
+    public void RequestNewIncident_shows_operator_prompt()
     {
+        // Only who documents is asked here; the Stichwort (and every other head datum) is entered
+        // afterwards through the workspace's Einsatzdaten dialog.
         var vm = New();
         vm.RequestNewIncidentCommand.Execute(null);
         Assert.NotNull(vm.PendingPrompt);
-        Assert.True(vm.PendingPrompt!.CollectsKeyword);
+        Assert.False(vm.PendingPrompt!.CollectsHost);
     }
 
     [Fact]

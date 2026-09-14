@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
-using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
@@ -72,12 +71,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             _exportStatusDetail = lastExport.Path;
         }
 
-        // Seed the backing field directly so initialization doesn't trigger a write-back/save.
+        // Seed the backing fields directly so initialization doesn't trigger a write-back/save.
+        _keywordDisplay = _session.Incident.Keyword;
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
+        _addressDisplay = Formatting.Address(_session.Incident.Street, _session.Incident.District);
 
-        // The Stichwort is creation-time-only (unlike the Einsatznummer above, it has no write-back
-        // path), so a plain property seeded once is enough -- no ObservableProperty needed.
-        KeywordDisplay = _session.Incident.Keyword;
+        // The header is a projection of the incident's head data; any mutation -- the Einsatzdaten
+        // dialog on this device, or (host or joined client alike) a command from another device
+        // applied to this session -- re-reads it from the aggregate.
+        _session.Changed += RefreshIncidentData;
         BuildChildren();
 
         // A joined client renders exactly what the host broadcasts; wire the connection lifecycle so
@@ -100,10 +102,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanContinueEditing))]
     [NotifyPropertyChangedFor(nameof(CanHost))]
-    [NotifyPropertyChangedFor(nameof(CanEditIncidentNumber))]
+    [NotifyPropertyChangedFor(nameof(CanEditIncidentData))]
     [NotifyCanExecuteChangedFor(nameof(CloseIncidentCommand))]
     [NotifyCanExecuteChangedFor(nameof(ContinueEditingCommand))]
-    [NotifyCanExecuteChangedFor(nameof(BeginEditIncidentNumberCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditIncidentDataCommand))]
     private bool _isReadOnly;
 
     [ObservableProperty]
@@ -130,20 +132,32 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private PdfExportOptionsViewModel? _pendingPdfExportOptions;
 
-    // The Stichwort, captured once at creation (#69) and never edited afterward -- unlike the
-    // Einsatznummer below, which the header lets you add/edit later.
-    public string? KeywordDisplay { get; private set; }
+    // The Einsatzdaten overlay (Stichwort, Einsatznummer, Adresse); null while no dialog is open.
+    [ObservableProperty]
+    private IncidentDataDialogViewModel? _pendingIncidentDataDialog;
 
-    // Display projection of the domain IncidentNumber, seeded once from the session and kept in
-    // sync by ConfirmIncidentNumber/OnRemoteLifecycle. Unlike KeywordDisplay this DOES have a
-    // write-back path (#69): the header offers an inline add/edit affordance, since the number is
-    // commonly unknown at creation and gets filled in once ILS calls back.
+    // ===== Header: display projections of the incident's head data. None of these write back --
+    // the only write path is the Einsatzdaten dialog (EditIncidentData), which replaced the inline
+    // Einsatznummer editor of #69. They are seeded in the constructor and refreshed from the
+    // aggregate by RefreshIncidentData on every session change. =====
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeroText))]
+    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
+    [NotifyPropertyChangedFor(nameof(HasIncidentData))]
+    private string? _keywordDisplay;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HeroText))]
     [NotifyPropertyChangedFor(nameof(HasEinsatznummer))]
     [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
-    [NotifyPropertyChangedFor(nameof(ShowAddEinsatznummerAffordance))]
+    [NotifyPropertyChangedFor(nameof(HasIncidentData))]
     private string _incidentNumberInput = string.Empty;
+
+    // "Straße, Ortsteil" -- the same join the PDF header prints, so the two never disagree.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLine))]
+    [NotifyPropertyChangedFor(nameof(HasIncidentData))]
+    private string? _addressDisplay;
 
     // The header's hero: the Stichwort when known, else the Einsatznummer, else a placeholder for
     // the rare incident that was given neither.
@@ -158,51 +172,36 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // instead -- the chip would then be a redundant repeat of the hero text.
     private bool IsEinsatznummerShownAsHero => string.IsNullOrWhiteSpace(KeywordDisplay) && HasEinsatznummer;
 
-    public bool ShowEinsatznummerChip => HasEinsatznummer && !IsEinsatznummerShownAsHero && !IsEditingIncidentNumber;
+    public bool ShowEinsatznummerChip => HasEinsatznummer && !IsEinsatznummerShownAsHero;
 
-    // Always offered when there's no Einsatznummer yet, regardless of whether a Stichwort is set --
-    // otherwise an incident created without either would have no way to add one (#250).
-    public bool ShowAddEinsatznummerAffordance => !HasEinsatznummer && !IsEditingIncidentNumber;
+    public bool ShowAddressLine => !string.IsNullOrWhiteSpace(AddressDisplay);
 
-    public bool ShowEinsatznummerEdit => IsEditingIncidentNumber;
+    // Drives which affordance the header shows: a quiet pencil once anything is known, an explicit
+    // "+ Einsatzdaten ergänzen" while nothing is -- so an incident started without any head data
+    // always has a visible way to get some (#250).
+    public bool HasIncidentData =>
+        !string.IsNullOrWhiteSpace(KeywordDisplay) || HasEinsatznummer || ShowAddressLine;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
-    [NotifyPropertyChangedFor(nameof(ShowAddEinsatznummerAffordance))]
-    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerEdit))]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmIncidentNumberCommand))]
-    private bool _isEditingIncidentNumber;
+    public bool CanEditIncidentData => !IsReadOnly;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmIncidentNumberCommand))]
-    private string _incidentNumberEditInput = string.Empty;
-
-    public bool CanEditIncidentNumber => !IsReadOnly;
-
-    [RelayCommand(CanExecute = nameof(CanEditIncidentNumber))]
-    private void BeginEditIncidentNumber()
+    [RelayCommand(CanExecute = nameof(CanEditIncidentData))]
+    private void EditIncidentData()
     {
-        IncidentNumberEditInput = IncidentNumberInput;
-        IsEditingIncidentNumber = true;
+        var dialog = new IncidentDataDialogViewModel(_session, OnChanged);
+
+        // Clear the overlay on either outcome; Save has already applied the edits on confirm, and
+        // the header projections refresh through the session's Changed event.
+        dialog.Closed += (_, _) => PendingIncidentDataDialog = null;
+        PendingIncidentDataDialog = dialog;
     }
 
-    private bool CanConfirmIncidentNumber => !string.IsNullOrWhiteSpace(IncidentNumberEditInput);
-
-    [RelayCommand(CanExecute = nameof(CanConfirmIncidentNumber))]
-    private void ConfirmIncidentNumber()
+    private void RefreshIncidentData()
     {
-        var number = new IncidentNumber(IncidentNumberEditInput.Trim());
-        _session.SetIncidentNumber(number);
-
-        // A local session applies this immediately in-process; a remote/joined session only
-        // reflects it once the host's broadcast round-trips (OnRemoteLifecycle) -- updating here
-        // too is harmless, it just gets overwritten with the same value shortly after.
-        IncidentNumberInput = number.Value;
-        IsEditingIncidentNumber = false;
+        var incident = _session.Incident;
+        KeywordDisplay = incident.Keyword;
+        IncidentNumberInput = incident.IncidentNumber?.Value ?? string.Empty;
+        AddressDisplay = Formatting.Address(incident.Street, incident.District);
     }
-
-    [RelayCommand]
-    private void CancelEditIncidentNumber() => IsEditingIncidentNumber = false;
 
     public CoMessprotokollViewModel CoMessprotokoll { get; private set; } = null!;
 
@@ -311,6 +310,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
 
         _disposed = true;
+        _session.Changed -= RefreshIncidentData;
 
         if (_session is RemoteIncidentSession remote)
         {
@@ -324,12 +324,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     }
 
     // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
-    // incident, or someone adds the Einsatznummer from another device); keep the header live and
-    // flip the whole workspace to read-only when the lifecycle itself changes.
+    // incident); keep the status live and flip the whole workspace to read-only when the lifecycle
+    // itself changes. The head data (Stichwort/Einsatznummer/Adresse) is refreshed separately by
+    // RefreshIncidentData, which is wired for local and remote sessions alike.
     private void OnRemoteLifecycle()
     {
         OnPropertyChanged(nameof(StatusDisplay));
-        IncidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
         if (_session.IsReadOnly != IsReadOnly)
         {
             IsReadOnly = _session.IsReadOnly;

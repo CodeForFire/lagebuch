@@ -40,13 +40,6 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
-    public void Keyword_not_collected_by_default()
-    {
-        var vm = new OperatorPromptViewModel();
-        Assert.False(vm.CollectsKeyword);
-    }
-
-    [Fact]
     public void CallSignOptions_default_to_empty()
     {
         var vm = new OperatorPromptViewModel();
@@ -72,36 +65,6 @@ public class OperatorPromptViewModelTests
         };
         vm.ConfirmCommand.Execute(null);
         Assert.Equal("Müller (Land 9)", vm.Result!.Display);
-    }
-
-    [Fact]
-    public void Keyword_is_null_by_default_and_settable()
-    {
-        var vm = new OperatorPromptViewModel(collectKeyword: true) { OperatorName = "Müller" };
-        Assert.Null(vm.Keyword);
-        vm.Keyword = "B3P";
-        Assert.Equal("B3P", vm.Keyword);
-    }
-
-    [Fact]
-    public void Keyword_never_gates_confirm_set_or_unset()
-    {
-        // The Einsatznummer is unknown at creation (#69) -- the Stichwort that replaces it in this
-        // dialog is optional too, so an incident can be started with neither.
-        var vm = new OperatorPromptViewModel(collectKeyword: true) { OperatorName = "Müller" };
-        Assert.True(vm.ConfirmCommand.CanExecute(null));
-
-        vm.Keyword = "B3P";
-        Assert.True(vm.ConfirmCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void Keyword_not_required_when_not_collected()
-    {
-        // The continue-editing flow (collectKeyword: false) never shows the field at all, so it
-        // must not gate Confirm there.
-        var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
-        Assert.True(vm.ConfirmCommand.CanExecute(null));
     }
 
     [Fact]

@@ -112,14 +112,6 @@ public class ForcesViewModelTests
         Assert.Null(vm.AddDisabledReason);
     }
 
-    // --- Issue #18 ---
-    [Fact]
-    public void Brigade_options_come_from_master_data()
-    {
-        // Was Array.Empty with a "free-text for MVP" comment, so the dropdown was permanently blank.
-        Assert.Equal(new[] { "FFB Wache 1", "Aich" }, NewVm().BrigadeOptions);
-    }
-
     [Fact]
     public void Status_options_are_the_per_unit_vocabulary_not_the_incident_one()
     {

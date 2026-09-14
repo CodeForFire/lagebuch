@@ -102,9 +102,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private Task RequestNewIncident() => NavigateAwayAsync(() =>
     {
         _pending = PendingAction.New;
-        PendingPrompt = new OperatorPromptViewModel(
-            collectKeyword: true,
-            callSignOptions: _home.CallSignOptions);
+        PendingPrompt = new OperatorPromptViewModel(callSignOptions: _home.CallSignOptions);
     });
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
@@ -140,7 +138,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             PendingPrompt = null;
             _pending = PendingAction.None;
-            _home.NewIncidentCommand.Execute(new NewIncidentRequest(op, prompt!.Keyword));
+            _home.NewIncidentCommand.Execute(new NewIncidentRequest(op));
             return;
         }
 

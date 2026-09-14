@@ -9,6 +9,22 @@ once we reach 1.0.
 
 ## [Unreleased]
 
+### Added
+- Einsatzdaten dialog: Stichwort, Einsatznummer, Straße and Ortsteil are edited together from a
+  pencil in the workspace header (or "+ Einsatzdaten ergänzen" while nothing is known yet). The
+  address had no UI at all before, so the PDF's "Adresse" line was always empty; it now shows in
+  the header and the PDF, and a change made on one device reaches every joined device.
+
+### Changed
+- The new-incident dialog no longer asks for a Stichwort; it is entered afterwards in the
+  Einsatzdaten dialog, like the Einsatznummer always was. New files are therefore named by date
+  and time only (`20260819-2217.fwincident`), and the header's inline "+ ILS-Nr. hinzufügen"
+  editor is replaced by that dialog.
+- Kräfte tab: "Feuerwehr / Wache" and "Funkrufname" in the entry dock are plain text fields.
+  They exist for vehicles that are not in the Stammdaten, so the suggestion dropdown they
+  used to open on focus only re-offered what the Fahrzeug picker already lists. Enter in
+  either field adds the row.
+
 ## [0.5.0] - 2026-09-11
 
 Attachment handling, PDF export control, more depth in CO-Messung and accessibility —

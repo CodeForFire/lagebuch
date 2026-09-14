@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.IncidentDataDialogView"
+             x:DataType="vm:IncidentDataDialogViewModel">
+  <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
+    <Border x:Name="IncidentDataDialogCard" Width="480" VerticalAlignment="Center" HorizontalAlignment="Center"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <StackPanel Margin="26,22,26,24" Spacing="12">
+          <TextBlock Text="EINSATZDATEN" Classes="display" FontSize="20" />
+          <!-- Everything here is optional and typically arrives piecemeal: the Stichwort from the
+               alarm, the Einsatznummer once ILS calls back (#69), the address as it firms up. The
+               fields are buffered until SPEICHERN so a half-typed number never lands in the file. -->
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <HeaderedContentControl Grid.Column="0" Classes="field" Header="STICHWORT">
+              <TextBox x:Name="IncidentDataKeywordBox" Text="{Binding Keyword}" PlaceholderText="z. B. B3P" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Grid.Column="1" Classes="field" Header="EINSATZNUMMER">
+              <TextBox x:Name="IncidentDataNumberBox" Classes="mono" Text="{Binding IncidentNumber}"
+                       PlaceholderText="z. B. B 1.2 260715 123" />
+            </HeaderedContentControl>
+          </Grid>
+          <Grid ColumnDefinitions="3*,2*" ColumnSpacing="12">
+            <HeaderedContentControl Grid.Column="0" Classes="field" Header="STRASSE">
+              <TextBox x:Name="IncidentDataStreetBox" Text="{Binding Street}" PlaceholderText="z. B. Hauptstr. 12" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Grid.Column="1" Classes="field" Header="ORTSTEIL">
+              <TextBox x:Name="IncidentDataDistrictBox" Text="{Binding District}" PlaceholderText="z. B. Puch" />
+            </HeaderedContentControl>
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="IncidentDataCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+            <Button x:Name="IncidentDataSaveButton" Classes="signal" Content="SPEICHERN"
+                    Command="{Binding SaveCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

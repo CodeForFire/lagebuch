@@ -269,7 +269,7 @@ public class CoMessprotokollViewModelTests
     }
 
     // Every other Add/Confirm command in the app (AddForce, AddRole, ConfirmTransfer, AddTrupp,
-    // AddTask, AddEntry, ConfirmIncidentNumber...) gates on its required text field being
+    // AddTask, AddEntry...) gates on its required text field being
     // non-empty. ConfirmAddBuildingCommand had no such gate: clicking HINZUFÜGEN with an empty
     // Hausname called straight through to Building.Create, which throws ArgumentException and
     // takes the whole desktop app down (unhandled on the UI thread).

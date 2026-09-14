@@ -224,8 +224,6 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         _requestConfirm = requestConfirm ?? ((_, onConfirmed) => onConfirmed());
         _masterVehicles = masterData.Vehicles;
         IsReadOnly = session.IsReadOnly;
-        BrigadeOptions = masterData.Brigades;
-        CallSignOptions = masterData.RadioCallSigns;
         StatusOptions = masterData.UnitStatus;
         Forces = new ObservableCollection<ForceRow>(session.Incident.Forces.Select(ToRow));
         TotalPersonnel = session.Incident.TotalPersonnel;
@@ -258,10 +256,6 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     }
 
     public bool IsReadOnly { get; }
-
-    public IReadOnlyList<string> BrigadeOptions { get; }
-
-    public IReadOnlyList<string> CallSignOptions { get; }
 
     /// <summary>
     /// Per-unit status (Alarmiert, Auf Anfahrt, ...) — deliberately not the incident-level status
