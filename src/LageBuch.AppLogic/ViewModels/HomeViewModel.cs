@@ -36,6 +36,11 @@ public sealed partial class HomeViewModel : ObservableObject
     // is null-guarded, so the feature is simply inert rather than required.
     private readonly ILastSaveFolderStore? _lastSaveFolder;
 
+    // The host address last used for a successful join, so the join dialog can prefill it next
+    // time instead of starting empty (it rarely changes once set up). Null when not supplied
+    // (e.g. most tests) -- every use site is null-guarded, so the feature is simply inert.
+    private readonly ILastJoinHostStore? _lastJoinHost;
+
     // Threaded straight into every IncidentWorkspaceViewModel this opens (#262); null (most tests
     // and every remote/joined workspace) just means "no last-export status to seed or persist".
     private readonly ILastPdfExportStore? _lastPdfExport;
@@ -51,7 +56,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastJoinHostStore? lastJoinHost = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -69,6 +74,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _attachmentCacheRoot = attachmentCacheRoot;
         _trustStore = trustStore;
         _lastPdfExport = lastPdfExport;
+        _lastJoinHost = lastJoinHost;
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -83,6 +89,9 @@ public sealed partial class HomeViewModel : ObservableObject
 
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
     public IReadOnlyList<string> CallSignOptions => _masterData.Get().RadioCallSigns;
+
+    /// <summary>The host address last used for a successful join, to prefill the join dialog with.</summary>
+    public string? LastJoinHost => _lastJoinHost?.GetLastHost();
 
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
@@ -276,6 +285,7 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = null;
             _certificateChangedHost = null;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
+            _lastJoinHost?.SetLastHost(request.Host);
             OpenRemoteWorkspace(session, hostMasterData);
         }
         catch (PinRejectedException ex)

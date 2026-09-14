@@ -68,7 +68,8 @@ public class MainActivity : AvaloniaMainActivity
             lastSaveFolder: null,
             attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
             trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)),
-            pdfExporter: new NoopIncidentPdfExporter());
+            pdfExporter: new NoopIncidentPdfExporter(),
+            lastJoinHost: new JsonLastJoinHostStore(AndroidAppPaths.LastJoinHostJsonPath(this)));
 
         base.OnCreate(savedInstanceState);
     }

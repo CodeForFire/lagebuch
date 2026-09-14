@@ -14,6 +14,8 @@ once we reach 1.0.
   pencil in the workspace header (or "+ Einsatzdaten ergänzen" while nothing is known yet). The
   address had no UI at all before, so the PDF's "Adresse" line was always empty; it now shows in
   the header and the PDF, and a change made on one device reaches every joined device.
+- The join dialog remembers the host address used for the last successful connection and
+  prefills it (selected, ready to overwrite) instead of starting empty every time.
 
 ### Changed
 - The new-incident dialog no longer asks for a Stichwort; it is entered afterwards in the
