@@ -274,8 +274,8 @@ public class ForcesTabRenderTests
         Dispatcher.UIThread.RunJobs();
         Capture(window, "forces-manual-entry.png"); // before: nothing picked, both fields free
 
-        var brigadeBox = view.GetControl<AutoCompleteBox>("BrigadeBox");
-        var callSignBox = view.GetControl<AutoCompleteBox>("CallSignBox");
+        var brigadeBox = view.GetControl<TextBox>("BrigadeBox");
+        var callSignBox = view.GetControl<TextBox>("CallSignBox");
         var clearButton = view.GetControl<Button>("ClearVehicleButton");
         Assert.True(brigadeBox.IsEnabled);
         Assert.True(callSignBox.IsEnabled);
@@ -300,6 +300,44 @@ public class ForcesTabRenderTests
         // Clearing keeps the derived values -- the operator edits on instead of starting over.
         Assert.Equal("FFB Wache 1", vm.Forces.NewBrigade);
         Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
+    }
+
+    [AvaloniaFact]
+    public void Brigade_and_call_sign_are_plain_text_fields_and_Enter_in_either_adds_the_row()
+    {
+        // Master-data vehicles are picked through the FAHRZEUG dropdown; these two fields exist
+        // for vehicles that are NOT in the Stammdaten (Fremdwehren), so they must be plain text
+        // boxes -- no suggestion list, no chevron, nothing that pops open on focus.
+        var view = HostForcesView(out var vm, out var window);
+        var brigadeBox = view.GetControl<TextBox>("BrigadeBox");
+        var callSignBox = view.GetControl<TextBox>("CallSignBox");
+        Assert.Empty(view.GetVisualDescendants().OfType<AutoCompleteBox>());
+
+        vm.Forces.NewBrigade = "FF Nachbarort";
+        vm.Forces.NewCallSign = "Nachbarort 40/1";
+        vm.Forces.NewMannschaftCount = 6;
+        Dispatcher.UIThread.RunJobs();
+
+        callSignBox.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Forces.Forces);
+        Assert.Equal("Nachbarort 40/1", row.CallSign);
+
+        vm.Forces.NewBrigade = "FF Nachbarort";
+        vm.Forces.NewCallSign = "Nachbarort 44/1";
+        vm.Forces.NewMannschaftCount = 6;
+        Dispatcher.UIThread.RunJobs();
+
+        brigadeBox.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, vm.Forces.Forces.Count);
+        Capture(window, "forces-manual-entry-plain-text.png");
     }
 
     [AvaloniaFact]

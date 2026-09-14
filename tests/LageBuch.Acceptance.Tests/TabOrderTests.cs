@@ -58,11 +58,11 @@ public class TabOrderTests
 
         Tab(window);
         Dispatcher.UIThread.RunJobs();
-        Assert.True(view.GetControl<AutoCompleteBox>("BrigadeBox").IsKeyboardFocusWithin);
+        Assert.True(view.GetControl<TextBox>("BrigadeBox").IsKeyboardFocusWithin);
 
         Tab(window);
         Dispatcher.UIThread.RunJobs();
-        Assert.True(view.GetControl<AutoCompleteBox>("CallSignBox").IsKeyboardFocusWithin);
+        Assert.True(view.GetControl<TextBox>("CallSignBox").IsKeyboardFocusWithin);
 
         Tab(window);
         Dispatcher.UIThread.RunJobs();
