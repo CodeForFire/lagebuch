@@ -140,7 +140,7 @@ public class AboutRenderTests
 
     private sealed class NoFiles : IMasterDataFileService
     {
-        public MasterDataSet Read(string path) => MasterDataSet.Empty;
+        public MasterDataImportResult Read(string path) => new(MasterDataSet.Empty, Array.Empty<string>());
 
         public void Write(string path, MasterDataSet set)
         {

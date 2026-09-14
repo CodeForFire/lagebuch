@@ -154,10 +154,17 @@ git tag v0.4.1 && git push origin v0.4.1
 
 ## Master data
 
-Dropdown contents (roles, radio call signs, brigades, personnel, ...) are treated
-as PII and are **never compiled into the application**. A fresh install starts
-with **empty** master data; you populate it in the in-app **Stammdaten** editor
-by importing a JSON file, and can write your own data back out again.
+Dropdown contents (roles, vehicles, personnel, ...) are treated as PII and are
+**never compiled into the application**. A fresh install starts with **empty**
+master data; you populate it in the in-app **Stammdaten** editor by importing a
+JSON file, and can write your own data back out again.
+
+There is no separate list of brigades (Wachen) or radio call signs
+(Funkrufnamen): both are derived from the **vehicles** — every vehicle's Wache
+becomes a brigade suggestion, and every vehicle's call sign (plus every roster
+person's call sign) becomes a call-sign suggestion. Maintaining the vehicle
+list is all that is needed; every field still accepts free text for anything
+not in it (a Leitstelle, a mutual-aid unit).
 
 ### Where it is stored
 
@@ -177,8 +184,9 @@ over, delete `masterdata.db`; the app recreates it empty on the next launch.
 ### Joined devices use the host's master data
 
 When you join another device's incident ("Mit Gerät verbinden"), that device's
-master data is used for the whole session — its brigades, radio call signs,
-vehicles and roster, and its Einsatzzeiten and Rückzugsdruck settings. The host
+master data is used for the whole session — its vehicles (and the brigades and
+call signs derived from them), its roster, and its Einsatzzeiten and
+Rückzugsdruck settings. The host
 is the master, so both devices always agree: an Atemschutz-Trupp registered from
 a joined tablet gets exactly the Einsatzzeit the host would have used.
 
@@ -204,7 +212,10 @@ Open **Stammdaten** and use the header buttons:
 The file is one JSON object; every top-level key is optional, so a file may hold
 the whole set, only the roster, or anything in between. See
 [`docs/master-data.example.json`](docs/master-data.example.json) for the full
-schema.
+schema. A file exported by an older version may still carry `brigades` and
+`radioCallSigns` lists; those keys are ignored, and any entry in them that no
+vehicle or roster person covers is listed in a notice after the import so you
+can add a vehicle for it before saving.
 
 ### PII
 

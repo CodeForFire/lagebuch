@@ -17,7 +17,7 @@ public class ForcesNotesFocusTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        Brigades = new[] { "FFB Wache 1" },
+        Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
         UnitStatus = new[] { "Alarmiert" },
     };
 

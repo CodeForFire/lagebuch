@@ -186,11 +186,17 @@ public class EtbViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var masterData = MasterDataSet.Empty with { RadioCallSigns = new[] { "Leitstelle", "Land 1" } };
+
+        // Callsign suggestions derive from the vehicles and the roster's callsigns.
+        var masterData = MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+            Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", null) },
+        };
 
         var vm = new EtbViewModel(session, clock, masterData, () => { });
 
-        Assert.Equal(new[] { "Leitstelle", "Land 1" }, vm.CallSignOptions);
+        Assert.Equal(new[] { "FFB 1/40/1", "Land 1" }, vm.CallSignOptions);
     }
 
     [Fact]

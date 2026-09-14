@@ -39,8 +39,6 @@ public class MasterDataStoreTests : IDisposable
         {
             Roles = new[] { "EL", "ZF" },
             UnitStatus = new[] { "Alarmiert" },
-            Brigades = new[] { "FFB Wache 1" },
-            RadioCallSigns = new[] { "Land 1" },
             TruppTypes = new[] { "Angriffstrupp" },
             ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
             ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbauschritt", true) },
@@ -118,6 +116,41 @@ public class MasterDataStoreTests : IDisposable
         var set = MasterDataStore.GetOrCreate(_path);
 
         Assert.Equal(new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
+    }
+
+    [Fact]
+    public void A_database_with_the_old_wachen_and_funkrufnamen_tables_opens_and_derives_from_vehicles()
+    {
+        // Simulate a database written while Wachen/Funkrufnamen were still their own lists. The
+        // tables are dropped on open (no version marker, so every open re-checks) and the derived
+        // lists come from md_vehicles alone -- an orphan entry no vehicle covers is gone.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_brigades (value TEXT NOT NULL);
+                CREATE TABLE md_call_signs (value TEXT NOT NULL);
+                INSERT INTO md_brigades (value) VALUES ('FFB Wache 1'), ('Alt-Wache');
+                INSERT INTO md_call_signs (value) VALUES ('FFB 1/40/1'), ('Leitstelle');
+                CREATE TABLE md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0);
+                INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ('FFB Wache 1', 'FFB 1/40/1', 9);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new[] { "FFB Wache 1" }, set.Brigades);
+        Assert.Equal(new[] { "FFB 1/40/1" }, set.RadioCallSigns);
+
+        using var check = new SqliteConnection($"Data Source={_path}");
+        check.Open();
+        using var count = check.CreateCommand();
+        count.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('md_brigades', 'md_call_signs');";
+        Assert.Equal(0L, (long)count.ExecuteScalar()!);
     }
 
     [Fact]

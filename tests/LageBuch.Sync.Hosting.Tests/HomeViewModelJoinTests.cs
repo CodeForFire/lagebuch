@@ -434,7 +434,7 @@ public class HomeViewModelJoinTests
 
 internal sealed class NoMasterDataFiles : IMasterDataFileService
 {
-    public MasterDataSet Read(string path) => MasterDataSet.Empty;
+    public MasterDataImportResult Read(string path) => new(MasterDataSet.Empty, Array.Empty<string>());
 
     public void Write(string path, MasterDataSet set)
     {

@@ -4,10 +4,10 @@ namespace LageBuch.AppLogic.Services;
 
 public sealed class MasterDataFileService : IMasterDataFileService
 {
-    public MasterDataSet Read(string path)
+    public MasterDataImportResult Read(string path)
     {
         using var stream = File.OpenRead(path);
-        return MasterDataJson.Parse(stream);
+        return MasterDataJson.ParseForImport(stream);
     }
 
     public void Write(string path, MasterDataSet set) =>

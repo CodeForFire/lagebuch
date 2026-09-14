@@ -795,7 +795,7 @@ public class IncidentWorkspaceViewModelTests
             ro,
             clock,
             new FakeTicker(),
-            MasterDataSet.Empty with { RadioCallSigns = callSigns },
+            MasterDataSet.Empty with { Vehicles = callSigns.Select(c => new Vehicle("FFB Wache 1", c, 9)).ToList() },
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());

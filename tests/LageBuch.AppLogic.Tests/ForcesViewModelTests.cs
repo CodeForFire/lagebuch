@@ -10,8 +10,6 @@ public class ForcesViewModelTests
 
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        RadioCallSigns = new[] { AnonymizedExampleData.CallSign },
-        Brigades = new[] { AnonymizedExampleData.Brigade, AnonymizedExampleData.SecondBrigade },
         UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
         Vehicles = AnonymizedExampleData.Vehicles,
     };

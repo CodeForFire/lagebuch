@@ -34,8 +34,7 @@ public class TabOrderTests
             Array.Empty<(string, bool)>());
         var md = MasterDataSet.Empty with
         {
-            Brigades = new[] { "FFB Wache 1" },
-            RadioCallSigns = new[] { "FFB 1/40/1" },
+            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
             UnitStatus = new[] { "Alarmiert" },
         };
         var vm = new ForcesViewModel(session, new FixedClock(), md, () => { });
@@ -107,7 +106,7 @@ public class TabOrderTests
 
     private sealed class NoFiles : IMasterDataFileService
     {
-        public MasterDataSet Read(string path) => MasterDataSet.Empty;
+        public MasterDataImportResult Read(string path) => new(MasterDataSet.Empty, Array.Empty<string>());
 
         public void Write(string path, MasterDataSet set)
         {
