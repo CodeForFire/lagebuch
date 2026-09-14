@@ -182,7 +182,8 @@ uninstall: ## Remove the app from the attached device/emulator
 package-linux: ## Build a local .deb (VERSION=x.y.z)
 	$(DOTNET) publish $(APP) -r linux-x64 $(PUBLISH_FLAGS) -p:Version=$(VERSION) -o publish
 	packaging/linux/build-deb.sh "$(VERSION)" publish \
-	  src/LageBuch.App.Shared/Assets/icon-1024.png dist
+	  src/LageBuch.App.Shared/Assets/icon-1024.png \
+	  src/LageBuch.App/Assets/icon.svg dist
 
 logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
 	packaging/logo/build-logo-assets.sh

@@ -86,6 +86,13 @@ jobs:
         run: >
           dotnet publish src/LageBuch.App/LageBuch.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
           -p:Version=${{ needs.version.outputs.version }} -o publish
+      # build-deb.sh renders the hicolor icon sizes with ImageMagick and refuses to build
+      # without it; ubuntu-24.04 runners carry no ImageMagick, rsvg or Inkscape. desktop-file-utils
+      # is only needed so the script's optional entry validation actually runs in CI.
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick desktop-file-utils
       - name: Build .deb
         run: |
           chmod +x packaging/linux/build-deb.sh
@@ -93,6 +100,7 @@ jobs:
             "${{ needs.version.outputs.version }}" \
             publish \
             src/LageBuch.App.Shared/Assets/icon-1024.png \
+            src/LageBuch.App/Assets/icon.svg \
             dist
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
