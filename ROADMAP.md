@@ -57,10 +57,11 @@ The plan, in order of what is actually achievable:
   Obtainium so updates do not mean re-downloading an APK by hand.
 
 On code signing, plainly: the SignPath Foundation reviewed this project and
-declined. OSSign has a minimum project-age requirement that Lagebuch meets in
-**February 2027** — that is the earliest a free Windows certificate is possible,
-and we plan to apply then. Apple's Developer ID is a paid membership and
-independent of both.
+declined. OSSign requires six months of activity on the account, the
+organisation and the project; CodeForFire was founded in August 2026, so
+**February 2027** is the earliest a free Windows certificate is possible, and we
+plan to apply then. Apple's Developer ID is a paid membership and independent of
+both.
 
 Issues: #209, #308, #208
 
