@@ -1,0 +1,36 @@
+<Project>
+
+  <!--
+    Stop .NET for Android's per-RID inner build from forking every referenced project
+    into a second, concurrently-built copy.
+
+    Microsoft.Android.Sdk.AssemblyResolution.targets, target _ResolveAssemblies,
+    re-invokes the Android head once per RID (android-arm64;android-x64 by default)
+    with a batch of extra *global* properties. Global properties flow down
+    ProjectReference edges, and Microsoft.Common.CurrentVersion.targets only strips
+    TargetFramework (single-TFM references) plus RuntimeIdentifier/SelfContained
+    (RID-agnostic references). Everything listed below survives the trip.
+
+    MSBuild keys its project cache on (project path, global properties), so
+    LageBuch.App.Shared and friends become two distinct configurations that both
+    resolve to the SAME obj/Release/net10.0 and bin/Release/net10.0 (no RID reaches
+    them, so AppendRuntimeIdentifierToOutputPath is inert). The solution build has no
+    dependency edge between LageBuch.App and LageBuch.App.Android, so MSBuild is free
+    to run both configurations at once, and LageBuch.App's csc intermittently reads
+    obj/Release/net10.0/ref/LageBuch.App.Shared.dll while the other configuration is
+    mutating that directory. That is the CS0006 seen on the ubuntu CI leg.
+
+    Undefining these makes the two configurations collapse back into one, so each
+    project is built exactly once. SkipCompilerExecution and DesignTimeBuild reaching
+    a real build are plainly wrong regardless: they are design-time-build switches.
+
+    If a future android workload bump adds new inner-build properties, re-derive this
+    list from _AdditionalProperties in that same targets file.
+  -->
+  <ItemGroup>
+    <ProjectReference Update="@(ProjectReference)">
+      <UndefineProperties>%(ProjectReference.UndefineProperties);_ComputeFilesToPublishForRuntimeIdentifiers;SkipCompilerExecution;ResolveAssemblyReferencesFindRelatedSatellites;AppendRuntimeIdentifierToOutputPath;DesignTimeBuild;_OuterIntermediateAssembly;_OuterIntermediateSatelliteAssembliesWithTargetPath;_OuterOutputPath;_OuterIntermediateOutputPath;_OuterCustomViewMapFile;_AndroidNdkDirectory</UndefineProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>
