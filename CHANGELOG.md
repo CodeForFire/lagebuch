@@ -40,6 +40,12 @@ once we reach 1.0.
   join host — are written atomically (to a temp file that is then renamed into place), the way
   `trust.json` already was. A crash or a full disk mid-write used to be able to leave a truncated
   file behind, which the next start silently read as "nothing remembered". (#302)
+- A failed write to `trust.json` no longer leaves the running app trusting a host certificate the
+  file does not record. Accepting or resetting a host's certificate updated memory first and wrote
+  afterwards, so if the write failed (full disk, permissions) the session kept connecting happily
+  while the next start re-prompted for the same host. The write now happens first and is only
+  adopted once it lands, and a retry after a failed reset does the work instead of silently
+  skipping it. (#302)
 - The sync server only bound IPv4 (`0.0.0.0`), so a device reachable only over IPv6 could never
   join a hosted incident. It now binds dual-stack, accepting both IPv4 and IPv6 on the same
   socket, and falls back to IPv4-only itself if the platform doesn't support IPv6.
