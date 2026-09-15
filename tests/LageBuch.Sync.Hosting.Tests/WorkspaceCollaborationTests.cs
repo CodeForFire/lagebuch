@@ -38,6 +38,50 @@ public class WorkspaceCollaborationTests
             new NoAlarm(),
             new NoopIncidentHostController());
 
+    // Completes once the client's cached incident satisfies <paramref name="condition"/>, re-checked
+    // on every host broadcast (times out so a broken push fails fast).
+    //
+    // Use this rather than counting NextChange calls whenever one user action fans out into more than
+    // one command: RemoteIncidentSession.Send is fire-and-forget, so the commands travel as separate,
+    // concurrent POSTs that race each other to the host, and the host broadcasts a fresh snapshot per
+    // command it applies. Neither the order the host applies them in nor the number of broadcasts the
+    // client ends up seeing is fixed, so only the converged state is a sound thing to wait for (#326).
+    //
+    // Waiting on the client also settles the host: IncidentHost broadcasts from inside the session's
+    // Changed raise, which the host's own workspace (subscribed first, at construction) has already
+    // handled -- so anything the client can see, the host has applied and projected into its header.
+    private static async Task WaitForClient(
+        RemoteIncidentSession session,
+        Func<bool> condition,
+        string description,
+        TimeSpan? timeout = null)
+    {
+        var tcs = new TaskCompletionSource();
+        void Handler()
+        {
+            if (condition())
+            {
+                tcs.TrySetResult();
+            }
+        }
+
+        // Subscribe before the first evaluation, so a broadcast can't slip through the gap between them.
+        session.Changed += Handler;
+        try
+        {
+            Handler();
+            await tcs.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(5));
+        }
+        catch (TimeoutException ex)
+        {
+            throw new TimeoutException($"Timed out waiting for {description}.", ex);
+        }
+        finally
+        {
+            session.Changed -= Handler;
+        }
+    }
+
     // Completes when the client next applies a host broadcast (times out so a broken push fails fast).
     private static Task NextChange(RemoteIncidentSession session, TimeSpan? timeout = null)
     {
@@ -186,14 +230,14 @@ public class WorkspaceCollaborationTests
         dialog.IncidentNumber = "B 1.2 260715 123";
         dialog.Street = "Hauptstr. 12";
 
-        // Save sends two commands (number, address); wait until both broadcasts have round-tripped.
-        var first = NextChange(client);
+        // Save sends two commands (number, address) that race each other to the host and broadcast
+        // back one at a time, so wait for both to have landed rather than for a fixed number of
+        // broadcasts -- the client may well see the address arrive first and the number only later.
         dialog.SaveCommand.Execute(null);
-        await first;
-        if (hostSession.Incident.Street is null)
-        {
-            await NextChange(client);
-        }
+        await WaitForClient(
+            client,
+            () => client.Incident.IncidentNumber is not null && client.Incident.Street is not null,
+            "the Einsatznummer and the Adresse to round-trip back to the client");
 
         Assert.Equal("B 1.2 260715 123", hostSession.Incident.IncidentNumber!.Value);
         Assert.Equal("Hauptstr. 12", hostSession.Incident.Street);
