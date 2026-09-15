@@ -12,6 +12,9 @@ once we reach 1.0.
 ### Added
 - Show the 25 MB per-file attachment limit in the Files view (#213)
 
+### Changed
+- Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
+
 ## [0.4.0] - 2026-09-05
 
 TLS/TOFU sync, .NET 10 & Avalonia 12 migration, host-driven Stammdaten sync,

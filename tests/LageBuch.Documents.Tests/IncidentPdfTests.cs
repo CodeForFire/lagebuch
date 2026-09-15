@@ -145,8 +145,9 @@ public class IncidentPdfTests
 
         PdfAssert.IsPdf(withFile);
 
-        // A PDF attachment's pages are appended separately and carry no caption of their own — the
-        // table row is the only place its (renamed) label shows up anywhere in the report.
+        // A PDF attachment's pages are appended as a separate appendix, each preceded by a caption
+        // page echoing the row's label — but without bytes/paths supplied the table row alone proves
+        // the (renamed) label renders in the report.
         Assert.True(
             withFile.Length > withoutFile.Length,
             $"Expected the file table to grow the PDF even without embedded bytes (without={withoutFile.Length}, with={withFile.Length}).");
@@ -174,7 +175,7 @@ public class IncidentPdfTests
 
     // Needs the native qpdf library (see PdfAttachmentMergerTests' remarks).
     [Fact]
-    public void Generate_appends_an_attached_pdfs_pages_after_the_report()
+    public void Generate_appends_a_caption_page_then_an_attached_pdfs_pages_after_the_report()
     {
         var incident = BuildFullIncident();
         var withoutAttachment = IncidentPdf.Generate(incident);
@@ -194,7 +195,9 @@ public class IncidentPdfTests
                 pdfAttachmentPaths: new Dictionary<Guid, string> { [file.Id] = attachmentPath });
 
             PdfAssert.IsPdf(withAttachment);
-            Assert.Equal(reportPages + PdfAssert.CountPages(attachmentPdf), PdfAssert.CountPages(withAttachment));
+
+            // One caption page is inserted before the attachment's own pages.
+            Assert.Equal(reportPages + 1 + PdfAssert.CountPages(attachmentPdf), PdfAssert.CountPages(withAttachment));
         }
         finally
         {

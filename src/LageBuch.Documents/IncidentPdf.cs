@@ -16,7 +16,8 @@ public static class IncidentPdf
     /// Disk paths for <c>application/pdf</c> entries in <see cref="Incident.Files"/>, keyed by id —
     /// appended as extra pages via <see cref="PdfAttachmentMerger"/>, which merges straight from
     /// these paths rather than requiring the caller to load each PDF's bytes into memory first (see
-    /// issue #167 P1 #3). An entry with no path supplied is skipped rather than failing the export.
+    /// issue #167 P1 #3) and inserts a caption page echoing each file's "Angehängte Dateien" row in
+    /// front of its pages. An entry with no path supplied is skipped rather than failing the export.
     /// </param>
     public static byte[] Generate(
         Incident incident,
@@ -33,7 +34,7 @@ public static class IncidentPdf
         var pdfAttachments = incident.Files
             .Where(f => f.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
             .Where(f => pdfAttachmentPaths.ContainsKey(f.Id))
-            .Select(f => pdfAttachmentPaths[f.Id])
+            .Select(f => new PdfAttachmentToMerge(pdfAttachmentPaths[f.Id], f))
             .ToList();
 
         return pdfAttachments.Count == 0 ? baseReport : PdfAttachmentMerger.Append(baseReport, pdfAttachments);
