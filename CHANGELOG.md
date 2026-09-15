@@ -16,6 +16,10 @@ once we reach 1.0.
   the header and the PDF, and a change made on one device reaches every joined device.
 - The join dialog remembers the host address used for the last successful connection and
   prefills it (selected, ready to overwrite) instead of starting empty every time.
+- Fictional sample data for a first try-out ("Probefahrt"): `docs/samples/demo-stammdaten.json`
+  and a matching `docs/samples/uebung.fwincident`, generated and kept valid by a test. The README
+  now opens in German for ELW crews, with a demo GIF and a sourced comparison table; the
+  developer documentation follows in English.
 
 ### Changed
 - Wachen and Funkrufnamen are derived from the Fahrzeuge (plus the Personal roster's call
