@@ -94,12 +94,16 @@ and attaches one package per platform:
 | macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
 
 All builds are self-contained — no .NET runtime needs to be installed separately.
+The Linux package still depends on a handful of system libraries (ICU, fontconfig,
+the X11 client libraries); `apt` pulls them in for you.
 The packages are **not code-signed**, so the OS warns on first launch:
 
 - **Windows** — run the `.msi`; if SmartScreen appears, *More info → Run anyway*.
 - **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click
   the app → Open** once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
-- **Linux** — `sudo dpkg -i lagebuch_*.deb` (or `sudo apt install ./lagebuch_*.deb`).
+- **Linux** — `sudo apt install ./lagebuch_*.deb`. Use `apt`, not `dpkg -i`: the
+  package declares its system dependencies and `dpkg` cannot resolve them (if you
+  did run `dpkg -i`, `sudo apt-get -f install` afterwards fixes it up).
 - **Android** — requires Android 6.0 (API 23) or newer; open the `.apk`;
   enable *install from unknown sources* for this app once when prompted.
 

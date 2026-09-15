@@ -105,7 +105,48 @@ fi
 
 # --- control metadata ------------------------------------------------------------------------
 # Installed-Size is in KiB, what apt shows before installing.
-# Depends is about the icon, not about running the app (the payload is self-contained).
+#
+# "Self-contained" means no .NET *runtime* is needed. It does not mean no system libraries are:
+# the payload still links fontconfig and libstdc++, still dlopens the X11 client libs, and still
+# aborts before the first window without ICU. Until this list existed the package declared only
+# hicolor-icon-theme, so on a machine without a desktop already present `apt install ./lagebuch.deb`
+# reported success and the app then died with "Couldn't find a valid ICU package installed on the
+# system" — a failure the package itself had promised could not happen.
+#
+# Every entry below was checked by installing the .deb into a bare debian:bookworm-slim container
+# and running the app against an X display outside the container (installing xvfb *inside* it would
+# drag in libx11-6 & friends and mask the very gaps being measured). "fatal" = the app aborts
+# without it; "silent" = it starts and maps a window anyway, which is the reason the line is here.
+#
+#   libc6 >= 2.34     highest GLIBC_ symbol over every shipped .so (libe_sqlite3.so)
+#   libstdc++6 >= 6   GLIBCXX_3.4.22 in libhostpolicy.so; CXXABI_1.3.9 in libqpdf.so
+#   libfontconfig1    fatal — NEEDED by libSkiaSharp.so, so Avalonia's renderer will not load
+#   libicu*           fatal — Formatting.cs pins de-DE and InvariantGlobalization is off
+#   libICE/libSM      fatal — Avalonia's X11PlatformLifetimeEvents ctor calls IceAddConnectionWatch
+#                     unconditionally; without them startup throws DllNotFoundException
+#   libxi6            silent — XInput2 is how Avalonia receives touch and pen input. The app starts
+#                     without it on core events, so a touchscreen ELW would simply stop responding
+#                     to touch with nothing in the log. A hard dependency is the cheaper failure.
+#   libx11-6/libxext6 dlopened directly by Avalonia.X11
+#
+# libssl3 is the one entry that is reasoned rather than observed: .NET dlopens libssl.so.3 on first
+# use, so it never appears in a start-and-quit trace, but the sync host's TLS and its self-signed
+# certificate have no other provider on Linux. libssl3 is a real package on bookworm and jammy and
+# a virtual one provided by libssl3t64 on trixie and noble, hence the alternation.
+#
+# The ICU alternation is newest-first because apt takes the first alternative it can resolve:
+# 76 trixie, 74 noble, 72 bookworm, 70 jammy — all four verified against the real archives. A
+# future release adds a new head entry; nothing else changes.
+#
+# Recommends, not Depends, for the rest — apt installs recommends by default, so they still arrive
+# on a normal `apt install ./lagebuch.deb`, but none of them can keep the app from starting:
+#   libxrandr2/libxcursor1  measured: window still maps without them (screen enumeration and
+#                           themed cursors fall back)
+#   libgl1                  measured: window still maps; Avalonia falls back to software rendering
+#   alsa-utils              aplay, the alarm cues — SystemAlarmService catches its absence and
+#                           stays silent
+#   xdg-utils               xdg-open, for attachments and links
+#
 # hicolor-icon-theme owns /usr/share/icons/hicolor/index.theme; without that file the theme has
 # no directory list and a lookup of Icon=lagebuch finds nothing at all. A normal GUI app gets it
 # transitively via libgtk, but a self-contained Avalonia app links no GTK. That package also
@@ -122,7 +163,13 @@ Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: amd64
-Depends: hicolor-icon-theme
+Depends: libc6 (>= 2.34), libstdc++6 (>= 6), libgcc-s1, zlib1g,
+ libfontconfig1,
+ libicu76 | libicu74 | libicu72 | libicu70,
+ libssl3 | libssl3t64,
+ libx11-6, libxext6, libxi6, libice6, libsm6,
+ hicolor-icon-theme
+Recommends: libxrandr2, libxcursor1, libgl1, alsa-utils, xdg-utils
 Maintainer: CodeForFire <noreply@github.com>
 Installed-Size: $SIZE_KB
 Description: Lagebuch — Einsatzdokumentation

@@ -43,6 +43,12 @@ once we reach 1.0.
   on `hicolor-icon-theme`. (#310)
 - Linux: complete the desktop entry — window-to-launcher matching (`StartupWMClass`), search
   keywords, a subtitle and an accurate description in `apt show` (#310)
+- Linux: the `.deb` now declares the system libraries it actually needs. "Self-contained"
+  covers the .NET runtime, not ICU, fontconfig and the X11 client libraries — so on a machine
+  without a desktop environment already installed, `apt install ./lagebuch_*.deb` reported
+  success and the app then died immediately with "Couldn't find a valid ICU package installed
+  on the system". Install it with `apt` rather than `dpkg -i`, which cannot resolve
+  dependencies. Verified on Debian 12/13 and Ubuntu 22.04/24.04.
 
 ## [0.5.0] - 2026-09-11
 
