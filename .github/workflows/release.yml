@@ -184,7 +184,9 @@ jobs:
 
           **Die Pakete sind nicht signiert.** Beim ersten Start:
           - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
-          - **Linux**: \`sudo dpkg -i lagebuch_*.deb\` (oder \`sudo apt install ./lagebuch_*.deb\`).
+          - **Linux**: \`sudo apt install ./lagebuch_*.deb\` — bitte \`apt\`, nicht \`dpkg -i\`:
+            das Paket deklariert seine System-Abhängigkeiten, und \`dpkg\` kann diese nicht
+            auflösen (nach einem \`dpkg -i\` hilft \`sudo apt-get -f install\`).
           - **Android**: aktiviere einmalig *Installation aus unbekannten Quellen* für den
             Browser/Dateimanager, mit dem die APK geöffnet wird.
           - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
