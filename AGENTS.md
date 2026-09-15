@@ -55,6 +55,13 @@ open a PR. Absolute rule, no exceptions.
 Never commit `docs/superpowers/` — local tooling artifacts only. If tracked,
 remove them and add to `.gitignore`.
 
+## Changelog entries
+
+Any PR touching `src/` must add an entry under `CHANGELOG.md`'s
+`## [Unreleased]` section. CI enforces this (a `changelog-check` job fails
+the PR if `src/` changed but `CHANGELOG.md` didn't) — do it in the same PR,
+not as a follow-up.
+
 ## Master-data example file
 
 `docs/master-data.example.json` is documented (README.md) as the full

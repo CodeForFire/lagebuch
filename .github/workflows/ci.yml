@@ -76,3 +76,22 @@ jobs:
 
       - name: Test
         run: dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
+
+  changelog-check:
+    name: changelog entry
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Require a CHANGELOG.md entry for src/ changes
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+          if grep -q '^src/' <<<"$changed" && ! grep -qx 'CHANGELOG.md' <<<"$changed"; then
+            echo "::error::This PR changes src/ but does not update CHANGELOG.md (add an entry under ## [Unreleased])."
+            exit 1
+          fi

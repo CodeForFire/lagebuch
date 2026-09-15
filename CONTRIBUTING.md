@@ -66,6 +66,8 @@ A PR template with a short checklist will guide you:
 - `dotnet build` / `dotnet test` green locally
 - **UI changes**: include before/after screenshots so reviewers can see the
   change without running the app
+- **Changes under `src/`**: add an entry under `CHANGELOG.md`'s
+  `## [Unreleased]` section — CI checks for this and fails the PR otherwise
 - No real master data committed (see below)
 
 ## Master data and PII
