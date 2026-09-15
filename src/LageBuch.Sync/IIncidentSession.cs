@@ -87,6 +87,12 @@ public interface IIncidentSession
     /// <summary>Stamps/clears a task's completion (#88).</summary>
     void SetTaskCompleted(Guid taskId, bool isDone);
 
+    /// <summary>Corrects a task's fields (#246): typo fixes, reassignment, re-prioritizing.</summary>
+    void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency);
+
+    /// <summary>Adds minutes to a task's due time (#246 "+5" quick action).</summary>
+    void ExtendTaskTimer(Guid taskId, int minutes);
+
     void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

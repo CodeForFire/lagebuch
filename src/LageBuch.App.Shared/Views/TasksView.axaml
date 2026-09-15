@@ -6,14 +6,19 @@
              x:Class="LageBuch.App.Shared.Views.TasksView"
              x:DataType="vm:TasksViewModel">
   <UserControl.Styles>
-    <Style Selector="TextBlock.prio-high">
-      <Setter Property="Foreground" Value="#FF3D2E" />
+    <!-- WICHTIG/DRINGL. are editable ComboBoxes (#246), not plain TextBlocks: color the control
+         itself (text + border) rather than just the text, since a colored word alone reads as a
+         weaker signal once it sits inside a bordered, chevron-decorated control. -->
+    <Style Selector="ComboBox.prio-high">
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="TextBlock.prio-medium">
+    <Style Selector="ComboBox.prio-medium">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
     </Style>
-    <Style Selector="TextBlock.prio-low">
+    <Style Selector="ComboBox.prio-low">
       <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
     </Style>
     <Style Selector="TextBlock.due">
@@ -92,40 +97,80 @@
         <DataGrid.Columns>
           <DataGridCheckBoxColumn Header="" Width="44"
               Binding="{Binding IsDone, Mode=TwoWay}" />
-          <DataGridTemplateColumn Header="WICHTIG" Width="120" IsReadOnly="True">
+          <!-- Editable like the input dock's ComboBoxes (#246); the color-coded classes still
+               reflect the row's current value. -->
+          <DataGridTemplateColumn Header="WICHTIG" Width="120">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
-                <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding ImportanceLabel}"
-                           Classes.prio-high="{Binding IsImportanceHigh}"
-                           Classes.prio-medium="{Binding IsImportanceMedium}"
-                           Classes.prio-low="{Binding IsImportanceLow}" />
+                <ComboBox Margin="6,4" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}"
+                          ItemsSource="{Binding ImportanceOptions}"
+                          SelectedValue="{Binding Importance}" SelectedValueBinding="{Binding Value}"
+                          Classes.prio-high="{Binding IsImportanceHigh}"
+                          Classes.prio-medium="{Binding IsImportanceMedium}"
+                          Classes.prio-low="{Binding IsImportanceLow}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ImportanceOption">
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="DRINGL." Width="120" IsReadOnly="True">
+          <DataGridTemplateColumn Header="DRINGL." Width="130">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
-                <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding UrgencyLabel}"
-                           Classes.prio-high="{Binding IsUrgencyHigh}"
-                           Classes.prio-medium="{Binding IsUrgencyMedium}"
-                           Classes.prio-low="{Binding IsUrgencyLow}" />
+                <ComboBox Margin="6,4" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}"
+                          ItemsSource="{Binding UrgencyOptions}"
+                          SelectedValue="{Binding Urgency}" SelectedValueBinding="{Binding Value}"
+                          Classes.prio-high="{Binding IsUrgencyHigh}"
+                          Classes.prio-medium="{Binding IsUrgencyMedium}"
+                          Classes.prio-low="{Binding IsUrgencyLow}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:UrgencyOption">
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="TIMER" Width="110" IsReadOnly="True">
+          <DataGridTemplateColumn Header="TIMER" Width="160">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
-                <TextBlock VerticalAlignment="Center" Margin="6,4" Text="{Binding RemainingDisplay}"
-                           Classes.due="{Binding IsOverdue}" />
+                <StackPanel Orientation="Horizontal" Spacing="4" Margin="6,4" VerticalAlignment="Center">
+                  <TextBlock VerticalAlignment="Center" Text="{Binding RemainingDisplay}"
+                             Classes.due="{Binding IsOverdue}" />
+                  <!-- Quick "+5 min" action (#246); disabled once done or for a task created
+                       without a timer via CanExtendTimer. -->
+                  <Button Padding="6,2" FontSize="11" Content="+5 min"
+                          IsVisible="{Binding !IsReadOnly}"
+                          Command="{Binding ExtendTimerCommand}"
+                          ToolTip.Tip="5 Minuten hinzufügen" />
+                </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTextColumn Header="ZUGETEILT" Binding="{Binding Assignee}" IsReadOnly="True" />
-          <DataGridTemplateColumn Header="AUFGABE" Width="*" IsReadOnly="True">
+          <!-- AutoCompleteBox like the input dock's ZUGETEILT field (#246): callsigns/Funktionen/
+               personnel suggest, anything else stays free text. -->
+          <DataGridTemplateColumn Header="ZUGETEILT" Width="150">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <AutoCompleteBox Margin="6,4" IsEnabled="{Binding !IsReadOnly}"
+                                 ItemsSource="{Binding AssigneeOptions}"
+                                 FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                 Text="{Binding Assignee, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <DataGridTemplateColumn Header="AUFGABE" Width="*">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <StackPanel Orientation="Vertical" Margin="6,4" Spacing="1">
-                  <TextBlock Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                  <!-- Committing per keystroke would rewrite the whole incident file on every
+                       character (#33 precedent) — LostFocus pushes once, on leaving the field. -->
+                  <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                           IsEnabled="{Binding !IsReadOnly}" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding CreatedDisplay}" Classes="overline" FontSize="9"
                              Foreground="{StaticResource TextSecondaryBrush}" />
                 </StackPanel>

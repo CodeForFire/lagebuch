@@ -196,6 +196,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));
 
+    public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
+        Mutate(() => Incident.UpdateTask(taskId, text, assignee, importance, urgency));
+
+    public void ExtendTaskTimer(Guid taskId, int minutes) =>
+        Mutate(() => Incident.ExtendTaskTimer(taskId, minutes, _clock));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

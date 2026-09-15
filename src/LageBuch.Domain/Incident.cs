@@ -898,6 +898,52 @@ public sealed class Incident
         return updated;
     }
 
+    /// <summary>
+    /// Corrects a task's fields (#246): typo fixes, reassignment, re-prioritizing. Deliberately
+    /// silent like <see cref="AddTask"/> -- a correction to work-management data isn't a
+    /// reportable ETB event either. Unknown ids throw so a replayed command fails loudly.
+    /// </summary>
+    public IncidentTask UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency)
+    {
+        EnsureOpen();
+        if (!Enum.IsDefined(importance))
+        {
+            throw new ArgumentException("Unbekannte Wichtigkeit.", nameof(importance));
+        }
+
+        if (!Enum.IsDefined(urgency))
+        {
+            throw new ArgumentException("Unbekannte Dringlichkeit.", nameof(urgency));
+        }
+
+        var index = _tasks.FindIndex(t => t.Id == taskId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Aufgabe {taskId} nicht gefunden.");
+        }
+
+        var updated = _tasks[index].WithDetails(text, assignee, importance, urgency);
+        _tasks[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Adds minutes to a task's due time (#246 "+5 min" quick action). Silent like
+    /// <see cref="UpdateTask"/>. Unknown ids throw so a replayed command fails loudly.</summary>
+    public IncidentTask ExtendTaskTimer(Guid taskId, int minutes, IClock clock)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        var index = _tasks.FindIndex(t => t.Id == taskId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Aufgabe {taskId} nicht gefunden.");
+        }
+
+        var updated = _tasks[index].WithExtendedTimer(minutes, clock.Now);
+        _tasks[index] = updated;
+        return updated;
+    }
+
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId)
             ?? throw new KeyNotFoundException($"Atemschutz-Trupp {truppId} not found.");
