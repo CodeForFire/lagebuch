@@ -34,6 +34,9 @@ once we reach 1.0.
   They exist for vehicles that are not in the Stammdaten, so the suggestion dropdown they
   used to open on focus only re-offered what the Fahrzeug picker already lists. Enter in
   either field adds the row.
+- The "ÖFFNEN" actions in the Links tab and the Über dialog share one URL-opening helper, so a
+  link that is blocked or cannot be opened is validated and reported identically in both places.
+  No change to what either shows. (#302)
 
 ### Fixed
 - The four small preference files — recent incidents, last save folder, last PDF export and last
