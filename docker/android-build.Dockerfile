@@ -31,6 +31,7 @@ ENV ANDROID_SDK_ROOT=${ANDROID_HOME}
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
     && cd ${ANDROID_HOME}/cmdline-tools \
     && wget -q https://dl.google.com/android/repository/commandlinetools-linux-16111833_latest.zip -O cmdline-tools.zip \
+    && echo "0877a1d048fe4a24efe2eff536ca4223f7adeb58648bb81909d33c446918cfa8  cmdline-tools.zip" | sha256sum -c - \
     && unzip -q cmdline-tools.zip \
     && rm cmdline-tools.zip \
     && mv cmdline-tools latest
