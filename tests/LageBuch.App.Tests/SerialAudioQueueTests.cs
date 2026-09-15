@@ -53,20 +53,32 @@ public class SerialAudioQueueTests
     {
         var queue = new SerialAudioQueue();
         var started = new ManualResetEventSlim();
+        var finish = new ManualResetEventSlim();
 
-        queue.Enqueue(() =>
+        try
         {
-            started.Set();
-            Thread.Sleep(TimeSpan.FromSeconds(2));
-        });
+            // Gated rather than a fixed sleep, so the action is provably still in flight when the
+            // second Enqueue runs below, and so its thread is released when this test ends rather
+            // than lingering for a couple of seconds afterwards.
+            queue.Enqueue(() =>
+            {
+                started.Set();
+                finish.Wait(TimeSpan.FromSeconds(30));
+            });
 
-        Assert.True(started.Wait(TimeSpan.FromSeconds(1)), "action never started");
+            // Liveness, not latency: same 5s budget as this file's other waits.
+            Assert.True(started.Wait(TimeSpan.FromSeconds(5)), "action never started");
 
-        var sw = Stopwatch.StartNew();
-        queue.Enqueue(() => { });
-        sw.Stop();
+            var sw = Stopwatch.StartNew();
+            queue.Enqueue(() => { });
+            sw.Stop();
 
-        Assert.True(sw.Elapsed < TimeSpan.FromMilliseconds(500), "Enqueue blocked the caller");
+            Assert.True(sw.Elapsed < TimeSpan.FromMilliseconds(500), "Enqueue blocked the caller");
+        }
+        finally
+        {
+            finish.Set();
+        }
     }
 
     [Fact]
@@ -74,16 +86,24 @@ public class SerialAudioQueueTests
     {
         var queue = new SerialAudioQueue(perItemTimeout: TimeSpan.FromMilliseconds(200));
         var laterRan = new ManualResetEventSlim();
+        var unstick = new ManualResetEventSlim();
 
-        queue.Enqueue(() => Thread.Sleep(TimeSpan.FromSeconds(30))); // simulates a hung player
-        queue.Enqueue(() => laterRan.Set());
+        try
+        {
+            // A hung player: the watchdog abandons it after perItemTimeout, but the action itself
+            // runs until it returns. Gate it rather than sleeping 30s so the abandoned thread goes
+            // away with the test instead of idling on for half a minute.
+            queue.Enqueue(() => unstick.Wait(TimeSpan.FromSeconds(30)));
+            queue.Enqueue(() => laterRan.Set());
 
-        // The later action's own Task.Run still has to wait its turn for a thread-pool thread,
-        // which under CI load can take longer than the 200ms watchdog itself — same 5s budget as
-        // this file's other CountdownEvent/ManualResetEventSlim waits, not a tighter one.
-        Assert.True(
-            laterRan.Wait(TimeSpan.FromSeconds(5)),
-            "later action never ran; the stuck item wedged the queue");
+            Assert.True(
+                laterRan.Wait(TimeSpan.FromSeconds(5)),
+                "later action never ran; the stuck item wedged the queue");
+        }
+        finally
+        {
+            unstick.Set();
+        }
     }
 
     private static void RecordTimedRun(
