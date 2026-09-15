@@ -19,6 +19,11 @@ Every PR that touches the UI must include screenshots. The flow is:
 For UI changes, provide a before/after pair. The render harness files are
 diagnostic-only and should not be committed unless they double as a real test.
 
+The README's screenshots and demo GIF come from one such test,
+`DemoFlowRenderTests` — regenerate them with `make screenshots` and
+`make demo-gif` whenever a view they show changes; `make samples` refreshes
+the fictional `docs/samples/uebung.fwincident` after a schema change.
+
 ## Git commits
 
 All commits must be:
