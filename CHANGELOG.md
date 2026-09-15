@@ -32,6 +32,10 @@ once we reach 1.0.
   either field adds the row.
 
 ### Fixed
+- The four small preference files — recent incidents, last save folder, last PDF export and last
+  join host — are written atomically (to a temp file that is then renamed into place), the way
+  `trust.json` already was. A crash or a full disk mid-write used to be able to leave a truncated
+  file behind, which the next start silently read as "nothing remembered". (#302)
 - The sync server only bound IPv4 (`0.0.0.0`), so a device reachable only over IPv6 could never
   join a hosted incident. It now binds dual-stack, accepting both IPv4 and IPv6 on the same
   socket, and falls back to IPv4-only itself if the platform doesn't support IPv6.
