@@ -142,7 +142,9 @@ public sealed class LocalIncidentSession : IIncidentSession
             }
         }
 
-        return exporter.Generate(Incident, fileBytes, pdfAttachmentPaths, sections);
+        // One timestamp for the whole document: read once here rather than per section, so the
+        // Aufgaben section's overdue markers reflect the moment the export was asked for.
+        return exporter.Generate(Incident, _clock.Now, fileBytes, pdfAttachmentPaths, sections);
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
