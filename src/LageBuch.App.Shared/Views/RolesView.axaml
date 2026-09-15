@@ -17,49 +17,58 @@
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
-             enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
-             make editable) — mirrors PersonNameBox below. -->
-        <HeaderedContentControl Classes="field suggest" Header="FUNKTION">
-          <AutoCompleteBox x:Name="RoleBox" Width="120"
-                           PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
-                           ItemsSource="{Binding RoleOptions}"
-                           FilterMode="ContainsOrdinal"
-                           MinimumPrefixLength="0"
-                           Text="{Binding NewRole}" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field suggest" Header="NAME">
-          <AutoCompleteBox x:Name="PersonNameBox" Width="200"
-                           PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
-                           ItemsSource="{Binding PersonOptions}"
-                           FilterMode="ContainsOrdinal"
-                           MinimumPrefixLength="0"
-                           Text="{Binding NewPersonName}"
-                           b:EnterSubmit.Command="{Binding AddRoleCommand}" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="ABSCHNITT">
-          <TextBox x:Name="SectionBox" Width="130"
-                   PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
-                   Text="{Binding NewSection}" />
-        </HeaderedContentControl>
-        <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
-             enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). -->
-        <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
-          <AutoCompleteBox Width="150"
-                           PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                           ItemsSource="{Binding CallSignOptions}"
-                           FilterMode="ContainsOrdinal"
-                           MinimumPrefixLength="0"
-                           Text="{Binding NewCallSign}" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="HANDYNUMMER">
-          <TextBox x:Name="PhoneBox" Width="150"
-                   PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
-                   Text="{Binding NewPhone}" />
-        </HeaderedContentControl>
-        <Button x:Name="AddRoleButton" Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
+      <StackPanel Spacing="10">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
+               enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
+               make editable) — mirrors PersonNameBox below. -->
+          <HeaderedContentControl Classes="field suggest" Header="FUNKTION">
+            <AutoCompleteBox x:Name="RoleBox" Width="120"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
+                             ItemsSource="{Binding RoleOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding NewRole}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field suggest" Header="NAME">
+            <AutoCompleteBox x:Name="PersonNameBox" Width="200"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
+                             ItemsSource="{Binding PersonOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding NewPersonName}"
+                             b:EnterSubmit.Command="{Binding AddRoleCommand}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="ABSCHNITT">
+            <TextBox x:Name="SectionBox" Width="130"
+                     PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
+                     Text="{Binding NewSection}" />
+          </HeaderedContentControl>
+          <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
+               enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). -->
+          <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
+            <AutoCompleteBox Width="150"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding NewCallSign}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="HANDYNUMMER">
+            <TextBox x:Name="PhoneBox" Width="150"
+                     PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                     Text="{Binding NewPhone}" />
+          </HeaderedContentControl>
+          <Button x:Name="AddRoleButton" Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        </StackPanel>
+        <!-- Funktion ist bewusst Freitext (ad hoc, überörtliche Hilfe), also nur ein Hinweis:
+             die Zuweisung wird so oder so übernommen. Gleiche Darstellung wie ForcesView's
+             DuplicateHint. -->
+        <TextBlock x:Name="UnknownRoleHint" Text="Funktion steht nicht in den Stammdaten — wird trotzdem zugewiesen"
+                   FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding IsNewRoleUnknown}" />
       </StackPanel>
     </Border>
 
