@@ -34,8 +34,12 @@ public sealed class JsonTrustStore : ITrustStore
     {
         lock (_gate)
         {
-            _cache[hostAddress] = thumbprint;
-            Persist();
+            var updated = new Dictionary<string, string>(_cache, StringComparer.Ordinal)
+            {
+                [hostAddress] = thumbprint,
+            };
+
+            Commit(updated);
         }
     }
 
@@ -43,11 +47,25 @@ public sealed class JsonTrustStore : ITrustStore
     {
         lock (_gate)
         {
-            if (_cache.Remove(hostAddress))
+            var updated = new Dictionary<string, string>(_cache, StringComparer.Ordinal);
+            if (updated.Remove(hostAddress))
             {
-                Persist();
+                Commit(updated);
             }
         }
+    }
+
+    // Disk first, memory second. The mutators used to update _cache and then write, so a write that
+    // threw (disk full, permissions, an AV lock on Windows) left this instance trusting a certificate
+    // that trust.json does not record -- a divergence that survives for the rest of the process, and
+    // one that matters: the next start reads the file back and re-prompts for a host this session had
+    // silently accepted. Building the candidate off to the side and only adopting it once the write
+    // has landed means a failed write changes nothing at all, and the caller's retry sees the same
+    // pre-write state rather than a cache that already looks updated.
+    private void Commit(Dictionary<string, string> updated)
+    {
+        Persist(updated);
+        _cache = updated;
     }
 
     // Write-then-rename: a crash between the two leaves either the old file untouched or the new one
@@ -55,10 +73,10 @@ public sealed class JsonTrustStore : ITrustStore
     // mutators take it for the whole read-modify-write), so the temp file's fixed name is safe from a
     // sibling in-process write; overwrite: true also clobbers a stale *.tmp left by a process that
     // crashed between the write and the move on its own previous attempt.
-    private void Persist()
+    private void Persist(Dictionary<string, string> trusted)
     {
         var tmpPath = _path + ".tmp";
-        File.WriteAllText(tmpPath, JsonSerializer.Serialize(_cache));
+        File.WriteAllText(tmpPath, JsonSerializer.Serialize(trusted));
         File.Move(tmpPath, _path, overwrite: true);
     }
 

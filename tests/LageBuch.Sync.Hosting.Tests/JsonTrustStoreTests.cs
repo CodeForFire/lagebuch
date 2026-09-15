@@ -151,4 +151,62 @@ public class JsonTrustStoreTests : IDisposable
         Assert.False(File.Exists(_path + ".tmp"));
         Assert.Equal("ABCD1234", new JsonTrustStore(_path).GetThumbprint("10.0.0.9"));
     }
+
+    [Fact]
+    public void A_failed_SaveThumbprint_leaves_memory_agreeing_with_disk()
+    {
+        var store = new JsonTrustStore(_path);
+        store.SaveThumbprint("10.0.0.9", "ORIGINAL1");
+
+        using (BlockTheWrite())
+        {
+            // SystemException, not IOException: opening a path that is a directory surfaces as
+            // UnauthorizedAccessException on Linux and IOException on Windows.
+            Assert.ThrowsAny<SystemException>(() => store.SaveThumbprint("10.0.0.9", "ROTATED2"));
+
+            // The point of the fix: the failed write must not have been adopted in memory, because
+            // the next start reads trust.json back and would then disagree with this live session.
+            Assert.Equal("ORIGINAL1", store.GetThumbprint("10.0.0.9"));
+        }
+
+        Assert.Equal("ORIGINAL1", new JsonTrustStore(_path).GetThumbprint("10.0.0.9"));
+    }
+
+    [Fact]
+    public void A_failed_RemoveThumbprint_leaves_the_thumbprint_trusted_and_retryable()
+    {
+        var store = new JsonTrustStore(_path);
+        store.SaveThumbprint("10.0.0.9", "ABCD1234");
+
+        using (BlockTheWrite())
+        {
+            Assert.ThrowsAny<SystemException>(() => store.RemoveThumbprint("10.0.0.9"));
+            Assert.Equal("ABCD1234", store.GetThumbprint("10.0.0.9"));
+        }
+
+        // Remove used to consume the dictionary's return value before persisting, so after a failed
+        // write the entry was already gone from memory and a retry saw false and skipped the write
+        // entirely -- leaving it on disk forever. The retry must still do the work.
+        store.RemoveThumbprint("10.0.0.9");
+        Assert.Null(new JsonTrustStore(_path).GetThumbprint("10.0.0.9"));
+    }
+
+    /// <summary>
+    /// Makes the next write fail: a directory sitting where the temp file wants to go stops
+    /// <c>File.WriteAllText</c> before <c>File.Move</c> ever runs.
+    /// </summary>
+    private BlockedWrite BlockTheWrite() => new(_path + ".tmp");
+
+    private sealed class BlockedWrite : IDisposable
+    {
+        private readonly string _tmpPath;
+
+        public BlockedWrite(string tmpPath)
+        {
+            _tmpPath = tmpPath;
+            Directory.CreateDirectory(_tmpPath);
+        }
+
+        public void Dispose() => Directory.Delete(_tmpPath);
+    }
 }

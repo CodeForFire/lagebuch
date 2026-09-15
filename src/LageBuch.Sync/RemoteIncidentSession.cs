@@ -497,9 +497,6 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // Arrives on SignalR's receive loop. Swap the cached incident and raise Changed on the UI thread:
     // the subscribers (EtbViewModel.Sync et al.) mutate Avalonia-bound collections, which Avalonia
     // rejects off-thread — so a broadcast raised here would otherwise never reach the view.
-    // Arrives on SignalR's receive loop. Swap the cached incident and raise Changed on the UI thread:
-    // the subscribers (EtbViewModel.Sync et al.) mutate Avalonia-bound collections, which Avalonia
-    // rejects off-thread — so a broadcast raised here would otherwise never reach the view.
     private void OnSnapshot(IncidentSnapshot snapshot) => _ui.Post(() =>
     {
         _incident = SnapshotMapper.FromSnapshot(snapshot);
