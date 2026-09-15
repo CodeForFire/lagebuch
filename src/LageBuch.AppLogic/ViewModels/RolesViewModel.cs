@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
@@ -165,7 +166,16 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddRoleCommand))]
+    [NotifyPropertyChangedFor(nameof(IsNewRoleUnknown))]
     private string _newRole = string.Empty;
+
+    /// <summary>
+    /// Whether the typed Funktion is absent from the Stammdaten — drives a hint, never a block.
+    /// Funktion is deliberately free text (an ad-hoc or mutual-aid role must stay enterable), so
+    /// this only points out that the entry will not match the rest; the assignment is made either
+    /// way. False while no Funktionen are configured at all, where it would flag everything.
+    /// </summary>
+    public bool IsNewRoleUnknown => StammdatenCatalogue.IsUnknown(NewRole, RoleOptions);
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddRoleCommand))]
@@ -191,8 +201,12 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     {
         // Von is stamped rather than typed: an assignment is recorded at the moment it happens,
         // and every other time in this application comes from the injected clock the same way.
+        //
+        // The Funktion adopts the Stammdaten spelling when it matches one apart from case or
+        // spacing, so "el" and "EL " do not become two more Funktionen alongside the configured
+        // "EL". An unrecognised one is assigned as typed -- see IsNewRoleUnknown.
         _session.AssignRole(
-            NewRole,
+            StammdatenCatalogue.Normalize(NewRole, RoleOptions) ?? NewRole,
             NewPersonName,
             NewCallSign,
             from: _clock.Now,

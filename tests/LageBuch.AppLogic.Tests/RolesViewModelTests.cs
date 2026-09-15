@@ -330,4 +330,56 @@ public class RolesViewModelTests
         vm.NewPersonName = "Müller";
         Assert.True(vm.AddRoleCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void AddRole_adopts_the_stammdaten_spelling_of_a_matching_funktion()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md());
+        vm.NewRole = "  el ";
+        vm.NewPersonName = "Max Mustermann";
+
+        vm.AddRoleCommand.Execute(null);
+
+        // "el" and "EL " must not become two more Funktionen alongside the configured "EL".
+        Assert.Equal("EL", vm.Roles[0].Role);
+    }
+
+    [Fact]
+    public void AddRole_assigns_an_unknown_funktion_as_typed()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, Md());
+        vm.NewRole = "Fachberater THW";
+        vm.NewPersonName = "Max Mustermann";
+
+        vm.AddRoleCommand.Execute(null);
+
+        // Free text on purpose: an ad-hoc or mutual-aid role must stay assignable.
+        Assert.Equal("Fachberater THW", vm.Roles[0].Role);
+    }
+
+    [Fact]
+    public void An_unknown_funktion_is_flagged_while_a_configured_one_is_not()
+    {
+        var vm = NewVm(new FixedClock(T0), Md());
+
+        vm.NewRole = "Fachberater THW";
+        Assert.True(vm.IsNewRoleUnknown);
+
+        vm.NewRole = "el";
+        Assert.False(vm.IsNewRoleUnknown);
+
+        vm.NewRole = string.Empty;
+        Assert.False(vm.IsNewRoleUnknown);
+    }
+
+    [Fact]
+    public void No_funktion_is_flagged_when_no_stammdaten_are_configured()
+    {
+        var vm = NewVm(new FixedClock(T0), MasterDataSet.Empty);
+        vm.NewRole = "Fachberater THW";
+
+        Assert.False(vm.IsNewRoleUnknown);
+    }
 }

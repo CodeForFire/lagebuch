@@ -845,4 +845,44 @@ public class ForcesViewModelTests
             Array.Empty<(string, bool)>());
         return new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
     }
+
+    [Fact]
+    public void A_row_carries_a_status_the_stammdaten_no_longer_list()
+    {
+        // The Status cell is a closed ComboBox bound to the row's StatusOptions. A status recorded
+        // in the incident but missing from today's Stammdaten -- an older Einsatz, an imported
+        // file, a joined client on different master data -- would have nothing to select and render
+        // blank, hiding a value the incident actually holds. (#302, #337)
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddForceUnit("FFB", 6, "FFB 40/1", status: "Einsatzbereit am Standort", notes: null);
+
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+
+        var row = vm.Forces[0];
+        Assert.Equal("Einsatzbereit am Standort", row.Status);
+        Assert.Contains("Einsatzbereit am Standort", row.StatusOptions, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void A_row_whose_status_is_configured_gets_the_plain_vocabulary()
+    {
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddForceUnit("FFB", 6, "FFB 40/1", status: "Im Einsatz", notes: null);
+
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+
+        Assert.Equal(new[] { "Alarmiert", "Im Einsatz" }, vm.Forces[0].StatusOptions);
+    }
 }

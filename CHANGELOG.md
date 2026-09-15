@@ -44,6 +44,15 @@ once we reach 1.0.
   grows them — so a cue could sit unplayed for seconds, or outlast its own hung-player watchdog
   without ever having started. Alarms fire exactly when the app is busiest, which is precisely
   when this bit. Cues now get a dedicated thread each and no longer queue behind unrelated work.
+- Kräfte: a unit's Status shows even when the Stammdaten no longer list it. The Status cell is a
+  closed dropdown, so a status recorded in an older Einsatz, an imported file or by a joined
+  device running different Stammdaten had nothing to select and rendered as an empty cell — the
+  status was still in the file, just invisible. It is now carried as an extra entry in that row's
+  dropdown. (#302, see #337)
+- Funktionen: a Funktion that matches the Stammdaten apart from upper/lower case or stray spaces
+  is recorded with the Stammdaten spelling, so "el" and "EL " no longer pile up next to the
+  configured "EL". An unknown Funktion is still assigned exactly as typed — ad-hoc and
+  überörtliche roles must stay enterable — but the dock now says it is not in the Stammdaten. (#302)
 - The four small preference files — recent incidents, last save folder, last PDF export and last
   join host — are written atomically (to a temp file that is then renamed into place), the way
   `trust.json` already was. A crash or a full disk mid-write used to be able to leave a truncated
