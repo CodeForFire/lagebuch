@@ -1,30 +1,12 @@
-using System.Text.Json;
-
 namespace LageBuch.AppLogic.Services;
 
 public sealed class JsonLastJoinHostStore : ILastJoinHostStore
 {
-    private readonly string _path;
+    private readonly JsonFileStore<string> _file;
 
-    public JsonLastJoinHostStore(string path) => _path = path;
+    public JsonLastJoinHostStore(string path) => _file = new JsonFileStore<string>(path);
 
-    public string? GetLastHost()
-    {
-        if (!File.Exists(_path))
-        {
-            return null;
-        }
+    public string? GetLastHost() => _file.TryRead(out var host) ? host : null;
 
-        try
-        {
-            return JsonSerializer.Deserialize<string>(File.ReadAllText(_path));
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    public void SetLastHost(string host) =>
-        File.WriteAllText(_path, JsonSerializer.Serialize(host));
+    public void SetLastHost(string host) => _file.Write(host);
 }

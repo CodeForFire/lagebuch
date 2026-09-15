@@ -1,31 +1,14 @@
-using System.Text.Json;
-
 namespace LageBuch.AppLogic.Services;
 
 public sealed class JsonRecentFilesStore : IRecentFilesStore
 {
     private const int MaxEntries = 10;
-    private readonly string _path;
+    private readonly JsonFileStore<List<string>> _file;
 
-    public JsonRecentFilesStore(string path) => _path = path;
+    public JsonRecentFilesStore(string path) => _file = new JsonFileStore<List<string>>(path);
 
-    public IReadOnlyList<string> GetRecent()
-    {
-        if (!File.Exists(_path))
-        {
-            return Array.Empty<string>();
-        }
-
-        try
-        {
-            var json = File.ReadAllText(_path);
-            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
-        }
-        catch (JsonException)
-        {
-            return Array.Empty<string>();
-        }
-    }
+    public IReadOnlyList<string> GetRecent() =>
+        _file.TryRead(out var recent) ? recent : Array.Empty<string>();
 
     public void Add(string path)
     {
@@ -37,6 +20,6 @@ public sealed class JsonRecentFilesStore : IRecentFilesStore
             list.RemoveRange(MaxEntries, list.Count - MaxEntries);
         }
 
-        File.WriteAllText(_path, JsonSerializer.Serialize(list));
+        _file.Write(list);
     }
 }

@@ -1,30 +1,12 @@
-using System.Text.Json;
-
 namespace LageBuch.AppLogic.Services;
 
 public sealed class JsonLastSaveFolderStore : ILastSaveFolderStore
 {
-    private readonly string _path;
+    private readonly JsonFileStore<string> _file;
 
-    public JsonLastSaveFolderStore(string path) => _path = path;
+    public JsonLastSaveFolderStore(string path) => _file = new JsonFileStore<string>(path);
 
-    public string? GetLastFolder()
-    {
-        if (!File.Exists(_path))
-        {
-            return null;
-        }
+    public string? GetLastFolder() => _file.TryRead(out var folder) ? folder : null;
 
-        try
-        {
-            return JsonSerializer.Deserialize<string>(File.ReadAllText(_path));
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    public void SetLastFolder(string folder) =>
-        File.WriteAllText(_path, JsonSerializer.Serialize(folder));
+    public void SetLastFolder(string folder) => _file.Write(folder);
 }
