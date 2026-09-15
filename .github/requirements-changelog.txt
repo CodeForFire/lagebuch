@@ -1,0 +1,3 @@
+# towncrier assembles changelog.d/ into CHANGELOG.md and backs the changelog
+# check in ci.yml. Pinned so CI is reproducible; Dependabot keeps it current.
+towncrier==26.9.0
