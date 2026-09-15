@@ -75,7 +75,21 @@ jobs:
         run: dotnet build ${{ matrix.solution }} --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
+        run: >
+          dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
+          --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+      # Coverage summary only needs to run once; ubuntu-latest builds the full
+      # solution (Android head included), so it has the most complete numbers.
+      - name: Coverage summary
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet tool restore
+          dotnet tool run reportgenerator \
+            "-reports:./coverage/**/coverage.cobertura.xml" \
+            "-targetdir:./coverage/report" \
+            "-reporttypes:MarkdownSummaryGithub"
+          cat ./coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
   changelog-check:
     name: changelog entry
