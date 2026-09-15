@@ -165,13 +165,14 @@ Lagebuch wird von [CodeForFire](https://github.com/CodeForFire) entwickelt –
 Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
 
 - **Fragen** zur Bedienung, zur Installation oder zum ELW-Laptop →
-  [Discussions](../../discussions). Dafür braucht ihr kein Bug-Ticket zu
-  schreiben.
+  [Fragen & Antworten](../../discussions/categories/fragen-antworten). Dafür
+  braucht ihr kein Bug-Ticket zu schreiben.
 - **Feedback aus der Praxis** ist das Wertvollste: was fehlt im ELW, was
-  nervt, was macht Papier heute noch besser? → [Discussions](../../discussions)
+  nervt, was macht Papier heute noch besser? → [Ideen](../../discussions/categories/ideen)
   oder direkt ein [Issue öffnen](../../issues/new/choose).
 - **Testen** auf eurem ELW-Laptop oder bei der nächsten Übung – auch ohne
-  Programmierkenntnisse. Erzählt davon in den [Discussions](../../discussions).
+  Programmierkenntnisse. Erzählt davon unter
+  [Aus der Praxis](../../discussions/categories/aus-der-praxis).
 - **Entwickeln, übersetzen, dokumentieren** → [CONTRIBUTING.md](CONTRIBUTING.md).
   Einstiegsaufgaben mit Anleitung liegen unter
   [good first issue](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).

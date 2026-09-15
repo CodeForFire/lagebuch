@@ -24,9 +24,10 @@ firefighter rather than a developer, the wording issues are the ones where your
 judgement beats ours. Propose the text in a comment and someone will help with
 the markup.
 
-Stuck? Ask in the issue or in
-[Discussions](https://github.com/CodeForFire/lagebuch/discussions). Asking early
-is cheaper for everyone than a pull request that goes the wrong way.
+Stuck? Ask in the issue, or in
+[Fragen & Antworten](https://github.com/CodeForFire/lagebuch/discussions/categories/fragen-antworten).
+Asking early is cheaper for everyone than a pull request that goes the wrong
+way. German and English are both fine there.
 
 Where the project is going is written up in [`ROADMAP.md`](ROADMAP.md).
 
