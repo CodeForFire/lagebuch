@@ -39,14 +39,35 @@ internal sealed class SerialAudioQueue
     {
         foreach (var play in _queue.GetConsumingEnumerable())
         {
-            try
+            // A dedicated thread per cue rather than Task.Run: the cue has to run somewhere the
+            // watchdog below can abandon, and the thread pool is the wrong somewhere. Cues are
+            // driven by alarms, which fire exactly when the app is busiest -- and a pool saturated
+            // by other work hands out threads only as fast as it grows them (a thread or two per
+            // second), so a cue could sit unplayed for seconds, or outlast its own watchdog without
+            // ever having started. An alarm that does not sound is the one failure this class
+            // exists to prevent. Cues are rare and short, so a thread each is well affordable.
+            var worker = new Thread(() =>
             {
-                Task.Run(play).Wait(_perItemTimeout);
-            }
-            catch
+                try
+                {
+                    play();
+                }
+                catch
+                {
+                    // A misbehaving cue must not stop the queue from serving the next one.
+                }
+            })
             {
-                // A misbehaving cue must not stop the queue from serving the next one.
-            }
+                IsBackground = true,
+                Name = $"{nameof(SerialAudioQueue)} item",
+            };
+
+            worker.Start();
+
+            // Bounded wait, not a join: if the cue hangs (a stuck OS player that never exits) the
+            // thread is abandoned -- background, so it cannot hold up shutdown -- and the next cue
+            // is served anyway.
+            worker.Join(_perItemTimeout);
         }
     }
 }
