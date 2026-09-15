@@ -81,17 +81,7 @@ jobs:
         run: dotnet format style LageBuch.Desktop.slnf --verify-no-changes
 
       - name: Build
-        run: dotnet build ${{ matrix.solution }} --configuration Release --no-restore -bl:${{ runner.temp }}/build.binlog
-
-      # TEMPORARY diagnostic -- remove before merge.
-      - name: Upload binlog
-        if: always() && matrix.android
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: binlog-${{ matrix.os }}
-          path: ${{ runner.temp }}/build.binlog
-          if-no-files-found: error
-          retention-days: 3
+        run: dotnet build ${{ matrix.solution }} --configuration Release --no-restore
 
       - name: Test
         run: dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
