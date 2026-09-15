@@ -9,95 +9,12 @@ once we reach 1.0.
 
 ## [Unreleased]
 
-### Added
-- Einsatzdaten dialog: Stichwort, Einsatznummer, Straße and Ortsteil are edited together from a
-  pencil in the workspace header (or "+ Einsatzdaten ergänzen" while nothing is known yet). The
-  address had no UI at all before, so the PDF's "Adresse" line was always empty; it now shows in
-  the header and the PDF, and a change made on one device reaches every joined device.
-- The join dialog remembers the host address used for the last successful connection and
-  prefills it (selected, ready to overwrite) instead of starting empty every time.
-- Fictional sample data for a first try-out ("Probefahrt"): `docs/samples/demo-stammdaten.json`
-  and a matching `docs/samples/uebung.fwincident`, generated and kept valid by a test. The README
-  now opens in German for ELW crews, with a demo GIF and a sourced comparison table; the
-  developer documentation follows in English.
+Unreleased entries are not kept in this file. Each change carries its own file under
+[`changelog.d/`](changelog.d/), which is assembled into a section here when a release is
+cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see the
+[unreleased changes][Unreleased].
 
-### Changed
-- Wachen and Funkrufnamen are derived from the Fahrzeuge (plus the Personal roster's call
-  signs) instead of being maintained as separate Stammdaten lists. Their editor sections and
-  the `brigades` / `radioCallSigns` JSON keys are gone; importing an older file names any
-  entry that no vehicle or person covers.
-- The new-incident dialog no longer asks for a Stichwort; it is entered afterwards in the
-  Einsatzdaten dialog, like the Einsatznummer always was. New files are therefore named by date
-  and time only (`20260819-2217.fwincident`), and the header's inline "+ ILS-Nr. hinzufügen"
-  editor is replaced by that dialog.
-- Kräfte tab: "Feuerwehr / Wache" and "Funkrufname" in the entry dock are plain text fields.
-  They exist for vehicles that are not in the Stammdaten, so the suggestion dropdown they
-  used to open on focus only re-offered what the Fahrzeug picker already lists. Enter in
-  either field adds the row.
-- The "ÖFFNEN" actions in the Links tab and the Über dialog share one URL-opening helper, so a
-  link that is blocked or cannot be opened is validated and reported identically in both places.
-  No change to what either shows. (#302)
-
-### Fixed
-- Handing the workspace view from one incident to another no longer lets the first incident's
-  "weiter bearbeiten" prompt act on the second. The view kept its handlers on the abandoned
-  prompt, and those handlers followed the view rather than the incident they belonged to, so
-  cancelling the old prompt closed the dialog the operator was actually looking at. Both the
-  workspace and the main view now detach from a prompt before wiring up the next one. (#302)
-- PDF export: the CO-Messprotokoll legend and the "Erledigt" marker in the Aufgaben table came
-  out as empty boxes on some machines. Both used characters the bundled Lato font does not
-  carry (■ U+25A0, ✔ U+2714), so they were quietly borrowed from whatever font the rendering
-  machine happened to have installed — fine on a developer desktop, blank on a slim container
-  or on Android, with nothing in the logs to say so. The legend now draws its three colour
-  swatches as real rectangles (taking their colours from the same source as the floor grid, so
-  the two can no longer drift apart) and a completed task is marked ● against ○ for an open
-  one. The export no longer depends on any font beyond the one it ships with.
-- Alarm cues could be delayed or silently skipped while the app was busy. Each cue ran on a
-  thread-pool thread, and a pool saturated by other work hands out threads only as fast as it
-  grows them — so a cue could sit unplayed for seconds, or outlast its own hung-player watchdog
-  without ever having started. Alarms fire exactly when the app is busiest, which is precisely
-  when this bit. Cues now get a dedicated thread each and no longer queue behind unrelated work.
-- Kräfte: a unit's Status shows even when the Stammdaten no longer list it. The Status cell is a
-  closed dropdown, so a status recorded in an older Einsatz, an imported file or by a joined
-  device running different Stammdaten had nothing to select and rendered as an empty cell — the
-  status was still in the file, just invisible. It is now carried as an extra entry in that row's
-  dropdown. (#302, see #337)
-- Funktionen: a Funktion that matches the Stammdaten apart from upper/lower case or stray spaces
-  is recorded with the Stammdaten spelling, so "el" and "EL " no longer pile up next to the
-  configured "EL". An unknown Funktion is still assigned exactly as typed — ad-hoc and
-  überörtliche roles must stay enterable — but the dock now says it is not in the Stammdaten. (#302)
-- The four small preference files — recent incidents, last save folder, last PDF export and last
-  join host — are written atomically (to a temp file that is then renamed into place), the way
-  `trust.json` already was. A crash or a full disk mid-write used to be able to leave a truncated
-  file behind, which the next start silently read as "nothing remembered". (#302)
-- The PDF's Aufgaben section marks a task "FÄLLIG" against the moment the export was taken,
-  instead of reading the wall clock while the document renders. Exporting the same closed
-  Einsatz twice now produces the same table, where before a task could be shown as due on one
-  export and overdue on the next. (#302)
-- A failed write to `trust.json` no longer leaves the running app trusting a host certificate the
-  file does not record. Accepting or resetting a host's certificate updated memory first and wrote
-  afterwards, so if the write failed (full disk, permissions) the session kept connecting happily
-  while the next start re-prompted for the same host. The write now happens first and is only
-  adopted once it lands, and a retry after a failed reset does the work instead of silently
-  skipping it. (#302)
-- The sync server only bound IPv4 (`0.0.0.0`), so a device reachable only over IPv6 could never
-  join a hosted incident. It now binds dual-stack, accepting both IPv4 and IPv6 on the same
-  socket, and falls back to IPv4-only itself if the platform doesn't support IPv6.
-- Linux: the app icon now resolves in the menu and the dock. The `.deb` shipped a single
-  1024px file filed under the theme's `512x512` directory and depended on nothing, so on a
-  system without a desktop icon theme there was no theme to find it in at all, and everywhere
-  else every size — panel, menu, dock, app grid — was scaled down from that one megapixel
-  image. It now installs a real file for each hicolor size plus the scalable SVG, and depends
-  on `hicolor-icon-theme`. (#310)
-- Linux: complete the desktop entry — window-to-launcher matching (`StartupWMClass`), search
-  keywords, a subtitle and an accurate description in `apt show` (#310)
-- Linux: the `.deb` now declares the system libraries it actually needs. "Self-contained"
-  covers the .NET runtime, not ICU, fontconfig and the X11 client libraries — so on a machine
-  without a desktop environment already installed, `apt install ./lagebuch_*.deb` reported
-  success and the app then died immediately with "Couldn't find a valid ICU package installed
-  on the system". Install it with `apt` rather than `dpkg -i`, which cannot resolve
-  dependencies. Verified on Debian 12/13 and Ubuntu 22.04/24.04.
-- CO-Messung: corrected the empty-state message to use German typographic quotes and added the missing comma before "um zu beginnen".
+<!-- towncrier release notes start -->
 
 ## [0.5.0] - 2026-09-11
 
@@ -190,9 +107,6 @@ plus every P0/P1 fix from the 2026-09 architecture, security and performance rev
 - Disable HINZUFÜGEN until a Kraft row has counted personnel (#227)
 - Stop bundling QuestPDF into the Android build (#252)
 - Allow adding an Einsatznummer even without a Stichwort (#253)
-
-### Changed
-- Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ## [0.4.0] - 2026-09-05
 
