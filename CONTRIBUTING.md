@@ -10,12 +10,12 @@ New to the project? Start with a
 [good first issue](https://github.com/CodeForFire/lagebuch/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 Each one names the files involved, the existing pattern to copy, and the command
 that verifies your change, so you do not have to reverse-engineer the codebase
-first. They range from a fifteen-minute typography fix to writing a page of
+first. They range from a fifteen-minute typography fix to a page of
 documentation.
 
 **Claiming one:** comment on the issue and it is yours. If no pull request
-appears within seven days it goes back in the pool — no explanation needed, life
-happens. Please do not open a pull request for an issue someone else has
+appears within seven days, it goes back in the pool — no explanation needed;
+life happens. Please do not open a pull request for an issue someone else has
 claimed.
 
 **You do not have to write C#.** Several issues are documentation, and some are
@@ -24,22 +24,22 @@ firefighter rather than a developer, the wording issues are the ones where your
 judgement beats ours. Propose the text in a comment and someone will help with
 the markup.
 
-Stuck? Ask in the issue, or in
+Stuck? Ask in the issue or in
 [Discussions](https://github.com/CodeForFire/lagebuch/discussions). Asking early
-is cheaper for everyone than a pull request that went the wrong way.
+is cheaper for everyone than a pull request that goes the wrong way.
 
 Where the project is going is written up in [`ROADMAP.md`](ROADMAP.md).
 
 ## Hacktoberfest
 
-Lagebuch takes part in Hacktoberfest, and we would rather you left with one
-merged change you are pleased with than four that were reverted.
+Lagebuch takes part in Hacktoberfest, and we would rather you leave with one
+merged change you are pleased with than four that get reverted.
 
 What counts here:
 
 - **Something a user or a maintainer would notice.** A fixed bug, a test that
   pins real behaviour, a page of documentation that did not exist. The
-  `good first issue` list is all of this.
+  `good first issue` list is exactly this kind of work.
 - **The normal rules, unchanged.** DCO sign-off (`git commit -s`), Conventional
   Commit subjects, a `CHANGELOG.md` entry for anything under `src/`, and green
   CI. These are enforced by CI and by review, not waived for October.
@@ -51,9 +51,9 @@ What does not count, and will be labelled `spam` or `invalid`:
 - adding yourself to a contributors list
 - automated or unreviewed changes generated wholesale by a tool
 
-Coding agents are welcome, as the section at the end of this file says. Review
-what they write before you send it — a pull request you cannot explain is one
-nobody can merge.
+Coding agents are welcome; see [AI-assisted contributions](#ai-assisted-contributions)
+below. Review what they write before you send it — a pull request you cannot
+explain is one nobody can merge.
 
 ## Development setup
 

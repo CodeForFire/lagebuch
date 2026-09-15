@@ -11,9 +11,9 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.5.0, shipping every one to two weeks. The app is in real use, but the
-`.fwincident` file format can still change between versions. That caveat is what
-1.0 removes.
+Version 0.5.0, with a release every one to two weeks. The app is in real use,
+but the `.fwincident` file format can still change between versions. That caveat
+is what 1.0 removes.
 
 ## v0.6 — Stability and performance
 
@@ -51,16 +51,16 @@ The plan, in order of what is actually achievable:
   winget does not raise the SmartScreen dialog, which makes it the recommended
   Windows path even before a certificate exists.
 - **SHA-256 checksums and Sigstore-backed build attestations** on every release.
-  Not recognised by the operating system, but verifiable, and it is the artefact
-  a Datenschutzbeauftragter can actually check.
+  Not recognised by the operating system, but verifiable, and they are the
+  artefacts a Datenschutzbeauftragter can actually check.
 - **A published Android signing-key fingerprint**, and distribution through
   Obtainium so updates do not mean re-downloading an APK by hand.
 
 On code signing, plainly: the SignPath Foundation reviewed this project and
-declined. OSSign requires a project to be six months old, which Lagebuch reaches
-in **February 2027** — that is the earliest a free Windows certificate is
-possible, and the application is planned for then. Apple's Developer ID is a paid
-membership and independent of both.
+declined. OSSign has a minimum project-age requirement that Lagebuch meets in
+**February 2027** — that is the earliest a free Windows certificate is possible,
+and we plan to apply then. Apple's Developer ID is a paid membership and
+independent of both.
 
 Issues: #209, #308, #208
 
@@ -96,11 +96,12 @@ Listed so the direction is visible, deliberately not scheduled:
 
 - **Wasserförderung über lange Wegstrecken** — planning and execution modes,
   using the map and elevation packs already published in
-  [lagebuch-regions](https://github.com/CodeForFire/lagebuch-regions). Issues #87, #150.
+  [lagebuch-regions](https://github.com/CodeForFire/lagebuch-regions).
+  Issues: #87, #150.
 - **FF-Agent integration** — reading existing brigade data instead of asking for
-  it twice. Issue #77.
+  it twice. Issue: #77.
 - **The UX review backlog** — accumulated findings from using the app on real
-  incidents. Issues #262, #282, #167.
+  incidents. Issues: #262, #282, #167.
 
 ## Influencing this
 

@@ -146,7 +146,7 @@ Datei aus einer neueren Version wird mit klarer Meldung abgelehnt statt
 beschädigt, ältere Dateien werden beim Öffnen migriert. Alle Änderungen stehen
 im [CHANGELOG](CHANGELOG.md).
 
-Woran wir als Nächstes arbeiten und was Version 1.0 bedeutet, steht in der
+Woran wir als Nächstes arbeiten und was Version 1.0 bedeutet, stehen in der
 [Roadmap](ROADMAP.md) – kurz gesagt: ab 1.0 bleibt eine Einsatzdatei dauerhaft
 lesbar.
 
@@ -169,13 +169,13 @@ Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
   schreiben.
 - **Feedback aus der Praxis** ist das Wertvollste: was fehlt im ELW, was
   nervt, was macht Papier heute noch besser? → [Discussions](../../discussions)
-  oder direkt ein [Issue öffnen](../../issues/new/choose)
+  oder direkt ein [Issue öffnen](../../issues/new/choose).
 - **Testen** auf eurem ELW-Laptop oder bei der nächsten Übung – auch ohne
   Programmierkenntnisse. Erzählt davon in den [Discussions](../../discussions).
 - **Entwickeln, übersetzen, dokumentieren** → [CONTRIBUTING.md](CONTRIBUTING.md).
   Einstiegsaufgaben mit Anleitung liegen unter
   [good first issue](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
-- **Sicherheitslücken** bitte nicht öffentlich melden → [SECURITY.md](SECURITY.md)
+- **Sicherheitslücken** bitte nicht öffentlich melden → [SECURITY.md](SECURITY.md).
 
 ---
 
