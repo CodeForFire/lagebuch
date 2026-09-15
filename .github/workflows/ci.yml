@@ -77,6 +77,29 @@ jobs:
       - name: Test
         run: dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
 
+      # Coverage is informational only (no threshold gate yet -- see #301), run
+      # as a second, non-blocking pass on ubuntu-latest only (full solution,
+      # Android head included, so it has the most complete numbers). It must
+      # not gate the PR: instrumentation overhead measurably increases the
+      # flake rate of a couple of async host/client collaboration tests, and
+      # that shouldn't fail a build the uninstrumented Test step just passed.
+      - name: Coverage
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        run: >
+          dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity quiet
+          --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+      - name: Coverage summary
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          dotnet tool restore
+          dotnet tool run reportgenerator \
+            "-reports:./coverage/**/coverage.cobertura.xml" \
+            "-targetdir:./coverage/report" \
+            "-reporttypes:MarkdownSummaryGithub"
+          cat ./coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
   changelog-check:
     name: changelog entry
     if: github.event_name == 'pull_request'
