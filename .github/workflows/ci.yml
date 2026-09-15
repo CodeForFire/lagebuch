@@ -66,10 +66,19 @@ jobs:
       - name: Restore
         run: dotnet restore ${{ matrix.solution }}
 
-      - name: Format check
-        run: |
-          dotnet format whitespace LageBuch.Desktop.slnf --verify-no-changes
-          dotnet format style LageBuch.Desktop.slnf --verify-no-changes
+      # One command per step, deliberately. Both of these used to share a single
+      # `run: |` block, which on the Windows leg runs under pwsh -- where a native
+      # command's non-zero exit does not abort the script and only the LAST
+      # command's code becomes the step's. The whitespace check failed on every
+      # Windows run (CRLF checkout, see .gitattributes) and was silently swallowed
+      # by the style check passing after it, so this gate reported success while
+      # enforcing nothing. Split like this, each command's exit code gates the job
+      # under pwsh and bash alike, with no `shell:` override to depend on.
+      - name: Format check (whitespace)
+        run: dotnet format whitespace LageBuch.Desktop.slnf --verify-no-changes
+
+      - name: Format check (style)
+        run: dotnet format style LageBuch.Desktop.slnf --verify-no-changes
 
       - name: Build
         run: dotnet build ${{ matrix.solution }} --configuration Release --no-restore

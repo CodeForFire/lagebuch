@@ -1,0 +1,14 @@
+# Normalise line endings on checkout everywhere.
+#
+# Without this, each checkout follows its own core.autocrlf -- which is true on
+# the windows-latest runner image, so every .cs file lands with CRLF while
+# .editorconfig declares `end_of_line = lf` for [*.cs]. `dotnet format whitespace
+# --verify-no-changes` then flags every line of every file on the Windows CI leg.
+* text=auto eol=lf
+
+# Binary assets: never touch these, and never diff them as text.
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.ttf  binary
+*.wav  binary
