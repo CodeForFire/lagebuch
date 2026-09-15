@@ -75,12 +75,21 @@ jobs:
         run: dotnet build ${{ matrix.solution }} --configuration Release --no-restore
 
       - name: Test
+        run: dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
+
+      # Coverage is informational only (no threshold gate yet -- see #301), run
+      # as a second, non-blocking pass on ubuntu-latest only (full solution,
+      # Android head included, so it has the most complete numbers). It must
+      # not gate the PR: instrumentation overhead measurably increases the
+      # flake rate of a couple of async host/client collaboration tests, and
+      # that shouldn't fail a build the uninstrumented Test step just passed.
+      - name: Coverage
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
         run: >
-          dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity normal
+          dotnet test ${{ matrix.solution }} --configuration Release --no-build --verbosity quiet
           --collect:"XPlat Code Coverage" --results-directory ./coverage
 
-      # Coverage summary only needs to run once; ubuntu-latest builds the full
-      # solution (Android head included), so it has the most complete numbers.
       - name: Coverage summary
         if: matrix.os == 'ubuntu-latest'
         run: |
