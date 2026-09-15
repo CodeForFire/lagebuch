@@ -54,7 +54,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
         android-image android-image-rebuild apk emulator install run-android \
-        logcat uninstall package-linux logo-assets
+        logcat uninstall package-linux logo-assets samples screenshots demo-gif
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -187,3 +187,16 @@ package-linux: ## Build a local .deb (VERSION=x.y.z)
 
 logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
 	packaging/logo/build-logo-assets.sh
+
+## Docs (README samples, screenshots, demo GIF)
+
+samples: ## Regenerate docs/samples/uebung.fwincident (DemoIncidentTests with SAMPLES_OUT)
+	SAMPLES_OUT=$(CURDIR)/docs/samples $(DOTNET) test tests/LageBuch.Persistence.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoIncidentTests
+
+screenshots: ## Regenerate docs/screenshots/*.png (DemoFlowRenderTests with RENDER_OUT)
+	RENDER_OUT=$(CURDIR)/docs/screenshots $(DOTNET) test tests/LageBuch.Acceptance.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoFlowRenderTests
+
+demo-gif: ## Build docs/demo/einsatz-flow.gif from docs/screenshots (needs ImageMagick + ffmpeg)
+	packaging/demo/build-demo-gif.sh docs/screenshots docs/demo/einsatz-flow.gif
