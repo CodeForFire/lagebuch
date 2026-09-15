@@ -109,21 +109,35 @@ jobs:
             "-reporttypes:MarkdownSummaryGithub"
           cat ./coverage/report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
+  # A pull request that changes src/ carries its changelog entry as its own file
+  # in changelog.d/, never as an edit to CHANGELOG.md — one file per change is
+  # what keeps concurrent pull requests from conflicting over the changelog.
+  # Apply the `no-changelog` label to skip this.
   changelog-check:
     name: changelog entry
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'no-changelog')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Require a CHANGELOG.md entry for src/ changes
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.x'
+
+      - name: Install towncrier
+        run: pip install -r .github/requirements-changelog.txt
+
+      - name: Require a changelog fragment for src/ changes
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          changed=$(git diff --name-only "origin/${BASE_REF}...HEAD")
-          if grep -q '^src/' <<<"$changed" && ! grep -qx 'CHANGELOG.md' <<<"$changed"; then
-            echo "::error::This PR changes src/ but does not update CHANGELOG.md (add an entry under ## [Unreleased])."
-            exit 1
+          if git diff --name-only "origin/${BASE_REF}...HEAD" | grep -q '^src/'; then
+            towncrier check --compare-with "origin/${BASE_REF}"
+          else
+            echo "No src/ changes in this pull request — changelog fragment not required."
           fi

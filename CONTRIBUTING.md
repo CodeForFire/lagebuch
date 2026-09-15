@@ -176,9 +176,55 @@ A PR template with a short checklist will guide you:
 - `dotnet build` / `dotnet test` green locally
 - **UI changes**: include before/after screenshots so reviewers can see the
   change without running the app
-- **Changes under `src/`**: add an entry under `CHANGELOG.md`'s
-  `## [Unreleased]` section — CI checks for this and fails the PR otherwise
+- **Changes under `src/`**: add a changelog entry as a new file in
+  `changelog.d/` — CI checks for this and fails the PR otherwise
+  (see [Changelog entries](#changelog-entries))
 - No real master data committed (see below)
+
+## Changelog entries
+
+`CHANGELOG.md` is assembled, not edited. Each change brings its own file in
+`changelog.d/`, so two pull requests never touch the same lines and can never
+conflict over the changelog:
+
+```
+changelog.d/+<slug>.<type>.md
+```
+
+`<type>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed` or
+`security` — the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+sections. `<slug>` is a short kebab-case description. The leading `+` is
+required: it is what keeps every filename unique, so two pull requests cannot
+collide even when they describe the same ticket.
+
+Put the entry in the file as plain prose, with no leading `- `, and reference
+the issue or PR inline the way the existing entries do:
+
+```markdown
+The PDF's Aufgaben section marks a task "FÄLLIG" against the moment the export
+was taken, instead of reading the wall clock while the document renders. (#302)
+```
+
+Write it for someone reading the release notes rather than the commit log: what
+changed, and why it matters. Do not edit `CHANGELOG.md` directly — entries land
+there when a release is cut.
+
+### Cutting a release
+
+[towncrier](https://towncrier.readthedocs.io) folds `changelog.d/` into
+`CHANGELOG.md`:
+
+```bash
+pip install -r .github/requirements-changelog.txt
+towncrier build --draft --version X.Y.Z   # preview; writes nothing
+towncrier build --version X.Y.Z           # writes the section, removes the fragments
+```
+
+Two things stay manual afterwards: the summary paragraph under the new heading,
+if the release deserves one, and the link definitions at the bottom of the file
+(repoint `[Unreleased]` at the new tag and add an `[X.Y.Z]` line). Open that as
+its own pull request; pushing the `vX.Y.Z` tag once it merges is what triggers
+`release.yml`.
 
 ## Master data and PII
 
