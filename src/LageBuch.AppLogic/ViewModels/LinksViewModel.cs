@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -86,29 +85,12 @@ public sealed partial class LinksViewModel : ObservableObject
     /// just what the user themselves typed here.
     /// </summary>
     [RelayCommand]
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Deliberately broad: any launcher failure surfaces in the view instead of crashing it.")]
     private async Task OpenAsync(Link link)
     {
-        ErrorMessage = null;
+        // Bare-domain normalization is this caller's job, not the validator's: a Stammdaten Link
+        // is routinely typed as "example.com". The link's display name is what the error names —
+        // the URL itself is not on screen in the Links list.
         var candidate = link.Url.Contains("://", StringComparison.Ordinal) ? link.Url : $"https://{link.Url}";
-        if (!HttpUrlValidator.TryGetHttpUri(candidate, out var uri))
-        {
-            ErrorMessage = $"„{link.Name}“ hat keine gültige http(s)-Adresse.";
-            return;
-        }
-
-        try
-        {
-            await _dialogs.OpenUrlAsync(uri.AbsoluteUri);
-        }
-        catch (Exception ex)
-        {
-            // No default browser/URL handler registered (a minimal OS install, or no app on
-            // Android able to resolve Intent.ActionView) throws out of the platform launcher.
-            ErrorMessage = $"„{link.Name}“ konnte nicht geöffnet werden: {ex.Message}";
-        }
+        ErrorMessage = await UrlLauncher.TryOpenAsync(_dialogs, candidate, link.Name);
     }
 }
