@@ -1,5 +1,14 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
-  - name: Security vulnerability
+  - name: Frage stellen
+    url: https://github.com/CodeForFire/lagebuch/discussions/categories/fragen-antworten
+    about: Läuft das auf unserem ELW-Laptop? Wie richte ich die Stammdaten ein? Fragen zur Bedienung und zur Installation bitte hier stellen — nicht als Issue.
+  - name: Idee oder Feedback aus der Praxis
+    url: https://github.com/CodeForFire/lagebuch/discussions/categories/ideen
+    about: Was fehlt im Einsatz, was nervt, was macht Papier heute noch besser? Hier diskutieren wir Ideen, bevor daraus ein Issue wird.
+  - name: Zeigt her euren ELW
+    url: https://github.com/CodeForFire/lagebuch/discussions/categories/zeigt-her-euren-elw
+    about: Eure Wehr nutzt Lagebuch oder testet es bei einer Übung? Erzählt davon — Feedback aus echten Einsätzen ist für uns das Wertvollste.
+  - name: Sicherheitslücke melden
     url: https://github.com/CodeForFire/lagebuch/security/advisories/new
-    about: Please report security vulnerabilities privately — do not open a public issue. See SECURITY.md.
+    about: Sicherheitslücken bitte vertraulich melden — nicht als öffentliches Issue. Siehe SECURITY.md.

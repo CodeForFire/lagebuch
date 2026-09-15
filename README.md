@@ -146,6 +146,10 @@ Datei aus einer neueren Version wird mit klarer Meldung abgelehnt statt
 beschädigt, ältere Dateien werden beim Öffnen migriert. Alle Änderungen stehen
 im [CHANGELOG](CHANGELOG.md).
 
+Woran wir als Nächstes arbeiten und was Version 1.0 bedeutet, steht in der
+[Roadmap](ROADMAP.md) – kurz gesagt: ab 1.0 bleibt eine Einsatzdatei dauerhaft
+lesbar.
+
 ## Screenshots
 
 Alle Screenshots zeigen fiktive Daten.
@@ -160,11 +164,18 @@ Alle Screenshots zeigen fiktive Daten.
 Lagebuch wird von [CodeForFire](https://github.com/CodeForFire) entwickelt –
 Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
 
+- **Fragen** zur Bedienung, zur Installation oder zum ELW-Laptop →
+  [Fragen & Antworten](../../discussions/categories/fragen-antworten). Dafür
+  braucht ihr kein Bug-Ticket zu schreiben.
 - **Feedback aus der Praxis** ist das Wertvollste: was fehlt im ELW, was
-  nervt, was macht Papier heute noch besser? → [Issue öffnen](../../issues/new/choose)
+  nervt, was macht Papier heute noch besser? → [Ideen](../../discussions/categories/ideen)
+  oder direkt ein [Issue öffnen](../../issues/new/choose)
 - **Testen** auf eurem ELW-Laptop oder bei der nächsten Übung – auch ohne
-  Programmierkenntnisse.
-- **Entwickeln, übersetzen, dokumentieren** → [CONTRIBUTING.md](CONTRIBUTING.md)
+  Programmierkenntnisse. Erzählt davon unter
+  [Zeigt her euren ELW](../../discussions/categories/zeigt-her-euren-elw).
+- **Entwickeln, übersetzen, dokumentieren** → [CONTRIBUTING.md](CONTRIBUTING.md).
+  Einstiegsaufgaben mit Anleitung liegen unter
+  [good first issue](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 - **Sicherheitslücken** bitte nicht öffentlich melden → [SECURITY.md](SECURITY.md)
 
 ---
