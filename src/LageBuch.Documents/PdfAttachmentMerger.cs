@@ -1,3 +1,4 @@
+using LageBuch.Documents.Sections;
 using QuestPDF.Fluent;
 
 namespace LageBuch.Documents;
@@ -10,27 +11,29 @@ namespace LageBuch.Documents;
 public static class PdfAttachmentMerger
 {
     /// <summary>
-    /// Appends every attachment's pages, in order, after <paramref name="baseReport"/>'s own pages.
+    /// Appends every attachment's pages, in order, after <paramref name="baseReport"/>'s own pages,
+    /// preceding each attachment with a single caption page (see <see cref="AttachmentCaptionSection"/>)
+    /// that links its pages back to the matching row in the report's "Angehängte Dateien" list.
     /// QuestPDF's <c>DocumentOperation</c> works on file paths only (no in-memory overload), so the
-    /// base report is round-tripped through a temp file, but attachments are merged straight from
-    /// <paramref name="pdfAttachmentPaths"/> — every attachment already lives on disk (see issue
-    /// #167 P1 #3), so there is no need to load it into memory and write it back out to a temp copy
-    /// first.
+    /// base report and each generated caption page are round-tripped through a temp file, but
+    /// attachments are merged straight from <paramref name="attachments"/>' paths — every attachment
+    /// already lives on disk (see issue #167 P1 #3), so there is no need to load it into memory and
+    /// write it back out to a temp copy first.
     /// </summary>
-    public static byte[] Append(byte[] baseReport, IReadOnlyList<string> pdfAttachmentPaths)
+    public static byte[] Append(byte[] baseReport, IReadOnlyList<PdfAttachmentToMerge> attachments)
     {
         ArgumentNullException.ThrowIfNull(baseReport);
-        ArgumentNullException.ThrowIfNull(pdfAttachmentPaths);
-        if (pdfAttachmentPaths.Count == 0)
+        ArgumentNullException.ThrowIfNull(attachments);
+        if (attachments.Count == 0)
         {
             return baseReport;
         }
 
-        foreach (var path in pdfAttachmentPaths)
+        foreach (var attachment in attachments)
         {
-            if (!File.Exists(path))
+            if (!File.Exists(attachment.Path))
             {
-                throw new FileNotFoundException($"PDF-Anhang nicht gefunden: {path}", path);
+                throw new FileNotFoundException($"PDF-Anhang nicht gefunden: {attachment.Path}", attachment.Path);
             }
         }
 
@@ -42,9 +45,15 @@ public static class PdfAttachmentMerger
             File.WriteAllBytes(basePath, baseReport);
 
             var operation = DocumentOperation.LoadFile(basePath, password: null);
-            foreach (var attachmentPath in pdfAttachmentPaths)
+            for (var i = 0; i < attachments.Count; i++)
             {
-                operation = operation.MergeFile(attachmentPath, pageSelector: null);
+                var attachment = attachments[i];
+
+                var captionPath = Path.Combine(workDir, $"caption-{i}.pdf");
+                File.WriteAllBytes(captionPath, AttachmentCaptionSection.GeneratePdf(attachment.File));
+
+                operation = operation.MergeFile(captionPath, pageSelector: null);
+                operation = operation.MergeFile(attachment.Path, pageSelector: null);
             }
 
             var outPath = Path.Combine(workDir, "merged.pdf");

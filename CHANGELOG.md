@@ -168,6 +168,9 @@ plus every P0/P1 fix from the 2026-09 architecture, security and performance rev
 - Stop bundling QuestPDF into the Android build (#252)
 - Allow adding an Einsatznummer even without a Stichwort (#253)
 
+### Changed
+- Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
+
 ## [0.4.0] - 2026-09-05
 
 TLS/TOFU sync, .NET 10 & Avalonia 12 migration, host-driven Stammdaten sync,
