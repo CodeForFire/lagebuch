@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisMode>All</AnalysisMode>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <!-- Required so IDE0005 (unused usings) runs during build; suppress the
          XML-doc-comment warnings that GenerateDocumentationFile turns on. -->
