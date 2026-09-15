@@ -14,6 +14,6 @@ internal sealed class QuestPdfIncidentExporter : IIncidentPdfExporter
 {
     public bool CanExport => true;
 
-    public byte[] Generate(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
-        IncidentPdf.Generate(incident, fileBytes, pdfAttachmentPaths, sections);
+    public byte[] Generate(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
+        IncidentPdf.Generate(incident, asOf, fileBytes, pdfAttachmentPaths, sections);
 }

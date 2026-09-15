@@ -43,6 +43,10 @@ once we reach 1.0.
   join host — are written atomically (to a temp file that is then renamed into place), the way
   `trust.json` already was. A crash or a full disk mid-write used to be able to leave a truncated
   file behind, which the next start silently read as "nothing remembered". (#302)
+- The PDF's Aufgaben section marks a task "FÄLLIG" against the moment the export was taken,
+  instead of reading the wall clock while the document renders. Exporting the same closed
+  Einsatz twice now produces the same table, where before a task could be shown as due on one
+  export and overdue on the next. (#302)
 - A failed write to `trust.json` no longer leaves the running app trusting a host certificate the
   file does not record. Accepting or resetting a host's certificate updated memory first and wrote
   afterwards, so if the write failed (full disk, permissions) the session kept connecting happily

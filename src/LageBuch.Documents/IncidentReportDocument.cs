@@ -9,6 +9,7 @@ namespace LageBuch.Documents;
 public sealed class IncidentReportDocument : IDocument
 {
     private readonly Incident _incident;
+    private readonly DateTimeOffset _asOf;
     private readonly IReadOnlyDictionary<Guid, byte[]> _imageBytesById;
     private readonly IncidentPdfSections _sections;
 
@@ -23,10 +24,15 @@ public sealed class IncidentReportDocument : IDocument
     /// Which of the 8 body sections to render (#262); defaults to all of them. The header and
     /// footer are always rendered regardless of this selection.
     /// </param>
-    public IncidentReportDocument(Incident incident, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null, IncidentPdfSections sections = IncidentPdfSections.All)
+    /// <param name="asOf">
+    /// The moment the export was taken. Only <see cref="Sections.TasksSection"/> uses it (to decide
+    /// which Aufgaben are overdue); every other section is a pure function of the incident.
+    /// </param>
+    public IncidentReportDocument(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null, IncidentPdfSections sections = IncidentPdfSections.All)
     {
         ArgumentNullException.ThrowIfNull(incident);
         _incident = incident;
+        _asOf = asOf;
         _sections = sections;
 
         // Skipped entirely when Files is deselected -- FilesSection.Compose (the only consumer)
@@ -79,7 +85,7 @@ public sealed class IncidentReportDocument : IDocument
 
                 if (_sections.HasFlag(IncidentPdfSections.Tasks))
                 {
-                    column.Item().Element(c => TasksSection.Compose(c, _incident));
+                    column.Item().Element(c => TasksSection.Compose(c, _incident, _asOf));
                 }
 
                 if (_sections.HasFlag(IncidentPdfSections.Atemschutz))

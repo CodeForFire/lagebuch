@@ -1233,7 +1233,7 @@ internal sealed class ThrowingPdfExporter : IIncidentPdfExporter
 {
     public bool CanExport => true;
 
-    public byte[] Generate(Incident incident, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
+    public byte[] Generate(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
         throw new InvalidOperationException("Datenträger voll");
 }
 

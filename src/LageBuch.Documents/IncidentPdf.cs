@@ -6,6 +6,11 @@ namespace LageBuch.Documents;
 public static class IncidentPdf
 {
     /// <param name="incident">The incident to render.</param>
+    /// <param name="asOf">
+    /// The moment the export was taken. Only the Aufgaben section uses it, to decide which tasks
+    /// are overdue; it is passed in rather than read from the wall clock so that exporting the same
+    /// incident twice produces the same document.
+    /// </param>
     /// <param name="fileBytes">
     /// Bytes for image entries in <see cref="Incident.Files"/>, keyed by id — resolved by the caller
     /// (this project stays filesystem-free). Image entries render inline via
@@ -25,6 +30,7 @@ public static class IncidentPdf
     /// </param>
     public static byte[] Generate(
         Incident incident,
+        DateTimeOffset asOf,
         IReadOnlyDictionary<Guid, byte[]>? fileBytes = null,
         IReadOnlyDictionary<Guid, string>? pdfAttachmentPaths = null,
         IncidentPdfSections sections = IncidentPdfSections.All)
@@ -34,7 +40,7 @@ public static class IncidentPdf
         fileBytes ??= new Dictionary<Guid, byte[]>();
         pdfAttachmentPaths ??= new Dictionary<Guid, string>();
 
-        var baseReport = new IncidentReportDocument(incident, fileBytes, sections).GeneratePdf();
+        var baseReport = new IncidentReportDocument(incident, asOf, fileBytes, sections).GeneratePdf();
 
         if (!sections.HasFlag(IncidentPdfSections.Files))
         {

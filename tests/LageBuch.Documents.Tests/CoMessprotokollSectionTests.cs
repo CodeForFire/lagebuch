@@ -6,6 +6,10 @@ namespace LageBuch.Documents.Tests;
 
 public class CoMessprotokollSectionTests
 {
+    // The moment the export is taken. Fixed so a task's "FÄLLIG" rendering does not depend on
+    // when the suite happens to run.
+    private static readonly DateTimeOffset ExportedAt = new(2026, 6, 22, 12, 0, 0, TimeSpan.FromHours(2));
+
     private static readonly FixedClock Clock = new(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
 
     private static Incident CreateIncidentWithBuilding()
@@ -22,7 +26,7 @@ public class CoMessprotokollSectionTests
     public void Pdf_Contains_CO_Section_With_Buildings()
     {
         var incident = CreateIncidentWithBuilding();
-        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
 
         Assert.True(pdf.Length > 1000);
         Assert.Equal(0x25, pdf[0]); // '%'
@@ -38,7 +42,7 @@ public class CoMessprotokollSectionTests
         incident.AddCoBuilding(Clock, op, "Haus A", 2, 3, undergroundFloorCount: 2);
         incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, -1, 1, 45);
 
-        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
 
         Assert.True(pdf.Length > 1000);
         Assert.Equal(0x25, pdf[0]); // '%'
@@ -58,7 +62,7 @@ public class CoMessprotokollSectionTests
         incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 3, 200); // Dangerous
         incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 4, 2001); // Lethal + implausible
 
-        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
 
         Assert.True(pdf.Length > 1000);
         Assert.Equal(0x25, pdf[0]); // '%'
@@ -69,7 +73,7 @@ public class CoMessprotokollSectionTests
     {
         var op = new SessionOperator("Test", null);
         var incident = Incident.Start(Clock, op);
-        var pdf = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
 
         Assert.True(pdf.Length > 1000);
         Assert.Equal(0x25, pdf[0]); // '%'

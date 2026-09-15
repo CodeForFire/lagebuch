@@ -9,7 +9,14 @@ public static class TasksSection
 {
     private static readonly string[] HeaderTitles = [string.Empty, "Wichtig", "Dringlich", "Fällig", "Zugeteilt", "Aufgabe", "Erledigt"];
 
-    public static void Compose(IContainer container, Incident incident)
+    /// <param name="container">The QuestPDF container to render into.</param>
+    /// <param name="incident">The incident whose Aufgaben are rendered.</param>
+    /// <param name="asOf">
+    /// The moment the export was taken, against which a task counts as overdue. Passed in rather
+    /// than read from the wall clock so the same incident always exports identically — and so this
+    /// section's "FÄLLIG" rendering can be tested at all.
+    /// </param>
+    public static void Compose(IContainer container, Incident incident, DateTimeOffset asOf)
     {
         container.Column(column =>
         {
@@ -51,7 +58,7 @@ public static class TasksSection
 
                 foreach (var task in sorted)
                 {
-                    var overdue = !task.IsCompleted && task.DueAt <= DateTimeOffset.Now;
+                    var overdue = !task.IsCompleted && task.DueAt <= asOf;
                     table.Cell().Element(BodyCell).Text(task.IsCompleted ? "✔" : "○");
                     table.Cell().Element(BodyCell).Text(Formatting.Level(task.Importance));
                     table.Cell().Element(BodyCell).Text(Formatting.Level(task.Urgency));
