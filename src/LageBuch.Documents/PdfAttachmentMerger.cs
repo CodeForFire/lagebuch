@@ -37,11 +37,11 @@ public static class PdfAttachmentMerger
             }
         }
 
-        var workDir = Path.Combine(Path.GetTempPath(), $"lagebuch-pdf-merge-{Guid.NewGuid():N}");
+        var workDir = Path.Join(Path.GetTempPath(), $"lagebuch-pdf-merge-{Guid.NewGuid():N}");
         Directory.CreateDirectory(workDir);
         try
         {
-            var basePath = Path.Combine(workDir, "report.pdf");
+            var basePath = Path.Join(workDir, "report.pdf");
             File.WriteAllBytes(basePath, baseReport);
 
             var operation = DocumentOperation.LoadFile(basePath, password: null);
@@ -49,14 +49,14 @@ public static class PdfAttachmentMerger
             {
                 var attachment = attachments[i];
 
-                var captionPath = Path.Combine(workDir, $"caption-{i}.pdf");
+                var captionPath = Path.Join(workDir, $"caption-{i}.pdf");
                 File.WriteAllBytes(captionPath, AttachmentCaptionSection.GeneratePdf(attachment.File));
 
                 operation = operation.MergeFile(captionPath, pageSelector: null);
                 operation = operation.MergeFile(attachment.Path, pageSelector: null);
             }
 
-            var outPath = Path.Combine(workDir, "merged.pdf");
+            var outPath = Path.Join(workDir, "merged.pdf");
             operation.Save(outPath);
             return File.ReadAllBytes(outPath);
         }
