@@ -70,8 +70,15 @@ jobs:
       # The release body links to this section, and a tag without one would publish
       # notes-less. Checked here, in the only job that runs before the Windows (2x) and
       # Android builds, so a forgotten release section costs seconds rather than minutes.
+      #
+      # Final releases only. A prerelease (v0.6.0-beta.1) is cut from work in progress,
+      # before that version's section is assembled, so requiring one would block exactly
+      # the beta tagging this workflow supports. The body links to CHANGELOG.md rather
+      # than inlining it, so a beta without a section still reads correctly.
       - name: Verify the tag has a changelog section
-        if: github.event_name == 'push'
+        if: >-
+          github.event_name == 'push' &&
+          steps.v.outputs.prerelease == 'false'
         env:
           VERSION: ${{ steps.v.outputs.version }}
         run: |
