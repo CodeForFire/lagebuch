@@ -175,11 +175,35 @@ jobs:
     if: github.event_name == 'push'
     permissions:
       contents: write # create the release and upload its assets
+      id-token: write # Sigstore needs an OIDC token to sign the provenance
+      attestations: write # and write the signed attestation back to the repo
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
+      # download-artifact nests each artifact in its own directory (dist/msi/...),
+      # but on the release page the assets sit side by side. Flatten first, so the
+      # checksum file lists the bare names a downloader actually has on disk and
+      # `sha256sum -c SHA256SUMS.txt` works in the download folder.
+      - name: Flatten artifacts and write SHA-256 checksums
+        run: |
+          find dist -mindepth 2 -type f -exec mv -t dist {} +
+          find dist -mindepth 1 -type d -empty -delete
+          cd dist
+          sha256sum -- * > "${RUNNER_TEMP}/SHA256SUMS.txt"
+          mv "${RUNNER_TEMP}/SHA256SUMS.txt" SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      # Sigstore-backed build provenance: proves these exact bytes came out of this
+      # workflow, from this commit. The OS does not know about it, but
+      # `gh attestation verify` does, and it is what a Datenschutzbeauftragter can
+      # check while the packages are still unsigned.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.msi
+            dist/*.deb
+            dist/*.apk
       - name: Extract changelog section
         env:
           VERSION: ${{ needs.version.outputs.version }}
@@ -220,6 +244,21 @@ jobs:
           Ein macOS-Build (Apple Silicon, \`.dmg\`) wird auf Anfrage bereitgestellt und dann hier
           angehängt.
 
+          **Prüfsummen und Herkunftsnachweis.** Dem Release liegt \`SHA256SUMS.txt\` bei:
+
+          \`\`\`
+          sha256sum -c SHA256SUMS.txt        # Linux, im Download-Ordner
+          shasum -a 256 -c SHA256SUMS.txt    # macOS
+          certutil -hashfile <Datei> SHA256  # Windows, mit SHA256SUMS.txt vergleichen
+          \`\`\`
+
+          Jede Installationsdatei trägt zusätzlich einen Sigstore-Herkunftsnachweis aus
+          dem Workflow-Lauf, der sie gebaut hat — prüfbar mit der GitHub CLI:
+
+          \`\`\`
+          gh attestation verify <Datei> --repo CodeForFire/lagebuch
+          \`\`\`
+
           **Die Pakete sind nicht signiert.** Beim ersten Start:
           - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
           - **Linux**: \`sudo apt install ./lagebuch_*.deb\` — bitte \`apt\`, nicht \`dpkg -i\`:
@@ -239,7 +278,7 @@ jobs:
           # leaves the last full release as "Latest". Pre-1.0 either way — see CHANGELOG.md,
           # breaking changes may land in any release until then.
           prerelease: ${{ needs.version.outputs.prerelease }}
-          files: dist/**/*
+          files: dist/* # flat since the checksum step; includes SHA256SUMS.txt
           body_path: release-notes.md
 
   # macOS carries the 10x minute multiplier, so it is not built on every tag. Run this workflow
@@ -250,6 +289,8 @@ jobs:
     runs-on: macos-latest
     permissions:
       contents: write # gh release upload adds the .dmg to an existing release
+      id-token: write # Sigstore needs an OIDC token to sign the provenance
+      attestations: write # and write the signed attestation back to the repo
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -273,13 +314,19 @@ jobs:
           name: dmg
           path: dist/*.dmg
           if-no-files-found: error
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.dmg
+      # The .dmg is built after the tag release exists, so it cannot join that
+      # release's SHA256SUMS.txt — it carries its own .sha256 file instead.
       - name: Attach .dmg to the release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
+          (cd dist && for f in *.dmg; do shasum -a 256 "$f" > "$f.sha256"; done)
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
-            gh release upload "v${VERSION}" dist/*.dmg --clobber
+            gh release upload "v${VERSION}" dist/*.dmg dist/*.dmg.sha256 --clobber
           else
             echo "No release v${VERSION} yet — .dmg is available as a workflow artifact only."
           fi
