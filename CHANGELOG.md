@@ -39,6 +39,11 @@ once we reach 1.0.
   No change to what either shows. (#302)
 
 ### Fixed
+- Handing the workspace view from one incident to another no longer lets the first incident's
+  "weiter bearbeiten" prompt act on the second. The view kept its handlers on the abandoned
+  prompt, and those handlers followed the view rather than the incident they belonged to, so
+  cancelling the old prompt closed the dialog the operator was actually looking at. Both the
+  workspace and the main view now detach from a prompt before wiring up the next one. (#302)
 - Alarm cues could be delayed or silently skipped while the app was busy. Each cue ran on a
   thread-pool thread, and a pool saturated by other work hands out threads only as fast as it
   grows them — so a cue could sit unplayed for seconds, or outlast its own hung-player watchdog

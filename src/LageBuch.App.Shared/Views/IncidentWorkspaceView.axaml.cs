@@ -7,6 +7,7 @@ namespace LageBuch.App.Shared.Views;
 public partial class IncidentWorkspaceView : UserControl
 {
     private IncidentWorkspaceViewModel? _vm;
+    private OperatorPromptViewModel? _prompt;
 
     public IncidentWorkspaceView()
     {
@@ -21,28 +22,63 @@ public partial class IncidentWorkspaceView : UserControl
             _vm.PropertyChanged -= OnViewModelPropertyChanged;
         }
 
+        // The outgoing workspace's prompt must let go of this view too. Its handlers read _vm,
+        // which is about to point at a different workspace: leaving them attached meant cancelling
+        // the old prompt reached into the new workspace and closed *its* prompt instead.
+        DetachPrompt();
+
         _vm = DataContext as IncidentWorkspaceViewModel;
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnViewModelPropertyChanged;
+            AttachPrompt();
         }
     }
 
     // When the continue-editing prompt appears, watch it for confirmation (Result set),
-    // then let the workspace VM apply it. Mirrors MainWindow's operator-prompt wiring.
+    // then let the workspace VM apply it. Mirrors MainView's operator-prompt wiring.
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IncidentWorkspaceViewModel.PendingPrompt)
-            && _vm?.PendingPrompt is { } prompt)
+        if (e.PropertyName != nameof(IncidentWorkspaceViewModel.PendingPrompt))
         {
-            prompt.PropertyChanged += (_, pe) =>
-            {
-                if (pe.PropertyName == nameof(OperatorPromptViewModel.Result) && prompt.Result is not null)
-                {
-                    _vm.ConfirmContinueEditing();
-                }
-            };
-            prompt.Cancelled += (_, _) => _vm.CancelContinueEditing();
+            return;
+        }
+
+        DetachPrompt();
+        AttachPrompt();
+    }
+
+    private void AttachPrompt()
+    {
+        if (_vm?.PendingPrompt is not { } prompt)
+        {
+            return;
+        }
+
+        _prompt = prompt;
+        prompt.PropertyChanged += OnPromptPropertyChanged;
+        prompt.Cancelled += OnPromptCancelled;
+    }
+
+    private void DetachPrompt()
+    {
+        if (_prompt is null)
+        {
+            return;
+        }
+
+        _prompt.PropertyChanged -= OnPromptPropertyChanged;
+        _prompt.Cancelled -= OnPromptCancelled;
+        _prompt = null;
+    }
+
+    private void OnPromptPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OperatorPromptViewModel.Result) && _prompt?.Result is not null)
+        {
+            _vm?.ConfirmContinueEditing();
         }
     }
+
+    private void OnPromptCancelled(object? sender, EventArgs e) => _vm?.CancelContinueEditing();
 }
