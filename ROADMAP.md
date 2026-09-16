@@ -39,6 +39,14 @@ is something to send us afterwards.
 
 Issues: #288, #289, #295, #296, #300
 
+The OpenSSF Scorecard badge in the README reports two checks as weak, and both
+readings are correct. Branch-Protection and Code-Review score low because `main`
+requires zero approving reviews. With one maintainer there is nobody to approve,
+and requiring an approval would simply stop the project. It stays as it is until
+a second maintainer exists, at which point the requirement goes to one. Force
+pushes, branch deletion and merging without green CI are already blocked, for
+administrators included.
+
 ## v0.8 — Install without warnings
 
 Today every install path asks the user to click past a warning: SmartScreen on
