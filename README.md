@@ -13,6 +13,7 @@
   <a href="../../releases"><img src="https://img.shields.io/github/downloads/CodeForFire/lagebuch/total" alt="Downloads" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/CodeForFire/lagebuch" alt="MIT" /></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/CodeForFire/lagebuch"><img src="https://api.scorecard.dev/projects/github.com/CodeForFire/lagebuch/badge" alt="OpenSSF Scorecard" /></a>
+  <a href="https://www.bestpractices.dev/projects/14683"><img src="https://www.bestpractices.dev/projects/14683/badge" alt="OpenSSF Best Practices" /></a>
 </p>
 
 <p align="center">
