@@ -9,8 +9,9 @@ namespace LageBuch.Documents.Sections;
 /// <summary>
 /// Lists every attached file (image or PDF) by its display name, then renders attached images
 /// inline below the list. A PDF attachment's pages are appended after the whole report instead
-/// (see <see cref="PdfAttachmentMerger"/>) and carry no caption of their own — this list is what
-/// makes a PDF attachment's name visible anywhere in the export at all.
+/// (see <see cref="PdfAttachmentMerger"/>), each preceded by a caption page that echoes its row
+/// in this list (see <see cref="AttachmentCaptionSection"/>) — this list is what makes a PDF
+/// attachment's name visible anywhere in the export.
 /// </summary>
 public static class FilesSection
 {
