@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The FileProvider (AndroidManifest.xml) grants access to exactly the two subtrees named here,
+  never the whole cache dir: a granted content:// URI can only ever address a file under one of
+  these, not import.json, picked attachments, or the joined-client attachment cache, all of which
+  also live under the cache dir but are intentionally left out.
+-->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <cache-path name="shared_cache" path="." />
+    <!-- <cache>/shared: everything this app itself hands out a URI for, namely ShareFileAsync's
+         and OpenFileAsync's targets, and the PDF/JSON export temp files that feed them
+         (AndroidAppPaths.SharedDir). -->
+    <cache-path name="shared" path="shared/" />
+    <!-- <cache>/lagebuch: on Android, Path.GetTempPath() resolves to the app cache dir, so
+         FilesViewModel.OpenFileAsync's Path.Combine(Path.GetTempPath(), "lagebuch", GUID,
+         safeName) lands here. That path is exercised on every attachment open, so this entry
+         must stay even though nothing in this project writes into it directly. -->
+    <cache-path name="attachments" path="lagebuch/" />
 </paths>

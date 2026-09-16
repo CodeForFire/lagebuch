@@ -7,8 +7,6 @@ namespace LageBuch.Persistence.MasterData;
 
 public sealed record MasterDataSet(
     IReadOnlyList<string> Roles,
-    IReadOnlyList<string> RadioCallSigns,
-    IReadOnlyList<string> Brigades,
     IReadOnlyList<string> UnitStatus,
     IReadOnlyList<Link> Links,
     IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
@@ -31,8 +29,6 @@ public sealed record MasterDataSet(
     public static MasterDataSet Empty { get; } = new(
         Array.Empty<string>(),
         Array.Empty<string>(),
-        Array.Empty<string>(),
-        Array.Empty<string>(),
         Array.Empty<Link>(),
         Array.Empty<ChecklistTemplateItem>(),
         Array.Empty<ChecklistTemplateItem>(),
@@ -49,11 +45,38 @@ public sealed record MasterDataSet(
     /// </summary>
     public bool IsEmpty =>
         Roles.Count == 0
-        && RadioCallSigns.Count == 0 && Brigades.Count == 0 && UnitStatus.Count == 0
+        && UnitStatus.Count == 0
         && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0
         && Vehicles.Count == 0;
+
+    /// <summary>
+    /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
+    /// in first-seen order. Derived rather than stored, so maintaining the Fahrzeuge alone is
+    /// sufficient and a Wache can never go missing from a list while its vehicles still exist.
+    /// Recomputed on every access (deliberately not cached: a <c>with</c> copy would carry a stale
+    /// cache, and the lists are tiny).
+    /// </summary>
+    public IReadOnlyList<string> Brigades =>
+        Vehicles.Select(v => v.Wache.Trim())
+            .Where(w => w.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>
+    /// The Funkrufnamen offered as suggestions: every vehicle's callsign followed by every roster
+    /// person's callsign, trimmed, case-insensitively de-duplicated, in first-seen order. Derived
+    /// like <see cref="Brigades"/>. Callsigns with no home in Stammdaten (a Leitstelle, a
+    /// mutual-aid unit) are still accepted as free text wherever a callsign is entered.
+    /// </summary>
+    public IReadOnlyList<string> RadioCallSigns =>
+        Vehicles.Select(v => v.CallSign)
+            .Concat(Personnel.Select(p => p.CallSign ?? string.Empty))
+            .Select(c => c.Trim())
+            .Where(c => c.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 }
 
 /// <summary>A named link — Stammdaten entry so useful external resources can be opened from an Einsatz.</summary>
@@ -119,9 +142,10 @@ public sealed record Person(string LastName, string FirstName, string? Role, str
 }
 
 /// <summary>
-/// One vehicle of a Wache (#76). The Wache reference is the brigade's name as spelled in the
-/// Brigades list (a free-text list, so no id exists to point at); the seat count feeds the
-/// Stärke preset when the vehicle is picked in the Kräfte entry. HasZugfuehrer marks a
+/// One vehicle of a Wache (#76). The Wache is the brigade's name as free text — the set's Wachen
+/// (<see cref="MasterDataSet.Brigades"/>) and Funkrufnamen (<see cref="MasterDataSet.RadioCallSigns"/>)
+/// are derived from these rows, so the vehicle list is the single place to maintain them. The
+/// seat count feeds the Stärke preset when the vehicle is picked in the Kräfte entry. HasZugfuehrer marks a
 /// command vehicle (ELW/KdoW) that carries the Zugführer -- unlike Officer/Mannschaft, ZF is
 /// not seat-derived, since only specific vehicles carry one. Defaulted so existing call sites
 /// and older Stammdaten payloads keep working unchanged.
@@ -198,18 +222,13 @@ public static class AnonymizedExampleData
     public const string LinkUrlPlaceholder = "z. B. " + LinkUrl;
 
     // A field that is genuinely optional reuses this idiom rather than inventing a second
-    // convention for the same idea (see OperatorPromptView's KeywordBox).
+    // convention for the same idea.
     public const string OptionalCallSignPlaceholder = "optional, z. B. " + CallSign;
 
     // Ready-built collections for fixtures that need a fuller MasterDataSet (render/PR-screenshot
     // tests). Built from the same constants above so a single-value placeholder and a list-based
-    // fixture never show contradictory example data.
-    public static readonly IReadOnlyList<string> Brigades =
-        new[] { Brigade, "FFB Wache 2", SecondBrigade, "Puch", "Emmering" };
-
-    public static readonly IReadOnlyList<string> RadioCallSigns =
-        new[] { CallSign, "FFB 1/23/1", OtherBrigadeCallSign, "Land 1" };
-
+    // fixture never show contradictory example data. The Wachen and Funkrufnamen a fixture sees
+    // are derived from these vehicles (plus the roster's callsigns), as in the app.
     public static readonly IReadOnlyList<Vehicle> Vehicles = new[]
     {
         new Vehicle(Brigade, CallSign, 9),
@@ -238,6 +257,12 @@ public static class AnonymizedExampleData
 /// </summary>
 public static class MasterDataJson
 {
+    // Keys older exports carried while Wachen and Funkrufnamen were still their own lists. Both
+    // are derived from vehicles/personnel now; Parse ignores them, ParseForImport reports what
+    // would be lost so the user can add a vehicle for it before saving.
+    private const string LegacyBrigadesKey = "brigades";
+    private const string LegacyCallSignsKey = "radioCallSigns";
+
     private static readonly JsonSerializerOptions ExportOptions = new()
     {
         WriteIndented = true,
@@ -261,13 +286,34 @@ public static class MasterDataJson
         return ParseRoot(doc.RootElement);
     }
 
+    /// <summary>
+    /// <see cref="Parse(Stream)"/> for the editor's Import: additionally lists the entries of the
+    /// legacy <c>brigades</c> / <c>radioCallSigns</c> keys that no vehicle or roster person in the
+    /// same file covers — those are not imported, and the editor shows them so nothing vanishes
+    /// silently. A current-format file yields an empty list.
+    /// </summary>
+    public static MasterDataImportResult ParseForImport(Stream json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var set = ParseRoot(doc.RootElement);
+        var dropped = Arr(doc.RootElement, LegacyBrigadesKey)
+            .Where(b => !set.Brigades.Contains(b.Trim(), StringComparer.OrdinalIgnoreCase))
+            .Concat(Arr(doc.RootElement, LegacyCallSignsKey)
+                .Where(c => !set.RadioCallSigns.Contains(c.Trim(), StringComparer.OrdinalIgnoreCase)))
+            .Select(x => x.Trim())
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new MasterDataImportResult(set, dropped);
+    }
+
+    private static IReadOnlyList<string> Arr(JsonElement e, string prop) =>
+        e.TryGetProperty(prop, out var a) && a.ValueKind == JsonValueKind.Array
+            ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
+            : Array.Empty<string>();
+
     private static MasterDataSet ParseRoot(JsonElement root)
     {
-        static IReadOnlyList<string> Arr(JsonElement e, string prop) =>
-            e.TryGetProperty(prop, out var a) && a.ValueKind == JsonValueKind.Array
-                ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
-                : Array.Empty<string>();
-
         IReadOnlyList<Link> links =
             root.TryGetProperty("links", out var lk) && lk.ValueKind == JsonValueKind.Array
                 ? lk.EnumerateArray()
@@ -290,8 +336,6 @@ public static class MasterDataJson
 
         return new MasterDataSet(
             Arr(root, "roles"),
-            Arr(root, "radioCallSigns"),
-            Arr(root, "brigades"),
             Arr(root, "unitStatus"),
             links,
             checklistAufbau,
@@ -389,8 +433,6 @@ public static class MasterDataJson
         {
             roles = set.Roles,
             unitStatus = set.UnitStatus,
-            radioCallSigns = set.RadioCallSigns,
-            brigades = set.Brigades,
             truppTypes = set.TruppTypes,
             checklistTemplateAufbau = set.ChecklistTemplateAufbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
@@ -418,3 +460,10 @@ public static class MasterDataJson
         return JsonSerializer.Serialize(model, ExportOptions);
     }
 }
+
+/// <summary>
+/// What <see cref="MasterDataJson.ParseForImport"/> read: the set itself plus the legacy Wachen /
+/// Funkrufnamen entries that were in the file but have no vehicle or roster person to derive from,
+/// and therefore are not part of <see cref="Set"/>.
+/// </summary>
+public sealed record MasterDataImportResult(MasterDataSet Set, IReadOnlyList<string> DroppedLegacyEntries);

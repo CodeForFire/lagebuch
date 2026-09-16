@@ -1,128 +1,217 @@
-# Lagebuch
+<p align="center">
+  <img src="docs/logo/lagebuch-logo.png" width="200" alt="Lagebuch" />
+</p>
 
-[![CI](https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/CodeForFire/lagebuch)](../../releases)
+<p align="center">
+  <strong>Einsatzdokumentation für den ELW.</strong><br />
+  Offline. Robust. Open Source.
+</p>
 
-Offline-first incident documentation (**Einsatzdokumentation**) for fire brigades.
-Lagebuch ("log book") is one robust desktop application for the command vehicle
-(ELW), cross-platform and fully offline, with optional multi-device sync and PDF
-reports.
+<p align="center">
+  <a href="https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml"><img src="https://github.com/CodeForFire/lagebuch/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="../../releases"><img src="https://img.shields.io/github/v/release/CodeForFire/lagebuch" alt="Release" /></a>
+  <a href="../../releases"><img src="https://img.shields.io/github/downloads/CodeForFire/lagebuch/total" alt="Downloads" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/CodeForFire/lagebuch" alt="MIT" /></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/CodeForFire/lagebuch"><img src="https://api.scorecard.dev/projects/github.com/CodeForFire/lagebuch/badge" alt="OpenSSF Scorecard" /></a>
+</p>
 
-Built with .NET 8 + Avalonia (desktop & Android), SQLite storage, SignalR sync
-and [QuestPDF](https://www.questpdf.com/) report generation.
+<p align="center">
+  <img src="docs/demo/einsatz-flow.gif" width="960" alt="Ein Einsatz in Lagebuch: Einsatzdaten, ETB, Kräfte, Atemschutz, Aufgaben, CO-Messung, PDF" />
+</p>
 
-| | | | |
-|---|---|---|---|
-| ![Home](docs/screenshots/home.png) | ![ETB](docs/screenshots/etb.png) | ![Aufgaben](docs/screenshots/aufgaben.png) | ![Funktionen](docs/screenshots/funktionen.png) |
-| ![Atemschutz](docs/screenshots/atemschutz.png) | ![CO-Messung](docs/screenshots/co-messung.png) | ![Checklisten](docs/screenshots/checkliste.png) | ![Stammdaten](docs/screenshots/stammdaten-editor.png) |
+Lagebuch ist das digitale Einsatztagebuch für den Einsatzleitwagen: eine
+Desktop-Anwendung, die auch ohne Netz, ohne Cloud und ohne Abo funktioniert.
+Ein Einsatz ist eine Datei auf dem ELW-Laptop – mit Einsatztagebuch, Kräften,
+Atemschutzüberwachung, Aufgaben, CO-Messprotokoll und PDF-Bericht.
 
-*All screenshots show fictional data.*
+*English speakers: the developer documentation starts at [For developers](#for-developers).*
 
-## Features
+## Für wen ist Lagebuch?
 
-**Incident workspace** — one window per Einsatz, keyboard-first:
+- **ELW-Besatzung und Führungsassistenten**, die im Einsatz mitschreiben,
+  Kräfte führen und die ILS auf dem Laufenden halten – mit der Tastatur, ohne
+  Maus-Akrobatik.
+- **Atemschutzüberwachung**, die verlässliche Zeiten, Druckabfragen und einen
+  Rückzugsalarm braucht, den man auch im lauten ELW hört.
+- **Kleine und mittlere Wehren**, die keine Lizenzgebühren, keine Server und
+  keine IT-Abteilung haben – aber trotzdem sauber dokumentieren wollen.
 
-- **Einsatzkopf** — Stichwort as the header hero, complete Bavarian-format
-  Einsatznummer (`B 1.2 <JJMMTT> <lfd.Nr.>`), ILS number addable later
-- **ETB** (Einsatztagebuch) — manual entries with incoming/outgoing direction,
-  automatic lifecycle logging (open, close, reopen), later editing that keeps a
-  full history
-- **Kräfte** — units added from a Stammdaten Fahrzeug (live-filtered by typed
-  Wache, already-assigned vehicles excluded), Stärke tracked as three numbers
-  and committed as one atomic write plus one ETB entry via an explicit
-  "Übernehmen" action, not per keystroke; Trupps are registered as crews, not
-  individuals
-- **Aufgaben** — task list with urgency/importance, assignee suggestions from
-  call signs, Funktionen and personnel, a spoken due-alarm, and one-click
-  creation straight from an ETB entry
-- **Funktionen** — command roles (EL, Abschnitt, von/bis) with transfer support
-  and editable mobile numbers
-- **Atemschutzüberwachung** — SCBA teams with pressure-control interval,
-  max-duration countdown, two-stage ILS Rückmeldung reminder with spoken cues
-  and a Rückzugsalarm siren
-- **CO-Messprotokoll** — building/floor/apartment search grid with per-dwelling
-  status (not searched / searched / affected), CO ppm value, resident name and
-  key-availability marker, mirroring the real-world door-marking convention
-- **Checklisten** — Aufbau/Abbau checklists from your own master data, mandatory
-  items highlighted, completion logged to the ETB
-- **Dateien** — attach photos and PDFs to an incident; they are merged into the
-  exported report
-- **Links** — quick access to department bookmark links (weather, maps, ...)
+## Warum Lagebuch?
 
-**Beyond a single window:**
+- **Läuft offline – wirklich.** Kein Internet, kein Konto, kein Server. Jeder
+  Einsatz ist eine einzelne `.fwincident`-Datei, die dir gehört und die du
+  archivieren, kopieren oder weitergeben kannst.
+- **Keine Daten verlassen den ELW.** Stammdaten, Namen und Handynummern
+  liegen nur auf deinem Gerät. Die optionale Mehrgeräte-Verbindung läuft im
+  LAN oder über Tailscale, TLS-gesichert mit PIN – ohne Cloud, ohne Telemetrie.
+- **Open Source, MIT-Lizenz.** Kein Abo, keine Sitzplatzlizenzen, kein
+  Vendor-Lock-in. Der Quellcode ist einsehbar, Änderungswünsche sind ein Issue
+  entfernt.
 
-- **ILS status reminder** — incident-wide (not per Trupp): fires after a
-  configurable "Erstmeldung nach" interval, then repeats on a configurable
-  "Intervall" with a spoken cue and an ERLEDIGT option; persists across
-  close/reopen/crash and is suppressed on joined/remote clients so the host
-  doesn't double-log
-- **PDF export** — one-click QuestPDF incident report
-- **Multi-device sync** — host an incident on the ELW laptop and follow along
-  from other devices over LAN or Tailscale (SignalR); joining requires a share
-  PIN; Android is a join-only companion client
-- **Offline & durable** — each incident is a single self-contained
-  `.fwincident` SQLite file on disk; files written by a newer build are refused
-  with a clear message instead of crashing
+## Was Lagebuch kann
 
-## Status
+| Modul | Was es tut |
+|---|---|
+| **Einsatzdaten** | Stichwort, bayerische Einsatznummer (`B 1.2 JJMMTT lfd.Nr.`) und Adresse – nachtragbar, sobald die ILS zurückruft |
+| **ETB** | Einsatztagebuch mit Richtung (Eingang/Ausgang/intern), automatischen Systemeinträgen und nachträglicher Korrektur mit Historie |
+| **Kräfte** | Fahrzeuge aus den Stammdaten, Stärke als ZF/GF/Mann, AGT-Zahl, Status und Bemerkung; Gesamtstärke immer im Blick |
+| **Aufgaben** | Aufträge mit Wichtigkeit, Dringlichkeit, Zuständigem und Timer – mit Sprachansage, wenn sie fällig werden; direkt aus einem ETB-Eintrag anlegbar |
+| **Funktionen** | EL, Abschnittsleiter und weitere Rollen mit von/bis, Übergabe und Handynummer |
+| **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene |
+| **Rückmeldung an ILS** | Erinnerung nach konfigurierbarer Zeit, danach im Intervall, mit ERLEDIGT-Quittierung; überlebt Neustart und Absturz |
+| **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), ppm-Wert mit Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort |
+| **Checklisten** | Aufbau- und Abbau-Checklisten aus den eigenen Stammdaten, Pflichtpunkte markiert, Abschluss im ETB protokolliert |
+| **Dateien & Links** | Fotos und PDFs an den Einsatz hängen (landen im Bericht); Schnellzugriff auf Wetter, Karten, Hydrantenplan |
+| **PDF-Bericht** | Ein Klick, Abschnitte wählbar, Anhänge eingebettet – fertig für Akte und Kreisbrandinspektion |
+| **Mehrere Geräte** | Einsatz auf dem ELW-Laptop hosten, mit Tablet oder zweitem Laptop im LAN/Tailscale mitschreiben; Android-App als Begleitgerät |
 
-Early development, pre-1.0 — expect breaking changes between versions.
-The incident schema is versioned; Lagebuch refuses to open files written by a
-newer version rather than corrupting them.
+## Lagebuch im Vergleich
 
-## Install
+Alle Angaben laut Herstellerseiten, Stand September 2026. Fehler oder
+Änderungen? Bitte [ein Issue öffnen](../../issues/new/choose).
 
-Grab an installer from [Releases](../../releases). Pushing a version tag builds
-and attaches one package per platform:
+| | Lagebuch | Papier | [Fireboard](https://fireboard.net/) | [MissionBuddies](https://www.missionbuddies.de/) | [fireplan.elw](https://www.fireplan.de/elw) |
+|---|---|---|---|---|---|
+| Ohne Internet voll nutzbar | ja | ja | Desktop-Suite ja; Stammdaten und Ticker über das Cloud-Portal ([Quelle](https://fireboard.net/)) | ja, Abgleich sobald wieder online ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | ja, als Browser-App ([Quelle](https://www.fireplan.de/elw)) |
+| Daten bleiben im ELW, kein Cloud-Konto | ja, eine Datei pro Einsatz | ja | nein, „cloudbasierte Lösung“ mit Portal-Benutzerkonto ([Quelle](https://fireboard.net/)) | nein, Cloud mit Servern in Deutschland ([Quelle](https://www.missionbuddies.de/faq/)) | k. A. |
+| Mehrere Geräte im Einsatz | ja, LAN/Tailscale, TLS-gepinnt, ohne Server | nein | ja, über Portal ([Quelle](https://fireboard.net/produkte/module/grundsystem/)) | ja; gratis auf 2 Geräten, Premium unbegrenzt ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | ja, live nur mit Internet ([Quelle](https://www.fireplan.de/elw)) |
+| Atemschutzüberwachung | ja, mit Sprachansage und Rückzugsalarm | Überwachungstafel | ja, laut Produktseite ([Quelle](https://fireboard.net/)) | ja, Gratis-Stufe ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | k. A. |
+| CO-Messprotokoll | ja | Zettel | k. A. | k. A. | k. A. |
+| PDF-Einsatzbericht | ja, Abschnitte wählbar | nein | ja ([Quelle](https://fireboard.net/produkte/module/grundsystem/)) | ja, modulweise Export ([Quelle](https://www.missionbuddies.de/faq/)) | k. A. |
+| Kosten | 0 €, MIT-Lizenz | Papier | Grundsystem kostenfrei; Module wie Einsatzführung einmalig 600 € zzgl. 90 €/Jahr Wartung ([Preisliste 02/2026](https://fireboard.net/wp-content/uploads/2026/02/Fireboard-Preisliste-gesamt-Feb2026.pdf)) | Gratis-Stufe, sonst Abo ([Quelle](https://www.missionbuddies.de/faq/)) | auf Anfrage |
+| Quellcode einsehbar | ja | – | nein | nein | nein |
+| Plattformen | Windows, Linux, macOS; Android als Begleit-App | – | Windows, Linux, macOS; Mobile App iOS/Android | Android, Windows, iOS | jeder Browser (PWA) |
 
-| Platform | File |
-|----------|------|
+## Probefahrt in 5 Minuten
+
+Alle Beispieldaten sind frei erfunden.
+
+1. **Installieren** – Paket für dein System aus den
+   [Releases](../../releases) laden, siehe [Installation](#installation).
+2. **Stammdaten importieren** –
+   [`demo-stammdaten.json`](docs/samples/demo-stammdaten.json)
+   herunterladen ([Direktlink](https://github.com/CodeForFire/lagebuch/raw/main/docs/samples/demo-stammdaten.json)),
+   in Lagebuch **STAMMDATEN → IMPORTIEREN** wählen, Datei öffnen, **SPEICHERN**.
+   Jetzt kennen die Dropdowns zwei Wachen, sieben Fahrzeuge, ein paar Namen,
+   Checklisten und Links.
+3. **Übungseinsatz öffnen** –
+   [`uebung.fwincident`](docs/samples/uebung.fwincident) herunterladen
+   ([Direktlink](https://github.com/CodeForFire/lagebuch/raw/main/docs/samples/uebung.fwincident)),
+   in Lagebuch **ÖFFNEN** wählen. Der Einsatz „B 3 – Zimmerbrand“ hat schon
+   ETB-Einträge, vier Fahrzeuge, zwei Atemschutztrupps, Aufgaben und ein
+   CO-Messprotokoll. Über **WEITER BEARBEITEN** kannst du selbst eingreifen.
+4. **Ausprobieren** – einen ETB-Eintrag schreiben, im Tab **ATEMSCHUTZ** einen
+   Trupp bereitstellen und starten, eine Aufgabe mit Timer anlegen, in der
+   **CO-MESSUNG** eine Wohnung markieren.
+5. **PDF EXPORTIEREN** – der fertige Einsatzbericht liegt nach ein paar
+   Sekunden auf der Platte.
+
+Wenn du danach mit deinen eigenen Daten weitermachen willst: Stammdaten
+exportieren, `masterdata.db` löschen (Pfad siehe
+[docs/master-data.md](docs/master-data.md)), eigene Datei importieren.
+
+## Installation
+
+Ein Paket pro Plattform liegt bei jedem [Release](../../releases):
+
+| Plattform | Datei |
+|-----------|-------|
 | Windows | `lagebuch-<version>-x64.msi` |
 | Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` |
 | Android | `lagebuch-<version>.apk` |
 | macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
 
-All builds are self-contained — no .NET runtime needs to be installed separately.
-The packages are **not code-signed**, so the OS warns on first launch:
+Alle Pakete bringen die .NET-Laufzeit mit; es muss nichts weiter installiert
+werden. Die Pakete sind **noch nicht signiert**, deshalb warnt das
+Betriebssystem beim ersten Start einmal:
 
-- **Windows** — run the `.msi`; if SmartScreen appears, *More info → Run anyway*.
-- **macOS** — open the `.dmg`, drag Lagebuch to Applications, then **right-click
-  the app → Open** once (or `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
-- **Linux** — `sudo dpkg -i lagebuch_*.deb` (or `sudo apt install ./lagebuch_*.deb`).
-- **Android** — requires Android 6.0 (API 23) or newer; open the `.apk`;
-  enable *install from unknown sources* for this app once when prompted.
+- **Windows** – `.msi` ausführen; erscheint SmartScreen, *Weitere
+  Informationen → Trotzdem ausführen*.
+- **macOS** – `.dmg` öffnen, Lagebuch nach *Programme* ziehen, dann einmalig
+  **Rechtsklick → Öffnen** (oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
+  Das `.dmg` wird auf Anfrage gebaut und an das Release angehängt.
+- **Linux** – `sudo apt install ./lagebuch_*.deb`. Bitte `apt`, nicht
+  `dpkg -i`: das Paket deklariert seine Systemabhängigkeiten (ICU, fontconfig,
+  X11-Bibliotheken), die nur `apt` auflöst. Falls doch `dpkg -i`:
+  `sudo apt-get -f install` räumt auf.
+- **Android** – ab Android 6.0 (API 23); `.apk` öffnen und die Installation
+  aus unbekannten Quellen für diese App einmal erlauben. Die Android-App ist
+  ein Begleitgerät: sie verbindet sich mit einem Einsatz, der auf einem Laptop
+  gehostet wird.
 
-The macOS `.dmg` is built on demand rather than on every tag: run the **Release**
-workflow manually (*Actions → Release → Run workflow*) with the release version,
-and the `.dmg` is attached to that release.
+## Status
 
-## Build & Test
+Lagebuch ist in aktiver Entwicklung und noch vor Version 1.0; zwischen
+Versionen kann sich das Dateiformat ändern. Das Format ist versioniert: eine
+Datei aus einer neueren Version wird mit klarer Meldung abgelehnt statt
+beschädigt, ältere Dateien werden beim Öffnen migriert. Alle Änderungen stehen
+im [CHANGELOG](CHANGELOG.md).
 
-Building the Android head requires the .NET Android workload (one-time, per machine):
+Woran wir als Nächstes arbeiten und was Version 1.0 bedeutet, stehen in der
+[Roadmap](ROADMAP.md) – kurz gesagt: ab 1.0 bleibt eine Einsatzdatei dauerhaft
+lesbar.
+
+## Screenshots
+
+Alle Screenshots zeigen fiktive Daten.
+
+| | | | |
+|---|---|---|---|
+| ![Startseite](docs/screenshots/home.png) | ![ETB](docs/screenshots/etb.png) | ![Kräfte](docs/screenshots/kraefte.png) | ![Aufgaben](docs/screenshots/aufgaben.png) |
+| ![Atemschutz](docs/screenshots/atemschutz.png) | ![CO-Messung](docs/screenshots/co-messung.png) | ![Checkliste](docs/screenshots/checkliste.png) | ![Stammdaten](docs/screenshots/stammdaten-editor.png) |
+
+## Mitmachen & Kontakt
+
+Lagebuch wird von [CodeForFire](https://github.com/CodeForFire) entwickelt –
+Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
+
+- **Fragen** zur Bedienung, zur Installation oder zum ELW-Laptop →
+  [Fragen & Antworten](../../discussions/categories/fragen-antworten). Dafür
+  braucht ihr kein Bug-Ticket zu schreiben.
+- **Feedback aus der Praxis** ist das Wertvollste: was fehlt im ELW, was
+  nervt, was macht Papier heute noch besser? → [Ideen](../../discussions/categories/ideen)
+  oder direkt ein [Issue öffnen](../../issues/new/choose).
+- **Testen** auf eurem ELW-Laptop oder bei der nächsten Übung – auch ohne
+  Programmierkenntnisse. Erzählt davon unter
+  [Aus der Praxis](../../discussions/categories/aus-der-praxis).
+- **Entwickeln, übersetzen, dokumentieren** → [CONTRIBUTING.md](CONTRIBUTING.md).
+  Einstiegsaufgaben mit Anleitung liegen unter
+  [good first issue](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+- **Sicherheitslücken** bitte nicht öffentlich melden → [SECURITY.md](SECURITY.md).
+
+---
+
+## For developers
+
+Lagebuch is an offline-first incident documentation app for fire brigades:
+.NET 10 + Avalonia (desktop and Android), SQLite storage (one `.fwincident`
+file per incident), SignalR sync with TLS trust-on-first-use, and
+[QuestPDF](https://www.questpdf.com/) reports. The code and its documentation
+are in English; the UI is German. Conventions, commit rules and the PII policy
+are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Build & Test
+
+The SDK version is pinned in `global.json`. Building the Android head
+additionally needs the .NET Android workload and a JDK ≤ 21 (newer JDKs are
+rejected with `XA0030`; use the Docker build in [`docker/`](docker/)):
 
 ```bash
-dotnet workload install android
+dotnet workload install android   # once per machine, Android head only
+dotnet build                      # or: make build (desktop only, skips Android)
+dotnet test                       # or: make test
 ```
+
+### Run
 
 ```bash
-dotnet build
-dotnet test
+dotnet run --project src/LageBuch.App/LageBuch.App.csproj   # or: make run
 ```
 
-If your machine's JDK is newer than JDK 21, the Android head will fail to
-build (`Microsoft.Android.Sdk` rejects newer JDKs outright — error
-`XA0030`). Use the Docker-based build in [`docker/`](docker/) instead.
+### Common tasks
 
-## Run
-
-```bash
-dotnet run --project src/LageBuch.App/LageBuch.App.csproj
-```
-
-## Common tasks
-
-A `Makefile` wraps the commands above plus the Android and packaging ones.
-Run `make` for the full list:
+A `Makefile` wraps the commands above plus the Android, packaging and
+documentation ones. Run `make` for the full list:
 
 ```bash
 make build            # everything except the Android head
@@ -131,80 +220,23 @@ make run              # the desktop app
 make apk              # build an installable APK in Docker
 make run-android      # boot the emulator, install and launch
 make package-linux    # build a local .deb
+make samples          # regenerate docs/samples/uebung.fwincident
+make screenshots      # regenerate docs/screenshots/*.png (headless Skia harness)
+make demo-gif         # rebuild docs/demo/einsatz-flow.gif from the screenshots
 ```
 
-## Releasing (maintainers)
+### Master data
 
-Pushing a tag triggers the release workflow:
+Dropdown contents (roles, vehicles, personnel, checklists, links) are never
+compiled into the app: a fresh install starts empty and is populated by
+importing a JSON file in the Stammdaten editor. The full description, storage
+paths, and the PII rules are in [docs/master-data.md](docs/master-data.md);
+the schema is documented by [`docs/master-data.example.json`](docs/master-data.example.json).
 
-```bash
-git tag v0.3.0 && git push origin v0.3.0
-```
+### Releasing
 
-## Master data
-
-Dropdown contents (roles, radio call signs, brigades, personnel, ...) are treated
-as PII and are **never compiled into the application**. A fresh install starts
-with **empty** master data; you populate it in the in-app **Stammdaten** editor
-by importing a JSON file, and can write your own data back out again.
-
-### Where it is stored
-
-On first start an empty `masterdata.db` is created. It is the live database the
-app reads and writes from then on, and where the Stammdaten editor saves:
-
-| Platform | Path |
-|---|---|
-| Windows | `%AppData%\Lagebuch\masterdata.db` |
-| Linux   | `~/.config/Lagebuch/masterdata.db` |
-| macOS   | `~/.config/Lagebuch/masterdata.db` |
-
-On macOS the app uses `~/.config`, **not** `~/Library/Application Support` —
-that is simply where .NET's `ApplicationData` folder resolves on Unix. To start
-over, delete `masterdata.db`; the app recreates it empty on the next launch.
-
-### Joined devices use the host's master data
-
-When you join another device's incident ("Mit Gerät verbinden"), that device's
-master data is used for the whole session — its brigades, radio call signs,
-vehicles and roster, and its Einsatzzeiten and Rückzugsdruck settings. The host
-is the master, so both devices always agree: an Atemschutz-Trupp registered from
-a joined tablet gets exactly the Einsatzzeit the host would have used.
-
-The join flow itself never reads or writes your own `masterdata.db` — it just
-isn't consulted while you're joined. (You can still open **Stammdaten** and
-edit it deliberately; that has no effect on the joined session, which keeps
-using the host's set.) Leaving the incident returns the device to its own
-master data — there is nothing to back up and nothing to restore. If the host
-has no master data at all, the joined device shows empty dropdowns too; every
-field still accepts free text.
-
-### Import and export
-
-Open **Stammdaten** and use the header buttons:
-
-- **IMPORTIEREN** — offered only while the data is still empty (a first-run
-  bootstrap, not a merge). Pick a JSON file; its contents load into the editor as
-  unsaved changes for review, and reach `masterdata.db` only when you press
-  **SPEICHERN** (or **VERWERFEN** to discard).
-- **EXPORTIEREN** — writes the current master data (including unsaved edits) to a
-  JSON file you can back up or hand to another install.
-
-The file is one JSON object; every top-level key is optional, so a file may hold
-the whole set, only the roster, or anything in between. See
-[`docs/master-data.example.json`](docs/master-data.example.json) for the full
-schema.
-
-### PII
-
-Any real master-data or personnel JSON — street lists, station and call-sign
-names, and above all names and mobile numbers — is personal/identifying data and
-must be kept **out of the repository**. `seed-source/` and `*.masterdata.json`
-are gitignored for exactly this reason; only the anonymised
-`docs/master-data.example.json` is tracked. An empty roster is a fully supported
-state: the name field on the Funktionen tab offers the roster as suggestions but
-always accepts free text, so off-roster and mutual-aid personnel can be entered
-either way.
+Pushing a version tag builds and publishes the packages; see
+[docs/releasing.md](docs/releasing.md).
 
 ## License
 

@@ -60,7 +60,19 @@ internal sealed class FakeStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
+    {
+        _files.Remove($"{path}/{storageFileName}");
+        return Task.CompletedTask;
+    }
+
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }
@@ -168,7 +180,7 @@ public class WorkspaceAcceptanceTests
         Roles = new[] { "EL" },
         ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Blaulicht aus?", false) },
         TruppTypes = new[] { "Angriffstrupp" },
-        Brigades = new[] { "FFB Wache 1", "Aich" },
+        Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), new Vehicle("Aich", "Aich 42/1", 6) },
         UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
         Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
     };
@@ -750,8 +762,9 @@ public class WorkspaceAcceptanceTests
         var summary = view.GetControl<TextBlock>("TransferSummaryText");
         Assert.DoesNotContain("→", summary.Text, StringComparison.Ordinal);
 
-        var panel = view.GetControl<Border>("TransferPanel");
-        var icon = Assert.Single(panel.GetVisualDescendants().OfType<PathIcon>());
+        // Named rather than the panel's only PathIcon (#259 added a chevron overlay on the
+        // transfer panel's own suggestion fields, so the arrow is no longer unique there).
+        var icon = view.GetControl<PathIcon>("TransferArrowIcon");
         Assert.True(icon.Bounds.Width > 0, "the transfer summary's arrow icon has zero width -- nothing is drawn");
     }
 }

@@ -41,7 +41,7 @@
               <TextBox Width="60" Text="{Binding TimerMinutes}" b:IntegerOnly.IsEnabled="True"
                        PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}" />
             </HeaderedContentControl>
-            <HeaderedContentControl Grid.Column="3" Classes="field" Header="ZUGETEILT">
+            <HeaderedContentControl Grid.Column="3" Classes="field suggest" Header="ZUGETEILT">
               <AutoCompleteBox ItemsSource="{Binding AssigneeOptions}"
                                PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"

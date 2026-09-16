@@ -28,12 +28,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private EditableListSection _unitStatus = null!;
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _brigades = null!;
-
-    // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _callSigns = null!;
-
-    // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private EditableListSection _truppTypes = null!;
 
     private ChecklistTemplateSection _checklistAufbau = null!;
@@ -67,6 +61,15 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private string? _fileError;
 
     /// <summary>
+    /// An informational note after a successful import: the legacy Wachen / Funkrufnamen entries
+    /// of an older file that no vehicle or roster person covers, and which therefore were not taken
+    /// over. Lets the user add a Fahrzeug for them before saving rather than losing them silently.
+    /// Cleared when the editor reloads or the next import/export starts.
+    /// </summary>
+    [ObservableProperty]
+    private string? _fileNotice;
+
+    /// <summary>
     /// Fahrzeuge sind eindeutig (#76 follow-up): der Funkrufname identifiziert das Fahrzeug und darf
     /// nur einmal vorkommen — unabhängig von der Wache, getrimmt und ohne Groß-/Kleinschreibung.
     /// Doppelte benennt diese Meldung und blockiert das Speichern, statt sie still zu deduplizieren.
@@ -87,6 +90,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         _original = _provider.Get();
         _originalIsEmpty = _original.IsEmpty;
         FileError = null;
+        FileNotice = null;
         PopulateSections(_original);
         RefreshVehicleConflicts();
         IsDirty = false;
@@ -107,13 +111,15 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         {
             _roles = new EditableListSection("Rollen", "ROLLE", set.Roles, MarkDirty),
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
-            _brigades = new EditableListSection("Wachen", "WACHE", set.Brigades, MarkDirty),
-            _callSigns = new EditableListSection("Funkrufnamen", "RUFNAME", set.RadioCallSigns, MarkDirty),
             _truppTypes = new EditableListSection("Trupp-Typen", "TYP", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),
             _checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty),
             _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),
             _personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty),
+
+            // Wachen and Funkrufnamen have no section of their own: they are derived from these
+            // rows (plus the roster), so the vehicle list is the single place to maintain them.
+            // The derived lists still serve as typing suggestions for further rows.
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
         };
 
@@ -161,8 +167,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     {
         Roles = _roles.ToValues(),
         UnitStatus = _unitStatus.ToValues(),
-        Brigades = _brigades.ToValues(),
-        RadioCallSigns = _callSigns.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),
         ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
@@ -190,9 +194,9 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     /// <summary>
     /// Bootstrap a fresh, empty install from a JSON file. Loads the file into the sections as unsaved
-    /// changes for review — nothing reaches the database until the user presses Save. Imported streets
-    /// ride along in <see cref="_original"/> (there is no streets section) and are persisted by Save.
-    /// Offered only while the data is empty, so there is nothing to overwrite.
+    /// changes for review — nothing reaches the database until the user presses Save. Legacy
+    /// Wachen / Funkrufnamen entries the file carries but nothing derives from are reported in
+    /// <see cref="FileNotice"/>. Offered only while the data is empty, so there is nothing to overwrite.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanImport))]
     [SuppressMessage(
@@ -202,13 +206,14 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private async Task Import()
     {
         FileError = null;
+        FileNotice = null;
         var path = await _dialogs.PickImportJsonAsync();
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
         }
 
-        MasterDataSet imported;
+        MasterDataImportResult imported;
         try
         {
             imported = _files.Read(path);
@@ -219,12 +224,15 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             return;
         }
 
-        _original = imported;
-        PopulateSections(imported);
+        _original = imported.Set;
+        PopulateSections(imported.Set);
+        FileNotice = imported.DroppedLegacyEntries.Count == 0
+            ? null
+            : $"Nicht übernommen (kein Fahrzeug / keine Person dazu): {string.Join(", ", imported.DroppedLegacyEntries)}";
         IsDirty = true; // user reviews, then Save (or Discard to revert to empty)
     }
 
-    /// <summary>Writes the current editor contents (including unsaved edits and carried-through streets) to a JSON file.</summary>
+    /// <summary>Writes the current editor contents (including unsaved edits) to a JSON file.</summary>
     [RelayCommand]
     [SuppressMessage(
         "Design",
@@ -233,6 +241,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private async Task Export()
     {
         FileError = null;
+        FileNotice = null;
         var path = await _dialogs.PickExportJsonAsync("stammdaten.json");
         if (string.IsNullOrWhiteSpace(path))
         {

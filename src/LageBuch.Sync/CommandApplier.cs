@@ -20,10 +20,12 @@ public static class CommandApplier
     /// <param name="incident">The host's authoritative aggregate to mutate.</param>
     /// <param name="clock">The host's clock — authoritative timestamps for every applied command.</param>
     /// <returns>
-    /// The newly recorded <see cref="IncidentFile"/> for an <see cref="AddFileCommand"/> — informational
-    /// only, since the attachment's bytes never travel through this command (issue #167 P1 #2: they
-    /// PUT to <see cref="SyncProtocol.FilesPath"/> as a separate request, keyed by the id the command
-    /// already carries). Null for every other command.
+    /// The newly recorded <see cref="IncidentFile"/> for an <see cref="AddFileCommand"/>, or the
+    /// just-removed one for a <see cref="RemoveFileCommand"/> — both informational, since the
+    /// attachment's bytes never travel through either command (issue #167 P1 #2: they ride
+    /// <see cref="SyncProtocol.FilesPath"/> as a separate request, keyed by the id the command
+    /// already carries). Callers use the returned <see cref="IncidentFile.FileName"/> to add or
+    /// delete the bytes on disk. Null for every other command.
     /// </returns>
     public static IncidentFile? Apply(SyncCommand command, Incident incident, IClock clock)
     {
@@ -125,6 +127,8 @@ public static class CommandApplier
             case RenameFileCommand c:
                 incident.RenameFile(c.FileId, c.DisplayName);
                 break;
+            case RemoveFileCommand c:
+                return incident.RemoveFile(clock, Operator(c.Operator), c.FileId);
             case AddTaskCommand c:
                 incident.AddTask(
                     clock,
@@ -160,7 +164,10 @@ public static class CommandApplier
                 incident.SetFloorDescription(c.BuildingId, c.FloorOrdinal, c.Description);
                 break;
             case SetApartmentLabelCommand c:
-                incident.SetApartmentLabel(c.BuildingId, c.ApartmentNumber, c.Label);
+                incident.SetApartmentLabel(c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.Label);
+                break;
+            case SetApartmentCountCommand c:
+                incident.SetApartmentCount(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.Count);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(

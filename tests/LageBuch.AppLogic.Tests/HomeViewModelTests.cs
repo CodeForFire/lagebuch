@@ -20,7 +20,7 @@ public class HomeViewModelTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller")));
 
         Assert.NotNull(opened);
         Assert.False(opened!.IsReadOnly);
@@ -29,7 +29,7 @@ public class HomeViewModelTests
     }
 
     [Fact]
-    public void NewIncident_with_keyword_suggests_a_date_time_stichwort_filename()
+    public void NewIncident_suggests_a_date_time_filename_and_starts_without_head_data()
     {
         var store = new FakeStore();
         var dialogs = new CapturingSaveDialogs();
@@ -38,31 +38,14 @@ public class HomeViewModelTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller")));
 
-        // The Einsatznummer is unknown at creation (#69) -- the filename is date + time + Stichwort.
-        Assert.Equal("20260622-0900-B3P.fwincident", dialogs.LastSuggestedName);
-        Assert.NotNull(opened);
-    }
-
-    [Fact]
-    public void NewIncident_without_keyword_falls_back_to_a_timestamp_only_filename()
-    {
-        var dialogs = new CapturingSaveDialogs();
-        var vm = new HomeViewModel(
-            new FakeStore(),
-            new FakeMasterData(),
-            new FakeRecent(),
-            dialogs,
-            new FixedClock(T0),
-            new FakeTicker(),
-            new FakeAlarmService(),
-            new NoopIncidentHostController(),
-            "1.0.0");
-
-        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), null));
-
+        // Neither the Einsatznummer nor the Stichwort is known at creation (#69) -- both are
+        // entered later through the Einsatzdaten dialog -- so the filename is date + time only.
         Assert.Equal("20260622-0900.fwincident", dialogs.LastSuggestedName);
+        Assert.NotNull(opened);
+        Assert.Equal("Unbenannter Einsatz", opened!.HeroText);
+        Assert.Null(store.Load("/x.fwincident").Keyword);
     }
 
     [Fact]
@@ -82,7 +65,7 @@ public class HomeViewModelTests
             "1.0.0",
             lastSaveFolder: lastFolder);
 
-        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller")));
 
         Assert.Equal("/einsaetze/2026", dialogs.LastInitialFolder);
     }
@@ -104,7 +87,7 @@ public class HomeViewModelTests
             "1.0.0",
             lastSaveFolder: lastFolder);
 
-        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller"), "B3P"));
+        vm.NewIncidentCommand.Execute(new NewIncidentRequest(new SessionOperator("Müller")));
 
         // The stored folder is whatever Path.GetDirectoryName yields on this OS, so derive
         // the expectation from the same input instead of hardcoding a separator flavor.
@@ -451,7 +434,16 @@ internal sealed class ThrowingStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }
@@ -483,7 +475,16 @@ internal sealed class SelectivelyThrowingStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }
@@ -523,7 +524,16 @@ internal sealed class CountingStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }

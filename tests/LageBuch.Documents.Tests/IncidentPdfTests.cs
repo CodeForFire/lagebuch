@@ -9,6 +9,10 @@ namespace LageBuch.Documents.Tests;
 
 public class IncidentPdfTests
 {
+    // The moment the export is taken. Fixed so a task's "FÄLLIG" rendering does not depend on
+    // when the suite happens to run.
+    private static readonly DateTimeOffset ExportedAt = new(2026, 6, 22, 12, 0, 0, TimeSpan.FromHours(2));
+
     private sealed class Clock : IClock
     {
         public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
@@ -64,7 +68,7 @@ public class IncidentPdfTests
     [Fact]
     public void Generate_produces_a_valid_pdf_for_a_full_incident()
     {
-        var bytes = IncidentPdf.Generate(BuildFullIncident());
+        var bytes = IncidentPdf.Generate(BuildFullIncident(), ExportedAt);
         PdfAssert.IsPdf(bytes);
     }
 
@@ -72,7 +76,7 @@ public class IncidentPdfTests
     public void Generate_produces_a_valid_pdf_for_a_minimal_incident()
     {
         var incident = Incident.Start(new Clock(), new SessionOperator("Müller"));
-        var bytes = IncidentPdf.Generate(incident);
+        var bytes = IncidentPdf.Generate(incident, ExportedAt);
         PdfAssert.IsPdf(bytes);
     }
 
@@ -85,14 +89,14 @@ public class IncidentPdfTests
         clock.Now = clock.Now.AddHours(2);
         incident.Close(clock, op);
 
-        var bytes = IncidentPdf.Generate(incident);
+        var bytes = IncidentPdf.Generate(incident, ExportedAt);
         PdfAssert.IsPdf(bytes);
     }
 
     [Fact]
     public void Direct_document_generation_ensures_license_and_produces_a_valid_pdf()
     {
-        var bytes = new IncidentReportDocument(BuildFullIncident()).GeneratePdf();
+        var bytes = new IncidentReportDocument(BuildFullIncident(), ExportedAt).GeneratePdf();
         PdfAssert.IsPdf(bytes);
     }
 
@@ -115,8 +119,8 @@ public class IncidentPdfTests
         var incident = Incident.Start(clock, op);
         var file = incident.AddFile(clock, op, "brand.jpg", "image/jpeg", TinyJpeg.Length);
 
-        var withoutImage = IncidentPdf.Generate(incident);
-        var withImage = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]> { [file.Id] = TinyJpeg });
+        var withoutImage = IncidentPdf.Generate(incident, ExportedAt);
+        var withImage = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]> { [file.Id] = TinyJpeg });
 
         PdfAssert.IsPdf(withImage);
 
@@ -137,11 +141,11 @@ public class IncidentPdfTests
         var clock = new Clock();
         var op = new SessionOperator("Müller");
         var incident = Incident.Start(clock, op);
-        var withoutFile = IncidentPdf.Generate(incident);
+        var withoutFile = IncidentPdf.Generate(incident, ExportedAt);
 
         var file = incident.AddFile(clock, op, "bericht.pdf", "application/pdf", 100);
         incident.RenameFile(file.Id, "Lagebericht Erdgeschoss");
-        var withFile = IncidentPdf.Generate(incident);
+        var withFile = IncidentPdf.Generate(incident, ExportedAt);
 
         PdfAssert.IsPdf(withFile);
 
@@ -160,7 +164,7 @@ public class IncidentPdfTests
         incident.AddFile(new Clock(), new SessionOperator("Müller"), "brand.jpg", "image/jpeg", 123);
 
         // No entry for the file's id in the dictionary — simulates a moved/missing sibling folder.
-        var bytes = IncidentPdf.Generate(incident, new Dictionary<Guid, byte[]>());
+        var bytes = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
 
         PdfAssert.IsPdf(bytes);
     }
@@ -169,8 +173,77 @@ public class IncidentPdfTests
     public void Generate_with_no_files_dictionary_at_all_still_works()
     {
         // The optional-parameter default (null -> empty) covers every pre-#62 caller unchanged.
-        var bytes = IncidentPdf.Generate(BuildFullIncident());
+        var bytes = IncidentPdf.Generate(BuildFullIncident(), ExportedAt);
         PdfAssert.IsPdf(bytes);
+    }
+
+    [Fact]
+    public void Generate_with_a_section_deselected_produces_a_smaller_pdf_than_all_sections()
+    {
+        // BuildFullIncident populates every section, so excluding one (ETB, which has real
+        // journal content) must shrink the output relative to rendering all of them.
+        var incident = BuildFullIncident();
+        var withAll = IncidentPdf.Generate(incident, ExportedAt, sections: IncidentPdfSections.All);
+        var withoutEtb = IncidentPdf.Generate(incident, ExportedAt, sections: IncidentPdfSections.All & ~IncidentPdfSections.Etb);
+
+        PdfAssert.IsPdf(withoutEtb);
+        Assert.True(
+            withoutEtb.Length < withAll.Length,
+            $"Expected omitting the ETB section to shrink the PDF (all={withAll.Length}, withoutEtb={withoutEtb.Length}).");
+    }
+
+    [Fact]
+    public void Generate_with_no_sections_selected_still_produces_a_valid_but_minimal_pdf()
+    {
+        var incident = BuildFullIncident();
+        var withAll = IncidentPdf.Generate(incident, ExportedAt, sections: IncidentPdfSections.All);
+        var withNone = IncidentPdf.Generate(incident, ExportedAt, sections: IncidentPdfSections.None);
+
+        PdfAssert.IsPdf(withNone);
+        Assert.True(
+            withNone.Length < withAll.Length,
+            $"Expected an empty section selection to produce a smaller PDF (all={withAll.Length}, none={withNone.Length}).");
+    }
+
+    [Fact]
+    public void Generate_defaults_to_all_sections_when_none_specified()
+    {
+        var incident = BuildFullIncident();
+        var withDefault = IncidentPdf.Generate(incident, ExportedAt);
+        var withAllExplicit = IncidentPdf.Generate(incident, ExportedAt, sections: IncidentPdfSections.All);
+
+        Assert.Equal(PdfAssert.CountPages(withAllExplicit), PdfAssert.CountPages(withDefault));
+    }
+
+    [Fact]
+    public void Generate_with_Files_deselected_also_omits_the_merged_pdf_attachment_pages()
+    {
+        var incident = BuildFullIncident();
+        var withoutAttachment = IncidentPdf.Generate(incident, ExportedAt, sections: IncidentPdfSections.All & ~IncidentPdfSections.Files);
+        var basePages = PdfAssert.CountPages(withoutAttachment);
+
+        var attachmentPdf = IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")), ExportedAt);
+        var file = incident.AddFile(new Clock(), new SessionOperator("Müller"), "bericht.pdf", "application/pdf", attachmentPdf.Length);
+        var attachmentPath = Path.Combine(Path.GetTempPath(), $"lagebuch-incident-pdf-test-{Guid.NewGuid():N}.pdf");
+        File.WriteAllBytes(attachmentPath, attachmentPdf);
+        try
+        {
+            var withFilesDeselected = IncidentPdf.Generate(
+                incident,
+                ExportedAt,
+                pdfAttachmentPaths: new Dictionary<Guid, string> { [file.Id] = attachmentPath },
+                sections: IncidentPdfSections.All & ~IncidentPdfSections.Files);
+
+            PdfAssert.IsPdf(withFilesDeselected);
+
+            // The merged attachment pages must NOT be appended when Files is deselected, even
+            // though a path was supplied for it.
+            Assert.Equal(basePages, PdfAssert.CountPages(withFilesDeselected));
+        }
+        finally
+        {
+            File.Delete(attachmentPath);
+        }
     }
 
     // Needs the native qpdf library (see PdfAttachmentMergerTests' remarks).
@@ -178,10 +251,10 @@ public class IncidentPdfTests
     public void Generate_appends_a_caption_page_then_an_attached_pdfs_pages_after_the_report()
     {
         var incident = BuildFullIncident();
-        var withoutAttachment = IncidentPdf.Generate(incident);
+        var withoutAttachment = IncidentPdf.Generate(incident, ExportedAt);
         var reportPages = PdfAssert.CountPages(withoutAttachment);
 
-        var attachmentPdf = IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")));
+        var attachmentPdf = IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")), ExportedAt);
         var file = incident.AddFile(new Clock(), new SessionOperator("Müller"), "bericht.pdf", "application/pdf", attachmentPdf.Length);
 
         // PDF attachments are merged straight from a disk path (issue #167 P1 #3), not from
@@ -192,6 +265,7 @@ public class IncidentPdfTests
         {
             var withAttachment = IncidentPdf.Generate(
                 incident,
+                ExportedAt,
                 pdfAttachmentPaths: new Dictionary<Guid, string> { [file.Id] = attachmentPath });
 
             PdfAssert.IsPdf(withAttachment);

@@ -139,6 +139,14 @@ public interface IIncidentSession
     /// Bemerkung field. Null/blank resets the label back to the file's original name.</summary>
     void RenameFile(Guid fileId, string? displayName);
 
+    /// <summary>
+    /// Removes an attachment: metadata and bytes both go, and the ETB records the removal (#262
+    /// UX follow-up), mirroring RemoveForceUnit. Like <see cref="AddFileAsync"/> — and unlike every
+    /// other mutation above — this is genuinely awaited rather than fire-and-forget: a real disk
+    /// delete is worth surfacing a failure for.
+    /// </summary>
+    Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default);
+
     void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0);
 
     void UpdateCoBuildingStructure(Guid buildingId, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0);
@@ -153,5 +161,7 @@ public interface IIncidentSession
 
     void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description);
 
-    void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label);
+    void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label);
+
+    void SetApartmentCount(Guid buildingId, int floorOrdinal, int count);
 }

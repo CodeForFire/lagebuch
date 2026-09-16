@@ -75,6 +75,57 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void V20_duplicated_force_unit_edits_migrate_to_v21_deduplicated()
+    {
+        // Simulate a file left behind by the pre-fix Save bug: every save re-inserted the unit's
+        // whole Wert-Historie on top of what was already on disk, so a file saved twice carried
+        // two copies of each edit row. Build one such file, stamp it back to V20, and verify V21
+        // collapses it to one row per (unit_id, ordinal) -- and that Load returns the deduplicated
+        // history in ordinal order rather than, say, both copies interleaved.
+        var clock = new Clock();
+        var op = new Domain.SessionOperator("Müller");
+        var incident = Domain.Incident.Start(clock, op);
+        var unit = incident.AddForceUnit(clock, op, "FFB", 6);
+        incident.UpdateForceStrength(clock, op, unit.Id, officerCount: 1, personnelCount: 5, scbaCount: 2);
+        incident.UpdateForceStrength(clock, op, unit.Id, officerCount: 1, personnelCount: 6, scbaCount: 2);
+
+        IncidentRepository.Save(_path, incident);
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            // Duplicate every edit row under a fresh id -- exactly what a second, pre-fix Save
+            // did -- then roll the file back to V20 so the migration runs forward through V21.
+            cmd.CommandText =
+                """
+                INSERT INTO force_unit_edits
+                    (id, unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at, previous_zugfuehrer_count)
+                SELECT lower(hex(randomblob(16))), unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at, previous_zugfuehrer_count
+                FROM force_unit_edits;
+                DELETE FROM schema_version;
+                INSERT INTO schema_version (version) VALUES (20);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var loaded = IncidentRepository.Load(_path);
+
+        using (var check = SqliteConnectionFactory.OpenReadOnly(_path))
+        using (var count = check.CreateCommand())
+        {
+            count.CommandText = "SELECT count(*) FROM force_unit_edits;";
+            Assert.Equal(2L, (long)count.ExecuteScalar()!);
+        }
+
+        var edits = loaded.Forces.Single().Edits;
+        Assert.Equal(2, edits.Count);
+        Assert.Equal(6, edits[0].PreviousPersonnelCount);
+        Assert.Equal(5, edits[1].PreviousPersonnelCount);
+    }
+
+    [Fact]
     public void V2_scba_trupp_migrates_to_v3_as_a_started_trupp()
     {
         // Build a file with the V1+V2 schema, stamped at version 2, holding one V2-shaped trupp

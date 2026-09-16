@@ -16,7 +16,7 @@ public class OperatorPromptFocusTests
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Blaulicht aus?", false) },
-        RadioCallSigns = new[] { "FFB 1/40/1", "Aich 42/1" },
+        Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), new Vehicle("Aich", "Aich 42/1", 6) },
     };
 
     private static IncidentWorkspaceViewModel ReadOnlyOpenWorkspace()

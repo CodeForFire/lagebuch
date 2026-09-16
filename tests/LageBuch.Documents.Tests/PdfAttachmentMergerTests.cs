@@ -10,13 +10,17 @@ namespace LageBuch.Documents.Tests;
 // distinct from any assertion failure here).
 public class PdfAttachmentMergerTests
 {
+    // The moment the export is taken. Fixed so a task's "FÄLLIG" rendering does not depend on
+    // when the suite happens to run.
+    private static readonly DateTimeOffset ExportedAt = new(2026, 6, 22, 12, 0, 0, TimeSpan.FromHours(2));
+
     private sealed class Clock : IClock
     {
         public DateTimeOffset Now { get; set; } = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
     }
 
     private static byte[] OnePagePdf() =>
-        IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")));
+        IncidentPdf.Generate(Incident.Start(new Clock(), new SessionOperator("Müller")), ExportedAt);
 
     // Each attachment must be described by the file-row it belongs to (display name, added-by,
     // date) plus the disk path of its PDF — the merger renders a caption page from that row and

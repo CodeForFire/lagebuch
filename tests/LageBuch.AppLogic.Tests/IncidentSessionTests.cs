@@ -315,7 +315,7 @@ public class IncidentSessionTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var bytes = await session.ExportPdfAsync();
+        var bytes = await session.ExportPdfAsync(new TestPdfExporter());
         Assert.True(bytes.Length > 100);
         Assert.Equal(0x25, bytes[0]); // %
     }
@@ -335,12 +335,13 @@ public class IncidentSessionTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
 
-        var withoutAttachment = await session.ExportPdfAsync();
+        var exporter = new TestPdfExporter();
+        var withoutAttachment = await session.ExportPdfAsync(exporter);
 
         // Any valid PDF stands in for "an attached PDF" — the export itself already produces one.
         await session.AddFileAsync("bericht.pdf", "application/pdf", withoutAttachment);
 
-        var withAttachment = await session.ExportPdfAsync();
+        var withAttachment = await session.ExportPdfAsync(exporter);
 
         Assert.True(
             withAttachment.Length > withoutAttachment.Length,
@@ -391,11 +392,21 @@ internal sealed class FakeStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(_diskDir, storageFileName);
 
-    public event Action<Exception>? SaveFailed
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
     {
-        add { }
-        remove { }
+        _files.Remove($"{path}/{storageFileName}");
+        return Task.CompletedTask;
     }
+
+    // Real events, not the usual no-op double: IncidentWorkspaceViewModelTests raises these
+    // directly to exercise the PersistenceError wiring without a real background writer thread.
+    public event Action<Exception>? SaveFailed;
+
+    public event Action? SaveSucceeded;
+
+    public void RaiseSaveFailed(Exception ex) => SaveFailed?.Invoke(ex);
+
+    public void RaiseSaveSucceeded() => SaveSucceeded?.Invoke();
 }
 
 // SaveFileBytesAsync doesn't complete until the caller-supplied gate task does — lets a test prove
@@ -426,7 +437,16 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }

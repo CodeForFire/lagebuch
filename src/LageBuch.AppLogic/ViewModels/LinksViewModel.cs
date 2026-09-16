@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -20,12 +20,63 @@ public sealed partial class LinksViewModel : ObservableObject
     {
         _dialogs = dialogs;
         Links = links;
+        VisibleLinks = new ObservableCollection<Link>(links);
     }
 
     public IReadOnlyList<Link> Links { get; }
 
+    /// <summary>
+    /// The subset of <see cref="Links"/> matching <see cref="FilterText"/>, and what the view
+    /// renders. <see cref="Links"/> deliberately stays the full set so "Keine Links hinterlegt"
+    /// (nothing in the Stammdaten) stays distinguishable from "nothing matched what you typed" —
+    /// two different situations for the operator. Same _all/visible split as
+    /// <see cref="RolesViewModel"/> and <see cref="EtbViewModel"/>.
+    /// </summary>
+    public ObservableCollection<Link> VisibleLinks { get; }
+
     [ObservableProperty]
     private string? _errorMessage;
+
+    /// <summary>
+    /// Live search over the Links tab (#262): a Wehr with more than a handful of Stammdaten-Links
+    /// otherwise has to scan the whole flat list while working an Einsatz.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFiltered))]
+    [NotifyPropertyChangedFor(nameof(NoMatchesMessage))]
+    private string _filterText = string.Empty;
+
+    /// <summary>
+    /// Whether a search term is active — drives the clear button, so it follows the typed text and
+    /// not the result count: a term that happens to match every link is still an active filter.
+    /// </summary>
+    public bool IsFiltered => !string.IsNullOrWhiteSpace(FilterText);
+
+    public string NoMatchesMessage => $"Kein Link passt zu „{FilterText.Trim()}“.";
+
+    partial void OnFilterTextChanged(string value) => ApplyFilter();
+
+    /// <summary>
+    /// Ordinal rather than culture-aware matching: a URL is not culture text, and this mirrors the
+    /// <c>FilterMode="ContainsOrdinal"</c> the AutoCompleteBoxes elsewhere in the app already use.
+    /// </summary>
+    private void ApplyFilter()
+    {
+        var term = FilterText.Trim();
+        VisibleLinks.Clear();
+        foreach (var link in Links)
+        {
+            if (term.Length == 0
+                || link.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || link.Url.Contains(term, StringComparison.OrdinalIgnoreCase))
+            {
+                VisibleLinks.Add(link);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void ClearFilter() => FilterText = string.Empty;
 
     /// <summary>
     /// Refuses anything but http(s) before it reaches the OS: on desktop, OpenUrlAsync ultimately
@@ -34,29 +85,12 @@ public sealed partial class LinksViewModel : ObservableObject
     /// just what the user themselves typed here.
     /// </summary>
     [RelayCommand]
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Deliberately broad: any launcher failure surfaces in the view instead of crashing it.")]
     private async Task OpenAsync(Link link)
     {
-        ErrorMessage = null;
+        // Bare-domain normalization is this caller's job, not the validator's: a Stammdaten Link
+        // is routinely typed as "example.com". The link's display name is what the error names —
+        // the URL itself is not on screen in the Links list.
         var candidate = link.Url.Contains("://", StringComparison.Ordinal) ? link.Url : $"https://{link.Url}";
-        if (!HttpUrlValidator.TryGetHttpUri(candidate, out var uri))
-        {
-            ErrorMessage = $"„{link.Name}“ hat keine gültige http(s)-Adresse.";
-            return;
-        }
-
-        try
-        {
-            await _dialogs.OpenUrlAsync(uri.AbsoluteUri);
-        }
-        catch (Exception ex)
-        {
-            // No default browser/URL handler registered (a minimal OS install, or no app on
-            // Android able to resolve Intent.ActionView) throws out of the platform launcher.
-            ErrorMessage = $"„{link.Name}“ konnte nicht geöffnet werden: {ex.Message}";
-        }
+        ErrorMessage = await UrlLauncher.TryOpenAsync(_dialogs, candidate, link.Name);
     }
 }

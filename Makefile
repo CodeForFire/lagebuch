@@ -21,6 +21,10 @@ APP_ID       := de.codeforfire.lagebuch
 FILTER       ?=
 PROJECT      ?=
 VERSION      ?= 0.1.0
+# The .deb needs the Debian spelling of a prerelease version: a '-' opens a Debian revision,
+# which sorts ABOVE the plain version, so apt would see the final release as a downgrade. '~'
+# sorts below it. The assembly keeps the semver spelling. Mirrors .github/workflows/release.yml.
+DEB_VERSION  := $(subst -,~,$(VERSION))
 
 ANDROID_HOME ?= $(HOME)/Android/Sdk
 ADB          := $(ANDROID_HOME)/platform-tools/adb
@@ -54,7 +58,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
         android-image android-image-rebuild apk emulator install run-android \
-        logcat uninstall package-linux
+        logcat uninstall package-linux logo-assets samples screenshots demo-gif
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -181,5 +185,22 @@ uninstall: ## Remove the app from the attached device/emulator
 
 package-linux: ## Build a local .deb (VERSION=x.y.z)
 	$(DOTNET) publish $(APP) -r linux-x64 $(PUBLISH_FLAGS) -p:Version=$(VERSION) -o publish
-	packaging/linux/build-deb.sh "$(VERSION)" publish \
-	  src/LageBuch.App.Shared/Assets/icon-1024.png dist
+	packaging/linux/build-deb.sh "$(DEB_VERSION)" publish \
+	  src/LageBuch.App.Shared/Assets/icon-1024.png \
+	  src/LageBuch.App/Assets/icon.svg dist
+
+logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
+	packaging/logo/build-logo-assets.sh
+
+## Docs (README samples, screenshots, demo GIF)
+
+samples: ## Regenerate docs/samples/uebung.fwincident (DemoIncidentTests with SAMPLES_OUT)
+	SAMPLES_OUT=$(CURDIR)/docs/samples $(DOTNET) test tests/LageBuch.Persistence.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoIncidentTests
+
+screenshots: ## Regenerate docs/screenshots/*.png (DemoFlowRenderTests with RENDER_OUT)
+	RENDER_OUT=$(CURDIR)/docs/screenshots $(DOTNET) test tests/LageBuch.Acceptance.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoFlowRenderTests
+
+demo-gif: ## Build docs/demo/einsatz-flow.gif from docs/screenshots (needs ImageMagick + ffmpeg)
+	packaging/demo/build-demo-gif.sh docs/screenshots docs/demo/einsatz-flow.gif

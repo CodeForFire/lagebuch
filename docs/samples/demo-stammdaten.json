@@ -1,0 +1,51 @@
+{
+  "_comment": "Fiktive Demo-Stammdaten für die Probefahrt. Alle Wachen, Fahrzeuge, Namen und Nummern sind erfunden. Importieren über STAMMDATEN → IMPORTIEREN, dann SPEICHERN.",
+  "roles": ["EL", "EAL", "ZF", "GF", "AS-Überwachung", "Presse"],
+  "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz", "Einsatzbereit über Funk", "Abgerückt"],
+  "truppTypes": ["Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "Sicherheitstrupp", "CSA-Trupp", "LPA-Trupp"],
+  "checklistTemplateAufbau": [
+    { "text": "Aufstellort ELW weit genug weg, um nicht zu behindern?", "mandatory": true },
+    { "text": "Rote Kennleuchte ein, Blaulicht aus?", "mandatory": false },
+    { "text": "Funkgeräte auf Einsatzkanal, Lautstärke geprüft?", "mandatory": true },
+    { "text": "PC eingeschaltet, Lagebuch geöffnet?", "mandatory": true },
+    { "text": "Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?", "mandatory": false },
+    { "text": "Rückmeldung an ILS abgesetzt?", "mandatory": true }
+  ],
+  "checklistTemplateAbbau": [
+    { "text": "Alle Trupps abgemeldet, Atemschutzüberwachung beendet?", "mandatory": true },
+    { "text": "Einsatzende an ILS gemeldet?", "mandatory": true },
+    { "text": "PDF-Bericht exportiert?", "mandatory": false },
+    { "text": "Fahrzeug abgerüstet und einsatzbereit?", "mandatory": true }
+  ],
+  "links": [
+    { "name": "Wetterdienst (DWD)", "url": "https://www.dwd.de" },
+    { "name": "BayernAtlas", "url": "https://geoportal.bayern.de/bayernatlas/" },
+    { "name": "Hydrantenplan", "url": "https://example.org/hydranten" },
+    { "name": "ILS Musterstadt", "url": "https://example.org/ils" }
+  ],
+  "vehicles": [
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 3, "hasZugfuehrer": true },
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 40/1", "seats": 9, "hasZugfuehrer": false },
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 41/1", "seats": 9, "hasZugfuehrer": false },
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 30/1", "seats": 3, "hasZugfuehrer": false },
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 14/1", "seats": 9, "hasZugfuehrer": false },
+    { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 42/1", "seats": 9, "hasZugfuehrer": false },
+    { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 47/1", "seats": 6, "hasZugfuehrer": false }
+  ],
+  "personnel": [
+    { "lastName": "Mustermann", "firstName": "Max", "role": "EL", "callSign": "Florian Musterstadt 11/1", "phone": "01 71 / 1 23 45 67" },
+    { "lastName": "Musterfrau", "firstName": "Erika", "role": "ZF", "callSign": null, "phone": "01 71 / 7 65 43 21" },
+    { "lastName": "Müller", "firstName": "Jens", "role": "GF", "callSign": "Florian Musterstadt 40/1", "phone": null },
+    { "lastName": "Schmidt", "firstName": "Lena", "role": "GF", "callSign": "Florian Musterstadt 41/1", "phone": null },
+    { "lastName": "Wagner", "firstName": "Tobias", "role": "AS-Überwachung", "callSign": null, "phone": null },
+    { "lastName": "Mustermann", "firstName": "Anna", "role": "GF", "callSign": "Florian Musterdorf 42/1", "phone": null }
+  ],
+  "settings": {
+    "ilsReminderIntervalMinutes": 15,
+    "ilsReminderFollowUpIntervalMinutes": 30,
+    "agtMaxDurationMinutes": 30,
+    "csaMaxDurationMinutes": 20,
+    "lpaMaxDurationMinutes": 60,
+    "returnPressureBar": 50
+  }
+}

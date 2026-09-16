@@ -129,6 +129,230 @@ public class FilesViewModelTests
         }
     }
 
+    // --- AddFilesAsync is the batch-capable core AddFileCommand now delegates into; drag-and-drop
+    // (#262 UX follow-up) calls it directly from code-behind with however many files were dropped ---
+    [Fact]
+    public async Task AddFiles_uploads_multiple_valid_files_in_one_batch()
+    {
+        var changes = 0;
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path1 = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var path2 = Path.Combine(Path.GetTempPath(), $"lage-{Guid.NewGuid():N}.pdf");
+        await File.WriteAllBytesAsync(path1, new byte[] { 1, 2, 3 });
+        await File.WriteAllBytesAsync(path2, new byte[] { 4, 5, 6 });
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => changes++);
+
+            await vm.AddFilesAsync(new[] { path1, path2 });
+
+            Assert.Equal(2, session.Incident.Files.Count);
+            Assert.Equal(2, vm.Files.Count);
+            Assert.Equal(1, changes); // one Changed notification for the whole batch, not per file
+            Assert.Null(vm.ErrorMessage);
+            Assert.False(vm.IsUploading);
+        }
+        finally
+        {
+            File.Delete(path1);
+            File.Delete(path2);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_reports_every_failure_when_all_dropped_files_are_rejected()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path1 = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
+        var path2 = Path.Combine(Path.GetTempPath(), $"mehr-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(path1, "hello");
+        await File.WriteAllTextAsync(path2, "world");
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            await vm.AddFilesAsync(new[] { path1, path2 });
+
+            Assert.Empty(session.Incident.Files);
+            Assert.Empty(vm.Files);
+            Assert.NotNull(vm.ErrorMessage);
+            Assert.Contains(Path.GetFileName(path1), vm.ErrorMessage, StringComparison.Ordinal);
+            Assert.Contains(Path.GetFileName(path2), vm.ErrorMessage, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path1);
+            File.Delete(path2);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_partial_failure_uploads_the_valid_file_and_reports_the_rejected_one()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var goodPath = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var badPath = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
+        await File.WriteAllBytesAsync(goodPath, new byte[] { 1, 2, 3 });
+        await File.WriteAllTextAsync(badPath, "hello");
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            await vm.AddFilesAsync(new[] { goodPath, badPath });
+
+            var file = Assert.Single(session.Incident.Files);
+            Assert.Equal(Path.GetFileName(goodPath), file.FileName);
+            Assert.NotNull(vm.ErrorMessage);
+            Assert.Contains(Path.GetFileName(badPath), vm.ErrorMessage, StringComparison.Ordinal);
+            Assert.DoesNotContain(Path.GetFileName(goodPath), vm.ErrorMessage, StringComparison.Ordinal);
+            Assert.False(vm.IsUploading);
+        }
+        finally
+        {
+            File.Delete(goodPath);
+            File.Delete(badPath);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_rejects_oversized_files_in_a_batch_without_reading_them_into_memory()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path1 = Path.Combine(Path.GetTempPath(), $"riesig1-{Guid.NewGuid():N}.jpg");
+        var path2 = Path.Combine(Path.GetTempPath(), $"riesig2-{Guid.NewGuid():N}.jpg");
+        foreach (var p in new[] { path1, path2 })
+        {
+            using var fs = new FileStream(p, FileMode.CreateNew);
+            fs.SetLength(IncidentFile.MaxSizeBytes + 1); // sparse — no real disk write, so the test stays fast
+        }
+
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+            await vm.AddFilesAsync(new[] { path1, path2 });
+            var allocatedDuring = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+
+            Assert.Empty(session.Incident.Files);
+            Assert.NotNull(vm.ErrorMessage);
+            Assert.True(
+                allocatedDuring < 10 * 1024 * 1024,
+                $"expected both oversized files to be rejected without reading them into memory, but the call allocated {allocatedDuring} bytes");
+        }
+        finally
+        {
+            File.Delete(path1);
+            File.Delete(path2);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_is_a_noop_with_an_empty_list()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+        await vm.AddFilesAsync(Array.Empty<string>());
+
+        Assert.Empty(session.Incident.Files);
+        Assert.Empty(vm.Files);
+    }
+
+    [Fact]
+    public async Task AddFiles_is_a_noop_on_a_readonly_session()
+    {
+        // Guards a programmatic call that bypasses AddFileCommand's CanExecute — the drag-and-drop
+        // handler in code-behind calls AddFilesAsync directly, with no command to gate it
+        // (#262 UX follow-up).
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Close();
+        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+
+            await vm.AddFilesAsync(new[] { path });
+
+            Assert.Empty(vm.Files);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task AddFiles_is_a_noop_while_already_uploading()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
+        try
+        {
+            var vm = new FilesViewModel(session, new FakeDialogs(), () => { }) { IsUploading = true };
+
+            await vm.AddFilesAsync(new[] { path });
+
+            Assert.Empty(session.Incident.Files);
+            Assert.Empty(vm.Files);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void MaxFileSizeHint_reflects_the_domain_cap()
     {
@@ -178,10 +402,197 @@ public class FilesViewModelTests
         }
         finally
         {
-            if (dialogs.LastOpenedPath is not null)
-            {
-                File.Delete(dialogs.LastOpenedPath);
-            }
+            DeleteOpenDirectory(dialogs.LastOpenedPath);
+        }
+    }
+
+    // The copy must land in a private per-open directory under the app's own temp root: the file
+    // name comes from a peer's AddFileCommand, and the shared temp directory was both writable
+    // from that name and overwritten across incidents.
+    [Fact]
+    public async Task OpenFile_copies_into_a_private_per_open_directory_under_the_lagebuch_temp_root()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
+        var dialogs = new FakeDialogs();
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row);
+        var first = dialogs.LastOpenedPath;
+        await vm.OpenFileCommand.ExecuteAsync(row);
+        var second = dialogs.LastOpenedPath;
+        try
+        {
+            Assert.NotNull(first);
+            Assert.NotNull(second);
+            var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+            Assert.StartsWith(root + Path.DirectorySeparatorChar, first, StringComparison.Ordinal);
+            Assert.Equal("brand.jpg", Path.GetFileName(first));
+            Assert.Equal(root, Path.GetDirectoryName(Path.GetDirectoryName(first))); // one level down
+            Assert.NotEqual(first, second); // a fresh directory per open, never a shared temp name
+        }
+        finally
+        {
+            DeleteOpenDirectory(first);
+            DeleteOpenDirectory(second);
+        }
+    }
+
+    // The domain already stripped the path segments off the peer-supplied name; this pins that the
+    // view model hands the dialog service that sanitised name and nothing else.
+    [Fact]
+    public async Task OpenFile_uses_the_sanitised_file_name_of_a_hostile_attachment()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("../../evil.png", "image/png", new byte[] { 9, 9, 9 });
+        var dialogs = new FakeDialogs();
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row);
+        try
+        {
+            Assert.NotNull(dialogs.LastOpenedPath);
+            Assert.Equal("evil.png", Path.GetFileName(dialogs.LastOpenedPath));
+            Assert.StartsWith(
+                Path.Combine(Path.GetTempPath(), "lagebuch") + Path.DirectorySeparatorChar,
+                dialogs.LastOpenedPath,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteOpenDirectory(dialogs.LastOpenedPath);
+        }
+    }
+
+    // A row that predates the extension/content-type rule (or arrived from a patched peer) still
+    // loads — Rehydrate deliberately never throws — but must not be opened. The desktop launcher
+    // refuses it, so without this guard ÖFFNEN would look like a dead button and still leave a temp
+    // copy of the bytes behind.
+    [Fact]
+    public async Task OpenFile_refuses_a_rehydrated_row_whose_extension_is_not_an_attachment_type()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        store.Save("/x.fwincident", IncidentWithFile(IncidentFile.Rehydrate(
+            Guid.NewGuid(), "Einsatzplan.hta", "Einsatzplan", "image/png", 3, T0, "Müller")));
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var dialogs = new FakeDialogs();
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row);
+
+        Assert.Equal("„Einsatzplan“ kann nicht geöffnet werden.", vm.ErrorMessage);
+        Assert.Null(dialogs.LastOpenedPath); // never handed to the launcher
+        Assert.Empty(TempCopiesNamed("Einsatzplan.hta")); // and no temp copy written
+    }
+
+    private static Incident IncidentWithFile(IncidentFile file) => Incident.Rehydrate(
+        Guid.NewGuid(),
+        T0,
+        IncidentState.Open,
+        null,
+        "Brand",
+        null,
+        null,
+        null,
+        null,
+        null,
+        Array.Empty<ChecklistItem>(),
+        Array.Empty<ChecklistItem>(),
+        Array.Empty<Domain.Etb.EtbEntry>(),
+        Array.Empty<RoleAssignment>(),
+        Array.Empty<ForceUnit>(),
+        Array.Empty<Domain.Atemschutz.AtemschutzTrupp>(),
+        Array.Empty<AuditEvent>(),
+        Array.Empty<Domain.Time.IncidentTimerState>(),
+        new[] { file },
+        Array.Empty<Domain.Tasks.IncidentTask>(),
+        Array.Empty<Domain.CoMeasurement.Building>(),
+        Array.Empty<Domain.CoMeasurement.Dwelling>());
+
+    // Any per-open copy of this name anywhere under the temp root. Tolerates another test's
+    // directory disappearing mid-scan — the suite runs classes in parallel.
+    private static string[] TempCopiesNamed(string fileName)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+        try
+        {
+            return Directory.Exists(root)
+                ? Directory.GetFiles(
+                    root,
+                    fileName,
+                    new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+                : Array.Empty<string>();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    // Copying to disk or launching the viewer can fail (full disk, no registered handler); like
+    // AddFileAsync and RemoveFileAsync, that belongs in ErrorMessage rather than escaping an async
+    // command as an unobserved exception.
+    [Fact]
+    public async Task OpenFile_surfaces_a_failure_as_an_error_message()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await session.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 9, 9, 9 });
+        var dialogs = new FakeDialogs { OpenFileFailure = new InvalidOperationException("kein Programm registriert") };
+        var vm = new FilesViewModel(session, dialogs, () => { });
+        var row = Assert.Single(vm.Files);
+
+        await vm.OpenFileCommand.ExecuteAsync(row); // must not throw
+
+        try
+        {
+            Assert.Equal("kein Programm registriert", vm.ErrorMessage);
+        }
+        finally
+        {
+            DeleteOpenDirectory(dialogs.LastOpenedPath);
+        }
+    }
+
+    // Removes the per-open directory the view model created — guarded so a regression that writes
+    // straight into the system temp directory fails an assertion instead of deleting /tmp.
+    private static void DeleteOpenDirectory(string? openedPath)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+        if (openedPath is not null
+            && Path.GetDirectoryName(openedPath) is { } dir
+            && dir.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            && Directory.Exists(dir))
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+        else if (openedPath is not null && File.Exists(openedPath))
+        {
+            File.Delete(openedPath);
         }
     }
 
@@ -265,5 +676,155 @@ public class FilesViewModelTests
 
         var row = Assert.Single(vm.Files);
         Assert.Equal("vorab.pdf", row.FileName);
+    }
+
+    // --- Removing an attachment is destructive, so it goes through the same confirm gate as
+    // ForcesViewModel's unit removal (#262 UX follow-up) ---
+    [Fact]
+    public async Task Removing_a_row_asks_for_confirmation_before_touching_the_session()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        string? confirmMessage = null;
+        Action? confirmAction = null;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (message, onConfirmed) =>
+        {
+            confirmMessage = message;
+            confirmAction = onConfirmed;
+        });
+        var row = Assert.Single(vm.Files);
+
+        row.RemoveCommand.Execute(null);
+
+        // Nothing happened yet — the host only recorded the request.
+        Assert.Single(vm.Files);
+        Assert.Single(session.Incident.Files);
+        Assert.Contains("brand.jpg", confirmMessage, StringComparison.Ordinal);
+
+        confirmAction!();
+        await WaitUntilAsync(() => vm.Files.Count == 0);
+
+        Assert.Empty(vm.Files);
+        Assert.Empty(session.Incident.Files);
+        Assert.Contains("Datei entfernt: brand.jpg", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Removing_a_renamed_row_uses_the_renamed_name_in_the_confirm_message()
+    {
+        // Regression: the confirm-closure used to capture the IncidentFile record from ToRow's
+        // construction time, so a rename (which replaces that record in the domain but — by design
+        // — never rebuilds the untouched row) left the confirm text showing the pre-rename name.
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        string? confirmMessage = null;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (message, _) => confirmMessage = message);
+        var row = Assert.Single(vm.Files);
+
+        row.DisplayName = "Küchenbrand";
+        row.RemoveCommand.Execute(null);
+
+        Assert.Contains("Küchenbrand", confirmMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("brand.jpg", confirmMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Removing_a_row_without_an_injected_confirm_runs_immediately()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }); // no requestConfirm supplied
+        var row = Assert.Single(vm.Files);
+
+        row.RemoveCommand.Execute(null);
+        await WaitUntilAsync(() => vm.Files.Count == 0);
+
+        Assert.Empty(vm.Files);
+        Assert.Empty(session.Incident.Files);
+    }
+
+    [Fact]
+    public void Rows_of_a_readonly_incident_cannot_remove_themselves()
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var seed = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        seed.Incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 10);
+        seed.Close();
+
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var vm = new FilesViewModel(ro, new FakeDialogs(), () => { });
+
+        var row = Assert.Single(vm.Files);
+        Assert.False(row.RemoveCommand.CanExecute(null));
+        row.RemoveCommand.Execute(null); // inert, not throwing
+        Assert.Single(ro.Incident.Files);
+    }
+
+    // Regression test for the append-only-to-reconciliation change: a file removed by another
+    // client (simulated by mutating the domain directly, the same way a host broadcast lands)
+    // must disappear from this ViewModel's rows once Sync() runs, not just newly-added ones show up.
+    [Fact]
+    public void Sync_drops_a_row_removed_by_another_client()
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var kept = session.Incident.AddFile(clock, op, "vorab.pdf", "application/pdf", 10);
+        var removedElsewhere = session.Incident.AddFile(clock, op, "brand.jpg", "image/jpeg", 10);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { });
+        Assert.Equal(2, vm.Files.Count);
+
+        // Another client's RemoveFileCommand landed and the host broadcast a new snapshot — here
+        // stood in for by mutating the domain directly and raising Changed, same shape as
+        // RemoteIncidentSession.OnSnapshot.
+        session.Incident.RemoveFile(clock, op, removedElsewhere.Id);
+        vm.Sync();
+
+        var row = Assert.Single(vm.Files);
+        Assert.Equal(kept.Id, row.Id);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(5);
+        }
     }
 }

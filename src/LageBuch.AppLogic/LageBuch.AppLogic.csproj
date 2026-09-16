@@ -4,7 +4,6 @@
     <ProjectReference Include="..\LageBuch.Domain\LageBuch.Domain.csproj" />
     <ProjectReference Include="..\LageBuch.Sync\LageBuch.Sync.csproj" />
     <ProjectReference Include="..\LageBuch.Persistence\LageBuch.Persistence.csproj" />
-    <ProjectReference Include="..\LageBuch.Documents\LageBuch.Documents.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,7 +17,6 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
   </PropertyGroup>
 
 </Project>

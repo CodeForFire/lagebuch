@@ -97,4 +97,114 @@ public class LinksViewModelTests
         await vm.OpenCommand.ExecuteAsync(vm.Links[1]);
         Assert.Null(vm.ErrorMessage);
     }
+
+    // Issue #262 (UX review, "Links" section): the tab was a flat list with no way to narrow it,
+    // which stops scaling as soon as a Wehr keeps more than a handful of Stammdaten-Links.
+    private static LinksViewModel WithThreeLinks() => new(
+        new[]
+        {
+            new Link("Wetterdienst", "https://dwd.de"),
+            new Link("Kartendienst", "https://example.org/karte"),
+            new Link("Gefahrgut", "https://example.org/hazmat"),
+        },
+        new FakeDialogs());
+
+    [Fact]
+    public void Every_link_is_visible_before_anything_is_typed()
+    {
+        var vm = WithThreeLinks();
+
+        Assert.Equal(3, vm.VisibleLinks.Count);
+        Assert.False(vm.IsFiltered);
+    }
+
+    [Fact]
+    public void Filtering_by_name_ignores_case()
+    {
+        var vm = WithThreeLinks();
+
+        vm.FilterText = "wetter";
+
+        Assert.Equal("Wetterdienst", Assert.Single(vm.VisibleLinks).Name);
+    }
+
+    [Fact]
+    public void Filtering_matches_the_url_as_well_as_the_name()
+    {
+        var vm = WithThreeLinks();
+
+        vm.FilterText = "hazmat";
+
+        Assert.Equal("Gefahrgut", Assert.Single(vm.VisibleLinks).Name);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_filter_shows_every_link(string filter)
+    {
+        var vm = WithThreeLinks();
+        vm.FilterText = "wetter";
+
+        vm.FilterText = filter;
+
+        Assert.Equal(3, vm.VisibleLinks.Count);
+    }
+
+    /// <summary>
+    /// The two empty states must stay distinguishable: "no Links configured at all" (Stammdaten
+    /// are empty) reads differently to the operator than "nothing matched what you typed", so
+    /// filtering must never touch <see cref="LinksViewModel.Links"/> itself.
+    /// </summary>
+    [Fact]
+    public void A_filter_that_matches_nothing_empties_the_visible_list_but_not_the_full_one()
+    {
+        var vm = WithThreeLinks();
+
+        vm.FilterText = "Drehleiter";
+
+        Assert.Empty(vm.VisibleLinks);
+        Assert.Equal(3, vm.Links.Count);
+    }
+
+    [Fact]
+    public void Clearing_the_filter_restores_every_link()
+    {
+        var vm = WithThreeLinks();
+        vm.FilterText = "wetter";
+
+        vm.ClearFilterCommand.Execute(null);
+
+        Assert.Equal(3, vm.VisibleLinks.Count);
+        Assert.Equal(string.Empty, vm.FilterText);
+    }
+
+    // Drives the clear button's visibility, so it has to follow FilterText rather than be set by
+    // ApplyFilter -- a filter that matches everything is still an active filter.
+    [Fact]
+    public void IsFiltered_tracks_whether_a_search_term_is_present()
+    {
+        var vm = WithThreeLinks();
+
+        vm.FilterText = "e";
+        Assert.True(vm.IsFiltered);
+        Assert.Equal(3, vm.VisibleLinks.Count);
+
+        vm.FilterText = "  ";
+        Assert.False(vm.IsFiltered);
+    }
+
+    [Fact]
+    public async Task Opening_a_link_still_works_while_a_filter_is_active()
+    {
+        var dialogs = new FakeDialogs();
+        var vm = new LinksViewModel(
+            new[] { new Link("Wetterdienst", "https://dwd.de"), new Link("Kartendienst", "https://example.org/karte") },
+            dialogs);
+
+        vm.FilterText = "karten";
+        await vm.OpenCommand.ExecuteAsync(vm.VisibleLinks[0]);
+
+        Assert.Equal("https://example.org/karte", dialogs.LastOpenedUrl);
+    }
 }

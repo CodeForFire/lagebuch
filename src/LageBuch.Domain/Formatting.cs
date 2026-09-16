@@ -1,9 +1,8 @@
 using System.Globalization;
-using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
-namespace LageBuch.Documents;
+namespace LageBuch.Domain;
 
 public static class Formatting
 {
@@ -29,6 +28,14 @@ public static class Formatting
 
     public static string OrDash(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    // "Straße, Ortsteil" with blank parts dropped; null when neither is set. Shared by the
+    // workspace header and the PDF header so the two never render the address differently.
+    public static string? Address(string? street, string? district)
+    {
+        var joined = string.Join(", ", new[] { street, district }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        return joined.Length == 0 ? null : joined;
+    }
 
     public static string Level(TaskImportance importance) => importance switch
     {

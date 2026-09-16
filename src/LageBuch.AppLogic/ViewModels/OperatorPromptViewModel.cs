@@ -7,17 +7,12 @@ namespace LageBuch.AppLogic.ViewModels;
 public sealed partial class OperatorPromptViewModel : ObservableObject
 {
     public OperatorPromptViewModel(
-        bool collectKeyword = false,
         IReadOnlyList<string>? callSignOptions = null,
         bool collectHost = false)
     {
-        CollectsKeyword = collectKeyword;
         CollectsHost = collectHost;
         CallSignOptions = callSignOptions ?? Array.Empty<string>();
     }
-
-    // True only for the new-incident flow; the continue-editing flow leaves it false.
-    public bool CollectsKeyword { get; }
 
     // True only for the join flow (§6): show the host address field on top of the operator prompt,
     // so the joining device says who documents here and which host to reach in one step.
@@ -45,12 +40,6 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _operatorCallSign;
-
-    // The Stichwort (e.g. "B3P") — collected instead of the Einsatznummer, which is unknown at the
-    // start of most incidents and not worth blocking on (#69). Free text, optional: an incident may
-    // never get one. The Einsatznummer itself can be added later, from the workspace header.
-    [ObservableProperty]
-    private string? _keyword;
 
     // Set while a join attempt is in flight (#182), so Confirm can't be double-clicked mid-request.
     [ObservableProperty]

@@ -24,7 +24,7 @@ public class TaskDialogRenderTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var masterData = MasterDataSet.Empty with { RadioCallSigns = AnonymizedExampleData.RadioCallSigns };
+        var masterData = MasterDataSet.Empty with { Vehicles = AnonymizedExampleData.Vehicles };
         var dialogVm = new TaskDialogViewModel(session, masterData, "Lagemeldung übermittelt", () => { });
 
         var view = new TaskDialogView { DataContext = dialogVm };

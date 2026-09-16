@@ -27,9 +27,12 @@ public static class CompositionRoot
         string appVersion,
         ILastSaveFolderStore? lastSaveFolder = null,
         string? attachmentCacheRoot = null,
-        ITrustStore? trustStore = null)
+        ITrustStore? trustStore = null,
+        IIncidentPdfExporter? pdfExporter = null,
+        ILastPdfExportStore? lastPdfExport = null,
+        ILastJoinHostStore? lastJoinHost = null)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastJoinHost: lastJoinHost);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
         return new MainWindowViewModel(home, editor, dialogs, appVersion);
     }

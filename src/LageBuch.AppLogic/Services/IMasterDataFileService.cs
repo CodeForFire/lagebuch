@@ -9,7 +9,11 @@ namespace LageBuch.AppLogic.Services;
 /// </summary>
 public interface IMasterDataFileService
 {
-    MasterDataSet Read(string path);
+    /// <summary>
+    /// Reads a file for the editor's Import: the set plus any legacy Wachen / Funkrufnamen entries
+    /// the file carried that nothing in it derives from (see <see cref="MasterDataImportResult"/>).
+    /// </summary>
+    MasterDataImportResult Read(string path);
 
     void Write(string path, MasterDataSet set);
 }

@@ -35,6 +35,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(CloseIncidentCommand), "close")]
 [JsonDerivedType(typeof(AddFileCommand), "addFile")]
 [JsonDerivedType(typeof(RenameFileCommand), "renameFile")]
+[JsonDerivedType(typeof(RemoveFileCommand), "removeFile")]
 [JsonDerivedType(typeof(AddTaskCommand), "addTask")]
 [JsonDerivedType(typeof(SetTaskCompletedCommand), "setTaskCompleted")]
 [JsonDerivedType(typeof(AddCoBuildingCommand), "addCoBuilding")]
@@ -45,6 +46,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(UpdateDwellingDetailsCommand), "updateDwellingDetails")]
 [JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
 [JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
+[JsonDerivedType(typeof(SetApartmentCountCommand), "setApartmentCount")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -123,6 +125,9 @@ public sealed record AddFileCommand(OperatorDto Operator, Guid FileId, string Fi
 // attributed command above.
 public sealed record RenameFileCommand(Guid FileId, string? DisplayName) : SyncCommand;
 
+// Attributed (unlike RenameFileCommand): removal logs an ETB entry, so the operator travels with it.
+public sealed record RemoveFileCommand(OperatorDto Operator, Guid FileId) : SyncCommand;
+
 // TimerMinutes travels instead of an absolute DueAt: the host stamps the anchor with its own
 // authoritative clock on apply, like every timestamped command.
 public sealed record AddTaskCommand(
@@ -158,4 +163,9 @@ public sealed record SetFloorDescriptionCommand(
 
 // No operator (silent)
 public sealed record SetApartmentLabelCommand(
-    Guid BuildingId, int ApartmentNumber, string? Label) : SyncCommand;
+    Guid BuildingId, int FloorOrdinal, int ApartmentNumber, string? Label) : SyncCommand;
+
+// #265: a floor's Wohnungen count, independent of the building's default -- attributed/logged
+// like UpdateCoBuildingStructure, since it changes structure rather than just a label.
+public sealed record SetApartmentCountCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int Count) : SyncCommand;

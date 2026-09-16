@@ -816,6 +816,33 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Takes an attachment back completely (#262 UX follow-up): row goes, and the ETB records the
+    /// removal like any other reportable event -- mirrors <see cref="RemoveForceUnit"/>, but
+    /// returns the removed record rather than void, because the caller (<c>LocalIncidentSession</c>,
+    /// <c>IncidentHost</c>) still needs its <see cref="IncidentFile.FileName"/> afterwards to delete
+    /// the attachment's bytes, which never pass through the domain. Logs the immutable
+    /// <see cref="IncidentFile.FileName"/>, not the editable <see cref="IncidentFile.DisplayName"/>,
+    /// so the add/remove pair stays greppable regardless of renames in between.
+    /// </summary>
+    public IncidentFile RemoveFile(IClock clock, SessionOperator op, Guid fileId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _files.FindIndex(f => f.Id == fileId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Datei {fileId} nicht gefunden.");
+        }
+
+        var file = _files[index];
+        _files.RemoveAt(index);
+        AppendSystemEntry(clock, op, $"Datei entfernt: {file.FileName}");
+        return file;
+    }
+
+    /// <summary>
     /// Records a task (#88). Deliberately silent — unlike <see cref="AddForceUnit"/>, no ETB
     /// system line: tasks are work management, not the operational log, and a task spawned from
     /// an ETB entry would just duplicate that entry. The PDF export reports tasks instead.
@@ -1028,12 +1055,58 @@ public sealed class Incident
         _buildings[index] = updated;
     }
 
-    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label)
+    public void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label)
     {
         EnsureOpen();
         var building = FindBuilding(buildingId);
-        var updated = building.WithApartmentLabel(apartmentNumber, label);
+        var updated = building.WithApartmentLabel(floorOrdinal, apartmentNumber, label);
         var index = _buildings.IndexOf(building);
         _buildings[index] = updated;
+    }
+
+    /// <summary>Changes a single floor's Wohnungen count independently of the building's default
+    /// (#265: real floors, especially Untergeschosse, rarely share one column count), growing or
+    /// trimming that floor's Dwellings to match.</summary>
+    public void SetApartmentCount(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int count)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var building = FindBuilding(buildingId);
+        if (floorOrdinal > building.FloorCount || floorOrdinal < -building.UndergroundFloorCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(floorOrdinal), "Das Geschoss existiert nicht.");
+        }
+
+        var updated = building.WithApartmentCount(floorOrdinal, count);
+        var index = _buildings.IndexOf(building);
+        _buildings[index] = updated;
+
+        var removed = _dwellings.RemoveAll(d =>
+            d.BuildingId == buildingId && d.FloorOrdinal == floorOrdinal && d.ApartmentNumber > count);
+
+        var added = 0;
+        for (var apt = 1; apt <= count; apt++)
+        {
+            if (!_dwellings.Any(d => d.BuildingId == buildingId && d.FloorOrdinal == floorOrdinal && d.ApartmentNumber == apt))
+            {
+                _dwellings.Add(Dwelling.Create(buildingId, floorOrdinal, apt));
+                added++;
+            }
+        }
+
+        var text = $"CO-Struktur geändert: {building.Name}, {CoMeasurementLabels.FloorLabel(floorOrdinal)} jetzt {count} Wohnungen";
+        if (removed > 0)
+        {
+            text += $", {removed} Wohnungen entfernt";
+        }
+
+        if (added > 0)
+        {
+            text += $", {added} Wohnungen hinzugefügt";
+        }
+
+        AppendSystemEntry(clock, op, text);
     }
 }

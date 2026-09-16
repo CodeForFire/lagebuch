@@ -38,6 +38,50 @@ public class WorkspaceCollaborationTests
             new NoAlarm(),
             new NoopIncidentHostController());
 
+    // Completes once the client's cached incident satisfies <paramref name="condition"/>, re-checked
+    // on every host broadcast (times out so a broken push fails fast).
+    //
+    // Use this rather than counting NextChange calls whenever one user action fans out into more than
+    // one command: RemoteIncidentSession.Send is fire-and-forget, so the commands travel as separate,
+    // concurrent POSTs that race each other to the host, and the host broadcasts a fresh snapshot per
+    // command it applies. Neither the order the host applies them in nor the number of broadcasts the
+    // client ends up seeing is fixed, so only the converged state is a sound thing to wait for (#326).
+    //
+    // Waiting on the client also settles the host: IncidentHost broadcasts from inside the session's
+    // Changed raise, which the host's own workspace (subscribed first, at construction) has already
+    // handled -- so anything the client can see, the host has applied and projected into its header.
+    private static async Task WaitForClient(
+        RemoteIncidentSession session,
+        Func<bool> condition,
+        string description,
+        TimeSpan? timeout = null)
+    {
+        var tcs = new TaskCompletionSource();
+        void Handler()
+        {
+            if (condition())
+            {
+                tcs.TrySetResult();
+            }
+        }
+
+        // Subscribe before the first evaluation, so a broadcast can't slip through the gap between them.
+        session.Changed += Handler;
+        try
+        {
+            Handler();
+            await tcs.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(5));
+        }
+        catch (TimeoutException ex)
+        {
+            throw new TimeoutException($"Timed out waiting for {description}.", ex);
+        }
+        finally
+        {
+            session.Changed -= Handler;
+        }
+    }
+
     // Completes when the client next applies a host broadcast (times out so a broken push fails fast).
     private static Task NextChange(RemoteIncidentSession session, TimeSpan? timeout = null)
     {
@@ -63,7 +107,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         var change = NextChange(client);
@@ -83,7 +127,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
         var change = NextChange(client);
         client.AddJournalEntry(EtbDirection.Outgoing, "Rückmeldung an ILS", "ELW", "Leitstelle");
@@ -111,7 +155,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
         Assert.Contains(clientWs.Etb.Entries, e => e.Text == "Lage erkundet");
 
@@ -132,7 +176,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
         Assert.False(clientWs.IsReadOnly);
 
@@ -141,6 +185,65 @@ public class WorkspaceCollaborationTests
         await change;
 
         Assert.True(clientWs.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task Client_header_reflects_einsatzdaten_edited_on_the_host()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+        Assert.Equal("Unbenannter Einsatz", clientWs.HeroText);
+
+        var change = NextChange(client);
+        hostSession.SetKeyword("B3P");
+        await change;
+        change = NextChange(client);
+        hostSession.SetAddress("Hauptstr. 12", "FFB");
+        await change;
+
+        // The header is a projection refreshed on every host broadcast, not only for the number.
+        Assert.Equal("B3P", clientWs.HeroText);
+        Assert.Equal("Hauptstr. 12, FFB", clientWs.AddressDisplay);
+    }
+
+    [Fact]
+    public async Task Host_header_reflects_einsatzdaten_saved_in_a_clients_dialog()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var hostWs = Workspace(hostSession, clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        clientWs.EditIncidentDataCommand.Execute(null);
+        var dialog = clientWs.PendingIncidentDataDialog!;
+        dialog.IncidentNumber = "B 1.2 260715 123";
+        dialog.Street = "Hauptstr. 12";
+
+        // Save sends two commands (number, address) that race each other to the host and broadcast
+        // back one at a time, so wait for both to have landed rather than for a fixed number of
+        // broadcasts -- the client may well see the address arrive first and the number only later.
+        dialog.SaveCommand.Execute(null);
+        await WaitForClient(
+            client,
+            () => client.Incident.IncidentNumber is not null && client.Incident.Street is not null,
+            "the Einsatznummer and the Adresse to round-trip back to the client");
+
+        Assert.Equal("B 1.2 260715 123", hostSession.Incident.IncidentNumber!.Value);
+        Assert.Equal("Hauptstr. 12", hostSession.Incident.Street);
+        Assert.Equal("B 1.2 260715 123", hostWs.HeroText);
+        Assert.Equal("Hauptstr. 12", hostWs.AddressDisplay);
+        Assert.Equal("B 1.2 260715 123", clientWs.HeroText);
     }
 
     [Fact]
@@ -156,6 +259,7 @@ public class WorkspaceCollaborationTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
             TestHost.DefaultPin,
             port);
 
@@ -188,7 +292,7 @@ public class WorkspaceCollaborationTests
         // Reconnect once quickly then give up, so "host gone" resolves in the test rather than after
         // the production two-minute window — while still exercising the transient-drop banner first.
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
         var clientWs = Workspace(client, clock);
 
         var disconnected = new TaskCompletionSource();
@@ -205,6 +309,38 @@ public class WorkspaceCollaborationTests
         await wentHome.Task.WaitAsync(TimeSpan.FromSeconds(10)); // reconnect gave up → back to Home
     }
 
+    // #279 P1 finding: IncidentWorkspaceViewModel subscribed all four RemoteIncidentSession lifecycle
+    // events (Changed, Disconnected, Reconnected, Ended) in its constructor with no matching -=, so a
+    // joined client's workspace kept reacting (and its children kept re-rendering off Changed) even
+    // after the shell navigated away from it.
+    [Fact]
+    public async Task Disposing_the_workspace_unsubscribes_from_every_remote_session_event()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        clientWs.Dispose();
+
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Changed))); // workspace + every child
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Disconnected)));
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Reconnected)));
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Ended)));
+    }
+
+    private static int RemoteEventSubscriberCount(RemoteIncidentSession session, string eventName)
+    {
+        var field = typeof(RemoteIncidentSession).GetField(
+            eventName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var handler = (Delegate?)field!.GetValue(session);
+        return handler?.GetInvocationList().Length ?? 0;
+    }
+
     // A joined client's view only updates if the host broadcast is marshalled onto the UI thread:
     // EtbViewModel mutates an Avalonia-bound ObservableCollection, which Avalonia rejects off-thread.
     // The other tests here pass because a headless xUnit run has no UI thread to reject the mutation;
@@ -219,7 +355,7 @@ public class WorkspaceCollaborationTests
 
         using var ui = new SingleThreadUiDispatcher();
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", ui, TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", ui, new InMemoryTrustStore(), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         int? mutatedOnThread = null;
@@ -247,7 +383,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
         int? mutatedOnThread = null;
         hostWs.Etb.Entries.CollectionChanged += (_, _) => mutatedOnThread = Environment.CurrentManagedThreadId;

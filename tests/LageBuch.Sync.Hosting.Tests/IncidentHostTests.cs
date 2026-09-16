@@ -57,6 +57,32 @@ public class IncidentHostTests
     }
 
     [Fact]
+    public async Task Host_bound_to_IPv6Any_still_accepts_IPv4_connections()
+    {
+        // Proves the dual-stack path (StartAsync -> ListenAnyIP for a wildcard address): a socket
+        // bound only to IPv6Any accepts an IPv4 connection solely because DualMode is on. Asserting
+        // via 127.0.0.1 rather than ::1 keeps this test independent of whether the CI/sandbox
+        // network namespace has IPv6 loopback configured at all -- IPv4 loopback always is.
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.IPv6Any, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var version = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute)));
+        Assert.Equal("1.2.3", version.Version);
+    }
+
+    [Fact]
     public async Task Host_applies_an_edit_journal_entry_command_and_broadcasts_it()
     {
         var clock = new FixedClock();
@@ -245,6 +271,53 @@ public class IncidentHostTests
         getResponse.EnsureSuccessStatusCode();
         Assert.Equal("image/jpeg", getResponse.Content.Headers.ContentType?.MediaType);
         Assert.Equal(bytes, await getResponse.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task Removing_a_file_deletes_its_bytes_so_a_later_get_404s()
+    {
+        // issue #262 UX follow-up: full round trip mirroring the register-then-upload-then-pull
+        // test above, but ending with a RemoveFileCommand — proves the metadata AND the bytes are
+        // both gone, not just the incident_files row.
+        var clock = new FixedClock();
+        var session = LocalIncidentSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        var bytes = new byte[] { 1, 2, 3, 4, 5 };
+        var fileId = Guid.NewGuid();
+        var addCommand = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", bytes.LongLength);
+        var addContent = new StringContent(SyncJson.Serialize<SyncCommand>(addCommand), Encoding.UTF8, "application/json");
+        (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), addContent)).EnsureSuccessStatusCode();
+
+        using var uploadContent = new ByteArrayContent(bytes);
+        uploadContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        (await http.PutAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute), uploadContent)).EnsureSuccessStatusCode();
+
+        // Bytes are pullable before removal.
+        (await http.GetAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute))).EnsureSuccessStatusCode();
+
+        var removeCommand = new RemoveFileCommand(new OperatorDto("Client", "RUF 1"), fileId);
+        var removeContent = new StringContent(SyncJson.Serialize<SyncCommand>(removeCommand), Encoding.UTF8, "application/json");
+        var removeResponse = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), removeContent);
+        removeResponse.EnsureSuccessStatusCode();
+
+        var snapshot = SyncJson.Deserialize<IncidentSnapshot>(await removeResponse.Content.ReadAsStringAsync());
+        Assert.Empty(snapshot.Files);
+        Assert.Contains(session.Incident.Journal, e => e.Text == "Datei entfernt: brand.jpg");
+
+        var afterGet = await http.GetAsync(new Uri(SyncProtocol.FilesPath(fileId), UriKind.RelativeOrAbsolute));
+        Assert.Equal(HttpStatusCode.NotFound, afterGet.StatusCode);
     }
 
     [Fact]

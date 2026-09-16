@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
@@ -16,6 +15,7 @@
     <AvaloniaResource Include="Assets\Fonts\*.ttf" />
     <AvaloniaResource Include="Assets\icon-1024.png" />
     <AvaloniaResource Include="Assets\codeforfire.png" />
+    <AvaloniaResource Include="Assets\lagebuch-logo.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -25,7 +25,6 @@ public class MasterDataSyncTests
     internal static MasterDataSet SetWith(string brigade, int returnPressureBar) =>
         MasterDataSet.Empty with
         {
-            Brigades = new[] { brigade },
             Vehicles = new[] { new Vehicle(brigade, "FFB 1/40/1", 9) },
             Settings = IncidentSettings.Defaults with { ReturnPressureBar = returnPressureBar },
         };
@@ -96,6 +95,7 @@ public class MasterDataSyncTests
             new SessionOperator("Client"),
             "1.0.0",
             new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
             TestHost.DefaultPin,
             port);
 

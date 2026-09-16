@@ -2,16 +2,14 @@ using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
-using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Time;
-using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-public sealed partial class IncidentWorkspaceViewModel : ObservableObject
+public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisposable
 {
     private readonly IIncidentSession _session;
 
@@ -24,8 +22,19 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
+    private readonly IIncidentPdfExporter _pdfExporter;
+    private readonly ILastPdfExportStore? _lastPdfExportStore;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController)
+    // The same app-lifetime store the session persists through (issue #167 review follow-up):
+    // its background writer's SaveFailed/SaveSucceeded never reached the UI before this, so a
+    // disk-full/locked/corrupt-DB write silently failed while the screen kept saying "gespeichert".
+    // Null for a joined client's remote workspace (RemoteIncidentSession writes nothing through
+    // this store), which is why both this and the dispatcher stay optional.
+    private readonly IIncidentStore? _store;
+    private readonly IUiDispatcher _uiDispatcher;
+    private bool _disposed;
+
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -36,14 +45,41 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         _dialogs = dialogs;
         _alarm = alarm;
         _hostController = hostController;
+        _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
+        _lastPdfExportStore = lastPdfExport;
+        _store = store;
+        _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         IsReadOnly = session.IsReadOnly;
 
-        // Seed the backing field directly so initialization doesn't trigger a write-back/save.
-        _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
+        // SaveFailed/SaveSucceeded fire on the store's background writer thread -- marshal onto
+        // the UI thread before touching PersistenceError. Unsubscribed in LeaveAsync, the one
+        // teardown path every caller already goes through, so this workspace doesn't outlive its
+        // own subscription to the app-lifetime store singleton.
+        if (_store is not null)
+        {
+            _store.SaveFailed += OnStoreSaveFailed;
+            _store.SaveSucceeded += OnStoreSaveSucceeded;
+        }
 
-        // The Stichwort is creation-time-only (unlike the Einsatznummer above, it has no write-back
-        // path), so a plain property seeded once is enough -- no ObservableProperty needed.
-        KeywordDisplay = _session.Incident.Keyword;
+        // Seed the export status line from the last persisted export (#262), so reopening the
+        // incident still shows "zuletzt exportiert" without requiring a fresh export this session.
+        // Only the file name is shown -- the full path is too long for the footer and lives in
+        // ExportStatusDetail (a tooltip) instead.
+        if (_lastPdfExportStore?.GetLastExport() is { } lastExport)
+        {
+            _exportStatus = $"Zuletzt exportiert: {Path.GetFileName(lastExport.Path)} um {lastExport.ExportedAt:HH:mm}";
+            _exportStatusDetail = lastExport.Path;
+        }
+
+        // Seed the backing fields directly so initialization doesn't trigger a write-back/save.
+        _keywordDisplay = _session.Incident.Keyword;
+        _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
+        _addressDisplay = Formatting.Address(_session.Incident.Street, _session.Incident.District);
+
+        // The header is a projection of the incident's head data; any mutation -- the Einsatzdaten
+        // dialog on this device, or (host or joined client alike) a command from another device
+        // applied to this session -- re-reads it from the aggregate.
+        _session.Changed += RefreshIncidentData;
         BuildChildren();
 
         // A joined client renders exactly what the host broadcasts; wire the connection lifecycle so
@@ -51,23 +87,36 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         if (session is RemoteIncidentSession remote)
         {
             remote.Changed += OnRemoteLifecycle;
-            remote.Disconnected += () => IsConnected = false;
-            remote.Reconnected += () => IsConnected = true;
-            remote.Ended += () => GoHomeRequested?.Invoke();
+            remote.Disconnected += OnRemoteDisconnected;
+            remote.Reconnected += OnRemoteReconnected;
+            remote.Ended += OnRemoteEnded;
         }
     }
+
+    private void OnRemoteDisconnected() => IsConnected = false;
+
+    private void OnRemoteReconnected() => IsConnected = true;
+
+    private void OnRemoteEnded() => GoHomeRequested?.Invoke();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanContinueEditing))]
     [NotifyPropertyChangedFor(nameof(CanHost))]
-    [NotifyPropertyChangedFor(nameof(CanEditIncidentNumber))]
+    [NotifyPropertyChangedFor(nameof(CanEditIncidentData))]
     [NotifyCanExecuteChangedFor(nameof(CloseIncidentCommand))]
     [NotifyCanExecuteChangedFor(nameof(ContinueEditingCommand))]
-    [NotifyCanExecuteChangedFor(nameof(BeginEditIncidentNumberCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EditIncidentDataCommand))]
     private bool _isReadOnly;
 
     [ObservableProperty]
     private DateTimeOffset? _lastSavedAt;
+
+    // Null = healthy. Set from IIncidentStore.SaveFailed (background writer thread, marshalled via
+    // IUiDispatcher) and stays visible -- unlike the export/share status lines -- until a later
+    // save actually succeeds (SaveSucceeded), because a save that silently never reached disk is
+    // exactly what an incident logbook must never let the operator miss.
+    [ObservableProperty]
+    private string? _persistenceError;
 
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
@@ -79,20 +128,36 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     [ObservableProperty]
     private TaskDialogViewModel? _pendingTaskDialog;
 
-    // The Stichwort, captured once at creation (#69) and never edited afterward -- unlike the
-    // Einsatznummer below, which the header lets you add/edit later.
-    public string? KeywordDisplay { get; private set; }
+    // The PDF section-selection overlay (#262); null while no export is in flight.
+    [ObservableProperty]
+    private PdfExportOptionsViewModel? _pendingPdfExportOptions;
 
-    // Display projection of the domain IncidentNumber, seeded once from the session and kept in
-    // sync by ConfirmIncidentNumber/OnRemoteLifecycle. Unlike KeywordDisplay this DOES have a
-    // write-back path (#69): the header offers an inline add/edit affordance, since the number is
-    // commonly unknown at creation and gets filled in once ILS calls back.
+    // The Einsatzdaten overlay (Stichwort, Einsatznummer, Adresse); null while no dialog is open.
+    [ObservableProperty]
+    private IncidentDataDialogViewModel? _pendingIncidentDataDialog;
+
+    // ===== Header: display projections of the incident's head data. None of these write back --
+    // the only write path is the Einsatzdaten dialog (EditIncidentData), which replaced the inline
+    // Einsatznummer editor of #69. They are seeded in the constructor and refreshed from the
+    // aggregate by RefreshIncidentData on every session change. =====
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeroText))]
+    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
+    [NotifyPropertyChangedFor(nameof(HasIncidentData))]
+    private string? _keywordDisplay;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HeroText))]
     [NotifyPropertyChangedFor(nameof(HasEinsatznummer))]
     [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
-    [NotifyPropertyChangedFor(nameof(ShowAddEinsatznummerAffordance))]
+    [NotifyPropertyChangedFor(nameof(HasIncidentData))]
     private string _incidentNumberInput = string.Empty;
+
+    // "Straße, Ortsteil" -- the same join the PDF header prints, so the two never disagree.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLine))]
+    [NotifyPropertyChangedFor(nameof(HasIncidentData))]
+    private string? _addressDisplay;
 
     // The header's hero: the Stichwort when known, else the Einsatznummer, else a placeholder for
     // the rare incident that was given neither.
@@ -101,55 +166,42 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         : !string.IsNullOrWhiteSpace(IncidentNumberInput) ? IncidentNumberInput
         : "Unbenannter Einsatz";
 
-    // The Einsatznummer slot (chip / add-affordance / edit row) only shows when the Einsatznummer
-    // isn't already occupying the hero slot itself -- i.e. whenever a Stichwort is the hero instead.
-    public bool ShowEinsatznummerSlot => !string.IsNullOrWhiteSpace(KeywordDisplay);
-
     public bool HasEinsatznummer => !string.IsNullOrWhiteSpace(IncidentNumberInput);
 
-    public bool ShowEinsatznummerChip => ShowEinsatznummerSlot && HasEinsatznummer && !IsEditingIncidentNumber;
+    // The Einsatznummer is already occupying the hero slot when there's no Stichwort to show
+    // instead -- the chip would then be a redundant repeat of the hero text.
+    private bool IsEinsatznummerShownAsHero => string.IsNullOrWhiteSpace(KeywordDisplay) && HasEinsatznummer;
 
-    public bool ShowAddEinsatznummerAffordance => ShowEinsatznummerSlot && !HasEinsatznummer && !IsEditingIncidentNumber;
+    public bool ShowEinsatznummerChip => HasEinsatznummer && !IsEinsatznummerShownAsHero;
 
-    public bool ShowEinsatznummerEdit => ShowEinsatznummerSlot && IsEditingIncidentNumber;
+    public bool ShowAddressLine => !string.IsNullOrWhiteSpace(AddressDisplay);
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerChip))]
-    [NotifyPropertyChangedFor(nameof(ShowAddEinsatznummerAffordance))]
-    [NotifyPropertyChangedFor(nameof(ShowEinsatznummerEdit))]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmIncidentNumberCommand))]
-    private bool _isEditingIncidentNumber;
+    // Drives which affordance the header shows: a quiet pencil once anything is known, an explicit
+    // "+ Einsatzdaten ergänzen" while nothing is -- so an incident started without any head data
+    // always has a visible way to get some (#250).
+    public bool HasIncidentData =>
+        !string.IsNullOrWhiteSpace(KeywordDisplay) || HasEinsatznummer || ShowAddressLine;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmIncidentNumberCommand))]
-    private string _incidentNumberEditInput = string.Empty;
+    public bool CanEditIncidentData => !IsReadOnly;
 
-    public bool CanEditIncidentNumber => !IsReadOnly;
-
-    [RelayCommand(CanExecute = nameof(CanEditIncidentNumber))]
-    private void BeginEditIncidentNumber()
+    [RelayCommand(CanExecute = nameof(CanEditIncidentData))]
+    private void EditIncidentData()
     {
-        IncidentNumberEditInput = IncidentNumberInput;
-        IsEditingIncidentNumber = true;
+        var dialog = new IncidentDataDialogViewModel(_session, OnChanged);
+
+        // Clear the overlay on either outcome; Save has already applied the edits on confirm, and
+        // the header projections refresh through the session's Changed event.
+        dialog.Closed += (_, _) => PendingIncidentDataDialog = null;
+        PendingIncidentDataDialog = dialog;
     }
 
-    private bool CanConfirmIncidentNumber => !string.IsNullOrWhiteSpace(IncidentNumberEditInput);
-
-    [RelayCommand(CanExecute = nameof(CanConfirmIncidentNumber))]
-    private void ConfirmIncidentNumber()
+    private void RefreshIncidentData()
     {
-        var number = new IncidentNumber(IncidentNumberEditInput.Trim());
-        _session.SetIncidentNumber(number);
-
-        // A local session applies this immediately in-process; a remote/joined session only
-        // reflects it once the host's broadcast round-trips (OnRemoteLifecycle) -- updating here
-        // too is harmless, it just gets overwritten with the same value shortly after.
-        IncidentNumberInput = number.Value;
-        IsEditingIncidentNumber = false;
+        var incident = _session.Incident;
+        KeywordDisplay = incident.Keyword;
+        IncidentNumberInput = incident.IncidentNumber?.Value ?? string.Empty;
+        AddressDisplay = Formatting.Address(incident.Street, incident.District);
     }
-
-    [RelayCommand]
-    private void CancelEditIncidentNumber() => IsEditingIncidentNumber = false;
 
     public CoMessprotokollViewModel CoMessprotokoll { get; private set; } = null!;
 
@@ -198,23 +250,86 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
 
     /// <summary>
     /// Called by the shell when this workspace is being left. Tears down a joined client's
-    /// SignalR/HTTP connection; a local session owns no such resources and is a no-op.
+    /// SignalR/HTTP connection; a local session owns no such resources and is a no-op. Also drops
+    /// this workspace's subscription to the (app-lifetime, singleton) store, so a closed workspace
+    /// doesn't keep reacting to saves it can no longer show.
     /// </summary>
     public async ValueTask LeaveAsync()
     {
+        if (_store is not null)
+        {
+            // IncidentStore is an app-lifetime singleton and its SaveFailed/SaveSucceeded carry no
+            // incident identity -- unsubscribing before every write queued by THIS workspace has
+            // landed would either drop a genuine late failure on the floor, or (worse) let it
+            // surface as the NEXT incident's PersistenceError once someone reuses the store. A
+            // local session shouldn't be left with writes in flight when leaving anyway, so
+            // draining here is free.
+            await _store.FlushAsync();
+            _store.SaveFailed -= OnStoreSaveFailed;
+            _store.SaveSucceeded -= OnStoreSaveSucceeded;
+        }
+
         if (_session is IAsyncDisposable disposable)
         {
             await disposable.DisposeAsync();
         }
     }
 
+    private void OnStoreSaveFailed(Exception ex) =>
+        _uiDispatcher.Post(() => PersistenceError = $"Speichern fehlgeschlagen: {ex.Message} — Änderungen werden NICHT gesichert.");
+
+    // Marshalling only when there's actually something to clear skips a pointless dispatcher hop
+    // on every ordinary successful save -- the overwhelmingly common case. Reading PersistenceError
+    // off the writer thread here is safe (reference-type reads are atomic, and clearing an
+    // already-null value is a no-op) even though the authoritative write to it happens later, on
+    // the UI thread. A Post queued by a handler that ran during LeaveAsync's FlushAsync (just
+    // before the unsubscribe above) can still be sitting in the UI dispatcher's queue when
+    // LeaveAsync returns -- harmless, since by then the shell has already navigated away and
+    // nothing reads this now-orphaned VM's PersistenceError again.
+    private void OnStoreSaveSucceeded()
+    {
+        if (PersistenceError is not null)
+        {
+            _uiDispatcher.Post(() => PersistenceError = null);
+        }
+    }
+
+    /// <summary>
+    /// The single synchronous teardown point for everything this workspace owns: every child tab
+    /// view model (and, through them, the ticker subscriptions Scba/Tasks/Reminder each hold) and
+    /// the four remote-session lifecycle events wired up in the constructor. Idempotent, since the
+    /// shell can reach it from more than one navigate-away path for the same workspace instance.
+    /// LeaveAsync above stays the async remote-session teardown; the shell calls both, in that
+    /// order, when leaving to Home.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _session.Changed -= RefreshIncidentData;
+
+        if (_session is RemoteIncidentSession remote)
+        {
+            remote.Changed -= OnRemoteLifecycle;
+            remote.Disconnected -= OnRemoteDisconnected;
+            remote.Reconnected -= OnRemoteReconnected;
+            remote.Ended -= OnRemoteEnded;
+        }
+
+        DisposeChildren();
+    }
+
     // A host broadcast can change lifecycle state under a joined client (e.g. the host closes the
-    // incident, or someone adds the Einsatznummer from another device); keep the header live and
-    // flip the whole workspace to read-only when the lifecycle itself changes.
+    // incident); keep the status live and flip the whole workspace to read-only when the lifecycle
+    // itself changes. The head data (Stichwort/Einsatznummer/Adresse) is refreshed separately by
+    // RefreshIncidentData, which is wired for local and remote sessions alike.
     private void OnRemoteLifecycle()
     {
         OnPropertyChanged(nameof(StatusDisplay));
-        IncidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
         if (_session.IsReadOnly != IsReadOnly)
         {
             IsReadOnly = _session.IsReadOnly;
@@ -230,46 +345,52 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         LastSavedAt = _clock.Now;
     }
 
+    // Every child subscribes to _session.Changed (and Scba/Tasks/Reminder additionally to _ticker)
+    // in its own constructor; disposing the outgoing instance is what unsubscribes the old handler.
+    // Shared by BuildChildren (issue #167 P2 finding — replacing children used to be uneven, leaking
+    // stale subscriptions on every rebuild) and by Dispose (issue #279 P1 finding — the workspace
+    // itself was never torn down on navigate-home, so the *last* generation of children outlived it).
+    private void DisposeChildren()
+    {
+        ChecklistAufbau?.Dispose();
+        ChecklistAbbau?.Dispose();
+        Etb?.Dispose();
+        Roles?.Dispose();
+        Forces?.Dispose();
+        Scba?.Dispose();
+        Files?.Dispose();
+        CoMessprotokoll?.Dispose();
+        Tasks?.Dispose();
+        Reminder?.Dispose();
+    }
+
     private void BuildChildren()
     {
-        // Every child below subscribes to _session.Changed in its own constructor; disposing the
-        // outgoing instance before replacing it is what unsubscribes the old handler (issue #167 P2
-        // finding — this used to be uneven, leaking stale subscriptions on every rebuild).
-        ChecklistAufbau?.Dispose();
-        ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
+        DisposeChildren();
 
-        ChecklistAbbau?.Dispose();
+        ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
         ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
 
-        Etb?.Dispose();
         Etb = new EtbViewModel(
             _session,
             _clock,
             _masterData,
             OnChanged,
-            text => OpenTaskDialog(text));
+            OpenTaskDialog);
 
-        Roles?.Dispose();
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
-        Forces?.Dispose();
-        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged);
+        Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
-        Scba?.Dispose();
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
 
-        Files?.Dispose();
-        Files = new FilesViewModel(_session, _dialogs, OnChanged);
+        Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
 
-        CoMessprotokoll?.Dispose();
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
 
-        Tasks?.Dispose();
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
-
-        Reminder?.Dispose();
 
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.
@@ -298,6 +419,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         OnPropertyChanged(nameof(HasReminder));
     }
 
+    /// <summary>
+    /// Generic confirm-before-acting hook for children (e.g. ForcesViewModel removing a unit) that
+    /// need the same destructive-action guard as <see cref="CloseIncident"/> without each owning
+    /// its own ConfirmDialogViewModel wiring.
+    /// </summary>
+    private void RequestConfirm(string message, Action onConfirmed)
+    {
+        var dialog = new ConfirmDialogViewModel("Bestätigen", message, "ENTFERNEN", onConfirmed);
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
+    }
+
     private bool CanClose => !IsReadOnly;
 
     // Closing is permanent (the incident becomes read-only), so confirm first. If a Trupp is
@@ -318,7 +451,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
         PendingConfirm = dialog;
     }
 
-    /// <summary>Opens the create-task overlay pre-filled from an ETB entry's text (#88).</summary>
+    /// <summary>Opens the create-task overlay pre-filled from an ETB entry's text, either from the
+    /// input dock's "add &amp; create task" button or an existing row's create-task icon (#88, #247).
+    /// </summary>
     private void OpenTaskDialog(string text)
     {
         var dialog = new TaskDialogViewModel(_session, _masterData, text, OnChanged);
@@ -364,21 +499,72 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject
     public void CancelContinueEditing() => PendingPrompt = null;
 
     // PDF export renders from the local .fwincident, so it belongs to the host that owns the file;
-    // a joined client (_local is null) hides the button and lets the host export instead.
-    public bool CanExport => _local is not null;
+    // a joined client (_local is null) hides the button and lets the host export instead. It also
+    // needs a platform that can actually render one -- QuestPDF doesn't support Android
+    // (QuestPDF/QuestPDF#1432), so that head supplies NoopIncidentPdfExporter and hides the button too.
+    public bool CanExport => _local is not null && _pdfExporter.CanExport;
 
+    // The one-line export outcome: a fresh success/failure message, or (before any export this
+    // session) seeded from ILastPdfExportStore in the constructor. Shows only the file name --
+    // the full path made this line too wide for the footer -- with the full path (when known)
+    // available via ExportStatusDetail for a tooltip.
+    [ObservableProperty]
+    private string? _exportStatus;
+
+    [ObservableProperty]
+    private string? _exportStatusDetail;
+
+    // Opens the section-selection overlay (#262); the actual generate/write/share work is the
+    // overlay's own awaitable ExportCommand (RunExportAsync below), so this stays synchronous.
     [RelayCommand(CanExecute = nameof(CanExport))]
-    private async Task ExportPdfAsync()
+    private void ExportPdf()
     {
-        var suggested = (_session.Incident.IncidentNumber?.Value ?? "Einsatz") + ".pdf";
+        var dialog = new PdfExportOptionsViewModel(RunExportAsync);
+
+        // Guards against a stale dialog's Closed firing after a newer one has already replaced it
+        // in PendingPdfExportOptions -- Export() awaits real async work while the dialog stays up,
+        // so (unlike the app's other Closed-clears-overlay dialogs) this one's Closed can in
+        // principle arrive well after this dialog stopped being "the" pending one.
+        dialog.Closed += (_, _) =>
+        {
+            if (PendingPdfExportOptions == dialog)
+            {
+                PendingPdfExportOptions = null;
+            }
+        };
+        PendingPdfExportOptions = dialog;
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Export can fail in several ways (disk full, exporter throwing, etc.); surfaces in the status line.")]
+    private async Task RunExportAsync(IncidentPdfSections sections)
+    {
+        // Reuse the incident's own name -- its .fwincident file's base name (date+time+Stichwort,
+        // see HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually
+        // still unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf".
+        var suggested = Path.GetFileNameWithoutExtension(_local!.Path) + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
         {
-            return;
+            return; // cancelled -- no status change, dialog still closes normally
         }
 
-        await File.WriteAllBytesAsync(path, await _local!.ExportPdfAsync());
-        await _dialogs.ShareFileAsync(path, "application/pdf");
+        try
+        {
+            var bytes = await _local!.ExportPdfAsync(_pdfExporter, sections);
+            await File.WriteAllBytesAsync(path, bytes);
+            await _dialogs.ShareFileAsync(path, "application/pdf");
+            ExportStatus = $"PDF exportiert: {Path.GetFileName(path)}";
+            ExportStatusDetail = path;
+            _lastPdfExportStore?.SetLastExport(path, _clock.Now);
+        }
+        catch (Exception ex)
+        {
+            ExportStatus = $"Export fehlgeschlagen: {ex.Message}";
+            ExportStatusDetail = null; // nothing to point a tooltip at -- the export failed
+        }
     }
 
     // ===== Multi-device hosting (#52): flip "Im Netzwerk freigeben" to expose this open incident. =====

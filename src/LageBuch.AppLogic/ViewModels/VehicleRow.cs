@@ -29,10 +29,10 @@ public sealed partial class VehicleRow : ObservableObject
         CallSignOptions = callSignOptions;
     }
 
-    /// <summary>Suggestions from the Stammdaten "Wachen" list.</summary>
+    /// <summary>Suggestions: the Wachen of the vehicles as loaded (derived, not a separate list).</summary>
     public IReadOnlyList<string> WacheOptions { get; }
 
-    /// <summary>Suggestions from the Stammdaten "Funkrufnamen" list.</summary>
+    /// <summary>Suggestions: the Funkrufnamen of the vehicles and roster as loaded (derived, not a separate list).</summary>
     public IReadOnlyList<string> CallSignOptions { get; }
 
     [ObservableProperty]

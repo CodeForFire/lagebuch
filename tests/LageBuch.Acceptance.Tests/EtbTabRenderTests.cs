@@ -40,7 +40,7 @@ public class EtbTabRenderTests
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
-        RadioCallSigns = AnonymizedExampleData.RadioCallSigns,
+        Vehicles = AnonymizedExampleData.Vehicles,
     };
 
     private static TabControl Tabs(Window window) =>

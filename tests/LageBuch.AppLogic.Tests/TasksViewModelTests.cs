@@ -26,7 +26,7 @@ public class TasksViewModelTests
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
-        RadioCallSigns = new[] { "FFB 1/44/1" },
+        Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 6) },
         Roles = new[] { "EL" },
         Personnel = new[] { new Person("Mustermann", "Max", "ZF", null, null) },
     };

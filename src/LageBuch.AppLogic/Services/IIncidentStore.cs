@@ -52,6 +52,13 @@ public interface IIncidentStore
     string ResolveFileDiskPath(string path, string storageFileName);
 
     /// <summary>
+    /// Deletes an attached file's bytes, best-effort — see
+    /// <c>LageBuch.Persistence.IIncidentFileStore.DeleteBytesAsync</c>. Never blocks or fails the
+    /// metadata removal (<c>Incident.RemoveFile</c>) that already happened.
+    /// </summary>
+    Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Raised on the background writer thread when a queued <see cref="Save"/> throws (the queue
     /// keeps serving later writes regardless). Fires off the UI thread — marshal it yourself (e.g.
     /// via <c>IUiDispatcher</c>) before touching UI-bound state from a handler.
@@ -61,4 +68,15 @@ public interface IIncidentStore
         "CA1003",
         Justification = "A plain Exception payload doesn't warrant a bespoke EventArgs type; matches this codebase's other events (e.g. IIncidentSession.Changed), which favor plain delegates over the sender/EventArgs pattern.")]
     event Action<Exception>? SaveFailed;
+
+    /// <summary>
+    /// Raised on the background writer thread after a queued <see cref="Save"/> completes without
+    /// throwing — lets a subscriber that showed a <see cref="SaveFailed"/> message clear it once
+    /// persistence is healthy again. Fires off the UI thread, same caveat as <see cref="SaveFailed"/>.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1003",
+        Justification = "A parameterless signal doesn't warrant a bespoke EventArgs type; matches this codebase's other events (e.g. SaveFailed above, IIncidentSession.Changed).")]
+    event Action? SaveSucceeded;
 }

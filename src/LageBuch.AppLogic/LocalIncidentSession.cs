@@ -1,5 +1,4 @@
 using LageBuch.AppLogic.Services;
-using LageBuch.Documents;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
@@ -115,8 +114,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     // every attached file's bytes land in this device's own sibling folder the moment it's added —
     // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
     // network pull, only IIncidentStore.
-    public async Task<byte[]> ExportPdfAsync()
+    public async Task<byte[]> ExportPdfAsync(IIncidentPdfExporter exporter, IncidentPdfSections sections = IncidentPdfSections.All)
     {
+        ArgumentNullException.ThrowIfNull(exporter);
         var fileBytes = new Dictionary<Guid, byte[]>();
         var pdfAttachmentPaths = new Dictionary<Guid, string>();
         foreach (var file in Incident.Files)
@@ -142,7 +142,9 @@ public sealed class LocalIncidentSession : IIncidentSession
             }
         }
 
-        return IncidentPdf.Generate(Incident, fileBytes, pdfAttachmentPaths);
+        // One timestamp for the whole document: read once here rather than per section, so the
+        // Aufgaben section's overdue markers reflect the moment the export was asked for.
+        return exporter.Generate(Incident, _clock.Now, fileBytes, pdfAttachmentPaths, sections);
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
@@ -269,6 +271,24 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void RenameFile(Guid fileId, string? displayName) => Mutate(() => Incident.RenameFile(fileId, displayName));
 
+    public async Task RemoveFileAsync(Guid fileId, CancellationToken cancellationToken = default)
+    {
+        var file = Incident.RemoveFile(_clock, RequireOperator(), fileId);
+        await _store.DeleteFileBytesAsync(Path, IncidentFile.StorageFileName(file.Id, file.FileName), cancellationToken);
+        Save();
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Deletes an attachment's bytes only, without touching the domain — used by the host (see
+    /// <c>LageBuch.Sync.Hosting.IncidentHost</c>) after applying a joined client's
+    /// <c>RemoveFileCommand</c> via <see cref="LageBuch.Sync.CommandApplier"/>, whose metadata
+    /// mutation already ran on the UI thread; this best-effort disk cleanup runs off it, mirroring
+    /// <see cref="SaveFileStreamAsync"/>'s split for <c>AddFileCommand</c>'s upload half.
+    /// </summary>
+    public Task DeleteFileBytesAsync(string storageFileName, CancellationToken cancellationToken = default) =>
+        _store.DeleteFileBytesAsync(Path, storageFileName, cancellationToken);
+
     public void AddCoBuilding(string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0) =>
         Mutate(() => Incident.AddCoBuilding(_clock, RequireOperator(), name, floorCount, apartmentsPerFloor, undergroundFloorCount));
 
@@ -290,8 +310,11 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>
         Mutate(() => Incident.SetFloorDescription(buildingId, floorOrdinal, description));
 
-    public void SetApartmentLabel(Guid buildingId, int apartmentNumber, string? label) =>
-        Mutate(() => Incident.SetApartmentLabel(buildingId, apartmentNumber, label));
+    public void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label) =>
+        Mutate(() => Incident.SetApartmentLabel(buildingId, floorOrdinal, apartmentNumber, label));
+
+    public void SetApartmentCount(Guid buildingId, int floorOrdinal, int count) =>
+        Mutate(() => Incident.SetApartmentCount(_clock, RequireOperator(), buildingId, floorOrdinal, count));
 
     public void Close()
     {

@@ -90,7 +90,8 @@ public class IncidentWorkspaceViewModelTests
             Md(),
             dialogs ?? new FakeDialogs(),
             new FakeAlarmService(),
-            new NoopIncidentHostController());
+            new NoopIncidentHostController(),
+            new TestPdfExporter());
     }
 
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
@@ -234,8 +235,8 @@ public class IncidentWorkspaceViewModelTests
     public void Setting_IncidentNumberInput_directly_does_not_write_back()
     {
         // IncidentNumberInput is a display projection; the only write-back path is the
-        // ConfirmIncidentNumberCommand flow below (#69) -- assigning the bound property directly
-        // (as a plain data-bound control would) must not autosave or mutate the domain.
+        // Einsatzdaten dialog below (#69) -- assigning the bound property directly (as a plain
+        // data-bound control would) must not autosave or mutate the domain.
         var vm = NewWorkspace(out var store, out _);
         var before = store.SaveCount;
 
@@ -273,11 +274,11 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal("B 99", vm.IncidentNumberInput);
     }
 
-    // --- Header hero + Einsatznummer add-later (#69) -----------------------------------------
-    [Fact]
-    public void HeroText_shows_the_keyword_when_set()
+    // --- Header hero + Einsatzdaten dialog (#69) ---------------------------------------------
+    private static IncidentWorkspaceViewModel WorkspaceWith(
+        out FakeStore store, string? keyword = null, Domain.ValueObjects.IncidentNumber? number = null)
     {
-        var store = new FakeStore();
+        store = new FakeStore();
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(
             store,
@@ -286,8 +287,9 @@ public class IncidentWorkspaceViewModelTests
             "/x.fwincident",
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>(),
-            keyword: "B3P");
-        var vm = new IncidentWorkspaceViewModel(
+            number,
+            keyword: keyword);
+        return new IncidentWorkspaceViewModel(
             session,
             clock,
             new FakeTicker(),
@@ -295,40 +297,30 @@ public class IncidentWorkspaceViewModelTests
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
+    }
+
+    [Fact]
+    public void HeroText_shows_the_keyword_when_set()
+    {
+        var vm = WorkspaceWith(out _, keyword: "B3P");
 
         Assert.Equal("B3P", vm.HeroText);
-        Assert.True(vm.ShowEinsatznummerSlot);
         Assert.False(vm.HasEinsatznummer);
-        Assert.True(vm.ShowAddEinsatznummerAffordance);
         Assert.False(vm.ShowEinsatznummerChip);
+        Assert.True(vm.HasIncidentData);
     }
 
     [Fact]
     public void HeroText_falls_back_to_the_einsatznummer_when_there_is_no_keyword()
     {
-        var store = new FakeStore();
-        var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
-            store,
-            clock,
-            new SessionOperator("Müller"),
-            "/x.fwincident",
-            new[] { ("A?", false) },
-            Array.Empty<(string, bool)>(),
-            incidentNumber: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
-        var vm = new IncidentWorkspaceViewModel(
-            session,
-            clock,
-            new FakeTicker(),
-            Md(),
-            new FakeDialogs(),
-            new FakeAlarmService(),
-            new NoopIncidentHostController());
+        var vm = WorkspaceWith(out _, number: new Domain.ValueObjects.IncidentNumber("B 1.2 260715 123"));
 
         Assert.Equal("B 1.2 260715 123", vm.HeroText);
 
         // The number is already the hero -- no redundant chip alongside it.
-        Assert.False(vm.ShowEinsatznummerSlot);
+        Assert.True(vm.HasEinsatznummer);
+        Assert.False(vm.ShowEinsatznummerChip);
+        Assert.True(vm.HasIncidentData);
     }
 
     [Fact]
@@ -337,24 +329,42 @@ public class IncidentWorkspaceViewModelTests
         var vm = NewWorkspace(out _, out _);
 
         Assert.Equal("Unbenannter Einsatz", vm.HeroText);
-        Assert.False(vm.ShowEinsatznummerSlot);
+
+        // Nothing known yet -- the header offers the "add" affordance instead of the pencil so
+        // the data isn't permanently un-enterable (#250).
+        Assert.False(vm.HasEinsatznummer);
+        Assert.False(vm.ShowEinsatznummerChip);
+        Assert.False(vm.HasIncidentData);
+        Assert.False(vm.ShowAddressLine);
     }
 
     [Fact]
-    public void Begin_confirm_flow_sets_the_einsatznummer_persists_it_and_shows_the_chip()
+    public void Chip_shows_when_both_keyword_and_number_are_set()
+    {
+        var vm = WorkspaceWith(out _, keyword: "B3P", number: new Domain.ValueObjects.IncidentNumber("B 99"));
+
+        Assert.Equal("B3P", vm.HeroText);
+        Assert.True(vm.ShowEinsatznummerChip);
+        Assert.Equal("B 99", vm.IncidentNumberInput);
+    }
+
+    [Fact]
+    public void Address_line_is_seeded_from_the_incident_and_joins_street_and_district()
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var seed = LocalIncidentSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
             "/x.fwincident",
             new[] { ("A?", false) },
-            Array.Empty<(string, bool)>(),
-            keyword: "B3P");
+            Array.Empty<(string, bool)>());
+        seed.SetAddress("Hauptstr. 12", "FFB");
+        var reopened = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
+
         var vm = new IncidentWorkspaceViewModel(
-            session,
+            reopened,
             clock,
             new FakeTicker(),
             Md(),
@@ -362,73 +372,66 @@ public class IncidentWorkspaceViewModelTests
             new FakeAlarmService(),
             new NoopIncidentHostController());
 
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        Assert.True(vm.IsEditingIncidentNumber);
-        Assert.True(vm.ShowEinsatznummerEdit);
-        Assert.False(vm.ShowAddEinsatznummerAffordance);
+        Assert.Equal("Hauptstr. 12, FFB", vm.AddressDisplay);
+        Assert.True(vm.ShowAddressLine);
+        Assert.True(vm.HasIncidentData);
+    }
 
-        vm.IncidentNumberEditInput = "B 1.2 260715 123";
-        vm.ConfirmIncidentNumberCommand.Execute(null);
+    [Fact]
+    public void EditIncidentData_opens_the_dialog_seeded_from_the_incident()
+    {
+        var vm = WorkspaceWith(out _, keyword: "B3P");
 
-        Assert.False(vm.IsEditingIncidentNumber);
+        vm.EditIncidentDataCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingIncidentDataDialog);
+        Assert.Equal("B3P", vm.PendingIncidentDataDialog!.Keyword);
+    }
+
+    [Fact]
+    public void Saving_the_dialog_refreshes_the_header_and_closes_the_overlay()
+    {
+        var vm = WorkspaceWith(out var store, keyword: "B3P");
+
+        vm.EditIncidentDataCommand.Execute(null);
+        var dialog = vm.PendingIncidentDataDialog!;
+        dialog.Keyword = "B4";
+        dialog.IncidentNumber = "B 1.2 260715 123";
+        dialog.Street = "Hauptstr. 12";
+        dialog.District = "FFB";
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Null(vm.PendingIncidentDataDialog);
+        Assert.Equal("B4", vm.HeroText);
         Assert.Equal("B 1.2 260715 123", vm.IncidentNumberInput);
-        Assert.True(vm.HasEinsatznummer);
         Assert.True(vm.ShowEinsatznummerChip);
+        Assert.Equal("Hauptstr. 12, FFB", vm.AddressDisplay);
+        Assert.True(vm.ShowAddressLine);
+        Assert.NotNull(vm.LastSavedAt);
         Assert.Equal("B 1.2 260715 123", store.Load("/x.fwincident").IncidentNumber!.Value);
     }
 
     [Fact]
-    public void Cancel_edit_discards_without_mutating()
+    public void Cancelling_the_dialog_closes_it_without_mutating()
     {
-        var store = new FakeStore();
-        var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
-            store,
-            clock,
-            new SessionOperator("Müller"),
-            "/x.fwincident",
-            new[] { ("A?", false) },
-            Array.Empty<(string, bool)>(),
-            keyword: "B3P");
-        var vm = new IncidentWorkspaceViewModel(
-            session,
-            clock,
-            new FakeTicker(),
-            Md(),
-            new FakeDialogs(),
-            new FakeAlarmService(),
-            new NoopIncidentHostController());
+        var vm = WorkspaceWith(out var store, keyword: "B3P");
 
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        vm.IncidentNumberEditInput = "B 1.2 260715 123";
-        vm.CancelEditIncidentNumberCommand.Execute(null);
+        vm.EditIncidentDataCommand.Execute(null);
+        vm.PendingIncidentDataDialog!.Keyword = "B4";
+        vm.PendingIncidentDataDialog!.CancelCommand.Execute(null);
 
-        Assert.False(vm.IsEditingIncidentNumber);
-        Assert.False(vm.HasEinsatznummer);
-        Assert.Null(store.Load("/x.fwincident").IncidentNumber);
+        Assert.Null(vm.PendingIncidentDataDialog);
+        Assert.Equal("B3P", vm.HeroText);
+        Assert.Equal("B3P", store.Load("/x.fwincident").Keyword);
     }
 
     [Fact]
-    public void Confirm_is_disabled_until_the_edit_input_is_non_blank()
-    {
-        var vm = NewWorkspace(out _, out _);
-        vm.BeginEditIncidentNumberCommand.Execute(null);
-        Assert.False(vm.ConfirmIncidentNumberCommand.CanExecute(null));
-
-        vm.IncidentNumberEditInput = "   ";
-        Assert.False(vm.ConfirmIncidentNumberCommand.CanExecute(null));
-
-        vm.IncidentNumberEditInput = "B 1";
-        Assert.True(vm.ConfirmIncidentNumberCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public void Editing_the_einsatznummer_is_blocked_on_a_readonly_workspace()
+    public void Editing_the_einsatzdaten_is_blocked_on_a_readonly_workspace()
     {
         var vm = ReadOnlyWorkspace(out _, closed: true);
 
-        Assert.False(vm.CanEditIncidentNumber);
-        Assert.False(vm.BeginEditIncidentNumberCommand.CanExecute(null));
+        Assert.False(vm.CanEditIncidentData);
+        Assert.False(vm.EditIncidentDataCommand.CanExecute(null));
     }
 
     [Fact]
@@ -511,6 +514,34 @@ public class IncidentWorkspaceViewModelTests
         Assert.True(vm.CloseIncidentCommand.CanExecute(null));
     }
 
+    // ExportPdfCommand is synchronous -- it only opens the section-selection dialog (#262); the
+    // actual generate/write/share work is the dialog's own awaitable ExportCommand.
+    [Fact]
+    public void ExportPdf_opens_the_section_selection_dialog()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.ExportPdfCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingPdfExportOptions);
+        Assert.All(vm.PendingPdfExportOptions!.Items, i => Assert.True(i.IsSelected));
+    }
+
+    // The Einsatznummer is usually unknown until ILS calls back (#69), so falling back to it for
+    // the suggested export name meant most exports proposed the literal "Einsatz.pdf" -- the
+    // incident already has a name (its own .fwincident file), so the export should reuse that.
+    [Fact]
+    public async Task ExportPdf_suggests_the_incidents_own_file_name()
+    {
+        var dialogs = new FakeDialogs { ExportPath = null };
+        var vm = NewWorkspace(out _, out _, dialogs);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        Assert.Equal("x.pdf", dialogs.LastSuggestedExportName);
+    }
+
     [Fact]
     public async Task ExportPdf_writes_file_when_path_chosen()
     {
@@ -518,20 +549,214 @@ public class IncidentWorkspaceViewModelTests
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var vm = NewWorkspace(out _, out _, dialogs);
 
-        await vm.ExportPdfCommand.ExecuteAsync(null);
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
 
         Assert.True(File.Exists(exportPath));
         var bytes = await File.ReadAllBytesAsync(exportPath);
         Assert.Equal(0x25, bytes[0]); // %PDF
+        Assert.Null(vm.PendingPdfExportOptions); // overlay closes once the export completes
+
+        // The status line shows just the file name -- the full path is too long for the footer
+        // (#262 follow-up) and lives in ExportStatusDetail (a tooltip) instead.
+        Assert.Contains(Path.GetFileName(exportPath), vm.ExportStatus, StringComparison.Ordinal);
+        Assert.DoesNotContain(Path.GetTempPath(), vm.ExportStatus, StringComparison.Ordinal);
+        Assert.Equal(exportPath, vm.ExportStatusDetail);
+        File.Delete(exportPath);
+    }
+
+    // Nothing in the app today lets a stale dialog outlive its slot, but PdfExportOptionsViewModel
+    // is the first overlay whose Closed can fire well after a newer one has replaced it in
+    // PendingPdfExportOptions (its Export command awaits real async work). The Closed handler must
+    // only clear the overlay it was registered for.
+    [Fact]
+    public void A_stale_dialogs_close_does_not_clear_a_newer_dialog()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.ExportPdfCommand.Execute(null);
+        var dialog1 = vm.PendingPdfExportOptions;
+
+        vm.ExportPdfCommand.Execute(null); // orphans dialog1, opens dialog2 in its place
+        var dialog2 = vm.PendingPdfExportOptions;
+        Assert.NotSame(dialog1, dialog2);
+
+        dialog1!.CancelCommand.Execute(null); // the orphaned dialog belatedly closes
+
+        Assert.Same(dialog2, vm.PendingPdfExportOptions);
+    }
+
+    [Fact]
+    public async Task ExportPdf_does_nothing_when_the_save_dialog_is_cancelled()
+    {
+        var dialogs = new FakeDialogs { ExportPath = null };
+        var vm = NewWorkspace(out _, out _, dialogs);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null); // should not throw
+
+        Assert.Null(vm.ExportStatus);
+    }
+
+    [Fact]
+    public async Task ExportPdf_omits_deselected_sections()
+    {
+        var dialogs = new FakeDialogs();
+        var vm = NewWorkspace(out _, out _, dialogs);
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewMannschaftCount = 9;
+        vm.Forces.AddForceCommand.Execute(null);
+
+        var pathAll = Path.Combine(Path.GetTempPath(), $"export-all-{Guid.NewGuid():N}.pdf");
+        dialogs.ExportPath = pathAll;
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        var pathReduced = Path.Combine(Path.GetTempPath(), $"export-reduced-{Guid.NewGuid():N}.pdf");
+        dialogs.ExportPath = pathReduced;
+        vm.ExportPdfCommand.Execute(null);
+        vm.PendingPdfExportOptions!.Items.Single(i => i.Section == IncidentPdfSections.Forces).IsSelected = false;
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        try
+        {
+            var allBytes = await File.ReadAllBytesAsync(pathAll);
+            var reducedBytes = await File.ReadAllBytesAsync(pathReduced);
+            Assert.True(
+                reducedBytes.Length < allBytes.Length,
+                $"Expected deselecting Kräfte to shrink the PDF (all={allBytes.Length}, reduced={reducedBytes.Length}).");
+        }
+        finally
+        {
+            File.Delete(pathAll);
+            File.Delete(pathReduced);
+        }
+    }
+
+    [Fact]
+    public async Task A_failing_exporter_surfaces_in_ExportStatus_and_does_not_throw()
+    {
+        var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var dialogs = new FakeDialogs { ExportPath = exportPath };
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs,
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new ThrowingPdfExporter());
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null); // must not throw
+
+        Assert.Contains("Datenträger voll", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.False(File.Exists(exportPath));
+        Assert.Null(vm.PendingPdfExportOptions); // overlay still closes on failure
+        Assert.Null(vm.ExportStatusDetail); // nothing to point a tooltip at -- the export failed
+    }
+
+    [Fact]
+    public async Task Exported_path_and_time_are_persisted_via_ILastPdfExportStore()
+    {
+        var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var dialogs = new FakeDialogs { ExportPath = exportPath };
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var lastExportStore = new FakeLastPdfExportStore();
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs,
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter(),
+            lastExportStore);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        Assert.Equal(exportPath, lastExportStore.SetPath);
+        Assert.Equal(T0, lastExportStore.SetAt);
         File.Delete(exportPath);
     }
 
     [Fact]
-    public async Task ExportPdf_does_nothing_when_cancelled()
+    public void ExportStatus_is_seeded_from_the_last_persisted_export_on_open()
     {
-        var dialogs = new FakeDialogs { ExportPath = null };
-        var vm = NewWorkspace(out _, out _, dialogs);
-        await vm.ExportPdfCommand.ExecuteAsync(null); // should not throw
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var lastExportStore = new FakeLastPdfExportStore(new LastPdfExport("/einsaetze/alt.pdf", T0.AddHours(-1)));
+
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter(),
+            lastExportStore);
+
+        Assert.Contains("alt.pdf", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.DoesNotContain("/einsaetze", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.Equal("/einsaetze/alt.pdf", vm.ExportStatusDetail);
+    }
+
+    // A platform whose exporter can't render (e.g. Android -- QuestPDF doesn't support it, see
+    // QuestPDF/QuestPDF#1432) hides the button instead of exposing one that would just throw (#184).
+    [Fact]
+    public void CanExport_is_false_when_the_platform_cannot_render_pdfs()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new NoopIncidentPdfExporter());
+
+        Assert.False(vm.CanExport);
+    }
+
+    [Fact]
+    public void CanExport_is_true_when_local_and_the_platform_can_render_pdfs()
+    {
+        var vm = NewWorkspace(out _, out _);
+        Assert.True(vm.CanExport);
     }
 
     [Fact]
@@ -570,7 +795,7 @@ public class IncidentWorkspaceViewModelTests
             ro,
             clock,
             new FakeTicker(),
-            MasterDataSet.Empty with { RadioCallSigns = callSigns },
+            MasterDataSet.Empty with { Vehicles = callSigns.Select(c => new Vehicle("FFB Wache 1", c, 9)).ToList() },
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
@@ -723,6 +948,92 @@ public class IncidentWorkspaceViewModelTests
         return handler?.GetInvocationList().Length ?? 0;
     }
 
+    // #279 P1 finding: the workspace itself was never IDisposable, so navigating away only ever
+    // disposed children inside BuildChildren (on a rebuild), never on final teardown -- the ticker
+    // subscriptions (Scba/Tasks/Reminder) and every child's _session.Changed handler outlived the
+    // workspace, ticking and appending to a journal nobody was looking at anymore.
+    [Fact]
+    public void Dispose_stops_the_ticker_and_unsubscribes_every_child_from_session_changed()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var ticker = new FakeTicker();
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            ticker,
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        vm.Dispose();
+
+        Assert.Equal(0, ticker.SubscriberCount);
+        Assert.Equal(0, ChangedSubscriberCount(session));
+    }
+
+    [Fact]
+    public void Dispose_is_idempotent()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.Dispose();
+        var exception = Record.Exception(() => vm.Dispose());
+
+        Assert.Null(exception);
+    }
+
+    // Every BuildChildren rebuild (ctor, continue-editing, close) already disposes the outgoing
+    // children before replacing them (#167 P2) -- Dispose() must only tear down the *current* set
+    // once more, not double-dispose every generation that ever existed.
+    [Fact]
+    public void Dispose_after_rebuilding_children_multiple_times_disposes_only_the_current_set()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var session = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+        var ticker = new FakeTicker();
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            ticker,
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        vm.ContinueEditingCommand.Execute(null); // rebuild #2
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmContinueEditing();
+
+        vm.CloseIncidentCommand.Execute(null); // rebuild #3
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        vm.Dispose();
+
+        Assert.Equal(0, ticker.SubscriberCount);
+        Assert.Equal(0, ChangedSubscriberCount(session));
+
+        var exception = Record.Exception(() => vm.Dispose());
+        Assert.Null(exception);
+    }
+
     [Fact]
     public void Etb_add_and_create_task_opens_prefilled_task_dialog()
     {
@@ -733,6 +1044,216 @@ public class IncidentWorkspaceViewModelTests
         Assert.NotNull(vm.PendingTaskDialog);
         Assert.Equal("Meldung an ILS", vm.PendingTaskDialog!.Text);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Meldung an ILS");
+    }
+
+    /// <summary>
+    /// Reopening the create-task overlay from an already-saved ETB row (#247) -- the one path
+    /// #88 left with no way back in once an entry was saved -- must anchor the resulting task's
+    /// timer to "now", not that row's own (possibly much older) timestamp, or a stale entry would
+    /// spawn a task that is overdue on arrival.
+    /// </summary>
+    [Fact]
+    public void Etb_row_create_task_icon_opens_dialog_anchored_to_now()
+    {
+        var vm = NewWorkspace(out _, out var clock);
+        vm.Etb.NewText = "Lage erkundet";
+        vm.Etb.AddEntryCommand.Execute(null);
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lage erkundet");
+
+        clock.Now = clock.Now.AddHours(1); // operator only gets to it later
+        var clickTime = clock.Now;
+        Assert.True(row.CanCreateTask);
+        row.CreateTaskCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingTaskDialog);
+        Assert.Equal("Lage erkundet", vm.PendingTaskDialog!.Text);
+
+        vm.PendingTaskDialog!.SaveCommand.Execute(null);
+
+        var task = Assert.Single(vm.Tasks.Rows, t => t.Text == "Lage erkundet");
+        Assert.StartsWith(Formatting.Timestamp(clickTime), task.CreatedDisplay, StringComparison.Ordinal);
+        Assert.False(task.IsOverdue); // anchored to now, so a fresh 15-minute timer is not overdue
+    }
+
+    // --- Persistence failure banner ----------------------------------------------------------
+    // IncidentStore's background writer raises SaveFailed on a disk-full/locked/corrupt-DB write
+    // (issue #167 P0 #1), but nothing in src/ used to subscribe to it -- the UI kept showing
+    // "gespeichert" while nothing reached disk. The workspace now surfaces it as PersistenceError,
+    // via the same store the session persists through (passed in here as `store:`).
+    private static IncidentWorkspaceViewModel WorkspaceWithStore(IIncidentStore store, out FixedClock clock)
+    {
+        clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        return new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            store: store);
+    }
+
+    [Fact]
+    public void A_failed_background_save_sets_a_German_persistence_error()
+    {
+        var store = new FakeStore();
+        var vm = WorkspaceWithStore(store, out _);
+
+        Assert.Null(vm.PersistenceError);
+
+        store.RaiseSaveFailed(new InvalidOperationException("Datenträger voll"));
+
+        Assert.Equal(
+            "Speichern fehlgeschlagen: Datenträger voll — Änderungen werden NICHT gesichert.",
+            vm.PersistenceError);
+    }
+
+    [Fact]
+    public void A_later_successful_save_clears_the_persistence_error()
+    {
+        var store = new FakeStore();
+        var vm = WorkspaceWithStore(store, out _);
+        store.RaiseSaveFailed(new InvalidOperationException("Datenträger voll"));
+        Assert.NotNull(vm.PersistenceError);
+
+        store.RaiseSaveSucceeded();
+
+        Assert.Null(vm.PersistenceError);
+    }
+
+    // Task 3 (a sibling PR) makes the workspace IDisposable; until then LeaveAsync is the one
+    // teardown path every caller already goes through (HomeViewModel navigates away via it), so
+    // that is where the store subscription comes off -- a closed workspace must not keep the
+    // app-lifetime store singleton reacting on its behalf.
+    [Fact]
+    public async Task Leaving_the_workspace_unsubscribes_from_the_store()
+    {
+        var store = new FakeStore();
+        var vm = WorkspaceWithStore(store, out _);
+
+        await vm.LeaveAsync();
+        store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
+
+        Assert.Null(vm.PersistenceError);
+    }
+
+    // Review fix round 1: IncidentStore is an app-lifetime singleton and its events carry no
+    // incident identity -- unsubscribing before every write queued by THIS workspace has actually
+    // landed would either drop a genuine late failure, or (worse) let it surface as the NEXT
+    // incident's PersistenceError once someone reuses the store. LeaveAsync must therefore await
+    // FlushAsync before unsubscribing. OrderRecordingStore lets this test hold FlushAsync's task
+    // pending to observe both halves of that ordering.
+    [Fact]
+    public async Task LeaveAsync_drains_the_store_before_unsubscribing()
+    {
+        var store = new OrderRecordingStore();
+        var vm = WorkspaceWithStore(store, out _);
+
+        var leaving = vm.LeaveAsync().AsTask();
+
+        // FlushAsync was called, but its task is still pending -- LeaveAsync must not have
+        // unsubscribed yet, so a write that was already queued before Leave (and only finishes
+        // now, as part of draining) still reaches this workspace's own PersistenceError.
+        Assert.Equal(new[] { "FlushAsync" }, store.Calls);
+        store.RaiseSaveFailed(new InvalidOperationException("Datenträger voll"));
+        Assert.Equal(
+            "Speichern fehlgeschlagen: Datenträger voll — Änderungen werden NICHT gesichert.",
+            vm.PersistenceError);
+
+        store.CompleteFlush();
+        await leaving;
+
+        // Unsubscribed only now: an event belonging to whatever incident reuses this app-lifetime
+        // store next must not bleed into this already-left, dead workspace.
+        vm.PersistenceError = null;
+        store.RaiseSaveFailed(new InvalidOperationException("gehört zum nächsten Einsatz"));
+        Assert.Null(vm.PersistenceError);
+    }
+}
+
+// Controls exactly when FlushAsync's task completes, and records call order, so
+// LeaveAsync_drains_the_store_before_unsubscribing can prove LeaveAsync drains the queue (and any
+// event a still-in-flight write raises) before it unsubscribes.
+internal sealed class OrderRecordingStore : IIncidentStore
+{
+    private readonly TaskCompletionSource _flushGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public List<string> Calls { get; } = new();
+
+    public void Save(string path, Incident incident)
+    {
+    }
+
+    public Task FlushAsync(CancellationToken cancellationToken = default)
+    {
+        Calls.Add("FlushAsync");
+        return _flushGate.Task;
+    }
+
+    public void CompleteFlush() => _flushGate.TrySetResult();
+
+    public Incident Load(string path) => throw new NotSupportedException();
+
+    public IncidentState? TryReadState(string path) => null;
+
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
+
+    public string ResolveFileDiskPath(string path, string storageFileName) => path;
+
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public event Action<Exception>? SaveFailed;
+
+    public event Action? SaveSucceeded;
+
+    public void RaiseSaveFailed(Exception ex) => SaveFailed?.Invoke(ex);
+
+    public void RaiseSaveSucceeded() => SaveSucceeded?.Invoke();
+}
+
+// Simulates a generation failure (e.g. disk full) so ExportPdf's try/catch can be exercised
+// without relying on an actual I/O failure.
+internal sealed class ThrowingPdfExporter : IIncidentPdfExporter
+{
+    public bool CanExport => true;
+
+    public byte[] Generate(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
+        throw new InvalidOperationException("Datenträger voll");
+}
+
+internal sealed class FakeLastPdfExportStore : ILastPdfExportStore
+{
+    private LastPdfExport? _seed;
+
+    public FakeLastPdfExportStore(LastPdfExport? seed = null) => _seed = seed;
+
+    public string? SetPath { get; private set; }
+
+    public DateTimeOffset? SetAt { get; private set; }
+
+    public LastPdfExport? GetLastExport() => _seed;
+
+    public void SetLastExport(string path, DateTimeOffset exportedAt)
+    {
+        SetPath = path;
+        SetAt = exportedAt;
+        _seed = new LastPdfExport(path, exportedAt);
     }
 }
 
@@ -746,11 +1267,17 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public string? LastOpenedUrl { get; private set; }
 
+    public string? LastSuggestedExportName { get; private set; }
+
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
 
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
-    public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult(ExportPath);
+    public Task<string?> PickExportPdfAsync(string suggestedFileName)
+    {
+        LastSuggestedExportName = suggestedFileName;
+        return Task.FromResult(ExportPath);
+    }
 
     public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
 
@@ -758,10 +1285,13 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public Task<string?> PickAttachmentAsync() => Task.FromResult(AttachmentPath);
 
+    /// <summary>Set to make <see cref="OpenFileAsync"/> fail, standing in for a launcher that throws.</summary>
+    public Exception? OpenFileFailure { get; set; }
+
     public Task OpenFileAsync(string path)
     {
         LastOpenedPath = path;
-        return Task.CompletedTask;
+        return OpenFileFailure is null ? Task.CompletedTask : Task.FromException(OpenFileFailure);
     }
 
     public Task OpenUrlAsync(string url)

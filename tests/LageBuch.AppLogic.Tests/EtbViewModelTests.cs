@@ -186,11 +186,17 @@ public class EtbViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var masterData = MasterDataSet.Empty with { RadioCallSigns = new[] { "Leitstelle", "Land 1" } };
+
+        // Callsign suggestions derive from the vehicles and the roster's callsigns.
+        var masterData = MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+            Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", null) },
+        };
 
         var vm = new EtbViewModel(session, clock, masterData, () => { });
 
-        Assert.Equal(new[] { "Leitstelle", "Land 1" }, vm.CallSignOptions);
+        Assert.Equal(new[] { "FFB 1/40/1", "Land 1" }, vm.CallSignOptions);
     }
 
     [Fact]
@@ -358,6 +364,69 @@ public class EtbViewModelTests
 
         vm.CloseHistoryCommand.Execute(null);
         Assert.Null(vm.HistoryEntry);
+    }
+
+    [Fact]
+    public void CreateTaskCommand_is_hidden_when_the_host_offers_no_task_feature()
+    {
+        var vm = NewVm(); // NewVm passes no createTaskFromEntry delegate
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+
+        Assert.False(row.CanCreateTask);
+        Assert.False(row.CreateTaskCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void CreateTaskCommand_invokes_the_delegate_with_the_row_text()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        string? capturedText = null;
+        void CaptureCreateTask(string text) => capturedText = text;
+
+        var vm = new EtbViewModel(
+            session,
+            clock,
+            MasterDataSet.Empty,
+            () => { },
+            CaptureCreateTask)
+        { NewText = "Lagemeldung" };
+        vm.AddEntryCommand.Execute(null);
+        var row = Assert.Single(vm.Entries, e => e.Text == "Lagemeldung");
+
+        Assert.True(row.CanCreateTask);
+        row.CreateTaskCommand.Execute(null);
+
+        Assert.Equal("Lagemeldung", capturedText);
+    }
+
+    [Fact]
+    public void CreateTaskCommand_is_hidden_on_a_readonly_session_even_when_the_host_offers_tasks()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
+        session.Close();
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, _ => { });
+
+        var row = Assert.Single(vm.Entries, r => r.Text == "Lagemeldung");
+        Assert.False(row.CanCreateTask);
+        Assert.False(row.CreateTaskCommand.CanExecute(null));
     }
 
     private static EtbViewModel NewVm()

@@ -27,9 +27,10 @@ internal static class WorkspaceRenderHelper
             new ChecklistTemplateItem("Fahrzeug abgerüstet und einsatzbereit?", true),
         },
         TruppTypes = new[] { "Angriffstrupp", "Sicherheitstrupp", "CSA-Trupp" },
-        Brigades = AnonymizedExampleData.Brigades,
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
-        RadioCallSigns = AnonymizedExampleData.RadioCallSigns,
+
+        // Wachen and Funkrufnamen suggestions derive from the vehicles (and the roster below).
+        Vehicles = AnonymizedExampleData.Vehicles,
         Links = AnonymizedExampleData.Links,
 
         // Fictional roster: the real personnel.json is gitignored, so tests supply their own

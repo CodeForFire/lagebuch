@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors">
 
   <Styles.Resources>
     <ResourceDictionary>
@@ -234,6 +235,9 @@
     <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <!-- Opens the suggestion dropdown on focus/click app-wide instead of requiring a keystroke
+         first (#259) — see Behaviors/OpenDropDownOnFocus.cs. -->
+    <Setter Property="b:OpenDropDownOnFocus.IsEnabled" Value="True" />
   </Style>
 
   <!-- NumericUpDown
@@ -270,6 +274,28 @@
         <StackPanel Spacing="2">
           <TextBlock Classes="overline" FontSize="10" Text="{TemplateBinding Header}" />
           <ContentPresenter Content="{TemplateBinding Content}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <!-- Suggestion field variant (#259): same "field" wrapper, but overlays a small chevron on the
+       content's top-right corner to signal it's backed by a suggestion list (AutoCompleteBox),
+       not free text. A non-hit-testable overlay rather than a template override on AutoCompleteBox
+       itself, which needs its own template intact for the popup/suggestion-list wiring. Opt in per
+       field with Classes="field suggest". -->
+  <Style Selector="HeaderedContentControl.field.suggest">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="2">
+          <TextBlock Classes="overline" FontSize="10" Text="{TemplateBinding Header}" />
+          <Grid>
+            <ContentPresenter Content="{TemplateBinding Content}" />
+            <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                      Margin="0,0,9,0" IsHitTestVisible="False"
+                      Foreground="{StaticResource TextMutedBrush}"
+                      Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+          </Grid>
         </StackPanel>
       </ControlTemplate>
     </Setter>

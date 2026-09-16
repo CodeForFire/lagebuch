@@ -155,6 +155,15 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
 
     public Task OpenFileAsync(string path)
     {
+        // Belt-and-suspenders, like OpenUrlAsync below: LaunchWithOsDefault runs the OS's registered
+        // handler for whatever it is given, so the only paths that may reach it are the attachment
+        // copies the app itself just wrote — an existing regular file under the private temp root.
+        // Attachment names come from whichever device added the file, so nothing here trusts them.
+        if (!AttachmentTempPaths.IsOpenableAttachment(path))
+        {
+            return Task.CompletedTask;
+        }
+
         LaunchWithOsDefault(path);
         return Task.CompletedTask;
     }

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -69,13 +70,9 @@ public class ForcesTabRenderTests
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
-        Brigades = new[] { AnonymizedExampleData.Brigade, AnonymizedExampleData.SecondBrigade },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
-        RadioCallSigns = new[]
-        {
-            AnonymizedExampleData.CallSign, AnonymizedExampleData.SecondCallSign,
-            AnonymizedExampleData.OtherBrigadeCallSign,
-        },
+
+        // Wachen and Funkrufnamen suggestions derive from these vehicles.
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 
@@ -97,10 +94,11 @@ public class ForcesTabRenderTests
         Tabs(window).SelectedIndex = 4; // KRÄFTE
         Dispatcher.UIThread.RunJobs();
 
-        vm.Forces.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
+        // Available across every Wache without typing anything (#215).
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
 
         vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0];
+        Assert.Equal("FFB Wache 1", vm.Forces.NewBrigade); // derived from the pick
         Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
         Assert.Equal(1, vm.Forces.NewOfficerCount);
         Assert.Equal(8, vm.Forces.NewMannschaftCount);
@@ -158,9 +156,13 @@ public class ForcesTabRenderTests
         Assert.Equal(2, vm.Forces.Forces.Count);
 
         // The ✕ column takes the unit back completely: row and totals shrink, the ETB logs it.
+        // Removal is destructive, so it goes through the same confirm overlay as CloseIncident.
         var row = vm.Forces.Forces.Single(r => r.Brigade == "FFB Wache 1");
         Assert.True(row.RemoveCommand.CanExecute(null));
         row.RemoveCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotNull(vm.PendingConfirm);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
         var remaining = Assert.Single(vm.Forces.Forces);
@@ -208,6 +210,132 @@ public class ForcesTabRenderTests
         }
     }
 
+    // #262 (UX review, "No accessibility support"): the Stärke korrigieren button sits inside a
+    // DataGridTemplateColumn cell, one layer deeper than a plain grid cell -- whether Tab reaches
+    // it at all was an open question, not an assumption (see the plan's decision on DataGrid
+    // keyboard reachability). It does, in a single Tab from the grid.
+    [AvaloniaFact]
+    public void Tab_from_the_grid_reaches_the_strength_correction_button()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewMannschaftCount = 6;
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        window.Measure(new Size(1920, 1032));
+        window.Arrange(new Rect(0, 0, 1920, 1032));
+        Dispatcher.UIThread.RunJobs();
+
+        var grid = view.GetControl<DataGrid>("ForcesGrid");
+        var strengthButton = grid.GetVisualDescendants().OfType<Button>()
+            .Single(b => (ToolTip.GetTip(b) as string) == "Stärke korrigieren");
+
+        grid.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(
+            strengthButton.IsKeyboardFocusWithin,
+            "Tab from the Forces grid no longer reaches the Stärke korrigieren button in one press.");
+    }
+
+    [AvaloniaFact]
+    public void Vehicle_selection_with_zugfuehrer_presets_within_seat_capacity()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        vm.Forces.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true);
+        Dispatcher.UIThread.RunJobs();
+
+        // The Zugführer occupies one of the vehicle's 4 seats -- the preset must not exceed the
+        // seat count (#260), so Officer/Mannschaft split the remaining 3, not all 4.
+        Assert.Equal(1, vm.Forces.NewZugfuehrerCount);
+        Assert.Equal(1, vm.Forces.NewOfficerCount);
+        Assert.Equal(2, vm.Forces.NewMannschaftCount);
+        Assert.Equal(4, vm.Forces.NewZugfuehrerCount + vm.Forces.NewOfficerCount + vm.Forces.NewMannschaftCount);
+
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Forces.Forces);
+        Assert.Equal("1/1/2/4", row.StrengthText);
+
+        Capture(window, "forces-zf-seat-preset.png");
+    }
+
+    [AvaloniaFact]
+    public void Selecting_a_vehicle_locks_brigade_and_call_sign_and_shows_a_clear_button()
+    {
+        var view = HostForcesView(out var vm, out var window);
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "forces-manual-entry.png"); // before: nothing picked, both fields free
+
+        var brigadeBox = view.GetControl<TextBox>("BrigadeBox");
+        var callSignBox = view.GetControl<TextBox>("CallSignBox");
+        var clearButton = view.GetControl<Button>("ClearVehicleButton");
+        Assert.True(brigadeBox.IsEnabled);
+        Assert.True(callSignBox.IsEnabled);
+        Assert.False(clearButton.IsVisible);
+
+        vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0]; // FFB 1/40/1
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(brigadeBox.IsEnabled);
+        Assert.False(callSignBox.IsEnabled);
+        Assert.True(clearButton.IsVisible);
+        Capture(window, "forces-vehicle-locked.png"); // after: identity fields locked, X shown
+
+        clearButton.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(brigadeBox.IsEnabled);
+        Assert.True(callSignBox.IsEnabled);
+        Assert.False(clearButton.IsVisible);
+        Assert.Null(vm.Forces.SelectedVehicle);
+
+        // Clearing keeps the derived values -- the operator edits on instead of starting over.
+        Assert.Equal("FFB Wache 1", vm.Forces.NewBrigade);
+        Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
+    }
+
+    [AvaloniaFact]
+    public void Brigade_and_call_sign_are_plain_text_fields_and_Enter_in_either_adds_the_row()
+    {
+        // Master-data vehicles are picked through the FAHRZEUG dropdown; these two fields exist
+        // for vehicles that are NOT in the Stammdaten (Fremdwehren), so they must be plain text
+        // boxes -- no suggestion list, no chevron, nothing that pops open on focus.
+        var view = HostForcesView(out var vm, out var window);
+        var brigadeBox = view.GetControl<TextBox>("BrigadeBox");
+        var callSignBox = view.GetControl<TextBox>("CallSignBox");
+        Assert.Empty(view.GetVisualDescendants().OfType<AutoCompleteBox>());
+
+        vm.Forces.NewBrigade = "FF Nachbarort";
+        vm.Forces.NewCallSign = "Nachbarort 40/1";
+        vm.Forces.NewMannschaftCount = 6;
+        Dispatcher.UIThread.RunJobs();
+
+        callSignBox.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Forces.Forces);
+        Assert.Equal("Nachbarort 40/1", row.CallSign);
+
+        vm.Forces.NewBrigade = "FF Nachbarort";
+        vm.Forces.NewCallSign = "Nachbarort 44/1";
+        vm.Forces.NewMannschaftCount = 6;
+        Dispatcher.UIThread.RunJobs();
+
+        brigadeBox.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, vm.Forces.Forces.Count);
+        Capture(window, "forces-manual-entry-plain-text.png");
+    }
+
     [AvaloniaFact]
     public void A_taken_vehicle_is_hidden_from_the_dropdown_and_a_typed_duplicate_is_blocked()
     {
@@ -234,22 +362,29 @@ public class ForcesTabRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        vm.Forces.NewBrigade = "FFB Wache 1";
         vm.Forces.SelectedVehicle = vm.Forces.VehicleOptions[0]; // FFB 1/40/1
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        // The taken vehicle no longer appears in the dropdown for its brigade.
-        vm.Forces.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/44/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
+        // The taken vehicle no longer appears in the dropdown, regardless of Wache (#215).
+        Assert.Equal(new[] { "FFB 1/44/1", "Aich 42/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
 
         // Free-typing the taken call sign blocks HINZUFÜGEN and shows the hint.
+        vm.Forces.NewBrigade = "FFB Wache 1"; // AddForceCommand cleared it after the first add
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.NewCallSign = "FFB 1/40/1";
         Dispatcher.UIThread.RunJobs();
         Assert.False(vm.Forces.AddForceCommand.CanExecute(null));
         var hint = view.GetControl<TextBlock>("DuplicateHint"); // the view owns the name scope
         Assert.True(hint.IsVisible);
+
+        // The hint used to sit at the end of the fields' horizontal StackPanel, where a window
+        // narrower than this test's 1920px could clip it off the right edge. It now renders on
+        // its own line below the fields, so it always has the full row width to wrap into.
+        var addButton = view.GetControl<Button>("AddForceButton");
+        Assert.True(
+            hint.Bounds.Y >= addButton.Bounds.Bottom,
+            $"DuplicateHint (y={hint.Bounds.Y}) should render below the fields row (button bottom={addButton.Bounds.Bottom}), not beside it");
 
         Capture(window, "forces-duplicate-blocked.png");
     }

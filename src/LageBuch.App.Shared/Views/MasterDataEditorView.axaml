@@ -21,6 +21,14 @@
                   IsVisible="{Binding FileError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding FileError}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
           </Border>
+          <!-- Hinweis, kein Fehler: Wachen/Funkrufnamen aus einer älteren Datei, zu denen kein
+               Fahrzeug und keine Person gehört, werden nicht übernommen und hier benannt. -->
+          <Border x:Name="FileNoticeBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#241608" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding FileNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding FileNotice}" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{StaticResource AmberBrush}" TextWrapping="Wrap" MaxWidth="520" />
+          </Border>
           <!-- Fahrzeuge sind eindeutig (#76 follow-up): doppelte Funkrufnamen blockieren das
                Speichern, die Meldung nennt die Konflikte. -->
           <Border x:Name="VehicleConflictsBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
@@ -121,16 +129,19 @@
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
                             <Button Grid.Column="1" Classes="icon-btn" Margin="6,0,0,0" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
                             </Button>
                             <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
                             <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -165,16 +176,19 @@
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
                             <Button Grid.Column="2" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
                             </Button>
                             <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
                             <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -212,16 +226,19 @@
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
                             <Button Grid.Column="2" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
                             </Button>
                             <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
                             <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -239,30 +256,47 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
-                  <!-- Column headers (#137): each row is unlabeled otherwise. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,Auto,Auto,Auto" Margin="0,0,0,6">
+                  <!-- Column headers (#137): each row is unlabeled otherwise.
+                       The trailing three columns use fixed widths matching the row template's
+                       icon-btn buttons (28px, plus each subsequent button's 4px left margin) —
+                       "Auto" would size to this Grid's own (empty) content instead of the row
+                       template's buttons, leaving the header and row Grids to disagree on width
+                       and dragging SITZPLÄTZE/ZF out of alignment with their columns. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,28,32,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="3" Text="ZF" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="3" Text="ZF" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Zugführerfahrzeug" />
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
-                          <Grid ColumnDefinitions="*,*,150,70,Auto,Auto,Auto" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,*,150,70,28,32,32" Margin="0,0,0,6">
                             <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                  aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
-                            <AutoCompleteBox Grid.Column="0"
-                                             PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
-                                             ItemsSource="{Binding WacheOptions}"
-                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                             Text="{Binding Wache}" Margin="0,0,6,0" />
-                            <AutoCompleteBox Grid.Column="1"
-                                             PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                                             ItemsSource="{Binding CallSignOptions}"
-                                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                                             Text="{Binding CallSign}" Margin="0,0,6,0" />
+                            <Grid Grid.Column="0" Margin="0,0,6,0">
+                              <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
+                                               ItemsSource="{Binding WacheOptions}"
+                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                               Text="{Binding Wache}" />
+                              <!-- Chevron affordance (#259), see OperatorPromptView for rationale. -->
+                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,9,0" IsHitTestVisible="False"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Grid>
+                            <Grid Grid.Column="1" Margin="0,0,6,0">
+                              <AutoCompleteBox PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                               ItemsSource="{Binding CallSignOptions}"
+                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                               Text="{Binding CallSign}" />
+                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,9,0" IsHitTestVisible="False"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Grid>
                             <NumericUpDown Grid.Column="2" Width="90" Minimum="0" Maximum="99" Increment="1"
                                            FormatString="0" Value="{Binding Seats}" VerticalAlignment="Center" />
                             <!-- Marks a command vehicle (ELW/KdoW) that carries the Zugführer: unlike
@@ -273,16 +307,19 @@
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
                             <Button Grid.Column="4" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
                             </Button>
                             <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
                             <Button Grid.Column="6" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -329,6 +366,7 @@
                                      PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                                      Text="{Binding Phone}" Margin="0,0,6,0" />
                             <Button Grid.Column="5" Classes="icon-btn" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />

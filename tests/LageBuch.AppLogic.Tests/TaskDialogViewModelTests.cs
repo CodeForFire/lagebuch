@@ -24,7 +24,7 @@ public class TaskDialogViewModelTests
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
-        RadioCallSigns = new[] { "FFB 1/44/1" },
+        Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 6) },
     };
 
     [Fact]
@@ -88,6 +88,22 @@ public class TaskDialogViewModelTests
 
         Assert.Empty(session.Incident.Tasks);
         Assert.True(closed);
+    }
+
+    [Fact]
+    public void Save_anchors_the_task_to_now_even_when_opened_from_an_older_etb_row()
+    {
+        var (session, clock) = NewSession();
+
+        // Reopened from an ETB row logged well before now (#247) -- the timer must still start
+        // from "now", not that row's own timestamp, or a long-past entry would spawn a task that
+        // is overdue on arrival.
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Nachtrag zu altem Eintrag", () => { });
+
+        dialog.SaveCommand.Execute(null);
+
+        var task = Assert.Single(session.Incident.Tasks);
+        Assert.Equal(clock.Now, task.CreatedAt);
     }
 
     [Fact]

@@ -10,7 +10,164 @@ once we reach 1.0.
 ## [Unreleased]
 
 ### Added
+- Einsatzdaten dialog: Stichwort, Einsatznummer, Straße and Ortsteil are edited together from a
+  pencil in the workspace header (or "+ Einsatzdaten ergänzen" while nothing is known yet). The
+  address had no UI at all before, so the PDF's "Adresse" line was always empty; it now shows in
+  the header and the PDF, and a change made on one device reaches every joined device.
+- The join dialog remembers the host address used for the last successful connection and
+  prefills it (selected, ready to overwrite) instead of starting empty every time.
+- Fictional sample data for a first try-out ("Probefahrt"): `docs/samples/demo-stammdaten.json`
+  and a matching `docs/samples/uebung.fwincident`, generated and kept valid by a test. The README
+  now opens in German for ELW crews, with a demo GIF and a sourced comparison table; the
+  developer documentation follows in English.
+
+### Changed
+- Wachen and Funkrufnamen are derived from the Fahrzeuge (plus the Personal roster's call
+  signs) instead of being maintained as separate Stammdaten lists. Their editor sections and
+  the `brigades` / `radioCallSigns` JSON keys are gone; importing an older file names any
+  entry that no vehicle or person covers.
+- The new-incident dialog no longer asks for a Stichwort; it is entered afterwards in the
+  Einsatzdaten dialog, like the Einsatznummer always was. New files are therefore named by date
+  and time only (`20260819-2217.fwincident`), and the header's inline "+ ILS-Nr. hinzufügen"
+  editor is replaced by that dialog.
+- Kräfte tab: "Feuerwehr / Wache" and "Funkrufname" in the entry dock are plain text fields.
+  They exist for vehicles that are not in the Stammdaten, so the suggestion dropdown they
+  used to open on focus only re-offered what the Fahrzeug picker already lists. Enter in
+  either field adds the row.
+- The "ÖFFNEN" actions in the Links tab and the Über dialog share one URL-opening helper, so a
+  link that is blocked or cannot be opened is validated and reported identically in both places.
+  No change to what either shows. (#302)
+
+### Fixed
+- Alarm cues could be delayed or silently skipped while the app was busy. Each cue ran on a
+  thread-pool thread, and a pool saturated by other work hands out threads only as fast as it
+  grows them — so a cue could sit unplayed for seconds, or outlast its own hung-player watchdog
+  without ever having started. Alarms fire exactly when the app is busiest, which is precisely
+  when this bit. Cues now get a dedicated thread each and no longer queue behind unrelated work.
+- The four small preference files — recent incidents, last save folder, last PDF export and last
+  join host — are written atomically (to a temp file that is then renamed into place), the way
+  `trust.json` already was. A crash or a full disk mid-write used to be able to leave a truncated
+  file behind, which the next start silently read as "nothing remembered". (#302)
+- The PDF's Aufgaben section marks a task "FÄLLIG" against the moment the export was taken,
+  instead of reading the wall clock while the document renders. Exporting the same closed
+  Einsatz twice now produces the same table, where before a task could be shown as due on one
+  export and overdue on the next. (#302)
+- A failed write to `trust.json` no longer leaves the running app trusting a host certificate the
+  file does not record. Accepting or resetting a host's certificate updated memory first and wrote
+  afterwards, so if the write failed (full disk, permissions) the session kept connecting happily
+  while the next start re-prompted for the same host. The write now happens first and is only
+  adopted once it lands, and a retry after a failed reset does the work instead of silently
+  skipping it. (#302)
+- The sync server only bound IPv4 (`0.0.0.0`), so a device reachable only over IPv6 could never
+  join a hosted incident. It now binds dual-stack, accepting both IPv4 and IPv6 on the same
+  socket, and falls back to IPv4-only itself if the platform doesn't support IPv6.
+- Linux: the app icon now resolves in the menu and the dock. The `.deb` shipped a single
+  1024px file filed under the theme's `512x512` directory and depended on nothing, so on a
+  system without a desktop icon theme there was no theme to find it in at all, and everywhere
+  else every size — panel, menu, dock, app grid — was scaled down from that one megapixel
+  image. It now installs a real file for each hicolor size plus the scalable SVG, and depends
+  on `hicolor-icon-theme`. (#310)
+- Linux: complete the desktop entry — window-to-launcher matching (`StartupWMClass`), search
+  keywords, a subtitle and an accurate description in `apt show` (#310)
+- Linux: the `.deb` now declares the system libraries it actually needs. "Self-contained"
+  covers the .NET runtime, not ICU, fontconfig and the X11 client libraries — so on a machine
+  without a desktop environment already installed, `apt install ./lagebuch_*.deb` reported
+  success and the app then died immediately with "Couldn't find a valid ICU package installed
+  on the system". Install it with `apt` rather than `dpkg -i`, which cannot resolve
+  dependencies. Verified on Debian 12/13 and Ubuntu 22.04/24.04.
+- CO-Messung: corrected the empty-state message to use German typographic quotes and added the missing comma before "um zu beginnen".
+
+## [0.5.0] - 2026-09-11
+
+Attachment handling, PDF export control, more depth in CO-Messung and accessibility —
+plus every P0/P1 fix from the 2026-09 architecture, security and performance review (#304).
+
+### Added
+- Drag and drop attachments onto the Dateien tab (#273)
+- Delete an attachment, with a confirmation prompt (#271)
+- PDF export: pick which sections go in, with progress and status feedback, and the incident
+  remembers where it was last exported to (#269)
+- CO-Messung: colour-coded ppm danger severity and a warning on implausible readings (#278)
+- CO-Messung: per-floor unit counts and labels (#268)
+- CO-Messung: an OG HINZUFÜGEN button to add upper floors (#263)
+- A visible ÖFFNEN button on each recent-incidents row (#276)
+- Search box on the Links tab, and ÖFFNEN now shows and says that it opens the system browser (#262, #275)
+- Accessibility: AutomationProperties labelling and keyboard navigation for the Kräfte flyouts (#283)
+- The project logo and slogan (#281)
+
+### Changed
+- CO-Messung: ABBRECHEN in the Wohnung editor now actually discards. Status, CO-Wert,
+  Bezeichnung, Bewohnername and Schlüssel are buffered until FERTIG, so an intermediate or
+  mistyped ppm reading no longer lands in the Einsatztagebuch. The tile previews the pending
+  state while the sidebar is open. (#242)
+- The PIN field on the join screen accepts digits only (#277)
+- Removing a unit asks for confirmation first, and Kräfte/Stammdaten explain why a control is
+  disabled or a label abbreviated (#257)
+- Release notes are generated from this file's section for the tag being built (#261)
+- Dependency updates across Avalonia, Microsoft.Data.Sqlite, the SignalR client and the test SDK
+
+### Fixed
+- Stop a Kraft's Stärke-Historie from duplicating on every save: each save was re-inserting
+  the whole edit history on top of what was already on disk, so a file saved N times held N
+  copies of every correction. Existing files are deduplicated the next time they are opened. (#279)
+- Surface a failed background save (disk full, read-only, locked/corrupt DB) as a persistent
+  red banner in the Einsatz workspace instead of silently leaving the incident unsaved (#280)
+- Leaving an open Einsatz via the top command bar (ÜBERSICHT, STAMMDATEN, ÖFFNEN, NEUER EINSATZ,
+  VERBINDEN) instead of the workspace's own "ZUR STARTSEITE" no longer leaks its subscription to
+  the background save-failure store (#280)
+- Navigating home no longer leaves the incident workspace running in the background: closing it
+  now stops its once-a-second ticker (Atemschutz, Aufgaben, ILS-Erinnerung) and unsubscribes it
+  from further changes, and a joined client also drops its host-connection event handlers. (#284)
+- Funktionen: the Rolle suggestions now open on focus and on click, not only while typing (#266)
+- Kräfte: the Zugführer flag no longer adds a seat on top of the vehicle's own capacity (#264)
+
+### Security
+- Harden CI workflows: `ci.yml` now runs with read-only `contents` permission and enforces
+  `dotnet format` in CI; `claude.yml` only responds to `@claude` mentions from repo owners,
+  members and collaborators; Dependabot now tracks the Android and acceptance-test projects'
+  own `Directory.Packages.props` files in addition to the root one.
+- Attachment names from a joined device can no longer escape the temp directory or smuggle in an
+  executable type. A file name is reduced to its last path segment and capped at 255 bytes on the
+  way into the domain (and on load, so a name already in a snapshot or file is neutralised too),
+  its extension must match the declared file type, ÖFFNEN copies the bytes into a fresh private
+  directory under the app's own temp root instead of the shared system temp directory, and the
+  desktop launcher refuses anything that is not a regular image or PDF file inside that root. (#285)
+- `JsonTrustStore` now takes its lock for reads too, closing a race where the TLS
+  certificate-pin check on a join could read the trusted-thumbprint cache while another
+  handshake was writing it; the trust file is also now written via a temp file plus rename, so
+  a crash mid-write can no longer leave a corrupt `trust.json` behind. Joining another device's
+  incident no longer has an "accept any certificate" fallback — a trust store is required, so a
+  join is always TLS-pinned. (#286)
+- Android: the `FileProvider` now grants access to only its `shared/` and `lagebuch/`
+  subdirectories, not the whole cache directory — `import.json`, picked attachments and the
+  synced-attachment cache are no longer reachable through a shared or opened URI. A malicious
+  content provider's `DISPLAY_NAME` for a picked attachment can no longer escape the app's cache
+  directory via `../` path traversal; it is now sanitised to a bare file name with a safe fallback. (#303)
+
+## [0.4.1] - 2026-09-07
+
+### Added
 - Show the 25 MB per-file attachment limit in the Files view (#213)
+- Create a task from an already-saved ETB entry via a row icon (#247)
+- Add a Zugführer headcount to Kräfte (#233)
+- Support Untergeschoss (UG) floors in CO-Messung (#235)
+- Add a +5 minute snooze for the ILS reminder (#244)
+- Add a Zugführer flag to vehicle master data (#248)
+- Derive the Feuerwehr automatically from a single Fahrzeug pick (#231)
+- Lock the brigade and call sign once a Fahrzeug is picked (#251)
+
+### Changed
+- Unify the "add entry" button placement across tabs (#236)
+
+### Fixed
+- Hide ETB system messages by default (#230)
+- Keep the selected Haus after entering a ppm value in CO-Messung (#238)
+- Make the apartment header field look editable in CO-Messung (#234)
+- Make Truppnummer an internal, auto-assigned SCBA field (#226)
+- Stop the Aufgabe alarm from clipping (#228)
+- Disable HINZUFÜGEN until a Kraft row has counted personnel (#227)
+- Stop bundling QuestPDF into the Android build (#252)
+- Allow adding an Einsatznummer even without a Stichwort (#253)
 
 ### Changed
 - Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
@@ -117,7 +274,9 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/CodeForFire/lagebuch/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/CodeForFire/lagebuch/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/CodeForFire/lagebuch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/CodeForFire/lagebuch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/CodeForFire/lagebuch/compare/v0.1.0...v0.2.0

@@ -2,7 +2,7 @@ using LageBuch.Domain;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-// Collected in the operator popup when creating a new incident. The Einsatznummer is unknown at
-// this point (#69) — only the Stichwort (dispatch's short keyword) is captured, and only if given;
-// the Einsatznummer can be added later, from the workspace header.
-public sealed record NewIncidentRequest(SessionOperator Operator, string? Keyword);
+// Collected in the operator popup when creating a new incident: only who documents. Neither the
+// Einsatznummer (#69) nor the Stichwort is asked for here -- every head datum (Stichwort,
+// Einsatznummer, Adresse) is entered afterwards through the workspace's Einsatzdaten dialog.
+public sealed record NewIncidentRequest(SessionOperator Operator);

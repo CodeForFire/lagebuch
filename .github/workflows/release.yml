@@ -14,8 +14,11 @@ on:
         description: Version to build the macOS .dmg for (e.g. 0.2.0), matching an existing v-tag release.
         required: true
 
+# Read-only by default. Only the `release` job, which creates the GitHub
+# release and uploads the packages, escalates to contents: write; the build
+# jobs just compile and hand artifacts over.
 permissions:
-  contents: write
+  contents: read
 
 env:
   PUBLISH_FLAGS: >-
@@ -28,18 +31,39 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      msi_version: ${{ steps.v.outputs.msi_version }}
+      deb_version: ${{ steps.v.outputs.deb_version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       # tag push -> strip the leading 'v' from the tag; dispatch -> the supplied input.
+      #
+      # A prerelease tag (v0.6.0-beta.1) needs three spellings of that one version, because the
+      # packaging formats disagree about what a suffix means:
+      #   version      0.6.0-beta.1   filenames, APK, -p:Version=, the CHANGELOG.md heading
+      #   msi_version  0.6.0          WiX rejects a non-numeric ProductVersion outright
+      #   deb_version  0.6.0~beta.1   '-' opens a Debian revision, which sorts ABOVE a plain
+      #                               0.6.0; '~' sorts below it, so apt sees the final as newer
       - id: v
         env:
           REF_NAME: ${{ github.ref_name }}
           INPUT_VERSION: ${{ inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "version=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "push" ]; then
+            v="${REF_NAME#v}"
           else
-            echo "version=${INPUT_VERSION}" >> "$GITHUB_OUTPUT"
+            v="${INPUT_VERSION}"
           fi
+          case "$v" in
+            *-*) prerelease=true ;;
+            *)   prerelease=false ;;
+          esac
+          {
+            echo "version=$v"
+            echo "msi_version=${v%%-*}"
+            echo "deb_version=$(printf '%s' "$v" | tr '-' '~')"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
 
   windows:
     needs: version
@@ -61,9 +85,11 @@ jobs:
       - name: Build MSI
         # Absolute paths: WiX resolves <Files Include> relative to the .wxs file's own directory,
         # not the working directory, so a bare "publish" would look under packaging/windows.
+        # msi_version, not version: a ProductVersion must be numeric, so the MSI inside a
+        # v0.6.0-beta.1 release identifies itself as 0.6.0. The file name keeps the full version.
         run: >
           wix build packaging/windows/Lagebuch.wxs
-          -d Version=${{ needs.version.outputs.version }}
+          -d Version=${{ needs.version.outputs.msi_version }}
           -d "PublishDir=${{ github.workspace }}\publish"
           -d "IconFile=${{ github.workspace }}\src\LageBuch.App\Assets\icon.ico"
           -o "lagebuch-${{ needs.version.outputs.version }}-x64.msi"
@@ -86,13 +112,21 @@ jobs:
         run: >
           dotnet publish src/LageBuch.App/LageBuch.App.csproj -r linux-x64 ${{ env.PUBLISH_FLAGS }}
           -p:Version=${{ needs.version.outputs.version }} -o publish
+      # build-deb.sh renders the hicolor icon sizes with ImageMagick and refuses to build
+      # without it; ubuntu-24.04 runners carry no ImageMagick, rsvg or Inkscape. desktop-file-utils
+      # is only needed so the script's optional entry validation actually runs in CI.
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick desktop-file-utils
       - name: Build .deb
         run: |
           chmod +x packaging/linux/build-deb.sh
           packaging/linux/build-deb.sh \
-            "${{ needs.version.outputs.version }}" \
+            "${{ needs.version.outputs.deb_version }}" \
             publish \
             src/LageBuch.App.Shared/Assets/icon-1024.png \
+            src/LageBuch.App/Assets/icon.svg \
             dist
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -110,7 +144,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Setup JDK
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21'
@@ -139,35 +173,74 @@ jobs:
     runs-on: ubuntu-latest
     # Publish the Windows + Linux installers to the release for the pushed tag.
     if: github.event_name == 'push'
+    permissions:
+      contents: write # create the release and upload its assets
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
+      - name: Extract changelog section
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 { found=1; next }
+            found && index($0, "## [") == 1 { exit }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' -e '${/^$/d}' > changelog-section.md
+          if [ ! -s changelog-section.md ]; then
+            echo "_No changelog entry found for v${VERSION}; see CHANGELOG.md._" > changelog-section.md
+          fi
+      - name: Build release notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          DEB_VERSION: ${{ needs.version.outputs.deb_version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          : > release-notes.md
+          if [ "$PRERELEASE" = "true" ]; then
+            cat >> release-notes.md <<'EOF'
+          > **Vorabversion.** Zum Ausprobieren und für Übungen gedacht — im Einsatz bitte nicht
+          > als einzige Dokumentation verwenden. Rückmeldungen gerne als GitHub-Issue.
+
+          EOF
+          fi
+          cat changelog-section.md >> release-notes.md
+          cat >> release-notes.md <<EOF
+
+          Getaggter Release-Build.
+
+          | Plattform | Datei |
+          |-----------|-------|
+          | Windows   | \`lagebuch-${VERSION}-x64.msi\` |
+          | Linux     | \`lagebuch_${DEB_VERSION}_amd64.deb\` |
+          | Android   | \`lagebuch-${VERSION}.apk\` |
+
+          Ein macOS-Build (Apple Silicon, \`.dmg\`) wird auf Anfrage bereitgestellt und dann hier
+          angehängt.
+
+          **Die Pakete sind nicht signiert.** Beim ersten Start:
+          - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
+          - **Linux**: \`sudo apt install ./lagebuch_*.deb\` — bitte \`apt\`, nicht \`dpkg -i\`:
+            das Paket deklariert seine System-Abhängigkeiten, und \`dpkg\` kann diese nicht
+            auflösen (nach einem \`dpkg -i\` hilft \`sudo apt-get -f install\`).
+          - **Android**: aktiviere einmalig *Installation aus unbekannten Quellen* für den
+            Browser/Dateimanager, mit dem die APK geöffnet wird.
+          - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
+            oder \`xattr -dr com.apple.quarantine /Applications/Lagebuch.app\`.
+          EOF
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ needs.version.outputs.version }}
           name: Lagebuch v${{ needs.version.outputs.version }}
-          prerelease: true
+          # Full releases since 0.5.0: brigades run these builds on real Einsätze, so the
+          # download should be the obvious one. A prerelease tag (v0.6.0-beta.1) flags itself and
+          # leaves the last full release as "Latest". Pre-1.0 either way — see CHANGELOG.md,
+          # breaking changes may land in any release until then.
+          prerelease: ${{ needs.version.outputs.prerelease }}
           files: dist/**/*
-          body: |
-            Getaggter Release-Build.
-
-            | Plattform | Datei |
-            |-----------|-------|
-            | Windows   | `lagebuch-${{ needs.version.outputs.version }}-x64.msi` |
-            | Linux     | `lagebuch_${{ needs.version.outputs.version }}_amd64.deb` |
-            | Android   | `lagebuch-${{ needs.version.outputs.version }}.apk` |
-
-            Ein macOS-Build (Apple Silicon, `.dmg`) wird auf Anfrage bereitgestellt und dann hier
-            angehängt.
-
-            **Die Pakete sind nicht signiert.** Beim ersten Start:
-            - **Windows**: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
-            - **Linux**: `sudo dpkg -i lagebuch_*.deb` (oder `sudo apt install ./lagebuch_*.deb`).
-            - **Android**: aktiviere einmalig *Installation aus unbekannten Quellen* für den
-              Browser/Dateimanager, mit dem die APK geöffnet wird.
-            - **macOS**: Rechtsklick auf Lagebuch.app → *Öffnen* (einmalig bestätigen),
-              oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`.
+          body_path: release-notes.md
 
   # macOS carries the 10x minute multiplier, so it is not built on every tag. Run this workflow
   # manually (workflow_dispatch) with the version of an existing release to add the .dmg to it.
@@ -175,6 +248,8 @@ jobs:
     needs: version
     if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
+    permissions:
+      contents: write # gh release upload adds the .dmg to an existing release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0

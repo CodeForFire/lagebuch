@@ -1,3 +1,4 @@
+using System.Net;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
@@ -43,6 +44,7 @@ public class RemoteClientTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
             TestHost.DefaultPin,
             port);
 
@@ -66,8 +68,8 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
 
-        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
-        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
         var aChange = NextChange(a);
         var bChange = NextChange(b);
@@ -86,9 +88,9 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var uploader = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
         await using var observer = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
         var uploaderChange = NextChange(uploader);
         var observerChange = NextChange(observer);
@@ -113,9 +115,9 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var renamer = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
         await using var observer = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
         var renamerAdded = NextChange(renamer);
         var observerAdded = NextChange(observer);
@@ -132,6 +134,63 @@ public class RemoteClientTests
         Assert.Equal("Küchenbrand", Assert.Single(observer.Incident.Files).DisplayName);
     }
 
+    // A patched client can put anything in AddFileCommand.FileName, and every peer later writes the
+    // bytes to a temp file under that name — so the host must neutralise it (accept the file, keep
+    // only the last path segment) before it ever reaches its own state or another device.
+    [Fact]
+    public async Task A_hostile_file_name_from_a_client_is_sanitised_before_it_reaches_the_host_or_a_peer()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        await using var attacker = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        await using var observer = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        var attackerChange = NextChange(attacker);
+        var observerChange = NextChange(observer);
+        await attacker.SendAsync(new AddFileCommand(
+            new OperatorDto("A", "RUF 1"),
+            Guid.NewGuid(),
+            "../../../.config/autostart/evil.png",
+            "image/png",
+            4));
+        await Task.WhenAll(attackerChange, observerChange);
+
+        Assert.Equal("evil.png", Assert.Single(hostSession.Incident.Files).FileName);
+        Assert.Equal("evil.png", Assert.Single(attacker.Incident.Files).FileName);
+        Assert.Equal("evil.png", Assert.Single(observer.Incident.Files).FileName); // via the snapshot
+        Assert.Equal("evil.png", Assert.Single(observer.Incident.Files).DisplayName);
+    }
+
+    // Sanitising cannot save an attachment whose *extension* is the payload: the OS launches
+    // "Lageplan.hta" with mshta whatever the declared content type says. The domain guard rejects
+    // the command, and HandleCommand maps that ArgumentException to 400.
+    [Fact]
+    public async Task A_file_whose_extension_contradicts_its_content_type_is_rejected_with_400()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        await using var attacker = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        var rejected = await Assert.ThrowsAsync<HttpRequestException>(() => attacker.SendAsync(new AddFileCommand(
+            new OperatorDto("A", "RUF 1"),
+            Guid.NewGuid(),
+            "Lageplan.hta",
+            "image/png",
+            4)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        Assert.Empty(hostSession.Incident.Files);
+    }
+
     [Fact]
     public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
     {
@@ -139,7 +198,7 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
         Assert.Null(await client.GetFileBytesAsync(Guid.NewGuid()));
     }
@@ -151,7 +210,7 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
         var tooBig = new byte[LageBuch.Domain.Files.IncidentFile.MaxSizeBytes + 1];
         await Assert.ThrowsAsync<ArgumentException>(() => client.AddFileAsync("huge.pdf", "application/pdf", tooBig));
@@ -168,7 +227,7 @@ public class RemoteClientTests
         try
         {
             await using var uploader = await RemoteIncidentSession.ConnectAsync(
-                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port);
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
             var bytes = new byte[] { 1, 2, 3 };
             var uploaderChange = NextChange(uploader);
             await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
@@ -180,6 +239,7 @@ public class RemoteClientTests
                 new SessionOperator("B"),
                 "1.0.0",
                 new ImmediateUiDispatcher(),
+                new InMemoryTrustStore(),
                 TestHost.DefaultPin,
                 port,
                 cacheRoot: cacheRoot);
@@ -206,7 +266,7 @@ public class RemoteClientTests
         await using var _ = host;
 
         await Assert.ThrowsAsync<VersionMismatchException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), TestHost.DefaultPin, port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port));
     }
 
     [Fact]
@@ -218,7 +278,7 @@ public class RemoteClientTests
 
         // A wrong PIN is refused at the first request, before the version compare — auth precedes content.
         await Assert.ThrowsAsync<PinRejectedException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), "9999", port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), "9999", port));
     }
 
     [Fact]
@@ -229,7 +289,7 @@ public class RemoteClientTests
         await using var _ = host;
 
         await Assert.ThrowsAsync<PinRejectedException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), pin: null, port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), pin: null, port));
     }
 
     [Fact]
@@ -245,9 +305,9 @@ public class RemoteClientTests
             new SessionOperator("Client"),
             "1.0.0",
             new ImmediateUiDispatcher(),
+            trust,
             TestHost.DefaultPin,
-            port,
-            trustStore: trust);
+            port);
 
         Assert.NotNull(client);
         Assert.Single(trust.Thumbprints); // first use captured it
@@ -269,9 +329,9 @@ public class RemoteClientTests
                 new SessionOperator("Client"),
                 "1.0.0",
                 new ImmediateUiDispatcher(),
+                trust,
                 TestHost.DefaultPin,
-                port,
-                trustStore: trust));
+                port));
     }
 
     [Fact]
@@ -285,7 +345,7 @@ public class RemoteClientTests
         // from this IP. The first wrong PIN is refused with 401 (and records a failure), the second
         // inside the backoff window is refused with 429; after two failures the window is 2s wide.
         using (var h = new HttpClient(TestHost.InsecureTrustAllHandler())
-               { BaseAddress = new Uri($"https://127.0.0.1:{port}") })
+        { BaseAddress = new Uri($"https://127.0.0.1:{port}") })
         {
             for (var i = 0; i < 2; i++)
             {
@@ -312,6 +372,7 @@ public class RemoteClientTests
                     new SessionOperator("Client"),
                     "1.0.0",
                     new ImmediateUiDispatcher(),
+                    new InMemoryTrustStore(),
                     "wrong",
                     port);
                 Assert.Fail("ConnectAsync should have thrown for the wrong PIN.");

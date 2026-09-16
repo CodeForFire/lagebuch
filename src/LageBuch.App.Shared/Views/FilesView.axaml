@@ -4,6 +4,20 @@
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.FilesView"
              x:DataType="vm:FilesViewModel">
+  <UserControl.Styles>
+    <!-- Drag-and-drop landing highlight (#262 UX follow-up), toggled from code-behind since
+         Avalonia's DragDrop events aren't bindable commands. Both states live here, not as local
+         XAML attributes on the border below — a local value always outranks a style setter, so the
+         drag-over override could never win against an inline BorderBrush/BorderThickness. -->
+    <Style Selector="Border#FilesDropZone">
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border#FilesDropZone.drag-over">
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+  </UserControl.Styles>
   <DockPanel>
     <TextBlock DockPanel.Dock="Top" Text="DATEIEN" Classes="overline" Margin="0,0,0,14" />
 
@@ -34,8 +48,11 @@
       </Grid>
     </Border>
 
-    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14">
+    <!-- Files can also be dropped anywhere on this panel (#262 UX follow-up); handlers wired in
+         code-behind toggle the "drag-over" class and call FilesViewModel.AddFilesAsync on drop. -->
+    <Border x:Name="FilesDropZone" Background="#0C1119"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14"
+            DragDrop.AllowDrop="{Binding !IsReadOnly}">
       <StackPanel Grid.IsSharedSizeScope="True">
         <!-- Column headers: the rename box below has no other visible label (#137). Columns share
              a SharedSizeGroup with the row template below so headers line up with their data even
@@ -47,6 +64,7 @@
             <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
             <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
             <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+            <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
           </Grid.ColumnDefinitions>
           <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
           <TextBlock Grid.Column="1" Text="GRÖSSE" Classes="overline" FontSize="10" Margin="10,0" />
@@ -64,6 +82,7 @@
                   <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAdded" />
                   <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAddedBy" />
                   <ColumnDefinition Width="Auto" SharedSizeGroup="FilesAction" />
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="FilesRemove" />
                 </Grid.ColumnDefinitions>
                 <!-- Committing per keystroke saved the whole incident file on every character
                      typed (#33). UpdateSourceTrigger=LostFocus pushes once, when the operator
@@ -83,6 +102,16 @@
                 <Button Grid.Column="4" Content="ÖFFNEN"
                         Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenFileCommand}"
                         CommandParameter="{Binding}" />
+                <!-- The delete affordance (#262 UX): row identity lives on IncidentFileRow itself,
+                     so — unlike ÖFFNEN above — this binds its own RemoveCommand directly, no
+                     ReflectionBinding needed. Same icon-btn/cross-glyph idiom as ForcesView's
+                     remove button. -->
+                <Button Grid.Column="5" Classes="icon-btn" Margin="6,0,0,0"
+                        IsVisible="{Binding !IsReadOnly}"
+                        Command="{Binding RemoveCommand}"
+                        ToolTip.Tip="Datei entfernen" AutomationProperties.Name="Datei entfernen">
+                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

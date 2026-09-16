@@ -47,7 +47,19 @@ internal sealed class InMemoryStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
+    {
+        _files.Remove($"{path}/{storageFileName}");
+        return Task.CompletedTask;
+    }
+
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }
@@ -80,6 +92,16 @@ internal sealed class InMemoryTrustStore : ITrustStore
     public void SaveThumbprint(string hostAddress, string thumbprint) => _map[hostAddress] = thumbprint;
 
     public void RemoveThumbprint(string hostAddress) => _map.Remove(hostAddress);
+}
+
+/// <summary>In-memory <see cref="ILastJoinHostStore"/> for asserting whether/what a join persisted.</summary>
+internal sealed class InMemoryLastJoinHostStore : ILastJoinHostStore
+{
+    private string? _host;
+
+    public string? GetLastHost() => _host;
+
+    public void SetLastHost(string host) => _host = host;
 }
 
 // Minimal service doubles for constructing ViewModels (IncidentWorkspaceViewModel/HomeViewModel).
@@ -310,7 +332,16 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
 
     public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
 
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
     {
         add { }
         remove { }

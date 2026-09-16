@@ -199,24 +199,36 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
+    private readonly Action<string, Action> _requestConfirm;
     private readonly IReadOnlyList<Vehicle> _masterVehicles;
 
+    /// <summary>
+    /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action before
+    /// running it (message, then the action to run on confirmation) — mirrors
+    /// <c>IncidentWorkspaceViewModel.CloseIncident</c>'s ConfirmDialogViewModel overlay. Defaults
+    /// to running the action immediately, so tests that don't care about the confirmation step
+    /// don't need to supply one.
+    /// </summary>
     public ForcesViewModel(
-        IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
+        IIncidentSession session,
+        IClock clock,
+        MasterDataSet masterData,
+        Action onChanged,
+        Action<string, Action>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
+        _requestConfirm = requestConfirm ?? ((_, onConfirmed) => onConfirmed());
         _masterVehicles = masterData.Vehicles;
         IsReadOnly = session.IsReadOnly;
-        BrigadeOptions = masterData.Brigades;
-        CallSignOptions = masterData.RadioCallSigns;
         StatusOptions = masterData.UnitStatus;
         Forces = new ObservableCollection<ForceRow>(session.Incident.Forces.Select(ToRow));
         TotalPersonnel = session.Incident.TotalPersonnel;
         TotalScba = session.Incident.TotalScba;
+        RefreshVehicleOptions(); // no longer brigade-filtered (#215) -- populate right away
         _session.Changed += RefreshForces;
     }
 
@@ -239,14 +251,11 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         TotalStrengthText = $"{TotalZugfuehrer}/{TotalOfficer}/{total - TotalOfficer - TotalZugfuehrer}/{total}";
         RefreshVehicleOptions(); // taken vehicles reappear once their row is gone
         OnPropertyChanged(nameof(IsDuplicateCallSign));
+        OnPropertyChanged(nameof(AddDisabledReason));
         AddForceCommand.NotifyCanExecuteChanged();
     }
 
     public bool IsReadOnly { get; }
-
-    public IReadOnlyList<string> BrigadeOptions { get; }
-
-    public IReadOnlyList<string> CallSignOptions { get; }
 
     /// <summary>
     /// Per-unit status (Alarmiert, Auf Anfahrt, ...) — deliberately not the incident-level status
@@ -286,6 +295,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private string _newBrigade = string.Empty;
 
     [ObservableProperty]
@@ -294,18 +304,22 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     /// <summary>Nullable: an empty field means 0 and keeps the placeholder visible.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newZugfuehrerCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newOfficerCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newMannschaftCount;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
+    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
     private int? _newScbaCount;
 
     [ObservableProperty]
@@ -315,31 +329,52 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     private string? _newNotes;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsVehicleSelected))]
     private Vehicle? _selectedVehicle;
+
+    /// <summary>
+    /// Drives the view's readonly lock on Feuerwehr/Funkrufname: once a vehicle derived them, they
+    /// must not silently drift from the Stammdaten vehicle the row represents. Personnel counts
+    /// stay editable regardless -- the real crew can differ from the vehicle's nominal seats.
+    /// </summary>
+    public bool IsVehicleSelected => SelectedVehicle is not null;
+
+    /// <summary>Drops back to manual entry (e.g. a wrong pick, or a Fremdwehr unit with no
+    /// matching vehicle) without wiping whatever Feuerwehr/Funkrufname/Stärke are currently
+    /// filled in -- the operator edits on from there instead of starting over.</summary>
+    [RelayCommand]
+    private void ClearVehicle() => SelectedVehicle = null;
+
+    // Set while OnSelectedVehicleChanged derives NewBrigade from the picked vehicle (#215), so the
+    // resulting OnNewBrigadeChanged does not immediately clear the very selection that caused it.
+    private bool _applyingVehiclePreset;
 
     partial void OnNewBrigadeChanged(string value)
     {
-        RefreshVehicleOptions();
-        SelectedVehicle = null;
+        if (!_applyingVehiclePreset)
+        {
+            // A manual edit no longer matches whatever vehicle (if any) was picked -- clear it
+            // rather than leave the dropdown showing a vehicle from a different Wache.
+            SelectedVehicle = null;
+        }
     }
 
     /// <summary>
-    /// Fahrzeuge der Stammdaten, gefiltert auf die getippte Wache (#76). Ein bereits aufgenommenes
-    /// Fahrzeug wird nicht noch einmal angeboten (#76 follow-up) — sein Funkrufname ist vergeben,
-    /// bis seine Zeile entfernt wird. DistinctBy schützt zusätzlich vor Duplikaten in Altdaten.
+    /// Fahrzeuge aller Wachen (#215): picking one derives Feuerwehr, so there is no need to type
+    /// it first. Ein bereits aufgenommenes Fahrzeug wird nicht noch einmal angeboten (#76
+    /// follow-up) — sein Funkrufname ist vergeben, bis seine Zeile entfernt wird. DistinctBy
+    /// schützt zusätzlich vor Duplikaten in Altdaten.
     /// </summary>
     [ObservableProperty]
     private IReadOnlyList<Vehicle> _vehicleOptions = Array.Empty<Vehicle>();
 
     private void RefreshVehicleOptions()
     {
-        var brigade = NewBrigade.Trim();
         var taken = Forces
             .Select(r => r.CallSign?.Trim())
             .Where(cs => !string.IsNullOrEmpty(cs))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         VehicleOptions = _masterVehicles
-            .Where(v => string.Equals(v.Wache, brigade, StringComparison.OrdinalIgnoreCase))
             .DistinctBy(v => v.CallSign, StringComparer.OrdinalIgnoreCase)
             .Where(v => !taken.Contains(v.CallSign.Trim()))
             .ToArray();
@@ -357,6 +392,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     partial void OnNewCallSignChanged(string? value)
     {
         OnPropertyChanged(nameof(IsDuplicateCallSign));
+        OnPropertyChanged(nameof(AddDisabledReason));
         AddForceCommand.NotifyCanExecuteChanged();
     }
 
@@ -364,12 +400,20 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     {
         if (value is null)
             return; // also fires when the form resets -- must not re-prefill then
+
+        _applyingVehiclePreset = true;
+        NewBrigade = value.Wache; // derive Feuerwehr from the picked vehicle (#215)
+        _applyingVehiclePreset = false;
+
         NewCallSign = value.CallSign;
 
         // Sitzplätze-Vorbelegung: 9 Sitze ergeben 1 Führungskraft + 8 Mannschaft (#76).
+        // The Zugführer occupies one of the vehicle's seats, so it comes out of the same pool
+        // instead of being added on top (#260).
         NewZugfuehrerCount = value.HasZugfuehrer ? 1 : 0;
-        NewOfficerCount = Math.Min(1, value.Seats);
-        NewMannschaftCount = Math.Max(value.Seats - 1, 0);
+        int remainingSeats = Math.Max(value.Seats - (NewZugfuehrerCount ?? 0), 0);
+        NewOfficerCount = Math.Min(1, remainingSeats);
+        NewMannschaftCount = Math.Max(remainingSeats - 1, 0);
         NewScbaCount = 0;
     }
 
@@ -380,11 +424,55 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         && (NewZugfuehrerCount ?? 0) >= 0 && (NewOfficerCount ?? 0) >= 0
         && (NewMannschaftCount ?? 0) >= 0 && (NewScbaCount ?? 0) >= 0
 
+        // A row with Brigade but no counted personnel reports nothing and is almost always a
+        // stray click, not an intentional entry (#220). Funkrufname stays optional on purpose --
+        // Fremdwehr headcounts without a specific vehicle are a real, supported case.
+        && (NewZugfuehrerCount ?? 0) + (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0) > 0
+
         // Mirrors the domain rule, so an over-count disables the button instead of throwing on click.
         && (NewScbaCount ?? 0) <= (NewZugfuehrerCount ?? 0) + (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0)
 
         // Ein Fahrzeug ist einzig — sein Funkrufname darf nicht schon in der Liste stehen.
         && !IsDuplicateCallSign;
+
+    /// <summary>
+    /// Explains a disabled HINZUFÜGEN in the same priority order as <see cref="CanAddForce"/>,
+    /// so a blocked add is never a silent guess — bound to the button's tooltip. Null (not an
+    /// empty string) once every condition is satisfied, so no empty tooltip pops up while the
+    /// button is enabled.
+    /// </summary>
+    public string? AddDisabledReason
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(NewBrigade))
+            {
+                return "Wache eingeben";
+            }
+
+            var zf = NewZugfuehrerCount ?? 0;
+            var gf = NewOfficerCount ?? 0;
+            var mann = NewMannschaftCount ?? 0;
+            var agt = NewScbaCount ?? 0;
+
+            if (zf < 0 || gf < 0 || mann < 0 || agt < 0)
+            {
+                return "Stärke darf nicht negativ sein";
+            }
+
+            if (zf + gf + mann == 0)
+            {
+                return "Mindestens eine Person eintragen";
+            }
+
+            if (agt > zf + gf + mann)
+            {
+                return "AGT darf die Stärke nicht überschreiten";
+            }
+
+            return IsDuplicateCallSign ? "Funkrufname ist bereits vergeben" : null;
+        }
+    }
 
     [RelayCommand(CanExecute = nameof(CanAddForce))]
     private void AddForce()
@@ -426,7 +514,14 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
             },
             () =>
             {
-                _session.RemoveForceUnit(f.Id); // Changed → RefreshForces drops the row
-                _onChanged();
+                // Irreversible during a live Einsatz, same as closing it — confirm first (#UX).
+                var label = string.IsNullOrWhiteSpace(f.CallSign) ? f.Brigade : $"{f.Brigade} {f.CallSign}";
+                _requestConfirm(
+                    $"„{label}“ aus der Kräfteübersicht entfernen. Fortfahren?",
+                    () =>
+                    {
+                        _session.RemoveForceUnit(f.Id); // Changed → RefreshForces drops the row
+                        _onChanged();
+                    });
             });
 }

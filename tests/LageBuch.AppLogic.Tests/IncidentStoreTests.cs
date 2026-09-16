@@ -90,6 +90,19 @@ public class IncidentStoreTests
     }
 
     [Fact]
+    public async Task A_successful_write_raises_SaveSucceeded()
+    {
+        var store = new IncidentStore((path, incident) => { });
+        var succeeded = false;
+        store.SaveSucceeded += () => succeeded = true;
+
+        store.Save("/x.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        await store.FlushAsync();
+
+        Assert.True(succeeded);
+    }
+
+    [Fact]
     public async Task The_real_writer_round_trips_through_IncidentRepository()
     {
         var path = Path.Combine(Path.GetTempPath(), $"store-{Guid.NewGuid():N}.fwincident");

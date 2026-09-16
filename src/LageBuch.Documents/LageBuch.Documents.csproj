@@ -8,10 +8,15 @@
     <PackageReference Include="QuestPDF" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Brand mark drawn into the report header; see Branding.cs. Regenerate with
+         packaging/logo/build-logo-assets.sh, never by hand. -->
+    <EmbeddedResource Include="Assets\lagebuch-mark.png" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
   </PropertyGroup>
 
 </Project>

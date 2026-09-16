@@ -6,8 +6,10 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// Editor for the Fahrzeuge Stammdaten list (#76) — rows of Wache + Funkrufname + Sitzplätze.
-/// The Wache is free text so a row can reference a Wache that only exists in the Brigades list;
-/// the Kräfte entry matches vehicles against its typed brigade by name, not by id.
+/// This is the single place Wachen and Funkrufnamen are maintained: both lists are derived from
+/// these rows (see <see cref="MasterDataSet.Brigades"/> / <see cref="MasterDataSet.RadioCallSigns"/>).
+/// Wache and Funkrufname are free text with the already-known values as typing suggestions; the
+/// Kräfte entry matches vehicles against its typed brigade by name, not by id.
 /// </summary>
 public sealed partial class VehiclesSection : EditorSection
 {

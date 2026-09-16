@@ -23,6 +23,7 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly ITicker _ticker;
     private readonly IAlarmService _alarm;
     private readonly IIncidentHostController _hostController;
+    private readonly IIncidentPdfExporter _pdfExporter;
     private readonly string _appVersion;
 
     // Marshals a joined client's host broadcasts onto the UI thread (see IUiDispatcher). Production
@@ -35,17 +36,27 @@ public sealed partial class HomeViewModel : ObservableObject
     // is null-guarded, so the feature is simply inert rather than required.
     private readonly ILastSaveFolderStore? _lastSaveFolder;
 
+    // The host address last used for a successful join, so the join dialog can prefill it next
+    // time instead of starting empty (it rarely changes once set up). Null when not supplied
+    // (e.g. most tests) -- every use site is null-guarded, so the feature is simply inert.
+    private readonly ILastJoinHostStore? _lastJoinHost;
+
+    // Threaded straight into every IncidentWorkspaceViewModel this opens (#262); null (most tests
+    // and every remote/joined workspace) just means "no last-export status to seed or persist".
+    private readonly ILastPdfExportStore? _lastPdfExport;
+
     // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
 
     // Remembers the TLS thumbprint of each host a device first joined (Trust-on-First-Use), so a
     // re-join that presents a different certificate can be flagged as a potential MITM/duplicate.
-    // Null (most tests) means "trust nothing and never record" -- the join then fails on any cert
-    // mismatch but has no store to compare against, so every first join succeeds without TOFU.
+    // Null (most tests, which never join a device) just means "join is unavailable" -- JoinDeviceAsync
+    // refuses to connect rather than falling back to an unpinned connection (there is no accept-any
+    // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastJoinHostStore? lastJoinHost = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -56,11 +67,14 @@ public sealed partial class HomeViewModel : ObservableObject
         _ticker = ticker;
         _alarm = alarm;
         _hostController = hostController;
+        _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         _appVersion = appVersion;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         _lastSaveFolder = lastSaveFolder;
         _attachmentCacheRoot = attachmentCacheRoot;
         _trustStore = trustStore;
+        _lastPdfExport = lastPdfExport;
+        _lastJoinHost = lastJoinHost;
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -75,6 +89,9 @@ public sealed partial class HomeViewModel : ObservableObject
 
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
     public IReadOnlyList<string> CallSignOptions => _masterData.Get().RadioCallSigns;
+
+    /// <summary>The host address last used for a successful join, to prefill the join dialog with.</summary>
+    public string? LastJoinHost => _lastJoinHost?.GetLastHost();
 
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
@@ -102,14 +119,11 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
     {
-        // Date + time + Stichwort, e.g. "20260819-2217-B3P.fwincident" -- the Einsatznummer is
-        // unknown at creation (#69) and no longer part of the filename; it can be added later from
-        // the workspace header. No Stichwort at all just leaves the timestamp alone.
+        // Date + time, e.g. "20260819-2217.fwincident". Neither the Einsatznummer (#69) nor the
+        // Stichwort is known at creation -- both are entered later through the workspace's
+        // Einsatzdaten dialog -- so nothing but the timestamp is available to name the file.
         var timestamp = _clock.Now.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
-        var stem = string.IsNullOrWhiteSpace(request.Keyword)
-            ? timestamp
-            : $"{timestamp}-{StripInvalidFileNameChars(request.Keyword.Trim())}";
-        var suggestedName = $"{stem}.fwincident";
+        var suggestedName = $"{timestamp}.fwincident";
         var path = await _dialogs.PickSaveAsync(suggestedName, _lastSaveFolder?.GetLastFolder());
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -130,18 +144,8 @@ public sealed partial class HomeViewModel : ObservableObject
             path,
             md.ChecklistTemplateAufbau.Select(i => (i.Text, i.IsMandatory)),
             md.ChecklistTemplateAbbau.Select(i => (i.Text, i.IsMandatory)),
-            incidentNumber: null,
-            keyword: request.Keyword);
+            incidentNumber: null);
         OpenWorkspace(session, path, md);
-    }
-
-    // Filesystem-invalid characters differ per platform; Path.GetInvalidFileNameChars() reflects
-    // whichever OS is running, so this drops only what that platform actually rejects and
-    // otherwise preserves the input verbatim, spaces included.
-    private static string StripInvalidFileNameChars(string value)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        return new string(value.Where(c => Array.IndexOf(invalid, c) < 0).ToArray());
     }
 
     // Opening is always read-only and prompt-free. The workspace offers "Weiter bearbeiten"
@@ -188,6 +192,10 @@ public sealed partial class HomeViewModel : ObservableObject
         }
     }
 
+    [SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "Ownership transfers to WorkspaceOpened's subscriber (MainWindowViewModel.ShowWorkspace), which disposes the outgoing workspace itself once CurrentView moves away from it.")]
     private void OpenWorkspace(LocalIncidentSession session, string path, Persistence.MasterData.MasterDataSet md)
     {
         _recent.Add(path);
@@ -198,7 +206,11 @@ public sealed partial class HomeViewModel : ObservableObject
         }
 
         InsertSortedByFileNameDescending(new RecentFileItem(path, session.Incident.State == IncidentState.Closed));
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController);
+
+        // The local workspace's own saves flow through this same _store singleton, so wiring it
+        // through here (issue #167 review follow-up) lets it surface a failed background write
+        // that would otherwise leave the operator believing the incident is safely persisted.
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport, _store, _uiDispatcher);
         WorkspaceOpened?.Invoke(workspace);
     }
 
@@ -222,6 +234,17 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand(IncludeCancelCommand = true)]
     private async Task JoinDeviceAsync(JoinRequest request, CancellationToken cancellationToken)
     {
+        // Unreachable in production (both app heads always construct this view model with a real
+        // JsonTrustStore) -- only a misconfigured caller (or a test that never meant to join) ends up
+        // here. RemoteIncidentSession.ConnectAsync has no accept-any fallback any more, so this must
+        // fail the same graceful way as every other join precondition, not throw and take the app down.
+        if (_trustStore is not { } trustStore)
+        {
+            JoinError = "Kein Trust Store konfiguriert — Verbindung zu anderen Geräten ist nicht möglich.";
+            ClearCertificateChangedHost();
+            return;
+        }
+
         var (host, port) = ParseHost(request.Host);
         try
         {
@@ -230,10 +253,10 @@ public sealed partial class HomeViewModel : ObservableObject
                 request.Operator,
                 _appVersion,
                 _uiDispatcher,
+                trustStore,
                 request.Pin,
                 port,
                 cacheRoot: _attachmentCacheRoot,
-                trustStore: _trustStore,
                 ct: cancellationToken);
 
             // The host is the Stammdaten master (#183): the workspace is built from the host's set,
@@ -262,6 +285,7 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = null;
             _certificateChangedHost = null;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
+            _lastJoinHost?.SetLastHost(request.Host);
             OpenRemoteWorkspace(session, hostMasterData);
         }
         catch (PinRejectedException ex)
@@ -357,6 +381,10 @@ public sealed partial class HomeViewModel : ObservableObject
 
     // The remote workspace can't host (a client isn't hostable) and has no local file, so it gets a
     // no-op host controller — the "Im Netzwerk freigeben" toggle and PDF export stay hidden.
+    [SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "Ownership transfers to WorkspaceOpened's subscriber (MainWindowViewModel.ShowWorkspace), which disposes the outgoing workspace itself once CurrentView moves away from it.")]
     private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md)
     {
         var workspace = new IncidentWorkspaceViewModel(

@@ -59,7 +59,7 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="ZUGETEILT">
+        <HeaderedContentControl Classes="field suggest" Header="ZUGETEILT">
           <AutoCompleteBox Width="150" ItemsSource="{Binding AssigneeOptions}"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                            FilterMode="ContainsOrdinal" MinimumPrefixLength="0"

@@ -16,8 +16,6 @@ public class MasterDataJsonTests
             {
               "roles": ["EL", "ZF"],
               "unitStatus": ["Alarmiert"],
-              "radioCallSigns": ["Land 1"],
-              "brigades": ["FFB Wache 1"],
               "truppTypes": ["Angriffstrupp"],
               "checklistTemplateAufbau": [{ "text": "Schritt 1", "mandatory": true }],
               "checklistTemplateAbbau": [{ "text": "Abbauschritt", "mandatory": false }],
@@ -143,8 +141,105 @@ public class MasterDataJsonTests
     [Fact]
     public void A_file_without_vehicles_parses_as_an_empty_list()
     {
-        var set = Parse("""{ "brigades": ["FFB Wache 1"] }""");
+        var set = Parse("""{ "roles": ["EL"] }""");
         Assert.Empty(set.Vehicles);
+        Assert.Empty(set.Brigades);
+        Assert.Empty(set.RadioCallSigns);
+    }
+
+    // Wachen and Funkrufnamen are derived from the Fahrzeuge (and Personal) rather than kept as
+    // separate lists, so maintaining vehicles alone is sufficient and nothing can drift apart.
+    [Fact]
+    public void Brigades_are_the_distinct_vehicle_waches_in_first_seen_order()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                new Vehicle("Aich", "Aich 42/1", 6),
+                new Vehicle("ffb wache 1", "FFB ELW 1", 4, HasZugfuehrer: true),
+                new Vehicle(" Puch ", "Puch 40/1", 9),
+            },
+        };
+
+        Assert.Equal(new[] { "FFB Wache 1", "Aich", "Puch" }, set.Brigades);
+    }
+
+    [Fact]
+    public void RadioCallSigns_are_vehicle_callsigns_followed_by_personal_callsigns_distinct()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                new Vehicle("Aich", "Aich 42/1", 6),
+            },
+            Personnel = new[]
+            {
+                new Person("Mustermann", "Max", "ZF", "Land 1", null),
+                new Person("Musterfrau", "Erika", "GF", null, null),
+                new Person("Muster", "Moritz", "GF", "  ", null),
+                new Person("Doppelt", "Dora", "GF", "aich 42/1", null),
+            },
+        };
+
+        Assert.Equal(new[] { "FFB 1/40/1", "Aich 42/1", "Land 1" }, set.RadioCallSigns);
+    }
+
+    [Fact]
+    public void Parse_ignores_the_legacy_brigades_and_radioCallSigns_keys()
+    {
+        var set = Parse("""
+            {
+              "brigades": ["Alt-Wache"],
+              "radioCallSigns": ["Leitstelle"],
+              "vehicles": [{ "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }]
+            }
+            """);
+
+        Assert.Equal(new[] { "FFB Wache 1" }, set.Brigades);
+        Assert.Equal(new[] { "FFB 1/40/1" }, set.RadioCallSigns);
+    }
+
+    [Fact]
+    public void Serialize_writes_no_brigades_or_radioCallSigns_keys()
+    {
+        var json = MasterDataJson.Serialize(MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
+        });
+
+        using var doc = JsonDocument.Parse(json);
+        Assert.False(doc.RootElement.TryGetProperty("brigades", out _));
+        Assert.False(doc.RootElement.TryGetProperty("radioCallSigns", out _));
+    }
+
+    [Fact]
+    public void ParseForImport_reports_legacy_entries_that_no_vehicle_or_person_covers()
+    {
+        var result = MasterDataJson.ParseForImport(new MemoryStream(Encoding.UTF8.GetBytes("""
+            {
+              "brigades": ["FFB Wache 1", "Alt-Wache", " ffb wache 1 "],
+              "radioCallSigns": ["FFB 1/40/1", "Land 1", "Leitstelle"],
+              "vehicles": [{ "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }],
+              "personnel": [{ "lastName": "Mustermann", "firstName": "Max", "callSign": "Land 1" }]
+            }
+            """)));
+
+        Assert.Equal(new[] { "FFB Wache 1" }, result.Set.Brigades);
+        Assert.Equal(new[] { "Alt-Wache", "Leitstelle" }, result.DroppedLegacyEntries);
+    }
+
+    [Fact]
+    public void ParseForImport_reports_nothing_for_a_current_format_file()
+    {
+        var result = MasterDataJson.ParseForImport(new MemoryStream(Encoding.UTF8.GetBytes("""
+            { "vehicles": [{ "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }] }
+            """)));
+
+        Assert.Empty(result.DroppedLegacyEntries);
     }
 
     /// <summary>ZF vehicles are command vehicles (ELW/KdoW), not seat-derived like Officer/Mannschaft.</summary>
@@ -246,7 +341,6 @@ public class MasterDataJsonTests
     {
         const string Json = """
             {
-              "brigades": ["FFB Wache 1"],
               "vehicles": [{ "wache": "FFB Wache 1", "callSign": "FFB 1/40/1", "seats": 9 }],
               "personnel": [{ "lastName": "Mustermann", "firstName": "Max" }],
               "settings": { "returnPressureBar": 70 }

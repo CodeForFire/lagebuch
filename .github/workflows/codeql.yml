@@ -1,0 +1,63 @@
+name: CodeQL
+
+# Static analysis for the C# code. Results land in the repository's Code
+# Scanning tab, and satisfy both OpenSSF Scorecard's SAST check and the
+# OpenSSF Best Practices "static analysis" criterion, which is a MUST at the
+# passing level.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, so a new CodeQL query release finds existing code even when the
+    # repository is quiet.
+    - cron: '27 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (csharp)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write # upload the SARIF results
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # dotnet-version is explicit, matching ci.yml and release.yml. Without it
+      # setup-dotnet falls back to global.json, whose "10.0.0" plus rollForward
+      # it rejects as not a full SDK version.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: csharp
+          build-mode: manual
+          queries: security-and-quality
+
+      # Mirrors the CI build. LageBuch.Desktop.slnf deliberately excludes the
+      # Android head: Microsoft.Android.Sdk rejects any JDK above 21 and the
+      # runner ships a newer one, so building the full solution here would
+      # fail with XA0030.
+      - name: Build
+        run: dotnet build LageBuch.Desktop.slnf -c Release
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: /language:csharp

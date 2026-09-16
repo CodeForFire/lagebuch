@@ -23,12 +23,8 @@ public sealed partial class AboutViewModel : ObservableObject
         Version = version;
     }
 
-    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
-    public string AppName => "Lagebuch";
-
-    [SuppressMessage("Performance", "CA1822", Justification = "XAML {Binding} target in AboutView; binding requires an instance property.")]
-    public string Descriptor => "Einsatzdokumentation";
-
+    // No AppName/Descriptor here: the About card shows the project badge, which carries the
+    // wordmark and the slogan as artwork (see AboutView.axaml).
     public string Version { get; }
 
     [SuppressMessage("Design", "CA1056", Justification = "RepositoryUrl is a display/launch string handed to IFileDialogService.OpenUrlAsync; System.Uri would add parse/validation behavior with no benefit here.")]
@@ -51,29 +47,8 @@ public sealed partial class AboutViewModel : ObservableObject
     [RelayCommand]
     private void Close() => Closed?.Invoke(this, EventArgs.Empty);
 
+    // The URL is on screen in the About card, so it is what the error names.
     [RelayCommand]
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Deliberately broad: any launcher failure surfaces in the dialog instead of crashing it.")]
-    private async Task OpenRepositoryAsync()
-    {
-        ErrorMessage = null;
-        if (!HttpUrlValidator.TryGetHttpUri(RepositoryUrl, out var uri))
-        {
-            ErrorMessage = $"„{RepositoryUrl}“ hat keine gültige http(s)-Adresse.";
-            return;
-        }
-
-        try
-        {
-            await _dialogs.OpenUrlAsync(uri.AbsoluteUri);
-        }
-        catch (Exception ex)
-        {
-            // No browser/URL handler registered on this machine (a minimal offline install) throws
-            // out of the platform launcher; report it in place instead of crashing the dialog.
-            ErrorMessage = $"„{RepositoryUrl}“ konnte nicht geöffnet werden: {ex.Message}";
-        }
-    }
+    private async Task OpenRepositoryAsync() =>
+        ErrorMessage = await UrlLauncher.TryOpenAsync(_dialogs, RepositoryUrl, RepositoryUrl);
 }

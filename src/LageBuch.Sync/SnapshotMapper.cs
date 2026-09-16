@@ -77,8 +77,9 @@ public static class SnapshotMapper
                 b.ApartmentsPerFloor,
                 b.FloorDescriptions.ToDictionary(kv => kv.Key.ToString(CultureInfo.InvariantCulture), kv => kv.Value),
                 b.Ordinal,
-                b.ApartmentLabels.ToDictionary(kv => kv.Key.ToString(CultureInfo.InvariantCulture), kv => kv.Value),
-                b.UndergroundFloorCount)).ToList(),
+                b.ApartmentLabels.ToDictionary(kv => kv.Key, kv => kv.Value),
+                b.UndergroundFloorCount,
+                b.ApartmentCounts.ToDictionary(kv => kv.Key.ToString(CultureInfo.InvariantCulture), kv => kv.Value))).ToList(),
             incident.Dwellings.Select(d => new DwellingDto(
                 d.Id,
                 d.BuildingId,
@@ -149,8 +150,9 @@ public static class SnapshotMapper
                 b.ApartmentsPerFloor,
                 b.FloorDescriptions.ToDictionary(kv => int.Parse(kv.Key, CultureInfo.InvariantCulture), kv => kv.Value),
                 b.Ordinal,
-                b.ApartmentLabels?.ToDictionary(kv => int.Parse(kv.Key, CultureInfo.InvariantCulture), kv => kv.Value),
-                b.UndergroundFloorCount)),
+                b.ApartmentLabels,
+                b.UndergroundFloorCount,
+                b.ApartmentCounts?.ToDictionary(kv => int.Parse(kv.Key, CultureInfo.InvariantCulture), kv => kv.Value))),
             snapshot.Dwellings.Select(d => Dwelling.Rehydrate(
                 d.Id,
                 d.BuildingId,

@@ -54,10 +54,15 @@ adb install -r src/LageBuch.App.Android/bin/Debug/net10.0-android/de.codeforfire
 ## Notes
 
 - The `commandlinetools-linux-*_latest.zip` build number in the Dockerfile
-  is pinned to what was current at the time of writing. If a future
+  is pinned to what was current at the time of writing, alongside a SHA-256
+  checksum verified against that build's download. If a future
   `sdkmanager`/`android sdk` invocation fails oddly, check
-  https://developer.android.com/studio#command-tools for the current build
-  and bump it.
+  https://developer.android.com/studio#command-tools for the current build,
+  bump it, and update the pinned checksum to match (download the new zip and
+  run `sha256sum` on it — Google's own repository manifest at
+  https://dl.google.com/android/repository/repository2-3.xml lists a SHA-1
+  per build, which is useful for cross-checking that the download wasn't
+  tampered with in transit).
 - `platforms/android-36` + `build-tools/36.0.0` are installed alongside 34
   because the .NET 10 Android workload compiles against the latest API
   level it bundles for `net10.0-android36.0`, regardless of the app's

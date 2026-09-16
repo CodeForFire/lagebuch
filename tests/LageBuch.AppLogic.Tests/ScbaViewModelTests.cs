@@ -12,7 +12,7 @@ public class ScbaViewModelTests
 
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        RadioCallSigns = new[] { "FFB 1/40/1" },
+        Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
         TruppTypes = new[] { "Angriffstrupp", "Wassertrupp" },
     };
 

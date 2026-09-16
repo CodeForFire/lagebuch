@@ -10,8 +10,6 @@ public class ForcesViewModelTests
 
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        RadioCallSigns = new[] { AnonymizedExampleData.CallSign },
-        Brigades = new[] { AnonymizedExampleData.Brigade, AnonymizedExampleData.SecondBrigade },
         UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
         Vehicles = AnonymizedExampleData.Vehicles,
     };
@@ -54,12 +52,62 @@ public class ForcesViewModelTests
         Assert.False(vm.AddForceCommand.CanExecute(null));
     }
 
-    // --- Issue #18 ---
+    // --- Issue #220: a row with no counted personnel is not a real entry ---
     [Fact]
-    public void Brigade_options_come_from_master_data()
+    public void AddForce_disabled_when_no_personnel_is_entered()
     {
-        // Was Array.Empty with a "free-text for MVP" comment, so the dropdown was permanently blank.
-        Assert.Equal(new[] { "FFB Wache 1", "Aich" }, NewVm().BrigadeOptions);
+        var vm = NewVm();
+        vm.NewBrigade = "FFB Wache 1";
+
+        // Brigade alone -- Führungskräfte and Mannschaft both left blank (0) -- must not be
+        // addable: an empty unit reports nothing and is almost always a stray click (#220).
+        Assert.False(vm.AddForceCommand.CanExecute(null));
+
+        vm.NewOfficerCount = 0;
+        vm.NewMannschaftCount = 0;
+        Assert.False(vm.AddForceCommand.CanExecute(null));
+
+        vm.NewMannschaftCount = 1;
+        Assert.True(vm.AddForceCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void AddForce_enabled_when_only_zugfuehrer_count_is_entered()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FFB Wache 1";
+
+        // A row reporting a single Zugführer with no Führungskräfte/Mannschaft is still a real,
+        // counted entry (#220 only rules out entirely empty rows).
+        vm.NewZugfuehrerCount = 1;
+        Assert.True(vm.AddForceCommand.CanExecute(null));
+    }
+
+    // --- AddDisabledReason mirrors CanAddForce so a blocked HINZUFÜGEN is never a silent guess
+    // (#UX) ---
+    [Fact]
+    public void AddDisabledReason_explains_each_blocking_condition_in_priority_order()
+    {
+        var vm = NewVm();
+        Assert.Equal("Wache eingeben", vm.AddDisabledReason);
+
+        vm.NewBrigade = "FFB Wache 1";
+        Assert.Equal("Mindestens eine Person eintragen", vm.AddDisabledReason);
+
+        vm.NewMannschaftCount = 6;
+        vm.NewScbaCount = 7;
+        Assert.Equal("AGT darf die Stärke nicht überschreiten", vm.AddDisabledReason);
+
+        vm.NewScbaCount = 2;
+        vm.NewCallSign = "FFB 1/40/1";
+        vm.AddForceCommand.Execute(null);
+        vm.NewBrigade = "FFB Wache 1";
+        vm.NewMannschaftCount = 6;
+        vm.NewCallSign = "FFB 1/40/1";
+        Assert.Equal("Funkrufname ist bereits vergeben", vm.AddDisabledReason);
+
+        vm.NewCallSign = "Some other name";
+        Assert.Null(vm.AddDisabledReason);
     }
 
     [Fact]
@@ -153,19 +201,56 @@ public class ForcesViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
-        vm.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
 
-        // Taking a vehicle removes it from the dropdown. (Adding clears the dock, so the brigade
-        // is typed again — the same gesture an operator performs for the next unit.)
+        // All Stammdaten vehicles, across every Wache (#215) -- populated without typing anything.
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+
+        // Taking a vehicle removes it from the dropdown.
         vm.SelectedVehicle = vm.VehicleOptions[0];
         vm.AddForceCommand.Execute(null);
-        vm.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
 
-        // Removing its row makes it available again — without touching the brigade field.
+        // Removing its row makes it available again.
         vm.Forces[0].RemoveCommand.Execute(null);
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+    }
+
+    // --- Issue #215: a single Fahrzeug pick derives Feuerwehr, spanning every Wache ----------
+    [Fact]
+    public void Vehicle_options_are_not_filtered_by_brigade()
+    {
+        var vm = NewVm();
+
+        // Available before anything is typed, and unaffected by what Feuerwehr says.
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+
+        vm.NewBrigade = "does not matter";
+        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
+    }
+
+    [Fact]
+    public void Selecting_a_vehicle_derives_the_brigade()
+    {
+        var vm = NewVm();
+        var aichVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+
+        vm.SelectedVehicle = aichVehicle;
+
+        Assert.Equal("Aich", vm.NewBrigade);
+        Assert.Equal("Aich 42/1", vm.NewCallSign);
+    }
+
+    [Fact]
+    public void Manually_editing_brigade_after_a_pick_clears_the_selected_vehicle()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "FFB 1/40/1");
+        Assert.NotNull(vm.SelectedVehicle);
+
+        // A manual edit no longer matches the picked vehicle's Wache -- the pick is stale.
+        vm.NewBrigade = "Emmering";
+
+        Assert.Null(vm.SelectedVehicle);
     }
 
     [Fact]
@@ -227,21 +312,6 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void Vehicle_options_filter_by_the_typed_brigade()
-    {
-        var vm = NewVm();
-
-        vm.NewBrigade = "FFB Wache 1";
-        Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
-
-        vm.NewBrigade = "aich"; // free-typed brigade: matched without case fuss
-        Assert.Equal(new[] { "Aich 42/1" }, vm.VehicleOptions.Select(v => v.CallSign));
-
-        vm.NewBrigade = "Emmering"; // mutual aid, no master data
-        Assert.Empty(vm.VehicleOptions);
-    }
-
-    [Fact]
     public void Vehicle_options_offer_each_call_sign_once_even_if_the_master_data_has_duplicates()
     {
         // Master data written before the uniqueness rule may still contain a duplicate call sign
@@ -263,8 +333,6 @@ public class ForcesViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var vm = new ForcesViewModel(session, new FixedClock(T0), masterData, () => { });
-
-        vm.NewBrigade = "FFB Wache 1";
 
         // The duplicate collapses; the first occurrence's spelling is kept.
         Assert.Equal(new[] { "FFB 1/40/1", "ffb 1/44/1" }, vm.VehicleOptions.Select(v => v.CallSign));
@@ -288,6 +356,38 @@ public class ForcesViewModelTests
         Assert.True(vm.AddForceCommand.CanExecute(null));
     }
 
+    // --- Two-mode Kraft entry: a vehicle pick locks the identity fields it derived ---
+    [Fact]
+    public void Selecting_a_vehicle_locks_brigade_and_call_sign()
+    {
+        var vm = NewVm();
+        Assert.False(vm.IsVehicleSelected);
+
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+
+        Assert.True(vm.IsVehicleSelected);
+        Assert.Equal("Aich", vm.NewBrigade);
+        Assert.Equal("Aich 42/1", vm.NewCallSign);
+    }
+
+    [Fact]
+    public void Clearing_the_selected_vehicle_unlocks_fields_without_wiping_them()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        var brigadeBeforeClear = vm.NewBrigade;
+        var callSignBeforeClear = vm.NewCallSign;
+        var officerCountBeforeClear = vm.NewOfficerCount;
+
+        vm.ClearVehicleCommand.Execute(null);
+
+        Assert.False(vm.IsVehicleSelected);
+        Assert.Null(vm.SelectedVehicle);
+        Assert.Equal(brigadeBeforeClear, vm.NewBrigade);
+        Assert.Equal(callSignBeforeClear, vm.NewCallSign);
+        Assert.Equal(officerCountBeforeClear, vm.NewOfficerCount);
+    }
+
     [Fact]
     public void Selecting_a_zugfuehrer_vehicle_prefills_the_zf_count()
     {
@@ -297,6 +397,12 @@ public class ForcesViewModelTests
         vm.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true);
 
         Assert.Equal(1, vm.NewZugfuehrerCount);
+
+        // The Zugführer occupies one of the vehicle's seats -- the preset total must not exceed
+        // Seats (#260), so Officer/Mannschaft are split from the remaining 3, not from all 4.
+        Assert.Equal(1, vm.NewOfficerCount);
+        Assert.Equal(2, vm.NewMannschaftCount);
+        Assert.Equal(4, vm.NewZugfuehrerCount + vm.NewOfficerCount + vm.NewMannschaftCount);
     }
 
     [Fact]
@@ -442,6 +548,45 @@ public class ForcesViewModelTests
         Assert.Equal(9, vm.TotalPersonnel);
         Assert.Equal(3, changes); // two adds + the removal
         Assert.Contains("Einheit entfernt: FFB Wache 1 (FFB 1/40/1)", session.Incident.Journal[^1].Text, StringComparison.Ordinal);
+    }
+
+    // --- Removing a unit is destructive, so it goes through the same confirm gate as
+    // CloseIncident (#UX) ---
+    [Fact]
+    public void Removing_a_row_asks_for_confirmation_before_touching_the_session()
+    {
+        var clock = new FixedClock(T0);
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        string? confirmMessage = null;
+        Action? confirmAction = null;
+        var vm = new ForcesViewModel(session, clock, Md(), () => { }, (message, onConfirmed) =>
+        {
+            confirmMessage = message;
+            confirmAction = onConfirmed;
+        })
+        {
+            NewBrigade = "FFB Wache 1",
+            NewMannschaftCount = 6,
+            NewCallSign = "FFB 1/40/1",
+        };
+        vm.AddForceCommand.Execute(null);
+
+        vm.Forces[0].RemoveCommand.Execute(null);
+
+        // Nothing happened yet — the host only recorded the request.
+        Assert.Single(vm.Forces);
+        Assert.Contains("FFB Wache 1", confirmMessage, StringComparison.Ordinal);
+        Assert.Contains("FFB 1/40/1", confirmMessage, StringComparison.Ordinal);
+
+        confirmAction!();
+
+        Assert.Empty(vm.Forces);
     }
 
     [Fact]

@@ -454,4 +454,79 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(15, loaded.Dwellings.Count);
         Assert.Contains(loaded.Dwellings, d => d.FloorOrdinal == -2);
     }
+
+    [Fact]
+    public void A_building_with_per_floor_apartment_counts_and_labels_round_trips()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        incident.SetApartmentCount(clock, op, incident.Buildings[0].Id, 0, 6);
+        incident.SetApartmentLabel(incident.Buildings[0].Id, 0, 2, "Müller");
+        incident.SetApartmentLabel(incident.Buildings[0].Id, 1, 2, "Schmidt");
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var building = Assert.Single(loaded.Buildings);
+        Assert.Equal(6, building.ApartmentsFor(0));
+        Assert.Equal(3, building.ApartmentsFor(1));
+        Assert.Equal(6, loaded.Dwellings.Count(d => d.FloorOrdinal == 0));
+        Assert.Equal("Müller", Domain.CoMeasurement.CoMeasurementLabels.ApartmentLabel(building, 0, 2));
+        Assert.Equal("Schmidt", Domain.CoMeasurement.CoMeasurementLabels.ApartmentLabel(building, 1, 2));
+    }
+
+    [Fact]
+    public void V19_file_gains_apartment_counts_column_and_still_loads()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        IncidentRepository.Save(_path, incident);
+
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "UPDATE schema_version SET version = 19; " +
+                               "ALTER TABLE co_buildings DROP COLUMN apartment_counts;";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var loaded = IncidentRepository.Load(_path);
+        var building = Assert.Single(loaded.Buildings);
+        Assert.Equal(3, building.ApartmentsFor(0)); // no overrides on an old file — reads the default
+    }
+
+    [Fact]
+    public void A_pre_265_apartment_label_migrates_to_every_floor_on_load()
+    {
+        // #265: apartment_labels used to be keyed by apartment number alone (shared across every
+        // floor). Simulate a file written by that version and confirm the label survives the
+        // upgrade instead of silently disappearing.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 3);
+        IncidentRepository.Save(_path, incident);
+
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "UPDATE co_buildings SET apartment_labels = '{\"2\":\"Müller\"}';";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var loaded = IncidentRepository.Load(_path);
+        var building = Assert.Single(loaded.Buildings);
+        Assert.Equal("Müller", Domain.CoMeasurement.CoMeasurementLabels.ApartmentLabel(building, 0, 2));
+        Assert.Equal("Müller", Domain.CoMeasurement.CoMeasurementLabels.ApartmentLabel(building, 1, 2));
+    }
 }
