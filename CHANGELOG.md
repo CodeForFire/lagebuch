@@ -9,6 +9,17 @@ once we reach 1.0.
 
 ## [Unreleased]
 
+## [0.6.0-beta.1] - 2026-09-16
+
+First beta of 0.6.0 — please try it in an Übung before it becomes the default download.
+
+**Breaking, Stammdaten:** Wachen and Funkrufnamen are no longer separate lists. They are
+derived from the Fahrzeuge and the Personal roster, and the `brigades` / `radioCallSigns`
+JSON keys are gone; importing an older master-data file still works and names any entry
+that no vehicle or person covers. Beyond that: the Einsatzdaten dialog — including the
+Adresse, which had no UI at all before — a remembered join host, sample data for a first
+try-out, and fixes for alarm timing, IPv6 sync and the Linux `.deb`.
+
 ### Added
 - Einsatzdaten dialog: Stichwort, Einsatznummer, Straße and Ortsteil are edited together from a
   pencil in the workspace header (or "+ Einsatzdaten ergänzen" while nothing is known yet). The
@@ -271,7 +282,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.6.0-beta.1...HEAD
+[0.6.0-beta.1]: https://github.com/CodeForFire/lagebuch/compare/v0.5.0...v0.6.0-beta.1
 [0.5.0]: https://github.com/CodeForFire/lagebuch/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/CodeForFire/lagebuch/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/CodeForFire/lagebuch/compare/v0.3.0...v0.4.0
