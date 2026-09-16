@@ -21,6 +21,10 @@ APP_ID       := de.codeforfire.lagebuch
 FILTER       ?=
 PROJECT      ?=
 VERSION      ?= 0.1.0
+# The .deb needs the Debian spelling of a prerelease version: a '-' opens a Debian revision,
+# which sorts ABOVE the plain version, so apt would see the final release as a downgrade. '~'
+# sorts below it. The assembly keeps the semver spelling. Mirrors .github/workflows/release.yml.
+DEB_VERSION  := $(subst -,~,$(VERSION))
 
 ANDROID_HOME ?= $(HOME)/Android/Sdk
 ADB          := $(ANDROID_HOME)/platform-tools/adb
@@ -181,7 +185,7 @@ uninstall: ## Remove the app from the attached device/emulator
 
 package-linux: ## Build a local .deb (VERSION=x.y.z)
 	$(DOTNET) publish $(APP) -r linux-x64 $(PUBLISH_FLAGS) -p:Version=$(VERSION) -o publish
-	packaging/linux/build-deb.sh "$(VERSION)" publish \
+	packaging/linux/build-deb.sh "$(DEB_VERSION)" publish \
 	  src/LageBuch.App.Shared/Assets/icon-1024.png \
 	  src/LageBuch.App/Assets/icon.svg dist
 
