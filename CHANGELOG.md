@@ -37,6 +37,7 @@ once we reach 1.0.
 - The "ÖFFNEN" actions in the Links tab and the Über dialog share one URL-opening helper, so a
   link that is blocked or cannot be opened is validated and reported identically in both places.
   No change to what either shows. (#302)
+- Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ### Fixed
 - Handing the workspace view from one incident to another no longer lets the first incident's
@@ -190,9 +191,6 @@ plus every P0/P1 fix from the 2026-09 architecture, security and performance rev
 - Disable HINZUFÜGEN until a Kraft row has counted personnel (#227)
 - Stop bundling QuestPDF into the Android build (#252)
 - Allow adding an Einsatznummer even without a Stichwort (#253)
-
-### Changed
-- Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ## [0.4.0] - 2026-09-05
 
