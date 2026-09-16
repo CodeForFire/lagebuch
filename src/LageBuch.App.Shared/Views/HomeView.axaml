@@ -9,7 +9,7 @@
             Margin="0,-60,-60,0" Opacity="0.05" IsHitTestVisible="False">
       <Border.Background>
         <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-          <GradientStop Color="#FF3D2E" Offset="0" />
+          <GradientStop Color="{StaticResource SignalColor}" Offset="0" />
           <GradientStop Color="Transparent" Offset="0.7" />
         </LinearGradientBrush>
       </Border.Background>

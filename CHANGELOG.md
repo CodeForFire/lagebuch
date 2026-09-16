@@ -37,6 +37,7 @@ once we reach 1.0.
 - The "ÖFFNEN" actions in the Links tab and the Über dialog share one URL-opening helper, so a
   link that is blocked or cannot be opened is validated and reported identically in both places.
   No change to what either shows. (#302)
+- Views now reference the `SignalBrush`/`SignalColor` design tokens instead of hardcoding `#FF3D2E` directly in TasksView and HomeView.
 
 ### Fixed
 - Alarm cues could be delayed or silently skipped while the app was busy. Each cue ran on a
