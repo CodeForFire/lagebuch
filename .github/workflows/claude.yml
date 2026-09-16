@@ -10,6 +10,10 @@ on:
   pull_request_review:
     types: [submitted]
 
+# Deny by default; the one job below grants itself exactly what it needs.
+# Without this, any job added later silently inherits the repository default.
+permissions: {}
+
 jobs:
   claude:
     if: |

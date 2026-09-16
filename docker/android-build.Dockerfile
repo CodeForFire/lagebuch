@@ -4,7 +4,10 @@
 # testing/sid) no longer package any JDK as old as 21 —
 # see docker/README.md for usage and rationale.
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0
+# Pinned by digest, not tag: a movable tag can be repointed, and OpenSSF
+# Scorecard's Pinned-Dependencies check reads this line. Dependabot's docker
+# ecosystem keeps the digest current (see .github/dependabot.yml).
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:2fa828c68761b1b8c23d7662dc134421b9d3b59fe1425fdbc80804e390cdb24d
 
 # Eclipse Temurin JDK 21 via Adoptium's apt repo. Codename is read from
 # /etc/os-release rather than hardcoded — the dotnet/sdk base image's own

@@ -14,8 +14,11 @@ on:
         description: Version to build the macOS .dmg for (e.g. 0.2.0), matching an existing v-tag release.
         required: true
 
+# Read-only by default. Only the `release` job, which creates the GitHub
+# release and uploads the packages, escalates to contents: write; the build
+# jobs just compile and hand artifacts over.
 permissions:
-  contents: write
+  contents: read
 
 env:
   PUBLISH_FLAGS: >-
@@ -170,6 +173,8 @@ jobs:
     runs-on: ubuntu-latest
     # Publish the Windows + Linux installers to the release for the pushed tag.
     if: github.event_name == 'push'
+    permissions:
+      contents: write # create the release and upload its assets
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -243,6 +248,8 @@ jobs:
     needs: version
     if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
+    permissions:
+      contents: write # gh release upload adds the .dmg to an existing release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
