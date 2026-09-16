@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
 
@@ -40,7 +41,11 @@ public sealed partial class ForceRow : ObservableObject
         Id = unit.Id;
         Brigade = unit.Brigade;
         CallSign = unit.CallSign;
-        StatusOptions = statusOptions;
+
+        // The Status cell is a closed ComboBox, so a status the Stammdaten no longer list has
+        // nothing to select and renders blank -- the unit's recorded status simply disappears from
+        // the grid. Carrying it as an extra option keeps it visible and selectable. (#302, #337)
+        StatusOptions = StammdatenCatalogue.Including(statusOptions, unit.Status);
         IsReadOnly = isReadOnly;
         _onEdited = onEdited;
         _onStrengthEdited = onStrengthEdited;
