@@ -59,7 +59,10 @@ public static class TasksSection
                 foreach (var task in sorted)
                 {
                     var overdue = !task.IsCompleted && task.DueAt <= asOf;
-                    table.Cell().Element(BodyCell).Text(task.IsCompleted ? "✔" : "○");
+
+                    // Filled/hollow circle rather than a checkmark: Lato carries no U+2714, and
+                    // the glyph was silently coming from a host-installed font where one existed.
+                    table.Cell().Element(BodyCell).Text(task.IsCompleted ? "●" : "○");
                     table.Cell().Element(BodyCell).Text(Formatting.Level(task.Importance));
                     table.Cell().Element(BodyCell).Text(Formatting.Level(task.Urgency));
                     table.Cell().Element(BodyCell).Column(col =>

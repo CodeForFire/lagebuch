@@ -44,6 +44,14 @@ once we reach 1.0.
   prompt, and those handlers followed the view rather than the incident they belonged to, so
   cancelling the old prompt closed the dialog the operator was actually looking at. Both the
   workspace and the main view now detach from a prompt before wiring up the next one. (#302)
+- PDF export: the CO-Messprotokoll legend and the "Erledigt" marker in the Aufgaben table came
+  out as empty boxes on some machines. Both used characters the bundled Lato font does not
+  carry (■ U+25A0, ✔ U+2714), so they were quietly borrowed from whatever font the rendering
+  machine happened to have installed — fine on a developer desktop, blank on a slim container
+  or on Android, with nothing in the logs to say so. The legend now draws its three colour
+  swatches as real rectangles (taking their colours from the same source as the floor grid, so
+  the two can no longer drift apart) and a completed task is marked ● against ○ for an open
+  one. The export no longer depends on any font beyond the one it ships with.
 - Alarm cues could be delayed or silently skipped while the app was busy. Each cue ran on a
   thread-pool thread, and a pool saturated by other work hands out threads only as fast as it
   grows them — so a cue could sit unplayed for seconds, or outlast its own hung-player watchdog

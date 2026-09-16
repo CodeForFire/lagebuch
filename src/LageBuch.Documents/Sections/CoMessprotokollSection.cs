@@ -96,17 +96,23 @@ public static class CoMessprotokollSection
                 }
             }
 
-            column.Item().PaddingTop(8).Text(t =>
+            column.Item().PaddingTop(8).Row(row =>
             {
-                t.Span("Legende: ").SemiBold().FontSize(8);
-                t.Span("■ ").FontColor(HexColor("#FFC000")).FontSize(8);
-                t.Span("Nicht abgesucht  ").FontSize(8);
-                t.Span("■ ").FontColor(HexColor("#92D050")).FontSize(8);
-                t.Span("Abgesucht  ").FontSize(8);
-                t.Span("■ ").FontColor(HexColor("#FF0000")).FontSize(8);
-                t.Span("Betroffen").FontSize(8);
+                row.AutoItem().AlignMiddle().PaddingRight(4).Text("Legende:").SemiBold().FontSize(8);
+                LegendEntry(row, DwellingStatus.NotSearched, "Nicht abgesucht");
+                LegendEntry(row, DwellingStatus.Searched, "Abgesucht");
+                LegendEntry(row, DwellingStatus.Affected, "Betroffen");
             });
         });
+    }
+
+    // The swatch is drawn, not typeset: Lato carries no U+25A0, so the old "■" span was
+    // silently borrowed from a host-installed font and came out blank where none had it.
+    // Drawing it also means the legend takes its colours from GetColor, like the grid does.
+    private static void LegendEntry(RowDescriptor row, DwellingStatus status, string label)
+    {
+        row.AutoItem().AlignMiddle().PaddingRight(3).Width(6).Height(6).Background(GetColor(status));
+        row.AutoItem().AlignMiddle().PaddingRight(10).Text(label).FontSize(8);
     }
 
     private static string GetColor(DwellingStatus status) => status switch
