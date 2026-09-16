@@ -41,9 +41,10 @@ What counts here:
 - **Something a user or a maintainer would notice.** A fixed bug, a test that
   pins real behaviour, a page of documentation that did not exist. The
   `good first issue` list is exactly this kind of work.
-- **The normal rules, unchanged.** DCO sign-off (`git commit -s`), Conventional
-  Commit subjects, a `CHANGELOG.md` entry for anything under `src/`, and green
-  CI. These are enforced by CI and by review, not waived for October.
+- **The normal rules, unchanged.** Signed commits (SSH or GPG), DCO sign-off
+  (`git commit -s`), Conventional Commit subjects, a `CHANGELOG.md` entry for
+  anything under `src/`, and green CI. These are enforced automatically, not
+  waived for October.
 
 What does not count, and will be labelled `spam` or `invalid`:
 
@@ -96,25 +97,82 @@ everything.
   pushes to `main` are not used.
 - Keep pull requests focused: one logical change per PR.
 - CI must pass (build + tests) before a PR can be merged.
+- Every commit must be **cryptographically signed** and carry a DCO
+  `Signed-off-by` trailer — see [Commit conventions](#commit-conventions).
+  Both are enforced on `main` by branch protection, so a branch carrying one
+  unsigned commit cannot be merged even when CI is green.
 
 ## Commit conventions
 
-All commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
-and be signed off (DCO, `Signed-off-by` trailer):
+Every commit must meet three requirements:
+
+1. a [Conventional Commits](https://www.conventionalcommits.org/) subject line,
+2. a DCO `Signed-off-by` trailer — `git commit -s`,
+3. a cryptographic signature, SSH or GPG — `git commit -S`.
 
 ```bash
-git commit -s -m "feat(atemschutz): add pressure interval warning"
+git commit -s -S -m "feat(atemschutz): add pressure interval warning"
 ```
 
 Subject line starts with a type prefix — `feat:`, `fix:`, `docs:`, `style:`,
 `refactor:`, `perf:`, `test:`, `build:`, `ci:`, or `chore:` — optionally
 scoped, e.g. `fix(backgroundjob):`.
 
+The sign-off and the signature are different things, and you need both. The
+trailer is a statement about **rights**: it certifies you may submit the change
+under the project's licence (see [Licence](#licence)). The signature is a
+statement about **identity**: it proves the commit came from you. Neither
+implies the other.
+
+### Signing your commits
+
+Set this up once and `git commit -s` is all you ever type again.
+
+**SSH** — recommended, because you already have a key:
+
+```bash
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+```
+
+Then upload that same public key to GitHub **a second time**, as a signing key:
+*Settings → SSH and GPG keys → New SSH key →* **Key type: Signing Key**. This
+is the step people miss. An authentication key does not verify signatures, so
+without it your commits are signed perfectly well and still show up as
+*Unverified* — and branch protection turns them away.
+
+**GPG** works too if you prefer it or already have a key; follow GitHub's
+[Telling Git about your signing key](https://docs.github.com/en/authentication/managing-commit-signature-verification/telling-git-about-your-signing-key).
+
+Check locally before you push:
+
+```bash
+git log --show-signature -1
+```
+
+and confirm the commit carries a green **Verified** badge once the pull request
+is open. That badge, not the local output, is what branch protection reads.
+
+### Fixing a branch you already pushed
+
+If you learn about this after the fact, or a commit slipped through unsigned,
+rewrite the branch rather than stacking a commit on top:
+
+```bash
+git rebase --signoff --gpg-sign origin/main
+git push --force-with-lease
+```
+
+That gives every commit on the branch both a fresh signature and a sign-off
+trailer. Force-pushing your own pull-request branch is expected here and does
+not lose review comments.
+
 ## Pull requests
 
 A PR template with a short checklist will guide you:
 
-- Conventional Commits with DCO sign-off
+- Conventional Commits, DCO signed off and cryptographically signed
 - `dotnet build` / `dotnet test` green locally
 - **UI changes**: include before/after screenshots so reviewers can see the
   change without running the app
