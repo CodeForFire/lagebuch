@@ -14,8 +14,17 @@
            Scope="perMachine"
            Compressed="yes">
 
-    <!-- Block a downgrade with a clear message rather than a confusing installer error. -->
-    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von Lagebuch ist bereits installiert." />
+    <!--
+      Block a downgrade with a clear message rather than a confusing installer error.
+
+      AllowSameVersionUpgrades is what lets the final 0.6.0 replace a 0.6.0-beta.N install: the
+      beta's ProductVersion is the numeric core (0.6.0), identical to the final's, and without this
+      the two would sit side by side in Programs and Features. The documented cost is that it also
+      permits a downgrade between builds whose first three version fields match — i.e. reinstalling
+      a beta over the matching final, which is exactly what a tester who needs to go back wants.
+    -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="Eine neuere Version von Lagebuch ist bereits installiert." />
 
     <MediaTemplate EmbedCab="yes" />
 
