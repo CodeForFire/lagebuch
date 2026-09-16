@@ -137,7 +137,7 @@
 
     <!-- Empty state -->
     <TextBlock DockPanel.Dock="Top"
-               Text="Keine Häuser erfasst. Klicken Sie auf 'HAUS HINZUFÜGEN' um zu beginnen."
+               Text="Keine Häuser erfasst. Klicken Sie auf „HAUS HINZUFÜGEN“, um zu beginnen."
                Foreground="{StaticResource TextMutedBrush}"
                IsVisible="{Binding !HasBuildings}"
                Margin="0,20,0,0" HorizontalAlignment="Center" />
