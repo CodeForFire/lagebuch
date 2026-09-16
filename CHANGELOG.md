@@ -10,10 +10,6 @@ once we reach 1.0.
 ## [Unreleased]
 
 ### Added
-- Every release now ships `SHA256SUMS.txt` and a Sigstore-backed build attestation for each
-  installer, so a download can be verified with `sha256sum -c` and
-  `gh attestation verify <Datei> --repo CodeForFire/lagebuch` while the packages are still
-  unsigned. The macOS `.dmg`, which is attached later, carries its own `.sha256` file.
 - Einsatzdaten dialog: Stichwort, Einsatznummer, Straße and Ortsteil are edited together from a
   pencil in the workspace header (or "+ Einsatzdaten ergänzen" while nothing is known yet). The
   address had no UI at all before, so the PDF's "Adresse" line was always empty; it now shows in
@@ -26,6 +22,9 @@ once we reach 1.0.
   developer documentation follows in English.
 
 ### Changed
+- The task list's high-priority and due text plus the home-view accent gradient now use the
+  shared signal colour theme token instead of duplicating its hex value; rendered output is
+  unchanged.
 - Wachen and Funkrufnamen are derived from the Fahrzeuge (plus the Personal roster's call
   signs) instead of being maintained as separate Stammdaten lists. Their editor sections and
   the `brigades` / `radioCallSigns` JSON keys are gone; importing an older file names any
@@ -41,36 +40,13 @@ once we reach 1.0.
 - The "ÖFFNEN" actions in the Links tab and the Über dialog share one URL-opening helper, so a
   link that is blocked or cannot be opened is validated and reported identically in both places.
   No change to what either shows. (#302)
-- Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ### Fixed
-- Handing the workspace view from one incident to another no longer lets the first incident's
-  "weiter bearbeiten" prompt act on the second. The view kept its handlers on the abandoned
-  prompt, and those handlers followed the view rather than the incident they belonged to, so
-  cancelling the old prompt closed the dialog the operator was actually looking at. Both the
-  workspace and the main view now detach from a prompt before wiring up the next one. (#302)
-- PDF export: the CO-Messprotokoll legend and the "Erledigt" marker in the Aufgaben table came
-  out as empty boxes on some machines. Both used characters the bundled Lato font does not
-  carry (■ U+25A0, ✔ U+2714), so they were quietly borrowed from whatever font the rendering
-  machine happened to have installed — fine on a developer desktop, blank on a slim container
-  or on Android, with nothing in the logs to say so. The legend now draws its three colour
-  swatches as real rectangles (taking their colours from the same source as the floor grid, so
-  the two can no longer drift apart) and a completed task is marked ● against ○ for an open
-  one. The export no longer depends on any font beyond the one it ships with.
 - Alarm cues could be delayed or silently skipped while the app was busy. Each cue ran on a
   thread-pool thread, and a pool saturated by other work hands out threads only as fast as it
   grows them — so a cue could sit unplayed for seconds, or outlast its own hung-player watchdog
   without ever having started. Alarms fire exactly when the app is busiest, which is precisely
   when this bit. Cues now get a dedicated thread each and no longer queue behind unrelated work.
-- Kräfte: a unit's Status shows even when the Stammdaten no longer list it. The Status cell is a
-  closed dropdown, so a status recorded in an older Einsatz, an imported file or by a joined
-  device running different Stammdaten had nothing to select and rendered as an empty cell — the
-  status was still in the file, just invisible. It is now carried as an extra entry in that row's
-  dropdown. (#302, see #337)
-- Funktionen: a Funktion that matches the Stammdaten apart from upper/lower case or stray spaces
-  is recorded with the Stammdaten spelling, so "el" and "EL " no longer pile up next to the
-  configured "EL". An unknown Funktion is still assigned exactly as typed — ad-hoc and
-  überörtliche roles must stay enterable — but the dock now says it is not in the Stammdaten. (#302)
 - The four small preference files — recent incidents, last save folder, last PDF export and last
   join host — are written atomically (to a temp file that is then renamed into place), the way
   `trust.json` already was. A crash or a full disk mid-write used to be able to leave a truncated
@@ -102,7 +78,6 @@ once we reach 1.0.
   success and the app then died immediately with "Couldn't find a valid ICU package installed
   on the system". Install it with `apt` rather than `dpkg -i`, which cannot resolve
   dependencies. Verified on Debian 12/13 and Ubuntu 22.04/24.04.
-- CO-Messung: corrected the empty-state message to use German typographic quotes and added the missing comma before "um zu beginnen".
 
 ## [0.5.0] - 2026-09-11
 
