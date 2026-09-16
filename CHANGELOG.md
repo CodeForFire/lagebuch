@@ -10,6 +10,10 @@ once we reach 1.0.
 ## [Unreleased]
 
 ### Added
+- Every release now ships `SHA256SUMS.txt` and a Sigstore-backed build attestation for each
+  installer, so a download can be verified with `sha256sum -c` and
+  `gh attestation verify <Datei> --repo CodeForFire/lagebuch` while the packages are still
+  unsigned. The macOS `.dmg`, which is attached later, carries its own `.sha256` file.
 - Einsatzdaten dialog: Stichwort, Einsatznummer, Straße and Ortsteil are edited together from a
   pencil in the workspace header (or "+ Einsatzdaten ergänzen" while nothing is known yet). The
   address had no UI at all before, so the PDF's "Adresse" line was always empty; it now shows in

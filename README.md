@@ -140,6 +140,21 @@ Betriebssystem beim ersten Start einmal:
   ein Begleitgerät: sie verbindet sich mit einem Einsatz, der auf einem Laptop
   gehostet wird.
 
+### Downloads prüfen
+
+Jedem Release liegt `SHA256SUMS.txt` bei, und jede Installationsdatei trägt
+einen Sigstore-Herkunftsnachweis aus dem Workflow-Lauf, der sie gebaut hat:
+
+```bash
+sha256sum -c SHA256SUMS.txt        # Linux, im Download-Ordner
+shasum -a 256 -c SHA256SUMS.txt    # macOS
+certutil -hashfile <Datei> SHA256  # Windows, mit SHA256SUMS.txt vergleichen
+gh attestation verify <Datei> --repo CodeForFire/lagebuch
+```
+
+So lässt sich nachweisen, dass die Datei unverändert aus diesem Repository
+stammt – auch solange die Pakete noch nicht signiert sind.
+
 ## Status
 
 Lagebuch ist in aktiver Entwicklung und noch vor Version 1.0; zwischen
