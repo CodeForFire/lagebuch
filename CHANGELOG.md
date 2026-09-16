@@ -75,6 +75,7 @@ once we reach 1.0.
   success and the app then died immediately with "Couldn't find a valid ICU package installed
   on the system". Install it with `apt` rather than `dpkg -i`, which cannot resolve
   dependencies. Verified on Debian 12/13 and Ubuntu 22.04/24.04.
+- CO-Messung: corrected the empty-state message to use German typographic quotes and added the missing comma before "um zu beginnen".
 
 ## [0.5.0] - 2026-09-11
 
