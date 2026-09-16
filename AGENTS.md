@@ -31,13 +31,28 @@ All commits must be:
   `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `build:`, `ci:`, `chore:`
   (optionally scoped, e.g. `fix(backgroundjob):`)
 - DCO signed-off: always pass `-s` to `git commit`
-- PGP signed: configured globally (`commit.gpgsign = true`)
+- Cryptographically signed, SSH or GPG: always pass `-S`, or set
+  `commit.gpgsign = true`
+
+The last two are project requirements, not local conventions — `main`'s branch
+protection rejects a pull request carrying an unsigned commit, and the DCO
+check fails one missing a `Signed-off-by` trailer. Neither can be merged past.
+[`CONTRIBUTING.md`](CONTRIBUTING.md#signing-your-commits) has the setup and the
+recovery recipe for a branch already pushed.
 
 Signing in the sandbox: SSH signing (`gpg.format = ssh`) needs the SSH key,
 which the command sandbox blocks — inside the sandbox `git commit` silently
-produces an unsigned commit despite `commit.gpgsign = true`. Run signing
-commits with the sandbox disabled and verify with
-`git cat-file commit HEAD | grep gpgsig` before pushing.
+produces an unsigned commit despite `commit.gpgsign = true`, and you find out
+only when the merge is blocked. Run signing commits with the sandbox disabled
+and verify before pushing with:
+
+```bash
+git cat-file commit HEAD | grep gpgsig
+```
+
+That check covers SSH signatures too: git stores them in the same `gpgsig`
+header, so the absence of that header means the commit is unsigned whichever
+format you use.
 
 ## Git push
 
