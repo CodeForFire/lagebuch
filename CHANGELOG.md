@@ -72,6 +72,11 @@ once we reach 1.0.
   characters the running OS rejects, so on Android a name could keep `< > : " | ? *`, invisible
   formatting characters, or run past the 255-byte limit every filesystem enforces, and only broke
   once the file reached a Windows peer. Both now share one sanitiser. (#302)
+- A joined device's attachment cache is now capped at 500 MB instead of growing without limit.
+  Every attachment pulled from the host was written to disk and nothing ever deleted it — not
+  leaving the incident, not joining the next one — so a tablet used across many Einsätze kept
+  every attachment of every one of them. Once a newly cached file pushes the cache over the cap,
+  the oldest entries are removed until it is back under. (#302)
 - A PDF export no longer fails outright because of a single character the report font cannot
   draw. Anything typed into an Einsatz reaches the export — ETB entries, Aufgaben, attachment
   names — and since the QuestPDF update an unrenderable character (an emoji, a name in another
