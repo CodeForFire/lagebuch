@@ -9,28 +9,20 @@ namespace LageBuch.Documents.Tests;
 // Pinning the suite to Lato alone turns that silent, host-dependent defect into a
 // failing test -- see the "Legende" swatches and the task checkmark this replaced.
 //
-// Both settings are looked up by name because QuestPDF 2026.9 renamed them
-// (UseEnvironmentFonts -> UseSystemFonts, CheckIfAllTextGlyphsAreAvailable ->
-// ThrowOnMissingTextGlyphs) and kept the old names as [Obsolete], which this repo
-// builds as an error. Naming either spelling directly would break the build on one
-// side of that version boundary. Once the bump has landed this can collapse into
-// two plain property assignments.
+// Production deliberately does not throw (PdfLicense.Ensure), because free text the
+// operator types must never cost them the export. That rule is for text LageBuch
+// itself writes, which is why it lives here and not there.
 internal static class LatoOnlyFontEnvironment
 {
     [ModuleInitializer]
     internal static void Pin()
     {
-        Set(current: "UseSystemFonts", legacy: "UseEnvironmentFonts", value: false);
-        Set(current: "ThrowOnMissingTextGlyphs", legacy: "CheckIfAllTextGlyphsAreAvailable", value: true);
-    }
+        // Ensure() pins the production font settings, and it is idempotent -- so it has
+        // to run here rather than later from the first Generate call, which would reset
+        // ThrowOnMissingTextGlyphs underneath us and quietly disable this whole guard.
+        PdfLicense.Ensure();
 
-    private static void Set(string current, string legacy, bool value)
-    {
-        var property = typeof(QuestPDF.Settings).GetProperty(current)
-            ?? typeof(QuestPDF.Settings).GetProperty(legacy)
-            ?? throw new InvalidOperationException(
-                $"QuestPDF.Settings exposes neither '{current}' nor '{legacy}'.");
-
-        property.SetValue(obj: null, value);
+        QuestPDF.Settings.UseSystemFonts = false;
+        QuestPDF.Settings.ThrowOnMissingTextGlyphs = true;
     }
 }
