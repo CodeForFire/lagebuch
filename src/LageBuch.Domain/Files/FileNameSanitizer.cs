@@ -8,7 +8,7 @@ namespace LageBuch.Domain.Files;
 /// name arrive here and neither can be trusted: an attachment name a joined client picks in
 /// <c>AddFileCommand</c>, which every peer later writes bytes under before handing the file to the
 /// OS; and a content provider's <c>DISPLAY_NAME</c> on Android, which a malicious provider fully
-/// controls. Both end up in a <see cref="Path.Combine(string, string)"/> against a fixed directory,
+/// controls. Both end up in a <see cref="Path.Join(string, string)"/> against a fixed directory,
 /// so <c>..\..\Startup\x.png</c> must never survive: only the last path segment is kept.
 /// <para>
 /// Callers decide what "nothing usable is left" means — <see cref="IncidentFile.Create(Guid, string, string, long, DateTimeOffset, string)"/>

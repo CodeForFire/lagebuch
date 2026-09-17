@@ -7,7 +7,7 @@ public class AttachmentTempPathsTests
     [Fact]
     public void Root_is_a_lagebuch_folder_under_the_system_temp_directory()
     {
-        Assert.Equal(Path.Combine(Path.GetTempPath(), "lagebuch"), AttachmentTempPaths.Root);
+        Assert.Equal(Path.Join(Path.GetTempPath(), "lagebuch"), AttachmentTempPaths.Root);
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public class AttachmentTempPathsTests
         var dir = AttachmentTempPaths.CreateOpenDirectory();
         try
         {
-            var path = Path.Combine(dir, "brand.jpg");
+            var path = Path.Join(dir, "brand.jpg");
             File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
 
             Assert.True(AttachmentTempPaths.IsOpenableAttachment(path));
@@ -50,7 +50,7 @@ public class AttachmentTempPathsTests
     [Fact]
     public void IsOpenableAttachment_refuses_a_file_outside_the_root()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}.jpg");
+        var path = Path.Join(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}.jpg");
         File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
         try
         {
@@ -65,11 +65,11 @@ public class AttachmentTempPathsTests
     [Fact]
     public void IsOpenableAttachment_refuses_a_traversal_that_only_looks_like_it_is_inside()
     {
-        var outside = Path.Combine(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}.jpg");
+        var outside = Path.Join(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}.jpg");
         File.WriteAllBytes(outside, new byte[] { 1, 2, 3 });
         try
         {
-            var traversal = Path.Combine(AttachmentTempPaths.Root, "..", Path.GetFileName(outside));
+            var traversal = Path.Join(AttachmentTempPaths.Root, "..", Path.GetFileName(outside));
 
             Assert.False(AttachmentTempPaths.IsOpenableAttachment(traversal));
         }
@@ -88,7 +88,7 @@ public class AttachmentTempPathsTests
         Directory.CreateDirectory(sibling);
         try
         {
-            var path = Path.Combine(sibling, "brand.jpg");
+            var path = Path.Join(sibling, "brand.jpg");
             File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
 
             Assert.False(AttachmentTempPaths.IsOpenableAttachment(path));
@@ -105,7 +105,7 @@ public class AttachmentTempPathsTests
         var dir = AttachmentTempPaths.CreateOpenDirectory();
         try
         {
-            Assert.False(AttachmentTempPaths.IsOpenableAttachment(Path.Combine(dir, "nope.jpg")));
+            Assert.False(AttachmentTempPaths.IsOpenableAttachment(Path.Join(dir, "nope.jpg")));
             Assert.False(AttachmentTempPaths.IsOpenableAttachment(dir));
             Assert.False(AttachmentTempPaths.IsOpenableAttachment(AttachmentTempPaths.Root));
         }
@@ -119,12 +119,12 @@ public class AttachmentTempPathsTests
     [Fact]
     public void IsOpenableAttachment_refuses_a_symlink_planted_inside_the_root()
     {
-        var outside = Path.Combine(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}.jpg");
+        var outside = Path.Join(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}.jpg");
         File.WriteAllBytes(outside, new byte[] { 1, 2, 3 });
         var dir = AttachmentTempPaths.CreateOpenDirectory();
         try
         {
-            var link = Path.Combine(dir, "brand.jpg");
+            var link = Path.Join(dir, "brand.jpg");
             File.CreateSymbolicLink(link, outside);
 
             Assert.False(AttachmentTempPaths.IsOpenableAttachment(link));
@@ -157,7 +157,7 @@ public class AttachmentTempPathsTests
         var dir = AttachmentTempPaths.CreateOpenDirectory();
         try
         {
-            var path = Path.Combine(dir, name);
+            var path = Path.Join(dir, name);
             File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
 
             Assert.False(AttachmentTempPaths.IsOpenableAttachment(path));
@@ -180,7 +180,7 @@ public class AttachmentTempPathsTests
         var dir = AttachmentTempPaths.CreateOpenDirectory();
         try
         {
-            var path = Path.Combine(dir, name);
+            var path = Path.Join(dir, name);
             File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
 
             Assert.True(AttachmentTempPaths.IsOpenableAttachment(path));

@@ -52,10 +52,10 @@ public class IncidentDataDialogRenderTests
         Assert.Equal("FFB", Find<TextBox>(window, "IncidentDataDistrictBox").Text);
         Assert.True(Find<Button>(window, "IncidentDataSaveButton").IsEnabled);
 
-        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "incident-data-dialog.png"));
+        frame.SavePng(Path.Join(dir, "incident-data-dialog.png"));
     }
 
     [AvaloniaFact]

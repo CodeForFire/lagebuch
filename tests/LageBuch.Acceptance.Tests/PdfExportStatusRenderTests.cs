@@ -57,7 +57,7 @@ public class PdfExportStatusRenderTests
 
     private static (Window Window, IncidentWorkspaceViewModel Vm, string ExportPath) ShowWorkspace()
     {
-        var exportPath = Path.Combine(Path.GetTempPath(), $"lagebuch-render-export-{Guid.NewGuid():N}.pdf");
+        var exportPath = Path.Join(Path.GetTempPath(), $"lagebuch-render-export-{Guid.NewGuid():N}.pdf");
         var session = LocalIncidentSession.StartNew(
             new FakeStore(),
             new FixedClock(),
@@ -91,7 +91,7 @@ public class PdfExportStatusRenderTests
 
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, name));
+        frame.SavePng(Path.Join(dir, name));
     }
 
     [AvaloniaFact]

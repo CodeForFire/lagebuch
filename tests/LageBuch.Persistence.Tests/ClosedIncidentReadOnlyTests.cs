@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Tests;
 
 public class ClosedIncidentReadOnlyTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"ro-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"ro-{Guid.NewGuid():N}.fwincident");
 
     private sealed class Clock : IClock
     {

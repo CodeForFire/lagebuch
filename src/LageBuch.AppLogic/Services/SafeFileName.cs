@@ -4,7 +4,7 @@ namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// Reduces an untrusted display name (e.g. a content provider's <c>DISPLAY_NAME</c>, which a
-/// malicious provider fully controls) to a bare file name safe to <see cref="Path.Combine(string, string)"/>
+/// malicious provider fully controls) to a bare file name safe to <see cref="Path.Join(string, string)"/>
 /// into a fixed directory.
 /// <para>
 /// A thin alias for <see cref="FileNameSanitizer"/>, which attachment names already went through —

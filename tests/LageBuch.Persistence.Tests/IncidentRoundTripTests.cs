@@ -11,7 +11,7 @@ namespace LageBuch.Persistence.Tests;
 
 public class IncidentRoundTripTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"rt-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"rt-{Guid.NewGuid():N}.fwincident");
 
     private sealed class Clock : IClock
     {

@@ -444,7 +444,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // never collide with this one's file ids.
     private string? CachePathFor(Guid fileId, string fileName) => _cacheRoot is null
         ? null
-        : Path.Combine(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
+        : Path.Join(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
 
     public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
 

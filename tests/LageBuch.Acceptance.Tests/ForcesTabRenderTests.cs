@@ -81,10 +81,10 @@ public class ForcesTabRenderTests
 
     private static void Capture(Window window, string name)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, name));
+        frame.SavePng(Path.Join(dir, name));
     }
 
     [AvaloniaFact]

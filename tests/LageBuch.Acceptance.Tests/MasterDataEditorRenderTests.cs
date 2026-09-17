@@ -75,9 +75,9 @@ public class MasterDataEditorRenderTests
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, "master-data-editor.png");
+        var path = Path.Join(dir, "master-data-editor.png");
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(path);
         Assert.True(new FileInfo(path).Length > 0);
@@ -104,10 +104,10 @@ public class MasterDataEditorRenderTests
         Assert.Contains(checkBoxes, c => c.IsChecked == true);
         Assert.Contains(checkBoxes, c => c.IsChecked == false);
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "master-data-editor-checkliste-aufbau.png"));
+        frame.SavePng(Path.Join(dir, "master-data-editor-checkliste-aufbau.png"));
     }
 
     [AvaloniaFact]
@@ -125,10 +125,10 @@ public class MasterDataEditorRenderTests
             .ToList();
         Assert.Equal(4, textBoxes.Count);
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "master-data-editor-links.png"));
+        frame.SavePng(Path.Join(dir, "master-data-editor-links.png"));
     }
 
     // #76: the Fahrzeuge section — Wache + Funkrufname + Sitzplätze per row, Wache and
@@ -208,9 +208,9 @@ public class MasterDataEditorRenderTests
         var zfHeader = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "ZF");
         Assert.Equal(zfHeader.Bounds.X, zfCheckBox.Bounds.X, 1);
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "master-data-editor-fahrzeuge-after.png"));
+        frame.SavePng(Path.Join(dir, "master-data-editor-fahrzeuge-after.png"));
     }
 }

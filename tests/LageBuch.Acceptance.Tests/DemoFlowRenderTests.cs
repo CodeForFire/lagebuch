@@ -68,12 +68,12 @@ public class DemoFlowRenderTests
     private static MasterDataSet LoadDemoMasterData()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "LageBuch.sln")))
+        while (dir is not null && !File.Exists(Path.Join(dir.FullName, "LageBuch.sln")))
         {
             dir = dir.Parent;
         }
 
-        var path = Path.Combine(dir?.FullName ?? throw new InvalidOperationException("LageBuch.sln not found"), "docs", "samples", "demo-stammdaten.json");
+        var path = Path.Join(dir?.FullName ?? throw new InvalidOperationException("LageBuch.sln not found"), "docs", "samples", "demo-stammdaten.json");
         return MasterDataJson.Parse(File.ReadAllText(path));
     }
 
@@ -87,7 +87,7 @@ public class DemoFlowRenderTests
 
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, name));
+        frame.SavePng(Path.Join(dir, name));
     }
 
     private static TabControl Tabs(Window window) =>

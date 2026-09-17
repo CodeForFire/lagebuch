@@ -105,7 +105,7 @@ public class IncidentStoreTests
     [Fact]
     public async Task The_real_writer_round_trips_through_IncidentRepository()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"store-{Guid.NewGuid():N}.fwincident");
+        var path = Path.Join(Path.GetTempPath(), $"store-{Guid.NewGuid():N}.fwincident");
         try
         {
             var store = new IncidentStore();

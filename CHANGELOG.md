@@ -36,6 +36,12 @@ once we reach 1.0.
   developer documentation follows in English.
 
 ### Changed
+- Every path is now joined with `Path.Join` instead of `Path.Combine`. `Path.Combine`
+  silently discards everything before an argument that turns out to be rooted, so a name
+  that slipped through sanitisation could point outside the folder it was meant to land in;
+  `Path.Join` always concatenates. Behaviour is unchanged for every existing call — each
+  one passes a relative later argument — and untrusted names still go through
+  `IncidentFile.SanitizeFileName` or `SafeFileName.Sanitize` first.
 - The task list's high-priority and due text plus the home-view accent gradient now use the
   shared signal colour theme token instead of duplicating its hex value; rendered output is
   unchanged.

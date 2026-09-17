@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Tests;
 // cheaply, tolerate unreadable files, and -- crucially -- never write to the file it inspects.
 public class IncidentStateProbeTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"probe-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"probe-{Guid.NewGuid():N}.fwincident");
 
     private sealed class Clock : IClock
     {

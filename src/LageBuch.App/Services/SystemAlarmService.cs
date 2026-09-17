@@ -113,7 +113,7 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
 
         try
         {
-            var path = Path.Combine(Path.GetTempPath(), $"lagebuch-{sound}.wav");
+            var path = Path.Join(Path.GetTempPath(), $"lagebuch-{sound}.wav");
             File.WriteAllBytes(path, bytes);
             _voiceTempFiles[sound] = path;
             return path;

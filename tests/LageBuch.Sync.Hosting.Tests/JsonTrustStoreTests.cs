@@ -2,7 +2,7 @@ namespace LageBuch.Sync.Hosting.Tests;
 
 public class JsonTrustStoreTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"trust-{Guid.NewGuid():N}.json");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"trust-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {
