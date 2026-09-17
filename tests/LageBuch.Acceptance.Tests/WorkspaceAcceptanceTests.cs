@@ -331,7 +331,7 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Files_tab_renders_an_already_attached_file()
     {
-        var vm = BuildWorkspace(out var session);
+        _ = BuildWorkspace(out var session);
         session.Incident.AddFile(new FixedClock(), session.Operator!, "brand.jpg", "image/jpeg", 2048);
         var view = new FilesView { DataContext = new FilesViewModel(session, new FakeDialogs(), () => { }) };
         var window = new Window { Content = view, Width = 800, Height = 600 };
@@ -345,7 +345,7 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Renaming_a_file_via_ui_writes_through_to_the_domain()
     {
-        var vm = BuildWorkspace(out var session);
+        _ = BuildWorkspace(out var session);
         session.Incident.AddFile(new FixedClock(), session.Operator!, "brand.jpg", "image/jpeg", 2048);
         var filesVm = new FilesViewModel(session, new FakeDialogs(), () => { });
         var view = new FilesView { DataContext = filesVm };
@@ -370,7 +370,7 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Adding_file_via_ui_updates_the_list_and_logs_to_the_etb()
     {
-        var vm = BuildWorkspace(out var session);
+        _ = BuildWorkspace(out var session);
         var path = System.IO.Path.Join(System.IO.Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
         File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
         try

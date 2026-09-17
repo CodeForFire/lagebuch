@@ -63,6 +63,10 @@ once we reach 1.0.
 - Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ### Fixed
+- Seven dead local assignments, one of them in `EqualWidthWrapPanel`'s arrange pass, left over
+  from earlier refactors. `IDE0059` ships at suggestion severity, below the threshold
+  `TreatWarningsAsErrors` acts on, so they had accumulated unnoticed; it is now a warning and
+  therefore a build error, so the next one cannot.
 - A PDF export no longer fails outright because of a single character the report font cannot
   draw. Anything typed into an Einsatz reaches the export — ETB entries, Aufgaben, attachment
   names — and since the QuestPDF update an unrenderable character (an emoji, a name in another

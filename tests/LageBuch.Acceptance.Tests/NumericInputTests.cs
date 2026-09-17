@@ -166,7 +166,7 @@ public class ForcesGridEditingTests
     [AvaloniaFact]
     public void Editing_status_on_a_row_reaches_the_incident()
     {
-        var (view, vm) = ShowForces(out var session);
+        var (_, vm) = ShowForces(out var session);
         vm.Forces.NewBrigade = "FFB Wache 1";
         vm.Forces.NewMannschaftCount = 9;
         vm.Forces.NewStatus = "Alarmiert";

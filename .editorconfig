@@ -5,6 +5,10 @@ indent_style = space
 indent_size = 4
 end_of_line = lf
 dotnet_diagnostic.IDE0005.severity = warning
+# IDE0059 (value assigned to a local is never read) ships at suggestion severity, below the
+# threshold TreatWarningsAsErrors acts on, so dead assignments accumulated silently until
+# CodeQL's cs/useless-assignment-to-local flagged seven of them. Raise it into the build.
+dotnet_diagnostic.IDE0059.severity = warning
 csharp_style_namespace_declarations = file_scoped:warning
 
 # Desktop Avalonia app: awaited continuations must keep the UI Dispatcher context, so
