@@ -83,6 +83,11 @@ once we reach 1.0.
   leaving the incident, not joining the next one — so a tablet used across many Einsätze kept
   every attachment of every one of them. Once a newly cached file pushes the cache over the cap,
   the oldest entries are removed until it is back under. (#302)
+- A failing once-a-second update no longer takes the others down with it. The Atemschutz, Aufgaben
+  and ILS-Erinnerung timers share one ticker, which called each subscriber without isolation — so
+  one that threw skipped everything after it in that tick and surfaced as an unhandled UI
+  exception. Each is now called on its own and a failure is reported instead of swallowed. The
+  tick also no longer allocates a fresh subscriber array every second. (#302)
 - A PDF export no longer fails outright because of a single character the report font cannot
   draw. Anything typed into an Einsatz reaches the export — ETB entries, Aufgaben, attachment
   names — and since the QuestPDF update an unrenderable character (an emoji, a name in another
