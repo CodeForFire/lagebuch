@@ -80,36 +80,6 @@ address the issue before any public disclosure.
   attribution is ever wanted, a cheap next step would be recording the
   source device/IP alongside the claimed operator name in ETB entries,
   without requiring a full identity-binding redesign.
-- **The first connection to a host is trusted without verification.** The
-  client pins the host certificate's SHA-256 fingerprint on first contact
-  and enforces it from then on, with no accept-any fallback — but the
-  fingerprint is not surfaced anywhere in the UI, so the two operators have
-  nothing to compare out of band. An attacker already on the LAN who wins
-  the race on that first connect can interpose. Tracked in
-  [#288](../../issues/288), along with the PIN length below and putting the
-  LAN address in the certificate's SAN.
-- **The share PIN is four digits.** Together with the per-source exponential
-  backoff (2^(n-1) seconds, capped at 60) that is enough against guessing,
-  not against an attacker with time and continued network access.
-- **Image attachments keep their metadata.** Nothing strips EXIF, so a photo
-  taken at the Einsatzstelle carries its GPS coordinates, capture time and
-  device model into the incident file, over the sync connection to every
-  joined device, and into the exported PDF report. Tracked in
-  [#384](../../issues/384).
-- **Copies of attachments outlive the session.** A joined device's
-  `attachment-cache/` is never cleared ([#382](../../issues/382)), and the
-  temp copies made when an attachment is opened are never removed
-  ([#383](../../issues/383)). Both keep the host's files on the device after
-  the incident is over.
-- **Releases are not code-signed**, so there is no OS-level signature to
-  verify and every install path raises a warning. SHA-256 checksums and
-  Sigstore build attestations ship with every release as the verifiable
-  substitute; the reasoning and the timeline are in
-  [ROADMAP.md](ROADMAP.md).
-- **There are no log files.** Good for data protection — it means no second
-  store of personal data — but it also means there is no forensic trail
-  after an incident and nothing for a reporter to attach. File logging is
-  proposed in [#300](../../issues/300).
 
 ## Non-security issues
 
