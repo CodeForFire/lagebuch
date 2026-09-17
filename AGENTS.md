@@ -70,6 +70,54 @@ open a PR. Absolute rule, no exceptions.
 - Every repo needs `.github/dependabot.yml` covering the `github-actions`
   ecosystem; add it if missing.
 
+## Static analysis
+
+Two tools police this code and they overlap: the build runs the .NET analyzers
+at `AnalysisMode=All` plus StyleCop with `TreatWarningsAsErrors`, and CodeQL
+runs the `security-and-quality` suite on every pull request. The build sees
+`[SuppressMessage]` attributes and `.editorconfig` severities; CodeQL does not.
+A decision recorded only in code therefore comes back as a CodeQL alert unless
+it is recorded in `.github/codeql/codeql-config.yml` too.
+
+Write code that trips neither:
+
+- **Join paths with `Path.Join`, never `Path.Combine`.** `Path.Combine` returns
+  its later argument alone once that argument turns out to be rooted, silently
+  discarding the directory you meant to stay inside; `Path.Join` always
+  concatenates. This is defence in depth, not a substitute for sanitising: a
+  name that crosses the trust boundary — a sync peer's file name, a content
+  provider's `DISPLAY_NAME`, anything read back out of an incident file — still
+  goes through `IncidentFile.SanitizeFileName` or `SafeFileName.Sanitize` first.
+- **Give every `catch (Exception)` a per-member `[SuppressMessage("Design",
+  "CA1031", Justification = "...")]`** that says where the failure surfaces —
+  a bound error string, a documented `null` contract, an event. The build
+  rejects the catch without one; the justification is also what makes CodeQL's
+  duplicate finding defensible instead of an open alert nobody can explain.
+- **Leave no dead locals.** `IDE0059` is a warning here and warnings are
+  errors. Use `_` for a value you do not need, including inside a tuple
+  deconstruction or an `out var` call.
+
+When a new CodeQL alert appears, never leave it open and never dismiss it
+without a written reason:
+
+1. **Fix it in code** if it is real. This is the default.
+2. **If the query duplicates a rule the build already governs** — a CA or SA
+   rule the repository has deliberately configured — exclude it by id in
+   `.github/codeql/codeql-config.yml`, with a comment naming that rule and why
+   the build's handling is the finer-grained one. Never exclude a query
+   carrying a security severity.
+3. **Only for a site-specific false positive**, dismiss that single alert with
+   a comment explaining it. Prefer 1 and 2: a dismissal lives outside the
+   repository, so no reviewer and no future reader ever sees the reasoning.
+
+A `code_scanning` ruleset rule blocks a pull request that introduces a new
+alert, so this is enforced rather than advisory.
+
+Note that `paths` and `paths-ignore` do **not** work in the CodeQL config here:
+GitHub restricts them to interpreted languages or `build-mode: none`, and this
+is C# under `build-mode: manual`. Scope by rule id, or by the build target in
+`codeql.yml`.
+
 ## Repository hygiene
 
 Never commit `docs/superpowers/` — local tooling artifacts only. If tracked,

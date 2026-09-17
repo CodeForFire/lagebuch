@@ -2,12 +2,12 @@ namespace LageBuch.Persistence.Tests;
 
 public class IncidentFileStoreTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), $"filestore-{Guid.NewGuid():N}");
+    private readonly string _dir = Path.Join(Path.GetTempPath(), $"filestore-{Guid.NewGuid():N}");
     private readonly string _incidentPath;
     private readonly IncidentFileStore _store = new();
 
     public IncidentFileStoreTests() =>
-        _incidentPath = Path.Combine(_dir, "20260622-0900-B.fwincident");
+        _incidentPath = Path.Join(_dir, "20260622-0900-B.fwincident");
 
     public void Dispose()
     {
@@ -49,9 +49,9 @@ public class IncidentFileStoreTests : IDisposable
         Directory.CreateDirectory(_dir);
         await _store.SaveBytesAsync(_incidentPath, "abc.jpg", new byte[] { 1 });
 
-        var expectedFolder = Path.Combine(_dir, "20260622-0900-B.files");
+        var expectedFolder = Path.Join(_dir, "20260622-0900-B.files");
         Assert.True(Directory.Exists(expectedFolder));
-        Assert.True(File.Exists(Path.Combine(expectedFolder, "abc.jpg")));
+        Assert.True(File.Exists(Path.Join(expectedFolder, "abc.jpg")));
     }
 
     [Fact]

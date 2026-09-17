@@ -88,7 +88,6 @@ public sealed class EqualWidthWrapPanel : Panel
         }
 
         var columns = ColumnsFor(finalSize.Width, count);
-        var itemWidth = ItemWidthFor(finalSize.Width, columns);
 
         var rowHeight = 0d;
         foreach (var child in Children)

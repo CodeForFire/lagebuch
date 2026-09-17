@@ -49,6 +49,9 @@ jobs:
           languages: csharp
           build-mode: manual
           queries: security-and-quality
+          # Query exclusions, each justified against the .NET analyzer or
+          # StyleCop rule that already governs the same code at build time.
+          config-file: ./.github/codeql/codeql-config.yml
 
       # Mirrors the CI build. LageBuch.Desktop.slnf deliberately excludes the
       # Android head: Microsoft.Android.Sdk rejects any JDK above 21 and the

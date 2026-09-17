@@ -545,7 +545,7 @@ public class IncidentWorkspaceViewModelTests
     [Fact]
     public async Task ExportPdf_writes_file_when_path_chosen()
     {
-        var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var vm = NewWorkspace(out _, out _, dialogs);
 
@@ -606,12 +606,12 @@ public class IncidentWorkspaceViewModelTests
         vm.Forces.NewMannschaftCount = 9;
         vm.Forces.AddForceCommand.Execute(null);
 
-        var pathAll = Path.Combine(Path.GetTempPath(), $"export-all-{Guid.NewGuid():N}.pdf");
+        var pathAll = Path.Join(Path.GetTempPath(), $"export-all-{Guid.NewGuid():N}.pdf");
         dialogs.ExportPath = pathAll;
         vm.ExportPdfCommand.Execute(null);
         await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
 
-        var pathReduced = Path.Combine(Path.GetTempPath(), $"export-reduced-{Guid.NewGuid():N}.pdf");
+        var pathReduced = Path.Join(Path.GetTempPath(), $"export-reduced-{Guid.NewGuid():N}.pdf");
         dialogs.ExportPath = pathReduced;
         vm.ExportPdfCommand.Execute(null);
         vm.PendingPdfExportOptions!.Items.Single(i => i.Section == IncidentPdfSections.Forces).IsSelected = false;
@@ -635,7 +635,7 @@ public class IncidentWorkspaceViewModelTests
     [Fact]
     public async Task A_failing_exporter_surfaces_in_ExportStatus_and_does_not_throw()
     {
-        var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(
@@ -667,7 +667,7 @@ public class IncidentWorkspaceViewModelTests
     [Fact]
     public async Task Exported_path_and_time_are_persisted_via_ILastPdfExportStore()
     {
-        var exportPath = Path.Combine(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var clock = new FixedClock(T0);
         var session = LocalIncidentSession.StartNew(

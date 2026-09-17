@@ -50,7 +50,7 @@ public class FilesTabRenderTests
 
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, name));
+        frame.SavePng(Path.Join(dir, name));
     }
 
     private static TabControl Tabs(Window window) =>
@@ -135,7 +135,7 @@ public class FilesTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
-        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var path = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
         await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
         try
         {

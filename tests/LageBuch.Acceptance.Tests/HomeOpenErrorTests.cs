@@ -68,7 +68,7 @@ public class HomeOpenErrorTests
         public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
             Task.FromResult<byte[]?>(null);
 
-        public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
+        public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
 
         public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
@@ -113,7 +113,7 @@ public class HomeOpenErrorTests
         {
             Directory.CreateDirectory(dir);
             using var frame = window.CaptureRenderedFrame()!;
-            frame.SavePng(Path.Combine(dir, renderTo));
+            frame.SavePng(Path.Join(dir, renderTo));
         }
 
         return (window, vm);

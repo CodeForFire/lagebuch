@@ -36,6 +36,12 @@ once we reach 1.0.
   developer documentation follows in English.
 
 ### Changed
+- Every path is now joined with `Path.Join` instead of `Path.Combine`. `Path.Combine`
+  silently discards everything before an argument that turns out to be rooted, so a name
+  that slipped through sanitisation could point outside the folder it was meant to land in;
+  `Path.Join` always concatenates. Behaviour is unchanged for every existing call — each
+  one passes a relative later argument — and untrusted names still go through
+  `IncidentFile.SanitizeFileName` or `SafeFileName.Sanitize` first.
 - The task list's high-priority and due text plus the home-view accent gradient now use the
   shared signal colour theme token instead of duplicating its hex value; rendered output is
   unchanged.
@@ -57,6 +63,10 @@ once we reach 1.0.
 - Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ### Fixed
+- Seven dead local assignments, one of them in `EqualWidthWrapPanel`'s arrange pass, left over
+  from earlier refactors. `IDE0059` ships at suggestion severity, below the threshold
+  `TreatWarningsAsErrors` acts on, so they had accumulated unnoticed; it is now a warning and
+  therefore a build error, so the next one cannot.
 - Android: a file picked from another app is now cleaned up the same way an attachment name from a
   joined device already was. The two had grown apart — the picked-name path stripped only the
   characters the running OS rejects, so on Android a name could keep `< > : " | ? *`, invisible

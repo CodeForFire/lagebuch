@@ -128,7 +128,7 @@
   "static_analysis_common_vulnerabilities_status": "Met",
   "static_analysis_common_vulnerabilities_justification": "CodeQL's security-and-quality suite is explicitly vulnerability-focused, and no CA3xxx injection or CA5xxx security analyzer rule is suppressed in the build.",
   "static_analysis_fixed_status": "Met",
-  "static_analysis_fixed_justification": "There are no outstanding CodeQL alerts; the first full run on the default branch reported none. Analyzer findings cannot accumulate at all, because TreatWarningsAsErrors turns them into build failures.",
+  "static_analysis_fixed_justification": "Alerts are driven to zero rather than triaged into a backlog. A finding is fixed in code by default; a query is excluded only where it duplicates a .NET analyzer or StyleCop rule the build already governs at a finer granularity, and each exclusion carries a comment naming that rule: https://github.com/CodeForFire/lagebuch/blob/main/.github/codeql/codeql-config.yml. No query carrying a security severity is excluded. A site-specific false positive is dismissed on the alert itself with a written reason. A code_scanning ruleset rule blocks any pull request that introduces a new alert, so a backlog cannot re-form; analyzer findings cannot accumulate either, because TreatWarningsAsErrors turns them into build failures.",
   "static_analysis_often_status": "Met",
   "static_analysis_often_justification": "On every pull request and every push to main, plus a weekly scheduled run so that newly released queries reach existing code even when the repository is quiet.",
   "dynamic_analysis_status": "Unmet",

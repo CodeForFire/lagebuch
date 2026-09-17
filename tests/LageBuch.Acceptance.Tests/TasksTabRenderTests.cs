@@ -50,7 +50,7 @@ public class TasksTabRenderTests
 
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, name));
+        frame.SavePng(Path.Join(dir, name));
     }
 
     private static TabControl Tabs(Window window) =>

@@ -18,7 +18,7 @@ namespace LageBuch.Persistence.Tests;
 // Set SAMPLES_OUT=<dir> to also write docs/samples/uebung.fwincident (`make samples`).
 public class DemoIncidentTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"demo-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"demo-{Guid.NewGuid():N}.fwincident");
 
     private sealed class Clock : IClock
     {
@@ -160,7 +160,7 @@ public class DemoIncidentTests : IDisposable
     [Fact]
     public void The_demo_master_data_file_parses_with_the_real_importer()
     {
-        var path = Path.Combine(RepoRoot(), "docs", "samples", "demo-stammdaten.json");
+        var path = Path.Join(RepoRoot(), "docs", "samples", "demo-stammdaten.json");
         Assert.True(File.Exists(path), $"missing sample file: {path}");
 
         using var stream = File.OpenRead(path);
@@ -197,7 +197,7 @@ public class DemoIncidentTests : IDisposable
         }
 
         Directory.CreateDirectory(dir);
-        var target = Path.Combine(dir, "uebung.fwincident");
+        var target = Path.Join(dir, "uebung.fwincident");
         foreach (var stale in new[] { target, target + "-wal", target + "-shm" })
         {
             if (File.Exists(stale))
@@ -220,7 +220,7 @@ public class DemoIncidentTests : IDisposable
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "LageBuch.sln")))
+        while (dir is not null && !File.Exists(Path.Join(dir.FullName, "LageBuch.sln")))
         {
             dir = dir.Parent;
         }

@@ -2,7 +2,7 @@ namespace LageBuch.App.Tests;
 
 public class AppPathsTests : IDisposable
 {
-    private readonly string _base = Path.Combine(Path.GetTempPath(), $"lb-{Guid.NewGuid():N}");
+    private readonly string _base = Path.Join(Path.GetTempPath(), $"lb-{Guid.NewGuid():N}");
 
     public void Dispose()
     {

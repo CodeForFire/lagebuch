@@ -81,10 +81,10 @@ public class ForcesTabRenderTests
 
     private static void Capture(Window window, string name)
     {
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, name));
+        frame.SavePng(Path.Join(dir, name));
     }
 
     [AvaloniaFact]
@@ -243,7 +243,7 @@ public class ForcesTabRenderTests
     [AvaloniaFact]
     public void Vehicle_selection_with_zugfuehrer_presets_within_seat_capacity()
     {
-        var view = HostForcesView(out var vm, out var window);
+        _ = HostForcesView(out var vm, out var window);
         vm.Forces.SelectedVehicle = new Vehicle("FFB Wache 1", "FFB ELW 1", 4, HasZugfuehrer: true);
         Dispatcher.UIThread.RunJobs();
 

@@ -33,7 +33,7 @@ public class CoMessprotokollViewModelTests
     [Fact]
     public void ViewModel_BuildsMatrix_FromIncident()
     {
-        var (session, vm) = CreateVm();
+        var (_, vm) = CreateVm();
 
         Assert.Single(vm.BuildingOptions);
         Assert.Equal("Haus A", vm.BuildingOptions[0].Name);

@@ -65,9 +65,9 @@ public class RolesTabRenderTests
 
         Assert.Single(vm.Roles.Roles);
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "roles-assignment.png"));
+        frame.SavePng(Path.Join(dir, "roles-assignment.png"));
     }
 }

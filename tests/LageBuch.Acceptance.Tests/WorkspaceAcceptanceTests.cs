@@ -58,7 +58,7 @@ internal sealed class FakeStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
     {
@@ -267,11 +267,11 @@ public class WorkspaceAcceptanceTests
         var window = new Window { Content = view, Width = 1000, Height = 700 };
         window.Show();
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
         {
-            before.SavePng(Path.Combine(dir, "etb-edit-before.png"));
+            before.SavePng(Path.Join(dir, "etb-edit-before.png"));
         }
 
         var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung erhalten");
@@ -281,7 +281,7 @@ public class WorkspaceAcceptanceTests
 
         using (var editing = window.CaptureRenderedFrame()!)
         {
-            editing.SavePng(Path.Combine(dir, "etb-edit-panel.png"));
+            editing.SavePng(Path.Join(dir, "etb-edit-panel.png"));
         }
 
         var editTextBox = view.GetControl<TextBox>("EditTextBox");
@@ -302,7 +302,7 @@ public class WorkspaceAcceptanceTests
 
         using (var after = window.CaptureRenderedFrame()!)
         {
-            after.SavePng(Path.Combine(dir, "etb-edit-after.png"));
+            after.SavePng(Path.Join(dir, "etb-edit-after.png"));
         }
 
         // History viewing is decoupled from editing (security review, #73) -- capture it separately.
@@ -310,7 +310,7 @@ public class WorkspaceAcceptanceTests
         Assert.NotNull(vm.Etb.HistoryEntry);
         using (var history = window.CaptureRenderedFrame()!)
         {
-            history.SavePng(Path.Combine(dir, "etb-edit-history.png"));
+            history.SavePng(Path.Join(dir, "etb-edit-history.png"));
         }
     }
 
@@ -331,7 +331,7 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Files_tab_renders_an_already_attached_file()
     {
-        var vm = BuildWorkspace(out var session);
+        _ = BuildWorkspace(out var session);
         session.Incident.AddFile(new FixedClock(), session.Operator!, "brand.jpg", "image/jpeg", 2048);
         var view = new FilesView { DataContext = new FilesViewModel(session, new FakeDialogs(), () => { }) };
         var window = new Window { Content = view, Width = 800, Height = 600 };
@@ -345,7 +345,7 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Renaming_a_file_via_ui_writes_through_to_the_domain()
     {
-        var vm = BuildWorkspace(out var session);
+        _ = BuildWorkspace(out var session);
         session.Incident.AddFile(new FixedClock(), session.Operator!, "brand.jpg", "image/jpeg", 2048);
         var filesVm = new FilesViewModel(session, new FakeDialogs(), () => { });
         var view = new FilesView { DataContext = filesVm };
@@ -370,8 +370,8 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Adding_file_via_ui_updates_the_list_and_logs_to_the_etb()
     {
-        var vm = BuildWorkspace(out var session);
-        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        _ = BuildWorkspace(out var session);
+        var path = System.IO.Path.Join(System.IO.Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
         File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
         try
         {
@@ -449,11 +449,11 @@ public class WorkspaceAcceptanceTests
         Assert.True(view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AbbauCompleteDot").IsVisible);
 
         // Capture the PR before/after screenshots (real Skia backend rasterizes embedded fonts).
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
         {
-            before.SavePng(Path.Combine(dir, "checkliste-aufbau-abbau-before.png"));
+            before.SavePng(Path.Join(dir, "checkliste-aufbau-abbau-before.png"));
         }
 
         vm.ChecklistAufbau.Items[0].IsDone = true;
@@ -463,7 +463,7 @@ public class WorkspaceAcceptanceTests
 
         using (var after = window.CaptureRenderedFrame()!)
         {
-            after.SavePng(Path.Combine(dir, "checkliste-aufbau-abbau-after.png"));
+            after.SavePng(Path.Join(dir, "checkliste-aufbau-abbau-after.png"));
         }
     }
 
@@ -700,11 +700,11 @@ public class WorkspaceAcceptanceTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using (var before = window.CaptureRenderedFrame()!)
         {
-            before.SavePng(Path.Combine(dir, "roles-transfer-before.png"));
+            before.SavePng(Path.Join(dir, "roles-transfer-before.png"));
         }
 
         var row = Assert.Single(vm.Roles.Roles);
@@ -714,7 +714,7 @@ public class WorkspaceAcceptanceTests
 
         using (var panel = window.CaptureRenderedFrame()!)
         {
-            panel.SavePng(Path.Combine(dir, "roles-transfer-panel.png"));
+            panel.SavePng(Path.Join(dir, "roles-transfer-panel.png"));
         }
 
         view.GetControl<AutoCompleteBox>("TransferPersonNameBox").Text = "Schmidt";
@@ -737,7 +737,7 @@ public class WorkspaceAcceptanceTests
 
         using (var after = window.CaptureRenderedFrame()!)
         {
-            after.SavePng(Path.Combine(dir, "roles-transfer-after.png"));
+            after.SavePng(Path.Join(dir, "roles-transfer-after.png"));
         }
     }
 

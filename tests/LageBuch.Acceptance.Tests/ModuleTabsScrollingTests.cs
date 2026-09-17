@@ -41,7 +41,7 @@ public class ModuleTabsScrollingTests
         {
             Directory.CreateDirectory(dir);
             using var frame = window.CaptureRenderedFrame()!;
-            frame.SavePng(Path.Combine(dir, "module-tabs-scrolling.png"));
+            frame.SavePng(Path.Join(dir, "module-tabs-scrolling.png"));
         }
 
         var tabs = ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");

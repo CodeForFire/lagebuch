@@ -34,9 +34,9 @@ public class TaskDialogRenderTests
 
         Assert.Equal("Lagemeldung übermittelt", dialogVm.Text);
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "task-dialog.png"));
+        frame.SavePng(Path.Join(dir, "task-dialog.png"));
     }
 }

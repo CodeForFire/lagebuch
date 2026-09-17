@@ -223,7 +223,7 @@ public class RemoteClientTests
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
-        var cacheRoot = Path.Combine(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        var cacheRoot = Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
         try
         {
             await using var uploader = await RemoteIncidentSession.ConnectAsync(

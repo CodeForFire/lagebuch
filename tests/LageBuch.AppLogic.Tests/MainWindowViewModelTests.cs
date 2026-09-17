@@ -20,7 +20,7 @@ public class MainWindowViewModelTests
     // test's TOFU state isolated from the others.
     private static MainWindowViewModel New(IFileDialogService? dialogs = null)
     {
-        var trustStore = new JsonTrustStore(Path.Combine(Path.GetTempPath(), $"trust-{Guid.NewGuid():N}.json"));
+        var trustStore = new JsonTrustStore(Path.Join(Path.GetTempPath(), $"trust-{Guid.NewGuid():N}.json"));
         var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", trustStore: trustStore);
         return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), dialogs ?? new FakeDialogs(), "0.1.0");
     }

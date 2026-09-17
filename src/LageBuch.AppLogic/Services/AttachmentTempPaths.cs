@@ -21,14 +21,14 @@ namespace LageBuch.AppLogic.Services;
 public static class AttachmentTempPaths
 {
     /// <summary>The one directory attachment copies may live in.</summary>
-    public static string Root { get; } = Path.Combine(Path.GetTempPath(), "lagebuch");
+    public static string Root { get; } = Path.Join(Path.GetTempPath(), "lagebuch");
 
     /// <summary>
     /// Creates and returns a fresh, empty directory under <see cref="Root"/> for a single "Öffnen".
     /// </summary>
     public static string CreateOpenDirectory()
     {
-        var directory = Path.Combine(Root, Guid.NewGuid().ToString("N"));
+        var directory = Path.Join(Root, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         return directory;
     }
