@@ -82,3 +82,8 @@ files under `docs/` are tracked. An empty roster is a fully supported state:
 the name field on the Funktionen tab offers the roster as suggestions but
 always accepts free text, so off-roster and mutual-aid personnel can be entered
 either way.
+
+[`datenschutz-und-sicherheit.md`](datenschutz-und-sicherheit.md) is the German
+page for the people who have to sign this off — it covers every category of
+personal data the app holds, all of the storage locations above, what the
+multi-device connection transmits, and the full deletion checklist.
