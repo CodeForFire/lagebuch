@@ -1,6 +1,3 @@
-using System.Globalization;
-using System.Text;
-
 namespace LageBuch.Domain.Files;
 
 public sealed record IncidentFile
@@ -138,7 +135,7 @@ public sealed record IncidentFile
             Id = id,
             FileName = SanitizeFileName(fileName)
                 ?? SanitizeFileName(StorageFileName(id, fileName))
-                ?? FallbackFileName,
+                ?? FileNameSanitizer.DefaultFallback,
             DisplayName = displayName,
             ContentType = contentType,
             SizeBytes = sizeBytes,
@@ -164,106 +161,11 @@ public sealed record IncidentFile
     /// </summary>
     public static string StorageFileName(Guid id, string fileName) => $"{id}{Path.GetExtension(fileName)}";
 
-    /// <summary>Last resort when not even the storage-style name survives sanitising.</summary>
-    private const string FallbackFileName = "anhang";
-
     /// <summary>
-    /// The per-name byte budget virtually every filesystem enforces (ext4, APFS, NTFS components).
-    /// A longer name would fail the write on a peer that opens the file, so it is capped here, once,
-    /// where every device sees the same result.
+    /// Sanitising is shared with the Android picked-name path via
+    /// <see cref="FileNameSanitizer"/>; what differs is only what happens when nothing usable is
+    /// left. <see cref="Create(Guid, string, string, long, DateTimeOffset, string)"/> rejects the
+    /// name outright, while <see cref="Rehydrate"/> must not — see each for the reasoning.
     /// </summary>
-    private const int MaxFileNameBytes = 255;
-
-    /// <summary>
-    /// Characters that must not appear in a <see cref="FileName"/>. The OS-specific set is only a
-    /// starting point: on Linux it is just <c>\0</c> and <c>/</c>, so the Windows-invalid set is
-    /// added unconditionally — the same attachment travels between a Windows host and a Linux
-    /// client (and back) and has to end up with the same name on both.
-    /// </summary>
-    private static readonly char[] InvalidFileNameChars =
-        [.. Path.GetInvalidFileNameChars(), .. "<>:\"|?*\\/"];
-
-    /// <summary>Both path separators, whatever the platform thinks of them.</summary>
-    private static readonly char[] SeparatorChars = ['/', '\\'];
-
-    /// <summary>
-    /// Reduces an attachment name to a bare, traversal-free file name, or returns <c>null</c> when
-    /// nothing usable is left. Attachment names are attacker-controlled — a joined client picks the
-    /// name in <c>AddFileCommand</c> and every peer later writes those bytes to a temp file under
-    /// that name before handing it to the OS — so a name like <c>..\..\Startup\x.png</c> must never
-    /// survive: only the last path segment is kept.
-    /// <para>
-    /// Deliberately hand-rolled rather than <see cref="Path.GetFileName(string)"/>, whose idea of a
-    /// separator is the platform's: a Windows host and a Linux client sync the same name and must
-    /// end up with the same file, so both separators (and the Windows-invalid character set) apply
-    /// everywhere.
-    /// </para>
-    /// <para>
-    /// The result is capped at <see cref="MaxFileNameBytes"/> UTF-8 bytes — the limit almost every
-    /// filesystem enforces — by shortening the stem and keeping the extension, which is what
-    /// decides the viewer a peer's ÖFFNEN launches.
-    /// </para>
-    /// <para>
-    /// <see cref="UnicodeCategory.Format"/> characters go too, not just control characters. They
-    /// are invisible but reorder what follows them, so <c>"Lageplan‮gnp.exe"</c> reads as
-    /// <c>Lageplan exe.png</c> in the Dateien list and the PDF while still being an <c>.exe</c> —
-    /// the extension check in <see cref="Create(Guid, string, string, long, DateTimeOffset, string)"/>
-    /// sees the real one, but the operator deciding whether to press ÖFFNEN does not. This also
-    /// removes the zero-width joiners, which no file name needs.
-    /// </para>
-    /// </summary>
-    private static string? SanitizeFileName(string? fileName)
-    {
-        if (string.IsNullOrWhiteSpace(fileName))
-        {
-            return null;
-        }
-
-        var trimmed = fileName.Trim();
-        var lastSegment = trimmed[(trimmed.LastIndexOfAny(SeparatorChars) + 1)..];
-        var cleaned = new string(lastSegment
-            .Where(c => !IsHidden(c) && Array.IndexOf(InvalidFileNameChars, c) < 0)
-            .ToArray()).Trim();
-
-        // "." and ".." are directory references, not names — and an all-dots name is no better.
-        return cleaned.Length == 0 || cleaned.All(c => c == '.') ? null : CapToByteLimit(cleaned);
-    }
-
-    /// <summary>
-    /// Characters that occupy no width of their own, so they cannot be seen in a rendered file name
-    /// but can still change how it reads. <see cref="char.IsControl(char)"/> alone misses the
-    /// bidirectional overrides (U+202E and friends), which are <see cref="UnicodeCategory.Format"/>.
-    /// </summary>
-    private static bool IsHidden(char c) =>
-        char.IsControl(c) || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format;
-
-    /// <summary>
-    /// Shortens the stem until the whole name fits <see cref="MaxFileNameBytes"/> UTF-8 bytes,
-    /// keeping the extension. Cuts on a character boundary (the encoder stops at the last whole
-    /// one), so a multi-byte name never ends in half a character.
-    /// </summary>
-    private static string CapToByteLimit(string name)
-    {
-        if (Encoding.UTF8.GetByteCount(name) <= MaxFileNameBytes)
-        {
-            return name;
-        }
-
-        var extension = Path.GetExtension(name);
-        var extensionBytes = Encoding.UTF8.GetByteCount(extension);
-        if (extensionBytes >= MaxFileNameBytes)
-        {
-            // Pathological: an "extension" that fills the budget on its own leaves no stem to keep.
-            extension = string.Empty;
-            extensionBytes = 0;
-        }
-
-        var stem = name[..^extension.Length];
-        var buffer = new byte[MaxFileNameBytes - extensionBytes];
-
-        // flush: false — a trailing high surrogate that has no room for its pair stays unconsumed
-        // rather than being encoded as a replacement character.
-        Encoding.UTF8.GetEncoder().Convert(stem, buffer, flush: false, out var charsUsed, out _, out _);
-        return string.Concat(stem.AsSpan(0, charsUsed), extension);
-    }
+    private static string? SanitizeFileName(string? fileName) => FileNameSanitizer.TrySanitize(fileName);
 }
