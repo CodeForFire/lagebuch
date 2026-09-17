@@ -45,6 +45,9 @@ Atemschutzüberwachung, Aufgaben, CO-Messprotokoll und PDF-Bericht.
 - **Keine Daten verlassen den ELW.** Stammdaten, Namen und Handynummern
   liegen nur auf deinem Gerät. Die optionale Mehrgeräte-Verbindung läuft im
   LAN oder über Tailscale, TLS-gesichert mit PIN – ohne Cloud, ohne Telemetrie.
+  Was genau wo gespeichert wird, steht in
+  [Datenschutz und Sicherheit](docs/datenschutz-und-sicherheit.md) – die Seite
+  für die Kreisbrandinspektion und den Datenschutzbeauftragten.
 - **Open Source, MIT-Lizenz.** Kein Abo, keine Sitzplatzlizenzen, kein
   Vendor-Lock-in. Der Quellcode ist einsehbar, Änderungswünsche sind ein Issue
   entfernt.
@@ -193,6 +196,9 @@ Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
 - **Entwickeln, übersetzen, dokumentieren** → [CONTRIBUTING.md](CONTRIBUTING.md).
   Einstiegsaufgaben mit Anleitung liegen unter
   [good first issue](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+- **Datenschutz** – welche Daten wo liegen, was übertragen wird, was ihr selbst
+  regeln müsst und wie ihr alles wieder löscht →
+  [Datenschutz und Sicherheit](docs/datenschutz-und-sicherheit.md).
 - **Sicherheitslücken** bitte nicht öffentlich melden → [SECURITY.md](SECURITY.md).
 
 ---
