@@ -348,9 +348,15 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
 - **Der Name in „Wer dokumentiert?“ wird nicht überprüft.** Er dient der
   Zuordnung in der Anzeige, nicht der Berechtigung. Ein verbundenes Gerät kann
   einen beliebigen Namen angeben.
-- **EXIF-Daten in Fotos werden nicht entfernt** – siehe oben.
+- **EXIF-Daten in Fotos werden nicht entfernt** – siehe oben. Das Entfernen
+  beim Anhängen ist geplant
+  ([Issue #384](https://github.com/CodeForFire/lagebuch/issues/384)).
 - **Der Anhang-Zwischenspeicher eines beitretenden Geräts wird nicht
-  automatisch geleert.**
+  automatisch geleert**
+  ([Issue #382](https://github.com/CodeForFire/lagebuch/issues/382)); dasselbe
+  gilt für die Arbeitskopien im temporären Verzeichnis
+  ([Issue #383](https://github.com/CodeForFire/lagebuch/issues/383)). Beide
+  stehen deshalb auf der Löschliste oben.
 - **Das Dateiformat ist vor Version 1.0 nicht eingefroren.** Ältere Dateien
   werden beim Öffnen migriert; ab 1.0 gilt die Zusage, dass eine Datei dauerhaft
   lesbar bleibt.
