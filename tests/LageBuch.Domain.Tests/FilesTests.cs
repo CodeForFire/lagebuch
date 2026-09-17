@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using LageBuch.Domain.Files;
 
@@ -278,6 +279,46 @@ public class FilesTests
 
         // Every remaining stem character is a whole 'ä' — no half-written UTF-8 sequence.
         Assert.All(file.FileName[..^4], c => Assert.Equal('ä', c));
+    }
+
+    // U+202E RIGHT-TO-LEFT OVERRIDE and its relatives are UnicodeCategory.Format, not control
+    // characters, so char.IsControl alone let them through. They render as nothing but reverse the
+    // text after them, which is how "Lageplan\u202Egnp.exe" reads as "Lageplan exe.png" in the
+    // Dateien list and the PDF while still being an executable. (#302)
+    [Theory]
+    [InlineData("\u202ELageplan.png")] // RIGHT-TO-LEFT OVERRIDE
+    [InlineData("Lageplan\u200E.png")] // LEFT-TO-RIGHT MARK
+    [InlineData("Lage\u200Dplan.png")] // ZERO WIDTH JOINER
+    [InlineData("Lage\u00ADplan.png")] // SOFT HYPHEN
+    public void Create_strips_invisible_formatting_characters(string hostile)
+    {
+        var file = IncidentFile.Create(hostile, "image/png", 1024, T0, "Müller");
+
+        Assert.DoesNotContain(file.FileName, c => CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format);
+        Assert.Equal(".png", Path.GetExtension(file.FileName));
+    }
+
+    [Fact]
+    public void Create_strips_a_bidi_override_used_to_disguise_an_executable()
+    {
+        // The name the attacker wants shown is "Lageplan exe.png"; what it really ends in is .exe,
+        // which Create must then reject outright because no allowed content type maps to it.
+        var spoofed = "Lageplan\u202Egnp.exe";
+
+        var ex = Assert.Throws<ArgumentException>(
+            () => IncidentFile.Create(spoofed, "image/png", 1024, T0, "Müller"));
+
+        // The message quotes the sanitised name, so the override must already be gone from it.
+        Assert.DoesNotContain('\u202E', ex.Message);
+    }
+
+    [Fact]
+    public void Rehydrate_strips_invisible_formatting_characters_without_throwing()
+    {
+        var file = IncidentFile.Rehydrate(
+            Guid.NewGuid(), "Lageplan\u202Egnp.png", "Küchenbrand", "image/png", 1024, T0, "Müller");
+
+        Assert.Equal("Lageplangnp.png", file.FileName);
     }
 
     // Rehydrate is the load path (SQLite and a host's snapshot), so it sanitises the same way but
