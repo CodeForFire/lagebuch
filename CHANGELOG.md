@@ -63,6 +63,10 @@ once we reach 1.0.
 - Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ### Fixed
+- Seven dead local assignments, one of them in `EqualWidthWrapPanel`'s arrange pass, left over
+  from earlier refactors. `IDE0059` ships at suggestion severity, below the threshold
+  `TreatWarningsAsErrors` acts on, so they had accumulated unnoticed; it is now a warning and
+  therefore a build error, so the next one cannot.
 - Android: a file picked from another app is now cleaned up the same way an attachment name from a
   joined device already was. The two had grown apart — the picked-name path stripped only the
   characters the running OS rejects, so on Android a name could keep `< > : " | ? *`, invisible
