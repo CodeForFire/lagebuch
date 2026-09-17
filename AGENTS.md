@@ -130,6 +130,33 @@ Any PR touching `src/` must add an entry under `CHANGELOG.md`'s
 the PR if `src/` changed but `CHANGELOG.md` didn't) — do it in the same PR,
 not as a follow-up.
 
+## The website
+
+The user-facing website lives in a separate repository,
+[`CodeForFire/codeforfire.github.io`](https://github.com/CodeForFire/codeforfire.github.io)
+(Astro Starlight, served at <https://codeforfire.github.io/>). Two things
+follow for work in *this* repository.
+
+**Some of its content is built from here.** Its build copies
+`docs/datenschutz-und-sicherheit.md`, `docs/logo/`, `docs/demo/einsatz-flow.gif`
+and `docs/screenshots/*.png` straight out of this repo. Renaming or moving any
+of those breaks the site build — deliberately, so the page is never silently
+lost. If you move one, open a pull request there in the same breath. Content
+changes need nothing: the site rebuilds nightly.
+
+**Three things are maintained in both places and must be updated together**,
+in the same pull request pair:
+
+| Here | There |
+|---|---|
+| README's *Warum Lagebuch?* claims | `src/content/docs/index.mdx` |
+| README's *Lagebuch im Vergleich* table | `src/content/docs/vergleich.md` |
+| README's *Installation* and *Downloads prüfen* | `src/content/docs/download.md` |
+
+A price, a platform or a competitor claim that changes in one and not the other
+is the failure mode to avoid: the comparison table cites sources and is the
+first thing a Kommandant checks.
+
 ## Master-data example file
 
 `docs/master-data.example.json` is documented (README.md) as the full
