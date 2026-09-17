@@ -42,6 +42,12 @@ address the issue before any public disclosure.
   a single event — so a compromised PIN exposes something with a longer useful
   life than the operation the PIN was issued for. `masterdata.db` and each
   incident's `.fwincident` file otherwise live in local application data.
+- **The full data-protection picture** — every category of personal data, all
+  storage locations, what the sync transmits, the split of technical and
+  organizational measures, and the deletion checklist — is documented in German
+  in [`docs/datenschutz-und-sicherheit.md`](docs/datenschutz-und-sicherheit.md),
+  written for the Kreisbrandinspektionen and Datenschutzbeauftragte who have to
+  approve a deployment.
 - **Multi-device sync** runs over LAN/Tailscale via SignalR and requires a
   share PIN to join an incident. Issues affecting that transport, the PIN gate,
   or the PDF export pipeline are very much in scope.
