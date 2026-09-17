@@ -5,10 +5,10 @@ sie gespeichert werden, was ein Gerät verlässt und was die Feuerwehr selbst
 regeln muss. Sie richtet sich an Kommandantinnen und Kommandanten,
 Kreisbrandinspektionen und kommunale Datenschutzbeauftragte.
 
-Stand: Version 0.5.0, September 2026. Lagebuch ist vor Version 1.0 und
-entwickelt sich schnell; maßgeblich ist diese Seite im Stand der installierten
-Version. Die Darstellung ist technisch und ausdrücklich **keine
-Rechtsberatung**.
+Stand: Version 0.5.0, September 2026. Lagebuch steht noch vor Version 1.0 und
+entwickelt sich schnell; maßgeblich ist jeweils die Fassung dieser Seite, die
+zur installierten Version gehört. Die Darstellung ist technisch und
+ausdrücklich **keine Rechtsberatung**.
 
 ## Kurzfassung
 
@@ -16,10 +16,10 @@ Rechtsberatung**.
   überträgt von sich aus nichts.
 - **Ein Einsatz ist eine Datei.** Die `.fwincident`-Datei liegt dort, wo sie
   gespeichert wurde, und gehört der Wehr.
-- **Keine Telemetrie, kein Absturzbericht, keine Updateprüfung.** Es gibt im
+- **Keine Telemetrie, keine Absturzberichte, keine Updateprüfung.** Es gibt im
   gesamten Programm keinen Aufruf, der Nutzungsdaten irgendwohin sendet.
 - **Keine Logdateien.** Das Programm schreibt heute kein Protokoll auf die
-  Platte – ein Absturz hinterlässt nichts, was personenbezogene Daten enthält.
+  Festplatte – ein Absturz hinterlässt nichts, was personenbezogene Daten enthält.
 - **Die Stammdaten sind nach der Installation leer.** Namen und Telefonnummern
   kommen ausschließlich durch einen selbst ausgelösten Import ins Programm.
 - **Die Mehrgeräte-Verbindung ist optional** und richtet sich immer an genau das
@@ -38,7 +38,7 @@ einzelne Datei gespeichert wird.
 | Stammdaten: Personal | Nachname, Vorname, Funktion, Funkrufname, **Telefonnummer** | `masterdata.db` |
 | Stammdaten: Fahrzeuge | Wache, Funkrufname, Sitzplätze – keine Personen | `masterdata.db` |
 | Funktionen im Einsatz | Name, Funkrufname, Abschnitt, **Telefonnummer**, von/bis | Einsatzdatei |
-| Atemschutzüberwachung | Name jedes Truppmitglieds mit Position (Truppführer, Truppmann, 2. Truppmann), Drücke und Zeiten | Einsatzdatei |
+| Atemschutzüberwachung | Name jedes Truppmitglieds mit Position (Truppführer, Truppmann, 2. Truppmann), Druckwerte und Zeiten | Einsatzdatei |
 | Einsatztagebuch (ETB) | Freitext bis 4000 Zeichen, Von/An, Richtung, „erfasst von“ | Einsatzdatei |
 | ETB-Korrekturen | **jede überschriebene Fassung bleibt erhalten**, mit Zeitpunkt und Bearbeiter | Einsatzdatei |
 | Einsatzdaten | Stichwort, Einsatznummer, **Straße und Ortsteil**, „abgeschlossen von“ | Einsatzdatei |
@@ -50,22 +50,22 @@ einzelne Datei gespeichert wird.
 
 Zwei Punkte verdienen besondere Aufmerksamkeit:
 
-**Das CO-Messprotokoll enthält Daten Dritter.** Der Bewohnername je Wohnung
-betrifft Personen, die nicht der Feuerwehr angehören und die der Erfassung nicht
-zugestimmt haben. Die Verarbeitung stützt sich auf die Einsatzdurchführung, und
-genau dieser Teil der Einsatzdatei sollte bei der Festlegung von Löschfristen
-zuerst betrachtet werden. Der Name ist ein Freitextfeld und kann leer bleiben –
+**Das CO-Messprotokoll enthält Daten Dritter.** Erfasst werden hier Namen von
+Personen, die nicht der Feuerwehr angehören und die der Erfassung nicht
+zugestimmt haben. Die Verarbeitung erfolgt zur Einsatzdurchführung, und genau
+dieser Teil der Einsatzdatei sollte bei der Festlegung von Löschfristen zuerst
+betrachtet werden. Der Name ist ein Freitextfeld und kann leer bleiben –
 die Wohnung lässt sich auch ohne ihn eindeutig über Haus, Stockwerk und Lage
 kennzeichnen.
 
-**Fotos können Zusatzinformationen tragen.** Lagebuch entfernt keine
+**Fotos enthalten mehr als das Bild.** Lagebuch entfernt keine
 EXIF-Metadaten aus angehängten Bildern. Ein mit dem Diensthandy aufgenommenes
 Foto behält damit unter Umständen GPS-Koordinaten, Aufnahmezeit und Gerätemodell
 – auch im exportierten PDF-Bericht.
 
 ### Woher die Stammdaten kommen
 
-Eine frische Installation startet mit **leeren** Stammdaten. Es sind keine
+Eine neue Installation startet mit **leeren** Stammdaten. Es sind keine
 Namen, Funkrufnamen, Wachen oder Telefonnummern im Programm enthalten; die
 einzigen mitgelieferten Beispieldaten sind frei erfunden. Personenbezogene Daten
 gelangen nur durch einen ausdrücklichen Import in der Stammdatenverwaltung auf
@@ -80,10 +80,10 @@ Konvention. Einzelheiten zur Stammdatenpflege stehen in
 Eine `.fwincident`-Datei ist eine **SQLite-Datenbank ohne Verschlüsselung**. Sie
 liegt dort, wo sie beim Speichern abgelegt wurde – Lagebuch gibt keinen Ort vor.
 Neben der Datei können betriebsbedingt Hilfsdateien mit den Endungen `-wal` und
-`-shm` auftauchen.
+`-shm` entstehen.
 
 **Anhänge liegen nicht in der Einsatzdatei**, sondern in einem Ordner daneben,
-der genauso heißt wie die Datei, mit der Endung `.files`:
+der denselben Namen trägt wie die Einsatzdatei, ergänzt um die Endung `.files`:
 
 ```
 Einsatz-20260917.fwincident     ← Einsatzdaten, ETB, Atemschutz, CO-Messung …
@@ -105,17 +105,18 @@ Alles Weitere liegt in einem einzigen Ordner:
 | Linux | `~/.config/Lagebuch/` |
 | macOS | `~/.config/Lagebuch/` |
 
-Unter macOS ist das bewusst `~/.config` und nicht `~/Library/Application
-Support`; dorthin löst der verwendete Standardpfad unter Unix auf.
+Unter macOS ist das `~/.config` und nicht `~/Library/Application Support`:
+dorthin zeigt unter Unix der plattformübergreifend verwendete Standardpfad für
+Anwendungsdaten.
 
 | Datei oder Ordner | Inhalt |
 |---|---|
-| `masterdata.db` | die Stammdaten der Wehr, **einschließlich Namen und Telefonnummern** |
+| `masterdata.db` | die Stammdaten der Wehr, **einschließlich der Namen und Telefonnummern** |
 | `recent.json` | die zuletzt geöffneten Einsatzdateien mit vollständigem Pfad |
 | `last-save-folder.json` | der zuletzt zum Speichern verwendete Ordner |
 | `last-pdf-export.json` | der zuletzt für den PDF-Export verwendete Ordner |
 | `last-join-host.json` | die zuletzt erfolgreich verbundene Gegenstelle |
-| `trust.json` | die gemerkten Zertifikat-Fingerabdrücke der Gegenstellen |
+| `trust.json` | die gespeicherten Zertifikats-Fingerabdrücke der Gegenstellen |
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
 
 Beim Öffnen eines Anhangs legt Lagebuch zusätzlich eine Arbeitskopie im
@@ -126,7 +127,7 @@ temporären Verzeichnis des Systems an, unterhalb von `lagebuch/`.
 Die Android-App speichert ausschließlich im app-eigenen Bereich: nichts auf der
 SD-Karte, nichts in frei zugänglichen Ordnern. Einsatzdateien, Stammdaten, der
 Anhang-Zwischenspeicher und die Exportdateien liegen dort. **Beim
-Deinstallieren der App entfernt Android alles davon.**
+Deinstallieren der App entfernt Android all diese Daten.**
 
 ## Was das Gerät verlässt
 
@@ -139,24 +140,25 @@ dem Bediener ausgelöst:
 2. **Angeklickte Links.** Wetter, Karten oder Hydrantenplan aus den Stammdaten
    werden an den Standardbrowser des Systems übergeben. Lagebuch selbst ruft
    die Seite nicht ab.
-3. **Der PDF-Bericht.** Er wird dorthin geschrieben, wo der Speicherdialog es
-   vorgibt. Was danach mit ihm geschieht, liegt bei der Wehr – er enthält den
-   vollständigen Einsatz einschließlich der eingebetteten Anhänge.
+3. **Der PDF-Bericht.** Er wird dorthin geschrieben, wo er im Speicherdialog
+   abgelegt wird. Was danach mit ihm geschieht, liegt bei der Wehr – er
+   enthält den vollständigen Einsatz einschließlich der eingebetteten Anhänge.
 
-Nicht vorhanden sind: Nutzungsstatistik, Absturzberichte, Updateprüfung,
-Werbe- oder Analysebibliotheken, Schriftarten oder Karten von fremden Servern.
+Nicht vorhanden sind: Nutzungsstatistiken, Absturzberichte, Updateprüfungen,
+Werbe- oder Analysebibliotheken sowie Schriftarten oder Karten von fremden
+Servern.
 
 **Lagebuch schreibt heute keine Protokolldateien.** Das ist für den Datenschutz
-angenehm – es entsteht kein zweiter Ort mit personenbezogenen Daten –, hat aber
+von Vorteil – es entsteht kein zweiter Ort mit personenbezogenen Daten –, hat aber
 eine Kehrseite: Nach einem Absturz gibt es nichts, was man zur Fehlersuche
 einreichen könnte. Sollte sich das in einer späteren Version ändern, wird es
 hier beschrieben.
 
 ## Die Mehrgeräte-Verbindung im Detail
 
-Ein Gerät kann einen Einsatz **gastgeben**, andere Geräte treten ihm bei. Der
-Gastgeber ist die Quelle der Wahrheit; es gibt keinen dritten Rechner und keinen
-Dienst dazwischen.
+Ein Gerät kann einen Einsatz **im Netzwerk freigeben**, andere Geräte treten
+ihm bei. Der Gastgeber führt den maßgeblichen Stand; es gibt keinen dritten
+Rechner und keinen Dienst dazwischen.
 
 **Transport.** Fester Port 5859, ausschließlich HTTPS (TLS 1.2 oder 1.3, je nach
 Betriebssystem). Einen unverschlüsselten Zugang gibt es nicht.
@@ -172,9 +174,9 @@ beliebiges Zertifikat zu akzeptieren, gibt es nicht.
 
 **PIN.** Der Beitritt verlangt eine vierstellige PIN, die für jede Freigabe neu
 und kryptografisch zufällig erzeugt, nur im Arbeitsspeicher gehalten und nie
-gespeichert wird. Sie wird bei jeder Anfrage mitgeschickt. Falsche Eingaben
-bremst der Gastgeber je Gegenstelle exponentiell aus, bis zu einer Minute
-Wartezeit.
+gespeichert wird. Sie wird bei jeder Anfrage mitgeschickt. Bei falschen
+Eingaben verzögert der Gastgeber die nächste Antwort je Gegenstelle
+exponentiell, bis zu einer Minute.
 
 **Was übertragen wird.** Nach jeder Änderung erhält jedes verbundene Gerät den
 vollständigen Stand des Einsatzes: Einsatzdaten, das gesamte ETB einschließlich
@@ -195,18 +197,19 @@ mehr als den Einsatz, für den sie ausgegeben wurde.
 
 **Anhänge auf dem beitretenden Gerät.** Geladene Anhänge bleiben im Ordner
 `attachment-cache/` liegen, auch nachdem die Verbindung beendet wurde. Er wird
-derzeit nicht automatisch aufgeräumt und gehört deshalb auf die Löschliste
-weiter unten.
+derzeit nicht automatisch geleert und gehört deshalb auf die Löschliste weiter
+unten.
 
 **Reichweite.** Der Gastgeber nimmt Verbindungen auf allen Netzwerkschnittstellen
 des Geräts an; eine Einschränkung auf bestimmte Adressbereiche findet nicht
-statt. Die im Programm angezeigte Adresse ist nur ein Vorschlag zum Weitersagen.
-Praktisch heißt das: **Erreichbarkeit im Netz plus PIN ist die gesamte
-Zugangskontrolle.** Im gedachten Einsatzfall – die eigenen Geräte im eigenen
-WLAN oder über Tailscale – ist das angemessen; in einem offenen Netz ist es das
-nicht.
+statt. Die im Programm angezeigte Adresse ist nur ein Vorschlag, den man am
+beitretenden Gerät eintragen kann. Praktisch heißt das: **Erreichbarkeit im
+Netz plus PIN ist die gesamte Zugangskontrolle.** Im vorgesehenen Einsatzfall –
+die eigenen Geräte im eigenen WLAN oder über Tailscale – ist das angemessen; in
+einem offenen Netz ist es das nicht.
 
-**Android** kann beitreten, aber nicht gastgeben. Die App ist ein Begleitgerät.
+**Android** kann beitreten, aber selbst keinen Einsatz freigeben. Die App ist
+ein Begleitgerät.
 
 ## Technische und organisatorische Maßnahmen
 
@@ -218,7 +221,7 @@ nicht.
 - PIN-Pflicht beim Beitritt, mit Bremse gegen systematisches Durchprobieren.
 - Anhänge nur als JPEG, PNG, GIF, WebP oder PDF; Dateiname und Dateityp werden
   geprüft, damit sich keine ausführbare Datei als Bild ausgeben kann.
-  Dateinamen werden entschärft, Pfadangaben entfernt, die Länge begrenzt.
+  Dateinamen werden bereinigt, Pfadangaben entfernt, die Länge begrenzt.
 - Beim Öffnen eines Anhangs prüft das Programm, dass es sich um eine echte
   Datei im eigenen Arbeitsverzeichnis handelt, bevor es sie an das
   Betriebssystem übergibt.
@@ -240,11 +243,12 @@ nicht.
   zugehörigen `.files`-Ordner –, einschließlich Sicherung und Zugriffsschutz auf
   dem Ablageort.
 - **Löschfristen** für Einsatzdateien, PDF-Berichte und die Personalliste
-  festlegen und umsetzen; siehe [Aufbewahren und Löschen](#aufbewahren-und-löschen).
+  festlegen und umsetzen; siehe
+  [Aufbewahren und Löschen](#aufbewahren-und-löschen).
 - **Umgang mit dem PDF-Bericht**, der den vollständigen Einsatz enthält:
   Versandweg, Empfängerkreis, Ablage.
-- **Weitergabe der PIN** im Einsatz: an wen, und dass sie nicht über den
-  Einsatz hinaus verwendet wird.
+- **Weitergabe der PIN** im Einsatz: an wen sie gegeben wird und dass sie nicht
+  über den Einsatz hinaus verwendet wird.
 - **Auswahl der Netzverbindung** für den Mehrgerätebetrieb: eigenes WLAN oder
   Tailscale, nicht das offene Gäste-WLAN der Einsatzstelle.
 
@@ -287,8 +291,8 @@ oder die Datei zu entfernen. Eine Besonderheit ist ausdrücklich zu benennen:
 bewahren sie mit Zeitpunkt und Bearbeiter auf. Das ist für die
 Dokumentationsintegrität gewollt – ein Einsatztagebuch, dessen Einträge sich
 spurlos ändern lassen, wäre als Nachweis wertlos. Berichtigung heißt dort also
-Ergänzung, nicht Überschreiben. Wer eine Vorfassung tatsächlich entfernen muss,
-entfernt den Eintrag.
+Ergänzung, nicht Überschreiben. Wer eine Vorfassung tatsächlich
+beseitigen will, muss den gesamten Eintrag löschen.
 
 ## Aufbewahren und Löschen
 
@@ -299,9 +303,9 @@ abgearbeitet sind.
 
 **Windows, Linux, macOS**
 
-1. Jede `.fwincident`-Datei, an allen Orten, an denen gespeichert wurde
-   (Anhaltspunkte liefern `recent.json` und `last-save-folder.json`), samt
-   etwaiger `-wal`- und `-shm`-Dateien.
+1. Jede `.fwincident`-Datei, an allen Orten, an denen Einsätze gespeichert
+   wurden (Anhaltspunkte liefern `recent.json` und `last-save-folder.json`),
+   samt etwaiger `-wal`- und `-shm`-Dateien.
 2. Zu jeder Einsatzdatei den gleichnamigen `.files`-Ordner.
 3. Aus dem Programmordner (`%AppData%\Lagebuch\` beziehungsweise
    `~/.config/Lagebuch/`):
@@ -331,13 +335,13 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
 - **Die Installationspakete sind noch nicht signiert.** Betriebssysteme warnen
   deshalb beim ersten Start. Die SignPath Foundation hat das Projekt abgelehnt;
   eine Bewerbung bei OSSign ist frühestens im Februar 2027 möglich, weil dort
-  sechs Monate Projektbestand verlangt werden. Bis dahin sind Prüfsumme und
-  Herkunftsnachweis der belastbare Ersatz. Einzelheiten in der
+  ein Mindestalter von sechs Monaten vorausgesetzt wird. Bis dahin sind
+  Prüfsumme und Herkunftsnachweis der belastbare Ersatz. Einzelheiten in der
   [Roadmap](../ROADMAP.md).
 - **Die erste Verbindung zu einer Gegenstelle ist ungeprüft.** Der Fingerabdruck
   wird beim ersten Kontakt übernommen und ab dann erzwungen; er wird im Programm
   bislang nicht angezeigt, kann also beim ersten Mal nicht mit dem Gastgeber
-  abgeglichen werden. Wer in diesem Moment im selben Netz mitspielt, könnte sich
+  abgeglichen werden. Wer in diesem Moment im selben Netz mitliest, könnte sich
   dazwischenschalten. Verbesserung ist geplant
   ([Issue #288](https://github.com/CodeForFire/lagebuch/issues/288)).
 - **Die PIN hat vier Stellen.** Zusammen mit der Bremse gegen Durchprobieren
@@ -363,13 +367,14 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
 - **Es gibt keine Protokolldateien** – zum Schutz der Daten gut, zur Fehlersuche
   nach einem Absturz schlecht.
 
-Diese Punkte stehen in englischer Sprache und aus der Sicht eines
-Sicherheitsforschers auch in [SECURITY.md](../SECURITY.md).
+Dieselben Punkte stehen – auf Englisch und aus der Sicht eines
+Sicherheitsforschers – auch in [SECURITY.md](../SECURITY.md).
 
 ## Fragen und Meldungen
 
 - Fragen zum Datenschutz, zur Installation oder zum Betrieb im ELW gerne unter
-  [Fragen & Antworten](https://github.com/CodeForFire/lagebuch/discussions/categories/fragen-antworten).
+  [Fragen & Antworten](https://github.com/CodeForFire/lagebuch/discussions/categories/fragen-antworten)
+  stellen.
 - **Sicherheitslücken bitte nicht öffentlich melden**, sondern vertraulich über
   [SECURITY.md](../SECURITY.md).
 - Fehler oder Lücken in dieser Seite: bitte
