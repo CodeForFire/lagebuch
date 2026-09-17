@@ -44,6 +44,11 @@ once we reach 1.0.
 - Prefix each attached PDF in the exported report with a caption page echoing its Files-list row (#262)
 
 ### Fixed
+- Android: a file picked from another app is now cleaned up the same way an attachment name from a
+  joined device already was. The two had grown apart — the picked-name path stripped only the
+  characters the running OS rejects, so on Android a name could keep `< > : " | ? *`, invisible
+  formatting characters, or run past the 255-byte limit every filesystem enforces, and only broke
+  once the file reached a Windows peer. Both now share one sanitiser. (#302)
 - A PDF export no longer fails outright because of a single character the report font cannot
   draw. Anything typed into an Einsatz reaches the export — ETB entries, Aufgaben, attachment
   names — and since the QuestPDF update an unrenderable character (an emoji, a name in another
