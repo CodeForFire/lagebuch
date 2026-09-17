@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace LageBuch.Domain.Files;
@@ -202,6 +203,14 @@ public sealed record IncidentFile
     /// filesystem enforces — by shortening the stem and keeping the extension, which is what
     /// decides the viewer a peer's ÖFFNEN launches.
     /// </para>
+    /// <para>
+    /// <see cref="UnicodeCategory.Format"/> characters go too, not just control characters. They
+    /// are invisible but reorder what follows them, so <c>"Lageplan‮gnp.exe"</c> reads as
+    /// <c>Lageplan exe.png</c> in the Dateien list and the PDF while still being an <c>.exe</c> —
+    /// the extension check in <see cref="Create(Guid, string, string, long, DateTimeOffset, string)"/>
+    /// sees the real one, but the operator deciding whether to press ÖFFNEN does not. This also
+    /// removes the zero-width joiners, which no file name needs.
+    /// </para>
     /// </summary>
     private static string? SanitizeFileName(string? fileName)
     {
@@ -213,12 +222,20 @@ public sealed record IncidentFile
         var trimmed = fileName.Trim();
         var lastSegment = trimmed[(trimmed.LastIndexOfAny(SeparatorChars) + 1)..];
         var cleaned = new string(lastSegment
-            .Where(c => !char.IsControl(c) && Array.IndexOf(InvalidFileNameChars, c) < 0)
+            .Where(c => !IsHidden(c) && Array.IndexOf(InvalidFileNameChars, c) < 0)
             .ToArray()).Trim();
 
         // "." and ".." are directory references, not names — and an all-dots name is no better.
         return cleaned.Length == 0 || cleaned.All(c => c == '.') ? null : CapToByteLimit(cleaned);
     }
+
+    /// <summary>
+    /// Characters that occupy no width of their own, so they cannot be seen in a rendered file name
+    /// but can still change how it reads. <see cref="char.IsControl(char)"/> alone misses the
+    /// bidirectional overrides (U+202E and friends), which are <see cref="UnicodeCategory.Format"/>.
+    /// </summary>
+    private static bool IsHidden(char c) =>
+        char.IsControl(c) || CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.Format;
 
     /// <summary>
     /// Shortens the stem until the whole name fits <see cref="MaxFileNameBytes"/> UTF-8 bytes,
