@@ -4,7 +4,7 @@ namespace LageBuch.AppLogic.Tests;
 
 public class JsonFileStoreTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"json-file-store-{Guid.NewGuid():N}.json");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"json-file-store-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {

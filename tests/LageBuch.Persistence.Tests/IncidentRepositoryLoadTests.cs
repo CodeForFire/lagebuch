@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Tests;
 // database at that path and only then fail, quietly littering the incident folder.
 public class IncidentRepositoryLoadTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"load-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"load-{Guid.NewGuid():N}.fwincident");
 
     public void Dispose()
     {

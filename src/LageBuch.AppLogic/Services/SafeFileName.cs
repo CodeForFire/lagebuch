@@ -2,7 +2,7 @@ namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// Reduces an untrusted display name (e.g. a content provider's <c>DISPLAY_NAME</c>, which a
-/// malicious provider fully controls) to a bare file name safe to <see cref="Path.Combine(string, string)"/>
+/// malicious provider fully controls) to a bare file name safe to <see cref="Path.Join(string, string)"/>
 /// into a fixed directory. Backslash-style traversal is normalised to forward slashes first so
 /// <see cref="Path.GetFileName(string)"/> — which only recognises the current platform's own
 /// separators — also strips a Windows-style <c>..\..\evil.dll</c> payload on Unix, not just

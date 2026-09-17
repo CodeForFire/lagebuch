@@ -4,7 +4,7 @@ namespace LageBuch.AppLogic.Tests;
 
 public class JsonLastPdfExportStoreTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"last-pdf-export-{Guid.NewGuid():N}.json");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"last-pdf-export-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {

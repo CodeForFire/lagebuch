@@ -63,9 +63,9 @@ public class EtbTabRenderTests
 
         Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung übermittelt");
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "etb-entry.png"));
+        frame.SavePng(Path.Join(dir, "etb-entry.png"));
     }
 }

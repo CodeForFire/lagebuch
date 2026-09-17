@@ -37,7 +37,7 @@ public class PdfAttachmentMergerTests
     // that, cleaned up once the test finishes.
     private static string WriteTempPdf(byte[] bytes)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"lagebuch-pdf-merger-test-{Guid.NewGuid():N}.pdf");
+        var path = Path.Join(Path.GetTempPath(), $"lagebuch-pdf-merger-test-{Guid.NewGuid():N}.pdf");
         File.WriteAllBytes(path, bytes);
         return path;
     }
@@ -102,7 +102,7 @@ public class PdfAttachmentMergerTests
     public void Append_throws_a_clear_error_for_a_missing_attachment_path()
     {
         var report = OnePagePdf();
-        var missingPath = Path.Combine(Path.GetTempPath(), $"lagebuch-pdf-merger-test-missing-{Guid.NewGuid():N}.pdf");
+        var missingPath = Path.Join(Path.GetTempPath(), $"lagebuch-pdf-merger-test-missing-{Guid.NewGuid():N}.pdf");
 
         Assert.Throws<FileNotFoundException>(() => PdfAttachmentMerger.Append(report, new[] { Attachment(missingPath) }));
     }

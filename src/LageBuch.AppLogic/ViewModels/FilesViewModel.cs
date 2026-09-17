@@ -297,7 +297,7 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
             // A private directory per open, never the shared system temp directory: the name comes
             // from whichever device added the file (a joined client picks it), and two incidents
             // carrying the same file name used to overwrite each other's copy here.
-            var tempPath = Path.Combine(AttachmentTempPaths.CreateOpenDirectory(), row.FileName);
+            var tempPath = Path.Join(AttachmentTempPaths.CreateOpenDirectory(), row.FileName);
             await File.WriteAllBytesAsync(tempPath, bytes);
             await _dialogs.OpenFileAsync(tempPath);
         }

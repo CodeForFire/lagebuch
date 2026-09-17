@@ -5,7 +5,7 @@ namespace LageBuch.Persistence.Tests;
 
 public class MasterDataStoreTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"md-{Guid.NewGuid():N}.db");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"md-{Guid.NewGuid():N}.db");
 
     public void Dispose()
     {

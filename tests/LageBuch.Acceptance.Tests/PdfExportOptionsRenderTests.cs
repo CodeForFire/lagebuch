@@ -26,9 +26,9 @@ public class PdfExportOptionsRenderTests
         Assert.Equal(8, dialogVm.Items.Count);
         Assert.All(dialogVm.Items, i => Assert.True(i.IsSelected));
 
-        var dir = Path.Combine(Path.GetTempPath(), "lagebuch-shots");
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
-        frame.SavePng(Path.Combine(dir, "pdf-export-options.png"));
+        frame.SavePng(Path.Join(dir, "pdf-export-options.png"));
     }
 }

@@ -4,7 +4,7 @@ namespace LageBuch.AppLogic.Tests;
 
 public class JsonLastJoinHostStoreTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"last-join-host-{Guid.NewGuid():N}.json");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"last-join-host-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {

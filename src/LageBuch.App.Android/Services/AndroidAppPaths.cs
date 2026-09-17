@@ -12,21 +12,21 @@ internal static class AndroidAppPaths
 {
     public static string IncidentsDir(Context context)
     {
-        var dir = System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "incidents");
+        var dir = System.IO.Path.Join(context.FilesDir!.AbsolutePath, "incidents");
         System.IO.Directory.CreateDirectory(dir);
         return dir;
     }
 
     public static string MasterDataDbPath(Context context) =>
-        System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "masterdata.db");
+        System.IO.Path.Join(context.FilesDir!.AbsolutePath, "masterdata.db");
 
     public static string RecentFilesJsonPath(Context context) =>
-        System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "recent.json");
+        System.IO.Path.Join(context.FilesDir!.AbsolutePath, "recent.json");
 
     public static string CacheDir(Context context) => context.CacheDir!.AbsolutePath;
 
     public static string AttachmentCacheDir(Context context) =>
-        System.IO.Path.Combine(CacheDir(context), "attachment-cache");
+        System.IO.Path.Join(CacheDir(context), "attachment-cache");
 
     /// <summary>
     /// One of the two subtrees the <c>FileProvider</c> grants a URI into (see
@@ -41,7 +41,7 @@ internal static class AndroidAppPaths
     /// </summary>
     public static string SharedDir(Context context)
     {
-        var dir = System.IO.Path.Combine(CacheDir(context), "shared");
+        var dir = System.IO.Path.Join(CacheDir(context), "shared");
         System.IO.Directory.CreateDirectory(dir);
         return dir;
     }
@@ -53,14 +53,14 @@ internal static class AndroidAppPaths
     /// </summary>
     public static string PickedDir(Context context)
     {
-        var dir = System.IO.Path.Combine(CacheDir(context), "picked");
+        var dir = System.IO.Path.Join(CacheDir(context), "picked");
         System.IO.Directory.CreateDirectory(dir);
         return dir;
     }
 
     public static string TrustJsonPath(Context context) =>
-        System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "trust.json");
+        System.IO.Path.Join(context.FilesDir!.AbsolutePath, "trust.json");
 
     public static string LastJoinHostJsonPath(Context context) =>
-        System.IO.Path.Combine(context.FilesDir!.AbsolutePath, "last-join-host.json");
+        System.IO.Path.Join(context.FilesDir!.AbsolutePath, "last-join-host.json");
 }

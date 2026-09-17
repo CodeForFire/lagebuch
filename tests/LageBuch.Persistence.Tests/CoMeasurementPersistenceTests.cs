@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Tests;
 
 public class CoMeasurementPersistenceTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"co-{Guid.NewGuid():N}.fwincident");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"co-{Guid.NewGuid():N}.fwincident");
 
     private sealed class Clock : IClock
     {

@@ -6,7 +6,7 @@ namespace LageBuch.AppLogic.Tests;
 
 public class MasterDataProviderTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"mdp-{Guid.NewGuid():N}.db");
+    private readonly string _path = Path.Join(Path.GetTempPath(), $"mdp-{Guid.NewGuid():N}.db");
 
     public void Dispose()
     {

@@ -20,7 +20,7 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var path = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
         await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
         try
         {
@@ -75,7 +75,7 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var path = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
+        var path = Path.Join(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(path, "hello");
         try
         {
@@ -103,7 +103,7 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var path = Path.Combine(Path.GetTempPath(), $"riesig-{Guid.NewGuid():N}.jpg");
+        var path = Path.Join(Path.GetTempPath(), $"riesig-{Guid.NewGuid():N}.jpg");
         using (var fs = new FileStream(path, FileMode.CreateNew))
         {
             fs.SetLength(IncidentFile.MaxSizeBytes + 1); // sparse — no real disk write, so the test stays fast
@@ -143,8 +143,8 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var path1 = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
-        var path2 = Path.Combine(Path.GetTempPath(), $"lage-{Guid.NewGuid():N}.pdf");
+        var path1 = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var path2 = Path.Join(Path.GetTempPath(), $"lage-{Guid.NewGuid():N}.pdf");
         await File.WriteAllBytesAsync(path1, new byte[] { 1, 2, 3 });
         await File.WriteAllBytesAsync(path2, new byte[] { 4, 5, 6 });
         try
@@ -177,8 +177,8 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var path1 = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
-        var path2 = Path.Combine(Path.GetTempPath(), $"mehr-{Guid.NewGuid():N}.txt");
+        var path1 = Path.Join(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
+        var path2 = Path.Join(Path.GetTempPath(), $"mehr-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(path1, "hello");
         await File.WriteAllTextAsync(path2, "world");
         try
@@ -211,8 +211,8 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var goodPath = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
-        var badPath = Path.Combine(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
+        var goodPath = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var badPath = Path.Join(Path.GetTempPath(), $"notes-{Guid.NewGuid():N}.txt");
         await File.WriteAllBytesAsync(goodPath, new byte[] { 1, 2, 3 });
         await File.WriteAllTextAsync(badPath, "hello");
         try
@@ -246,8 +246,8 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var path1 = Path.Combine(Path.GetTempPath(), $"riesig1-{Guid.NewGuid():N}.jpg");
-        var path2 = Path.Combine(Path.GetTempPath(), $"riesig2-{Guid.NewGuid():N}.jpg");
+        var path1 = Path.Join(Path.GetTempPath(), $"riesig1-{Guid.NewGuid():N}.jpg");
+        var path2 = Path.Join(Path.GetTempPath(), $"riesig2-{Guid.NewGuid():N}.jpg");
         foreach (var p in new[] { path1, path2 })
         {
             using var fs = new FileStream(p, FileMode.CreateNew);
@@ -309,7 +309,7 @@ public class FilesViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Close();
-        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var path = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
         await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
         try
         {
@@ -336,7 +336,7 @@ public class FilesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var path = Path.Combine(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
+        var path = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
         await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
         try
         {
@@ -433,7 +433,7 @@ public class FilesViewModelTests
         {
             Assert.NotNull(first);
             Assert.NotNull(second);
-            var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+            var root = Path.Join(Path.GetTempPath(), "lagebuch");
             Assert.StartsWith(root + Path.DirectorySeparatorChar, first, StringComparison.Ordinal);
             Assert.Equal("brand.jpg", Path.GetFileName(first));
             Assert.Equal(root, Path.GetDirectoryName(Path.GetDirectoryName(first))); // one level down
@@ -470,7 +470,7 @@ public class FilesViewModelTests
             Assert.NotNull(dialogs.LastOpenedPath);
             Assert.Equal("evil.png", Path.GetFileName(dialogs.LastOpenedPath));
             Assert.StartsWith(
-                Path.Combine(Path.GetTempPath(), "lagebuch") + Path.DirectorySeparatorChar,
+                Path.Join(Path.GetTempPath(), "lagebuch") + Path.DirectorySeparatorChar,
                 dialogs.LastOpenedPath,
                 StringComparison.Ordinal);
         }
@@ -531,7 +531,7 @@ public class FilesViewModelTests
     // directory disappearing mid-scan — the suite runs classes in parallel.
     private static string[] TempCopiesNamed(string fileName)
     {
-        var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+        var root = Path.Join(Path.GetTempPath(), "lagebuch");
         try
         {
             return Directory.Exists(root)
@@ -582,7 +582,7 @@ public class FilesViewModelTests
     // straight into the system temp directory fails an assertion instead of deleting /tmp.
     private static void DeleteOpenDirectory(string? openedPath)
     {
-        var root = Path.Combine(Path.GetTempPath(), "lagebuch");
+        var root = Path.Join(Path.GetTempPath(), "lagebuch");
         if (openedPath is not null
             && Path.GetDirectoryName(openedPath) is { } dir
             && dir.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)

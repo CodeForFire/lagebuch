@@ -40,7 +40,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
     {
         var folder = FolderFor(incidentPath);
         Directory.CreateDirectory(folder);
-        await File.WriteAllBytesAsync(Path.Combine(folder, storageFileName), bytes, cancellationToken);
+        await File.WriteAllBytesAsync(Path.Join(folder, storageFileName), bytes, cancellationToken);
     }
 
     public async Task SaveStreamAsync(string incidentPath, string storageFileName, Stream source, CancellationToken cancellationToken = default)
@@ -48,7 +48,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
         ArgumentNullException.ThrowIfNull(source);
         var folder = FolderFor(incidentPath);
         Directory.CreateDirectory(folder);
-        var path = Path.Combine(folder, storageFileName);
+        var path = Path.Join(folder, storageFileName);
 
         // Write to a sibling temp file first and move it into place only once the whole upload has
         // landed, so a same-id retry after a dropped connection can never leave a half-written file
@@ -80,7 +80,7 @@ public sealed class IncidentFileStore : IIncidentFileStore
     }
 
     public string ResolveDiskPath(string incidentPath, string storageFileName) =>
-        Path.Combine(FolderFor(incidentPath), storageFileName);
+        Path.Join(FolderFor(incidentPath), storageFileName);
 
     [SuppressMessage(
         "Design",
@@ -104,6 +104,6 @@ public sealed class IncidentFileStore : IIncidentFileStore
     {
         var directory = Path.GetDirectoryName(incidentPath);
         var stem = Path.GetFileNameWithoutExtension(incidentPath);
-        return Path.Combine(string.IsNullOrEmpty(directory) ? "." : directory, stem + ".files");
+        return Path.Join(string.IsNullOrEmpty(directory) ? "." : directory, stem + ".files");
     }
 }

@@ -23,13 +23,13 @@ public sealed class AndroidFileDialogService : IFileDialogService
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null)
     {
         var dir = AndroidAppPaths.IncidentsDir(_activity);
-        var path = System.IO.Path.Combine(dir, suggestedFileName);
+        var path = System.IO.Path.Join(dir, suggestedFileName);
         var count = 1;
         while (System.IO.File.Exists(path))
         {
             var stem = System.IO.Path.GetFileNameWithoutExtension(suggestedFileName);
             var ext = System.IO.Path.GetExtension(suggestedFileName);
-            path = System.IO.Path.Combine(dir, $"{stem} ({count++}){ext}");
+            path = System.IO.Path.Join(dir, $"{stem} ({count++}){ext}");
         }
 
         return Task.FromResult<string?>(path);
@@ -40,10 +40,10 @@ public sealed class AndroidFileDialogService : IFileDialogService
     public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
 
     public Task<string?> PickExportPdfAsync(string suggestedFileName) =>
-        Task.FromResult<string?>(System.IO.Path.Combine(AndroidAppPaths.SharedDir(_activity), suggestedFileName));
+        Task.FromResult<string?>(System.IO.Path.Join(AndroidAppPaths.SharedDir(_activity), suggestedFileName));
 
     public Task<string?> PickExportJsonAsync(string suggestedFileName) =>
-        Task.FromResult<string?>(System.IO.Path.Combine(AndroidAppPaths.SharedDir(_activity), suggestedFileName));
+        Task.FromResult<string?>(System.IO.Path.Join(AndroidAppPaths.SharedDir(_activity), suggestedFileName));
 
     private TaskCompletionSource<string?>? _pendingImport;
 
@@ -77,7 +77,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             return;
         }
 
-        var destPath = System.IO.Path.Combine(AndroidAppPaths.PickedDir(_activity), "import.json");
+        var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), "import.json");
         using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
         using (var output = System.IO.File.Create(destPath))
         {
@@ -121,7 +121,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             return;
         }
 
-        var destPath = System.IO.Path.Combine(AndroidAppPaths.PickedDir(_activity), DisplayNameOf(uri));
+        var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), DisplayNameOf(uri));
         using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
         using (var output = System.IO.File.Create(destPath))
         {
@@ -133,7 +133,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
 
     // A content provider fully controls DISPLAY_NAME -- a hostile one can return "../../evil" to
     // escape PickedDir, so SafeFileName.Sanitize reduces it to a bare, harmless file name before
-    // it ever reaches Path.Combine.
+    // it ever reaches Path.Join.
     private string DisplayNameOf(global::Android.Net.Uri uri)
     {
         using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
@@ -206,16 +206,16 @@ public sealed class AndroidFileDialogService : IFileDialogService
 
         var fullPath = System.IO.Path.GetFullPath(path);
         var sharedDir = AndroidAppPaths.SharedDir(_activity);
-        var attachmentsDir = System.IO.Path.Combine(AndroidAppPaths.CacheDir(_activity), "lagebuch");
+        var attachmentsDir = System.IO.Path.Join(AndroidAppPaths.CacheDir(_activity), "lagebuch");
 
         if (IsUnder(fullPath, sharedDir) || IsUnder(fullPath, attachmentsDir))
         {
             return fullPath;
         }
 
-        var destDir = System.IO.Path.Combine(sharedDir, Guid.NewGuid().ToString("N"));
+        var destDir = System.IO.Path.Join(sharedDir, Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(destDir);
-        var destPath = System.IO.Path.Combine(destDir, System.IO.Path.GetFileName(fullPath));
+        var destPath = System.IO.Path.Join(destDir, System.IO.Path.GetFileName(fullPath));
         System.IO.File.Copy(fullPath, destPath, overwrite: true);
         return destPath;
     }

@@ -377,7 +377,7 @@ internal sealed class FakeStore : IIncidentStore
     public async Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default)
     {
         _files[$"{path}/{storageFileName}"] = bytes;
-        await File.WriteAllBytesAsync(Path.Combine(_diskDir, storageFileName), bytes, cancellationToken);
+        await File.WriteAllBytesAsync(Path.Join(_diskDir, storageFileName), bytes, cancellationToken);
     }
 
     public async Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default)
@@ -390,7 +390,7 @@ internal sealed class FakeStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult(_files.TryGetValue($"{path}/{storageFileName}", out var b) ? b : null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(_diskDir, storageFileName);
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(_diskDir, storageFileName);
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default)
     {
@@ -435,7 +435,7 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
     public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.FromResult<byte[]?>(null);
 
-    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Combine(path, storageFileName);
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
 
     public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
