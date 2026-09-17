@@ -25,6 +25,10 @@ Desktop-Anwendung, die auch ohne Netz, ohne Cloud und ohne Abo funktioniert.
 Ein Einsatz ist eine Datei auf dem ELW-Laptop – mit Einsatztagebuch, Kräften,
 Atemschutzüberwachung, Aufgaben, CO-Messprotokoll und PDF-Bericht.
 
+**Alles auf einer Seite:** [codeforfire.github.io](https://codeforfire.github.io/) –
+Übersicht, Probefahrt, Download und Datenschutz, ohne GitHub-Konto und ohne
+Markdown.
+
 *English speakers: the developer documentation starts at [For developers](#for-developers).*
 
 ## Für wen ist Lagebuch?
@@ -184,6 +188,8 @@ Alle Screenshots zeigen fiktive Daten.
 Lagebuch wird von [CodeForFire](https://github.com/CodeForFire) entwickelt –
 Feuerwehrleuten aus Bayern, die im Einsatz selbst damit arbeiten.
 
+- **Website** mit allen Seiten für Anwender →
+  [codeforfire.github.io](https://codeforfire.github.io/).
 - **Fragen** zur Bedienung, zur Installation oder zum ELW-Laptop →
   [Fragen & Antworten](../../discussions/categories/fragen-antworten). Dafür
   braucht ihr kein Bug-Ticket zu schreiben.
