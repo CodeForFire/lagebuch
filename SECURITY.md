@@ -44,20 +44,22 @@ address the issue before any public disclosure.
   incident's `.fwincident` file otherwise live in local application data.
 - **The full data-protection picture** — every category of personal data, all
   storage locations, what the sync transmits, the split of technical and
-  organizational measures, and the deletion checklist — is documented in German
-  in [`docs/datenschutz-und-sicherheit.md`](docs/datenschutz-und-sicherheit.md),
-  written for the Kreisbrandinspektionen and Datenschutzbeauftragte who have to
-  approve a deployment.
+  organizational measures, and the deletion checklist — is documented in
+  German in
+  [`docs/datenschutz-und-sicherheit.md`](docs/datenschutz-und-sicherheit.md),
+  written for the Kreisbrandinspektionen and Datenschutzbeauftragte who have
+  to approve a deployment.
 - **Multi-device sync** runs over LAN/Tailscale via SignalR and requires a
   share PIN to join an incident. Issues affecting that transport, the PIN gate,
   or the PDF export pipeline are very much in scope.
 
 ## Known limitations
 
-The German [`docs/datenschutz-und-sicherheit.md`](docs/datenschutz-und-sicherheit.md)
+The German
+[`docs/datenschutz-und-sicherheit.md`](docs/datenschutz-und-sicherheit.md)
 lists the same limits under "Bekannte Grenzen". This is that list, in that
-order, cut for a researcher rather than for a Datenschutzbeauftragter, plus one
-note on why the trust model around the middle two is where it is.
+order, cut for a researcher rather than for a Datenschutzbeauftragter, plus
+one note on why the trust model around the middle two is where it is.
 
 - **The installers are not code-signed.** Every install path makes the user
   click past an operating-system warning — SmartScreen on Windows, quarantine
@@ -73,8 +75,12 @@ note on why the trust model around the middle two is where it is.
 - **The first connection to a host is unauthenticated.** Sync pins the host
   certificate Trust-on-First-Use: the joining device records its SHA-256
   thumbprint in `trust.json` on first contact and from then on accepts only
-  that thumbprint, with no override and no fallback to an unverified
-  connection. That thumbprint comparison is the *whole* client-side trust
+  that thumbprint: a changed one aborts the connection, and there is no
+  fallback to an unverified one. The pin can be reset — "forget" on a host
+  drops its entry, which is what makes a legitimately reissued certificate
+  usable — so that action is itself the downgrade path back to an
+  unauthenticated first contact. That thumbprint comparison is the *whole*
+  client-side trust
   decision — the per-share certificate is self-signed and its SAN covers only
   `localhost` and loopback while the host binds every interface, so chain and
   hostname validation are replaced outright rather than layered on. The
@@ -82,7 +88,7 @@ note on why the trust model around the middle two is where it is.
   be compared against the host out of band: an attacker already positioned on
   the LAN at that moment can get themselves pinned instead, and every later
   connection will then look correct.
-  ([#288](https://github.com/CodeForFire/lagebuch/issues/288))
+  ([#288](../../issues/288))
 - **The share PIN is four digits.** It is drawn per share from
   `RandomNumberGenerator`, held in memory only, never persisted, and a wrong
   PIN puts the offending source IP into an exponential backoff
@@ -92,7 +98,7 @@ note on why the trust model around the middle two is where it is.
   remote address does not resolve into one shared bucket — enough against
   someone guessing, not against an attacker with network access, time and more
   than one address. Six digits are part of the same issue as the thumbprint
-  display ([#288](https://github.com/CodeForFire/lagebuch/issues/288)).
+  display ([#288](../../issues/288)).
 - **The PIN plus network reachability is the entire access-control
   boundary.** A device that can reach the host over the LAN/Tailscale link
   and knows the (rate-limited, TLS-protected) PIN is already fully trusted
@@ -128,14 +134,14 @@ note on why the trust model around the middle two is where it is.
   private address, often the same one whose resident is already named in the
   CO-Messprotokoll. PNG, WebP and GIF metadata chunks are equally untouched.
   Stripping on ingest is planned
-  ([#384](https://github.com/CodeForFire/lagebuch/issues/384)).
+  ([#384](../../issues/384)).
 - **Attachment copies outlive the session that created them.** A joining
   device keeps every attachment it pulled in `attachment-cache/` after the
   connection ends, and the cache is never cleared automatically
-  ([#382](https://github.com/CodeForFire/lagebuch/issues/382)); opening an
+  ([#382](../../issues/382)); opening an
   attachment additionally leaves a working copy under `lagebuch/` in the
   system temp directory, one fresh directory per open, also never cleaned up
-  ([#383](https://github.com/CodeForFire/lagebuch/issues/383)). Both are
+  ([#383](../../issues/383)). Both are
   plaintext copies of personal data outside the incident file, so both are on
   the German page's deletion checklist.
 - **The file format is not frozen before 1.0.** Older `.fwincident` files are
