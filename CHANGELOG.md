@@ -17,7 +17,10 @@ once we reach 1.0.
   the split between what Lagebuch does and what the brigade has to arrange itself, the DSGVO
   classification — no Auftragsverarbeitung, so no AV-Vertrag — a complete deletion checklist,
   and the known limits, unsigned packages and unverified first connection included. Linked from
-  the README, `SECURITY.md` and `docs/master-data.md`.
+  the README, `SECURITY.md` and `docs/master-data.md`. `SECURITY.md`'s "Known limitations" now
+  carries the same limits in English, so the two documents agree: the unverified first TOFU
+  connection, the four-digit PIN, unstripped EXIF metadata, the attachment copies that outlive a
+  session, unsigned releases, and the absence of log files.
 - Every release now ships `SHA256SUMS.txt` and a Sigstore-backed build attestation for each
   installer, so a download can be verified with `sha256sum -c` and
   `gh attestation verify <Datei> --repo CodeForFire/lagebuch` while the packages are still

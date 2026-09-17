@@ -367,8 +367,9 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
 - **Es gibt keine Protokolldateien** – zum Schutz der Daten gut, zur Fehlersuche
   nach einem Absturz schlecht.
 
-Dieselben Punkte stehen – auf Englisch und aus der Sicht eines
-Sicherheitsforschers – auch in [SECURITY.md](../SECURITY.md).
+Bis auf den Hinweis zum Dateiformat, der keine Sicherheitsfrage ist, stehen
+diese Punkte – auf Englisch und aus der Sicht eines Sicherheitsforschers – auch
+in [SECURITY.md](../SECURITY.md).
 
 ## Fragen und Meldungen
 
