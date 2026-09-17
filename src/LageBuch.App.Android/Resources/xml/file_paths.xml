@@ -10,8 +10,11 @@
          and OpenFileAsync's targets, and the PDF/JSON export temp files that feed them
          (AndroidAppPaths.SharedDir). -->
     <cache-path name="shared" path="shared/" />
-    <!-- <cache>/lagebuch: on Android, Path.GetTempPath() resolves to the app cache dir, so
-         FilesViewModel.OpenFileAsync's Path.Combine(Path.GetTempPath(), "lagebuch", GUID,
+    <!-- <cache>/lagebuch: this path segment is AttachmentTempPaths.RootFolderName. XML cannot
+         reference a C# constant, so if that constant ever changes, change it here too or the
+         FileProvider stops recognising the tree and every ÖFFNEN fails.
+         On Android, Path.GetTempPath() resolves to the app cache dir, so
+         FilesViewModel.OpenFileAsync's Path.Join(Path.GetTempPath(), "lagebuch", GUID,
          safeName) lands here. That path is exercised on every attachment open, so this entry
          must stay even though nothing in this project writes into it directly. -->
     <cache-path name="attachments" path="lagebuch/" />

@@ -78,10 +78,17 @@ public sealed class AndroidFileDialogService : IFileDialogService
         }
 
         var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), "import.json");
-        using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
-        using (var output = System.IO.File.Create(destPath))
+        try
         {
-            input.CopyTo(output);
+            CopyTo(uri, destPath);
+        }
+        catch (Exception ex) when (IsPickFailure(ex))
+        {
+            // This method runs on Android's activity-result callback, which has no caller to catch
+            // for it -- an exception here takes the Activity down. Hand it to the awaiting picker
+            // task instead, where MasterDataEditorViewModel.Import turns it into an error line.
+            pending.SetException(ex);
+            return;
         }
 
         pending.SetResult(destPath);
@@ -122,28 +129,71 @@ public sealed class AndroidFileDialogService : IFileDialogService
         }
 
         var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), DisplayNameOf(uri));
-        using (var input = _activity.ContentResolver!.OpenInputStream(uri)!)
-        using (var output = System.IO.File.Create(destPath))
+        try
         {
-            input.CopyTo(output);
+            CopyTo(uri, destPath);
+        }
+        catch (Exception ex) when (IsPickFailure(ex))
+        {
+            // Same reasoning as CompleteImport: FilesViewModel.AddFileAsync surfaces it.
+            pending.SetException(ex);
+            return;
         }
 
         pending.SetResult(destPath);
     }
+
+    /// <summary>
+    /// Streams a picked <c>content://</c> URI into <paramref name="destPath"/>. The null-forgiving
+    /// <c>!</c> on OpenInputStream is deliberate rather than checked: a provider that returns no
+    /// stream is exactly the failure the callers catch, and an NRE here carries the same meaning as
+    /// the IOException a broken stream would give.
+    /// </summary>
+    private void CopyTo(global::Android.Net.Uri uri, string destPath)
+    {
+        using var input = _activity.ContentResolver!.OpenInputStream(uri)!;
+        using var output = System.IO.File.Create(destPath);
+        input.CopyTo(output);
+    }
+
+    /// <summary>
+    /// The ways reading someone else's content provider can fail: it hands back nothing, throws
+    /// across the Binder, revokes the grant, or the copy runs out of space. Deliberately not a
+    /// blanket catch -- a genuine bug in our own code should still surface as a crash.
+    /// <para>
+    /// <see cref="Java.Lang.Throwable"/> is the catch-all for the provider's side of the Binder:
+    /// every bound Java exception derives from it, including the cancellation and
+    /// security exceptions a provider can raise, so they need no separate entries here.
+    /// </para>
+    /// </summary>
+    private static bool IsPickFailure(Exception ex) =>
+        ex is System.IO.IOException
+            or UnauthorizedAccessException
+            or NullReferenceException
+            or OperationCanceledException
+            or Java.Lang.Throwable;
 
     // A content provider fully controls DISPLAY_NAME -- a hostile one can return "../../evil" to
     // escape PickedDir, so SafeFileName.Sanitize reduces it to a bare, harmless file name before
     // it ever reaches Path.Join.
     private string DisplayNameOf(global::Android.Net.Uri uri)
     {
-        using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
-        if (cursor is not null && cursor.MoveToFirst())
+        try
         {
-            var index = cursor.GetColumnIndex(global::Android.Provider.IOpenableColumns.DisplayName);
-            if (index >= 0)
+            using var cursor = _activity.ContentResolver!.Query(uri, null, null, null, null);
+            if (cursor is not null && cursor.MoveToFirst())
             {
-                return SafeFileName.Sanitize(cursor.GetString(index));
+                var index = cursor.GetColumnIndex(global::Android.Provider.IOpenableColumns.DisplayName);
+                if (index >= 0)
+                {
+                    return SafeFileName.Sanitize(cursor.GetString(index));
+                }
             }
+        }
+        catch (Exception ex) when (IsPickFailure(ex))
+        {
+            // A provider that will not answer the name query is no reason to abandon the pick --
+            // the bytes are still readable, and the fallback name is a perfectly good one.
         }
 
         return SafeFileName.DefaultFallback;
@@ -206,7 +256,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
 
         var fullPath = System.IO.Path.GetFullPath(path);
         var sharedDir = AndroidAppPaths.SharedDir(_activity);
-        var attachmentsDir = System.IO.Path.Join(AndroidAppPaths.CacheDir(_activity), "lagebuch");
+        var attachmentsDir = System.IO.Path.Join(AndroidAppPaths.CacheDir(_activity), AttachmentTempPaths.RootFolderName);
 
         if (IsUnder(fullPath, sharedDir) || IsUnder(fullPath, attachmentsDir))
         {

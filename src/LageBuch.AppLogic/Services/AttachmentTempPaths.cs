@@ -20,8 +20,19 @@ namespace LageBuch.AppLogic.Services;
 /// </summary>
 public static class AttachmentTempPaths
 {
+    /// <summary>
+    /// The single folder name under the temp root that attachment copies live in. Shared because
+    /// three places have to agree on it and none of them can see the others' copy of the literal:
+    /// <see cref="Root"/> here, the Android head's <c>EnsureShareable</c> (which recognises this
+    /// tree as already shareable and skips a second copy), and the <c>attachments</c> entry in the
+    /// Android head's <c>file_paths.xml</c>, which is what makes the FileProvider willing to hand
+    /// out a URI for it at all. XML cannot reference this constant, so that file carries a comment
+    /// pointing here; the other two use it directly.
+    /// </summary>
+    public const string RootFolderName = "lagebuch";
+
     /// <summary>The one directory attachment copies may live in.</summary>
-    public static string Root { get; } = Path.Join(Path.GetTempPath(), "lagebuch");
+    public static string Root { get; } = Path.Join(Path.GetTempPath(), RootFolderName);
 
     /// <summary>
     /// Creates and returns a fresh, empty directory under <see cref="Root"/> for a single "Öffnen".
