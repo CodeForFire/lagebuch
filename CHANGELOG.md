@@ -36,6 +36,9 @@ once we reach 1.0.
   developer documentation follows in English.
 
 ### Changed
+- The task list's high-priority and due text plus the home-view accent gradient now use the
+  shared signal colour theme token instead of duplicating its hex value; rendered output is
+  unchanged.
 - Wachen and Funkrufnamen are derived from the Fahrzeuge (plus the Personal roster's call
   signs) instead of being maintained as separate Stammdaten lists. Their editor sections and
   the `brigades` / `radioCallSigns` JSON keys are gone; importing an older file names any

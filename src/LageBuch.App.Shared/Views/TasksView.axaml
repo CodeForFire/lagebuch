@@ -7,7 +7,7 @@
              x:DataType="vm:TasksViewModel">
   <UserControl.Styles>
     <Style Selector="TextBlock.prio-high">
-      <Setter Property="Foreground" Value="#FF3D2E" />
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBlock.prio-medium">
@@ -17,7 +17,7 @@
       <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
     </Style>
     <Style Selector="TextBlock.due">
-      <Setter Property="Foreground" Value="#FF3D2E" />
+      <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
   </UserControl.Styles>
