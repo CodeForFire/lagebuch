@@ -43,6 +43,60 @@ All builds are self-contained — no .NET runtime needs to be installed
 separately. The packages are **not code-signed** yet; the install notes in the
 README explain the first-launch warnings on each platform.
 
+## winget (Windows Package Manager)
+
+`winget install CodeForFire.Lagebuch` matters beyond convenience: a silent MSI
+install through winget does not raise the SmartScreen dialog, which makes it
+the only warning-free Windows path while the packages are unsigned.
+
+Submitting a version is a **manual step at release time**, and deliberately so.
+[Komac](https://github.com/russellbanks/Komac), the tool the winget community
+uses for this, needs a *classic* GitHub token with the `public_repo` scope —
+fine-grained tokens can create the commit but fail to open the pull request.
+Running it from CI would mean keeping such a token, which can write to every
+public repository its owner has, in this repository's secrets. Running it from
+a laptop reuses the login `gh` already holds:
+
+```bash
+komac token add --token="$(gh auth token)"   # once
+komac update CodeForFire.Lagebuch \
+  --version 0.6.0 \
+  --urls https://github.com/CodeForFire/lagebuch/releases/download/v0.6.0/lagebuch-0.6.0-x64.msi \
+  --submit
+```
+
+Komac downloads the MSI, computes the SHA-256, reads the ProductCode out of it,
+carries the previous version's metadata forward and opens the pull request from
+your winget-pkgs fork. Cross-check the hash it reports against the release's own
+`SHA256SUMS.txt` — they must agree.
+
+**Full releases only.** winget has no notion of a pre-release, so submitting a
+beta would make it the version every user is offered.
+
+The upstream repository requires a moderator to approve community pull
+requests, so the new version appears in the catalogue hours to weeks after the
+release, not minutes.
+
+### Doing it by hand
+
+Without Komac the manifests are four small YAML files under
+`manifests/c/CodeForFire/Lagebuch/<version>/` in a branch of the fork. Take the
+previous version as the template and change the version, the installer URL, the
+SHA-256 and the MSI's ProductCode:
+
+```bash
+gh release download v<version> -p 'lagebuch-*-x64.msi'
+sha256sum lagebuch-<version>-x64.msi          # InstallerSha256, uppercase
+msiinfo export lagebuch-<version>-x64.msi Property | grep -E 'ProductCode|UpgradeCode'
+```
+
+`msiinfo` comes from `msitools` and reads the MSI on Linux; the UpgradeCode
+must stay `{A03EAA1B-3D77-4FF0-A60A-5ABE27C27B18}`, the one fixed in
+[`Lagebuch.wxs`](../packaging/windows/Lagebuch.wxs). The manifests can be
+validated without Windows against the published JSON schemas
+(`microsoft/winget-cli`, `schemas/JSON/manifests/v1.12.0/`); upstream's own
+pipeline is the authoritative check.
+
 ## macOS
 
 The macOS `.dmg` is built on demand rather than on every tag: run the
