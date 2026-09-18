@@ -207,15 +207,19 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     {
         FileError = null;
         FileNotice = null;
-        var path = await _dialogs.PickImportJsonAsync();
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return;
-        }
 
+        // The pick itself can fail, not just the read: on Android the chosen content:// URI is
+        // streamed into app-private storage before this returns, and a provider that hands back
+        // nothing (or a full disk) faults the task rather than returning null.
         MasterDataImportResult imported;
         try
         {
+            var path = await _dialogs.PickImportJsonAsync();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
             imported = _files.Read(path);
         }
         catch (Exception ex)

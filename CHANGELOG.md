@@ -67,6 +67,12 @@ once we reach 1.0.
   from earlier refactors. `IDE0059` ships at suggestion severity, below the threshold
   `TreatWarningsAsErrors` acts on, so they had accumulated unnoticed; it is now a warning and
   therefore a build error, so the next one cannot.
+- Android: picking a file that cannot be read no longer takes the app down. The chosen file is
+  streamed into the app's own storage before the picker returns, and a content provider that hands
+  back nothing — or a full disk — threw from inside Android's result callback, where nothing was
+  there to catch it. Both the Stammdaten import and the attachment picker now report it as an
+  error line instead, and a provider that will not say what the file is called falls back to a
+  generic name rather than abandoning the pick. (#302)
 - Android: a file picked from another app is now cleaned up the same way an attachment name from a
   joined device already was. The two had grown apart — the picked-name path stripped only the
   characters the running OS rejects, so on Android a name could keep `< > : " | ? *`, invisible

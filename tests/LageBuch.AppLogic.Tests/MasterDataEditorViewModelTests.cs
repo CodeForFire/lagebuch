@@ -46,7 +46,12 @@ public class MasterDataEditorViewModelTests
 
         public Task<string?> PickExportPdfAsync(string s) => Task.FromResult<string?>(null);
 
-        public Task<string?> PickImportJsonAsync() => Task.FromResult(ImportPath);
+        /// <summary>When set, the pick faults instead of returning a path — the Android shape.</summary>
+        public Exception? ImportFailure { get; set; }
+
+        public Task<string?> PickImportJsonAsync() => ImportFailure is null
+            ? Task.FromResult(ImportPath)
+            : Task.FromException<string?>(ImportFailure);
 
         public Task<string?> PickExportJsonAsync(string s) => Task.FromResult(ExportPath);
 
@@ -599,5 +604,18 @@ public class MasterDataEditorViewModelTests
 
         Assert.Null(vm.VehicleConflicts);
         Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Import_surfaces_a_failing_picker_instead_of_faulting_the_command()
+    {
+        // The pick itself can fail, not only the read: on Android it streams the chosen
+        // content:// URI into app-private storage before returning. (#302)
+        var dialogs = new FakeDialogs { ImportFailure = new IOException("Datei nicht lesbar.") };
+        var vm = new MasterDataEditorViewModel(new FakeMasterData(), dialogs, new NoFiles());
+
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        Assert.Equal("Import fehlgeschlagen: Datei nicht lesbar.", vm.FileError);
     }
 }

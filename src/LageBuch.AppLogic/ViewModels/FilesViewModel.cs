@@ -163,9 +163,25 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
     private bool CanAddFile => !IsReadOnly && !IsUploading;
 
     [RelayCommand(CanExecute = nameof(CanAddFile))]
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The picker itself can fail (a content provider that hands back nothing, a full disk); it surfaces as an error line like every other attachment failure.")]
     private async Task AddFileAsync()
     {
-        var path = await _dialogs.PickAttachmentAsync();
+        string? path;
+        try
+        {
+            // Not just "cancelled or a path": on Android the chosen content:// URI is streamed into
+            // app-private storage before this returns, so the pick can fault rather than return null.
+            path = await _dialogs.PickAttachmentAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(path))
         {
             return;

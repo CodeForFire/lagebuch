@@ -1,3 +1,4 @@
+using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Files;
@@ -826,5 +827,48 @@ public class FilesViewModelTests
         {
             await Task.Delay(5);
         }
+    }
+
+    [Fact]
+    public async Task AddFile_surfaces_a_failing_picker_instead_of_faulting_the_command()
+    {
+        // On Android the picked content:// URI is streamed into app-private storage before the
+        // pick returns, so a provider that hands back nothing faults the task rather than
+        // returning null. That used to escape the command as an unhandled async exception. (#302)
+        var session = LocalIncidentSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new FilesViewModel(session, new ThrowingPickerDialogs(), () => { });
+
+        await vm.AddFileCommand.ExecuteAsync(null);
+
+        Assert.Equal("Anhang konnte nicht gelesen werden.", vm.ErrorMessage);
+        Assert.Empty(vm.Files);
+    }
+
+    private sealed class ThrowingPickerDialogs : IFileDialogService
+    {
+        public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickOpenAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickExportPdfAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickImportJsonAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickExportJsonAsync(string suggestedFileName) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickAttachmentAsync() =>
+            Task.FromException<string?>(new IOException("Anhang konnte nicht gelesen werden."));
+
+        public Task OpenFileAsync(string path) => Task.CompletedTask;
+
+        public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
+        public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 }
