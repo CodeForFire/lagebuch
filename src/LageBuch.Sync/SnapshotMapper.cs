@@ -105,8 +105,9 @@ public static class SnapshotMapper
             snapshot.Status,
             snapshot.ClosedAt,
             snapshot.ClosedBy,
-            snapshot.ChecklistAufbau.Select(c => ChecklistItem.Rehydrate(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)),
-            snapshot.ChecklistAbbau.Select(c => ChecklistItem.Rehydrate(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)),
+            ChecklistDefaults.AsLists(
+                snapshot.ChecklistAufbau.Select(c => ChecklistItem.Rehydrate(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)),
+                snapshot.ChecklistAbbau.Select(c => ChecklistItem.Rehydrate(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory))),
             snapshot.Journal.Select(e => EtbEntry.Rehydrate(
                 e.Id,
                 e.Timestamp,
