@@ -4,19 +4,31 @@
              x:Class="LageBuch.App.Shared.Views.HomeView"
              x:DataType="vm:HomeViewModel">
   <Grid>
-    <!-- Faint diagonal hazard texture in the corner for atmosphere -->
+    <!-- Faint hazard glow in the corner for atmosphere. Radial, anchored on the corner it
+         decorates, and fading to a zero-alpha stop of its own hue. The linear version fading to
+         `Transparent` rendered as a visible 320x320 grey rectangle: `Transparent` is transparent
+         WHITE, so the unpremultiplied interpolation drifted through grey, the last stop at offset
+         0.7 cut the box mid-fade into hard left and bottom edges, and StartPoint="0%,0%" put the
+         bright end at the box's top-LEFT, pointing into the page instead of at the corner.
+         SignalFadedColor is SignalColor at zero alpha; fading to a different hue is what
+         produced the grey. -->
     <Border HorizontalAlignment="Right" VerticalAlignment="Top" Width="320" Height="320"
-            Margin="0,-60,-60,0" Opacity="0.05" IsHitTestVisible="False">
+            Opacity="0.05" IsHitTestVisible="False">
       <Border.Background>
-        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+        <RadialGradientBrush Center="100%,0%" GradientOrigin="100%,0%" RadiusX="100%" RadiusY="100%">
           <GradientStop Color="{StaticResource SignalColor}" Offset="0" />
-          <GradientStop Color="Transparent" Offset="0.7" />
-        </LinearGradientBrush>
+          <GradientStop Color="{StaticResource SignalFadedColor}" Offset="1" />
+        </RadialGradientBrush>
       </Border.Background>
     </Border>
 
     <ScrollViewer>
-      <StackPanel Margin="56,48" Spacing="28" MaxWidth="720" HorizontalAlignment="Center">
+      <!-- Stretch, not Center: Center sizes this column to its widest child, and the widest child
+           is a virtualized ListBox whose desired width changes as rows are realized and recycled
+           (a long path in the recent list wanted the full 720, a short one only ~643), so the
+           whole page jumped sideways on every scroll. Stretch pins it to min(viewport, 720);
+           Avalonia still centres a Stretch element that MaxWidth has made narrower than its slot. -->
+      <StackPanel Margin="56,48" Spacing="28" MaxWidth="720" HorizontalAlignment="Stretch">
         <!-- Greeting -->
         <StackPanel Spacing="6">
           <TextBlock Text="EINSATZBEREIT" Classes="overline" Foreground="{StaticResource ActiveBrush}" />
@@ -76,8 +88,14 @@
                       VerticalAlignment="Center" Margin="14,0,0,0" />
             </Grid>
 
+            <!-- One scrollbar, on the page: a height-capped ListBox nested inside the page's
+                 ScrollViewer swallowed the wheel until it bottomed out, so the list scrolled
+                 several rows before the page moved at all. Disabled (not Auto) is what guarantees
+                 it: the templated ScrollViewer then measures at infinite height and never
+                 scrolls. JsonRecentFilesStore caps the list at 10 rows. -->
             <ListBox x:Name="RecentList" ItemsSource="{Binding RecentFiles}"
-                     SelectionMode="Single" MaxHeight="420">
+                     SelectionMode="Single"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:RecentFileItem">
                   <!-- Fixed lock gutter so filenames line up whether or not the incident is closed -->
