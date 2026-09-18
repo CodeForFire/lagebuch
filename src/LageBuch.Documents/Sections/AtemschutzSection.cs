@@ -47,7 +47,24 @@ public static class AtemschutzSection
 
                 foreach (var trupp in incident.ScbaTrupps)
                 {
-                    table.Cell().Element(Cells.Body).Text(trupp.DisplayName);
+                    // The Sicherheitstrupp (#399) rides as a sub-line here rather than taking a
+                    // ninth column. A4 portrait less the 1.5 cm margins leaves ~510pt; the five
+                    // constant columns already claim 345 of it, so the remaining 165pt splits
+                    // 2/3/2 into roughly 47/71/47pt and Mannschaft already wraps. A ninth column
+                    // would cut it to 55pt (relative) or 45pt (constant) and the crew — the thing
+                    // this table exists to record — would stop being legible. A sub-line costs no
+                    // width at all. A dangling id prints nothing, which is the right degradation.
+                    table.Cell().Element(Cells.Body).Column(cell =>
+                    {
+                        cell.Item().Text(trupp.DisplayName);
+                        if (trupp.SafetyTruppId is { } safetyId
+                            && incident.FindScbaTruppOrDefault(safetyId) is { } safety)
+                        {
+                            cell.Item().Text($"Si.-Trupp: Trupp {safety.TruppNumber}")
+                                .FontSize(8).FontColor(Colors.Grey.Darken1);
+                        }
+                    });
+
                     table.Cell().Element(Cells.Body).Text(trupp.MembersDisplay);
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(trupp.CallSign));
                     table.Cell().Element(Cells.Body).Text(trupp.StartTime is { } s ? Formatting.Timestamp(s) : "—");

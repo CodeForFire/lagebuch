@@ -108,7 +108,8 @@ public sealed record ScbaTruppDto(
     int ReturnPressureBar,
     int PressureControlIntervalMinutes,
     DateTimeOffset? ExitTime,
-    IReadOnlyList<PressureReadingDto> Readings);
+    IReadOnlyList<PressureReadingDto> Readings,
+    Guid? SafetyTruppId = null);
 
 public sealed record AuditEventDto(DateTimeOffset At, string Action, string By);
 

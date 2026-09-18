@@ -720,6 +720,9 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void MarkScbaRemoved(Guid truppId) => _inner.MarkScbaRemoved(truppId);
 
+    public void SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId) =>
+        _inner.SetScbaSafetyTrupp(truppId, safetyTruppId);
+
     public void SetIncidentNumber(IncidentNumber? number) => _inner.SetIncidentNumber(number);
 
     public void SetKeyword(string? keyword) => _inner.SetKeyword(keyword);

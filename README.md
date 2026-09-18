@@ -65,7 +65,7 @@ Markdown.
 | **Kräfte** | Fahrzeuge aus den Stammdaten, Stärke als ZF/GF/Mann, AGT-Zahl, Status und Bemerkung; Gesamtstärke immer im Blick |
 | **Aufgaben** | Aufträge mit Wichtigkeit, Dringlichkeit, Zuständigem und Timer – mit Sprachansage, wenn sie fällig werden; direkt aus einem ETB-Eintrag anlegbar |
 | **Funktionen** | EL, Abschnittsleiter und weitere Rollen mit von/bis, Übergabe und Handynummer |
-| **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene |
+| **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene; Sicherheitstrupp je Trupp zugeordnet und im ETB protokolliert |
 | **Rückmeldung an ILS** | Erinnerung nach konfigurierbarer Zeit, danach im Intervall, mit ERLEDIGT-Quittierung; überlebt Neustart und Absturz |
 | **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), ppm-Wert mit Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort |
 | **Checklisten** | Aufbau- und Abbau-Checklisten aus den eigenen Stammdaten, Pflichtpunkte markiert, Abschluss im ETB protokolliert |
