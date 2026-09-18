@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.AppLogic.Services;
 
 namespace LageBuch.AppLogic.Tests;
@@ -160,6 +161,10 @@ public class TickSubscribersTests
     }
 
     [Fact]
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The assertion is that no exception of any shape escapes; a narrower catch would let an unanticipated one kill the thread instead of failing the test.")]
     public void Add_and_remove_from_many_threads_do_not_throw_or_lose_the_count()
     {
         // Mirrors DispatcherTimerTickerTests' concurrency fact (#202, #212) at this layer, with a
@@ -179,17 +184,14 @@ public class TickSubscribersTests
                     subscribers.Remove(OnTick);
                 }
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
-                errors.Add(ex);
-            }
-            catch (ArgumentException ex)
-            {
-                errors.Add(ex);
-            }
-            catch (NullReferenceException ex)
-            {
-                // The shapes an unsynchronised List<Action> actually fails with under this load.
+                // Deliberately every shape, not just the ones an unsynchronised List<Action>
+                // happens to fail with -- InvalidOperationException, ArgumentException,
+                // NullReferenceException, IndexOutOfRangeException when a resize lands mid-copy.
+                // The assertion below is "nothing went wrong", so a narrower catch would let an
+                // unanticipated shape escape onto a bare Thread, where an unhandled exception
+                // takes the test host down instead of failing this test with the exception in hand.
                 errors.Add(ex);
             }
         })).ToList();
