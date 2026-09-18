@@ -509,7 +509,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     break;
                 }
 
-                totalBytes -= file.Length;
+                var reclaimed = file.Length;
                 try
                 {
                     file.Delete();
@@ -517,8 +517,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     // Best-effort: a file another handle is using right now, or one that is
-                    // read-only, simply stays, and the next pass gets another chance at it.
+                    // read-only, simply stays -- and stays counted, so the pass carries on to the
+                    // entries it can actually reclaim instead of stopping on a total that only
+                    // looks like it is under the cap. The next pass gets another chance at it.
+                    continue;
                 }
+
+                totalBytes -= reclaimed;
             }
         }
     }

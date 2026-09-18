@@ -264,13 +264,13 @@ public class RemoteClientTests
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
-        var cacheRoot = Path.Combine(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        var cacheRoot = Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
         Directory.CreateDirectory(cacheRoot);
         try
         {
             // An unrelated, older entry -- what a previously joined incident leaves behind, since
             // nothing deletes its folder when that session ends. This is the growth being bounded.
-            var staleFile = Path.Combine(cacheRoot, "stale.bin");
+            var staleFile = Path.Join(cacheRoot, "stale.bin");
             await File.WriteAllBytesAsync(staleFile, new byte[10]);
             File.SetLastWriteTimeUtc(staleFile, DateTime.UtcNow.AddDays(-1));
 
@@ -316,7 +316,7 @@ public class RemoteClientTests
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
-        var cacheRoot = Path.Combine(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        var cacheRoot = Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
         try
         {
             await using var uploader = await RemoteIncidentSession.ConnectAsync(
