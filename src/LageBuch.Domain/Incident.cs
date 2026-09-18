@@ -771,6 +771,30 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// Designates the Sicherheitstrupp standing by for <paramref name="truppId"/> (#399), or clears
+    /// it with a null <paramref name="safetyTruppId"/>. Takes no clock: nothing here is timestamped,
+    /// and the ETB line is written by the caller like every other Atemschutz mutation.
+    /// </summary>
+    /// <remarks>
+    /// A <paramref name="safetyTruppId"/> naming no Trupp in this incident is refused. That is
+    /// deliberately stricter than <see cref="AtemschutzTrupp.Rehydrate"/>, which accepts whatever a
+    /// stored file holds: a live command carrying an unknown id is a bug in the caller, while a
+    /// stored row carrying one is history, and refusing to open the file would help nobody.
+    /// </remarks>
+    public AtemschutzTrupp SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId)
+    {
+        EnsureOpen();
+        var trupp = FindScbaTrupp(truppId);
+        if (safetyTruppId is { } id)
+        {
+            _ = FindScbaTrupp(id);
+        }
+
+        trupp.AssignSafetyTrupp(safetyTruppId);
+        return trupp;
+    }
+
+    /// <summary>
     /// Records an attached file's metadata and logs it to the ETB. Bytes never pass through the
     /// domain — the caller writes them to storage separately, keyed by
     /// <see cref="IncidentFile.StorageFileName"/> on the returned <see cref="IncidentFile"/>.
@@ -901,6 +925,12 @@ public sealed class Incident
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>
         _scbaTrupps.FirstOrDefault(t => t.Id == truppId)
             ?? throw new KeyNotFoundException($"Atemschutz-Trupp {truppId} not found.");
+
+    /// <summary>Resolves a Trupp id to the Trupp, or null when it names none. Unlike the private
+    /// lookup this never throws: its callers are display paths (the Sicherheitstrupp column, the
+    /// PDF) that must render an old file holding a dangling id rather than fail on it.</summary>
+    public AtemschutzTrupp? FindScbaTruppOrDefault(Guid truppId) =>
+        _scbaTrupps.FirstOrDefault(t => t.Id == truppId);
 
     public void AddCoBuilding(IClock clock, SessionOperator op, string name, int floorCount, int apartmentsPerFloor, int undergroundFloorCount = 0)
     {

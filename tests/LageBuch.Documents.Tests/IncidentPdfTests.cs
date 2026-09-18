@@ -59,6 +59,9 @@ public class IncidentPdfTests
         incident.AddForceUnit(clock, op, "Emmering", 9, scbaCount: 4);
         var trupp = incident.AddScbaTrupp(
             clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300, callSign: "FFB 1/40/1");
+        var sicherheit = incident.AddScbaTrupp(
+            clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Mayr"), entryPressure: 290, callSign: "FFB 1/44/1");
+        incident.SetScbaSafetyTrupp(trupp.Id, sicherheit.Id);
         incident.StartScbaTrupp(clock, trupp.Id);
         incident.RecordScbaPressure(clock, trupp.Id, 220);
         incident.WithdrawScbaTrupp(clock, trupp.Id);

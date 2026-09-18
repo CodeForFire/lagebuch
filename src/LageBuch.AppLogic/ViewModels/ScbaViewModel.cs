@@ -28,6 +28,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
     private readonly Action<int> _onRecordPressure;
     private readonly Action _onWithdraw;
     private readonly Action _onMarkRemoved;
+    private readonly Action<Guid?> _onAssignSafetyTrupp;
 
     public ScbaTruppRow(
         AtemschutzTrupp trupp,
@@ -36,7 +37,11 @@ public sealed partial class ScbaTruppRow : ObservableObject
         Action onStart,
         Action<int> onRecordPressure,
         Action onWithdraw,
-        Action onMarkRemoved)
+        Action onMarkRemoved,
+        IReadOnlyList<SafetyTruppOption> safetyTruppOptions,
+        SafetyTruppOption selectedSafetyTrupp,
+        string? safetyTruppHint,
+        Action<Guid?> onAssignSafetyTrupp)
     {
         ArgumentNullException.ThrowIfNull(trupp);
         _trupp = trupp;
@@ -46,7 +51,16 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _onRecordPressure = onRecordPressure;
         _onWithdraw = onWithdraw;
         _onMarkRemoved = onMarkRemoved;
+        _onAssignSafetyTrupp = onAssignSafetyTrupp;
         _pressureInput = trupp.LatestPressure ?? 300;
+        SafetyTruppOptions = safetyTruppOptions;
+        SafetyTruppHint = safetyTruppHint;
+
+        // Assign the backing field, not the property: going through the setter here would fire
+        // OnSelectedSafetyTruppChanged during construction, and RefreshTrupps builds a fresh row
+        // for every Trupp on every change -- so each rebuild would re-send the assignment it is
+        // merely displaying. Same reason _pressureInput is seeded directly above.
+        _selectedSafetyTrupp = selectedSafetyTrupp;
     }
 
     public Guid Id => _trupp.Id;
@@ -129,6 +143,38 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _ => "Im Einsatz",
     };
 
+    /// <summary>The Trupps that may be picked as this one's Sicherheitstrupp, "— kein —" first.
+    /// Carried on the row rather than the ViewModel because the cell template binds against the
+    /// row, the same shape ForceRow uses for its status options.</summary>
+    public IReadOnlyList<SafetyTruppOption> SafetyTruppOptions { get; }
+
+    /// <summary>The single amber line under the picker, or null when there is nothing to say.
+    /// Computed by the ViewModel at row-build time: every input to it is domain state, and any
+    /// change to domain state rebuilds the rows, so it cannot go stale between rebuilds.</summary>
+    public string? SafetyTruppHint { get; }
+
+    public bool HasSafetyTruppHint => !string.IsNullOrEmpty(SafetyTruppHint);
+
+    public bool CanAssignSafetyTrupp => !_isReadOnly && !_trupp.IsReturned;
+
+    [ObservableProperty]
+    private SafetyTruppOption _selectedSafetyTrupp;
+
+    partial void OnSelectedSafetyTruppChanged(SafetyTruppOption value)
+    {
+        // Avalonia nulls SelectedItem while ItemsSource is being swapped, and RefreshTrupps swaps
+        // it on every change, so a null here is always the ComboBox resetting itself and never a
+        // user choice -- "kein Sicherheitstrupp" arrives as SafetyTruppOption.None instead. The
+        // equality check makes a rebuild that re-selects the value already on the Trupp inert, so
+        // there is no redundant command and no duplicate ETB line.
+        if (_isReadOnly || value is null || value.Id == _trupp.SafetyTruppId)
+        {
+            return;
+        }
+
+        _onAssignSafetyTrupp(value.Id);
+    }
+
     [ObservableProperty]
     private int _pressureInput;
 
@@ -166,6 +212,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(ControlRemainingDisplay));
         OnPropertyChanged(nameof(StatusDisplay));
+        OnPropertyChanged(nameof(CanAssignSafetyTrupp));
         StartCommand.NotifyCanExecuteChanged();
         RecordPressureCommand.NotifyCanExecuteChanged();
         WithdrawCommand.NotifyCanExecuteChanged();
@@ -530,15 +577,112 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         _onChanged();
     }
 
-    private ScbaTruppRow CreateRow(AtemschutzTrupp trupp) =>
-        new(
+    private ScbaTruppRow CreateRow(AtemschutzTrupp trupp)
+    {
+        var safetyOptions = SafetyOptionsFor(trupp);
+        return new ScbaTruppRow(
             trupp,
             _clock,
             IsReadOnly,
             () => Start(trupp.Id),
             bar => RecordPressure(trupp.Id, bar),
             () => Withdraw(trupp.Id),
-            () => MarkRemoved(trupp.Id));
+            () => MarkRemoved(trupp.Id),
+            safetyOptions,
+            safetyOptions.FirstOrDefault(o => o.Id == trupp.SafetyTruppId) ?? SafetyTruppOption.None,
+            SafetyTruppHintFor(trupp),
+            safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId));
+    }
+
+    /// <summary>The picker contents for one row: "— kein —", then every other Trupp still
+    /// bereitgestellt, ordered by Truppnummer.</summary>
+    private List<SafetyTruppOption> SafetyOptionsFor(AtemschutzTrupp trupp)
+    {
+        var options = new List<SafetyTruppOption> { SafetyTruppOption.None };
+        options.AddRange(
+            _session.Incident.ScbaTrupps
+                .Where(t => t.Id != trupp.Id && t.IsWaiting)
+                .OrderBy(t => t.TruppNumber)
+                .Select(Option));
+
+        // Keep a Sicherheitstrupp that has since gone under air in the list. A ComboBox whose
+        // SelectedItem matches nothing in its ItemsSource renders blank, which would wipe the
+        // recorded assignment off the screen at exactly the moment it matters most -- the same
+        // reasoning as StammdatenCatalogue.Including for a value the Stammdaten no longer offer.
+        if (trupp.SafetyTruppId is { } assignedId
+            && options.TrueForAll(o => o.Id != assignedId)
+            && _session.Incident.FindScbaTruppOrDefault(assignedId) is { } assigned)
+        {
+            options.Add(Option(assigned));
+        }
+
+        return options;
+
+        static SafetyTruppOption Option(AtemschutzTrupp t) =>
+            new(t.Id, $"Trupp {t.TruppNumber}", t.Designation);
+    }
+
+    /// <summary>The amber line under one row's picker. Only one fits in the column, so the most
+    /// urgent wins: no cover at all beats a cover that has left Bereitstellung, which beats a cover
+    /// that is being shared. Never a block — the Einsatzleiter decides, the app records.</summary>
+    private string? SafetyTruppHintFor(AtemschutzTrupp trupp)
+    {
+        if (trupp.SafetyTruppId is not { } assignedId)
+        {
+            return trupp.IsActive || trupp.IsWithdrawing ? "kein Sicherheitstrupp" : null;
+        }
+
+        // A dangling id says nothing useful to the Einsatzleiter, so it says nothing at all.
+        if (_session.Incident.FindScbaTruppOrDefault(assignedId) is not { } assigned)
+        {
+            return null;
+        }
+
+        if (!assigned.IsWaiting)
+        {
+            return "nicht mehr bereitgestellt";
+        }
+
+        var alsoCovered = _session.Incident.ScbaTrupps
+            .Where(t => t.Id != trupp.Id && t.SafetyTruppId == assignedId && !t.IsReturned)
+            .OrderBy(t => t.TruppNumber)
+            .Select(t => $"Trupp {t.TruppNumber}")
+            .ToList();
+
+        return alsoCovered.Count > 0 ? $"deckt auch {string.Join(", ", alsoCovered)}" : null;
+    }
+
+    private void AssignSafetyTrupp(Guid truppId, Guid? safetyTruppId)
+    {
+        var incident = _session.Incident;
+        if (incident.FindScbaTruppOrDefault(truppId) is not { } trupp
+            || trupp.SafetyTruppId == safetyTruppId)
+        {
+            return;
+        }
+
+        // Read all three labels before mutating: the mutation raises Changed, which rebuilds every
+        // row, and on a joined device the local snapshot is replaced wholesale.
+        var covered = trupp.DisplayName;
+        var coveredCallSign = trupp.CallSign;
+        var previous = trupp.SafetyTruppId is { } previousId
+            ? incident.FindScbaTruppOrDefault(previousId)
+            : null;
+        var next = safetyTruppId is { } nextId ? incident.FindScbaTruppOrDefault(nextId) : null;
+
+        var text = previous is null
+            ? $"Sicherheitstrupp für {covered} festgelegt: {Label(next)}"
+            : next is null
+                ? $"Sicherheitstrupp für {covered} aufgehoben: bisher {Label(previous)}"
+                : $"Sicherheitstrupp für {covered} gewechselt: bisher {Label(previous)}, jetzt {Label(next)}";
+
+        _session.SetScbaSafetyTrupp(truppId, safetyTruppId);
+        _session.AddJournalEntry(
+            EtbDirection.System, text, from: (next ?? previous)?.CallSign, to: coveredCallSign);
+        _onChanged();
+
+        static string Label(AtemschutzTrupp? t) => t?.DisplayName ?? "unbekannt";
+    }
 
     // Display name/call-sign for the ETB line are read from the current snapshot before mutating
     // (they don't change once registered) — so this works whether the trupp lives in a local
@@ -551,13 +695,41 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     private void Start(Guid truppId)
     {
+        var incident = _session.Incident;
         var (displayName, callSign) = TruppLabel(truppId);
+        var safety = incident.FindScbaTruppOrDefault(truppId)?.SafetyTruppId is { } safetyId
+            ? incident.FindScbaTruppOrDefault(safetyId)
+            : null;
+
+        // The Trupps this one was standing by for, read before the mutation rebuilds the rows.
+        // Start is the only transition that needs this hook: a Trupp stands by while it is
+        // bereitgestellt, and Start is the sole way out of that state -- Withdraw requires
+        // IsActive and MarkRemoved requires IsWithdrawing, so both are strictly downstream and
+        // would only repeat a loss already recorded here.
+        var uncovered = incident.ScbaTrupps
+            .Where(t => t.Id != truppId && t.SafetyTruppId == truppId && !t.IsReturned)
+            .OrderBy(t => t.TruppNumber)
+            .Select(t => (t.DisplayName, t.CallSign))
+            .ToList();
+
         _session.StartScbaTrupp(truppId);
-        _session.AddJournalEntry(
-            EtbDirection.System,
-            $"{displayName} im Einsatz",
-            from: callSign,
-            to: null);
+
+        // Naming the Sicherheitstrupp on the "im Einsatz" line, and naming its absence, is the
+        // point of #399: this is the line the Einsatzbericht is read for afterwards.
+        var startText = safety is null
+            ? $"{displayName} im Einsatz, ohne Sicherheitstrupp"
+            : $"{displayName} im Einsatz, Sicherheitstrupp: {safety.DisplayName}";
+        _session.AddJournalEntry(EtbDirection.System, startText, from: callSign, to: null);
+
+        foreach (var (uncoveredName, uncoveredCallSign) in uncovered)
+        {
+            _session.AddJournalEntry(
+                EtbDirection.System,
+                $"{displayName} geht selbst unter Atemschutz — {uncoveredName} ist ohne Sicherheitstrupp",
+                from: callSign,
+                to: uncoveredCallSign);
+        }
+
         RefreshHeader();
         _onChanged();
     }

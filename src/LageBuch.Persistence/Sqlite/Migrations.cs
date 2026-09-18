@@ -7,7 +7,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 21;
+    public const int CurrentVersion = 22;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -142,6 +142,11 @@ public static class Migrations
         if (version < 21)
         {
             ApplyV21(cn, tx);
+        }
+
+        if (version < 22)
+        {
+            ApplyV22(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -648,6 +653,14 @@ public static class Migrations
     // stacked up by repeated saves.
     private static void ApplyV21(SqliteConnection cn, SqliteTransaction tx) =>
         Exec(cn, tx, "DELETE FROM force_unit_edits WHERE rowid NOT IN (SELECT MIN(rowid) FROM force_unit_edits GROUP BY unit_id, ordinal);");
+
+    // The Sicherheitstrupp standing by for a Trupp (#399), as a link to another row of this same
+    // table. Additive and nullable, so an older file reads back with no Sicherheitstrupp recorded
+    // -- which is exactly what was true of it before the column existed. Deliberately no FOREIGN
+    // KEY: Save is wipe-and-rewrite, so a constraint would fire on the intermediate state while the
+    // rows are being re-inserted, and the load path tolerates a dangling id by design.
+    private static void ApplyV22(SqliteConnection cn, SqliteTransaction tx) =>
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupps", "safety_trupp_id", "TEXT");
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

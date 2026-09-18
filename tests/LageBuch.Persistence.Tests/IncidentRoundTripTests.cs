@@ -270,6 +270,11 @@ public class IncidentRoundTripTests : IDisposable
             entryPressure: 300);
         var waitingId = waiting.Id;
 
+        // #399: the Sicherheitstrupp link is stored as a plain id, so it must survive save/load
+        // even when it points at a Trupp that has since been abgenommen — that is history, and the
+        // Einsatzbericht is read for exactly this.
+        incident.SetScbaSafetyTrupp(active.Id, removed.Id);
+
         IncidentRepository.Save(_path, incident);
         var loaded = IncidentRepository.Load(_path);
 
@@ -300,6 +305,9 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(180, loadedActive.LatestPressure);
         Assert.True(loadedActive.IsActive);
         Assert.Equal("Trupp 1 (Angriffstrupp)", loadedActive.DisplayName);
+
+        Assert.Equal(removed.Id, loadedActive.SafetyTruppId);
+        Assert.Null(loaded.ScbaTrupps[2].SafetyTruppId);
 
         var loadedRemoved = loaded.ScbaTrupps[1];
         Assert.True(loadedRemoved.IsReturned);

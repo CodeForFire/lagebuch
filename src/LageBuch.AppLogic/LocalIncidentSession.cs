@@ -232,6 +232,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void MarkScbaRemoved(Guid truppId) =>
         Mutate(() => Incident.MarkScbaRemoved(_clock, truppId));
 
+    public void SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId) =>
+        Mutate(() => Incident.SetScbaSafetyTrupp(truppId, safetyTruppId));
+
     public void SetIncidentNumber(IncidentNumber? number) => Mutate(() => Incident.SetIncidentNumber(number));
 
     public void SetKeyword(string? keyword) => Mutate(() => Incident.SetKeyword(keyword));

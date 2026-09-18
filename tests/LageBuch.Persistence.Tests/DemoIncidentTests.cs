@@ -83,13 +83,16 @@ public class DemoIncidentTests : IDisposable
             entryPressure: 300,
             callSign: "Florian Musterstadt 40/1",
             task: "Innenangriff 2. OG");
-        incident.StartScbaTrupp(c, angriffstrupp.Id);
-        incident.AddScbaTrupp(
+        var sicherheitstrupp = incident.AddScbaTrupp(
             c,
             "Sicherheitstrupp",
             TruppMember.Crew("Mustermann", "Musterfrau"),
             entryPressure: 300,
             callSign: "Florian Musterstadt 41/1");
+
+        // FwDV 7's order: the Sicherheitstrupp stands by before the Angriffstrupp goes under air.
+        incident.SetScbaSafetyTrupp(angriffstrupp.Id, sicherheitstrupp.Id);
+        incident.StartScbaTrupp(c, angriffstrupp.Id);
 
         c.Now = c.Now.AddMinutes(3);
         incident.AddJournalEntry(c, elw, EtbDirection.Incoming, "Person aus dem 2. OG über DLK gerettet, Übergabe an RD", from: "Florian Musterstadt 30/1", to: "Florian Musterstadt 11/1");
@@ -147,6 +150,7 @@ public class DemoIncidentTests : IDisposable
         Assert.True(loaded.ScbaTrupps[0].IsActive);
         Assert.Equal(240, loaded.ScbaTrupps[0].LatestPressure);
         Assert.True(loaded.ScbaTrupps[1].IsWaiting);
+        Assert.Equal(loaded.ScbaTrupps[1].Id, loaded.ScbaTrupps[0].SafetyTruppId);
         Assert.Equal(3, loaded.Tasks.Count);
         Assert.True(loaded.Tasks[0].IsCompleted);
         Assert.Single(loaded.Buildings);

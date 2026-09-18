@@ -106,6 +106,10 @@ public interface IIncidentSession
 
     void MarkScbaRemoved(Guid truppId);
 
+    /// <summary>Designates the Sicherheitstrupp standing by for a Trupp (#399), or clears it
+    /// with a null <paramref name="safetyTruppId"/>.</summary>
+    void SetScbaSafetyTrupp(Guid truppId, Guid? safetyTruppId);
+
     void SetIncidentNumber(IncidentNumber? number);
 
     void SetKeyword(string? keyword);

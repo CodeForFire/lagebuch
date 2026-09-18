@@ -43,6 +43,8 @@ public class CommandSerializationTests
         new RecordScbaPressureCommand(Guid.NewGuid(), 250),
         new WithdrawScbaTruppCommand(Guid.NewGuid()),
         new MarkScbaRemovedCommand(Guid.NewGuid()),
+        new SetScbaSafetyTruppCommand(Guid.NewGuid(), Guid.NewGuid()),
+        new SetScbaSafetyTruppCommand(Guid.NewGuid(), null),
         new SetIncidentNumberCommand("B 1.2 260812 001"),
         new SetKeywordCommand("Brand 2"),
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),
@@ -79,6 +81,20 @@ public class CommandSerializationTests
     {
         var json = SyncJson.Serialize<SyncCommand>(new ToggleChecklistItemCommand(Op, Guid.NewGuid()));
         Assert.Contains("\"$type\":\"toggleChecklistItem\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SetScbaSafetyTrupp_discriminator_and_null_survive_the_wire()
+    {
+        // The discriminator is a wire contract: renaming it silently breaks a joined device, which
+        // is only caught when a Sicherheitstrupp assignment stops arriving mid-Einsatz.
+        var truppId = Guid.NewGuid();
+        var json = SyncJson.Serialize<SyncCommand>(new SetScbaSafetyTruppCommand(truppId, null));
+        Assert.Contains("\"$type\":\"setScbaSafetyTrupp\"", json, StringComparison.Ordinal);
+
+        var back = Assert.IsType<SetScbaSafetyTruppCommand>(SyncJson.Deserialize<SyncCommand>(json));
+        Assert.Equal(truppId, back.TruppId);
+        Assert.Null(back.SafetyTruppId);
     }
 
     [Fact]

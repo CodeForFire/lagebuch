@@ -95,6 +95,7 @@ internal static class SchemaGuard
         new("scba_trupps", "entry_pressure", "INTEGER", false, null),
         new("scba_trupps", "withdraw_time", "TEXT", false, null),
         new("scba_trupps", "exit_time", "TEXT", false, null),
+        new("scba_trupps", "safety_trupp_id", "TEXT", false, null),
     ];
 
     /// <summary>Every column this build can repair, in the order it is declared above.</summary>
