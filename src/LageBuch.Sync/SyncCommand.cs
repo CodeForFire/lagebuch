@@ -38,6 +38,8 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(RemoveFileCommand), "removeFile")]
 [JsonDerivedType(typeof(AddTaskCommand), "addTask")]
 [JsonDerivedType(typeof(SetTaskCompletedCommand), "setTaskCompleted")]
+[JsonDerivedType(typeof(UpdateTaskCommand), "updateTask")]
+[JsonDerivedType(typeof(ExtendTaskTimerCommand), "extendTaskTimer")]
 [JsonDerivedType(typeof(AddCoBuildingCommand), "addCoBuilding")]
 [JsonDerivedType(typeof(UpdateCoBuildingStructureCommand), "updateCoBuildingStructure")]
 [JsonDerivedType(typeof(RemoveCoBuildingCommand), "removeCoBuilding")]
@@ -135,6 +137,13 @@ public sealed record AddTaskCommand(
     TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes) : SyncCommand;
 
 public sealed record SetTaskCompletedCommand(OperatorDto Operator, Guid TaskId, bool IsDone) : SyncCommand;
+
+// No operator on the wire: a task correction is a silent edit (no ETB entry), like RenameFileCommand.
+public sealed record UpdateTaskCommand(
+    Guid TaskId, string Text, string Assignee, TaskImportance Importance, TaskUrgency Urgency) : SyncCommand;
+
+// No operator (silent) -- the "+5" quick action.
+public sealed record ExtendTaskTimerCommand(Guid TaskId, int Minutes) : SyncCommand;
 
 // UndergroundFloorCount defaults to 0 so a pre-#218 payload deserializes as "keine
 // Untergeschosse" instead of failing the contract (same convention as #76's OfficerCount).

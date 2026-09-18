@@ -34,6 +34,13 @@ once we reach 1.0.
   and a matching `docs/samples/uebung.fwincident`, generated and kept valid by a test. The README
   now opens in German for ELW crews, with a demo GIF and a sourced comparison table; the
   developer documentation follows in English.
+- Aufgaben can be corrected after they are created. Wichtigkeit, Dringlichkeit, "Zugeteilt an"
+  and the task text were all read-only once the row existed, so a task typed in haste — the
+  normal case on an Einsatz — could only be ticked off and entered again. Each cell in the
+  AUFGABEN grid now edits in place, and a running timer gains a "+5 min" button; pressing it on
+  an already overdue task sets the new due time to five minutes from now rather than five
+  minutes after a deadline that has already passed. Edits reach every joined device like any
+  other change, and are silent in the ETB, exactly as creating a task already was. (#246)
 
 ### Changed
 - Every path is now joined with `Path.Join` instead of `Path.Combine`. `Path.Combine`
