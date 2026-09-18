@@ -422,6 +422,13 @@ public class MigrationForwardCompatTests : IDisposable
             // file claim a schema it does not have, and the newer build would then skip the very
             // migration that produced it.
             Assert.Equal(newer, Migrations.GetVersion(cn));
+
+            // Nor may the schema be touched. The reconciliation pass runs after this guard, so a
+            // file from ahead of us is left exactly as its own build wrote it -- rebuilding tables
+            // this build happens to know about would be the same over-reach as stamping the marker.
+            using var check = cn.CreateCommand();
+            check.CommandText = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name<>'schema_version';";
+            Assert.Equal(0L, (long)check.ExecuteScalar()!);
         }
     }
 

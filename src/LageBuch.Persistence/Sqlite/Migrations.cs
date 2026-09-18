@@ -144,6 +144,13 @@ public static class Migrations
             ApplyV21(cn, tx);
         }
 
+        // The version gate above is not proof that the steps it skipped ever ran: a build from a
+        // parallel branch numbers its own migrations too, so a file can carry a marker this lineage
+        // never put there and be missing a column no `version < N` will ever add back. Reconcile the
+        // file's real shape against the expected schema on every open -- after the versioned steps,
+        // because V3/V6/V17 rebuild scba_trupps and only the final shape is worth widening.
+        SchemaGuard.Reconcile(cn, tx);
+
         SetVersion(cn, tx, CurrentVersion);
         tx.Commit();
     }
