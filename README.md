@@ -159,6 +159,14 @@ certutil -hashfile <Datei> SHA256  # Windows, mit SHA256SUMS.txt vergleichen
 gh attestation verify <Datei> --repo CodeForFire/lagebuch
 ```
 
+`SHA256SUMS.txt` deckt `.msi`, `.deb` und `.apk` ab. Das `.dmg` entsteht erst
+nach dem Release und bringt deshalb seine eigene Prüfsumme mit:
+
+```bash
+shasum -a 256 -c lagebuch-<Version>-macos-arm64.dmg.sha256   # macOS
+sha256sum -c lagebuch-<Version>-macos-arm64.dmg.sha256       # Linux
+```
+
 So lässt sich nachweisen, dass die Datei unverändert aus diesem Repository
 stammt – auch solange die Pakete noch nicht signiert sind.
 

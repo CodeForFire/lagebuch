@@ -21,6 +21,22 @@ new version heading before tagging. The heading has to match the tag exactly
 minus the `v` (`## [0.6.0-beta.1]` for `v0.6.0-beta.1`); otherwise the notes
 fall back to a "no changelog entry found" placeholder.
 
+## After the tag: check the release
+
+The checksums and the provenance are what the README tells users to verify, and
+only a tag push runs those steps — they landed after v0.5.0 was cut (#375), so
+they had never run once when this list was written. Four checks, once per
+release:
+
+- [ ] `SHA256SUMS.txt` is attached and lists the `.msi`, the `.deb` and the
+      `.apk` under their bare names. `sha256sum -c SHA256SUMS.txt` has to pass
+      in a folder holding nothing but the downloads.
+- [ ] `gh attestation verify <file> --repo CodeForFire/lagebuch` passes for
+      those three. It reads the file, not the URL, so download them first.
+- [ ] The macOS run attached both the `.dmg` and its `.sha256`, and
+      `shasum -a 256 -c lagebuch-<version>-macos-arm64.dmg.sha256` passes.
+- [ ] The release is marked pre-release if and only if the tag carries a suffix.
+
 ## Betas and release candidates
 
 A tag with a suffix — `v0.6.0-beta.1`, `v0.6.0-rc.2` — publishes as a GitHub
@@ -100,8 +116,22 @@ pipeline is the authoritative check.
 ## macOS
 
 The macOS `.dmg` is built on demand rather than on every tag: run the
-**Release** workflow manually (*Actions → Release → Run workflow*) with the
-release version, and the `.dmg` is attached to that release.
+**Release** workflow manually with the release version, and the `.dmg` plus its
+`.sha256` are attached to that release.
+
+**Start the run on the tag, not on `main`.** A manual run checks out the ref it
+was started on, so starting it on `main` builds whatever has merged since the
+tag and uploads that as the release's `.dmg`:
+
+```bash
+gh workflow run release.yml --ref v0.6.0 -f version=0.6.0
+```
+
+In the web UI: *Actions → Release → Run workflow*, then set **Use workflow
+from** to the tag before filling in the version.
+
+The `.dmg` is built after the tag release already exists, so it cannot join
+that release's `SHA256SUMS.txt`; it carries a `.dmg.sha256` next to it instead.
 
 ## Local packaging
 
