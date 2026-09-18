@@ -7,54 +7,38 @@ namespace LageBuch.App.Shared.Services;
 /// ITicker backed by Avalonia's DispatcherTimer — fires on the UI thread once per second.
 /// A single shared DispatcherTimer multiplexes all current subscribers; it runs only while
 /// at least one subscription is alive.
+/// <para>
+/// The subscriber set and the fan-out live in <see cref="TickSubscribers"/>, which has no timer and
+/// no UI dependency and is therefore testable without a dispatcher. This class is only the timer:
+/// it owns when ticks happen, not what a tick does.
+/// </para>
 /// </summary>
 public sealed class DispatcherTimerTicker : ITicker
 {
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private readonly List<Action> _subscribers = new();
-    private readonly object _gate = new();
+    private readonly TickSubscribers _subscribers;
 
-    public DispatcherTimerTicker() => _timer.Tick += (_, _) => Notify();
+    /// <param name="onSubscriberError">
+    /// Where a throwing tick subscriber is reported. Left unset it goes to <c>Trace</c>; a head that
+    /// has somewhere better to put it (the workspace's own error surface, as #280 did for background
+    /// save failures) can pass that instead.
+    /// </param>
+    public DispatcherTimerTicker(Action<Exception>? onSubscriberError = null)
+    {
+        _subscribers = new TickSubscribers(onSubscriberError);
+        _timer.Tick += (_, _) => _subscribers.Notify();
+    }
 
     public IDisposable Subscribe(Action onTick)
     {
-        lock (_gate)
-        {
-            _subscribers.Add(onTick);
-            if (!_timer.IsEnabled)
-            {
-                _timer.Start();
-            }
-        }
-
+        // Start under TickSubscribers' own lock, so a concurrent Dispose cannot interleave between
+        // the add and the Start and leave the timer stopped with a live subscriber (issue #202).
+        _subscribers.Add(onTick, onFirstSubscriber: _timer.Start);
         return new Subscription(this, onTick);
     }
 
-    private void Notify()
-    {
-        Action[] subscribers;
-        lock (_gate)
-        {
-            subscribers = _subscribers.ToArray();
-        }
-
-        foreach (var s in subscribers)
-        {
-            s();
-        }
-    }
-
-    private void Unsubscribe(Action onTick)
-    {
-        lock (_gate)
-        {
-            _subscribers.Remove(onTick);
-            if (_subscribers.Count == 0)
-            {
-                _timer.Stop();
-            }
-        }
-    }
+    private void Unsubscribe(Action onTick) =>
+        _subscribers.Remove(onTick, onLastSubscriberGone: _timer.Stop);
 
     private sealed class Subscription : IDisposable
     {
