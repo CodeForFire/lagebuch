@@ -29,6 +29,10 @@
   <Color x:Key="SignalColor">#FF3D2E</Color>
   <Color x:Key="SignalHotColor">#FF5A3C</Color>
   <Color x:Key="SignalDeepColor">#C71E12</Color>
+  <!-- SignalColor at zero alpha, for a gradient that has to fade out. Avalonia interpolates
+       gradient stops unpremultiplied, so fading to `Transparent` (which is transparent WHITE)
+       drifts the midtones through grey instead of dimming the hue. -->
+  <Color x:Key="SignalFadedColor">#00FF3D2E</Color>
 
   <Color x:Key="AmberColor">#FFB23E</Color>
   <Color x:Key="AmberDeepColor">#7A4A07</Color>

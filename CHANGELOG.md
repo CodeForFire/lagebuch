@@ -79,6 +79,22 @@ once we reach 1.0.
   Such a character is now simply left blank and the export completes. The text LageBuch itself
   writes is held to the stricter rule in the test suite, where a character the bundled font
   lacks still fails the build.
+- Übersicht: the page no longer jumps sideways while it is scrolled. The content column was
+  sized to its widest child, and that child is the virtualized "Zuletzt verwendet" list, whose
+  measured width changes as rows are realized and recycled — so a recent entry with a long path
+  made the column 720px wide and scrolling it out of view snapped the whole page down to ~643px
+  and back. The column is now pinned to the viewport width (capped at 720) regardless of what
+  the list happens to be showing.
+- Übersicht: the "Zuletzt verwendet" list no longer has a scrollbar of its own. Nested inside
+  the page's scroller it swallowed the wheel until it hit its own bottom, so the list moved
+  several rows before the page moved at all. The list now sizes to its (at most ten) entries
+  and the page is the only thing that scrolls.
+- Übersicht: the decorative glow in the top-right corner no longer renders as a grey rectangle
+  with hard edges. It faded to `Transparent` — which is transparent *white*, so the gradient
+  drifted through grey — and stopped fading at 70%, cutting the 320×320 box mid-gradient; its
+  bright end also pointed into the middle of the page instead of at the corner. It is now a
+  radial fade anchored on the corner, ending on a fully transparent stop of the same signal
+  colour (a new `SignalFadedColor` token, so the two stops cannot drift apart). (#376)
 - Handing the workspace view from one incident to another no longer lets the first incident's
   "weiter bearbeiten" prompt act on the second. The view kept its handlers on the abandoned
   prompt, and those handlers followed the view rather than the incident they belonged to, so
