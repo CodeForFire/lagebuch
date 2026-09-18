@@ -402,7 +402,10 @@ public sealed class IncidentRepository
         // Bring an older file up to the current schema before reading it. A file last written
         // by an earlier version sits at its old schema_version; without this, Load would query
         // tables that don't exist yet. Migration is version-gated/idempotent and only adds empty
-        // tables, so re-opening a closed incident read-only afterwards still reads no new content.
+        // tables or empty columns, so re-opening a closed incident read-only afterwards still reads
+        // no new content. The version gate alone is not enough -- a build from a parallel branch can
+        // stamp a marker whose meaning differs from this lineage's, so Migrate also reconciles the
+        // file's real columns against the expected schema on every open (see SchemaGuard).
         using (var migrateCn = SqliteConnectionFactory.OpenExisting(path))
         {
             Migrations.Migrate(migrateCn);

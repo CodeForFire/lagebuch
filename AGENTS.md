@@ -24,6 +24,25 @@ The README's screenshots and demo GIF come from one such test,
 `make demo-gif` whenever a view they show changes; `make samples` refreshes
 the fictional `docs/samples/uebung.fwincident` after a schema change.
 
+## Schema migrations
+
+A feature branch that adds a migration owns version N only until `main` takes
+N. Before merging, rebase and **renumber** the branch's migrations above
+`main`'s current `Migrations.CurrentVersion` — two branches shipping different
+"V18"s is how a file ends up stamped with a version whose migrations it never
+received.
+
+For the same reason, never run a branch build against real Einsatzdateien: it
+stamps its own `schema_version` onto them, and the released app then skips
+every migration numbered below it. `SchemaGuard` repairs missing columns after
+the fact, but it cannot restore data a foreign build dropped, and it
+deliberately does not touch tables.
+
+Any migration that adds a column must also declare it in
+`SchemaGuard.ExpectedColumns`
+(`src/LageBuch.Persistence/Sqlite/SchemaGuard.cs`);
+`SchemaReconciliationTests` fails the build otherwise.
+
 ## Git commits
 
 All commits must be:
