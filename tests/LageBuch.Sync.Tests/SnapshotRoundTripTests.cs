@@ -148,6 +148,23 @@ public class SnapshotRoundTripTests
     }
 
     [Fact]
+    public void Round_trip_preserves_the_sicherheitstrupp_link()
+    {
+        var clock = new FixedClock();
+        var incident = Incident.Start(clock, new SessionOperator("Müller", "FFB 12/1"));
+        var angriff = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        var sicherheit = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Maier"), entryPressure: 290);
+        incident.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
+
+        var json = SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident));
+        var r = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        // A joined tablet has to see the same Sicherheitstrupp the ELW does, by the same id.
+        Assert.Equal(sicherheit.Id, r.ScbaTrupps.Single(t => t.Id == angriff.Id).SafetyTruppId);
+        Assert.Null(r.ScbaTrupps.Single(t => t.Id == sicherheit.Id).SafetyTruppId);
+    }
+
+    [Fact]
     public void Snapshot_carries_file_metadata_but_never_bytes()
     {
         // IncidentFileDto has no byte[] member at all — this pins that down at the JSON level too,

@@ -28,6 +28,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(RecordScbaPressureCommand), "recordScbaPressure")]
 [JsonDerivedType(typeof(WithdrawScbaTruppCommand), "withdrawScbaTrupp")]
 [JsonDerivedType(typeof(MarkScbaRemovedCommand), "markScbaRemoved")]
+[JsonDerivedType(typeof(SetScbaSafetyTruppCommand), "setScbaSafetyTrupp")]
 [JsonDerivedType(typeof(SetIncidentNumberCommand), "setIncidentNumber")]
 [JsonDerivedType(typeof(SetKeywordCommand), "setKeyword")]
 [JsonDerivedType(typeof(SetAddressCommand), "setAddress")]
@@ -104,6 +105,11 @@ public sealed record WithdrawScbaTruppCommand(Guid TruppId) : SyncCommand;
 
 /// <summary>Abgenommen — replaces the old "markScbaReturned"/Zurück command (#78).</summary>
 public sealed record MarkScbaRemovedCommand(Guid TruppId) : SyncCommand;
+
+/// <summary>Designates the Sicherheitstrupp standing by for a Trupp (#399); a null SafetyTruppId
+/// clears it. Carries no operator: the ETB line is written by the sending device through
+/// AddJournalEntry, exactly like every other Atemschutz mutation.</summary>
+public sealed record SetScbaSafetyTruppCommand(Guid TruppId, Guid? SafetyTruppId) : SyncCommand;
 
 public sealed record SetIncidentNumberCommand(string? IncidentNumber) : SyncCommand;
 

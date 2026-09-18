@@ -244,6 +244,13 @@ public class DemoFlowRenderTests
         vm.Scba.NewTruppmann = AnonymizedExampleData.PersonFirstName;
         vm.Scba.NewCallSign = "Florian Musterdorf 42/1";
         vm.Scba.AddTruppCommand.Execute(null);
+
+        // #399: post Trupp 3 as Trupp 2's Sicherheitstrupp through the picker, exactly as the
+        // operator would. Trupp 1 deliberately keeps none, so the screenshot shows both the filled
+        // column and the amber "kein Sicherheitstrupp" warning on the row that is in Rückzugsalarm.
+        var sicherheitstruppId = vm.Scba.Trupps[2].Id;
+        vm.Scba.Trupps[1].SelectedSafetyTrupp =
+            vm.Scba.Trupps[1].SafetyTruppOptions.Single(o => o.Id == sicherheitstruppId);
         clock.Now = clock.Now.AddMinutes(11);
         ticker.Pulse();
         vm.Reminder?.AcknowledgeCommand.Execute(null);
@@ -253,6 +260,8 @@ public class DemoFlowRenderTests
         Assert.True(vm.Scba.Trupps[0].IsAlarm, "Trupp 1 should be in Rückzugsalarm after 31 minutes");
         Assert.True(vm.Scba.Trupps[1].IsActive);
         Assert.False(vm.Scba.Trupps[1].IsAlarm);
+        Assert.Equal(sicherheitstruppId, vm.Scba.Trupps[1].SelectedSafetyTrupp.Id);
+        Assert.Equal("kein Sicherheitstrupp", vm.Scba.Trupps[0].SafetyTruppHint);
         Capture(window, "atemschutz.png");
 
         // 7) Aufgaben: one done, one overdue, one open.

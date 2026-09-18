@@ -2,7 +2,9 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
+using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -33,6 +35,21 @@ public class ScbaTabRenderTests
         var trupp = Assert.Single(vm.Scba.Trupps);
         Assert.True(trupp.IsActive);
         Assert.True(trupp.IsAlarm);
+
+        // #399: the alarming Trupp went under air with nobody standing by, so its Sicherheitstrupp
+        // cell warns. Resolved through the row rather than by walking to the TextBlock, because an
+        // x:Name inside a DataTemplate is template-scoped and GetControl cannot see it.
+        Assert.Equal("kein Sicherheitstrupp", trupp.SafetyTruppHint);
+        Assert.True(trupp.HasSafetyTruppHint);
+        Assert.Equal(SafetyTruppOption.None, trupp.SelectedSafetyTrupp);
+
+        var truppColumn = window.GetVisualDescendants().OfType<DataGrid>().Single()
+            .Columns.Single(c => (string?)c.Header == "TRUPP");
+        var cell = truppColumn.GetCellContent(trupp)!;
+        Assert.Contains(
+            cell.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Name == "SafetyTruppHintText" && t.IsVisible);
+        Assert.Single(cell.GetVisualDescendants().OfType<ComboBox>());
 
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (!string.IsNullOrWhiteSpace(dir))

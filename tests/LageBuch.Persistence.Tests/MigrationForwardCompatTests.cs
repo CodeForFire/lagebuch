@@ -126,6 +126,93 @@ public class MigrationForwardCompatTests : IDisposable
     }
 
     [Fact]
+    public void A_v21_file_gains_the_safety_trupp_column_and_reads_back_as_none()
+    {
+        var clock = new Clock();
+        var op = new Domain.SessionOperator("Müller", "FFB 12/1");
+        var incident = Domain.Incident.Start(clock, op, "Brand");
+        incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        IncidentRepository.Save(_path, incident);
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            // Drop the column and roll the marker back to V21: what a file last written before
+            // #399 actually looks like on disk.
+            cmd.CommandText =
+                """
+                ALTER TABLE scba_trupps DROP COLUMN safety_trupp_id;
+                DELETE FROM schema_version;
+                INSERT INTO schema_version (version) VALUES (21);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var loaded = IncidentRepository.Load(_path);
+
+        // No Sicherheitstrupp recorded is exactly what was true of that file before the column
+        // existed, so "null" is the honest answer rather than a lost value.
+        Assert.Null(loaded.ScbaTrupps.Single().SafetyTruppId);
+
+        using var check = SqliteConnectionFactory.OpenReadOnly(_path);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(check));
+    }
+
+    [Fact]
+    public void An_unreadable_safety_trupp_id_still_opens_the_file()
+    {
+        var clock = new Clock();
+        var op = new Domain.SessionOperator("Müller", "FFB 12/1");
+        var incident = Domain.Incident.Start(clock, op, "Brand");
+        incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        IncidentRepository.Save(_path, incident);
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "UPDATE scba_trupps SET safety_trupp_id = 'nicht-mal-eine-guid';";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        // A single unparseable field must degrade to "no Sicherheitstrupp", never take the whole
+        // Einsatz with it -- the same stance Rehydrate takes on a crew it cannot validate.
+        Assert.Null(IncidentRepository.Load(_path).ScbaTrupps.Single().SafetyTruppId);
+    }
+
+    [Fact]
+    public void A_safety_trupp_id_pointing_at_no_trupp_still_opens_the_file()
+    {
+        var clock = new Clock();
+        var op = new Domain.SessionOperator("Müller", "FFB 12/1");
+        var incident = Domain.Incident.Start(clock, op, "Brand");
+        incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        IncidentRepository.Save(_path, incident);
+
+        var ghost = Guid.NewGuid();
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "UPDATE scba_trupps SET safety_trupp_id = $ghost;";
+            cmd.Parameters.AddWithValue("$ghost", ghost.ToString());
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var loaded = IncidentRepository.Load(_path);
+        var trupp = loaded.ScbaTrupps.Single();
+
+        // Rehydrate keeps whatever the file says -- a stored Trupp is history and must stay
+        // readable -- while the display paths resolve it and simply find nothing.
+        Assert.Equal(ghost, trupp.SafetyTruppId);
+        Assert.Null(loaded.FindScbaTruppOrDefault(ghost));
+    }
+
+    [Fact]
     public void V2_scba_trupp_migrates_to_v3_as_a_started_trupp()
     {
         // Build a file with the V1+V2 schema, stamped at version 2, holding one V2-shaped trupp

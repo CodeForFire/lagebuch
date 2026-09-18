@@ -89,6 +89,16 @@ public sealed class AtemschutzTrupp
 
     public string? Task { get; private init; }
 
+    /// <summary>The Trupp bereitgestellt as this Trupp's Sicherheitstrupp (FwDV 7), or null while
+    /// none is designated. Deliberately a link by id and not a Trupp-Art name: the designation is
+    /// free text the brigade edits (#398), so a Trupp called "Sicherheitstrupp" is a naming
+    /// convention while this link is the fact. One Trupp may stand by for several deployed Trupps
+    /// -- that is a doctrine question the Einsatzleiter answers, not something the file refuses.
+    /// The link is never cleared automatically: when the standby goes under air itself the ETB
+    /// records the loss and the grid derives the warning, so who covered whom survives into the
+    /// Einsatzbericht.</summary>
+    public Guid? SafetyTruppId { get; private set; }
+
     /// <summary>When the Trupp was announced/registered (not yet necessarily under air).</summary>
     public DateTimeOffset RegisteredAt { get; private init; }
 
@@ -208,7 +218,8 @@ public sealed class AtemschutzTrupp
         int returnPressureBar,
         int pressureControlIntervalMinutes,
         DateTimeOffset? exitTime,
-        IEnumerable<PressureReading> readings)
+        IEnumerable<PressureReading> readings,
+        Guid? safetyTruppId = null)
     {
         var trupp = new AtemschutzTrupp
         {
@@ -225,6 +236,7 @@ public sealed class AtemschutzTrupp
             ReturnPressureBar = returnPressureBar,
             PressureControlIntervalMinutes = pressureControlIntervalMinutes,
             ExitTime = exitTime,
+            SafetyTruppId = safetyTruppId,
         };
 
         // Rehydrate deliberately does not re-run ValidateCrew: a stored Trupp is history, and
@@ -233,6 +245,23 @@ public sealed class AtemschutzTrupp
         trupp._members.AddRange(members);
         trupp._readings.AddRange(readings);
         return trupp;
+    }
+
+    /// <summary>Designates (or, with null, withdraws) the Sicherheitstrupp standing by for this
+    /// Trupp. Accepted in every state, including while under air and after Abnehmen: a
+    /// Sicherheitstrupp really is relieved and replaced mid-Einsatz, and a record that can never be
+    /// corrected is worse than one that changes. The caller logs each change to the ETB, which is
+    /// where the chronology lives. The one rejection is self-cover, which is always a bug rather
+    /// than a judgement call.</summary>
+    public void AssignSafetyTrupp(Guid? safetyTruppId)
+    {
+        if (safetyTruppId == Id)
+        {
+            throw new ArgumentException(
+                "Ein Trupp kann nicht sein eigener Sicherheitstrupp sein.", nameof(safetyTruppId));
+        }
+
+        SafetyTruppId = safetyTruppId;
     }
 
     /// <summary>Sends the Trupp under air: starts the clock. The entry pressure was already

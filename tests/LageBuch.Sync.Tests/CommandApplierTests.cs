@@ -15,6 +15,34 @@ public class CommandApplierTests
         CommandApplier.Apply(SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize(command)), incident, clock);
 
     [Fact]
+    public void SetScbaSafetyTrupp_assigns_and_clears_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var angriff = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        var sicherheit = incident.AddScbaTrupp(clock, "Sicherheitstrupp", TruppMember.Crew("Huber", "Maier"), entryPressure: 290);
+
+        ApplyOverWire(new SetScbaSafetyTruppCommand(angriff.Id, sicherheit.Id), incident, clock);
+        Assert.Equal(sicherheit.Id, angriff.SafetyTruppId);
+
+        ApplyOverWire(new SetScbaSafetyTruppCommand(angriff.Id, null), incident, clock);
+        Assert.Null(angriff.SafetyTruppId);
+    }
+
+    [Fact]
+    public void SetScbaSafetyTrupp_refuses_an_id_the_host_does_not_know()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var angriff = incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+
+        // The host is authoritative: a client command naming a Trupp it does not have is a bug, and
+        // storing the dangling id would quietly corrupt the file rather than surface the problem.
+        Assert.Throws<KeyNotFoundException>(
+            () => ApplyOverWire(new SetScbaSafetyTruppCommand(angriff.Id, Guid.NewGuid()), incident, clock));
+    }
+
+    [Fact]
     public void Applying_a_non_file_command_returns_null()
     {
         var clock = new FixedClock();
