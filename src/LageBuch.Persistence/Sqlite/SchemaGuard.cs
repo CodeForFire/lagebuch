@@ -36,6 +36,7 @@ internal static class SchemaGuard
     [
         "audit_events",
         "checklist_items",
+        "checklist_lists",
         "co_buildings",
         "co_dwellings",
         "etb_entries",
@@ -57,6 +58,9 @@ internal static class SchemaGuard
         new("checklist_items", "note", "TEXT", false, null),
         new("checklist_items", "is_mandatory", "INTEGER", true, "0"),
         new("checklist_items", "kind", "INTEGER", true, "0"),
+        new("checklist_items", "list_id", "TEXT", false, null),
+        new("checklist_lists", "ordinal", "INTEGER", true, "0"),
+        new("checklist_lists", "title", "TEXT", true, "''"),
         new("co_buildings", "floor_descriptions", "TEXT", true, "'{}'"),
         new("co_buildings", "apartment_labels", "TEXT", true, "'{}'"),
         new("co_buildings", "underground_floor_count", "INTEGER", true, "0"),

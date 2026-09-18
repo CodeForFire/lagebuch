@@ -5,7 +5,7 @@ namespace LageBuch.Domain;
 /// </summary>
 /// <remarks>
 /// The ids are frozen and must never change. Three independent paths resolve to exactly these —
-/// the incident file's V22 backfill of the old <c>kind</c> column, the Stammdaten store's one-time
+/// the incident file's V23 backfill of the old <c>kind</c> column, the Stammdaten store's one-time
 /// move off <c>md_checklist_template</c>, and <c>MasterDataJson</c>'s legacy
 /// <c>checklistTemplateAufbau</c>/<c>checklistTemplateAbbau</c> keys — so that a file, a Stammdaten
 /// database and an exported JSON all keep agreeing about which list is which. Change one of these
@@ -45,7 +45,7 @@ public static class ChecklistDefaults
     /// </summary>
     /// <remarks>
     /// Transitional, for the readers still handed the fixed pair — the incident repository before
-    /// V22 gives a file its own <c>checklist_lists</c> table, and the sync snapshot before it
+    /// V23 gives a file its own <c>checklist_lists</c> table, and the sync snapshot before it
     /// carries n lists. Both lists are produced even when empty, so this stays faithful to the
     /// behaviour it is standing in for; the "drop an empty list" rule belongs to the migration and
     /// to Stammdaten parsing, not here. Delete this with its last caller.

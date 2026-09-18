@@ -19,7 +19,7 @@ public sealed class IncidentRepository
 
         foreach (var table in new[]
                  {
-                    "incident_meta", "checklist_items", "etb_entries", "etb_entry_edits",
+                    "incident_meta", "checklist_items", "checklist_lists", "etb_entries", "etb_entry_edits",
                     "role_assignments", "force_units", "force_unit_edits", "scba_trupps",
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
@@ -51,8 +51,10 @@ public sealed class IncidentRepository
                 p("$closedBy", (object?)incident.ClosedBy ?? DBNull.Value);
             });
 
-        WriteChecklist(cn, tx, incident.ChecklistAufbau, kind: 0);
-        WriteChecklist(cn, tx, incident.ChecklistAbbau, kind: 1);
+        for (var i = 0; i < incident.Checklists.Count; i++)
+        {
+            WriteChecklist(cn, tx, incident.Checklists[i], ordinal: i);
+        }
 
         for (var i = 0; i < incident.Journal.Count; i++)
         {
@@ -338,15 +340,27 @@ public sealed class IncidentRepository
         tx.Commit();
     }
 
-    private static void WriteChecklist(SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<Domain.ChecklistItem> items, int kind)
+    private static void WriteChecklist(
+        SqliteConnection cn, SqliteTransaction tx, Domain.ChecklistList list, int ordinal)
     {
-        for (var i = 0; i < items.Count; i++)
+        Run(
+            cn,
+            tx,
+            "INSERT INTO checklist_lists (id, ordinal, title) VALUES ($id,$o,$t);",
+            p =>
+            {
+                p("$id", list.Id.ToString());
+                p("$o", ordinal);
+                p("$t", list.Title);
+            });
+
+        for (var i = 0; i < list.Items.Count; i++)
         {
-            var c = items[i];
+            var c = list.Items[i];
             Run(
                 cn,
                 tx,
-                "INSERT INTO checklist_items (id, ordinal, text, is_done, note, is_mandatory, kind) VALUES ($id,$o,$t,$d,$n,$m,$k);",
+                "INSERT INTO checklist_items (id, ordinal, text, is_done, note, is_mandatory, kind, list_id) VALUES ($id,$o,$t,$d,$n,$m,$k,$l);",
                 p =>
                 {
                     p("$id", c.Id.ToString());
@@ -355,7 +369,11 @@ public sealed class IncidentRepository
                     p("$d", c.IsDone ? 1 : 0);
                     p("$n", (object?)c.Note ?? DBNull.Value);
                     p("$m", c.IsMandatory ? 1 : 0);
-                    p("$k", kind);
+
+                    // kind is retired: list_id names the list now. The column is kept (dormant)
+                    // so the schema is unchanged, the same call ils_number made; always written 0.
+                    p("$k", 0);
+                    p("$l", list.Id.ToString());
                 });
         }
     }
@@ -430,14 +448,30 @@ public sealed class IncidentRepository
             cn,
             "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by FROM incident_meta LIMIT 1;");
 
-        var checklistAufbau = ReadAll(
+        // One query per table, grouped in C# -- the same shape as editsByEntry below. Items whose
+        // list_id matches no list row are dropped: V23 fills list_id for every row it finds, so a
+        // null here means a row SchemaGuard repaired the column for after the fact, and filing it
+        // under a list it was never part of would be a guess.
+        var checklistItemsByList = ReadAll(
             cn,
-            "SELECT id, text, is_done, note, is_mandatory FROM checklist_items WHERE kind = 0 ORDER BY ordinal;",
-            r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3), r.GetInt32(4) != 0));
-        var checklistAbbau = ReadAll(
+            "SELECT list_id, id, text, is_done, note, is_mandatory FROM checklist_items ORDER BY ordinal;",
+            r => (ListId: Str(r, 0),
+                  Item: Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(1)), r.GetString(2), r.GetInt32(3) != 0, Str(r, 4), r.GetInt32(5) != 0)))
+            .Where(x => x.ListId is not null)
+            .GroupBy(x => x.ListId!)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Item).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var checklists = ReadAll(
             cn,
-            "SELECT id, text, is_done, note, is_mandatory FROM checklist_items WHERE kind = 1 ORDER BY ordinal;",
-            r => Domain.ChecklistItem.Rehydrate(Guid.Parse(r.GetString(0)), r.GetString(1), r.GetInt32(2) != 0, Str(r, 3), r.GetInt32(4) != 0));
+            "SELECT id, title FROM checklist_lists ORDER BY ordinal;",
+            r => (Id: r.GetString(0), Title: r.GetString(1)))
+            .Select(l => Domain.ChecklistList.Rehydrate(Guid.Parse(l.Id), l.Title, ItemsOf(l.Id)))
+            .ToList();
+
+        IReadOnlyList<Domain.ChecklistItem> ItemsOf(string listId) =>
+            checklistItemsByList.TryGetValue(listId, out var items)
+                ? items
+                : Array.Empty<Domain.ChecklistItem>();
 
         var editsByEntry = ReadAll(
             cn,
@@ -653,7 +687,7 @@ public sealed class IncidentRepository
             meta[8] as string,
             meta[9] is string ca ? ParseDate(ca) : null,
             meta[10] as string,
-            ChecklistDefaults.AsLists(checklistAufbau, checklistAbbau),
+            checklists,
             journal,
             roles,
             forces,
