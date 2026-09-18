@@ -99,7 +99,7 @@
               Binding="{Binding IsDone, Mode=TwoWay}" />
           <!-- Editable like the input dock's ComboBoxes (#246); the color-coded classes still
                reflect the row's current value. -->
-          <DataGridTemplateColumn Header="WICHTIG" Width="120">
+          <DataGridTemplateColumn Header="WICHTIG" Width="145">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <ComboBox Margin="6,4" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}"
@@ -117,7 +117,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="DRINGL." Width="130">
+          <DataGridTemplateColumn Header="DRINGL." Width="145">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <ComboBox Margin="6,4" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}"
@@ -153,7 +153,7 @@
           </DataGridTemplateColumn>
           <!-- AutoCompleteBox like the input dock's ZUGETEILT field (#246): callsigns/Funktionen/
                personnel suggest, anything else stays free text. -->
-          <DataGridTemplateColumn Header="ZUGETEILT" Width="150">
+          <DataGridTemplateColumn Header="ZUGETEILT" Width="210">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
                 <AutoCompleteBox Margin="6,4" IsEnabled="{Binding !IsReadOnly}"
