@@ -24,11 +24,21 @@ namespace LageBuch.Sync;
 /// </summary>
 public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 {
+    /// <summary>
+    /// Default cap for the attachment cache (issue #167 P2: the disk cache in
+    /// <see cref="GetFileBytesAsync"/> had no eviction at all). 500 MB comfortably covers a normal
+    /// incident's attachments while bounding what a device that has joined many incidents over
+    /// time accumulates on disk.
+    /// </summary>
+    public const long DefaultCacheMaxBytes = 500L * 1024 * 1024;
+
     private readonly HttpClient _http;
     private readonly HttpClientHandler _handler;
     private readonly HubConnection _hub;
     private readonly IUiDispatcher _ui;
     private readonly string? _cacheRoot;
+    private readonly long _cacheMaxBytes;
+    private readonly object _cacheEvictionGate = new();
     private Incident _incident;
 
     public SessionOperator? Operator { get; }
@@ -81,6 +91,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         SessionOperator op,
         Incident initial,
         string? cacheRoot,
+        long cacheMaxBytes,
         string hostMasterDataJson)
     {
         _http = http;
@@ -90,6 +101,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Operator = op;
         _incident = initial;
         _cacheRoot = cacheRoot;
+        _cacheMaxBytes = cacheMaxBytes;
         HostMasterDataJson = hostMasterDataJson;
     }
 
@@ -124,6 +136,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// supply it (a folder under the app's data/cache dir). Null disables caching — bytes are
     /// re-fetched from the host on every call, which is correct, just not free.
     /// </param>
+    /// <param name="cacheMaxBytes">
+    /// Size cap for <paramref name="cacheRoot"/> across every incident cached there; once a newly
+    /// cached file pushes the total over this, the oldest files (by last-write time) are deleted
+    /// until it is back under. Defaults to <see cref="DefaultCacheMaxBytes"/>; irrelevant when
+    /// <paramref name="cacheRoot"/> is null.
+    /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
     public static async Task<RemoteIncidentSession> ConnectAsync(
         string host,
@@ -135,6 +153,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         int port = SyncProtocol.Port,
         IRetryPolicy? reconnectPolicy = null,
         string? cacheRoot = null,
+        long cacheMaxBytes = DefaultCacheMaxBytes,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(trustStore);
@@ -242,7 +261,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, handler, hub, ui, op, initial, cacheRoot, hostMasterDataJson);
+            var session = new RemoteIncidentSession(http, handler, hub, ui, op, initial, cacheRoot, cacheMaxBytes, hostMasterDataJson);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -412,7 +431,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         var cachePath = CachePathFor(fileId, file.FileName);
         if (cachePath is not null && File.Exists(cachePath))
         {
-            return await File.ReadAllBytesAsync(cachePath, cancellationToken);
+            try
+            {
+                return await File.ReadAllBytesAsync(cachePath, cancellationToken);
+            }
+            catch (IOException)
+            {
+                // An eviction pass can delete this file between the Exists check and the read; fall
+                // through and re-fetch from the host rather than failing the whole call.
+            }
         }
 
         HttpResponseMessage response;
@@ -435,6 +462,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         {
             Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
             await File.WriteAllBytesAsync(cachePath, bytes, cancellationToken);
+            EvictOldestCacheEntriesOverCap();
         }
 
         return bytes;
@@ -445,6 +473,60 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private string? CachePathFor(Guid fileId, string fileName) => _cacheRoot is null
         ? null
         : Path.Join(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
+
+    /// <summary>
+    /// Trims the cache back under <see cref="_cacheMaxBytes"/>, oldest by last-write time first.
+    /// <para>
+    /// Scoped to the whole cache root, not just this incident's subfolder: the unbounded growth is
+    /// a device accumulating the attachments of every incident it has ever joined, and nothing
+    /// deletes a previous incident's folder when that session ends. Last-write rather than
+    /// last-read, because reads do not touch mtime — so this is "oldest written", which for a cache
+    /// that is written once and then read is the same thing often enough to be worth the simplicity.
+    /// </para>
+    /// </summary>
+    private void EvictOldestCacheEntriesOverCap()
+    {
+        if (_cacheRoot is null || !Directory.Exists(_cacheRoot))
+        {
+            return;
+        }
+
+        // Serialize eviction passes: two concurrent downloads would otherwise each enumerate and
+        // sum the same tree before either deleted anything, and both would then delete against a
+        // total that was already stale.
+        lock (_cacheEvictionGate)
+        {
+            var files = new DirectoryInfo(_cacheRoot)
+                .EnumerateFiles("*", SearchOption.AllDirectories)
+                .OrderBy(f => f.LastWriteTimeUtc)
+                .ToList();
+            var totalBytes = files.Sum(f => f.Length);
+
+            foreach (var file in files)
+            {
+                if (totalBytes <= _cacheMaxBytes)
+                {
+                    break;
+                }
+
+                var reclaimed = file.Length;
+                try
+                {
+                    file.Delete();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Best-effort: a file another handle is using right now, or one that is
+                    // read-only, simply stays -- and stays counted, so the pass carries on to the
+                    // entries it can actually reclaim instead of stopping on a total that only
+                    // looks like it is under the cap. The next pass gets another chance at it.
+                    continue;
+                }
+
+                totalBytes -= reclaimed;
+            }
+        }
+    }
 
     public void RenameFile(Guid fileId, string? displayName) => Send(new RenameFileCommand(fileId, displayName));
 

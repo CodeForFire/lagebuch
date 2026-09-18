@@ -259,6 +259,98 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task GetFileBytesAsync_evicts_the_oldest_cached_files_once_the_cache_exceeds_its_cap()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        var cacheRoot = Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(cacheRoot);
+        try
+        {
+            // An unrelated, older entry -- what a previously joined incident leaves behind, since
+            // nothing deletes its folder when that session ends. This is the growth being bounded.
+            var staleFile = Path.Join(cacheRoot, "stale.bin");
+            await File.WriteAllBytesAsync(staleFile, new byte[10]);
+            File.SetLastWriteTimeUtc(staleFile, DateTime.UtcNow.AddDays(-1));
+
+            await using var uploader = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            var bytes = new byte[] { 1, 2, 3 };
+            var uploaderChange = NextChange(uploader);
+            await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+            await uploaderChange; // AddFileAsync's HTTP response can outrace the self-broadcast
+            var fileId = Assert.Single(uploader.Incident.Files).Id;
+
+            await using var puller = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("B"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                new InMemoryTrustStore(),
+                TestHost.DefaultPin,
+                port,
+                cacheRoot: cacheRoot,
+                cacheMaxBytes: 5); // below stale (10) + new (3), so eviction has to run
+            await puller.GetFileBytesAsync(fileId);
+
+            Assert.False(File.Exists(staleFile), "the older, unrelated cache entry should have been evicted");
+            var remaining = Directory.EnumerateFiles(cacheRoot, "*", SearchOption.AllDirectories).ToList();
+            var totalRemaining = remaining.Sum(f => new FileInfo(f).Length);
+            Assert.True(totalRemaining <= 5, $"expected the cache back under its cap, but it holds {totalRemaining} bytes");
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetFileBytesAsync_keeps_a_normal_cache_well_under_the_default_cap()
+    {
+        // The default path must not evict what it just wrote -- the cap is 500 MB and a single
+        // attachment is capped at 25 MB, so a normal pull is nowhere near it.
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        var cacheRoot = Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        try
+        {
+            await using var uploader = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            var bytes = new byte[] { 1, 2, 3 };
+            var uploaderChange = NextChange(uploader);
+            await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
+            await uploaderChange;
+            var fileId = Assert.Single(uploader.Incident.Files).Id;
+
+            await using var puller = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("B"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                new InMemoryTrustStore(),
+                TestHost.DefaultPin,
+                port,
+                cacheRoot: cacheRoot);
+            await puller.GetFileBytesAsync(fileId);
+
+            var cachedFile = Assert.Single(Directory.EnumerateFiles(cacheRoot, "*", SearchOption.AllDirectories));
+            Assert.Equal(bytes, await File.ReadAllBytesAsync(cachedFile));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Connect_refuses_a_version_mismatch()
     {
         var clock = new FixedClock();
