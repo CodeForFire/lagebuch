@@ -24,7 +24,6 @@ namespace LageBuch.Acceptance.Tests;
 public class HomeLayoutTests
 {
     private const double ColumnMaxWidth = 720.0;
-    private const double GlowSize = 320.0;
 
     // The MaxHeight the recent list used to carry, which gave it a scrollbar of its own.
     private const double OldMaxHeight = 420.0;
@@ -85,14 +84,15 @@ public class HomeLayoutTests
         return window;
     }
 
-    // Located by its MaxWidth rather than by name so these tests fail on the layout they guard
-    // rather than on a missing x:Name.
-    private static StackPanel ContentColumn(Window window) =>
-        window.GetVisualDescendants().OfType<StackPanel>().First(p => p.MaxWidth == ColumnMaxWidth);
+    // By name, like OpenErrorBanner and RecentFilesHint: matching on MaxWidth/Width would compare
+    // doubles for exact equality, which CodeQL rightly rejects (cs/equality-on-floats).
+    private static T ByName<T>(Window window, string name)
+        where T : Control =>
+        window.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
 
-    private static Border Glow(Window window) =>
-        window.GetVisualDescendants().OfType<Border>()
-            .First(b => b.Width == GlowSize && b.Height == GlowSize);
+    private static StackPanel ContentColumn(Window window) => ByName<StackPanel>(window, "ContentColumn");
+
+    private static Border Glow(Window window) => ByName<Border>(window, "HazardGlow");
 
     private static ScrollViewer PageScroller(Window window) =>
         window.GetVisualDescendants().OfType<ScrollViewer>().First();
@@ -160,7 +160,7 @@ public class HomeLayoutTests
             + $"{page.Viewport.Height}) -- there would be nothing for the wheel to do";
         Assert.True(page.Extent.Height > page.Viewport.Height, overflow);
 
-        Assert.Equal(0, page.Offset.Y);
+        Assert.Equal(0, page.Offset.Y, precision: 0);
         window.MouseWheel(new Point(window.Width / 2, 400), new Vector(0, -3));
         Dispatcher.UIThread.RunJobs();
 

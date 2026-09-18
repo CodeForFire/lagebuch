@@ -96,6 +96,15 @@ Write code that trips neither:
 - **Leave no dead locals.** `IDE0059` is a warning here and warnings are
   errors. Use `_` for a value you do not need, including inside a tuple
   deconstruction or an `out var` call.
+- **Never compare `double` or `float` with `==` or `!=`** (`cs/equality-on-floats`).
+  This bites hardest in UI tests, where it is tempting to find a control by a
+  layout value — `OfType<StackPanel>().First(p => p.MaxWidth == 720)`. Find
+  controls by `x:Name` instead, adding the name to the `.axaml` if it has none;
+  that is what `OpenErrorBanner` and `RecentFilesHint` are for. Where a number
+  really is the subject, assert on it with a tolerance — xUnit's
+  `Assert.Equal(expected, actual, precision: 0)`, or `Math.Abs(a - b) <= 1.0` —
+  and never with `Assert.Equal(0, someDouble)`, which is an exact comparison
+  wearing a method call.
 
 When a new CodeQL alert appears, never leave it open and never dismiss it
 without a written reason:

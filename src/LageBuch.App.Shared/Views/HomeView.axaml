@@ -12,8 +12,8 @@
          bright end at the box's top-LEFT, pointing into the page instead of at the corner.
          SignalFadedColor is SignalColor at zero alpha; fading to a different hue is what
          produced the grey. -->
-    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Width="320" Height="320"
-            Opacity="0.05" IsHitTestVisible="False">
+    <Border x:Name="HazardGlow" HorizontalAlignment="Right" VerticalAlignment="Top"
+            Width="320" Height="320" Opacity="0.05" IsHitTestVisible="False">
       <Border.Background>
         <RadialGradientBrush Center="100%,0%" GradientOrigin="100%,0%" RadiusX="100%" RadiusY="100%">
           <GradientStop Color="{StaticResource SignalColor}" Offset="0" />
@@ -28,7 +28,8 @@
            (a long path in the recent list wanted the full 720, a short one only ~643), so the
            whole page jumped sideways on every scroll. Stretch pins it to min(viewport, 720);
            Avalonia still centres a Stretch element that MaxWidth has made narrower than its slot. -->
-      <StackPanel Margin="56,48" Spacing="28" MaxWidth="720" HorizontalAlignment="Stretch">
+      <StackPanel x:Name="ContentColumn" Margin="56,48" Spacing="28" MaxWidth="720"
+                  HorizontalAlignment="Stretch">
         <!-- Greeting -->
         <StackPanel Spacing="6">
           <TextBlock Text="EINSATZBEREIT" Classes="overline" Foreground="{StaticResource ActiveBrush}" />
