@@ -44,17 +44,11 @@ public class RolesTabRenderTests
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     [AvaloniaFact]
     public void Funktionen_tab_shows_a_running_assignment()
     {
         var (window, vm) = ShowWorkspace();
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 3; // FUNKTIONEN
-        Dispatcher.UIThread.RunJobs();
-        Assert.Equal("FUNKTIONEN", ((TabItem)tabs.SelectedItem!).Header);
+        WorkspaceRenderHelper.SelectTab(window, "FUNKTIONEN");
 
         vm.Roles.NewRole = AnonymizedExampleData.RoleExample;
         vm.Roles.NewPersonName = $"{AnonymizedExampleData.PersonLastName}, {AnonymizedExampleData.PersonFirstName}";

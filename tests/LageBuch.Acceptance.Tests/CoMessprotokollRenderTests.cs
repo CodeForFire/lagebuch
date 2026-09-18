@@ -48,9 +48,6 @@ public class CoMessprotokollRenderTests
         frame.SavePng(Path.Join(dir, name));
     }
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     [AvaloniaFact]
     public void CoMessprotokoll_Tab_Renders()
     {
@@ -74,11 +71,8 @@ public class CoMessprotokollRenderTests
         session.RecordCoValue(buildingA.Id, 2, 4, 900);
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 6; // CO-MESSUNG
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
 
-        Assert.Equal("CO-MESSUNG", ((TabItem)tabs.SelectedItem!).Header);
         Assert.Equal(2, vm.CoMessprotokoll.BuildingOptions.Count);
         Assert.NotNull(vm.CoMessprotokoll.SelectedBuilding);
         Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);
@@ -94,9 +88,7 @@ public class CoMessprotokollRenderTests
         session.AddCoBuilding("Mehrfamilienhaus A", 1, 1);
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 6; // CO-MESSUNG
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
 
         var cell = vm.CoMessprotokoll.MatrixRows[0].Cells[0];
         cell.OpenEditorCommand.Execute(null);
@@ -122,9 +114,7 @@ public class CoMessprotokollRenderTests
         session.SetApartmentCount(building.Id, 0, 6);
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 6; // CO-MESSUNG
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
 
         var egRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 0);
         var ogRow = vm.CoMessprotokoll.MatrixRows.Single(r => r.Ordinal == 1);

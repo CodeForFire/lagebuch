@@ -54,16 +54,12 @@ public class LinksTabRenderTests
         frame.SavePng(Path.Join(dir, name));
     }
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     [AvaloniaFact]
     public void Workspace_renders_eight_tabs_before_links_is_opened()
     {
         var (window, _) = ShowWorkspace();
-        var tabs = Tabs(window);
 
-        Assert.Equal(10, tabs.Items.Count);
+        Assert.Equal(10, WorkspaceRenderHelper.RailHeaders(window).Count);
         Capture(window, "links-before.png");
     }
 
@@ -72,11 +68,8 @@ public class LinksTabRenderTests
     {
         var (window, vm) = ShowWorkspace();
 
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 8; // LINKS
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "LINKS");
 
-        Assert.Equal("LINKS", ((TabItem)tabs.SelectedItem!).Header);
         Assert.Equal(2, vm.Links.Links.Count);
         Assert.Contains(vm.Links.Links, l => l.Name == "Wetterdienst" && l.Url == "https://dwd.de");
         Capture(window, "links-after.png");
@@ -89,8 +82,7 @@ public class LinksTabRenderTests
     public void Error_banner_renders_a_laid_out_icon()
     {
         var (window, vm) = ShowWorkspace();
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 8; // LINKS
+        WorkspaceRenderHelper.SelectTab(window, "LINKS");
         vm.Links.ErrorMessage = "Fehler beim Öffnen.";
         Dispatcher.UIThread.RunJobs();
 
@@ -107,8 +99,7 @@ public class LinksTabRenderTests
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowLinksTab()
     {
         var (window, vm) = ShowWorkspace();
-        Tabs(window).SelectedIndex = 8; // LINKS
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "LINKS");
         return (window, vm);
     }
 
@@ -211,8 +202,7 @@ public class LinksTabRenderTests
         var (window, _) = ShowWorkspace();
         window.Width = 411;
         window.Height = 872;
-        Tabs(window).SelectedIndex = 8; // LINKS
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "LINKS");
 
         var box = Named<TextBox>(window, "LinkSearchBox");
         var right = box.TranslatePoint(new Point(box.Bounds.Width, 0), window)!.Value.X;

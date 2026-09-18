@@ -76,9 +76,6 @@ public class ForcesTabRenderTests
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     private static void Capture(Window window, string name)
     {
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
@@ -91,8 +88,7 @@ public class ForcesTabRenderTests
     public void Vehicle_selection_presets_the_dock_and_the_row_shows_1_1_2_strength()
     {
         var (window, vm) = ShowWorkspace();
-        Tabs(window).SelectedIndex = 4; // KRÄFTE
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
 
         // Available across every Wache without typing anything (#215).
         Assert.Equal(new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
@@ -119,7 +115,7 @@ public class ForcesTabRenderTests
     public void A_strength_correction_is_committed_as_one_edit_and_exposes_the_verlauf()
     {
         var (window, vm) = ShowWorkspace();
-        Tabs(window).SelectedIndex = 4; // KRÄFTE
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
         vm.Forces.NewBrigade = "Aich";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
@@ -145,7 +141,7 @@ public class ForcesTabRenderTests
     public void A_row_can_be_removed_completely_and_the_etb_records_it()
     {
         var (window, vm) = ShowWorkspace();
-        Tabs(window).SelectedIndex = 4; // KRÄFTE
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
         vm.Forces.NewBrigade = "FFB Wache 1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);

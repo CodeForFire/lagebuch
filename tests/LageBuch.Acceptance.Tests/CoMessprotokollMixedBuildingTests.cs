@@ -93,9 +93,7 @@ public class CoMessprotokollMixedBuildingTests
         session.SetDwellingDetails(id, 3, 1, "Fam. Kellner", null);
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-        tabs.SelectedIndex = 6; // CO-MESSUNG
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
 
         return (window, vm);
     }

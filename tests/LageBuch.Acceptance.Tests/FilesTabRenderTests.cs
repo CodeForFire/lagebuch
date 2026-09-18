@@ -53,16 +53,12 @@ public class FilesTabRenderTests
         frame.SavePng(Path.Join(dir, name));
     }
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     [AvaloniaFact]
     public void Workspace_renders_eight_tabs_before_dateien_is_opened()
     {
         var (window, _, _) = ShowWorkspace();
-        var tabs = Tabs(window);
 
-        Assert.Equal(10, tabs.Items.Count);
+        Assert.Equal(10, WorkspaceRenderHelper.RailHeaders(window).Count);
         Capture(window, "files-before.png");
     }
 
@@ -78,11 +74,8 @@ public class FilesTabRenderTests
         vm.Files.Sync();
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // DATEIEN
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
 
-        Assert.Equal("DATEIEN", ((TabItem)tabs.SelectedItem!).Header);
         Assert.Single(vm.Files.Files);
         Assert.Equal("Küchenbrand, Erdgeschoss", vm.Files.Files[0].DisplayName);
         Capture(window, "files-after.png");
@@ -99,9 +92,7 @@ public class FilesTabRenderTests
         vm.Files.Sync();
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // DATEIEN
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
 
         var row = Assert.Single(vm.Files.Files);
         Capture(window, "files-remove-before.png");
@@ -130,9 +121,7 @@ public class FilesTabRenderTests
     public async Task Dropping_a_file_on_dateien_highlights_the_zone_then_uploads_it()
     {
         var (window, vm, session) = ShowWorkspace();
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // DATEIEN
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
 
         var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
         var path = Path.Join(Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
@@ -190,9 +179,7 @@ public class FilesTabRenderTests
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // DATEIEN
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
 
         var dropZone = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "FilesDropZone");
 
@@ -216,8 +203,7 @@ public class FilesTabRenderTests
     public void Error_banner_renders_a_laid_out_icon()
     {
         var (window, vm, _) = ShowWorkspace();
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 7; // DATEIEN
+        WorkspaceRenderHelper.SelectTab(window, "DATEIEN");
         vm.Files.ErrorMessage = "Fehler beim Hochladen.";
         Dispatcher.UIThread.RunJobs();
 

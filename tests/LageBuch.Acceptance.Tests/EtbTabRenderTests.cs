@@ -43,17 +43,11 @@ public class EtbTabRenderTests
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     [AvaloniaFact]
     public void Etb_tab_shows_an_added_entry()
     {
         var (window, vm) = ShowWorkspace();
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 1; // ETB
-        Dispatcher.UIThread.RunJobs();
-        Assert.Equal("ETB", ((TabItem)tabs.SelectedItem!).Header);
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
 
         vm.Etb.NewFrom = AnonymizedExampleData.CallSign;
         vm.Etb.NewTo = AnonymizedExampleData.SecondCallSign;
