@@ -252,6 +252,13 @@ jobs:
           certutil -hashfile <Datei> SHA256  # Windows, mit SHA256SUMS.txt vergleichen
           \`\`\`
 
+          Die Datei deckt \`.msi\`, \`.deb\` und \`.apk\` ab. Ein \`.dmg\` wird erst nach diesem
+          Release gebaut und bringt seine eigene Prüfsumme mit:
+
+          \`\`\`
+          shasum -a 256 -c lagebuch-${VERSION}-macos-arm64.dmg.sha256
+          \`\`\`
+
           Jede Installationsdatei trägt zusätzlich einen Sigstore-Herkunftsnachweis aus
           dem Workflow-Lauf, der sie gebaut hat — prüfbar mit der GitHub CLI:
 

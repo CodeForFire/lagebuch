@@ -174,6 +174,12 @@ once we reach 1.0.
   compares its actual columns against the expected schema and adds whatever is missing, regardless
   of the recorded version, so an affected file repairs itself the next time it is opened. Columns
   and tables the app does not know are left untouched.
+- The download-verification instructions no longer send macOS users to a file that cannot
+  contain their download. `SHA256SUMS.txt` covers the `.msi`, the `.deb` and the `.apk`; the
+  `.dmg` is built after the release exists and carries its own `.dmg.sha256`, so
+  `shasum -a 256 -c SHA256SUMS.txt` — the only line the README and the release notes offered a
+  Mac user — failed on every one of the three files it listed. Both now name the `.dmg.sha256`
+  path as well.
 
 ### Security
 - Attachment names are stripped of invisible formatting characters, not just control characters.
