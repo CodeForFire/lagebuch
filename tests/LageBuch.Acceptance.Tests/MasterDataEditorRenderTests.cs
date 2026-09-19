@@ -18,7 +18,7 @@ public class MasterDataEditorRenderTests
         {
             Roles = new[] { "EL", "EAL", "ZF", "GF" },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
-            TruppTypes = new[] { "Angriffstrupp", "Wassertrupp", "CSA-Trupp" },
+            TruppTypes = new[] { new TruppType("Angriffstrupp"), new TruppType("Wassertrupp"), new TruppType("CSA-Trupp", 3, 20) },
 
             // Wachen and Funkrufnamen derive from these rows (plus the roster's "Land 1").
             Vehicles = new[]
@@ -108,6 +108,35 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-checkliste-aufbau.png"));
+    }
+
+    // The Trupp-Typen editor gained a Staerke and an Einsatzzeit per row (#398), so it is no
+    // longer the single-string-per-row EditableListSection the simple categories use.
+    [AvaloniaFact]
+    public void Trupp_typen_section_renders_staerke_and_einsatzzeit_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Trupp-Typen");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var names = view.GetVisualDescendants().OfType<TextBox>()
+            .Where(t => t.Text is "Angriffstrupp" or "Wassertrupp" or "CSA-Trupp").ToList();
+        Assert.Equal(3, names.Count);
+
+        // One Staerke and one Einsatzzeit spinner per row, carrying the row's own values -- the
+        // CSA-Trupp's three people and 20 minutes come from its Stammdaten, not from its name.
+        var numbers = view.GetVisualDescendants().OfType<NumericUpDown>().ToList();
+        Assert.Equal(6, numbers.Count);
+        Assert.Contains(numbers, n => n.Value == 3);
+        Assert.Contains(numbers, n => n.Value == 20);
+
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "master-data-editor-trupp-typen.png"));
     }
 
     [AvaloniaFact]

@@ -83,24 +83,6 @@
                       <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
                     <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
-                      <TextBlock Grid.Column="0" Text="Einsatzzeit AGT" VerticalAlignment="Center" />
-                      <NumericUpDown Grid.Column="1" Value="{Binding AgtMaxDurationMinutes}"
-                                     Minimum="1" Maximum="180" Increment="1" FormatString="0" />
-                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
-                      <TextBlock Grid.Column="0" Text="Einsatzzeit CSA-Trupp" VerticalAlignment="Center" />
-                      <NumericUpDown Grid.Column="1" Value="{Binding CsaMaxDurationMinutes}"
-                                     Minimum="1" Maximum="180" Increment="1" FormatString="0" />
-                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
-                      <TextBlock Grid.Column="0" Text="Einsatzzeit LPA" VerticalAlignment="Center" />
-                      <NumericUpDown Grid.Column="1" Value="{Binding LpaMaxDurationMinutes}"
-                                     Minimum="1" Maximum="180" Increment="1" FormatString="0" />
-                      <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    </Grid>
-                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
                       <TextBlock Grid.Column="0" Text="Rückzugsdruck" VerticalAlignment="Center" />
                       <NumericUpDown Grid.Column="1" Value="{Binding ReturnPressureBar}"
                                      Minimum="0" Maximum="400" Increment="5" FormatString="0" />
@@ -319,6 +301,65 @@
                               <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
                             <Button Grid.Column="6" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
+              <!-- Trupp-Typen editor (#398): the crew size and Einsatzzeit live on the row, so
+                   renaming a type can no longer silently drop its rule. -->
+              <DataTemplate x:DataType="vm:TruppTypesSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- Fixed trailing widths matching the row template's icon-btn buttons, as in the
+                       Fahrzeuge template above: "Auto" would size to this Grid's own empty content. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,150,28,32,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="TYP" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="STÄRKE" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Personen im Trupp: 2, oder 3 mit zweitem Truppmann" />
+                    <TextBlock Grid.Column="2" Text="EINSATZZEIT" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Vorgeschlagene Einsatzzeit bei der Anmeldung" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TruppTypeRow">
+                          <Grid ColumnDefinitions="*,110,150,28,32,32" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
+                                     PlaceholderText="Angriffstrupp" />
+                            <!-- Bounds are bound, not written in: a Trupp has as many positions as
+                                 TruppRole has, and the control must never drift from it. -->
+                            <NumericUpDown Grid.Column="1" Width="90" Increment="1" FormatString="0"
+                                           Minimum="{Binding MinMemberCount}"
+                                           Maximum="{Binding MaxMemberCount}"
+                                           Value="{Binding MemberCount}" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Column="2" Width="110" Minimum="1" Maximum="180" Increment="1"
+                                           FormatString="0" Value="{Binding MaxDurationMinutes}"
+                                           VerticalAlignment="Center" />
+                            <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
+                                 $parent path cannot resolve here. -->
+                            <Button Grid.Column="3" Classes="icon-btn" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            </Button>
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Button>
+                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">

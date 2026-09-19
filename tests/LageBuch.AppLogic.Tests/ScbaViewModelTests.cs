@@ -8,12 +8,25 @@ namespace LageBuch.AppLogic.Tests;
 
 public class ScbaViewModelTests
 {
+    /// <summary>A Trupp-Typ the Stammdaten crew with three. The name is incidental since #398 --
+    /// what makes it three people is its row, and these tests prove exactly that.</summary>
+    private const string CsaTrupp = "CSA-Trupp";
+
+    private const string LpaTrupp = "LPA-Trupp";
+
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
-        TruppTypes = new[] { "Angriffstrupp", "Wassertrupp" },
+        TruppTypes = new[]
+        {
+            new TruppType("Angriffstrupp"),
+            new TruppType("Wassertrupp"),
+
+            // Three people, per its Stammdaten row -- not because the app knows the word "CSA".
+            new TruppType(CsaTrupp, 3, 20),
+        },
     };
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
@@ -523,13 +536,13 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void A_csa_trupp_reveals_and_requires_the_third_name()
+    public void A_three_person_trupp_type_reveals_and_requires_the_third_name()
     {
         var vm = Vm(new FixedClock(T0), NewSession(new FixedClock(T0)));
         vm.NewDesignation = "Angriffstrupp";
         Assert.False(vm.RequiresThirdMember);
 
-        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        vm.NewDesignation = CsaTrupp;
         Assert.True(vm.RequiresThirdMember);
 
         vm.NewTruppfuehrer = "Müller";
@@ -541,11 +554,11 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void A_third_name_left_over_from_a_csa_selection_is_not_carried_into_an_ordinary_trupp()
+    public void A_third_name_left_over_from_a_three_person_type_is_not_carried_into_an_ordinary_trupp()
     {
         var clock = new FixedClock(T0);
         var vm = Vm(clock, NewSession(clock));
-        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        vm.NewDesignation = CsaTrupp;
         vm.NewZweiterTruppmann = "Huber";
 
         // Switching back to a two-person type must not smuggle the third name into the crew and
@@ -565,7 +578,7 @@ public class ScbaViewModelTests
         var session = NewSession(clock);
         var vm = Vm(clock, session);
 
-        Register(vm, AtemschutzTrupp.ChemicalTruppDesignation, "Müller", "Schmidt", "Huber");
+        Register(vm, CsaTrupp, "Müller", "Schmidt", "Huber");
 
         Assert.Contains(
             session.Incident.Journal,
@@ -587,7 +600,7 @@ public class ScbaViewModelTests
     {
         var clock = new FixedClock(T0);
         var vm = Vm(clock, NewSession(clock));
-        Register(vm, AtemschutzTrupp.ChemicalTruppDesignation, "Müller", "Schmidt", "Huber");
+        Register(vm, CsaTrupp, "Müller", "Schmidt", "Huber");
 
         Assert.Equal(string.Empty, vm.NewTruppfuehrer);
         Assert.Equal(string.Empty, vm.NewTruppmann);
@@ -645,9 +658,9 @@ public class ScbaViewModelTests
     public void NewControlIntervalMinutes_defaults_to_a_third_of_the_einsatzzeit()
     {
         var clock = new FixedClock(T0);
-        var vm = VmWith(clock, NewSession(clock), CustomSettings); // AGT default 35 minutes
+        var vm = VmWith(clock, NewSession(clock), CustomSettings); // no type picked yet => 30 min
 
-        Assert.Equal(11, vm.NewControlIntervalMinutes); // 35 / 3, truncated
+        Assert.Equal(10, vm.NewControlIntervalMinutes); // 30 / 3, truncated
     }
 
     [Fact]
@@ -656,7 +669,7 @@ public class ScbaViewModelTests
         var clock = new FixedClock(T0);
         var vm = VmWith(clock, NewSession(clock), CustomSettings);
 
-        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation; // CSA default 22 minutes
+        vm.NewDesignation = CsaTrupp; // its Stammdaten row says 22 minutes
         Assert.Equal(22, vm.NewMaxDurationMinutes);
         Assert.Equal(7, vm.NewControlIntervalMinutes); // 22 / 3, truncated
     }
@@ -682,22 +695,27 @@ public class ScbaViewModelTests
 
         Register(vm); // adds an Angriffstrupp, then resets the form
 
-        Assert.Equal(11, vm.NewControlIntervalMinutes); // back to AGT-Einsatzzeit / 3
+        Assert.Equal(10, vm.NewControlIntervalMinutes); // back to the no-type Einsatzzeit / 3
     }
 
-    // Distinct values so a swapped mapping is caught; nothing here matches a compiled-in default.
+    // Distinct Einsatzzeiten so a swapped mapping is caught; nothing here matches a compiled-in
+    // default. Since #398 they live on the Trupp-Typ, not in three settings keyed by name.
+    private static readonly TruppType[] CustomTruppTypes =
+    {
+        new("Angriffstrupp", 2, 35),
+        new(CsaTrupp, 3, 22),
+        new(LpaTrupp, 2, 48),
+    };
+
     private static readonly IncidentSettings CustomSettings = new(
         IlsReminderIntervalMinutes: 15,
         IlsReminderFollowUpIntervalMinutes: 30,
-        AgtMaxDurationMinutes: 35,
-        CsaMaxDurationMinutes: 22,
-        LpaMaxDurationMinutes: 48,
         ReturnPressureBar: 55);
 
     private static ScbaViewModel VmWith(FixedClock clock, LocalIncidentSession session, IncidentSettings settings) =>
         new(
             session,
-            MasterDataSet.Empty with { TruppTypes = new[] { "Angriffstrupp" }, Settings = settings },
+            MasterDataSet.Empty with { TruppTypes = CustomTruppTypes, Settings = settings },
             clock,
             new FakeTicker(),
             new FakeAlarmService(),
@@ -709,34 +727,65 @@ public class ScbaViewModelTests
         var clock = new FixedClock(T0);
         var vm = VmWith(clock, NewSession(clock), CustomSettings);
 
-        Assert.Equal(35, vm.NewMaxDurationMinutes);   // no designation yet => AGT default
+        // No designation picked yet, so the Einsatzzeit is the same fallback an unlisted type
+        // gets. The Rueckzugsdruck is still a global setting.
+        Assert.Equal(AtemschutzTrupp.DefaultMaxDurationMinutes, vm.NewMaxDurationMinutes);
         Assert.Equal(55, vm.NewReturnPressureBar);
     }
 
     [Fact]
-    public void Selecting_a_CSA_trupp_suggests_the_CSA_einsatzzeit_and_reverts_for_an_AGT()
+    public void Selecting_a_trupp_type_suggests_the_einsatzzeit_from_its_stammdaten_row()
     {
         var clock = new FixedClock(T0);
         var vm = VmWith(clock, NewSession(clock), CustomSettings);
 
-        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
-        Assert.Equal(22, vm.NewMaxDurationMinutes);   // CSA default
+        vm.NewDesignation = CsaTrupp;
+        Assert.Equal(22, vm.NewMaxDurationMinutes);
 
         vm.NewDesignation = "Angriffstrupp";
-        Assert.Equal(35, vm.NewMaxDurationMinutes);   // back to AGT default
+        Assert.Equal(35, vm.NewMaxDurationMinutes);
     }
 
     [Fact]
-    public void Selecting_an_LPA_trupp_suggests_the_LPA_einsatzzeit_and_reverts_for_an_AGT()
+    public void A_designation_the_stammdaten_do_not_list_falls_back_rather_than_blocking()
+    {
+        // The whole point of #398: the rules follow the row, and a type with no row is simply an
+        // ordinary Trupp. An Einsatz in progress is never blocked by a missing Stammdaten entry.
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        vm.NewDesignation = "Chemietrupp";
+
+        Assert.False(vm.RequiresThirdMember);
+        Assert.Equal(AtemschutzTrupp.DefaultMaxDurationMinutes, vm.NewMaxDurationMinutes);
+    }
+
+    [Fact]
+    public void A_trupp_type_is_matched_the_way_every_other_stammdaten_value_is()
+    {
+        // Trimmed and ignoring case, like StammdatenCatalogue does elsewhere -- so a designation
+        // that differs only in spacing still finds its row instead of silently losing its rules.
+        var clock = new FixedClock(T0);
+        var vm = VmWith(clock, NewSession(clock), CustomSettings);
+
+        vm.NewDesignation = " csa-trupp ";
+
+        Assert.True(vm.RequiresThirdMember);
+        Assert.Equal(22, vm.NewMaxDurationMinutes);
+    }
+
+    [Fact]
+    public void A_longer_einsatzzeit_type_suggests_its_own_value_and_keeps_two_people()
     {
         var clock = new FixedClock(T0);
         var vm = VmWith(clock, NewSession(clock), CustomSettings);
 
-        vm.NewDesignation = AtemschutzTrupp.LpaTruppDesignation;
-        Assert.Equal(48, vm.NewMaxDurationMinutes);   // LPA default (longer than AGT)
+        vm.NewDesignation = LpaTrupp;
+        Assert.Equal(48, vm.NewMaxDurationMinutes);   // its row: longer than an ordinary Trupp
+        Assert.False(vm.RequiresThirdMember);         // ... but crewed by two
 
         vm.NewDesignation = "Angriffstrupp";
-        Assert.Equal(35, vm.NewMaxDurationMinutes);   // back to AGT default
+        Assert.Equal(35, vm.NewMaxDurationMinutes);
     }
 
     [Fact]
@@ -746,13 +795,13 @@ public class ScbaViewModelTests
         var vm = VmWith(clock, NewSession(clock), CustomSettings);
 
         vm.NewMaxDurationMinutes = 45;                // user overrides
-        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        vm.NewDesignation = CsaTrupp;
 
-        Assert.Equal(45, vm.NewMaxDurationMinutes);   // not overwritten by the CSA default
+        Assert.Equal(45, vm.NewMaxDurationMinutes);   // not overwritten by the type's own value
     }
 
     [Fact]
-    public void Registering_resets_the_einsatzzeit_to_the_AGT_default_and_clears_the_override()
+    public void Registering_resets_the_einsatzzeit_and_clears_the_override()
     {
         var clock = new FixedClock(T0);
         var vm = VmWith(clock, NewSession(clock), CustomSettings);
@@ -760,10 +809,11 @@ public class ScbaViewModelTests
 
         Register(vm);                                 // adds an Angriffstrupp, then resets the form
 
-        Assert.Equal(35, vm.NewMaxDurationMinutes);   // reset to AGT default
+        // The form clears the designation too, so this is the no-type fallback again.
+        Assert.Equal(AtemschutzTrupp.DefaultMaxDurationMinutes, vm.NewMaxDurationMinutes);
 
-        // Override cleared: a CSA selection now re-suggests the CSA default again.
-        vm.NewDesignation = AtemschutzTrupp.ChemicalTruppDesignation;
+        // Override cleared: picking a type re-suggests its own Einsatzzeit again.
+        vm.NewDesignation = CsaTrupp;
         Assert.Equal(22, vm.NewMaxDurationMinutes);
     }
 }

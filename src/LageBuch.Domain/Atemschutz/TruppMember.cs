@@ -1,8 +1,13 @@
 namespace LageBuch.Domain.Atemschutz;
 
 /// <summary>
-/// Position within an Atemschutztrupp. The Excel Atemschutzüberwachung sheet lays out exactly
-/// Truppführer + Truppmann per Trupp; the second Truppmann exists only for a CSA-Trupp.
+/// Position within an Atemschutztrupp. The Excel Atemschutzüberwachung sheet lays out
+/// Truppführer + Truppmann per Trupp, plus a second Truppmann for the Trupp-Typen whose
+/// Stammdaten-Eintrag calls for three people (a CSA-Trupp, in the shipped example).
+/// <para>
+/// The ordinals are a storage contract — <c>IncidentRepository</c> persists them as ints and
+/// casts them back — so they may be appended to but never renumbered.
+/// </para>
 /// </summary>
 public enum TruppRole
 {
@@ -25,8 +30,9 @@ public sealed record TruppMember(TruppRole Role, string Name)
     }
 
     /// <summary>
-    /// Builds a crew in position order: Truppführer, Truppmann, and — for a CSA-Trupp — a second
-    /// Truppmann. Callers pass names and get the positions right by construction.
+    /// Builds a crew in position order: Truppführer, Truppmann, and — where the Trupp-Typ asks
+    /// for three — a second Truppmann. Callers pass names and get the positions right by
+    /// construction.
     /// </summary>
     public static IReadOnlyList<TruppMember> Crew(
         string truppfuehrer, string truppmann, string? zweiterTruppmann = null)

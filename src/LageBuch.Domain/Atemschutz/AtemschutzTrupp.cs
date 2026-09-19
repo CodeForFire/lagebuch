@@ -13,44 +13,32 @@ namespace LageBuch.Domain.Atemschutz;
 /// </summary>
 public sealed class AtemschutzTrupp
 {
+    /// <summary>
+    /// Fallback Einsatzzeit for a Trupp whose type the Stammdaten do not list. Every listed type
+    /// carries its own <c>MaxDurationMinutes</c>; this is only what "no type at all" means.
+    /// </summary>
     public const int DefaultMaxDurationMinutes = 30;
-
-    /// <summary>
-    /// Default operational time for a <see cref="ChemicalTruppDesignation"/>: a chemical-suit Trupp
-    /// works to a shorter limit than an ordinary AGT, so it defaults lower than
-    /// <see cref="DefaultMaxDurationMinutes"/> rather than sharing it.
-    /// </summary>
-    public const int DefaultChemicalMaxDurationMinutes = 20;
-
-    /// <summary>
-    /// Default operational time for an <see cref="LpaTruppDesignation"/>: a long-duration
-    /// breathing apparatus works to a longer limit than an ordinary AGT, so it defaults higher
-    /// than <see cref="DefaultMaxDurationMinutes"/>.
-    /// </summary>
-    public const int DefaultLpaMaxDurationMinutes = 60;
     public const int DefaultReturnPressureBar = 50;
     public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;
 
     /// <summary>
-    /// The Trupp type that operates in chemical protection suits and is crewed by three rather
-    /// than two. Named here rather than duplicated as a literal in the ViewModel, the seed and the
-    /// tests, because the cardinality rule keys off it.
+    /// Crew size of an ordinary Trupp: Truppführer + Truppmann. Also the minimum — Atemschutz is
+    /// never a solo activity.
     /// </summary>
-    public const string ChemicalTruppDesignation = "CSA-Trupp";
-
-    /// <summary>
-    /// The Trupp type that operates a long-duration breathing apparatus and defaults to a longer
-    /// Einsatzzeit than an ordinary AGT. Named here so the duration-suggestion keys off it rather
-    /// than a literal in the ViewModel. Crewed normally (two) — no special cardinality rule.
-    /// </summary>
-    public const string LpaTruppDesignation = "LPA-Trupp";
-
-    /// <summary>Crew size of an ordinary Trupp: Truppführer + Truppmann.</summary>
     public const int StandardMemberCount = 2;
 
-    /// <summary>Crew size of a <see cref="ChemicalTruppDesignation"/>.</summary>
-    public const int ChemicalMemberCount = 3;
+    /// <summary>
+    /// The largest crew a Trupp can have, which is not a policy choice but a consequence of
+    /// <see cref="TruppRole"/> having exactly that many positions: the monitoring sheet has
+    /// nowhere to write a fourth name, and the role ordinals are a storage contract.
+    /// <para>
+    /// How many people a <em>particular</em> Trupp type needs is Stammdaten (a Trupp-Typ's
+    /// <c>MemberCount</c>), not a constant here — see issue #398. This class validates only what
+    /// it can prove without the Stammdaten it cannot see.
+    /// </para>
+    /// </summary>
+    public const int MaxMemberCount = 3;
 
     private readonly List<PressureReading> _readings = new();
     private readonly List<TruppMember> _members = new();
@@ -75,8 +63,8 @@ public sealed class AtemschutzTrupp
     public static string FormatDisplayName(int truppNumber, string designation) => $"Trupp {truppNumber} ({designation})";
 
     /// <summary>
-    /// The crew, in position order. Always <see cref="StandardMemberCount"/> people, or
-    /// <see cref="ChemicalMemberCount"/> for a CSA-Trupp — a Trupp is never one person.
+    /// The crew, in position order: between <see cref="StandardMemberCount"/> and
+    /// <see cref="MaxMemberCount"/> people, as the Trupp-Typ in the Stammdaten calls for.
     /// </summary>
     public IReadOnlyList<TruppMember> Members => _members;
 
@@ -161,28 +149,20 @@ public sealed class AtemschutzTrupp
         return trupp;
     }
 
-    /// <summary>True when this designation denotes a three-person chemical-protection Trupp.</summary>
-    public static bool IsChemicalTrupp(string designation) =>
-        string.Equals(designation?.Trim(), ChemicalTruppDesignation, StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>True when this designation denotes a long-duration-apparatus (LPA) Trupp.</summary>
-    public static bool IsLpaTrupp(string designation) =>
-        string.Equals(designation?.Trim(), LpaTruppDesignation, StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>Required crew size for a designation: three for CSA, two otherwise.</summary>
-    public static int RequiredMemberCount(string designation) =>
-        IsChemicalTrupp(designation) ? ChemicalMemberCount : StandardMemberCount;
-
     private static void ValidateCrew(string designation, List<TruppMember> crew)
     {
         // Atemschutz is never a solo activity -- a Trupp is the unit that goes under air together,
-        // and the monitoring sheet has no concept of a single wearer. Enforcing the count here
-        // rather than in the ViewModel keeps it true for rehydrated and imported data as well.
-        var required = RequiredMemberCount(designation);
-        if (crew.Count != required)
+        // and the monitoring sheet has no concept of a single wearer, nor room for a fourth name.
+        //
+        // How many people a *particular* type needs used to be decided here, by comparing the
+        // designation against the literal "CSA-Trupp" -- which quietly stopped applying the moment
+        // a brigade renamed the type in its Stammdaten (#398). That rule now lives on the Trupp-Typ
+        // itself and is enforced where the Stammdaten are readable, in ScbaViewModel. What is left
+        // here is what this class can prove on its own, for registered and imported data alike.
+        if (crew.Count < StandardMemberCount || crew.Count > MaxMemberCount)
         {
             throw new ArgumentException(
-                $"{designation.Trim()} muss aus genau {required} Personen bestehen (angegeben: {crew.Count}).",
+                $"{designation.Trim()} muss aus {StandardMemberCount} bis {MaxMemberCount} Personen bestehen (angegeben: {crew.Count}).",
                 nameof(crew));
         }
 
@@ -191,9 +171,14 @@ public sealed class AtemschutzTrupp
             throw new ArgumentException("Alle Truppmitglieder müssen einen Namen haben.", nameof(crew));
         }
 
-        if (crew.Select(m => m.Role).Distinct().Count() != crew.Count)
+        // Contiguous from Truppfuehrer, not merely distinct: a two-person crew of
+        // {Truppfuehrer, ZweiterTruppmann} leaves a hole at Truppmann, and a sheet with a gap in
+        // the middle is one nobody can read back.
+        if (!crew.Select(m => (int)m.Role).OrderBy(r => r).SequenceEqual(Enumerable.Range(0, crew.Count)))
         {
-            throw new ArgumentException("Jede Truppfunktion darf nur einmal besetzt sein.", nameof(crew));
+            throw new ArgumentException(
+                "Die Truppfunktionen müssen lückenlos ab Truppführer besetzt sein, jede genau einmal.",
+                nameof(crew));
         }
     }
 

@@ -26,7 +26,7 @@ internal static class WorkspaceRenderHelper
         {
             new ChecklistTemplateItem("Fahrzeug abgerüstet und einsatzbereit?", true),
         },
-        TruppTypes = new[] { "Angriffstrupp", "Sicherheitstrupp", "CSA-Trupp" },
+        TruppTypes = new[] { new TruppType("Angriffstrupp"), new TruppType("Sicherheitstrupp"), new TruppType("CSA-Trupp", 3, 20) },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
 
         // Wachen and Funkrufnamen suggestions derive from the vehicles (and the roster below).

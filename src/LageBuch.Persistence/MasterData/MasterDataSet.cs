@@ -11,7 +11,10 @@ public sealed record MasterDataSet(
     IReadOnlyList<Link> Links,
     IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
     IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau,
-    IReadOnlyList<string> TruppTypes,
+
+    // Trupp-Typen with the crew size and Einsatzzeit each one calls for (#398). Was a bare list
+    // of names until the rules keyed off those names by string comparison.
+    IReadOnlyList<TruppType> TruppTypes,
     IReadOnlyList<Person> Personnel,
 
     // Vehicles per Wache with their seat count (#76).
@@ -32,7 +35,7 @@ public sealed record MasterDataSet(
         Array.Empty<Link>(),
         Array.Empty<ChecklistTemplateItem>(),
         Array.Empty<ChecklistTemplateItem>(),
-        Array.Empty<string>(),
+        Array.Empty<TruppType>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
         IncidentSettings.Defaults);
@@ -104,16 +107,8 @@ public sealed record IncidentSettings(
     // here but not yet consumed by the reminder timer (see #70).
     int IlsReminderFollowUpIntervalMinutes,
 
-    // Atemschutz Einsatzzeit for an ordinary AGT-Trupp.
-    int AgtMaxDurationMinutes,
-
-    // Atemschutz Einsatzzeit for a CSA-Trupp (chemical suit) — shorter than an AGT.
-    int CsaMaxDurationMinutes,
-
-    // Atemschutz Einsatzzeit for an LPA-Trupp (long-duration apparatus) — longer than an AGT.
-    int LpaMaxDurationMinutes,
-
-    // Rückzugsdruck: pressure at or below which a Trupp must turn back.
+    // Rückzugsdruck: pressure at or below which a Trupp must turn back. The Einsatzzeiten used to
+    // sit beside it, one per hard-coded Trupp-Typ name; they are per-Trupp-Typ Stammdaten now (#398).
     int ReturnPressureBar)
 {
     /// <summary>
@@ -123,9 +118,6 @@ public sealed record IncidentSettings(
     public static IncidentSettings Defaults { get; } = new(
         IlsReminderIntervalMinutes: 15,
         IlsReminderFollowUpIntervalMinutes: 30,
-        AgtMaxDurationMinutes: AtemschutzTrupp.DefaultMaxDurationMinutes,
-        CsaMaxDurationMinutes: AtemschutzTrupp.DefaultChemicalMaxDurationMinutes,
-        LpaMaxDurationMinutes: AtemschutzTrupp.DefaultLpaMaxDurationMinutes,
         ReturnPressureBar: AtemschutzTrupp.DefaultReturnPressureBar);
 }
 
@@ -151,6 +143,81 @@ public sealed record Person(string LastName, string FirstName, string? Role, str
 /// and older Stammdaten payloads keep working unchanged.
 /// </summary>
 public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false);
+
+/// <summary>
+/// One Trupp-Typ: its name, how many people it is crewed by, and the Einsatzzeit it defaults to.
+/// <para>
+/// Crew size and Einsatzzeit used to be decided by comparing the name against the compiled-in
+/// literals "CSA-Trupp" and "LPA-Trupp" (#398). Because the name is Stammdaten the user edits
+/// freely, a brigade writing "CSA Trupp" or "Chemietrupp" got a two-person CSA-Trupp accepted
+/// without complaint. Carrying the numbers on the row is what makes that impossible.
+/// </para>
+/// <para>
+/// <see cref="MemberCount"/> is expected to be between <see cref="AtemschutzTrupp.StandardMemberCount"/>
+/// and <see cref="AtemschutzTrupp.MaxMemberCount"/>, but this record deliberately does <b>not</b>
+/// throw on a value outside that range: it is built while parsing a file that crossed a trust
+/// boundary, and <c>HomeViewModel</c> catches only the JSON exception types around that parse --
+/// an ArgumentException escaping it would leak an open sync connection. Every entrance clamps
+/// instead; see <see cref="MasterDataJson"/> and the Stammdaten editor.
+/// </para>
+/// </summary>
+public sealed record TruppType(string Name, int MemberCount, int MaxDurationMinutes)
+{
+    /// <summary>An ordinary two-person Trupp on the standard Einsatzzeit -- the shape every type
+    /// has until someone says otherwise. Keeps the many construction sites to just a name.</summary>
+    public TruppType(string name)
+        : this(name, AtemschutzTrupp.StandardMemberCount, AtemschutzTrupp.DefaultMaxDurationMinutes)
+    {
+    }
+
+    /// <summary>
+    /// <paramref name="memberCount"/> forced into the range a Trupp can actually have. Used at
+    /// every entrance (file import, the editor) so an impossible crew size never reaches the app,
+    /// and never throws -- see the class remarks.
+    /// </summary>
+    public static int ClampMemberCount(int memberCount) => Math.Clamp(
+        memberCount, AtemschutzTrupp.StandardMemberCount, AtemschutzTrupp.MaxMemberCount);
+}
+
+/// <summary>
+/// The crew size and Einsatzzeit the two named Trupp-Typen carried before #398 moved those numbers
+/// onto the Stammdaten row. This is the <b>only</b> place in the codebase where a Trupp-Typ name is
+/// compared against a literal, and it is reached only while translating data written by an older
+/// version: the SQLite widening in <see cref="MasterDataStore"/>, which runs once per store, and
+/// the bare-string branch of <see cref="MasterDataJson"/>, which sees only pre-#398 exports.
+/// <para>
+/// Both entrances share it so a brigade restoring from a JSON backup and one opening its existing
+/// masterdata.db end up with identical rows. It must never gain a third entry -- a new Trupp-Typ
+/// with special needs is something the user configures, which is the entire point of the issue.
+/// </para>
+/// </summary>
+internal static class LegacyTruppTypeDefaults
+{
+    /// <summary>The pre-#398 rules, keyed by the designation they used to be matched against.</summary>
+    public static IReadOnlyDictionary<string, (int MemberCount, int MaxDurationMinutes)> ByName { get; } =
+        new Dictionary<string, (int, int)>(StringComparer.OrdinalIgnoreCase)
+        {
+            // AtemschutzTrupp.RequiredMemberCount returned three for this one, and the Einsatzzeit
+            // came from IncidentSettings.CsaMaxDurationMinutes, which defaulted to 20.
+            ["CSA-Trupp"] = (3, 20),
+
+            // Crewed normally; only the Einsatzzeit differed (LpaMaxDurationMinutes, default 60).
+            ["LPA-Trupp"] = (2, 60),
+        };
+
+    /// <summary>
+    /// The row a bare pre-#398 name becomes. Trimmed and case-insensitive, matching exactly what
+    /// the old <c>IsChemicalTrupp</c>/<c>IsLpaTrupp</c> accepted, so a store migrates with the
+    /// rule it actually had -- no more and no less.
+    /// </summary>
+    public static TruppType ToTruppType(string name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        return ByName.TryGetValue(trimmed, out var d)
+            ? new TruppType(trimmed, d.MemberCount, d.MaxDurationMinutes)
+            : new TruppType(trimmed);
+    }
+}
 
 /// <summary>
 /// The single source of truth for fictional example data shown in input-field placeholders
@@ -340,7 +407,7 @@ public static class MasterDataJson
             links,
             checklistAufbau,
             checklistAbbau,
-            Arr(root, "truppTypes"),
+            ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
             ParseSettings(root));
@@ -378,6 +445,52 @@ public static class MasterDataJson
     }
 
     /// <summary>
+    /// Reads <c>truppTypes</c>, which holds one object per Trupp-Typ: <c>name</c>, <c>memberCount</c>
+    /// and <c>maxDurationMinutes</c>.
+    /// <para>
+    /// A file exported before #398 has a bare string there instead, because the crew size and
+    /// Einsatzzeit were still decided by comparing that string against a compiled-in name. Such an
+    /// item is translated through <see cref="LegacyTruppTypeDefaults"/> -- the same table the SQLite
+    /// widening uses -- so a brigade restoring from a JSON backup and one simply opening its
+    /// existing masterdata.db end up with identical rows. The branch is per item rather than per
+    /// array: a hand-edited file may legitimately mix the two, and checking costs nothing.
+    /// </para>
+    /// <para>
+    /// <c>memberCount</c> is clamped rather than rejected. This runs on a payload that crossed a
+    /// trust boundary (an imported file, or a sync host's <c>/masterdata</c>), and HomeViewModel
+    /// catches only the JSON exception types around the latter -- throwing here would escape that
+    /// catch and leak the open hub connection instead of failing the join cleanly.
+    /// </para>
+    /// </summary>
+    private static IReadOnlyList<TruppType> ParseTruppTypes(JsonElement root)
+    {
+        if (!root.TryGetProperty("truppTypes", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<TruppType>();
+        }
+
+        var result = new List<TruppType>();
+        foreach (var x in arr.EnumerateArray())
+        {
+            if (x.ValueKind == JsonValueKind.String)
+            {
+                result.Add(LegacyTruppTypeDefaults.ToTruppType(x.GetString()!));
+                continue;
+            }
+
+            result.Add(new TruppType(
+                x.GetProperty("name").GetString()!.Trim(),
+                TruppType.ClampMemberCount(Int(x, "memberCount", AtemschutzTrupp.StandardMemberCount)),
+                Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes)));
+        }
+
+        return result;
+
+        static int Int(JsonElement e, string prop, int fallback) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : fallback;
+    }
+
+    /// <summary>
     /// Reads the optional <c>settings</c> object. A missing object, or any missing field within it,
     /// falls back to <see cref="IncidentSettings.Defaults"/> so an older or partial file still yields
     /// a complete record.
@@ -396,9 +509,6 @@ public static class MasterDataJson
         return new IncidentSettings(
             Int(s, "ilsReminderIntervalMinutes", d.IlsReminderIntervalMinutes),
             Int(s, "ilsReminderFollowUpIntervalMinutes", d.IlsReminderFollowUpIntervalMinutes),
-            Int(s, "agtMaxDurationMinutes", d.AgtMaxDurationMinutes),
-            Int(s, "csaMaxDurationMinutes", d.CsaMaxDurationMinutes),
-            Int(s, "lpaMaxDurationMinutes", d.LpaMaxDurationMinutes),
             Int(s, "returnPressureBar", d.ReturnPressureBar));
     }
 
@@ -433,7 +543,12 @@ public static class MasterDataJson
         {
             roles = set.Roles,
             unitStatus = set.UnitStatus,
-            truppTypes = set.TruppTypes,
+            truppTypes = set.TruppTypes.Select(t => new
+            {
+                name = t.Name,
+                memberCount = t.MemberCount,
+                maxDurationMinutes = t.MaxDurationMinutes,
+            }),
             checklistTemplateAufbau = set.ChecklistTemplateAufbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
@@ -450,9 +565,6 @@ public static class MasterDataJson
             {
                 ilsReminderIntervalMinutes = set.Settings.IlsReminderIntervalMinutes,
                 ilsReminderFollowUpIntervalMinutes = set.Settings.IlsReminderFollowUpIntervalMinutes,
-                agtMaxDurationMinutes = set.Settings.AgtMaxDurationMinutes,
-                csaMaxDurationMinutes = set.Settings.CsaMaxDurationMinutes,
-                lpaMaxDurationMinutes = set.Settings.LpaMaxDurationMinutes,
                 returnPressureBar = set.Settings.ReturnPressureBar,
             },
         };

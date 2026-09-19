@@ -1,4 +1,5 @@
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -162,5 +163,91 @@ public class MasterDataSectionTests
         s.MoveDownCommand.Execute(s.Rows[^1]);
 
         Assert.Equal(new[] { "Land 1", "Land 2" }, s.Rows.Select(r => r.CallSign));
+    }
+
+    [Fact]
+    public void TruppTypes_add_defaults_to_an_ordinary_two_person_trupp()
+    {
+        var changes = 0;
+        var s = new TruppTypesSection("Trupp-Typen", Array.Empty<TruppType>(), () => changes++);
+
+        s.AddCommand.Execute(null);
+
+        Assert.Equal(AtemschutzTrupp.StandardMemberCount, s.Rows[0].MemberCount);
+        Assert.Equal(AtemschutzTrupp.DefaultMaxDurationMinutes, s.Rows[0].MaxDurationMinutes);
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void TruppTypes_ToValues_trims_drops_blanks_and_keeps_the_first_spelling()
+    {
+        // The Atemschutz form looks a type up by name; two rows differing only in case would make
+        // that lookup a coin toss, so the first spelling wins as it does for the other lists.
+        var s = new TruppTypesSection(
+            "Trupp-Typen",
+            new[]
+            {
+                new TruppType("  Angriffstrupp  ", 2, 30),
+                new TruppType("angriffstrupp", 3, 20),
+                new TruppType("   ", 2, 30),
+                new TruppType("Chemietrupp", 3, 20),
+            },
+            () => { });
+
+        Assert.Equal(
+            new[] { new TruppType("Angriffstrupp", 2, 30), new TruppType("Chemietrupp", 3, 20) },
+            s.ToValues());
+    }
+
+    [Fact]
+    public void TruppTypes_ToValues_clamps_a_crew_size_the_sheet_has_no_room_for()
+    {
+        var s = new TruppTypesSection("Trupp-Typen", new[] { new TruppType("Gross", 2, 30) }, () => { });
+        s.Rows[0].MemberCount = 9;
+
+        Assert.Equal(AtemschutzTrupp.MaxMemberCount, s.ToValues()[0].MemberCount);
+    }
+
+    [Fact]
+    public void TruppTypes_editing_a_row_flags_a_change()
+    {
+        var changes = 0;
+        var s = new TruppTypesSection(
+            "Trupp-Typen", new[] { new TruppType("Angriffstrupp") }, () => changes++);
+
+        s.Rows[0].MemberCount = 3;
+        s.Rows[0].MaxDurationMinutes = 20;
+        s.Rows[0].Name = "Chemietrupp";
+
+        Assert.Equal(3, changes);
+    }
+
+    [Fact]
+    public void TruppTypes_remove_and_reorder_flag_changes()
+    {
+        var changes = 0;
+        var s = new TruppTypesSection(
+            "Trupp-Typen",
+            new[] { new TruppType("Erster"), new TruppType("Zweiter"), new TruppType("Dritter") },
+            () => changes++);
+
+        s.MoveUpCommand.Execute(s.Rows[^1]);   // Erster, Dritter, Zweiter
+        s.MoveDownCommand.Execute(s.Rows[0]);  // Dritter, Erster, Zweiter
+        s.RemoveCommand.Execute(s.Rows[0]);    // Erster, Zweiter
+
+        Assert.Equal(new[] { "Erster", "Zweiter" }, s.Rows.Select(r => r.Name));
+        Assert.Equal(3, changes);
+    }
+
+    [Fact]
+    public void TruppTypes_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
+    {
+        var s = new TruppTypesSection(
+            "Trupp-Typen", new[] { new TruppType("Erster"), new TruppType("Zweiter") }, () => { });
+
+        s.MoveUpCommand.Execute(s.Rows[0]);
+        s.MoveDownCommand.Execute(s.Rows[^1]);
+
+        Assert.Equal(new[] { "Erster", "Zweiter" }, s.Rows.Select(r => r.Name));
     }
 }

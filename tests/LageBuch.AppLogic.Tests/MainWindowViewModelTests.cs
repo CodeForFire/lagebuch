@@ -408,7 +408,7 @@ internal sealed class MvFakeMasterData : IMasterDataProvider
     {
         Roles = new[] { "EL" },
         ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
-        TruppTypes = new[] { "Angriffstrupp" },
+        TruppTypes = new[] { new TruppType("Angriffstrupp") },
         Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), new Vehicle("Aich", "Aich 42/1", 6) },
     };
 

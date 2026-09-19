@@ -255,10 +255,10 @@ public class IncidentRoundTripTests : IDisposable
         clock.Now = clock.Now.AddMinutes(2);
         incident.MarkScbaRemoved(clock, removed.Id);
 
-        // CSA trupp: three people, to prove the crew size round-trips rather than being assumed.
+        // Three-person trupp, to prove the crew size round-trips rather than being assumed.
         incident.AddScbaTrupp(
             clock,
-            AtemschutzTrupp.ChemicalTruppDesignation,
+            "CSA-Trupp",
             TruppMember.Crew("Berger", "Frank", "Lang"),
             entryPressure: 300);
 
@@ -286,9 +286,9 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(new[] { "Müller", "Schmidt" }, loadedActive.Members.Select(m => m.Name));
 
         var loadedCsa = loaded.ScbaTrupps[2];
-        Assert.Equal(AtemschutzTrupp.ChemicalTruppDesignation, loadedCsa.Designation);
+        Assert.Equal("CSA-Trupp", loadedCsa.Designation);
         Assert.Equal(3, loadedCsa.TruppNumber);
-        Assert.Equal(3, loadedCsa.Members.Count);
+        Assert.Equal(AtemschutzTrupp.MaxMemberCount, loadedCsa.Members.Count);
         Assert.Equal("Berger / Frank / Lang", loadedCsa.MembersDisplay);
         Assert.Equal("FFB 1/40/1", loadedActive.CallSign);
         Assert.Equal(active.StartTime, loadedActive.StartTime);

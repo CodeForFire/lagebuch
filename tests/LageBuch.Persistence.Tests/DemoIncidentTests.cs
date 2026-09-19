@@ -175,6 +175,10 @@ public class DemoIncidentTests : IDisposable
         Assert.NotEmpty(set.Roles);
         Assert.NotEmpty(set.UnitStatus);
         Assert.NotEmpty(set.TruppTypes);
+
+        // The sample is what a first-time user imports, so it must actually demonstrate #398:
+        // a Trupp-Typ carrying its own crew size and Einsatzzeit rather than relying on its name.
+        Assert.Contains(set.TruppTypes, t => t.Name == "CSA-Trupp" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
         Assert.NotEmpty(set.ChecklistTemplateAufbau);
         Assert.NotEmpty(set.ChecklistTemplateAbbau);
         Assert.NotEmpty(set.Links);

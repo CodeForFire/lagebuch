@@ -1,3 +1,5 @@
+using LageBuch.Persistence.MasterData;
+
 namespace LageBuch.AppLogic.Services;
 
 /// <summary>
@@ -60,6 +62,38 @@ public static class StammdatenCatalogue
         }
 
         return [.. catalogue, current];
+    }
+
+    /// <summary>
+    /// The Trupp-Typ <paramref name="designation"/> names, or null when the catalogue has no such
+    /// row. Matched the same way as every other catalogue value here -- trimmed, ignoring case --
+    /// so "csa-trupp " still finds the row the Stammdaten spell "CSA-Trupp".
+    /// <para>
+    /// This is how the Atemschutz form learns a Trupp's crew size and Einsatzzeit since #398 moved
+    /// them off the compiled-in names. A null is not an error: an unlisted designation is simply a
+    /// Trupp the Stammdaten do not describe, and the caller falls back to an ordinary two-person
+    /// Trupp rather than refusing to register it mid-Einsatz.
+    /// </para>
+    /// </summary>
+    public static TruppType? Find(string? designation, IReadOnlyList<TruppType> catalogue)
+    {
+        ArgumentNullException.ThrowIfNull(catalogue);
+
+        var trimmed = designation?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        foreach (var entry in catalogue)
+        {
+            if (string.Equals(entry?.Name?.Trim(), trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                return entry;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>The catalogue's own spelling of <paramref name="trimmed"/>, or null if it has none.</summary>

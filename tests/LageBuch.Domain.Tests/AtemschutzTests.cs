@@ -270,7 +270,7 @@ public class AtemschutzTests
             TruppMember.Crew("Müller", "Schmidt"),
             entryPressure: 300);
 
-        Assert.Equal(2, trupp.Members.Count);
+        Assert.Equal(AtemschutzTrupp.StandardMemberCount, trupp.Members.Count);
         Assert.Equal(TruppRole.Truppfuehrer, trupp.Members[0].Role);
         Assert.Equal("Müller", trupp.Members[0].Name);
         Assert.Equal(TruppRole.Truppmann, trupp.Members[1].Role);
@@ -289,37 +289,38 @@ public class AtemschutzTests
     }
 
     [Fact]
-    public void An_ordinary_trupp_rejects_a_third_person()
+    public void A_trupp_of_three_fills_the_third_position()
     {
-        var incident = NewIncident(out var clock);
-
-        Assert.Throws<ArgumentException>(
-            () => incident.AddScbaTrupp(clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt", "Huber"), entryPressure: 300));
-    }
-
-    [Fact]
-    public void A_csa_trupp_is_exactly_three_people()
-    {
+        // Which types are crewed by three is Stammdaten (#398); the domain's part is that the
+        // third position exists and is filled in order. Any designation may have three people --
+        // "CSA-Trupp" is no longer special here, and that is the point of the issue.
         var incident = NewIncident(out var clock);
 
         var trupp = incident.AddScbaTrupp(
             clock,
-            AtemschutzTrupp.ChemicalTruppDesignation,
+            "Chemietrupp",
             TruppMember.Crew("Müller", "Schmidt", "Huber"),
             entryPressure: 300);
 
-        Assert.Equal(3, trupp.Members.Count);
+        Assert.Equal(AtemschutzTrupp.MaxMemberCount, trupp.Members.Count);
         Assert.Equal(TruppRole.ZweiterTruppmann, trupp.Members[2].Role);
         Assert.Equal("Müller / Schmidt / Huber", trupp.MembersDisplay);
     }
 
     [Fact]
-    public void A_csa_trupp_rejects_a_crew_of_two()
+    public void A_crew_larger_than_the_sheet_has_positions_for_is_rejected()
     {
         var incident = NewIncident(out var clock);
+        var tooMany = new[]
+        {
+            TruppMember.Create(TruppRole.Truppfuehrer, "Müller"),
+            TruppMember.Create(TruppRole.Truppmann, "Schmidt"),
+            TruppMember.Create(TruppRole.ZweiterTruppmann, "Huber"),
+            TruppMember.Create(TruppRole.ZweiterTruppmann, "Wagner"),
+        };
 
         Assert.Throws<ArgumentException>(
-            () => incident.AddScbaTrupp(clock, AtemschutzTrupp.ChemicalTruppDesignation, TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300));
+            () => incident.AddScbaTrupp(clock, "Angriffstrupp", tooMany, entryPressure: 300));
     }
 
     [Fact]
@@ -334,6 +335,30 @@ public class AtemschutzTests
 
         Assert.Throws<ArgumentException>(
             () => incident.AddScbaTrupp(clock, "Angriffstrupp", duplicated, entryPressure: 300));
+    }
+
+    [Fact]
+    public void A_crew_with_a_gap_in_the_middle_is_rejected()
+    {
+        // Truppführer + 2. Truppmann, nobody as Truppmann. The positions are distinct, so the
+        // old duplicate check let this through and the monitoring sheet had a hole in it.
+        var incident = NewIncident(out var clock);
+        var gapped = new[]
+        {
+            TruppMember.Create(TruppRole.Truppfuehrer, "Müller"),
+            TruppMember.Create(TruppRole.ZweiterTruppmann, "Huber"),
+        };
+
+        Assert.Throws<ArgumentException>(
+            () => incident.AddScbaTrupp(clock, "Angriffstrupp", gapped, entryPressure: 300));
+    }
+
+    [Fact]
+    public void The_largest_crew_matches_the_positions_the_sheet_has()
+    {
+        // MaxMemberCount is a const for the const-string SQL and the .axaml bounds to use; it is
+        // only correct as long as it equals the number of TruppRole positions.
+        Assert.Equal(AtemschutzTrupp.MaxMemberCount, Enum.GetValues<TruppRole>().Length);
     }
 
     [Fact]
@@ -454,21 +479,6 @@ public class AtemschutzTests
 
         Assert.Equal(TimeSpan.FromMinutes(7), trupp.Elapsed(T0.AddMinutes(7)));
     }
-
-    [Theory]
-    [InlineData("LPA-Trupp", true)]
-    [InlineData("lpa-trupp", true)]
-    [InlineData(" LPA-Trupp ", true)]
-    [InlineData("Angriffstrupp", false)]
-    [InlineData("CSA-Trupp", false)]
-    public void IsLpaTrupp_recognises_the_LPA_designation(string designation, bool expected) =>
-        Assert.Equal(expected, AtemschutzTrupp.IsLpaTrupp(designation));
-
-    [Fact]
-    public void An_LPA_trupp_keeps_the_standard_two_person_crew() =>
-        Assert.Equal(
-            AtemschutzTrupp.StandardMemberCount,
-            AtemschutzTrupp.RequiredMemberCount(AtemschutzTrupp.LpaTruppDesignation));
 
     [Fact]
     public void Return_pressure_defaults_to_50_bar()

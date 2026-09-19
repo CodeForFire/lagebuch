@@ -1,4 +1,5 @@
 using LageBuch.AppLogic.Services;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -80,4 +81,31 @@ public class StammdatenCatalogueTests
 
         Assert.Contains("im einsatz", options, StringComparer.Ordinal);
     }
+
+    // --- Find: the Trupp-Typ lookup the Atemschutz form uses since #398 ---
+    private static readonly TruppType[] TruppTypes =
+        [new("Angriffstrupp"), new("CSA-Trupp", 3, 20)];
+
+    [Theory]
+    [InlineData("CSA-Trupp")]
+    [InlineData("csa-trupp")]
+    [InlineData("  CSA-Trupp  ")]
+    public void Find_matches_a_trupp_type_trimmed_and_ignoring_case(string designation)
+    {
+        // The same leniency Normalize applies to every other catalogue value -- a designation that
+        // differs only in spacing must not quietly lose the rules its row carries.
+        Assert.Equal(new TruppType("CSA-Trupp", 3, 20), StammdatenCatalogue.Find(designation, TruppTypes));
+    }
+
+    [Theory]
+    [InlineData("Chemietrupp")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void Find_returns_null_rather_than_guessing_for_an_unlisted_designation(string? designation) =>
+        Assert.Null(StammdatenCatalogue.Find(designation, TruppTypes));
+
+    [Fact]
+    public void Find_on_an_empty_catalogue_is_simply_a_miss() =>
+        Assert.Null(StammdatenCatalogue.Find("CSA-Trupp", Array.Empty<TruppType>()));
 }

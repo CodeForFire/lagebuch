@@ -5,6 +5,18 @@ Dropdown contents (roles, vehicles, personnel, ...) are treated as PII and are
 master data; you populate it in the in-app **Stammdaten** editor by importing a
 JSON file, and can write your own data back out again.
 
+## Trupp-Typen carry their own rules
+
+Each Trupp-Typ row holds the crew size (**Stärke**, 2 or 3) and the **Einsatzzeit** the
+Atemschutz form suggests when that type is picked. A CSA-Trupp is three people on a
+shorter clock because its Stammdaten row says so — not because the app recognises the
+word "CSA". Rename it, add a `Chemietrupp` of your own, or give a `Sicherheitstrupp` a
+longer Einsatzzeit, and the rules follow the row.
+
+A Trupp is never fewer than two people and never more than three: the
+Atemschutzüberwachung has exactly three positions (Truppführer, Truppmann,
+2. Truppmann) and nowhere to write a fourth name.
+
 There is no separate list of brigades (Wachen) or radio call signs
 (Funkrufnamen): both are derived from the **vehicles** — every vehicle's Wache
 becomes a brigade suggestion, and every vehicle's call sign (plus every roster
@@ -40,10 +52,10 @@ over, delete `masterdata.db`; the app recreates it empty on the next launch.
 
 When you join another device's incident ("Mit Gerät verbinden"), that device's
 master data is used for the whole session — its vehicles (and the brigades and
-call signs derived from them), its roster, and its Einsatzzeiten and
-Rückzugsdruck settings. The host is the master, so both devices always agree:
-an Atemschutz-Trupp registered from a joined tablet gets exactly the
-Einsatzzeit the host would have used.
+call signs derived from them), its roster, its Trupp-Typen with their
+Stärke and Einsatzzeit, and its Rückzugsdruck. The host is the master, so both
+devices always agree: an Atemschutz-Trupp registered from a joined tablet gets
+exactly the crew size and Einsatzzeit the host would have used.
 
 The join flow itself never reads or writes your own `masterdata.db` — it just
 isn't consulted while you're joined. (You can still open **Stammdaten** and
@@ -71,6 +83,15 @@ A file exported by an older version may still carry `brigades` and
 `radioCallSigns` lists; those keys are ignored, and any entry in them that no
 vehicle or roster person covers is listed in a notice after the import so you
 can add a vehicle for it before saving.
+
+Such a file also has `truppTypes` as a plain list of names, from before the
+Stärke and Einsatzzeit moved onto the row. It still imports: each name becomes a
+two-person Trupp-Typ on the standard Einsatzzeit, except `CSA-Trupp` and
+`LPA-Trupp`, which get the values the old hard-coded rule gave them (3 / 20 min
+and 2 / 60 min). Your existing `masterdata.db` is migrated the same way, once,
+the first time this version opens it — so nothing changes for a brigade using
+the shipped spellings, and a brigade that had renamed the type gets the row it
+can now correct itself.
 
 ## PII
 
