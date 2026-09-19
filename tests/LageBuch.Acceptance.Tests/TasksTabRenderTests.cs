@@ -18,7 +18,7 @@ public class TasksTabRenderTests
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session, ManualTicker Ticker, FixedClock Clock) ShowWorkspace()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),

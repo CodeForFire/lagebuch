@@ -72,7 +72,11 @@ public class AutomationPropertiesTests
         }
 
         AssertNamed("Rollen", 3); // Nach oben / Nach unten / Entfernen, one row
-        AssertNamed("Checkliste Aufbau", 3);
+        AssertNamed("Aufbau", 3);
+
+        // Navigation rows reorder but cannot be removed: they are derived from the modules and
+        // the Checklisten, so only «Neue Checkliste» and the delete button change the set.
+        AssertNamed("Navigation", 2 * (NavModules.All.Count + 1));
         AssertNamed("Links", 3);
         AssertNamed("Personal", 1); // only Entfernen
 
@@ -83,7 +87,7 @@ public class AutomationPropertiesTests
 
     private static ForcesViewModel BuildForcesVm(out LocalIncidentSession session)
     {
-        session = LocalIncidentSession.StartNew(
+        session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
@@ -135,7 +139,7 @@ public class AutomationPropertiesTests
 
     private static (EtbViewModel Vm, LocalIncidentSession Session) BuildEtbVm()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
@@ -205,7 +209,7 @@ public class AutomationPropertiesTests
     [AvaloniaFact]
     public async Task Einsatzdaten_pencil_and_share_toggle_buttons_are_named_for_automation()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
@@ -264,7 +268,7 @@ public class AutomationPropertiesTests
     {
         var clock = new FixedClock();
         var op = new SessionOperator("Müller", "FFB 12/1");
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             op,

@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
-using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
@@ -18,7 +17,7 @@ public class IncidentHostTests
     public async Task Host_serves_version_and_snapshot_and_applies_a_posted_command()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -64,7 +63,7 @@ public class IncidentHostTests
         // via 127.0.0.1 rather than ::1 keeps this test independent of whether the CI/sandbox
         // network namespace has IPv6 loopback configured at all -- IPv4 loopback always is.
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -86,7 +85,7 @@ public class IncidentHostTests
     public async Task Host_applies_an_edit_journal_entry_command_and_broadcasts_it()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -126,7 +125,7 @@ public class IncidentHostTests
         // same "reject cleanly" path as the other domain guards, not escape as an unhandled 500
         // (security review, #73).
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -151,7 +150,7 @@ public class IncidentHostTests
     public async Task Host_rejects_a_command_against_a_closed_incident_with_400()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -183,7 +182,7 @@ public class IncidentHostTests
     public async Task Host_rejects_every_endpoint_and_the_hub_without_the_right_pin(string? pin)
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -227,7 +226,7 @@ public class IncidentHostTests
         // PUT keyed by the id the client generated for it — rather than the bytes riding the command
         // as a base64-inflated JSON blob.
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -280,7 +279,7 @@ public class IncidentHostTests
         // test above, but ending with a RemoveFileCommand — proves the metadata AND the bytes are
         // both gone, not just the incident_files row.
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -324,7 +323,7 @@ public class IncidentHostTests
     public async Task UploadFile_returns_404_for_a_file_id_never_registered_via_a_command()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -353,7 +352,7 @@ public class IncidentHostTests
         // requires the sent byte count to match, so this is also the most realistic reproduction —
         // and 25 MB over loopback is still a sub-second transfer.
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -388,7 +387,7 @@ public class IncidentHostTests
         var clock = new FixedClock();
         var gate = new TaskCompletionSource();
         var store = new DelayedFileWriteStore(gate.Task);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -434,7 +433,7 @@ public class IncidentHostTests
     public async Task GetFile_returns_404_for_an_unknown_id()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -457,7 +456,7 @@ public class IncidentHostTests
     public async Task GetFile_requires_the_pin_like_every_other_route()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -479,7 +478,7 @@ public class IncidentHostTests
     public async Task Host_accepts_the_hub_negotiate_with_the_right_pin()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -501,7 +500,7 @@ public class IncidentHostTests
     public async Task Host_serves_over_https_with_self_signed_cert()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),
@@ -523,7 +522,7 @@ public class IncidentHostTests
     public async Task Repeated_wrong_pins_from_one_ip_trigger_429_with_retry_after()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),

@@ -32,7 +32,7 @@ public class HomeViewModelJoinTests
             lastJoinHost: lastJoinHost);
 
     private static LocalIncidentSession HostSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),

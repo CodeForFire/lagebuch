@@ -23,7 +23,7 @@ public class OperatorPromptFocusTests
     {
         var store = new FakeStore();
         var clock = new FixedClock();
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),

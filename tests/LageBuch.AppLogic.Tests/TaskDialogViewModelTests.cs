@@ -12,7 +12,7 @@ public class TaskDialogViewModelTests
     private static (LocalIncidentSession Session, FixedClock Clock) NewSession()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -123,7 +123,7 @@ public class TaskDialogViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),

@@ -8,7 +8,7 @@ namespace LageBuch.Sync.Hosting.Tests;
 public class RemoteClientTests
 {
     private static LocalIncidentSession HostSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             new InMemoryStore(),
             clock,
             new SessionOperator("Host", "FFB 1"),

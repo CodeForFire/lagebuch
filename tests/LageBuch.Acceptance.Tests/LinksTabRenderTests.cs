@@ -6,7 +6,6 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -20,7 +19,7 @@ public class LinksTabRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),

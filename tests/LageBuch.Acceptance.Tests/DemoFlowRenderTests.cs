@@ -127,7 +127,8 @@ public class DemoFlowRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(9, vm.Sections.Count);
+        // Einstellungen + Navigation + 6 data categories + the demo Stammdaten's 2 Checklisten.
+        Assert.Equal(10, vm.Sections.Count);
         Capture(window, "stammdaten-editor.png");
     }
 
@@ -141,8 +142,8 @@ public class DemoFlowRenderTests
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, Elw),
             "/home/elw/Einsaetze/uebung.fwincident",
-            md.ChecklistTemplateAufbau.Select(i => (i.Text, i.IsMandatory)),
-            md.ChecklistTemplateAbbau.Select(i => (i.Text, i.IsMandatory)),
+            md.ChecklistTemplates.Select(t => new ChecklistSeed(
+                t.Id, t.Title, t.Items.Select(i => (i.Text, i.IsMandatory)).ToList())).ToList(),
             new IncidentNumber("B 1.2 260622 0042"),
             keyword: "B 3 – Zimmerbrand");
         session.SetAddress("Hauptstraße 12", "Musterstadt");
@@ -171,7 +172,7 @@ public class DemoFlowRenderTests
         // 2) Aufbau checklist, three of the mandatory items ticked.
         foreach (var index in new[] { 0, 2, 3 })
         {
-            session.ToggleChecklistItem(session.Incident.ChecklistAufbau[index].Id);
+            session.ToggleChecklistItem(session.Incident.Checklists[0].Items[index].Id);
         }
 
         SelectTab(window, "AUFBAU");

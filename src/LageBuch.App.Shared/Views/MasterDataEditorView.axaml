@@ -50,14 +50,21 @@
         <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusMd}" Padding="6" Margin="0,0,16,0">
-          <ListBox x:Name="CategoryList" ItemsSource="{Binding Sections}"
-                   SelectedItem="{Binding SelectedSection}">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:EditorSection">
-                <TextBlock Text="{Binding Title}" Padding="6,4" />
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+          <DockPanel>
+            <!-- Checklisten are user data now, so the rail needs a way to grow. The button docks
+                 below the list rather than sitting in it, so it never scrolls out of reach. -->
+            <Button x:Name="AddChecklistButton" DockPanel.Dock="Bottom"
+                    Content="+ NEUE CHECKLISTE" HorizontalAlignment="Stretch"
+                    Margin="0,6,0,0" Command="{Binding AddChecklistCommand}" />
+            <ListBox x:Name="CategoryList" ItemsSource="{Binding Sections}"
+                     SelectedItem="{Binding SelectedSection}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:EditorSection">
+                  <TextBlock Text="{Binding Title}" Padding="6,4" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
         </Border>
 
         <Border Grid.Column="1" Background="#0C1119"
@@ -141,6 +148,21 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+
+                  <!-- The list's name. The overline keeps the context the rail label used to
+                       carry when it read "Checkliste Aufbau" rather than just "Aufbau". Editing
+                       here renames the rail entry and the Navigation row as you type. -->
+                  <TextBlock DockPanel.Dock="Top" Text="CHECKLISTE" Classes="overline"
+                             FontSize="10" Margin="0,0,0,4" />
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+                    <TextBox Grid.Column="0" x:Name="ChecklistTitleBox" Text="{Binding Title}"
+                             Watermark="Name der Checkliste" Margin="0,0,8,0" />
+                    <Button Grid.Column="1" x:Name="DeleteChecklistButton" Content="LÖSCHEN"
+                            VerticalAlignment="Center"
+                            Command="{ReflectionBinding $parent[UserControl].DataContext.DeleteChecklistCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+
                   <!-- Column headers (#137): each row is unlabeled otherwise. -->
                   <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="TEXT" Classes="overline" FontSize="10" />
@@ -174,6 +196,50 @@
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
+              <!-- Navigation: the Einsatz sidebar's order and what it shows. Rows are derived
+                   (the modules this build has, plus every Checkliste), so there is nothing to add
+                   or remove here; only reorder, and switch on or off. -->
+              <DataTemplate x:DataType="vm:NavigationSection">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Top" Classes="overline" FontSize="10" Margin="0,0,0,4"
+                             Text="REITER IM EINSATZ" />
+                  <TextBlock DockPanel.Dock="Top" Margin="0,0,0,14" TextWrapping="Wrap"
+                             Foreground="{StaticResource TextSecondaryBrush}"
+                             Text="Reihenfolge und Sichtbarkeit der Seitenleiste. Das ETB ist immer sichtbar." />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NavRow">
+                          <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,6">
+                            <CheckBox Grid.Column="0" IsChecked="{Binding IsVisible}"
+                                      IsEnabled="{Binding CanHide}"
+                                      ToolTip.Tip="Das ETB ist immer sichtbar."
+                                      AutomationProperties.Name="Sichtbar"
+                                      VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" />
+                            <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
+                                 DataContext, whose static type is object under compiled bindings, so a
+                                 compiled $parent cast path won't resolve. -->
+                            <Button Grid.Column="2" Classes="icon-btn" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            </Button>
+                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
                           </Grid>
                         </DataTemplate>

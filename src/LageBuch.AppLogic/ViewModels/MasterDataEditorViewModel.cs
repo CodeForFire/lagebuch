@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
+using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -18,6 +19,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private readonly IMasterDataProvider _provider;
     private readonly IFileDialogService _dialogs;
     private readonly IMasterDataFileService _files;
+
+    // 0..n Checklisten, in Stammdaten order. Their rail entries sit together after the fixed
+    // categories, because that order is the operator's own rather than alphabetical.
+    private readonly List<ChecklistTemplateSection> _checklists = new();
+
     private MasterDataSet _original = MasterDataSet.Empty;
     private bool _originalIsEmpty = true;
 
@@ -30,8 +36,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private TruppTypesSection _truppTypes = null!;
 
-    private ChecklistTemplateSection _checklistAufbau = null!;
-    private ChecklistTemplateSection _checklistAbbau = null!;
+    private NavigationSection _navigation = null!;
     private LinksSection _links = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
@@ -103,9 +108,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
         Sections.Clear();
 
-        // Einstellungen is a meta section (numeric defaults), not a data category, so it stays
-        // pinned first; everything else sorts alphabetically below it.
+        // Einstellungen and Navigation are meta sections (defaults, and what the Einsatz sidebar
+        // shows), not data categories, so they stay pinned at the top in that order; the data
+        // categories sort alphabetically below them.
         Sections.Add(_settings = new SettingsSection("Einstellungen", set.Settings, MarkDirty));
+        Sections.Add(_navigation = new NavigationSection("Navigation", MarkDirty));
 
         EditorSection[] categories =
         {
@@ -113,8 +120,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),
-            _checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty),
-            _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),
             _personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
@@ -123,25 +128,25 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
         };
 
-        foreach (var section in categories.OrderBy(s => s.Title, SectionTitleComparer))
+        foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
         {
             Sections.Add(section);
         }
 
+        // The Checklisten come last and in Stammdaten order, not alphabetically: their order is
+        // the operator's own, expressed in the Navigation list, and no comparer can express that.
+        _checklists.Clear();
+        foreach (var template in set.ChecklistTemplates)
+        {
+            var section = new ChecklistTemplateSection(template.Id, template.Title, template.Items, MarkDirty);
+            _checklists.Add(section);
+            Sections.Add(section);
+        }
+
+        _navigation.Rebuild(set.Navigation, _checklists);
+
         SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
     }
-
-    /// <summary>
-    /// Alphabetical, except Checkliste Aufbau (setup) comes before Abbau (teardown) — the order
-    /// they happen in, which plain alphabetical sorting would otherwise reverse.
-    /// </summary>
-    private static readonly IComparer<string> SectionTitleComparer = Comparer<string>.Create((x, y) =>
-        (x, y) switch
-        {
-            ("Checkliste Aufbau", "Checkliste Abbau") => -1,
-            ("Checkliste Abbau", "Checkliste Aufbau") => 1,
-            _ => string.Compare(x, y, StringComparison.OrdinalIgnoreCase),
-        });
 
     private void OnVehiclesChanged()
     {
@@ -169,12 +174,73 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         UnitStatus = _unitStatus.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),
-        ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
-            _checklistAufbau.ToValues(), _checklistAbbau.ToValues()),
+        ChecklistTemplates = ChecklistTemplatesFromSections(),
+        Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),
     };
+
+    /// <summary>
+    /// A blank name gets a fallback rather than dropping the list: the operator cleared the name,
+    /// not the items, and losing their Checkliste over it would be indefensible.
+    /// </summary>
+    private List<ChecklistTemplate> ChecklistTemplatesFromSections() =>
+        _checklists
+            .Select(c => new ChecklistTemplate(
+                c.Id, ChecklistDefaults.TitleOrFallback(c.Title), c.ToValues()))
+            .ToList();
+
+    /// <summary>
+    /// Adds an empty Checkliste and selects it, so the operator lands in the new list's editor
+    /// with the name field ready.
+    /// </summary>
+    [RelayCommand]
+    private void AddChecklist()
+    {
+        var section = new ChecklistTemplateSection(
+            Guid.NewGuid(), "Neue Checkliste", Array.Empty<ChecklistTemplateItem>(), MarkDirty);
+        _checklists.Add(section);
+        Sections.Add(section);
+
+        // Rebuilt rather than appended to, so the new list reaches the Navigation layout: the
+        // resolver's append rule rescues an Einsatz's own lists, never a layout's missing rows.
+        _navigation.Rebuild(_navigation.ToValues(), _checklists);
+        SelectedSection = section;
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Deletes a Checkliste template after confirming. Einsätze already started from it are
+    /// untouched — each carries its own copy of the list, and the workspace appends any list its
+    /// file holds that the layout no longer names.
+    /// </summary>
+    [RelayCommand]
+    private void DeleteChecklist(ChecklistTemplateSection section)
+    {
+        if (section is null)
+        {
+            return;
+        }
+
+        var name = ChecklistDefaults.TitleOrFallback(section.Title);
+        var message = $"„{name}“ wird aus den Stammdaten entfernt. "
+            + "Bereits begonnene Einsätze behalten ihre Kopie.";
+        var dialog = new ConfirmDialogViewModel(
+            "Checkliste löschen?", message, "LÖSCHEN", () => RemoveChecklist(section));
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
+    }
+
+    private void RemoveChecklist(ChecklistTemplateSection section)
+    {
+        var index = Sections.IndexOf(section);
+        _checklists.Remove(section);
+        Sections.Remove(section);
+        _navigation.Rebuild(_navigation.ToValues(), _checklists);
+        SelectedSection = Sections[Math.Clamp(index, 0, Sections.Count - 1)];
+        MarkDirty();
+    }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()

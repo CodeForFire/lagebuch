@@ -14,7 +14,7 @@ public class TasksViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -236,7 +236,7 @@ public class TasksViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),

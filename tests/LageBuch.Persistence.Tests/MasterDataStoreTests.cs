@@ -53,8 +53,8 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new[] { "EL", "ZF" }, reopened.Roles);
         Assert.Equal(
             new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
-            reopened.ChecklistTemplateAufbau);
-        Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplateAbbau);
+            reopened.ChecklistTemplates[0].Items);
+        Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplates[1].Items);
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("Land 1", max.CallSign);
@@ -213,7 +213,7 @@ public class MasterDataStoreTests : IDisposable
 
         MasterDataStore.Save(_path, MasterDataSet.Empty with { ChecklistTemplates = ChecklistTemplate.AufbauAbbau(Items("C", "A"), null) });
 
-        Assert.Equal(Items("C", "A"), MasterDataStore.GetOrCreate(_path).ChecklistTemplateAufbau);
+        Assert.Equal(Items("C", "A"), MasterDataStore.GetOrCreate(_path).ChecklistTemplates[0].Items);
 
         static IReadOnlyList<ChecklistTemplateItem> Items(params string[] texts) =>
             texts.Select(t => new ChecklistTemplateItem(t, false)).ToList();
@@ -230,8 +230,8 @@ public class MasterDataStoreTests : IDisposable
         });
 
         var reopened = MasterDataStore.GetOrCreate(_path);
-        Assert.Equal(new ChecklistTemplateItem("Fahrzeug prüfen", true), Assert.Single(reopened.ChecklistTemplateAufbau));
-        Assert.Equal(new ChecklistTemplateItem("Material zählen", false), Assert.Single(reopened.ChecklistTemplateAbbau));
+        Assert.Equal(new ChecklistTemplateItem("Fahrzeug prüfen", true), Assert.Single(reopened.ChecklistTemplates[0].Items));
+        Assert.Equal(new ChecklistTemplateItem("Material zählen", false), Assert.Single(reopened.ChecklistTemplates[1].Items));
     }
 
     [Fact]
@@ -254,8 +254,11 @@ public class MasterDataStoreTests : IDisposable
 
         var set = MasterDataStore.GetOrCreate(_path);
 
-        Assert.Equal(new ChecklistTemplateItem("Altes Item", false), Assert.Single(set.ChecklistTemplateAufbau));
-        Assert.Empty(set.ChecklistTemplateAbbau);
+        // One list, not two: a kind with no rows produces no template, the same rule the V23
+        // file migration and the legacy-JSON import follow.
+        var template = Assert.Single(set.ChecklistTemplates);
+        Assert.Equal("Aufbau", template.Title);
+        Assert.Equal(new ChecklistTemplateItem("Altes Item", false), Assert.Single(template.Items));
     }
 
     [Fact]

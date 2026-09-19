@@ -62,18 +62,6 @@ public sealed record MasterDataSet(
         && Personnel.Count == 0
         && Vehicles.Count == 0;
 
-    // Transitional: callers still phrased as the fixed Aufbau/Abbau pair. Read-only, so a
-    // `with { ChecklistTemplateAufbau = ... }` site has to move to ChecklistTemplates and say
-    // which list it means. Goes away with its last caller.
-    public IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau =>
-        ItemsOf(ChecklistDefaults.AufbauListId);
-
-    public IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau =>
-        ItemsOf(ChecklistDefaults.AbbauListId);
-
-    private IReadOnlyList<ChecklistTemplateItem> ItemsOf(Guid id) =>
-        ChecklistTemplates.FirstOrDefault(t => t.Id == id)?.Items ?? Array.Empty<ChecklistTemplateItem>();
-
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
     /// in first-seen order. Derived rather than stored, so maintaining the Fahrzeuge alone is

@@ -190,7 +190,7 @@ public class WorkspaceAcceptanceTests
 
     private static IncidentWorkspaceViewModel BuildWorkspace(out LocalIncidentSession session)
     {
-        session = LocalIncidentSession.StartNew(
+        session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
@@ -205,7 +205,7 @@ public class WorkspaceAcceptanceTests
     {
         var store = new FakeStore();
         var clock = new FixedClock();
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -416,7 +416,7 @@ public class WorkspaceAcceptanceTests
 
         Assert.True(checkBox.IsChecked);
         Assert.True(FirstChecklist(vm).Items[0].IsDone);
-        Assert.True(session.Incident.ChecklistAufbau[0].IsDone);
+        Assert.True(session.Incident.Checklists[0].Items[0].IsDone);
     }
 
     // The AUFBAU/ABBAU tab headers carry a status dot: red while a mandatory item is still open,
@@ -424,7 +424,7 @@ public class WorkspaceAcceptanceTests
     [AvaloniaFact]
     public void Aufbau_tab_dot_turns_green_once_its_mandatory_item_is_checked()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),

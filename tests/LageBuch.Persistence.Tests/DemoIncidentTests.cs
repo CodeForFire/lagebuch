@@ -44,25 +44,27 @@ public class DemoIncidentTests : IDisposable
 
         var incident = Incident.Start(c, elw, "B 3 – Zimmerbrand", new IncidentNumber("B 1.2 260622 0042"));
         incident.SetAddress("Hauptstraße 12", "Musterstadt");
-        incident.SeedChecklist(
-            new[]
+        incident.SeedChecklist(new[]
+        {
+            new ChecklistSeed(ChecklistDefaults.AufbauListId, ChecklistDefaults.AufbauTitle, new[]
             {
                 ("Aufstellort ELW weit genug weg, um nicht zu behindern?", true),
                 ("Rote Kennleuchte ein, Blaulicht aus?", false),
                 ("Funkgeräte auf Einsatzkanal, Lautstärke geprüft?", true),
                 ("PC eingeschaltet, Lagebuch geöffnet?", true),
                 ("Rückmeldung an ILS abgesetzt?", true),
-            },
-            new[]
+            }),
+            new ChecklistSeed(ChecklistDefaults.AbbauListId, ChecklistDefaults.AbbauTitle, new[]
             {
                 ("Alle Trupps abgemeldet, Atemschutzüberwachung beendet?", true),
                 ("Einsatzende an ILS gemeldet?", true),
                 ("PDF-Bericht exportiert?", false),
                 ("Fahrzeug abgerüstet und einsatzbereit?", true),
-            });
-        incident.ToggleChecklistItem(c, elw, incident.ChecklistAufbau[0].Id);
-        incident.ToggleChecklistItem(c, elw, incident.ChecklistAufbau[2].Id);
-        incident.ToggleChecklistItem(c, elw, incident.ChecklistAufbau[3].Id);
+            }),
+        });
+        incident.ToggleChecklistItem(c, elw, incident.Checklists[0].Items[0].Id);
+        incident.ToggleChecklistItem(c, elw, incident.Checklists[0].Items[2].Id);
+        incident.ToggleChecklistItem(c, elw, incident.Checklists[0].Items[3].Id);
 
         incident.AddJournalEntry(c, elw, EtbDirection.Incoming, "Alarmierung B 3 Zimmerbrand, Hauptstraße 12, Rauch aus dem 2. OG, Personen vermutlich noch im Gebäude", from: "ILS", to: "Florian Musterstadt 11/1");
         c.Now = c.Now.AddMinutes(4);
@@ -155,8 +157,8 @@ public class DemoIncidentTests : IDisposable
         Assert.True(loaded.Tasks[0].IsCompleted);
         Assert.Single(loaded.Buildings);
         Assert.Equal(6, loaded.Dwellings.Count);
-        Assert.Equal(5, loaded.ChecklistAufbau.Count);
-        Assert.Equal(3, loaded.ChecklistAufbau.Count(i => i.IsDone));
+        Assert.Equal(5, loaded.Checklists[0].Items.Count);
+        Assert.Equal(3, loaded.Checklists[0].Items.Count(i => i.IsDone));
 
         WriteSampleIfRequested(incident);
     }
@@ -187,8 +189,8 @@ public class DemoIncidentTests : IDisposable
         // which no rule keyed off a name could ever have expressed.
         Assert.Contains(set.TruppTypes, t => t.Name == "CSA-Trupp" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
         Assert.Contains(set.TruppTypes, t => t.Name == "Strahlenschutztrupp" && t.MemberCount == 3 && t.MaxDurationMinutes == 30);
-        Assert.NotEmpty(set.ChecklistTemplateAufbau);
-        Assert.NotEmpty(set.ChecklistTemplateAbbau);
+        Assert.NotEmpty(set.ChecklistTemplates[0].Items);
+        Assert.NotEmpty(set.ChecklistTemplates[1].Items);
         Assert.NotEmpty(set.Links);
         Assert.Equal(50, set.Settings.ReturnPressureBar);
 

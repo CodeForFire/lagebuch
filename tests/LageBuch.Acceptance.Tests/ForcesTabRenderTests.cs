@@ -6,7 +6,6 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -21,7 +20,7 @@ public class ForcesTabRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
@@ -46,7 +45,7 @@ public class ForcesTabRenderTests
     {
         // Hosted directly (same idiom as the duplicate test below): the workspace shell's
         // ViewLocator content does not materialize under the headless host.
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
@@ -338,7 +337,7 @@ public class ForcesTabRenderTests
         // Hosted directly (same idiom as ControlBorderConsistencyTests): the workspace shell's
         // ViewLocator content does not materialize under the headless host, so the view is built
         // against the same ForcesViewModel instance instead.
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),

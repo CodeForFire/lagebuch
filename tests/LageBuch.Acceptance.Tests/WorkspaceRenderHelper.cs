@@ -5,7 +5,6 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -59,7 +58,7 @@ internal static class WorkspaceRenderHelper
 
         // Keyword + Einsatznummer both set: the common post-#69 shape once ILS has called back --
         // Stichwort as the header hero, the Einsatznummer as the secondary chip beside it.
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),

@@ -19,7 +19,7 @@ public class FilesTabRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
@@ -160,7 +160,7 @@ public class FilesTabRenderTests
     public void A_readonly_incident_does_not_accept_drops()
     {
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),

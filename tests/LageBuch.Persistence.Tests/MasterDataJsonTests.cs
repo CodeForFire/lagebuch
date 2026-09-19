@@ -27,8 +27,8 @@ public class MasterDataJsonTests
         Assert.Equal(new[] { "EL", "ZF" }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
         Assert.Equal(new TruppType("Angriffstrupp", 2, 30), Assert.Single(set.TruppTypes));
-        Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplateAufbau));
-        Assert.Equal(new ChecklistTemplateItem("Abbauschritt", false), Assert.Single(set.ChecklistTemplateAbbau));
+        Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplates[0].Items));
+        Assert.Equal(new ChecklistTemplateItem("Abbauschritt", false), Assert.Single(set.ChecklistTemplates[1].Items));
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(set.Links));
         var max = set.Personnel.Single();
         Assert.Equal("Max", max.FirstName);
@@ -42,8 +42,7 @@ public class MasterDataJsonTests
 
         Assert.Equal(
             new[] { new ChecklistTemplateItem("Schritt 1", false), new ChecklistTemplateItem("Schritt 2", false) },
-            set.ChecklistTemplateAufbau);
-        Assert.Empty(set.ChecklistTemplateAbbau);
+            Assert.Single(set.ChecklistTemplates).Items);
     }
 
     [Fact]
@@ -56,7 +55,7 @@ public class MasterDataJsonTests
             }
             """);
 
-        Assert.Equal(new ChecklistTemplateItem("Neu", true), Assert.Single(set.ChecklistTemplateAufbau));
+        Assert.Equal(new ChecklistTemplateItem("Neu", true), Assert.Single(set.ChecklistTemplates[0].Items));
     }
 
     [Fact]
@@ -115,8 +114,8 @@ public class MasterDataJsonTests
 
         Assert.Equal(original.Roles, reparsed.Roles);
         Assert.Equal(original.UnitStatus, reparsed.UnitStatus);
-        Assert.Equal(original.ChecklistTemplateAufbau, reparsed.ChecklistTemplateAufbau);
-        Assert.Equal(original.ChecklistTemplateAbbau, reparsed.ChecklistTemplateAbbau);
+        Assert.Equal(original.ChecklistTemplates[0].Items, reparsed.ChecklistTemplates[0].Items);
+        Assert.Equal(original.ChecklistTemplates[1].Items, reparsed.ChecklistTemplates[1].Items);
         Assert.Equal(original.Links, reparsed.Links);
         Assert.Equal(original.Personnel, reparsed.Personnel);
     }

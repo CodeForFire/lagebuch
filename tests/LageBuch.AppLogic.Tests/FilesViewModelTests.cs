@@ -14,7 +14,7 @@ public class FilesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -50,7 +50,7 @@ public class FilesViewModelTests
     public async Task AddFile_cancelled_picker_does_nothing()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -69,7 +69,7 @@ public class FilesViewModelTests
     public async Task AddFile_surfaces_a_domain_rejection_as_an_error_instead_of_throwing()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -97,7 +97,7 @@ public class FilesViewModelTests
     public async Task AddFile_rejects_an_oversized_file_without_reading_it_into_memory()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -137,7 +137,7 @@ public class FilesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -171,7 +171,7 @@ public class FilesViewModelTests
     public async Task AddFiles_reports_every_failure_when_all_dropped_files_are_rejected()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -205,7 +205,7 @@ public class FilesViewModelTests
     public async Task AddFiles_partial_failure_uploads_the_valid_file_and_reports_the_rejected_one()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -240,7 +240,7 @@ public class FilesViewModelTests
     public async Task AddFiles_rejects_oversized_files_in_a_batch_without_reading_them_into_memory()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -280,7 +280,7 @@ public class FilesViewModelTests
     public async Task AddFiles_is_a_noop_with_an_empty_list()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -302,7 +302,7 @@ public class FilesViewModelTests
         // handler in code-behind calls AddFilesAsync directly, with no command to gate it
         // (#262 UX follow-up).
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -330,7 +330,7 @@ public class FilesViewModelTests
     public async Task AddFiles_is_a_noop_while_already_uploading()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -364,7 +364,7 @@ public class FilesViewModelTests
     public void ReadOnly_session_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -382,7 +382,7 @@ public class FilesViewModelTests
     public async Task OpenFile_writes_a_temp_copy_and_hands_it_to_the_dialog_service()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -414,7 +414,7 @@ public class FilesViewModelTests
     public async Task OpenFile_copies_into_a_private_per_open_directory_under_the_lagebuch_temp_root()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -453,7 +453,7 @@ public class FilesViewModelTests
     public async Task OpenFile_uses_the_sanitised_file_name_of_a_hostile_attachment()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -554,7 +554,7 @@ public class FilesViewModelTests
     public async Task OpenFile_surfaces_a_failure_as_an_error_message()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -600,7 +600,7 @@ public class FilesViewModelTests
     public void Row_seeds_DisplayName_from_the_file_name()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -618,7 +618,7 @@ public class FilesViewModelTests
     public void Editing_DisplayName_writes_through_to_the_domain()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -638,7 +638,7 @@ public class FilesViewModelTests
     public void Editing_DisplayName_on_a_readonly_session_is_ignored()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -663,7 +663,7 @@ public class FilesViewModelTests
         var clock = new FixedClock(T0);
         var store = new FakeStore();
         var op = new SessionOperator("Müller", "FFB 12/1");
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             op,
@@ -684,7 +684,7 @@ public class FilesViewModelTests
     public async Task Removing_a_row_asks_for_confirmation_before_touching_the_session()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -723,7 +723,7 @@ public class FilesViewModelTests
         // construction time, so a rename (which replaces that record in the domain but — by design
         // — never rebuilds the untouched row) left the confirm text showing the pre-rename name.
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -746,7 +746,7 @@ public class FilesViewModelTests
     public async Task Removing_a_row_without_an_injected_confirm_runs_immediately()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -770,7 +770,7 @@ public class FilesViewModelTests
         var clock = new FixedClock(T0);
         var store = new FakeStore();
         var op = new SessionOperator("Müller", "FFB 12/1");
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             op,
@@ -797,7 +797,7 @@ public class FilesViewModelTests
     {
         var clock = new FixedClock(T0);
         var op = new SessionOperator("Müller", "FFB 12/1");
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             op,

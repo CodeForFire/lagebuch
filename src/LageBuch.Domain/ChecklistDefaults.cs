@@ -39,23 +39,4 @@ public static class ChecklistDefaults
     /// </summary>
     public static string TitleOrFallback(string? title) =>
         string.IsNullOrWhiteSpace(title) ? FallbackTitle : title.Trim();
-
-    /// <summary>
-    /// Wraps a legacy Aufbau/Abbau item pair as the two well-known lists.
-    /// </summary>
-    /// <remarks>
-    /// Transitional, for the readers still handed the fixed pair — the incident repository before
-    /// V23 gives a file its own <c>checklist_lists</c> table, and the sync snapshot before it
-    /// carries n lists. Both lists are produced even when empty, so this stays faithful to the
-    /// behaviour it is standing in for; the "drop an empty list" rule belongs to the migration and
-    /// to Stammdaten parsing, not here. Delete this with its last caller.
-    /// </remarks>
-    public static IReadOnlyList<ChecklistList> AsLists(
-        IEnumerable<ChecklistItem> aufbau,
-        IEnumerable<ChecklistItem> abbau) =>
-        new[]
-        {
-            ChecklistList.Rehydrate(AufbauListId, AufbauTitle, aufbau),
-            ChecklistList.Rehydrate(AbbauListId, AbbauTitle, abbau),
-        };
 }

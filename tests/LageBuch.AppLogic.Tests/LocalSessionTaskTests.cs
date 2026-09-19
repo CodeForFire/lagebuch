@@ -8,7 +8,7 @@ public class LocalSessionTaskTests
     private static readonly DateTimeOffset T0 = new(2026, 8, 24, 9, 0, 0, TimeSpan.FromHours(2));
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),

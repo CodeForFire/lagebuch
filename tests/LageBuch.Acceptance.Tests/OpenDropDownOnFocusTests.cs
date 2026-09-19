@@ -4,7 +4,6 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
@@ -23,7 +22,7 @@ public class OpenDropDownOnFocusTests
 
     private static RolesViewModel BuildRolesVm()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),

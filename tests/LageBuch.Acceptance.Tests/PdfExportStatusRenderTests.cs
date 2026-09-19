@@ -4,7 +4,6 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -58,7 +57,7 @@ public class PdfExportStatusRenderTests
     private static (Window Window, IncidentWorkspaceViewModel Vm, string ExportPath) ShowWorkspace()
     {
         var exportPath = Path.Join(Path.GetTempPath(), $"lagebuch-render-export-{Guid.NewGuid():N}.pdf");
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),

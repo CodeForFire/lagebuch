@@ -9,7 +9,7 @@ public class ChecklistViewModelTests
 
     private static LocalIncidentSession NewSession(
         IEnumerable<(string, bool)>? aufbau = null, IEnumerable<(string, bool)>? abbau = null) =>
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -36,7 +36,7 @@ public class ChecklistViewModelTests
         vm.Items[0].IsDone = true;
 
         Assert.True(vm.Items[0].IsDone);
-        Assert.True(session.Incident.ChecklistAufbau[0].IsDone);
+        Assert.True(session.Incident.Checklists[0].Items[0].IsDone);
         Assert.Equal(1, changes);
     }
 
@@ -50,14 +50,14 @@ public class ChecklistViewModelTests
         vm.Items[0].IsDone = false;
 
         Assert.False(vm.Items[0].IsDone);
-        Assert.False(session.Incident.ChecklistAufbau[0].IsDone);
+        Assert.False(session.Incident.Checklists[0].Items[0].IsDone);
     }
 
     [Fact]
     public void ReadOnly_session_does_not_mutate_domain()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -72,7 +72,7 @@ public class ChecklistViewModelTests
 
         // Even if a value change slips through, the domain stays untouched.
         vm.Items[0].IsDone = true;
-        Assert.False(session.Incident.ChecklistAufbau[0].IsDone);
+        Assert.False(session.Incident.Checklists[0].Items[0].IsDone);
     }
 
     [Fact]

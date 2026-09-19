@@ -49,14 +49,6 @@ public sealed class Incident
     /// <summary>The Einsatz's Checklisten, in order — 0..n of them, each its own copy of a template.</summary>
     public IReadOnlyList<ChecklistList> Checklists => _checklists;
 
-    // Transitional: the callers still phrased in terms of the old fixed pair. They go away as the
-    // repository, sync, PDF and view-model layers move over to Checklists; deliberately not
-    // [Obsolete], because TreatWarningsAsErrors would turn every remaining call site into a build
-    // break in the very commit that is meant to leave them alone.
-    public IReadOnlyList<ChecklistItem> ChecklistAufbau => ItemsOf(ChecklistDefaults.AufbauListId);
-
-    public IReadOnlyList<ChecklistItem> ChecklistAbbau => ItemsOf(ChecklistDefaults.AbbauListId);
-
     public IReadOnlyList<EtbEntry> Journal => _journal;
 
     public IReadOnlyList<RoleAssignment> Roles => _roles;
@@ -293,24 +285,6 @@ public sealed class Incident
         {
             _checklists.Add(ChecklistList.FromSeed(seed));
         }
-    }
-
-    // Transitional overload for the callers still phrased as the fixed Aufbau/Abbau pair; it
-    // seeds exactly the two well-known lists so their behaviour is unchanged. Goes away with the
-    // ChecklistAufbau/ChecklistAbbau properties above.
-    public void SeedChecklist(
-        IEnumerable<(string Text, bool IsMandatory)> aufbauItems,
-        IEnumerable<(string Text, bool IsMandatory)> abbauItems)
-    {
-        ArgumentNullException.ThrowIfNull(aufbauItems);
-        ArgumentNullException.ThrowIfNull(abbauItems);
-        SeedChecklist(new[]
-        {
-            new ChecklistSeed(
-                ChecklistDefaults.AufbauListId, ChecklistDefaults.AufbauTitle, aufbauItems.ToList()),
-            new ChecklistSeed(
-                ChecklistDefaults.AbbauListId, ChecklistDefaults.AbbauTitle, abbauItems.ToList()),
-        });
     }
 
     /// <summary>

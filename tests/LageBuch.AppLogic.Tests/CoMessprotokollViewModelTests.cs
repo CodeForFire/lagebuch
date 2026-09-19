@@ -18,7 +18,7 @@ public class CoMessprotokollViewModelTests
     {
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             Clock,
             op,
@@ -166,7 +166,7 @@ public class CoMessprotokollViewModelTests
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
         var path = Path.GetTempFileName();
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             Clock,
             op,
@@ -301,7 +301,7 @@ public class CoMessprotokollViewModelTests
     {
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
-        var local = LocalIncidentSession.StartNew(
+        var local = TestSession.StartNew(
             store,
             Clock,
             op,
@@ -339,7 +339,7 @@ public class CoMessprotokollViewModelTests
     {
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
-        var local = LocalIncidentSession.StartNew(
+        var local = TestSession.StartNew(
             store,
             Clock,
             op,
@@ -375,7 +375,7 @@ public class CoMessprotokollViewModelTests
     {
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             Clock,
             op,
@@ -589,7 +589,7 @@ public class CoMessprotokollViewModelTests
         var op = new SessionOperator("Test", null);
         var store = new FakeStore();
         var path = Path.GetTempFileName();
-        var writable = LocalIncidentSession.StartNew(
+        var writable = TestSession.StartNew(
             store,
             Clock,
             op,

@@ -12,7 +12,7 @@ public class ReminderViewModelTests
     private static (LocalIncidentSession Session, FixedClock Clock) NewSession()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),

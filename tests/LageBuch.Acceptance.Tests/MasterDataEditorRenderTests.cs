@@ -81,7 +81,8 @@ public class MasterDataEditorRenderTests
         var list = view.GetControl<ListBox>("CategoryList");
 
         // 8 categories plus #76's Fahrzeuge, which also supply the Wachen and Funkrufnamen.
-        Assert.Equal(9, list.ItemCount);
+        // Einstellungen + Navigation + 6 data categories + this fixture's 2 Checklisten.
+        Assert.Equal(10, list.ItemCount);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
@@ -94,13 +95,39 @@ public class MasterDataEditorRenderTests
     }
 
     // The Checkliste template editor split into Aufbau/Abbau sections, each row gaining a
+    // The ETB's checkbox being disabled is a promise the UI makes, not just a view-model flag:
+    // it is the legally relevant record and every Systemmeldung lands there. The resolver ignores
+    // a hidden ETB anyway, but this is where an operator is told why they cannot switch it off.
+    [AvaloniaFact]
+    public void Navigation_section_lists_every_entry_and_locks_the_etb_checkbox()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Navigation");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var labels = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.Contains("ETB", labels);
+        Assert.Contains("Atemschutz", labels);
+        Assert.Contains("Aufbau", labels);
+        Assert.Contains("Abbau", labels);
+
+        // One checkbox per row; exactly one of them -- the ETB's -- is disabled.
+        var checkBoxes = view.GetVisualDescendants().OfType<CheckBox>().ToList();
+        Assert.Equal(NavModules.All.Count + 2, checkBoxes.Count);
+        var locked = Assert.Single(checkBoxes, c => !c.IsEnabled);
+        Assert.True(locked.IsChecked);
+    }
+
     // mandatory checkbox alongside the text (#72) -- distinct from the single-string-per-row
     // EditableListSection the other categories still use.
     [AvaloniaFact]
     public void Checkliste_aufbau_section_renders_text_and_mandatory_checkbox_per_row()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
-        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Checkliste Aufbau");
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Aufbau");
         var view = new MasterDataEditorView { DataContext = vm };
         var window = new Window { Content = view, Width = 1080, Height = 680 };
         window.Show();

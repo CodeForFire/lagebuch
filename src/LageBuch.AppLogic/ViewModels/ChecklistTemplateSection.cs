@@ -5,20 +5,42 @@ using LageBuch.Persistence.MasterData;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// Editor for one Checkliste template list (Aufbau or Abbau) — ordered rows of text + mandatory,
-/// unlike <see cref="EditableListSection"/>'s single string per row.
+/// Editor for one user-defined Checkliste template — ordered rows of text + mandatory, unlike
+/// <see cref="EditableListSection"/>'s single string per row, plus the list's own name.
 /// </summary>
+/// <remarks>
+/// The section's <see cref="EditorSection.Title"/> <em>is</em> the list's name: it is bound
+/// two-way from the detail pane, so typing there renames the rail entry as you go. The
+/// <see cref="Id"/> is what an Einsatz seeded from this template carries, so it survives renaming
+/// and is never regenerated on load.
+/// </remarks>
 public sealed partial class ChecklistTemplateSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public ChecklistTemplateSection(string title, IEnumerable<ChecklistTemplateItem> items, Action onChanged)
+    public ChecklistTemplateSection(
+        Guid id, string title, IEnumerable<ChecklistTemplateItem> items, Action onChanged)
         : base(title)
     {
+        ArgumentNullException.ThrowIfNull(items);
+        Id = id;
         _onChanged = onChanged;
         Rows = new ObservableCollection<ChecklistTemplateRow>(
             items.Select(i => new ChecklistTemplateRow(i.Text, i.IsMandatory, onChanged)));
+
+        // Title's change hook is generated on EditorSection, so it cannot be implemented here;
+        // renaming still has to mark the editor dirty like any other edit.
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(Title))
+            {
+                _onChanged();
+            }
+        };
     }
+
+    /// <summary>The template's stable id, carried into every Einsatz seeded from it.</summary>
+    public Guid Id { get; }
 
     public ObservableCollection<ChecklistTemplateRow> Rows { get; }
 

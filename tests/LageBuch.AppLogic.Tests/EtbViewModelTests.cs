@@ -14,7 +14,7 @@ public class EtbViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -44,7 +44,7 @@ public class EtbViewModelTests
     public void AddEntry_disabled_when_text_blank()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -60,7 +60,7 @@ public class EtbViewModelTests
     public void ReadOnly_session_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -97,7 +97,7 @@ public class EtbViewModelTests
     public void HideSystemEntries_hides_system_rows_and_keeps_human_rows()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -127,7 +127,7 @@ public class EtbViewModelTests
     public void System_entry_added_while_filtering_stays_hidden_but_human_entry_appears()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -179,7 +179,7 @@ public class EtbViewModelTests
     public void CallSignOptions_reflects_the_Funkrufnamen_master_data()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -268,7 +268,7 @@ public class EtbViewModelTests
     public void CanEdit_is_false_for_System_entries()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -289,7 +289,7 @@ public class EtbViewModelTests
     public void ReadOnly_session_disables_editing()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -312,7 +312,7 @@ public class EtbViewModelTests
     public void History_stays_viewable_on_a_read_only_session()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -383,7 +383,7 @@ public class EtbViewModelTests
     public void CreateTaskCommand_invokes_the_delegate_with_the_row_text()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -413,7 +413,7 @@ public class EtbViewModelTests
     public void CreateTaskCommand_is_hidden_on_a_readonly_session_even_when_the_host_offers_tasks()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -432,7 +432,7 @@ public class EtbViewModelTests
     private static EtbViewModel NewVm()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),

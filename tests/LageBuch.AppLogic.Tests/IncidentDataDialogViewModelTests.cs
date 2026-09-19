@@ -13,7 +13,7 @@ public class IncidentDataDialogViewModelTests
 
     private static LocalIncidentSession NewSession(FakeStore store, string? keyword = null, IncidentNumber? number = null)
     {
-        return LocalIncidentSession.StartNew(
+        return TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),

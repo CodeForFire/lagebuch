@@ -20,7 +20,7 @@ public class IncidentWorkspaceViewModelTests
     private static IncidentWorkspaceViewModel EditableWorkspace(IIncidentHostController host)
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -81,7 +81,7 @@ public class IncidentWorkspaceViewModelTests
     {
         store = new FakeStore();
         clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -104,7 +104,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -169,7 +169,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -256,7 +256,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -285,7 +285,7 @@ public class IncidentWorkspaceViewModelTests
     {
         store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -358,7 +358,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -643,7 +643,7 @@ public class IncidentWorkspaceViewModelTests
         var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -675,7 +675,7 @@ public class IncidentWorkspaceViewModelTests
         var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -706,7 +706,7 @@ public class IncidentWorkspaceViewModelTests
     public void ExportStatus_is_seeded_from_the_last_persisted_export_on_open()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -737,7 +737,7 @@ public class IncidentWorkspaceViewModelTests
     public void CanExport_is_false_when_the_platform_cannot_render_pdfs()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -788,7 +788,7 @@ public class IncidentWorkspaceViewModelTests
         var callSigns = new[] { "FFB 1/40/1", "Aich 42/1" };
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -874,7 +874,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -915,7 +915,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -962,7 +962,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -1004,7 +1004,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -1088,7 +1088,7 @@ public class IncidentWorkspaceViewModelTests
     private static IncidentWorkspaceViewModel WorkspaceWithStore(IIncidentStore store, out FixedClock clock)
     {
         clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
