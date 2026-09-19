@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -32,7 +33,27 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // this store), which is why both this and the dispatcher stay optional.
     private readonly IIncidentStore? _store;
     private readonly IUiDispatcher _uiDispatcher;
+
+    // The checklist view models currently in the rail. Held separately from NavItems because each
+    // one owns a session.Changed subscription that has to be released on rebuild.
+    private readonly List<ChecklistViewModel> _checklists = new();
     private bool _disposed;
+
+    // The rail labels, which have always been authored upper-case in the XAML. Kept beside the
+    // module keys rather than in NavModules: the keys are persisted Stammdaten, these are German
+    // display strings, and the two should not be able to drift into each other.
+    private static readonly Dictionary<string, string> ModuleHeaders =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [NavModules.Etb] = "ETB",
+            [NavModules.Tasks] = "AUFGABEN",
+            [NavModules.Roles] = "FUNKTIONEN",
+            [NavModules.Forces] = "KRÄFTE",
+            [NavModules.Scba] = "ATEMSCHUTZ",
+            [NavModules.Co] = "CO-MESSUNG",
+            [NavModules.Files] = "DATEIEN",
+            [NavModules.Links] = "LINKS",
+        };
 
     public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null)
     {
@@ -205,9 +226,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public CoMessprotokollViewModel CoMessprotokoll { get; private set; } = null!;
 
-    public ChecklistViewModel ChecklistAufbau { get; private set; } = null!;
-
-    public ChecklistViewModel ChecklistAbbau { get; private set; } = null!;
+    /// <summary>
+    /// The left rail, in order: the built-in modules Stammdaten leaves visible, interleaved with
+    /// this Einsatz's Checklisten. Mutated in place on rebuild — replacing the collection would
+    /// break the view's ItemsSource binding.
+    /// </summary>
+    public ObservableCollection<WorkspaceNavItemViewModel> NavItems { get; } = new();
 
     public EtbViewModel Etb { get; private set; } = null!;
 
@@ -352,8 +376,22 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // itself was never torn down on navigate-home, so the *last* generation of children outlived it).
     private void DisposeChildren()
     {
-        ChecklistAufbau?.Dispose();
-        ChecklistAbbau?.Dispose();
+        // The nav items own their checklist subscriptions, and each ChecklistViewModel owns a
+        // session.Changed handler — so both generations have to go, not just the collection.
+        foreach (var item in NavItems)
+        {
+            item.Dispose();
+        }
+
+        NavItems.Clear();
+
+        foreach (var checklist in _checklists)
+        {
+            checklist.Dispose();
+        }
+
+        _checklists.Clear();
+
         Etb?.Dispose();
         Roles?.Dispose();
         Forces?.Dispose();
@@ -367,9 +405,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private void BuildChildren()
     {
         DisposeChildren();
-
-        ChecklistAufbau = new ChecklistViewModel(_session, ChecklistKind.Aufbau, OnChanged);
-        ChecklistAbbau = new ChecklistViewModel(_session, ChecklistKind.Abbau, OnChanged);
 
         Etb = new EtbViewModel(
             _session,
@@ -405,8 +440,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 _masterData.Settings.IlsReminderIntervalMinutes,
                 _masterData.Settings.IlsReminderFollowUpIntervalMinutes);
 
-        OnPropertyChanged(nameof(ChecklistAufbau));
-        OnPropertyChanged(nameof(ChecklistAbbau));
+        BuildNavItems();
+
         OnPropertyChanged(nameof(Etb));
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
@@ -417,6 +452,46 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Tasks));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
+    }
+
+    /// <summary>
+    /// Builds the rail from the Stammdaten layout and this Einsatz's own Checklisten.
+    /// </summary>
+    /// <remarks>
+    /// A <see cref="ChecklistViewModel"/> is created only for a list that survives resolution: a
+    /// hidden list's items are unreachable, so there is nothing to keep in sync, and building one
+    /// anyway would be a session subscription nobody ever reads.
+    /// </remarks>
+    private void BuildNavItems()
+    {
+        var modules = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            [NavModules.Etb] = Etb,
+            [NavModules.Tasks] = Tasks,
+            [NavModules.Roles] = Roles,
+            [NavModules.Forces] = Forces,
+            [NavModules.Scba] = Scba,
+            [NavModules.Co] = CoMessprotokoll,
+            [NavModules.Files] = Files,
+            [NavModules.Links] = Links,
+        };
+
+        foreach (var spec in NavigationLayout.Resolve(_masterData.Navigation, _session.Incident.Checklists))
+        {
+            if (spec.List is { } list)
+            {
+                var checklist = new ChecklistViewModel(_session, list, OnChanged);
+                _checklists.Add(checklist);
+                NavItems.Add(new WorkspaceNavItemViewModel(
+                    WorkspaceNavItemViewModel.HeaderFor(list.Title), checklist, checklist));
+                continue;
+            }
+
+            if (modules.TryGetValue(spec.ModuleKey, out var content))
+            {
+                NavItems.Add(new WorkspaceNavItemViewModel(ModuleHeaders[spec.ModuleKey], content));
+            }
+        }
     }
 
     /// <summary>

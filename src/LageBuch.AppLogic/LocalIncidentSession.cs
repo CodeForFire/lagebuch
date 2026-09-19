@@ -52,8 +52,7 @@ public sealed class LocalIncidentSession : IIncidentSession
         IClock clock,
         SessionOperator op,
         string path,
-        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAufbau,
-        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAbbau,
+        IEnumerable<ChecklistSeed> checklistSeeds,
         IncidentNumber? incidentNumber = null,
         string? keyword = null)
     {
@@ -63,10 +62,43 @@ public sealed class LocalIncidentSession : IIncidentSession
         // The Einsatznummer goes through the factory rather than SetIncidentNumber afterwards, so the
         // automatic "Einsatz begonnen" entry can name it.
         var incident = Incident.Start(clock, op, keyword: keyword, incidentNumber: incidentNumber);
-        incident.SeedChecklist(checklistTemplateAufbau, checklistTemplateAbbau);
+        incident.SeedChecklist(checklistSeeds);
         var session = new LocalIncidentSession(store, clock, incident, path, op);
         session.Save();
         return session;
+    }
+
+    // Transitional overload for the callers still phrased as the fixed Aufbau/Abbau pair.
+    public static LocalIncidentSession StartNew(
+        IIncidentStore store,
+        IClock clock,
+        SessionOperator op,
+        string path,
+        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAufbau,
+        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAbbau,
+        IncidentNumber? incidentNumber = null,
+        string? keyword = null)
+    {
+        ArgumentNullException.ThrowIfNull(checklistTemplateAufbau);
+        ArgumentNullException.ThrowIfNull(checklistTemplateAbbau);
+        return StartNew(
+            store,
+            clock,
+            op,
+            path,
+            new[]
+            {
+                new ChecklistSeed(
+                    ChecklistDefaults.AufbauListId,
+                    ChecklistDefaults.AufbauTitle,
+                    checklistTemplateAufbau.ToList()),
+                new ChecklistSeed(
+                    ChecklistDefaults.AbbauListId,
+                    ChecklistDefaults.AbbauTitle,
+                    checklistTemplateAbbau.ToList()),
+            },
+            incidentNumber,
+            keyword);
     }
 
     public static LocalIncidentSession Open(IIncidentStore store, IClock clock, string path, SessionOperator? op)

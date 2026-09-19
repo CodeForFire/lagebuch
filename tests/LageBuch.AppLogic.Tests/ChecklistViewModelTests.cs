@@ -17,12 +17,18 @@ public class ChecklistViewModelTests
             aufbau ?? new[] { ("A?", false) },
             abbau ?? Array.Empty<(string, bool)>());
 
+    private static ChecklistList Aufbau(LocalIncidentSession session) =>
+        session.Incident.Checklists.Single(l => l.Id == ChecklistDefaults.AufbauListId);
+
+    private static ChecklistList Abbau(LocalIncidentSession session) =>
+        session.Incident.Checklists.Single(l => l.Id == ChecklistDefaults.AbbauListId);
+
     [Fact]
     public void Setting_isdone_marks_item_done_and_fires_onchanged()
     {
         var changes = 0;
         var session = NewSession();
-        var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => changes++);
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => changes++);
 
         Assert.False(vm.Items[0].IsDone);
 
@@ -38,7 +44,7 @@ public class ChecklistViewModelTests
     public void Toggling_isdone_off_again_clears_the_item()
     {
         var session = NewSession();
-        var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => { });
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => { });
 
         vm.Items[0].IsDone = true;
         vm.Items[0].IsDone = false;
@@ -59,7 +65,7 @@ public class ChecklistViewModelTests
             new[] { ("A?", false) },
             Array.Empty<(string, bool)>());
         session.Close();
-        var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => Assert.Fail("onChanged must not fire when read-only"));
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => Assert.Fail("onChanged must not fire when read-only"));
 
         Assert.True(vm.IsReadOnly);
         Assert.True(vm.Items[0].IsReadOnly);
@@ -73,7 +79,7 @@ public class ChecklistViewModelTests
     public void Items_carry_the_mandatory_flag_from_the_domain()
     {
         var session = NewSession(aufbau: new[] { ("Pflicht", true), ("Optional", false) });
-        var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => { });
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => { });
 
         Assert.True(vm.Items[0].IsMandatory);
         Assert.False(vm.Items[1].IsMandatory);
@@ -83,7 +89,7 @@ public class ChecklistViewModelTests
     public void AllMandatoryDone_flips_true_once_every_mandatory_item_is_checked()
     {
         var session = NewSession(aufbau: new[] { ("Pflicht", true), ("Optional", false) });
-        var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => { });
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => { });
 
         Assert.False(vm.AllMandatoryDone);
 
@@ -98,7 +104,7 @@ public class ChecklistViewModelTests
     public void AllMandatoryDone_starts_true_when_the_list_has_no_mandatory_items()
     {
         var session = NewSession(aufbau: new[] { ("Optional", false) });
-        var vm = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => { });
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => { });
 
         Assert.True(vm.AllMandatoryDone);
     }
@@ -109,8 +115,8 @@ public class ChecklistViewModelTests
         var session = NewSession(
             aufbau: new[] { ("Aufbau Pflicht", true) },
             abbau: new[] { ("Abbau Pflicht", true) });
-        var aufbau = new ChecklistViewModel(session, ChecklistKind.Aufbau, () => { });
-        var abbau = new ChecklistViewModel(session, ChecklistKind.Abbau, () => { });
+        var aufbau = new ChecklistViewModel(session, Aufbau(session), () => { });
+        var abbau = new ChecklistViewModel(session, Abbau(session), () => { });
 
         aufbau.Items[0].IsDone = true;
 

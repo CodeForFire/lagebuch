@@ -142,8 +142,10 @@ public sealed partial class HomeViewModel : ObservableObject
             _clock,
             request.Operator,
             path,
-            md.ChecklistTemplateAufbau.Select(i => (i.Text, i.IsMandatory)),
-            md.ChecklistTemplateAbbau.Select(i => (i.Text, i.IsMandatory)),
+            md.ChecklistTemplates.Select(t => new ChecklistSeed(
+                t.Id,
+                t.Title,
+                t.Items.Select(i => (i.Text, i.IsMandatory)).ToList())).ToList(),
             incidentNumber: null);
         OpenWorkspace(session, path, md);
     }

@@ -77,6 +77,9 @@ public class DemoFlowRenderTests
         return MasterDataJson.Parse(File.ReadAllText(path));
     }
 
+    private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
+        (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
+
     private static void Capture(Window window, string name)
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
@@ -172,7 +175,7 @@ public class DemoFlowRenderTests
         }
 
         SelectTab(window, "AUFBAU");
-        Assert.Equal(3, vm.ChecklistAufbau.Items.Count(i => i.IsDone));
+        Assert.Equal(3, FirstChecklist(vm).Items.Count(i => i.IsDone));
         Capture(window, "checkliste.png");
 
         // 3) ETB: the first minutes of the incident.

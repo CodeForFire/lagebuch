@@ -81,9 +81,11 @@ public class NavRailHelperTests
         var files = WorkspaceRenderHelper.SelectedTabContent(window);
         Assert.Contains(files.GetVisualDescendants().OfType<Control>(), c => c.Name == "FilesDropZone");
 
+        // The presenter reuses the realized Border and re-binds it, so the visual identity is not
+        // the thing to assert -- what matters is that its subtree is now the other module's.
         WorkspaceRenderHelper.SelectTab(window, "LINKS");
         var links = WorkspaceRenderHelper.SelectedTabContent(window);
-        Assert.NotSame(files, links);
+        Assert.Contains(links.GetVisualDescendants().OfType<Control>(), c => c.Name == "LinkSearchBox");
         Assert.DoesNotContain(links.GetVisualDescendants().OfType<Control>(), c => c.Name == "FilesDropZone");
     }
 }

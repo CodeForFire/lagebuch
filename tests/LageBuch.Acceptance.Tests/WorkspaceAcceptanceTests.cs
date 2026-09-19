@@ -175,6 +175,9 @@ internal sealed class NoopAlarmService : IAlarmService
 
 public class WorkspaceAcceptanceTests
 {
+    private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
+        (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
+
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         Roles = new[] { "EL" },
@@ -398,7 +401,7 @@ public class WorkspaceAcceptanceTests
     public void Clicking_checklist_checkbox_persists_done_state()
     {
         var vm = BuildWorkspace(out var session);
-        var view = new ChecklistView { DataContext = vm.ChecklistAufbau };
+        var view = new ChecklistView { DataContext = FirstChecklist(vm) };
         var window = new Window { Content = view, Width = 600, Height = 400 };
         window.Show();
 
@@ -412,7 +415,7 @@ public class WorkspaceAcceptanceTests
         window.MouseUp(center, Avalonia.Input.MouseButton.Left);
 
         Assert.True(checkBox.IsChecked);
-        Assert.True(vm.ChecklistAufbau.Items[0].IsDone);
+        Assert.True(FirstChecklist(vm).Items[0].IsDone);
         Assert.True(session.Incident.ChecklistAufbau[0].IsDone);
     }
 
@@ -440,13 +443,12 @@ public class WorkspaceAcceptanceTests
         var window = new Window { Content = view, Width = 1000, Height = 700 };
         window.Show();
 
-        var completeDot = view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AufbauCompleteDot");
-        var incompleteDot = view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AufbauIncompleteDot");
+        var (completeDot, incompleteDot) = WorkspaceRenderHelper.RailStatusDots(window, "AUFBAU");
         Assert.False(completeDot.IsVisible);
         Assert.True(incompleteDot.IsVisible);
 
         // The neighboring ABBAU list has no items -- vacuously complete from the start.
-        Assert.True(view.GetControl<Avalonia.Controls.Shapes.Ellipse>("AbbauCompleteDot").IsVisible);
+        Assert.True(WorkspaceRenderHelper.RailStatusDots(window, "ABBAU").Complete.IsVisible);
 
         // Capture the PR before/after screenshots (real Skia backend rasterizes embedded fonts).
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
@@ -456,7 +458,7 @@ public class WorkspaceAcceptanceTests
             before.SavePng(Path.Join(dir, "checkliste-aufbau-abbau-before.png"));
         }
 
-        vm.ChecklistAufbau.Items[0].IsDone = true;
+        FirstChecklist(vm).Items[0].IsDone = true;
 
         Assert.True(completeDot.IsVisible);
         Assert.False(incompleteDot.IsVisible);

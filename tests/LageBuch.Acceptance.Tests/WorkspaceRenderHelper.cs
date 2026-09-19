@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Shapes;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -152,6 +153,33 @@ internal static class WorkspaceRenderHelper
             .First(p => p.Name == "PART_SelectedContentHost");
         return host.Child
             ?? throw new InvalidOperationException("the selected rail tab has no realized content.");
+    }
+
+    /// <summary>
+    /// The two status dots in a rail tab's header, in template order: complete, then incomplete.
+    /// </summary>
+    /// <remarks>
+    /// They used to carry x:Names (AufbauCompleteDot and friends), which a templated header cannot
+    /// have — one template now serves every tab. Scoping the search to the tab's own container is
+    /// what replaces the name.
+    /// </remarks>
+    public static (Ellipse Complete, Ellipse Incomplete) RailStatusDots(Window window, string header)
+    {
+        var tabs = Tabs(window);
+        for (var i = 0; i < tabs.ItemCount; i++)
+        {
+            var container = tabs.ContainerFromIndex(i);
+            if (HeaderTextOf(container) != header)
+            {
+                continue;
+            }
+
+            var dots = container!.GetVisualDescendants().OfType<Ellipse>().ToArray();
+            Assert.Equal(2, dots.Length);
+            return (dots[0], dots[1]);
+        }
+
+        throw new InvalidOperationException($"no rail tab headed \"{header}\".");
     }
 
     /// <summary>Every rail tab's rendered header, in rail order.</summary>

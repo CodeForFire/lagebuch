@@ -9,6 +9,11 @@ public class HomeViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
+    // The rail is built from Stammdaten now, so a test reaches its checklist through the nav
+    // items rather than a fixed ChecklistAufbau property.
+    private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
+        (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
+
     [Fact]
     public void NewIncident_opens_workspace_and_adds_to_recent()
     {
@@ -25,7 +30,7 @@ public class HomeViewModelTests
         Assert.NotNull(opened);
         Assert.False(opened!.IsReadOnly);
         Assert.Contains("/x.fwincident", recent.GetRecent());
-        Assert.Equal("A?", opened.ChecklistAufbau.Items[0].Text); // checklist template seeded
+        Assert.Equal("A?", FirstChecklist(opened).Items[0].Text); // checklist template seeded
     }
 
     [Fact]

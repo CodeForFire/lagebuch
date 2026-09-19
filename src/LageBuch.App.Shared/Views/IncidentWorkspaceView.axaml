@@ -300,80 +300,34 @@
            the gap between rail and content. -->
       <!-- Greyed out while a joined client is reconnecting — it can't send commands until the link is back. -->
       <Border Background="{StaticResource AppBackgroundBrush}" Padding="24,0,0,0" IsEnabled="{Binding IsInputEnabled}">
-        <TabControl x:Name="ModuleTabs">
+        <!-- The rail is Stammdaten now (0..n Checklisten, per-module visibility), so it binds a
+             resolved collection instead of ten literal TabItems. One header template serves every
+             tab: IsComplete/IsIncomplete are plain booleans on the nav item and are both false for
+             a module, so only a Checkliste shows a status dot. Binding the dots through a nullable
+             checklist instead would leave IsVisible at its default (true) wherever the binding
+             resolved to nothing, putting a dot on every tab. -->
+        <TabControl x:Name="ModuleTabs" ItemsSource="{Binding NavItems}">
           <TabControl.Background>
             <SolidColorBrush Color="Transparent" />
           </TabControl.Background>
-          <TabItem>
-            <TabItem.Header>
-              <StackPanel x:DataType="vm:ChecklistViewModel" DataContext="{Binding ChecklistAufbau}"
-                          Orientation="Horizontal" Spacing="7">
-                <TextBlock Text="AUFBAU" />
-                <Ellipse x:Name="AufbauCompleteDot" Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding AllMandatoryDone}" />
-                <Ellipse x:Name="AufbauIncompleteDot" Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding !AllMandatoryDone}" />
+          <TabControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <TextBlock Text="{Binding Header}" />
+                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding IsComplete}" />
+                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding IsIncomplete}" />
               </StackPanel>
-            </TabItem.Header>
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding ChecklistAufbau}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="ETB">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Etb}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="AUFGABEN">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Tasks}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="FUNKTIONEN">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Roles}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="KRÄFTE">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Forces}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="ATEMSCHUTZ">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Scba}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="CO-MESSUNG">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding CoMessprotokoll}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="DATEIEN">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Files}" />
-            </Border>
-          </TabItem>
-          <TabItem Header="LINKS">
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding Links}" />
-            </Border>
-          </TabItem>
-          <TabItem>
-            <TabItem.Header>
-              <StackPanel x:DataType="vm:ChecklistViewModel" DataContext="{Binding ChecklistAbbau}"
-                          Orientation="Horizontal" Spacing="7">
-                <TextBlock Text="ABBAU" />
-                <Ellipse x:Name="AbbauCompleteDot" Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding AllMandatoryDone}" />
-                <Ellipse x:Name="AbbauIncompleteDot" Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding !AllMandatoryDone}" />
-              </StackPanel>
-            </TabItem.Header>
-            <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
-              <ContentControl Content="{Binding ChecklistAbbau}" />
-            </Border>
-          </TabItem>
+            </DataTemplate>
+          </TabControl.ItemTemplate>
+          <TabControl.ContentTemplate>
+            <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
+              <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+                <ContentControl Content="{Binding Content}" />
+              </Border>
+            </DataTemplate>
+          </TabControl.ContentTemplate>
         </TabControl>
       </Border>
     </DockPanel>
