@@ -3,10 +3,14 @@ using Microsoft.Data.Sqlite;
 
 namespace LageBuch.Persistence.Tests;
 
-// docs/samples/uebung.fwincident is a real file written by a released build, not a fixture
-// assembled in a test -- which makes it the only end-to-end check that a migration actually opens
-// what users already have. It is copied first: opening it in place would stamp this branch's
-// schema_version onto a tracked file, exactly what AGENTS.md warns never to do to an Einsatzdatei.
+// docs/samples/uebung.fwincident is a whole Einsatzdatei rather than a fixture assembled in a
+// test, so this is the end-to-end check that the shipped sample actually opens and still carries
+// its Checklisten. It was a V21 file while this branch was written, which is how the V23 upgrade
+// was first exercised against something a released build had produced; `make samples` has since
+// rewritten it at V23, and the V21 path is covered by ChecklistListMigrationTests' own fixtures.
+//
+// It is copied before opening: a Load migrates in place, and stamping this branch's
+// schema_version onto a tracked file is exactly what AGENTS.md warns never to do.
 public class SampleIncidentUpgradeTests : IDisposable
 {
     private readonly string _copy = Path.Join(Path.GetTempPath(), $"sample-{Guid.NewGuid():N}.fwincident");
