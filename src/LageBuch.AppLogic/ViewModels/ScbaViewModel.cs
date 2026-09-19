@@ -21,7 +21,6 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class ScbaTruppRow : ObservableObject
 {
-    private readonly AtemschutzTrupp _trupp;
     private readonly IClock _clock;
     private readonly bool _isReadOnly;
     private readonly Action _onStart;
@@ -29,6 +28,9 @@ public sealed partial class ScbaTruppRow : ObservableObject
     private readonly Action _onWithdraw;
     private readonly Action _onMarkRemoved;
     private readonly Action<Guid?> _onAssignSafetyTrupp;
+
+    // Re-pointed by Update rather than replaced with a whole new row (#294) -- see Update's remarks.
+    private AtemschutzTrupp _trupp;
 
     public ScbaTruppRow(
         AtemschutzTrupp trupp,
@@ -53,7 +55,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _onMarkRemoved = onMarkRemoved;
         _onAssignSafetyTrupp = onAssignSafetyTrupp;
         _pressureInput = trupp.LatestPressure ?? 300;
-        SafetyTruppOptions = safetyTruppOptions;
+        SafetyTruppOptions = new ObservableCollection<SafetyTruppOption>(safetyTruppOptions);
         SafetyTruppHint = safetyTruppHint;
 
         // Assign the backing field, not the property: going through the setter here would fire
@@ -143,15 +145,24 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _ => "Im Einsatz",
     };
 
-    /// <summary>The Trupps that may be picked as this one's Sicherheitstrupp, "— kein —" first.
-    /// Carried on the row rather than the ViewModel because the cell template binds against the
-    /// row, the same shape ForceRow uses for its status options.</summary>
-    public IReadOnlyList<SafetyTruppOption> SafetyTruppOptions { get; }
+    /// <summary>
+    /// The Trupps that may be picked as this one's Sicherheitstrupp, "— kein —" first. Carried on
+    /// the row rather than the ViewModel because the cell template binds against the row, the same
+    /// shape ForceRow uses for its status options.
+    /// </summary>
+    /// <remarks>
+    /// One collection for the row's whole life, mutated in place by <see cref="Update"/> and never
+    /// reassigned. Handing the ComboBox a new list makes it drop and re-pick its selection, and the
+    /// "— kein —" it writes back is indistinguishable from the operator choosing it — which cleared
+    /// the Sicherheitstrupp a moment after it was set. Keeping the instance also keeps an open
+    /// dropdown attached to its items instead of having them swapped underneath it.
+    /// </remarks>
+    public ObservableCollection<SafetyTruppOption> SafetyTruppOptions { get; }
 
     /// <summary>The single amber line under the picker, or null when there is nothing to say.
-    /// Computed by the ViewModel at row-build time: every input to it is domain state, and any
-    /// change to domain state rebuilds the rows, so it cannot go stale between rebuilds.</summary>
-    public string? SafetyTruppHint { get; }
+    /// Recomputed by the ViewModel on every incident change and pushed in through
+    /// <see cref="Update"/>.</summary>
+    public string? SafetyTruppHint { get; private set; }
 
     public bool HasSafetyTruppHint => !string.IsNullOrEmpty(SafetyTruppHint);
 
@@ -162,11 +173,14 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     partial void OnSelectedSafetyTruppChanged(SafetyTruppOption value)
     {
-        // Avalonia nulls SelectedItem while ItemsSource is being swapped, and RefreshTrupps swaps
-        // it on every change, so a null here is always the ComboBox resetting itself and never a
-        // user choice -- "kein Sicherheitstrupp" arrives as SafetyTruppOption.None instead. The
-        // equality check makes a rebuild that re-selects the value already on the Trupp inert, so
-        // there is no redundant command and no duplicate ETB line.
+        // A null arrives when the ComboBox resets itself; it is never a user choice, because
+        // "kein Sicherheitstrupp" is SafetyTruppOption.None. The equality check then makes the
+        // picker following the domain inert, so only a real change reaches the session.
+        //
+        // Both guards depend on SafetyTruppOptions being a stable collection: replacing the
+        // ItemsSource makes Avalonia reset SelectedItem and write "— kein —" back, which is
+        // indistinguishable from the operator choosing it and silently wiped the assignment.
+        // That is why Update reconciles the options in place instead of handing over a new list.
         if (_isReadOnly || value is null || value.Id == _trupp.SafetyTruppId)
         {
             return;
@@ -197,6 +211,62 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     [RelayCommand(CanExecute = nameof(CanMarkRemoved))]
     private void MarkRemoved() => _onMarkRemoved();
+
+    /// <summary>
+    /// Re-points this row at the current state of its Trupp, instead of the ViewModel replacing the
+    /// row object. Replacing it is what <see cref="ScbaViewModel.RefreshTrupps"/> used to do, and it
+    /// cannot survive an interactive control in the row: the Sicherheitstrupp picker writes to the
+    /// domain from inside its own selection event, so tearing the row down there destroys the
+    /// ComboBox mid-selection and strands its popup — a real top-level window holding the pointer
+    /// grab — on screen, which freezes the app (#294).
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="trupp"/> may be a different instance than the one held: a joined device
+    /// rebuilds its whole aggregate from each snapshot. <see cref="PressureInput"/> is deliberately
+    /// left alone — it is a half-typed Druckabfrage, and another device's edit must not overwrite
+    /// what the operator is in the middle of entering.
+    /// </remarks>
+    public void Update(
+        AtemschutzTrupp trupp,
+        IReadOnlyList<SafetyTruppOption> safetyTruppOptions,
+        SafetyTruppOption selectedSafetyTrupp,
+        string? safetyTruppHint)
+    {
+        ArgumentNullException.ThrowIfNull(trupp);
+        ArgumentNullException.ThrowIfNull(safetyTruppOptions);
+        _trupp = trupp;
+        SafetyTruppHint = safetyTruppHint;
+
+        // Reconcile the options rather than replace the collection — see SafetyTruppOptions. The
+        // options are records, so an entry that has not actually changed compares equal and is left
+        // untouched, and the ComboBox sees no change at all on the common path.
+        for (var i = 0; i < safetyTruppOptions.Count; i++)
+        {
+            if (i >= SafetyTruppOptions.Count)
+            {
+                SafetyTruppOptions.Add(safetyTruppOptions[i]);
+            }
+            else if (SafetyTruppOptions[i] != safetyTruppOptions[i])
+            {
+                SafetyTruppOptions[i] = safetyTruppOptions[i];
+            }
+        }
+
+        while (SafetyTruppOptions.Count > safetyTruppOptions.Count)
+        {
+            SafetyTruppOptions.RemoveAt(SafetyTruppOptions.Count - 1);
+        }
+
+        // Assigned after _trupp, so the setter's "same as the domain" guard sees the new value and
+        // the write-back stays inert: this is the picker following the domain, never driving it.
+        // Taken from the live collection so the ComboBox matches it by identity as well as value.
+        SelectedSafetyTrupp =
+            SafetyTruppOptions.FirstOrDefault(o => o.Id == selectedSafetyTrupp.Id) ?? SafetyTruppOption.None;
+
+        OnPropertyChanged(nameof(SafetyTruppHint));
+        OnPropertyChanged(nameof(HasSafetyTruppHint));
+        Refresh();
+    }
 
     public void Refresh()
     {
@@ -609,10 +679,14 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             () => Withdraw(trupp.Id),
             () => MarkRemoved(trupp.Id),
             safetyOptions,
-            safetyOptions.FirstOrDefault(o => o.Id == trupp.SafetyTruppId) ?? SafetyTruppOption.None,
+            SelectedOptionFor(trupp, safetyOptions),
             SafetyTruppHintFor(trupp),
             safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId));
     }
+
+    private static SafetyTruppOption SelectedOptionFor(
+        AtemschutzTrupp trupp, IReadOnlyList<SafetyTruppOption> options) =>
+        options.FirstOrDefault(o => o.Id == trupp.SafetyTruppId) ?? SafetyTruppOption.None;
 
     /// <summary>The picker contents for one row: "— kein —", then every other Trupp still
     /// bereitgestellt, ordered by Truppnummer.</summary>
@@ -796,13 +870,48 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         _onChanged();
     }
 
-    // Rebuild the trupp rows from the incident on any change — this device's edit, or another's.
+    /// <summary>
+    /// Brings the rows in line with the incident on any change — this device's edit, or another's —
+    /// reconciling by id and updating in place rather
+    /// than Clear()+re-add (#294). <c>Clear()</c> raises a Reset, which makes Avalonia tear down and
+    /// re-realise every container — and since the Sicherheitstrupp picker writes to the domain from
+    /// inside its own selection event, that tore the ComboBox down mid-selection and left its popup
+    /// stranded on screen holding the pointer grab, freezing the app. Reconciling is also what
+    /// EtbViewModel.Sync already does, and it keeps selection, focus and scroll position across a
+    /// change made anywhere in the incident.
+    /// </summary>
     private void RefreshTrupps()
     {
-        Trupps.Clear();
-        foreach (var trupp in _session.Incident.ScbaTrupps)
+        var trupps = _session.Incident.ScbaTrupps;
+        for (var i = 0; i < trupps.Count; i++)
         {
-            Trupps.Add(CreateRow(trupp));
+            var trupp = trupps[i];
+
+            // Trupps are only ever appended (there is no remove), so a mismatch here means the row
+            // is new. Rebuilding the tail from that point keeps the reconciliation honest if that
+            // ever stops being true.
+            if (i < Trupps.Count && Trupps[i].Id != trupp.Id)
+            {
+                while (Trupps.Count > i)
+                {
+                    Trupps.RemoveAt(Trupps.Count - 1);
+                }
+            }
+
+            if (i < Trupps.Count)
+            {
+                var options = SafetyOptionsFor(trupp);
+                Trupps[i].Update(trupp, options, SelectedOptionFor(trupp, options), SafetyTruppHintFor(trupp));
+            }
+            else
+            {
+                Trupps.Add(CreateRow(trupp));
+            }
+        }
+
+        while (Trupps.Count > trupps.Count)
+        {
+            Trupps.RemoveAt(Trupps.Count - 1);
         }
 
         // Another device may have just taken the suggested number -- re-suggest (#217: the number

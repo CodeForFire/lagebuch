@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -235,6 +236,111 @@ public class ScbaSafetyTruppTests
         Row(vm, sicherheit.Id).StartCommand.Execute(null);
 
         Assert.DoesNotContain(Journal(session), t => t.Contains("geht selbst unter Atemschutz", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Assigning_does_not_tear_the_row_down_underneath_the_picker()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+        var row = Row(vm, angriff.Id);
+
+        Assign(vm, angriff.Id, sicherheit.Id);
+
+        // The picker writes to the domain from inside its own selection event. If that write
+        // replaces the row object, Avalonia tears the ComboBox down mid-selection and its popup —
+        // a real top-level window holding the pointer grab — is orphaned on screen, which freezes
+        // the app (#294's Clear()+re-add, made fatal by an interactive control in the row).
+        Assert.Same(row, Row(vm, angriff.Id));
+        Assert.Equal(sicherheit.Id, row.SelectedSafetyTrupp.Id);
+    }
+
+    [Fact]
+    public void A_row_survives_an_unrelated_change_and_follows_the_domain()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+        var row = Row(vm, angriff.Id);
+
+        // A change from anywhere in the incident (here: another device assigning) must update the
+        // existing row rather than replace it.
+        session.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
+
+        Assert.Same(row, Row(vm, angriff.Id));
+        Assert.Equal(sicherheit.Id, row.SelectedSafetyTrupp.Id);
+        Assert.Equal(sicherheit.Id, row.SafetyTruppOptions.Single(o => o.Id == sicherheit.Id).Id);
+    }
+
+    [Fact]
+    public void A_newly_added_trupp_appears_without_replacing_the_existing_rows()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var first = Row(vm, angriff.Id);
+
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+
+        Assert.Same(first, Row(vm, angriff.Id));
+        Assert.Equal(2, vm.Trupps.Count);
+        Assert.Equal(sicherheit.Id, vm.Trupps[1].Id);
+
+        // The new Trupp is bereitgestellt, so it must now be offered to the first row.
+        Assert.Contains(first.SafetyTruppOptions, o => o.Id == sicherheit.Id);
+    }
+
+    [Fact]
+    public void The_assignment_survives_the_changes_it_sets_off()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        Row(vm, angriff.Id).StartCommand.Execute(null);
+        var wasser = Register(vm, "Wassertrupp");
+        Row(vm, wasser.Id).StartCommand.Execute(null);
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+
+        Assign(vm, wasser.Id, sicherheit.Id);
+
+        // Assigning writes an ETB entry, which raises Changed again and re-enters the refresh. If
+        // that refresh hands the ComboBox a new options list, Avalonia resets SelectedItem and
+        // writes "— kein —" back — indistinguishable from the operator picking it, so the
+        // assignment was wiped a moment after it was made.
+        Assert.Equal(sicherheit.Id, session.Incident.ScbaTrupps.Single(t => t.Id == wasser.Id).SafetyTruppId);
+        Assert.Equal(sicherheit.Id, Row(vm, wasser.Id).SelectedSafetyTrupp.Id);
+
+        // And it must survive any later change from anywhere in the incident.
+        session.AddJournalEntry(EtbDirection.System, "irgendetwas anderes");
+        Assert.Equal(sicherheit.Id, session.Incident.ScbaTrupps.Single(t => t.Id == wasser.Id).SafetyTruppId);
+        Assert.Equal(sicherheit.Id, Row(vm, wasser.Id).SelectedSafetyTrupp.Id);
+    }
+
+    [Fact]
+    public void The_options_collection_is_never_swapped_out_from_under_the_picker()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp");
+        var row = Row(vm, angriff.Id);
+        var options = row.SafetyTruppOptions;
+
+        var sicherheit = Register(vm, "Sicherheitstrupp");
+        Assign(vm, angriff.Id, sicherheit.Id);
+        session.AddJournalEntry(EtbDirection.System, "noch etwas");
+
+        // Same instance throughout: an open dropdown keeps its items, and the ComboBox never drops
+        // and re-picks its selection.
+        Assert.Same(options, Row(vm, angriff.Id).SafetyTruppOptions);
+        Assert.Contains(options, o => o.Id == sicherheit.Id);
     }
 
     [Fact]
