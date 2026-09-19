@@ -169,8 +169,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         UnitStatus = _unitStatus.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),
-        ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
-        ChecklistTemplateAbbau = _checklistAbbau.ToValues(),
+        ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
+            _checklistAufbau.ToValues(), _checklistAbbau.ToValues()),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),

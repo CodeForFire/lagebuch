@@ -86,9 +86,8 @@ public sealed class MasterDataStore
                 });
         }
 
-        Run(cn, tx, "DELETE FROM md_checklist_template;", _ => { });
-        InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAufbau, kind: 0, ordinalOffset: 0);
-        InsertChecklistTemplate(cn, tx, set.ChecklistTemplateAbbau, kind: 1, ordinalOffset: set.ChecklistTemplateAufbau.Count);
+        WriteChecklists(cn, tx, set.ChecklistTemplates);
+        WriteNavigation(cn, tx, set.Navigation);
 
         Run(cn, tx, "DELETE FROM md_personnel;", _ => { });
         foreach (var person in set.Personnel)
@@ -123,25 +122,66 @@ public sealed class MasterDataStore
         tx.Commit();
     }
 
-    // Ordinal is the table's PRIMARY KEY, so Aufbau and Abbau rows share one running sequence
-    // (Abbau continuing where Aufbau left off) rather than each restarting at 0.
-    private static void InsertChecklistTemplate(
-        SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<ChecklistTemplateItem> items, int kind, int ordinalOffset)
+    // Full replace, like every other category here. Per-list ordinals restart at 0, which is what
+    // the composite (list_id, ordinal) key exists for.
+    private static void WriteChecklists(
+        SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<ChecklistTemplate> templates)
     {
-        for (var i = 0; i < items.Count; i++)
+        Run(cn, tx, "DELETE FROM md_checklist_items;", _ => { });
+        Run(cn, tx, "DELETE FROM md_checklist_lists;", _ => { });
+
+        for (var t = 0; t < templates.Count; t++)
         {
-            var item = items[i];
-            var ordinal = ordinalOffset + i;
+            var template = templates[t];
+            var ordinal = t;
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_checklist_template (ordinal, text, is_mandatory, kind) VALUES ($o,$t,$m,$k);",
+                "INSERT INTO md_checklist_lists (id, ordinal, title) VALUES ($id,$o,$t);",
+                p =>
+                {
+                    p("$id", template.Id.ToString());
+                    p("$o", ordinal);
+                    p("$t", template.Title);
+                });
+
+            for (var i = 0; i < template.Items.Count; i++)
+            {
+                var item = template.Items[i];
+                var itemOrdinal = i;
+                Run(
+                    cn,
+                    tx,
+                    "INSERT INTO md_checklist_items (list_id, ordinal, text, is_mandatory) VALUES ($l,$o,$t,$m);",
+                    p =>
+                    {
+                        p("$l", template.Id.ToString());
+                        p("$o", itemOrdinal);
+                        p("$t", item.Text);
+                        p("$m", item.IsMandatory ? 1 : 0);
+                    });
+            }
+        }
+    }
+
+    private static void WriteNavigation(
+        SqliteConnection cn, SqliteTransaction tx, IReadOnlyList<NavEntry> navigation)
+    {
+        Run(cn, tx, "DELETE FROM md_navigation;", _ => { });
+        for (var i = 0; i < navigation.Count; i++)
+        {
+            var entry = navigation[i];
+            var ordinal = i;
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_navigation (ordinal, module, checklist_id, is_visible) VALUES ($o,$m,$c,$v);",
                 p =>
                 {
                     p("$o", ordinal);
-                    p("$t", item.Text);
-                    p("$m", item.IsMandatory ? 1 : 0);
-                    p("$k", kind);
+                    p("$m", entry.ModuleKey);
+                    p("$c", (object?)entry.ChecklistId?.ToString() ?? DBNull.Value);
+                    p("$v", entry.IsVisible ? 1 : 0);
                 });
         }
     }
@@ -166,11 +206,23 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0);
-            CREATE TABLE IF NOT EXISTS md_checklist_template (
-                ordinal INTEGER PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS md_checklist_lists (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                title TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS md_checklist_items (
+                list_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
                 text TEXT NOT NULL,
                 is_mandatory INTEGER NOT NULL DEFAULT 0,
-                kind INTEGER NOT NULL DEFAULT 0
+                PRIMARY KEY (list_id, ordinal)
+            );
+            CREATE TABLE IF NOT EXISTS md_navigation (
+                ordinal INTEGER PRIMARY KEY,
+                module TEXT NOT NULL,
+                checklist_id TEXT,
+                is_visible INTEGER NOT NULL DEFAULT 1
             );
             CREATE TABLE IF NOT EXISTS md_trupp_types (
                 value TEXT NOT NULL,
@@ -188,10 +240,15 @@ public sealed class MasterDataStore
             """;
         Exec(cn, schema);
 
-        // Widen a pre-existing md_checklist_template that predates the Aufbau/Abbau split — this
-        // store has no version marker, so every open re-checks rather than gating on one.
-        SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "is_mandatory", "INTEGER NOT NULL DEFAULT 0");
-        SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "kind", "INTEGER NOT NULL DEFAULT 0");
+        MoveChecklistTemplateToLists(cn);
+
+        // The optional columns of the Checklisten and Navigation tables. Like md_personnel's below,
+        // no shipped version ever lacked them -- both tables arrived complete -- but #397's sweep
+        // holds every repairable column to the same rule, and a store that lost one would otherwise
+        // fail to open with "no such column" instead of repairing itself.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_items", "is_mandatory", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_navigation", "checklist_id", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_navigation", "is_visible", "INTEGER NOT NULL DEFAULT 1");
 
         // Widen a pre-existing md_vehicles that predates the ZF flag -- existing vehicles read as
         // "no Zugführer" rather than failing to load.
@@ -313,38 +370,127 @@ public sealed class MasterDataStore
             TruppType.ClampMaxDurationMinutes(ReadSetting(cn, key) ?? fallback);
     }
 
+    /// <summary>
+    /// Moves a pre-existing <c>md_checklist_template</c> into the n-list tables, once.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The old table could not be widened in place: <c>ordinal</c> was its PRIMARY KEY, and the
+    /// two lists shared one running sequence (Abbau continuing where Aufbau left off) to fit
+    /// inside it. Per-list ordinals restart at 0, which that key cannot express.
+    /// </para>
+    /// <para>
+    /// This store has no version marker, so the old table's own existence is the marker: it is
+    /// dropped on success and the whole method then costs one <c>sqlite_master</c> lookup. That is
+    /// the same idiom already used for <c>md_call_signs</c>/<c>md_brigades</c>.
+    /// </para>
+    /// <para>
+    /// Done row by row in C# rather than as one INSERT..SELECT: undoing the offset scheme needs a
+    /// per-list counter, which would mean a window function, and this matches how the rest of the
+    /// file reads and writes. It is the only destructive step here, so it gets its own transaction
+    /// — <c>EnsureSchema</c> otherwise runs untransacted.
+    /// </para>
+    /// </remarks>
+    private static void MoveChecklistTemplateToLists(SqliteConnection cn)
+    {
+        if (!SchemaHelpers.TableExists(cn, null, "md_checklist_template"))
+        {
+            return;
+        }
+
+        // A store old enough to predate the Aufbau/Abbau split has neither column; widen first so
+        // the read below is uniform.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "is_mandatory", "INTEGER NOT NULL DEFAULT 0");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_checklist_template", "kind", "INTEGER NOT NULL DEFAULT 0");
+
+        var aufbau = new List<ChecklistTemplateItem>();
+        var abbau = new List<ChecklistTemplateItem>();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT text, is_mandatory, kind FROM md_checklist_template ORDER BY ordinal;";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var item = new ChecklistTemplateItem(r.GetString(0), r.GetInt32(1) != 0);
+                (r.GetInt32(2) == 0 ? aufbau : abbau).Add(item);
+            }
+        }
+
+        using var tx = cn.BeginTransaction();
+        WriteChecklists(cn, tx, ChecklistTemplate.AufbauAbbau(aufbau, abbau));
+        Run(cn, tx, "DROP TABLE md_checklist_template;", _ => { });
+        tx.Commit();
+    }
+
     private static MasterDataSet Read(SqliteConnection cn)
     {
-        var (checklistAufbau, checklistAbbau) = ReadChecklistTemplate(cn);
         return new(
             ReadColumn(cn, "SELECT value FROM md_roles;"),
             ReadColumn(cn, "SELECT value FROM md_unit_status;"),
             ReadLinks(cn),
-            checklistAufbau,
-            checklistAbbau,
+            ReadChecklists(cn),
+            ReadNavigation(cn),
             ReadTruppTypes(cn),
             ReadPersonnel(cn),
             ReadVehicles(cn),
             ReadSettings(cn));
     }
 
-    // Rows are ordered globally by ordinal (Aufbau's block precedes Abbau's — see
-    // InsertChecklistTemplate), so filtering by kind here preserves each list's own order.
-    private static (IReadOnlyList<ChecklistTemplateItem> Aufbau, IReadOnlyList<ChecklistTemplateItem> Abbau)
-        ReadChecklistTemplate(SqliteConnection cn)
+    // One query per table, grouped here. An item row whose list_id has no list row is dropped
+    // rather than filed under a guess.
+    private static List<ChecklistTemplate> ReadChecklists(SqliteConnection cn)
     {
-        using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT text, is_mandatory, kind FROM md_checklist_template ORDER BY ordinal;";
-        using var r = cmd.ExecuteReader();
-        var aufbau = new List<ChecklistTemplateItem>();
-        var abbau = new List<ChecklistTemplateItem>();
-        while (r.Read())
+        var itemsByList = new Dictionary<string, List<ChecklistTemplateItem>>(StringComparer.OrdinalIgnoreCase);
+        using (var cmd = cn.CreateCommand())
         {
-            var item = new ChecklistTemplateItem(r.GetString(0), r.GetInt32(1) != 0);
-            (r.GetInt32(2) == 0 ? aufbau : abbau).Add(item);
+            cmd.CommandText = "SELECT list_id, text, is_mandatory FROM md_checklist_items ORDER BY list_id, ordinal;";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var listId = r.GetString(0);
+                if (!itemsByList.TryGetValue(listId, out var items))
+                {
+                    items = new List<ChecklistTemplateItem>();
+                    itemsByList[listId] = items;
+                }
+
+                items.Add(new ChecklistTemplateItem(r.GetString(1), r.GetInt32(2) != 0));
+            }
         }
 
-        return (aufbau, abbau);
+        var templates = new List<ChecklistTemplate>();
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT id, title FROM md_checklist_lists ORDER BY ordinal;";
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                var id = r.GetString(0);
+                IReadOnlyList<ChecklistTemplateItem> items = itemsByList.TryGetValue(id, out var found)
+                    ? found
+                    : Array.Empty<ChecklistTemplateItem>();
+                templates.Add(new ChecklistTemplate(Guid.Parse(id), r.GetString(1), items));
+            }
+        }
+
+        return templates;
+    }
+
+    private static List<NavEntry> ReadNavigation(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT module, checklist_id, is_visible FROM md_navigation ORDER BY ordinal;";
+        using var r = cmd.ExecuteReader();
+        var entries = new List<NavEntry>();
+        while (r.Read())
+        {
+            entries.Add(new NavEntry(
+                r.GetString(0),
+                r.IsDBNull(1) ? null : Guid.Parse(r.GetString(1)),
+                r.GetInt32(2) != 0));
+        }
+
+        return entries;
     }
 
     /// <summary>One raw md_settings value, or null when the key has no row. For the internal

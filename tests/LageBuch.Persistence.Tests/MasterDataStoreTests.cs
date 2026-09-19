@@ -40,9 +40,10 @@ public class MasterDataStoreTests : IDisposable
         {
             Roles = new[] { "EL", "ZF" },
             UnitStatus = new[] { "Alarmiert" },
+            ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
+                new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
+                new[] { new ChecklistTemplateItem("Abbauschritt", true) }),
             TruppTypes = new[] { new TruppType("Angriffstrupp") },
-            ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
-            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbauschritt", true) },
             Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
@@ -207,10 +208,10 @@ public class MasterDataStoreTests : IDisposable
     {
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
-            ChecklistTemplateAufbau = Items("A", "B", "C"),
+            ChecklistTemplates = ChecklistTemplate.AufbauAbbau(Items("A", "B", "C"), null),
         });
 
-        MasterDataStore.Save(_path, MasterDataSet.Empty with { ChecklistTemplateAufbau = Items("C", "A") });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { ChecklistTemplates = ChecklistTemplate.AufbauAbbau(Items("C", "A"), null) });
 
         Assert.Equal(Items("C", "A"), MasterDataStore.GetOrCreate(_path).ChecklistTemplateAufbau);
 
@@ -223,8 +224,9 @@ public class MasterDataStoreTests : IDisposable
     {
         MasterDataStore.Save(_path, MasterDataSet.Empty with
         {
-            ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Fahrzeug prüfen", true) },
-            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Material zählen", false) },
+            ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
+                new[] { new ChecklistTemplateItem("Fahrzeug prüfen", true) },
+                new[] { new ChecklistTemplateItem("Material zählen", false) }),
         });
 
         var reopened = MasterDataStore.GetOrCreate(_path);

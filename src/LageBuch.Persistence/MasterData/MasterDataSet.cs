@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 
 namespace LageBuch.Persistence.MasterData;
@@ -9,8 +10,13 @@ public sealed record MasterDataSet(
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> UnitStatus,
     IReadOnlyList<Link> Links,
-    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau,
-    IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau,
+
+    // 0..n user-defined Checkliste templates, in the order the Stammdaten editor lists them.
+    IReadOnlyList<ChecklistTemplate> ChecklistTemplates,
+
+    // The nav rail's order and per-entry visibility. Empty means "this build's default" — see
+    // NavLayout.Default for why that is not materialized here.
+    IReadOnlyList<NavEntry> Navigation,
 
     // Trupp-Typen with the crew size and Einsatzzeit each one calls for (#398). Was a bare list
     // of names until the rules keyed off those names by string comparison.
@@ -33,8 +39,8 @@ public sealed record MasterDataSet(
         Array.Empty<string>(),
         Array.Empty<string>(),
         Array.Empty<Link>(),
-        Array.Empty<ChecklistTemplateItem>(),
-        Array.Empty<ChecklistTemplateItem>(),
+        Array.Empty<ChecklistTemplate>(),
+        Array.Empty<NavEntry>(),
         Array.Empty<TruppType>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
@@ -45,14 +51,28 @@ public sealed record MasterDataSet(
     /// condition under which the Stammdaten editor offers Import — a bootstrap, not a merge.
     /// <see cref="Settings"/> deliberately does not count: it always carries defaults, and letting it
     /// mark the set non-empty would suppress the Import bootstrap on an otherwise fresh install.
+    /// <see cref="Navigation"/> is excluded for exactly the same reason — a layout saved once would
+    /// otherwise permanently suppress the bootstrap.
     /// </summary>
     public bool IsEmpty =>
         Roles.Count == 0
         && UnitStatus.Count == 0
-        && Links.Count == 0 && ChecklistTemplateAufbau.Count == 0 && ChecklistTemplateAbbau.Count == 0
+        && Links.Count == 0 && ChecklistTemplates.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0
         && Vehicles.Count == 0;
+
+    // Transitional: callers still phrased as the fixed Aufbau/Abbau pair. Read-only, so a
+    // `with { ChecklistTemplateAufbau = ... }` site has to move to ChecklistTemplates and say
+    // which list it means. Goes away with its last caller.
+    public IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAufbau =>
+        ItemsOf(ChecklistDefaults.AufbauListId);
+
+    public IReadOnlyList<ChecklistTemplateItem> ChecklistTemplateAbbau =>
+        ItemsOf(ChecklistDefaults.AbbauListId);
+
+    private IReadOnlyList<ChecklistTemplateItem> ItemsOf(Guid id) =>
+        ChecklistTemplates.FirstOrDefault(t => t.Id == id)?.Items ?? Array.Empty<ChecklistTemplateItem>();
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -87,9 +107,45 @@ public sealed record MasterDataSet(
 [SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 public sealed record Link(string Name, string Url);
 
-/// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's Aufbau/Abbau
-/// checklist is seeded from at start.</summary>
+/// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's
+/// Checklisten are seeded from at start.</summary>
 public sealed record ChecklistTemplateItem(string Text, bool IsMandatory);
+
+/// <summary>
+/// One user-defined Checkliste template: a name, its items, and the id every Einsatz seeded from
+/// it carries — which is what lets the Navigation layout name this list, and what keeps an Einsatz
+/// matched to it after a rename.
+/// </summary>
+/// <param name="Id">Stable id. The two that predate user-defined lists are frozen in <see cref="ChecklistDefaults"/>.</param>
+/// <param name="Title">The list's name, bare ("Aufbau", not "Checkliste Aufbau").</param>
+/// <param name="Items">The template's items, in order.</param>
+public sealed record ChecklistTemplate(Guid Id, string Title, IReadOnlyList<ChecklistTemplateItem> Items)
+{
+    /// <summary>
+    /// The two lists as Stammdaten held them before this was configurable, dropping either if it
+    /// has no items — the same rule the V23 file migration follows, so an imported legacy file and
+    /// a migrated Einsatzdatei agree about which lists exist.
+    /// </summary>
+    public static IReadOnlyList<ChecklistTemplate> AufbauAbbau(
+        IReadOnlyList<ChecklistTemplateItem>? aufbau,
+        IReadOnlyList<ChecklistTemplateItem>? abbau)
+    {
+        var templates = new List<ChecklistTemplate>(2);
+        if (aufbau is { Count: > 0 })
+        {
+            templates.Add(new ChecklistTemplate(
+                ChecklistDefaults.AufbauListId, ChecklistDefaults.AufbauTitle, aufbau));
+        }
+
+        if (abbau is { Count: > 0 })
+        {
+            templates.Add(new ChecklistTemplate(
+                ChecklistDefaults.AbbauListId, ChecklistDefaults.AbbauTitle, abbau));
+        }
+
+        return templates;
+    }
+}
 
 /// <summary>
 /// Configurable operational defaults — the timer/duration values the app used to bake in as
@@ -442,7 +498,7 @@ public static class MasterDataJson
                     .ToList()
                 : Array.Empty<Link>();
 
-        var (checklistAufbau, checklistAbbau) = ParseChecklistTemplate(root);
+        var checklists = ParseChecklists(root);
 
         IReadOnlyList<Vehicle> vehicles =
             root.TryGetProperty("vehicles", out var v) && v.ValueKind == JsonValueKind.Array
@@ -459,8 +515,8 @@ public static class MasterDataJson
             Arr(root, "roles"),
             Arr(root, "unitStatus"),
             links,
-            checklistAufbau,
-            checklistAbbau,
+            checklists,
+            ParseNavigation(root),
             ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
@@ -468,27 +524,57 @@ public static class MasterDataJson
     }
 
     /// <summary>
-    /// Reads the Aufbau/Abbau template lists. A file still on the old flat <c>checklistTemplate</c>
-    /// string array (pre-split) maps every item to Aufbau, all optional — the safest default, since
-    /// nothing silently becomes a blocking requirement — with Abbau left empty.
+    /// Reads the Checkliste templates, newest shape first.
     /// </summary>
-    private static (IReadOnlyList<ChecklistTemplateItem> Aufbau, IReadOnlyList<ChecklistTemplateItem> Abbau)
-        ParseChecklistTemplate(JsonElement root)
+    /// <remarks>
+    /// Three shapes have to import, because every Stammdaten file in the wild predates the newest:
+    /// <list type="number">
+    /// <item><c>checklists</c> — 0..n named lists with ids. Wins outright when present.</item>
+    /// <item>
+    /// <c>checklistTemplateAufbau</c>/<c>checklistTemplateAbbau</c> — mapped onto the frozen ids,
+    /// so an imported file's Aufbau list is still the one a Navigation layout names. Either side
+    /// is dropped when empty, matching the V23 file migration.
+    /// </item>
+    /// <item>
+    /// <c>checklistTemplate</c> — the oldest flat string array, before the split. Every item
+    /// becomes an optional Aufbau item: the safest default, since nothing silently turns into a
+    /// blocking requirement.
+    /// </item>
+    /// </list>
+    /// </remarks>
+    private static IReadOnlyList<ChecklistTemplate> ParseChecklists(JsonElement root)
     {
+        if (root.TryGetProperty("checklists", out var lists) && lists.ValueKind == JsonValueKind.Array)
+        {
+            return lists.EnumerateArray()
+                .Select(l => new ChecklistTemplate(
+                    l.TryGetProperty("id", out var id)
+                    && id.ValueKind == JsonValueKind.String
+                    && Guid.TryParse(id.GetString(), out var parsed)
+                        ? parsed
+                        : Guid.NewGuid(),
+                    ChecklistDefaults.TitleOrFallback(
+                        l.TryGetProperty("title", out var t) ? t.GetString() : null),
+                    Items(l, "items")))
+                .ToList();
+        }
+
         if (root.TryGetProperty("checklistTemplateAufbau", out _) || root.TryGetProperty("checklistTemplateAbbau", out _))
         {
-            return (ChecklistItems(root, "checklistTemplateAufbau"), ChecklistItems(root, "checklistTemplateAbbau"));
+            return ChecklistTemplate.AufbauAbbau(
+                Items(root, "checklistTemplateAufbau"), Items(root, "checklistTemplateAbbau"));
         }
 
         if (root.TryGetProperty("checklistTemplate", out var legacy) && legacy.ValueKind == JsonValueKind.Array)
         {
-            return (legacy.EnumerateArray().Select(x => new ChecklistTemplateItem(x.GetString()!, false)).ToList(),
+            return ChecklistTemplate.AufbauAbbau(
+                legacy.EnumerateArray().Select(x => new ChecklistTemplateItem(x.GetString()!, false)).ToList(),
                 Array.Empty<ChecklistTemplateItem>());
         }
 
-        return (Array.Empty<ChecklistTemplateItem>(), Array.Empty<ChecklistTemplateItem>());
+        return Array.Empty<ChecklistTemplate>();
 
-        static IReadOnlyList<ChecklistTemplateItem> ChecklistItems(JsonElement e, string prop) =>
+        static IReadOnlyList<ChecklistTemplateItem> Items(JsonElement e, string prop) =>
             e.TryGetProperty(prop, out var a) && a.ValueKind == JsonValueKind.Array
                 ? a.EnumerateArray()
                     .Select(x => new ChecklistTemplateItem(
@@ -577,6 +663,34 @@ public static class MasterDataJson
     }
 
     /// <summary>
+    /// Reads the optional <c>navigation</c> array. A missing key yields an empty layout, which
+    /// means "this build's default" — never a materialized copy of it, see <see cref="NavLayout"/>.
+    /// A row without <c>visible</c> is visible: a hand-written file that lists modules means
+    /// "show these".
+    /// </summary>
+    private static IReadOnlyList<NavEntry> ParseNavigation(JsonElement root)
+    {
+        if (!root.TryGetProperty("navigation", out var nav) || nav.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<NavEntry>();
+        }
+
+        return nav.EnumerateArray().Select(ToEntry).ToList();
+
+        static NavEntry ToEntry(JsonElement e)
+        {
+            var module = e.TryGetProperty("module", out var m) ? m.GetString() ?? string.Empty : string.Empty;
+            var checklistId = e.TryGetProperty("checklistId", out var c)
+                && c.ValueKind == JsonValueKind.String
+                && Guid.TryParse(c.GetString(), out var id)
+                    ? id
+                    : (Guid?)null;
+            var visible = !e.TryGetProperty("visible", out var v) || v.ValueKind != JsonValueKind.False;
+            return new NavEntry(module, checklistId, visible);
+        }
+    }
+
+    /// <summary>
     /// Reads the optional <c>settings</c> object. A missing object, or any missing field within it,
     /// falls back to <see cref="IncidentSettings.Defaults"/> so an older or partial file still yields
     /// a complete record.
@@ -635,8 +749,8 @@ public static class MasterDataJson
                 memberCount = t.MemberCount,
                 maxDurationMinutes = t.MaxDurationMinutes,
             }),
-            checklistTemplateAufbau = set.ChecklistTemplateAufbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
-            checklistTemplateAbbau = set.ChecklistTemplateAbbau.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
+            checklists = ChecklistsForExport(set),
+            navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
             vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer }),
             personnel = set.Personnel.Select(p => new
@@ -657,6 +771,25 @@ public static class MasterDataJson
 
         return JsonSerializer.Serialize(model, ExportOptions);
     }
+
+    // The legacy checklistTemplateAufbau/Abbau keys are deliberately not written any more: they
+    // cannot express a third list, and emitting both shapes would leave two sources of truth in
+    // one file. Import still reads them, and the older flat checklistTemplate array.
+    private static List<object> ChecklistsForExport(MasterDataSet set) =>
+        set.ChecklistTemplates.Select(t => new
+        {
+            id = t.Id,
+            title = t.Title,
+            items = t.Items.Select(i => new { text = i.Text, mandatory = i.IsMandatory }),
+        }).Cast<object>().ToList();
+
+    private static List<object> NavigationForExport(MasterDataSet set) =>
+        set.Navigation.Select(n => new
+        {
+            module = n.ModuleKey,
+            checklistId = n.ChecklistId,
+            visible = n.IsVisible,
+        }).Cast<object>().ToList();
 }
 
 /// <summary>

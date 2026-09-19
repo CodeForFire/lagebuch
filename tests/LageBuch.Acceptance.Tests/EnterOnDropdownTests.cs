@@ -18,7 +18,7 @@ public class EnterOnDropdownTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Blaulicht aus?", false) },
+        ChecklistTemplates = ChecklistTemplate.AufbauAbbau(new[] { new ChecklistTemplateItem("Blaulicht aus?", false) }, null),
         TruppTypes = new[] { new TruppType("Angriffstrupp") },
         Personnel = new[]
         {

@@ -23,7 +23,7 @@ public class AutomationPropertiesTests
         public MasterDataSet Get() => MasterDataSet.Empty with
         {
             Roles = new[] { "EL" },
-            ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Aufstellort ELW frei?", true) },
+            ChecklistTemplates = ChecklistTemplate.AufbauAbbau(new[] { new ChecklistTemplateItem("Aufstellort ELW frei?", true) }, null),
             Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", null) },
         };

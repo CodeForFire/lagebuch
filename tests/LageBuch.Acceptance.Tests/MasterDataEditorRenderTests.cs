@@ -36,12 +36,13 @@ public class MasterDataEditorRenderTests
                 new Vehicle("Aich", "Aich 42/1", 6),
                 new Vehicle("Puch", "Puch 40/1", 9),
             },
-            ChecklistTemplateAufbau = new[]
-            {
-                new ChecklistTemplateItem("Aufstellort ELW frei?", true),
-                new ChecklistTemplateItem("Kennleuchte ein, Blaulicht aus?", false),
-            },
-            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Fahrzeug abgerüstet?", true) },
+            ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
+                new[]
+                {
+                    new ChecklistTemplateItem("Aufstellort ELW frei?", true),
+                    new ChecklistTemplateItem("Kennleuchte ein, Blaulicht aus?", false),
+                },
+                new[] { new ChecklistTemplateItem("Fahrzeug abgerüstet?", true) }),
             Links = new[]
             {
                 new Link("Wetterdienst", "https://dwd.de"),

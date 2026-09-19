@@ -20,18 +20,16 @@ internal static class WorkspaceRenderHelper
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         Roles = new[] { "EL" },
-        ChecklistTemplateAufbau = new[]
-        {
-            new ChecklistTemplateItem("Aufstellort ELW weit genug weg um nicht zu behindern?", true),
-            new ChecklistTemplateItem("Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?", false),
-            new ChecklistTemplateItem("Rote Kennleuchte ein, Blaulicht aus?", false),
-            new ChecklistTemplateItem("PC eingeschaltet und VPN Verbindung aktiviert?", false),
-            new ChecklistTemplateItem("Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?", false),
-        },
-        ChecklistTemplateAbbau = new[]
-        {
-            new ChecklistTemplateItem("Fahrzeug abgerüstet und einsatzbereit?", true),
-        },
+        ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
+            new[]
+            {
+                new ChecklistTemplateItem("Aufstellort ELW weit genug weg um nicht zu behindern?", true),
+                new ChecklistTemplateItem("Bei BEIDEN Funkgeräten über die Bedienteile am Armaturenbrett die Lautstärke auf 0 gestellt?", false),
+                new ChecklistTemplateItem("Rote Kennleuchte ein, Blaulicht aus?", false),
+                new ChecklistTemplateItem("PC eingeschaltet und VPN Verbindung aktiviert?", false),
+                new ChecklistTemplateItem("Kopfdaten ETB ausgefüllt (Einsatzort, Bearbeiter)?", false),
+            },
+            new[] { new ChecklistTemplateItem("Fahrzeug abgerüstet und einsatzbereit?", true) }),
         TruppTypes = new[] { new TruppType("Angriffstrupp"), new TruppType("Sicherheitstrupp"), new TruppType("CSA-Trupp", 3, 20) },
         UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz" },
 

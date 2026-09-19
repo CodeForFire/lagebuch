@@ -101,8 +101,9 @@ public class MasterDataJsonTests
             Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä") },
 
             // relaxed escaping must survive the round trip
-            ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Ä ö ü / ß Schritt", true) },
-            ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbau Ä ö ü", false) },
+            ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
+                new[] { new ChecklistTemplateItem("Ä ö ü / ß Schritt", true) },
+                new[] { new ChecklistTemplateItem("Abbau Ä ö ü", false) }),
             Personnel = new[]
             {
                 new Person("Mustermann", "Max", "ZF", "Land 1", "0171"),

@@ -9,12 +9,43 @@
     { "name": "Strahlenschutztrupp", "memberCount": 3, "maxDurationMinutes": 30 },
     { "name": "LPA-Trupp", "memberCount": 2, "maxDurationMinutes": 60 }
   ],
-  "checklistTemplateAufbau": [
-    { "text": "Aufstellort ELW frei?", "mandatory": true },
-    { "text": "Kennleuchte ein, Blaulicht aus?", "mandatory": false }
+  "checklists": [
+    {
+      "id": "6c2f1a44-0b7e-4d3a-9f21-8a5c1d0e7b10",
+      "title": "Aufbau",
+      "items": [
+        { "text": "Aufstellort ELW frei?", "mandatory": true },
+        { "text": "Kennleuchte ein, Blaulicht aus?", "mandatory": false }
+      ]
+    },
+    {
+      "id": "9d81e5b2-73c6-4f08-a1d4-2e6b93f5c8a7",
+      "title": "Abbau",
+      "items": [
+        { "text": "Fahrzeug abgerüstet?", "mandatory": true }
+      ]
+    },
+    {
+      "id": "b7f3c611-2a58-4c9e-8d40-5f1a2b3c4d5e",
+      "title": "Nachbereitung",
+      "items": [
+        { "text": "Einsatzbericht geschrieben?", "mandatory": false },
+        { "text": "Verbrauchsmaterial nachgefüllt?", "mandatory": false }
+      ]
+    }
   ],
-  "checklistTemplateAbbau": [
-    { "text": "Fahrzeug abgerüstet?", "mandatory": true }
+  "navigation": [
+    { "module": "checklist", "checklistId": "6c2f1a44-0b7e-4d3a-9f21-8a5c1d0e7b10", "visible": true },
+    { "module": "etb", "visible": true },
+    { "module": "tasks", "visible": true },
+    { "module": "roles", "visible": true },
+    { "module": "forces", "visible": true },
+    { "module": "scba", "visible": true },
+    { "module": "co", "visible": false },
+    { "module": "files", "visible": true },
+    { "module": "links", "visible": true },
+    { "module": "checklist", "checklistId": "9d81e5b2-73c6-4f08-a1d4-2e6b93f5c8a7", "visible": true },
+    { "module": "checklist", "checklistId": "b7f3c611-2a58-4c9e-8d40-5f1a2b3c4d5e", "visible": true }
   ],
   "links": [
     { "name": "Wetterdienst", "url": "https://dwd.de" },
