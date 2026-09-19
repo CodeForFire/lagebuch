@@ -73,10 +73,41 @@ public class CoMeasurementTests
         Assert.Equal("3. OG", CoMeasurementLabels.FloorLabel(3));
     }
 
+    [Theory]
+    [InlineData(0, 3, "EG–3. OG")]
+    [InlineData(2, 3, "2. UG–3. OG")]
+    public void CoMeasurementLabels_FloorRangeLabel(int undergroundFloorCount, int floorCount, string expected)
+    {
+        Assert.Equal(expected, CoMeasurementLabels.FloorRangeLabel(undergroundFloorCount, floorCount));
+    }
+
     [Fact]
     public void CoMeasurementLabels_ApartmentLabel()
     {
         Assert.Equal("Whg. 5", CoMeasurementLabels.ApartmentLabel(5));
+    }
+
+    [Theory]
+    [InlineData(1, 3, "Links")]
+    [InlineData(2, 3, "Mitte")]
+    [InlineData(3, 3, "Rechts")]
+    [InlineData(1, 2, "Whg. 1")]
+    [InlineData(1, 4, "Whg. 1")]
+    public void CoMeasurementLabels_DefaultApartmentLabel(
+        int apartmentNumber,
+        int apartmentsPerFloor,
+        string expected)
+    {
+        Assert.Equal(expected, CoMeasurementLabels.DefaultApartmentLabel(apartmentNumber, apartmentsPerFloor));
+    }
+
+    [Fact]
+    public void CoMeasurementLabels_ApartmentLabel_CustomLabelWinsOverGeneratedDefault()
+    {
+        var building = Building.Create("Haus A", 2, 3, 0)
+            .WithApartmentLabel(1, 2, "Familie Müller");
+
+        Assert.Equal("Familie Müller", CoMeasurementLabels.ApartmentLabel(building, 1, 2));
     }
 
     [Fact]
@@ -85,6 +116,15 @@ public class CoMeasurementTests
         Assert.Equal("noch nicht abgesucht", CoMeasurementLabels.StatusText(DwellingStatus.NotSearched));
         Assert.Equal("abgesucht – keine Personen betroffen", CoMeasurementLabels.StatusText(DwellingStatus.Searched));
         Assert.Equal("Person(en) betroffen", CoMeasurementLabels.StatusText(DwellingStatus.Affected));
+    }
+
+    [Theory]
+    [InlineData(DwellingStatus.NotSearched, "GELB")]
+    [InlineData(DwellingStatus.Searched, "GRÜN")]
+    [InlineData(DwellingStatus.Affected, "ROT")]
+    public void CoMeasurementLabels_StatusChip(DwellingStatus status, string expected)
+    {
+        Assert.Equal(expected, CoMeasurementLabels.StatusChip(status));
     }
 
     [Fact]
