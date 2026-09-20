@@ -834,7 +834,7 @@ public class FilesViewModelTests
         // On Android the picked content:// URI is streamed into app-private storage before the
         // pick returns, so a provider that hands back nothing faults the task rather than
         // returning null. That used to escape the command as an unhandled async exception. (#302)
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
