@@ -58,7 +58,7 @@ public class AutomationPropertiesTests
 
         void AssertNamed(string sectionTitle, int expectedButtons)
         {
-            vm.SelectedSection = (EditorSection?)vm.Sections.FirstOrDefault(s => s.Title == sectionTitle)
+            vm.SelectedSection = vm.Sections.FirstOrDefault(s => s.Title == sectionTitle)
                 ?? vm.Checklists.Single(c => c.Title == sectionTitle);
             Dispatcher.UIThread.RunJobs();
             var buttons = IconButtons(view);
