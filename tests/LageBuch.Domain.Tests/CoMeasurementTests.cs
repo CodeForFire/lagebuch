@@ -1,4 +1,5 @@
 using LageBuch.Domain.CoMeasurement;
+using LageBuch.Domain.Etb;
 
 namespace LageBuch.Domain.Tests;
 
@@ -206,6 +207,69 @@ public class CoMeasurementTests
         // Same value - no new entry
         incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
         Assert.Equal(journalCountBefore + 1, incident.Journal.Count);
+    }
+
+    // #424: the reading is a professional record, not bookkeeping. It must not land on
+    // EtbDirection.System, because the ETB hides that by default (#223) -- which is precisely
+    // why crews reported the change as "not documented".
+    [Fact]
+    public void Incident_RecordCoValue_LogsAMeasurementEntry_NotASystemEntry()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
+
+        var entry = incident.Journal.Last();
+        Assert.Equal(EtbDirection.Measurement, entry.Direction);
+        Assert.Contains("45 ppm", entry.Text, StringComparison.Ordinal);
+    }
+
+    // The scoping of #424: only the ppm line moved. Everything else the CO tab writes stays
+    // bookkeeping and stays hideable.
+    [Fact]
+    public void Incident_OtherCoEvents_StillLogSystemEntries()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        Assert.Equal(EtbDirection.System, incident.Journal.Last().Direction);
+
+        incident.SetDwellingStatus(clock, op, incident.Buildings[0].Id, 0, 1, DwellingStatus.Searched);
+        Assert.Equal(EtbDirection.System, incident.Journal.Last().Direction);
+
+        incident.RemoveCoBuilding(clock, op, incident.Buildings[0].Id);
+        Assert.Equal(EtbDirection.System, incident.Journal.Last().Direction);
+    }
+
+    [Fact]
+    public void Incident_EditJournalEntry_RefusesAMeasurementEntry()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
+        var measurement = incident.Journal.Last();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            incident.EditJournalEntry(clock, op, measurement.Id, "45 ppm war falsch"));
+    }
+
+    // Widening the enum must not widen what a forged synced command can push through: the
+    // Enum.IsDefined guard in AddJournalEntry is the only thing between the wire and the journal.
+    [Fact]
+    public void Incident_AddJournalEntry_StillRejectsAnUndefinedDirection()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+
+        Assert.Throws<ArgumentException>(() =>
+            incident.AddJournalEntry(clock, op, (EtbDirection)99, "geschmuggelt"));
     }
 
     [Fact]

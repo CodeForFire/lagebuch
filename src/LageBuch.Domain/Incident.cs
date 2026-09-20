@@ -193,14 +193,31 @@ public sealed class Incident
         }
     }
 
-    // Appends an automatic (system-generated) entry straight to the journal, deliberately
-    // bypassing AddJournalEntry's EnsureOpen guard: Close has to log its own entry, and this is
-    // only ever called from methods that guard themselves. Uses EtbDirection.System so these
-    // machine-written lines are distinguishable from -- and filterable apart from -- human
-    // "Intern" notes.
+    // Appends an automatic (app-written) entry straight to the journal, deliberately bypassing
+    // AddJournalEntry's EnsureOpen guard: Close has to log its own entry, and this is only ever
+    // called from methods that guard themselves. The direction is what makes these machine-written
+    // lines distinguishable from -- and filterable apart from -- human "Intern" notes.
+    private void AppendAutomaticEntry(
+        IClock clock,
+        SessionOperator op,
+        EtbDirection direction,
+        string text,
+        string? from = null,
+        string? to = null) =>
+        _journal.Add(EtbEntry.Create(clock.Now, direction, text, op, from, to));
+
+    // Bookkeeping: "Einsatz begonnen", a Kraft added, a role assigned. Hidden by default in the
+    // ETB (#223).
     private void AppendSystemEntry(
         IClock clock, SessionOperator op, string text, string? from = null, string? to = null) =>
-        _journal.Add(EtbEntry.Create(clock.Now, EtbDirection.System, text, op, from, to));
+        AppendAutomaticEntry(clock, op, EtbDirection.System, text, from, to);
+
+    // A professional record rather than bookkeeping -- what a Trupp measured (#424). Same
+    // machine-written provenance as AppendSystemEntry, but never hidden by the ETB's
+    // "Systemmeldungen ausblenden" filter, because hiding a measurement is what made the reading
+    // look undocumented in the first place.
+    private void AppendMeasurementEntry(IClock clock, SessionOperator op, string text) =>
+        AppendAutomaticEntry(clock, op, EtbDirection.Measurement, text);
 
     public void ResumeEditing(IClock clock, SessionOperator resumedBy)
     {
@@ -380,9 +397,10 @@ public sealed class Incident
         }
 
         var existing = _journal[index];
-        if (existing.Direction == EtbDirection.System)
+        if (EtbDirections.IsAppWritten(existing.Direction))
         {
-            throw new InvalidOperationException("Systemeinträge können nicht bearbeitet werden.");
+            throw new InvalidOperationException(
+                "Automatisch erzeugte Einträge können nicht bearbeitet werden.");
         }
 
         var edited = existing.WithEditedText(text, op, clock.Now);
@@ -1036,7 +1054,7 @@ public sealed class Incident
         var text = coValue is { } v
             ? $"CO-Messung {location}: {v} ppm"
             : $"CO-Messung {location}: Messwert gelöscht";
-        AppendSystemEntry(clock, op, text);
+        AppendMeasurementEntry(clock, op, text);
     }
 
     public void SetDwellingStatus(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status)
