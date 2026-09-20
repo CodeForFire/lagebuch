@@ -126,6 +126,14 @@ public class DemoIncidentTests : IDisposable
         incident.SetDwellingDetails(haus, 0, 1, "Mustermann", false);
         incident.AddJournalEntry(c, elw, EtbDirection.Internal, "CO-Messung im Treppenhaus begonnen, 2. OG rechts 120 ppm", from: "Florian Musterstadt 41/1");
 
+        // Re-measured after the flat was ventilated (#424). Two readings on the same Wohnung are
+        // what makes the sample show a Messreihe rather than a single number -- the Verlauf is the
+        // point of the CO section, so the Probefahrt has to demonstrate one.
+        c.Now = c.Now.AddMinutes(9);
+        incident.RecordCoValue(c, elw, haus, 2, 1, 40);
+        c.Now = c.Now.AddMinutes(7);
+        incident.RecordCoValue(c, elw, haus, 2, 1, 5);
+
         c.Now = c.Now.AddMinutes(4);
         incident.AddJournalEntry(c, elw, EtbDirection.Outgoing, "Lagemeldung: Feuer unter Kontrolle, Menschenrettung abgeschlossen, Nachlöscharbeiten laufen", from: "Florian Musterstadt 11/1", to: "ILS");
         return incident;
@@ -157,6 +165,11 @@ public class DemoIncidentTests : IDisposable
         Assert.True(loaded.Tasks[0].IsCompleted);
         Assert.Single(loaded.Buildings);
         Assert.Equal(6, loaded.Dwellings.Count);
+
+        // #424: the sample has to carry a real Messreihe, not just a current value, or the CO
+        // section of the Probefahrt's PDF demonstrates nothing.
+        var messreihe = loaded.Dwellings.Single(d => d.FloorOrdinal == 2 && d.ApartmentNumber == 1).Readings;
+        Assert.Equal(new int?[] { 120, 40, 5 }, messreihe.Select(r => r.Value));
         Assert.Equal(5, loaded.Checklists[0].Items.Count);
         Assert.Equal(3, loaded.Checklists[0].Items.Count(i => i.IsDone));
 

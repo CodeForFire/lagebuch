@@ -93,7 +93,7 @@ public class EtbViewModelTests
     public void Measurement_entries_survive_the_default_system_filter()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -118,7 +118,7 @@ public class EtbViewModelTests
     public void Measurement_entries_are_not_editable()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),

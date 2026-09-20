@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 23;
+    public const int CurrentVersion = 24;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -153,6 +153,11 @@ public static class Migrations
         if (version < 23)
         {
             ApplyV23(cn, tx);
+        }
+
+        if (version < 24)
+        {
+            ApplyV24(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -733,6 +738,36 @@ public static class Migrations
             UPDATE checklist_items SET list_id = '{abbau}'  WHERE list_id IS NULL AND kind = 1;
             """;
         Exec(cn, tx, backfill);
+    }
+
+    // Per-Wohnung CO measurement history (#424). Old files gain the empty table on their next
+    // open (Load migrates before reading) and nothing is backfilled: the readings a pre-#424
+    // incident took survive only as German ETB prose, and matching that text back to a
+    // (building, floor, apartment) triple would have to guess past renamed buildings and the
+    // Links/Mitte/Rechts labels. An invented timestamp is worse than an honest gap.
+    //
+    // The bump also does ApplyV7's job: a file written by this build may carry the new
+    // EtbDirection.Measurement (ordinal 4) in etb_entries.direction, and the
+    // version > CurrentVersion guard in Migrate is what stops an older build rendering that
+    // unknown ordinal as "4".
+    //
+    // One row per reading, not one column per gas: #410 turns the single CO value into up to six
+    // named gas slots, and it extends this table with gas_slot/unit via AddColumnIfMissing
+    // without touching the row shape. Deliberately no UNIQUE (dwelling_id, measured_at) -- those
+    // six slots will share one timestamp.
+    private static void ApplyV24(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql24 = """
+            CREATE TABLE IF NOT EXISTS co_readings (
+                id TEXT PRIMARY KEY,
+                dwelling_id TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                measured_at TEXT NOT NULL,
+                value INTEGER,
+                recorded_by TEXT NOT NULL
+            );
+            """;
+        Exec(cn, tx, sql24);
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

@@ -23,7 +23,7 @@ public sealed class IncidentRepository
                     "role_assignments", "force_units", "force_unit_edits", "scba_trupps",
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
-                    "co_buildings", "co_dwellings",
+                    "co_buildings", "co_dwellings", "co_readings",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -312,6 +312,24 @@ public sealed class IncidentRepository
                     p("$kv", d.KeyAvailable is { } k ? (object)(k ? 1 : 0) : DBNull.Value);
                     p("$cv", (object?)d.CoValue ?? DBNull.Value);
                 });
+
+            for (var j = 0; j < d.Readings.Count; j++)
+            {
+                var reading = d.Readings[j];
+                Run(
+                    cn,
+                    tx,
+                    "INSERT INTO co_readings (id, dwelling_id, ordinal, measured_at, value, recorded_by) " + "VALUES ($id,$did,$o,$at,$v,$by);",
+                    p =>
+                    {
+                        p("$id", Guid.NewGuid().ToString());
+                        p("$did", d.Id.ToString());
+                        p("$o", j);
+                        p("$at", reading.MeasuredAt.ToString(Iso));
+                        p("$v", (object?)reading.Value ?? DBNull.Value);
+                        p("$by", reading.RecordedBy);
+                    });
+            }
         }
 
         for (var i = 0; i < incident.Tasks.Count; i++)
@@ -640,18 +658,34 @@ public sealed class IncidentRepository
                     acDict);
             });
 
+        // Grouped up front rather than queried per Wohnung, the same shape as strengthEditsByUnit
+        // above. Ordered by dwelling_id as well as ordinal: grouping alone would survive a bare
+        // "ORDER BY ordinal", but the series' order is the whole point of storing it.
+        var readingsByDwelling = ReadAll(
+            cn,
+            "SELECT dwelling_id, measured_at, value, recorded_by FROM co_readings ORDER BY dwelling_id, ordinal;",
+            r => (DwellingId: Guid.Parse(r.GetString(0)),
+                  Reading: new Domain.CoMeasurement.CoReading(ParseDate(r.GetString(1)), NullableInt(r, 2), r.GetString(3))))
+            .GroupBy(x => x.DwellingId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Reading).ToList());
+
         var dwellings = ReadAll(
             cn,
             "SELECT id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value FROM co_dwellings ORDER BY floor_ordinal, apartment_number;",
-            r => Domain.CoMeasurement.Dwelling.Rehydrate(
-                Guid.Parse(r.GetString(0)),
-                Guid.Parse(r.GetString(1)),
-                r.GetInt32(2),
-                r.GetInt32(3),
-                Str(r, 4),
-                (Domain.CoMeasurement.DwellingStatus)r.GetInt32(5),
-                r.IsDBNull(6) ? null : r.GetInt32(6) == 1,
-                NullableInt(r, 7)));
+            r =>
+            {
+                var id = Guid.Parse(r.GetString(0));
+                return Domain.CoMeasurement.Dwelling.Rehydrate(
+                    id,
+                    Guid.Parse(r.GetString(1)),
+                    r.GetInt32(2),
+                    r.GetInt32(3),
+                    Str(r, 4),
+                    (Domain.CoMeasurement.DwellingStatus)r.GetInt32(5),
+                    r.IsDBNull(6) ? null : r.GetInt32(6) == 1,
+                    NullableInt(r, 7),
+                    readingsByDwelling.TryGetValue(id, out var rs) ? rs : null);
+            });
 
         var tasks = ReadAll(
             cn,
