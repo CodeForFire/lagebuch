@@ -124,6 +124,17 @@ Write code that trips neither:
   `Assert.Equal(expected, actual, precision: 0)`, or `Math.Abs(a - b) <= 1.0` —
   and never with `Assert.Equal(0, someDouble)`, which is an exact comparison
   wearing a method call.
+- **Never call an API the toolchain marks obsolete.** When the warning names
+  the replacement, use it — `TextBox.Watermark` → `PlaceholderText`. On the C#
+  side `TreatWarningsAsErrors` already fails the build (CS0612/0618/0619), but
+  Avalonia's XAML compiler logs through MSBuild and slipped past it, so
+  `Directory.Build.props` escalates `AVLN5001` separately. Note that a XAML
+  deprecation only surfaces on a **full** rebuild — an incremental build skips
+  the XAML compile, which is how a deprecated `Watermark` once shipped
+  unnoticed. If a deprecation ever genuinely has to stand, suppress that one
+  occurrence with a written justification; never widen `NoWarn`.
+  A `PART_` name in a control template is not an obsolete member —
+  `TextBox /template/ TextBlock#PART_Watermark` stays exactly as it is.
 
 When a new CodeQL alert appears, never leave it open and never dismiss it
 without a written reason:
