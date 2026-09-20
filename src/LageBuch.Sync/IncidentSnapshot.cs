@@ -149,4 +149,13 @@ public sealed record BuildingDto(
 
 public sealed record DwellingDto(
     Guid Id, Guid BuildingId, int FloorOrdinal, int ApartmentNumber,
-    string? ResidentName, DwellingStatus Status, bool? KeyAvailable, int? CoValue);
+    string? ResidentName, DwellingStatus Status, bool? KeyAvailable, int? CoValue,
+
+    // Appended with a default, the BuildingDto convention: a snapshot written before #424 has no
+    // readings key, deserializes to null, and maps to an empty series. That default is this
+    // layer's equivalent of a migration -- the wire has no schema version of its own.
+    IReadOnlyList<CoReadingDto>? Readings = null);
+
+/// <summary>One CO reading on the wire; the JSON-shaped sibling of
+/// <see cref="LageBuch.Domain.CoMeasurement.CoReading"/>.</summary>
+public sealed record CoReadingDto(DateTimeOffset MeasuredAt, int? Value, string RecordedBy);
