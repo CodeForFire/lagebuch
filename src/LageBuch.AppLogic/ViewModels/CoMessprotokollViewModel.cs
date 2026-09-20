@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Time;
 using LageBuch.Sync;
@@ -44,6 +45,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         _residentName = dwelling.ResidentName;
         _keyAvailable = dwelling.KeyAvailable;
         _label = CoMeasurementLabels.ApartmentLabel(building, dwelling.FloorOrdinal, dwelling.ApartmentNumber);
+        Readings = dwelling.Readings;
         StatusBrush = GetStatusBrush(dwelling.Status);
     }
 
@@ -77,6 +79,18 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     /// with ResidentName/KeyAvailable, when FERTIG commits (see CoMessprotokollViewModel.ConfirmEditor).</summary>
     [ObservableProperty]
     private string _label;
+
+    /// <summary>Every reading committed for this Wohnung, oldest first. Set once from the domain
+    /// and never written back: the pending sidebar value is not a measurement until FERTIG, so
+    /// there is deliberately nothing here for ApplyPendingEditToMatrix to preview.</summary>
+    public IReadOnlyList<CoReading> Readings { get; }
+
+    /// <summary>"Messreihe: 08:14 120 ppm · 08:41 40 ppm" for the tooltip, empty below two
+    /// readings -- with one it only repeats <see cref="CoDisplay"/>, which the tooltip already
+    /// carries a line above.</summary>
+    public string CoSeriesText => Readings.Count < 2
+        ? string.Empty
+        : "Messreihe: " + string.Join(" · ", Readings.Select(CoMeasurementLabels.ReadingLabel));
 
     public string CoDisplay => CoValue is { } v ? $"{v} ppm" : "Kein Messwert";
 
@@ -113,6 +127,12 @@ public sealed partial class DwellingCellViewModel : ObservableObject
                 false => "Kein Schlüssel",
                 _ => "Schlüssel unbekannt",
             });
+
+            if (CoSeriesText.Length > 0)
+            {
+                parts.Add(CoSeriesText);
+            }
+
             return string.Join(" · ", parts);
         }
     }
@@ -180,6 +200,32 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 /// Einsatztagebuch before the operator had a chance to cancel. One dwelling is one reportable
 /// event, the same reasoning the Kräfte Stärke editor already applies to its three numbers.
 /// Holds no session reference on purpose: it cannot write, only be read back on commit.</summary>
+/// <summary>
+/// One committed reading, pre-formatted for the MESSREIHE list — the view binds strings and
+/// booleans, never a domain record (the <c>EtbEntryRow</c> convention).
+/// </summary>
+public sealed record CoReadingRow(
+    string Time,
+    string Value,
+    string RecordedBy,
+    bool IsCoElevated,
+    bool IsCoDangerous,
+    bool IsCoLethal)
+{
+    public static CoReadingRow From(CoReading reading)
+    {
+        ArgumentNullException.ThrowIfNull(reading);
+        var severity = CoSeverityClassifier.SeverityOf(reading.Value);
+        return new(
+            Formatting.TimeOfDay(reading.MeasuredAt),
+            reading.Value is { } v ? $"{v} ppm" : "gelöscht",
+            reading.RecordedBy,
+            severity == CoSeverity.Elevated,
+            severity == CoSeverity.Dangerous,
+            severity == CoSeverity.Lethal);
+    }
+}
+
 public sealed partial class DwellingEditorViewModel : ObservableObject
 {
     public DwellingEditorViewModel(Dwelling dwelling, Building building)
@@ -195,6 +241,10 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
         OriginalResidentName = dwelling.ResidentName;
         OriginalKeyAvailable = dwelling.KeyAvailable;
         OriginalLabel = CoMeasurementLabels.ApartmentLabel(building, dwelling.FloorOrdinal, dwelling.ApartmentNumber);
+
+        // Newest first: during an Einsatz the question is "what is it now, and was it worse?",
+        // so the latest reading belongs at the top where the eye lands.
+        Readings = dwelling.Readings.Reverse().Select(CoReadingRow.From).ToList();
 
         _status = OriginalStatus;
         _coValue = OriginalCoValue;
@@ -233,6 +283,16 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
     public bool? OriginalKeyAvailable { get; }
 
     public string OriginalLabel { get; }
+
+    /// <summary>
+    /// The Wohnung's committed Messreihe, newest first. Read-only on purpose: a keystroke in the
+    /// ppm field is not a measurement, and ABBRECHEN has to be able to discard it — a previewed
+    /// row would put a reading in the list that never happened, with a timestamp that does not
+    /// exist yet (it is minted by the clock inside RecordCoValue when FERTIG commits).
+    /// </summary>
+    public IReadOnlyList<CoReadingRow> Readings { get; }
+
+    public bool HasReadings => Readings.Count > 0;
 
     public bool HasStatusChange => Status != OriginalStatus;
 

@@ -32,6 +32,39 @@ public class CoMessprotokollSectionTests
         Assert.Equal(0x25, pdf[0]); // '%'
     }
 
+    // #424: a Wohnung with a Messreihe renders the series line; one with a single reading omits
+    // it, and a cleared value prints as "gelöscht" rather than vanishing. Text is not extracted in
+    // this suite (see PdfAssert), so this pins that composing does not throw across those shapes --
+    // the wording was checked by eye on a generated PDF.
+    [Fact]
+    public void Pdf_Contains_CO_Section_With_A_Measurement_Series()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Huber", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 3);
+        var haus = incident.Buildings[0].Id;
+
+        // Three readings, falling.
+        incident.RecordCoValue(clock, op, haus, 0, 1, 250);
+        clock.Now = clock.Now.AddMinutes(27);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 40);
+        clock.Now = clock.Now.AddMinutes(21);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 5);
+
+        // Two readings ending in a deletion.
+        incident.RecordCoValue(clock, op, haus, 0, 2, 120);
+        incident.RecordCoValue(clock, op, haus, 0, 2, null);
+
+        // A single reading: no series line.
+        incident.RecordCoValue(clock, op, haus, 1, 1, 8);
+
+        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
+
+        Assert.True(pdf.Length > 1000);
+        Assert.Equal(0x25, pdf[0]); // '%'
+    }
+
     [Fact]
     public void Pdf_Contains_CO_Section_With_Underground_Floors()
     {

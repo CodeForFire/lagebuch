@@ -200,6 +200,39 @@
                      IsVisible="{Binding Editor.IsCoImplausible}" />
         </StackPanel>
 
+        <!-- MESSREIHE (#424): this Wohnung's committed readings, newest first. Only values
+             actually written by FERTIG appear here: the field above already shows the pending
+             one, and a keystroke is not a measurement, so previewing it would put a reading in
+             the list that ABBRECHEN then silently un-happened. Each value carries the same
+             severity coloring as the tile, so a fallen-from-120 reading still reads as having
+             been dangerous. -->
+        <StackPanel x:Name="MessreihePanel" Spacing="2"
+                    IsVisible="{Binding Editor.HasReadings}">
+          <TextBlock Text="MESSREIHE" Classes="overline" FontSize="10" />
+          <ItemsControl x:Name="MessreiheList" ItemsSource="{Binding Editor.Readings}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CoReadingRow">
+                <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,2,0,0">
+                  <TextBlock Grid.Column="0" Text="{Binding Time}"
+                             FontFamily="{StaticResource MonoFont}" FontSize="11"
+                             Foreground="{StaticResource TextMutedBrush}" Margin="0,0,8,0" />
+                  <TextBlock Grid.Column="1" Text="{Binding Value}"
+                             FontFamily="{StaticResource MonoFont}" FontSize="11"
+                             Classes="coValue"
+                             Classes.elevated="{Binding IsCoElevated}"
+                             Classes.dangerous="{Binding IsCoDangerous}"
+                             Classes.lethal="{Binding IsCoLethal}" />
+                  <TextBlock Grid.Column="2" Text="{Binding RecordedBy}"
+                             FontSize="10" Margin="8,0,0,0"
+                             VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis"
+                             Foreground="{StaticResource TextMutedBrush}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
         <!-- Bezeichnung (#265): every unit's own label now, instead of a header shared with every
              other floor's same-numbered column: defaults to "Whg. N" (or "Links/Mitte/Rechts"
              for a 3-flat floor), always user-editable, shown directly on the tile. -->
