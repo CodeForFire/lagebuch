@@ -40,8 +40,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         Action<int> onRecordPressure,
         Action onWithdraw,
         Action onMarkRemoved,
-        IReadOnlyList<SafetyTruppOption> safetyTruppOptions,
-        SafetyTruppOption selectedSafetyTrupp,
+        IReadOnlyList<SafetyTruppChoice> safetyTruppChoices,
         string? safetyTruppHint,
         Action<Guid?> onAssignSafetyTrupp)
     {
@@ -55,14 +54,8 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _onMarkRemoved = onMarkRemoved;
         _onAssignSafetyTrupp = onAssignSafetyTrupp;
         _pressureInput = trupp.LatestPressure ?? 300;
-        SafetyTruppOptions = new ObservableCollection<SafetyTruppOption>(safetyTruppOptions);
+        SafetyTruppChoices = safetyTruppChoices;
         SafetyTruppHint = safetyTruppHint;
-
-        // Assign the backing field, not the property: going through the setter here would fire
-        // OnSelectedSafetyTruppChanged during construction, and RefreshTrupps builds a fresh row
-        // for every Trupp on every change -- so each rebuild would re-send the assignment it is
-        // merely displaying. Same reason _pressureInput is seeded directly above.
-        _selectedSafetyTrupp = selectedSafetyTrupp;
     }
 
     public Guid Id => _trupp.Id;
@@ -145,19 +138,15 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _ => "Im Einsatz",
     };
 
-    /// <summary>
-    /// The Trupps that may be picked as this one's Sicherheitstrupp, "— kein —" first. Carried on
-    /// the row rather than the ViewModel because the cell template binds against the row, the same
-    /// shape ForceRow uses for its status options.
-    /// </summary>
-    /// <remarks>
-    /// One collection for the row's whole life, mutated in place by <see cref="Update"/> and never
-    /// reassigned. Handing the ComboBox a new list makes it drop and re-pick its selection, and the
-    /// "— kein —" it writes back is indistinguishable from the operator choosing it — which cleared
-    /// the Sicherheitstrupp a moment after it was set. Keeping the instance also keeps an open
-    /// dropdown attached to its items instead of having them swapped underneath it.
-    /// </remarks>
-    public ObservableCollection<SafetyTruppOption> SafetyTruppOptions { get; }
+    /// <summary>The Trupps that may be designated as this one's Sicherheitstrupp, "— kein —"
+    /// first. Carried on the row rather than the ViewModel because the flyout's item template binds
+    /// against the entry itself, the same shape ForceRow uses for its status options.</summary>
+    public IReadOnlyList<SafetyTruppChoice> SafetyTruppChoices { get; private set; }
+
+    /// <summary>The flyout button's face: the Sicherheitstrupp in force, or "— kein —".</summary>
+    public string SafetyTruppButtonText =>
+        SafetyTruppChoices.FirstOrDefault(c => c.Id == _trupp.SafetyTruppId)?.Display
+            ?? SafetyTruppChoice.NoneDisplay;
 
     /// <summary>The single amber line under the picker, or null when there is nothing to say.
     /// Recomputed by the ViewModel on every incident change and pushed in through
@@ -167,27 +156,6 @@ public sealed partial class ScbaTruppRow : ObservableObject
     public bool HasSafetyTruppHint => !string.IsNullOrEmpty(SafetyTruppHint);
 
     public bool CanAssignSafetyTrupp => !_isReadOnly && !_trupp.IsReturned;
-
-    [ObservableProperty]
-    private SafetyTruppOption _selectedSafetyTrupp;
-
-    partial void OnSelectedSafetyTruppChanged(SafetyTruppOption value)
-    {
-        // A null arrives when the ComboBox resets itself; it is never a user choice, because
-        // "kein Sicherheitstrupp" is SafetyTruppOption.None. The equality check then makes the
-        // picker following the domain inert, so only a real change reaches the session.
-        //
-        // Both guards depend on SafetyTruppOptions being a stable collection: replacing the
-        // ItemsSource makes Avalonia reset SelectedItem and write "— kein —" back, which is
-        // indistinguishable from the operator choosing it and silently wiped the assignment.
-        // That is why Update reconciles the options in place instead of handing over a new list.
-        if (_isReadOnly || value is null || value.Id == _trupp.SafetyTruppId)
-        {
-            return;
-        }
-
-        _onAssignSafetyTrupp(value.Id);
-    }
 
     [ObservableProperty]
     private int _pressureInput;
@@ -214,11 +182,9 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     /// <summary>
     /// Re-points this row at the current state of its Trupp, instead of the ViewModel replacing the
-    /// row object. Replacing it is what <see cref="ScbaViewModel.RefreshTrupps"/> used to do, and it
-    /// cannot survive an interactive control in the row: the Sicherheitstrupp picker writes to the
-    /// domain from inside its own selection event, so tearing the row down there destroys the
-    /// ComboBox mid-selection and strands its popup — a real top-level window holding the pointer
-    /// grab — on screen, which freezes the app (#294).
+    /// row object on every change. Replacing it is what <see cref="ScbaViewModel.RefreshTrupps"/>
+    /// used to do (#294), and no row holding an interactive control survives being torn down while
+    /// the operator is using it.
     /// </summary>
     /// <remarks>
     /// <paramref name="trupp"/> may be a different instance than the one held: a joined device
@@ -228,41 +194,20 @@ public sealed partial class ScbaTruppRow : ObservableObject
     /// </remarks>
     public void Update(
         AtemschutzTrupp trupp,
-        IReadOnlyList<SafetyTruppOption> safetyTruppOptions,
-        SafetyTruppOption selectedSafetyTrupp,
+        IReadOnlyList<SafetyTruppChoice> safetyTruppChoices,
         string? safetyTruppHint)
     {
         ArgumentNullException.ThrowIfNull(trupp);
-        ArgumentNullException.ThrowIfNull(safetyTruppOptions);
+        ArgumentNullException.ThrowIfNull(safetyTruppChoices);
         _trupp = trupp;
+        SafetyTruppChoices = safetyTruppChoices;
         SafetyTruppHint = safetyTruppHint;
 
-        // Reconcile the options rather than replace the collection — see SafetyTruppOptions. The
-        // options are records, so an entry that has not actually changed compares equal and is left
-        // untouched, and the ComboBox sees no change at all on the common path.
-        for (var i = 0; i < safetyTruppOptions.Count; i++)
-        {
-            if (i >= SafetyTruppOptions.Count)
-            {
-                SafetyTruppOptions.Add(safetyTruppOptions[i]);
-            }
-            else if (SafetyTruppOptions[i] != safetyTruppOptions[i])
-            {
-                SafetyTruppOptions[i] = safetyTruppOptions[i];
-            }
-        }
-
-        while (SafetyTruppOptions.Count > safetyTruppOptions.Count)
-        {
-            SafetyTruppOptions.RemoveAt(SafetyTruppOptions.Count - 1);
-        }
-
-        // Assigned after _trupp, so the setter's "same as the domain" guard sees the new value and
-        // the write-back stays inert: this is the picker following the domain, never driving it.
-        // Taken from the live collection so the ComboBox matches it by identity as well as value.
-        SelectedSafetyTrupp =
-            SafetyTruppOptions.FirstOrDefault(o => o.Id == selectedSafetyTrupp.Id) ?? SafetyTruppOption.None;
-
+        // Replacing the list outright is safe here, unlike with the ComboBox this replaced: a
+        // flyout has no selection model holding indices into it, and its entries are only realised
+        // while it is open.
+        OnPropertyChanged(nameof(SafetyTruppChoices));
+        OnPropertyChanged(nameof(SafetyTruppButtonText));
         OnPropertyChanged(nameof(SafetyTruppHint));
         OnPropertyChanged(nameof(HasSafetyTruppHint));
         Refresh();
@@ -667,10 +612,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         _onChanged();
     }
 
-    private ScbaTruppRow CreateRow(AtemschutzTrupp trupp)
-    {
-        var safetyOptions = SafetyOptionsFor(trupp);
-        return new ScbaTruppRow(
+    private ScbaTruppRow CreateRow(AtemschutzTrupp trupp) =>
+        new(
             trupp,
             _clock,
             IsReadOnly,
@@ -678,42 +621,43 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             bar => RecordPressure(trupp.Id, bar),
             () => Withdraw(trupp.Id),
             () => MarkRemoved(trupp.Id),
-            safetyOptions,
-            SelectedOptionFor(trupp, safetyOptions),
+            SafetyChoicesFor(trupp),
             SafetyTruppHintFor(trupp),
             safetyTruppId => AssignSafetyTrupp(trupp.Id, safetyTruppId));
-    }
 
-    private static SafetyTruppOption SelectedOptionFor(
-        AtemschutzTrupp trupp, IReadOnlyList<SafetyTruppOption> options) =>
-        options.FirstOrDefault(o => o.Id == trupp.SafetyTruppId) ?? SafetyTruppOption.None;
-
-    /// <summary>The picker contents for one row: "— kein —", then every other Trupp still
-    /// bereitgestellt, ordered by Truppnummer.</summary>
-    private List<SafetyTruppOption> SafetyOptionsFor(AtemschutzTrupp trupp)
+    /// <summary>The flyout entries for one row: "— kein —", then every other Trupp still
+    /// bereitgestellt, ordered by Truppnummer. Each entry carries the command that designates it,
+    /// so the flyout's item template binds against the entry and never has to reach back out of
+    /// the popup's visual tree.</summary>
+    private List<SafetyTruppChoice> SafetyChoicesFor(AtemschutzTrupp trupp)
     {
-        var options = new List<SafetyTruppOption> { SafetyTruppOption.None };
-        options.AddRange(
+        void Select(Guid? safetyTruppId) => AssignSafetyTrupp(trupp.Id, safetyTruppId);
+
+        var choices = new List<SafetyTruppChoice>
+        {
+            new(null, SafetyTruppChoice.NoneDisplay, null, trupp.SafetyTruppId is null, Select),
+        };
+        choices.AddRange(
             _session.Incident.ScbaTrupps
                 .Where(t => t.Id != trupp.Id && t.IsWaiting)
                 .OrderBy(t => t.TruppNumber)
-                .Select(Option));
+                .Select(Choice));
 
-        // Keep a Sicherheitstrupp that has since gone under air in the list. A ComboBox whose
-        // SelectedItem matches nothing in its ItemsSource renders blank, which would wipe the
-        // recorded assignment off the screen at exactly the moment it matters most -- the same
-        // reasoning as StammdatenCatalogue.Including for a value the Stammdaten no longer offer.
+        // Keep a Sicherheitstrupp that has since gone under air in the list, so the recorded
+        // assignment stays visible and re-selectable at exactly the moment it matters most -- the
+        // same reasoning as StammdatenCatalogue.Including for a value the Stammdaten no longer
+        // offer.
         if (trupp.SafetyTruppId is { } assignedId
-            && options.TrueForAll(o => o.Id != assignedId)
+            && choices.TrueForAll(c => c.Id != assignedId)
             && _session.Incident.FindScbaTruppOrDefault(assignedId) is { } assigned)
         {
-            options.Add(Option(assigned));
+            choices.Add(Choice(assigned));
         }
 
-        return options;
+        return choices;
 
-        static SafetyTruppOption Option(AtemschutzTrupp t) =>
-            new(t.Id, $"Trupp {t.TruppNumber}", t.Designation);
+        SafetyTruppChoice Choice(AtemschutzTrupp t) =>
+            new(t.Id, $"Trupp {t.TruppNumber}", t.Designation, t.Id == trupp.SafetyTruppId, Select);
     }
 
     /// <summary>The amber line under one row's picker. Only one fits in the column, so the most
@@ -748,6 +692,15 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     private void AssignSafetyTrupp(Guid truppId, Guid? safetyTruppId)
     {
+        // A closed incident is a historical record: inert rather than throwing. The flyout button
+        // is already disabled, but the guard belongs here too because a programmatic Execute
+        // bypasses CanExecute — the same rule ForceRow's setters follow. Picking the entry already
+        // in force is likewise a no-op, so re-choosing it writes no second ETB line.
+        if (IsReadOnly)
+        {
+            return;
+        }
+
         var incident = _session.Incident;
         if (incident.FindScbaTruppOrDefault(truppId) is not { } trupp
             || trupp.SafetyTruppId == safetyTruppId)
@@ -900,8 +853,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
             if (i < Trupps.Count)
             {
-                var options = SafetyOptionsFor(trupp);
-                Trupps[i].Update(trupp, options, SelectedOptionFor(trupp, options), SafetyTruppHintFor(trupp));
+                Trupps[i].Update(trupp, SafetyChoicesFor(trupp), SafetyTruppHintFor(trupp));
             }
             else
             {

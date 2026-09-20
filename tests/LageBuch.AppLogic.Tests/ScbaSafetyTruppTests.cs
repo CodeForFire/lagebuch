@@ -17,7 +17,7 @@ public class ScbaSafetyTruppTests
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
         Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9) },
-        TruppTypes = new[] { "Angriffstrupp", "Wassertrupp", "Sicherheitstrupp" },
+        TruppTypes = new[] { new TruppType("Angriffstrupp"), new TruppType("Wassertrupp"), new TruppType("Sicherheitstrupp") },
     };
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
@@ -45,12 +45,13 @@ public class ScbaSafetyTruppTests
 
     private static ScbaTruppRow Row(ScbaViewModel vm, Guid id) => vm.Trupps.Single(r => r.Id == id);
 
-    /// <summary>Picks the option for <paramref name="safetyId"/> the way the ComboBox would.</summary>
-    private static void Assign(ScbaViewModel vm, Guid truppId, Guid? safetyId)
-    {
-        var row = Row(vm, truppId);
-        row.SelectedSafetyTrupp = row.SafetyTruppOptions.Single(o => o.Id == safetyId);
-    }
+    /// <summary>Invokes the flyout entry for <paramref name="safetyId"/>, as a click would.</summary>
+    private static void Assign(ScbaViewModel vm, Guid truppId, Guid? safetyId) =>
+        Row(vm, truppId).SafetyTruppChoices.Single(c => c.Id == safetyId).SelectCommand.Execute(null);
+
+    /// <summary>The entry the row shows as in force.</summary>
+    private static Guid? Current(ScbaTruppRow row) =>
+        row.SafetyTruppChoices.Single(c => c.IsCurrent).Id;
 
     private static List<string> Journal(LocalIncidentSession session) =>
         session.Incident.Journal.Select(e => e.Text).ToList();
@@ -65,9 +66,9 @@ public class ScbaSafetyTruppTests
         Register(vm, "Wassertrupp");
         Register(vm, "Sicherheitstrupp");
 
-        var options = Row(vm, angriff.Id).SafetyTruppOptions;
+        var options = Row(vm, angriff.Id).SafetyTruppChoices;
 
-        Assert.Equal(SafetyTruppOption.None, options[0]);
+        Assert.Equal(SafetyTruppChoice.NoneDisplay, options[0].Display);
         Assert.Equal(new[] { "— kein —", "Trupp 2", "Trupp 3" }, options.Select(o => o.Display));
 
         // A Trupp is never offered as its own Sicherheitstrupp.
@@ -85,7 +86,7 @@ public class ScbaSafetyTruppTests
 
         Row(vm, other.Id).StartCommand.Execute(null);
 
-        Assert.DoesNotContain(Row(vm, angriff.Id).SafetyTruppOptions, o => o.Id == other.Id);
+        Assert.DoesNotContain(Row(vm, angriff.Id).SafetyTruppChoices, o => o.Id == other.Id);
     }
 
     [Fact]
@@ -103,8 +104,8 @@ public class ScbaSafetyTruppTests
         // A ComboBox whose SelectedItem is absent from ItemsSource renders blank, which would hide
         // the recorded assignment exactly when it matters most.
         var row = Row(vm, angriff.Id);
-        Assert.Contains(row.SafetyTruppOptions, o => o.Id == sicherheit.Id);
-        Assert.Equal(sicherheit.Id, row.SelectedSafetyTrupp.Id);
+        Assert.Contains(row.SafetyTruppChoices, o => o.Id == sicherheit.Id);
+        Assert.Equal(sicherheit.Id, Current(row));
     }
 
     [Fact]
@@ -255,7 +256,7 @@ public class ScbaSafetyTruppTests
         // a real top-level window holding the pointer grab — is orphaned on screen, which freezes
         // the app (#294's Clear()+re-add, made fatal by an interactive control in the row).
         Assert.Same(row, Row(vm, angriff.Id));
-        Assert.Equal(sicherheit.Id, row.SelectedSafetyTrupp.Id);
+        Assert.Equal(sicherheit.Id, Current(row));
     }
 
     [Fact]
@@ -273,8 +274,8 @@ public class ScbaSafetyTruppTests
         session.SetScbaSafetyTrupp(angriff.Id, sicherheit.Id);
 
         Assert.Same(row, Row(vm, angriff.Id));
-        Assert.Equal(sicherheit.Id, row.SelectedSafetyTrupp.Id);
-        Assert.Equal(sicherheit.Id, row.SafetyTruppOptions.Single(o => o.Id == sicherheit.Id).Id);
+        Assert.Equal(sicherheit.Id, Current(row));
+        Assert.Equal(sicherheit.Id, row.SafetyTruppChoices.Single(o => o.Id == sicherheit.Id).Id);
     }
 
     [Fact]
@@ -293,7 +294,7 @@ public class ScbaSafetyTruppTests
         Assert.Equal(sicherheit.Id, vm.Trupps[1].Id);
 
         // The new Trupp is bereitgestellt, so it must now be offered to the first row.
-        Assert.Contains(first.SafetyTruppOptions, o => o.Id == sicherheit.Id);
+        Assert.Contains(first.SafetyTruppChoices, o => o.Id == sicherheit.Id);
     }
 
     [Fact]
@@ -315,32 +316,31 @@ public class ScbaSafetyTruppTests
         // writes "— kein —" back — indistinguishable from the operator picking it, so the
         // assignment was wiped a moment after it was made.
         Assert.Equal(sicherheit.Id, session.Incident.ScbaTrupps.Single(t => t.Id == wasser.Id).SafetyTruppId);
-        Assert.Equal(sicherheit.Id, Row(vm, wasser.Id).SelectedSafetyTrupp.Id);
+        Assert.Equal(sicherheit.Id, Current(Row(vm, wasser.Id)));
 
         // And it must survive any later change from anywhere in the incident.
         session.AddJournalEntry(EtbDirection.System, "irgendetwas anderes");
         Assert.Equal(sicherheit.Id, session.Incident.ScbaTrupps.Single(t => t.Id == wasser.Id).SafetyTruppId);
-        Assert.Equal(sicherheit.Id, Row(vm, wasser.Id).SelectedSafetyTrupp.Id);
+        Assert.Equal(sicherheit.Id, Current(Row(vm, wasser.Id)));
     }
 
     [Fact]
-    public void The_options_collection_is_never_swapped_out_from_under_the_picker()
+    public void Re_choosing_the_entry_already_in_force_writes_nothing()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
         var vm = Vm(clock, session);
         var angriff = Register(vm, "Angriffstrupp");
-        var row = Row(vm, angriff.Id);
-        var options = row.SafetyTruppOptions;
-
         var sicherheit = Register(vm, "Sicherheitstrupp");
         Assign(vm, angriff.Id, sicherheit.Id);
-        session.AddJournalEntry(EtbDirection.System, "noch etwas");
+        var before = session.Incident.Journal.Count;
 
-        // Same instance throughout: an open dropdown keeps its items, and the ComboBox never drops
-        // and re-picks its selection.
-        Assert.Same(options, Row(vm, angriff.Id).SafetyTruppOptions);
-        Assert.Contains(options, o => o.Id == sicherheit.Id);
+        // The flyout offers every entry including the current one, so picking it again is an
+        // ordinary click and must not litter the ETB with a second "festgelegt" line.
+        Assign(vm, angriff.Id, sicherheit.Id);
+
+        Assert.Equal(before, session.Incident.Journal.Count);
+        Assert.Equal(sicherheit.Id, Current(Row(vm, angriff.Id)));
     }
 
     [Fact]
@@ -372,25 +372,6 @@ public class ScbaSafetyTruppTests
 
         Assign(vm, angriff.Id, sicherheit.Id);
 
-        Assert.Equal(before, session.Incident.Journal.Count);
-    }
-
-    [Fact]
-    public void A_null_selection_is_ignored_rather_than_read_as_kein()
-    {
-        var clock = new FixedClock(T0);
-        var session = NewSession(clock);
-        var vm = Vm(clock, session);
-        var angriff = Register(vm, "Angriffstrupp");
-        var sicherheit = Register(vm, "Sicherheitstrupp");
-        Assign(vm, angriff.Id, sicherheit.Id);
-        var before = session.Incident.Journal.Count;
-
-        // Avalonia nulls SelectedItem while swapping ItemsSource. That must never be mistaken for
-        // the user choosing "kein Sicherheitstrupp", which arrives as SafetyTruppOption.None.
-        Row(vm, angriff.Id).SelectedSafetyTrupp = null!;
-
-        Assert.Equal(sicherheit.Id, session.Incident.ScbaTrupps[0].SafetyTruppId);
         Assert.Equal(before, session.Incident.Journal.Count);
     }
 
@@ -461,7 +442,7 @@ public class ScbaSafetyTruppTests
         Assert.False(row.CanAssignSafetyTrupp);
 
         var before = session.Incident.Journal.Count;
-        row.SelectedSafetyTrupp = row.SafetyTruppOptions.Single(o => o.Id == sicherheit.Id);
+        row.SafetyTruppChoices.Single(c => c.Id == sicherheit.Id).SelectCommand.Execute(null);
 
         Assert.Null(session.Incident.ScbaTrupps[0].SafetyTruppId);
         Assert.Equal(before, session.Incident.Journal.Count);

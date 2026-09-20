@@ -41,7 +41,7 @@ public class ScbaTabRenderTests
         // x:Name inside a DataTemplate is template-scoped and GetControl cannot see it.
         Assert.Equal("kein Sicherheitstrupp", trupp.SafetyTruppHint);
         Assert.True(trupp.HasSafetyTruppHint);
-        Assert.Equal(SafetyTruppOption.None, trupp.SelectedSafetyTrupp);
+        Assert.Equal(SafetyTruppChoice.NoneDisplay, trupp.SafetyTruppButtonText);
 
         var truppColumn = window.GetVisualDescendants().OfType<DataGrid>().Single()
             .Columns.Single(c => (string?)c.Header == "TRUPP");
@@ -49,7 +49,9 @@ public class ScbaTabRenderTests
         Assert.Contains(
             cell.GetVisualDescendants().OfType<TextBlock>(),
             t => t.Name == "SafetyTruppHintText" && t.IsVisible);
-        Assert.Single(cell.GetVisualDescendants().OfType<ComboBox>());
+        Assert.Contains(
+            cell.GetVisualDescendants().OfType<Button>(),
+            b => b.Name == "SafetyTruppButton");
 
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
         if (!string.IsNullOrWhiteSpace(dir))

@@ -148,19 +148,47 @@
                        already two or three crew lines tall. A picker, not a label, because the
                        standby crew really is relieved and replaced mid-Einsatz; and the amber line
                        warns without ever blocking, exactly like RolesView's UnknownRoleHint. -->
+                  <!-- A button and a Flyout, deliberately not a ComboBox. Designating a
+                       Sicherheitstrupp writes to the incident, and that write comes straight back
+                       through Changed to rebuild this row and its entries. A ComboBox does that
+                       inside its own SelectionModel batch, which still holds indices into the list
+                       being rebuilt — it crashed with an IndexOutOfRange out of EndBatchUpdate.
+                       A command runs after the flyout has dismissed, with no selection model in
+                       the picture. Same Button.Flyout idiom as ForcesView's Stärke editor. -->
                   <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
                     <TextBlock Grid.Column="0" Text="Si." Classes="cellLabel" />
-                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                              ItemsSource="{Binding SafetyTruppOptions}"
-                              SelectedItem="{Binding SelectedSafetyTrupp}"
-                              IsEnabled="{Binding CanAssignSafetyTrupp}">
-                      <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:SafetyTruppOption">
-                          <TextBlock Text="{Binding Display}" ToolTip.Tip="{Binding Detail}"
-                                     TextTrimming="CharacterEllipsis" />
-                        </DataTemplate>
-                      </ComboBox.ItemTemplate>
-                    </ComboBox>
+                    <Button Grid.Column="1" x:Name="SafetyTruppButton"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Padding="8,4" FontSize="12"
+                            Content="{Binding SafetyTruppButtonText}"
+                            IsEnabled="{Binding CanAssignSafetyTrupp}"
+                            AutomationProperties.Name="Sicherheitstrupp wählen">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <ItemsControl ItemsSource="{Binding SafetyTruppChoices}" MinWidth="170">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:SafetyTruppChoice">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left" Padding="8,5"
+                                        Command="{Binding SelectCommand}"
+                                        ToolTip.Tip="{Binding Detail}">
+                                  <Grid ColumnDefinitions="14,Auto,*" ColumnSpacing="6">
+                                    <!-- The entry in force is marked rather than styled, so it
+                                         still reads at a glance on the ELW's dimmed screen. -->
+                                    <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold"
+                                               IsVisible="{Binding IsCurrent}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Display}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Detail}"
+                                               Classes="cellLabel" TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                  </Grid>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
                   </Grid>
                   <TextBlock x:Name="SafetyTruppHintText" Text="{Binding SafetyTruppHint}"
                              FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"

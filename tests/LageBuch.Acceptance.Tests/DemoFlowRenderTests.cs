@@ -249,8 +249,8 @@ public class DemoFlowRenderTests
         // operator would. Trupp 1 deliberately keeps none, so the screenshot shows both the filled
         // column and the amber "kein Sicherheitstrupp" warning on the row that is in Rückzugsalarm.
         var sicherheitstruppId = vm.Scba.Trupps[2].Id;
-        vm.Scba.Trupps[1].SelectedSafetyTrupp =
-            vm.Scba.Trupps[1].SafetyTruppOptions.Single(o => o.Id == sicherheitstruppId);
+        vm.Scba.Trupps[1].SafetyTruppChoices
+            .Single(c => c.Id == sicherheitstruppId).SelectCommand.Execute(null);
         clock.Now = clock.Now.AddMinutes(11);
         ticker.Pulse();
         vm.Reminder?.AcknowledgeCommand.Execute(null);
@@ -260,7 +260,7 @@ public class DemoFlowRenderTests
         Assert.True(vm.Scba.Trupps[0].IsAlarm, "Trupp 1 should be in Rückzugsalarm after 31 minutes");
         Assert.True(vm.Scba.Trupps[1].IsActive);
         Assert.False(vm.Scba.Trupps[1].IsAlarm);
-        Assert.Equal(sicherheitstruppId, vm.Scba.Trupps[1].SelectedSafetyTrupp.Id);
+        Assert.Equal(sicherheitstruppId, vm.Scba.Trupps[1].SafetyTruppChoices.Single(c => c.IsCurrent).Id);
         Assert.Equal("kein Sicherheitstrupp", vm.Scba.Trupps[0].SafetyTruppHint);
         Capture(window, "atemschutz.png");
 
