@@ -164,12 +164,19 @@ remove them and add to `.gitignore`.
 
 ## Changelog entries
 
-Any PR touching `src/` must add a changelog entry as its own file in
-`changelog.d/`, named `+<slug>.<type>.md`, where `<type>` is one of `added`,
-`changed`, `deprecated`, `removed`, `fixed` or `security`. The file holds the
-entry text as plain prose, with no leading `- `; reference issues inline
-(`(#302)`). CI enforces this — the `changelog entry` job runs
-`towncrier check` — so do it in the same PR, not as a follow-up.
+Any PR touching `src/` must add **exactly one** changelog entry, as its own
+file in `changelog.d/`, named `+<slug>.<type>.md`, where `<type>` is one of
+`added`, `changed`, `deprecated`, `removed`, `fixed` or `security`. The file
+holds the entry text as plain prose, with no leading `- `; reference issues
+inline (`(#302)`). CI enforces that an entry exists — the `changelog entry` job
+runs `towncrier check` — so do it in the same PR, not as a follow-up.
+
+One entry, not one per commit. A pull request is one change as far as the
+release notes are concerned, and the entry describes what it does for the
+reader, never the layers it was built in: a feature split across domain,
+persistence and UI commits is still a single entry. A PR that also carries an
+unrelated fix folds that into the same entry rather than adding a second file —
+if the two really do not belong together, they are two pull requests.
 
 Never edit `CHANGELOG.md` directly. It is assembled from `changelog.d/` by
 `towncrier build` when a release is cut. Editing it from a feature branch is
