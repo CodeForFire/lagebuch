@@ -183,8 +183,8 @@ A PR template with a short checklist will guide you:
 
 ## Changelog entries
 
-`CHANGELOG.md` is assembled, not edited. Each change brings its own file in
-`changelog.d/`, so two pull requests never touch the same lines and can never
+`CHANGELOG.md` is assembled, not edited. Each pull request brings its own file
+in `changelog.d/`, so two pull requests never touch the same lines and can never
 conflict over the changelog:
 
 ```
@@ -208,6 +208,13 @@ was taken, instead of reading the wall clock while the document renders. (#302)
 Write it for someone reading the release notes rather than the commit log: what
 changed, and why it matters. Do not edit `CHANGELOG.md` directly — entries land
 there when a release is cut.
+
+**One entry per pull request**, not one per commit. The entry describes what the
+change does for the reader, never the layers it was built in, so a feature split
+across domain, persistence and UI commits still gets a single file. If your PR
+also carries an unrelated fix, fold it into the same entry — and if the two
+really do not belong in one entry, they probably do not belong in one pull
+request either.
 
 ### Cutting a release
 
