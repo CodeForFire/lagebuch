@@ -209,6 +209,15 @@ public class MasterDataSectionTests
     }
 
     [Fact]
+    public void TruppTypes_ToValues_clamps_an_einsatzzeit_no_countdown_can_run()
+    {
+        var s = new TruppTypesSection("Trupp-Typen", new[] { new TruppType("Kaputt", 2, 30) }, () => { });
+        s.Rows[0].MaxDurationMinutes = 0;
+
+        Assert.Equal(1, s.ToValues()[0].MaxDurationMinutes);
+    }
+
+    [Fact]
     public void TruppTypes_editing_a_row_flags_a_change()
     {
         var changes = 0;

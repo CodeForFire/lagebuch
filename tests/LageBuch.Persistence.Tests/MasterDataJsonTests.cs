@@ -338,6 +338,26 @@ public class MasterDataJsonTests
     }
 
     [Fact]
+    public void Parse_clamps_an_unrunnable_einsatzzeit_rather_than_throwing()
+    {
+        // Same trust boundary as the crew size, and the same reason not to throw. Left unclamped,
+        // a zero would reach AtemschutzTrupp.Register's ThrowIfNegativeOrZero out of a
+        // fire-and-forget mutation and take the UI down -- the #217 crash shape.
+        var set = Parse("""
+            {
+              "truppTypes": [
+                { "name": "Null", "maxDurationMinutes": 0 },
+                { "name": "Negativ", "maxDurationMinutes": -5 },
+                { "name": "Lang", "maxDurationMinutes": 240 }
+              ]
+            }
+            """);
+
+        // No ceiling on the last one: a four-hour LPA is a real thing and must survive untouched.
+        Assert.Equal(new[] { 1, 1, 240 }, set.TruppTypes.Select(t => t.MaxDurationMinutes));
+    }
+
+    [Fact]
     public void Parse_clamps_an_impossible_crew_size_rather_than_throwing()
     {
         // This runs on a payload that crossed a trust boundary, and HomeViewModel catches only the

@@ -26,6 +26,9 @@ public class ScbaViewModelTests
 
             // Three people, per its Stammdaten row -- not because the app knows the word "CSA".
             new TruppType(CsaTrupp, 3, 20),
+
+            // #418: also three, but the full 30 minutes, and nothing in its name says "CSA".
+            new TruppType("Strahlenschutztrupp", 3, 30),
         },
     };
 
@@ -544,6 +547,28 @@ public class ScbaViewModelTests
 
         vm.NewDesignation = CsaTrupp;
         Assert.True(vm.RequiresThirdMember);
+
+        vm.NewTruppfuehrer = "Müller";
+        vm.NewTruppmann = "Schmidt";
+        Assert.False(vm.AddTruppCommand.CanExecute(null));
+
+        vm.NewZweiterTruppmann = "Huber";
+        Assert.True(vm.AddTruppCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void A_three_person_type_that_is_not_the_CSA_one_also_reveals_the_third_name()
+    {
+        // #418, and the point of the whole change: nothing about the third crew position is tied
+        // to the word "CSA" any more. A Strahlenschutztrupp is three people because its
+        // Stammdaten row says 3, and the form follows -- including the Einsatzzeit, which differs
+        // from the CSA-Trupp's, so a rule keyed off the designation could not have covered both.
+        var vm = Vm(new FixedClock(T0), NewSession(new FixedClock(T0)));
+
+        vm.NewDesignation = "Strahlenschutztrupp";
+
+        Assert.True(vm.RequiresThirdMember);
+        Assert.Equal(30, vm.NewMaxDurationMinutes);
 
         vm.NewTruppfuehrer = "Müller";
         vm.NewTruppmann = "Schmidt";

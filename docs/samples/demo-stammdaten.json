@@ -8,6 +8,7 @@
     { "name": "Schlauchtrupp", "memberCount": 2, "maxDurationMinutes": 30 },
     { "name": "Sicherheitstrupp", "memberCount": 2, "maxDurationMinutes": 30 },
     { "name": "CSA-Trupp", "memberCount": 3, "maxDurationMinutes": 20 },
+    { "name": "Strahlenschutztrupp", "memberCount": 3, "maxDurationMinutes": 30 },
     { "name": "LPA-Trupp", "memberCount": 2, "maxDurationMinutes": 60 }
   ],
   "checklistTemplateAufbau": [

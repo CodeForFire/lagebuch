@@ -361,6 +361,36 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_stored_einsatzzeit_no_countdown_can_run_is_clamped_on_read()
+    {
+        // Save can no longer write such a row, so this has to be planted directly -- the point is
+        // a masterdata.db edited outside the app. Unclamped it would reach
+        // AtemschutzTrupp.Register's ThrowIfNegativeOrZero and crash the Atemschutz form.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_trupp_types (
+                    value TEXT NOT NULL,
+                    member_count INTEGER NOT NULL DEFAULT 2,
+                    max_duration_minutes INTEGER NOT NULL DEFAULT 30);
+                INSERT INTO md_trupp_types (value, member_count, max_duration_minutes) VALUES
+                    ('Kaputt', 2, 0),
+                    ('Lang', 2, 240);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        // Floor only: the four-hour entry is left exactly as the brigade wrote it.
+        Assert.Equal(new[] { 1, 240 }, set.TruppTypes.Select(t => t.MaxDurationMinutes));
+    }
+
+    [Fact]
     public void The_retired_einsatzzeit_settings_are_removed_from_an_existing_store()
     {
         using (var cn = new SqliteConnection($"Data Source={_path}"))

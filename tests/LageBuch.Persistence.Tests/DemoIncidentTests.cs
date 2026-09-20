@@ -178,7 +178,11 @@ public class DemoIncidentTests : IDisposable
 
         // The sample is what a first-time user imports, so it must actually demonstrate #398:
         // a Trupp-Typ carrying its own crew size and Einsatzzeit rather than relying on its name.
+        // Two three-person types with *different* Einsatzzeiten is the pair that shows it -- the
+        // Strahlenschutztrupp (#418) is three people like a CSA-Trupp but runs the full 30 minutes,
+        // which no rule keyed off a name could ever have expressed.
         Assert.Contains(set.TruppTypes, t => t.Name == "CSA-Trupp" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
+        Assert.Contains(set.TruppTypes, t => t.Name == "Strahlenschutztrupp" && t.MemberCount == 3 && t.MaxDurationMinutes == 30);
         Assert.NotEmpty(set.ChecklistTemplateAufbau);
         Assert.NotEmpty(set.ChecklistTemplateAbbau);
         Assert.NotEmpty(set.Links);

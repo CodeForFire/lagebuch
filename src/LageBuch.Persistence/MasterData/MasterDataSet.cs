@@ -177,6 +177,21 @@ public sealed record TruppType(string Name, int MemberCount, int MaxDurationMinu
     /// </summary>
     public static int ClampMemberCount(int memberCount) => Math.Clamp(
         memberCount, AtemschutzTrupp.StandardMemberCount, AtemschutzTrupp.MaxMemberCount);
+
+    /// <summary>
+    /// <paramref name="minutes"/> forced to something a countdown can actually run. Applied at the
+    /// same entrances as <see cref="ClampMemberCount"/> and for the same reason: a zero or negative
+    /// Einsatzzeit out of a hand-edited store would reach <c>AtemschutzTrupp.Register</c>, whose
+    /// <c>ThrowIfNegativeOrZero</c> would throw out of a fire-and-forget mutation and take the UI
+    /// with it -- the crash shape #217 already fixed once for the Truppnummer field.
+    /// <para>
+    /// A floor only. Unlike a crew size this has no structural ceiling: <c>TruppRole</c> fixes how
+    /// many people fit on the monitoring sheet, but nothing fixes how long a set of apparatus
+    /// lasts, and a brigade running a four-hour LPA must not find that silently shortened here.
+    /// The editor's own <c>Maximum</c> is a convenience for the spinner, not a rule about Atemschutz.
+    /// </para>
+    /// </summary>
+    public static int ClampMaxDurationMinutes(int minutes) => Math.Max(1, minutes);
 }
 
 /// <summary>
@@ -481,7 +496,8 @@ public static class MasterDataJson
             result.Add(new TruppType(
                 x.GetProperty("name").GetString()!.Trim(),
                 TruppType.ClampMemberCount(Int(x, "memberCount", AtemschutzTrupp.StandardMemberCount)),
-                Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes)));
+                TruppType.ClampMaxDurationMinutes(
+                    Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes))));
         }
 
         return result;

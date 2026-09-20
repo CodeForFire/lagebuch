@@ -10,6 +10,12 @@ once we reach 1.0.
 ## [Unreleased]
 
 ### Added
+- The shipped Stammdaten examples now include a **Strahlenschutztrupp**: three people like a
+  CSA-Trupp, but the full 30 minutes. That pair is the proof that the rules hang on the
+  Stammdaten row rather than on the name — two three-person types with *different*
+  Einsatzzeiten is something the old logic, wired to the literal `CSA-Trupp`, could not express
+  at all. A brigade that calls the Trupp something else, or runs it on a different Einsatzzeit,
+  enters that in Stammdaten; it is no longer a code change. (#418)
 - `docs/datenschutz-und-sicherheit.md`: the German data-protection page for Kommandanten,
   Kreisbrandinspektionen and kommunale Datenschutzbeauftragte. It names every category of
   personal data the app holds (including the CO-Messprotokoll's resident names and the roster's
@@ -74,7 +80,9 @@ once we reach 1.0.
   and a brigade can give a Sicherheitstrupp or a self-defined type the same treatment. Existing
   Stammdaten are migrated once, on first open, so nothing changes for anyone using the shipped
   spellings; the three global Einsatzzeit-Einstellungen (AGT/CSA/LPA) are gone, replaced by the
-  per-type value. A Stammdaten file exported by an older version still imports.
+  per-type value. A Stammdaten file exported by an older version still imports, and a Stärke or
+  Einsatzzeit edited into a file by hand is clamped to something the Atemschutz form can work
+  with rather than taken literally.
 - Stammdaten: every repairable column in `masterdata.db` is now restored on open, and a test
   sweeps all of them so the next one cannot be forgotten. The file has no schema version, so it
   reconciles itself on every open — but that reconciliation was three hand-written lines, and a

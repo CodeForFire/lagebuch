@@ -397,10 +397,13 @@ public sealed class MasterDataStore
         var list = new List<TruppType>();
         while (r.Read())
         {
-            // Clamped on the way out as well as on the way in: the column is only defaulted, not
+            // Clamped on the way out as well as on the way in: the columns are only defaulted, not
             // constrained, so a file edited by hand outside the app cannot put an unreachable crew
-            // position on the Atemschutz form.
-            list.Add(new TruppType(r.GetString(0), TruppType.ClampMemberCount(r.GetInt32(1)), r.GetInt32(2)));
+            // position on the Atemschutz form, nor an Einsatzzeit no countdown can run.
+            list.Add(new TruppType(
+                r.GetString(0),
+                TruppType.ClampMemberCount(r.GetInt32(1)),
+                TruppType.ClampMaxDurationMinutes(r.GetInt32(2))));
         }
 
         return list;

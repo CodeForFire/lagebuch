@@ -71,7 +71,7 @@ public sealed partial class TruppTypesSection : EditorSection
     /// Rows with a non-blank name, trimmed, first spelling winning a case-insensitive duplicate --
     /// the same normalization the plain name list did before, since the Atemschutz form looks a
     /// type up by name and two rows differing only in case would make that lookup a coin toss.
-    /// The crew size is clamped to what a Trupp can actually have.
+    /// The crew size and the Einsatzzeit are clamped to values the app can actually work with.
     /// </summary>
     public IReadOnlyList<TruppType> ToValues()
     {
@@ -83,7 +83,9 @@ public sealed partial class TruppTypesSection : EditorSection
             if (name.Length > 0 && seen.Add(name))
             {
                 result.Add(new TruppType(
-                    name, TruppType.ClampMemberCount(row.MemberCount), row.MaxDurationMinutes));
+                    name,
+                    TruppType.ClampMemberCount(row.MemberCount),
+                    TruppType.ClampMaxDurationMinutes(row.MaxDurationMinutes)));
             }
         }
 
