@@ -152,112 +152,146 @@
             Width="320"
             Padding="16"
             IsEnabled="{Binding !IsReadOnly}">
-      <StackPanel Spacing="12">
+      <DockPanel>
         <!-- #242: every field below edits a buffer (Editor), not the incident. ABBRECHEN discards
              it, FERTIG is the single commit point; the tile behind the sidebar previews the pending
              state meanwhile, so the door mark still updates as the crew works. -->
-        <TextBlock Text="WOHNUNG BEARBEITEN" Classes="overline" />
+        <TextBlock DockPanel.Dock="Top" Text="WOHNUNG BEARBEITEN" Classes="overline"
+                   Margin="0,0,0,12" />
 
-        <!-- Status buttons -->
-        <TextBlock Text="STATUS" Classes="overline" FontSize="10" />
-        <StackPanel Spacing="8">
-          <Button Background="#FFC000" Content="Noch nicht abgesucht"
-                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
-                  Command="{Binding SetEditorStatusNotSearchedCommand}" />
-          <Button Background="#92D050" Content="Abgesucht – keine Personen"
-                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
-                  Command="{Binding SetEditorStatusSearchedCommand}" />
-          <Button Background="#FF0000" Content="Person(en) betroffen"
-                  HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
-                  Command="{Binding SetEditorStatusAffectedCommand}" />
+        <!-- #424: ABBRECHEN/FERTIG are anchored, not scrolled. FERTIG is the single commit
+             point of this whole sidebar, so a button you first have to go looking for is the
+             same bug in a weaker form. Docked before the ScrollViewer because a DockPanel
+             gives its last, undocked child whatever is left: the idiom MasterDataEditorView
+             uses for its own fixed footers. -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8"
+                    HorizontalAlignment="Right" Margin="0,12,0,0">
+          <Button x:Name="EditorCancelButton" Content="ABBRECHEN"
+                  Command="{Binding CloseEditorCommand}" />
+          <Button x:Name="EditorConfirmButton" Classes="signal" Content="FERTIG"
+                  Command="{Binding ConfirmEditorCommand}" />
         </StackPanel>
 
-        <!-- CO Value -->
-        <StackPanel Spacing="2">
-          <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
-          <!-- No Enter-to-commit here on purpose: NumericUpDown already live-updates Editor.CoValue
-               per keystroke (it syncs Text to Value on every TextBox.TextChanged), which is what
-               drives the implausible-value warning below as the operator types. An Enter shortcut
-               that also closes the sidebar (like FERTIG) would defeat that warning's whole point,
-               since typing a value and hitting Enter is one fluid motion: the sidebar would vanish
-               in the same instant the warning appeared, before anyone could actually read it. -->
-          <!-- ClipValueToMinMax="True" is load-bearing, not decorative: Avalonia's NumericUpDown
-               defaults it to false, which means typing anything above Maximum (e.g. a fat-fingered
-               "111111111") throws inside the control's own text-to-value conversion, that exception
-               is swallowed internally, and Value silently never updates: no warning, no color, no
-               feedback at all. Exactly the typo this field exists to catch, met with total silence.
-               Clipping instead lands the value at 9999, which is comfortably inside both the Lethal
-               and implausible-value bands below, so a wild typo still gets a visible reaction. -->
-          <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" ClipValueToMinMax="True"
-                         Value="{Binding Editor.CoValue}"
-                         FormatString="0" PlaceholderText="Kein Messwert" />
-          <!-- Caution about a likely typo (e.g. 9999 vs 999), not a severity warning; deliberately
-               non-blocking: a real fire scene can genuinely produce extreme ppm values, so FERTIG
-               still commits it. -->
-          <TextBlock Text="⚠ Ungewöhnlich hoher Wert – bitte auf Tippfehler prüfen"
-                     FontSize="10" TextWrapping="Wrap"
-                     Foreground="{StaticResource AmberBrush}"
-                     IsVisible="{Binding Editor.IsCoImplausible}" />
-        </StackPanel>
+        <!-- The sidebar had no ScrollViewer at all: a StackPanel measures against infinity, so
+             the Border simply clipped whatever did not fit, and at the app's own MinHeight of 600
+             that was FERTIG: by 15px with no Messreihe and 469px with 25 readings. Android has
+             no MinHeight at all. AllowAutoHide="False" for the same reason the matrix below uses
+             it: an overlay scrollbar reserves no layout width and would sit on top of the input
+             fields in a 320px column. -->
+        <ScrollViewer x:Name="EditorScroll"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      AllowAutoHide="False">
+          <StackPanel Spacing="12">
 
-        <!-- MESSREIHE (#424): this Wohnung's committed readings, newest first. Only values
-             actually written by FERTIG appear here: the field above already shows the pending
-             one, and a keystroke is not a measurement, so previewing it would put a reading in
-             the list that ABBRECHEN then silently un-happened. Each value carries the same
-             severity coloring as the tile, so a fallen-from-120 reading still reads as having
-             been dangerous. -->
-        <StackPanel x:Name="MessreihePanel" Spacing="2"
-                    IsVisible="{Binding Editor.HasReadings}">
-          <TextBlock Text="MESSREIHE" Classes="overline" FontSize="10" />
-          <ItemsControl x:Name="MessreiheList" ItemsSource="{Binding Editor.Readings}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:CoReadingRow">
-                <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,2,0,0">
-                  <TextBlock Grid.Column="0" Text="{Binding Time}"
-                             FontFamily="{StaticResource MonoFont}" FontSize="11"
-                             Foreground="{StaticResource TextMutedBrush}" Margin="0,0,8,0" />
-                  <TextBlock Grid.Column="1" Text="{Binding Value}"
-                             FontFamily="{StaticResource MonoFont}" FontSize="11"
-                             Classes="coValue"
-                             Classes.elevated="{Binding IsCoElevated}"
-                             Classes.dangerous="{Binding IsCoDangerous}"
-                             Classes.lethal="{Binding IsCoLethal}" />
-                  <TextBlock Grid.Column="2" Text="{Binding RecordedBy}"
-                             FontSize="10" Margin="8,0,0,0"
-                             VerticalAlignment="Center"
-                             TextTrimming="CharacterEllipsis"
-                             Foreground="{StaticResource TextMutedBrush}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
+            <!-- Status buttons -->
+            <TextBlock Text="STATUS" Classes="overline" FontSize="10" />
+            <StackPanel Spacing="8">
+              <Button Background="#FFC000" Content="Noch nicht abgesucht"
+                      HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                      Command="{Binding SetEditorStatusNotSearchedCommand}" />
+              <Button Background="#92D050" Content="Abgesucht – keine Personen"
+                      HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                      Command="{Binding SetEditorStatusSearchedCommand}" />
+              <Button Background="#FF0000" Content="Person(en) betroffen"
+                      HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"
+                      Command="{Binding SetEditorStatusAffectedCommand}" />
+            </StackPanel>
 
-        <!-- Bezeichnung (#265): every unit's own label now, instead of a header shared with every
-             other floor's same-numbered column: defaults to "Whg. N" (or "Links/Mitte/Rechts"
-             for a 3-flat floor), always user-editable, shown directly on the tile. -->
-        <StackPanel Spacing="2">
-          <TextBlock Text="BEZEICHNUNG" Classes="overline" FontSize="10" />
-          <TextBox Text="{Binding Editor.Label}" />
-        </StackPanel>
+            <!-- CO Value -->
+            <StackPanel Spacing="2">
+              <TextBlock Text="CO-WERT (ppm)" Classes="overline" FontSize="10" />
+              <!-- No Enter-to-commit here on purpose: NumericUpDown already live-updates Editor.CoValue
+                   per keystroke (it syncs Text to Value on every TextBox.TextChanged), which is what
+                   drives the implausible-value warning below as the operator types. An Enter shortcut
+                   that also closes the sidebar (like FERTIG) would defeat that warning's whole point,
+                   since typing a value and hitting Enter is one fluid motion: the sidebar would vanish
+                   in the same instant the warning appeared, before anyone could actually read it. -->
+              <!-- ClipValueToMinMax="True" is load-bearing, not decorative: Avalonia's NumericUpDown
+                   defaults it to false, which means typing anything above Maximum (e.g. a fat-fingered
+                   "111111111") throws inside the control's own text-to-value conversion, that exception
+                   is swallowed internally, and Value silently never updates: no warning, no color, no
+                   feedback at all. Exactly the typo this field exists to catch, met with total silence.
+                   Clipping instead lands the value at 9999, which is comfortably inside both the Lethal
+                   and implausible-value bands below, so a wild typo still gets a visible reaction. -->
+              <NumericUpDown x:Name="CoValueInput" Minimum="0" Maximum="9999" ClipValueToMinMax="True"
+                             Value="{Binding Editor.CoValue}"
+                             FormatString="0" PlaceholderText="Kein Messwert" />
+              <!-- Caution about a likely typo (e.g. 9999 vs 999), not a severity warning; deliberately
+                   non-blocking: a real fire scene can genuinely produce extreme ppm values, so FERTIG
+                   still commits it. -->
+              <TextBlock Text="⚠ Ungewöhnlich hoher Wert – bitte auf Tippfehler prüfen"
+                         FontSize="10" TextWrapping="Wrap"
+                         Foreground="{StaticResource AmberBrush}"
+                         IsVisible="{Binding Editor.IsCoImplausible}" />
+            </StackPanel>
 
-        <!-- Resident Name -->
-        <StackPanel Spacing="2">
-          <TextBlock Text="NAME DER BEWOHNER (OPTIONAL)" Classes="overline" FontSize="10" />
-          <TextBox Text="{Binding Editor.ResidentName}"
-                   PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}" />
-        </StackPanel>
+            <!-- MESSREIHE (#424): this Wohnung's committed readings, newest first. Only values
+                 actually written by FERTIG appear here: the field above already shows the pending
+                 one, and a keystroke is not a measurement, so previewing it would put a reading in
+                 the list that ABBRECHEN then silently un-happened. Each value carries the same
+                 severity coloring as the tile, so a fallen-from-120 reading still reads as having
+                 been dangerous. -->
+            <StackPanel x:Name="MessreihePanel" Spacing="2"
+                        IsVisible="{Binding Editor.HasReadings}">
+              <TextBlock Text="MESSREIHE" Classes="overline" FontSize="10" />
+              <!-- Capped at roughly six rows (#424). Dwelling.Readings has no ceiling and this
+                   ItemsControl does not virtualise, so a Wohnung measured all shift would grow the
+                   panel without limit and push BEZEICHNUNG and the Bewohner fields, which sit
+                   below it, out of view. Newest reading first, so what stays visible is what is
+                   current. This is a deliberate exception to the one-scrollbar-per-region rule
+                   HomeView documents: there a nested list scrolling at all is the bug, here the
+                   bounded inner scroll IS the fix. -->
+              <ScrollViewer x:Name="MessreiheScroll" MaxHeight="108"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+              <ItemsControl x:Name="MessreiheList" ItemsSource="{Binding Editor.Readings}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CoReadingRow">
+                    <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,2,0,0">
+                      <TextBlock Grid.Column="0" Text="{Binding Time}"
+                                 FontFamily="{StaticResource MonoFont}" FontSize="11"
+                                 Foreground="{StaticResource TextMutedBrush}" Margin="0,0,8,0" />
+                      <TextBlock Grid.Column="1" Text="{Binding Value}"
+                                 FontFamily="{StaticResource MonoFont}" FontSize="11"
+                                 Classes="coValue"
+                                 Classes.elevated="{Binding IsCoElevated}"
+                                 Classes.dangerous="{Binding IsCoDangerous}"
+                                 Classes.lethal="{Binding IsCoLethal}" />
+                      <TextBlock Grid.Column="2" Text="{Binding RecordedBy}"
+                                 FontSize="10" Margin="8,0,0,0"
+                                 VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis"
+                                 Foreground="{StaticResource TextMutedBrush}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              </ScrollViewer>
+            </StackPanel>
 
-        <!-- Key Available: label lives on the CheckBox itself (Content), matching RolesView's
-             "Alle Funktionen" checkbox, so the label and glyph share one baseline. -->
-        <CheckBox Content="Schlüssel vorhanden" IsChecked="{Binding Editor.KeyAvailable}" />
+            <!-- Bezeichnung (#265): every unit's own label now, instead of a header shared with every
+                 other floor's same-numbered column: defaults to "Whg. N" (or "Links/Mitte/Rechts"
+                 for a 3-flat floor), always user-editable, shown directly on the tile. -->
+            <StackPanel Spacing="2">
+              <TextBlock Text="BEZEICHNUNG" Classes="overline" FontSize="10" />
+              <TextBox Text="{Binding Editor.Label}" />
+            </StackPanel>
 
-        <!-- Action buttons -->
-        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-          <Button Content="ABBRECHEN" Command="{Binding CloseEditorCommand}" />
-          <Button Classes="signal" Content="FERTIG" Command="{Binding ConfirmEditorCommand}" />
-        </StackPanel>
-      </StackPanel>
+            <!-- Resident Name -->
+            <StackPanel Spacing="2">
+              <TextBlock Text="NAME DER BEWOHNER (OPTIONAL)" Classes="overline" FontSize="10" />
+              <TextBox Text="{Binding Editor.ResidentName}"
+                       PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}" />
+            </StackPanel>
+
+            <!-- Key Available: label lives on the CheckBox itself (Content), matching RolesView's
+                 "Alle Funktionen" checkbox, so the label and glyph share one baseline. -->
+            <CheckBox Content="Schlüssel vorhanden" IsChecked="{Binding Editor.KeyAvailable}" />
+
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
     </Border>
 
     <!-- Building summary strip: the "how far are we" answer that scanning tiles can't give quickly
