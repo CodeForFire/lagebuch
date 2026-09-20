@@ -1042,13 +1042,17 @@ public sealed class Incident
         var building = FindBuilding(buildingId);
         var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
 
+        // No-op writes return before anything is recorded. This is what keeps a retried or
+        // duplicated RecordCoValueCommand from inflating the series, and it is deliberately the
+        // same guard that already suppresses a duplicate ETB line. Consequence worth knowing: a
+        // genuine re-measurement that returns the identical value is not captured.
         if (dwelling.CoValue == coValue)
         {
             return;
         }
 
         var index = _dwellings.IndexOf(dwelling);
-        _dwellings[index] = dwelling.WithCoValue(coValue);
+        _dwellings[index] = dwelling.WithCoReading(coValue, clock.Now, op.Display);
 
         var location = CoMeasurementLabels.DwellingLocation(building, floorOrdinal, apartmentNumber);
         var text = coValue is { } v

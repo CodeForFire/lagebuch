@@ -209,6 +209,113 @@ public class CoMeasurementTests
         Assert.Equal(journalCountBefore + 1, incident.Journal.Count);
     }
 
+    // --- Issue #424: the Messreihe ---
+    [Fact]
+    public void Incident_RecordCoValue_AppendsAReading()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Huber", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 120);
+
+        var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        var reading = Assert.Single(dwelling.Readings);
+        Assert.Equal(120, reading.Value);
+        Assert.Equal(clock.Now, reading.MeasuredAt);
+        Assert.Equal(op.Display, reading.RecordedBy);
+        Assert.Equal(120, dwelling.CoValue);
+    }
+
+    [Fact]
+    public void Incident_RecordCoValue_KeepsTheReadingsInMeasurementOrder()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 8, 14, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+
+        incident.RecordCoValue(clock, op, haus, 0, 1, 120);
+        clock.Now = clock.Now.AddMinutes(27);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 40);
+        clock.Now = clock.Now.AddMinutes(21);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 5);
+
+        var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(new int?[] { 120, 40, 5 }, dwelling.Readings.Select(r => r.Value));
+        Assert.Equal(
+            new[] { "08:14", "08:41", "09:02" },
+            dwelling.Readings.Select(r => Formatting.TimeOfDay(r.MeasuredAt)));
+
+        // The current value is always the last reading, never a fourth, separately-tracked number.
+        Assert.Equal(dwelling.Readings[^1].Value, dwelling.CoValue);
+    }
+
+    // The idempotence guard is what keeps a retried sync command from inflating the series.
+    [Fact]
+    public void Incident_RecordCoValue_WithTheSameValue_AppendsNoReading()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+
+        incident.RecordCoValue(clock, op, haus, 0, 1, 45);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 45);
+
+        Assert.Single(incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1).Readings);
+    }
+
+    // The case the series exists for: once the value is cleared, CoValue says "kein Messwert" and
+    // the series is the only surviving record that 120 ppm was ever measured here.
+    [Fact]
+    public void Incident_RecordCoValue_DeletingTheValue_AppendsANullReading()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+
+        incident.RecordCoValue(clock, op, haus, 0, 1, 120);
+        incident.RecordCoValue(clock, op, haus, 0, 1, null);
+
+        var dwelling = incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(2, dwelling.Readings.Count);
+        Assert.Equal(120, dwelling.Readings[0].Value);
+        Assert.Null(dwelling.Readings[1].Value);
+        Assert.Null(dwelling.CoValue);
+    }
+
+    [Fact]
+    public void Incident_RecordCoValue_RecordsEachDwellingSeparately()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+
+        incident.RecordCoValue(clock, op, haus, 0, 1, 120);
+        incident.RecordCoValue(clock, op, haus, 0, 2, 8);
+
+        Assert.Single(incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1).Readings);
+        Assert.Single(incident.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 2).Readings);
+    }
+
+    [Fact]
+    public void Dwelling_Rehydrate_WithoutReadings_HasAnEmptySeries()
+    {
+        var dwelling = Dwelling.Rehydrate(
+            Guid.NewGuid(), Guid.NewGuid(), 0, 1, null, DwellingStatus.NotSearched, null, 45);
+
+        Assert.Empty(dwelling.Readings);
+        Assert.Equal(45, dwelling.CoValue);
+    }
+
     // #424: the reading is a professional record, not bookkeeping. It must not land on
     // EtbDirection.System, because the ETB hides that by default (#223) -- which is precisely
     // why crews reported the change as "not documented".
