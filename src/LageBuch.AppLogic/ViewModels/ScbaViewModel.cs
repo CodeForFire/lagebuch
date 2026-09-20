@@ -200,6 +200,13 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     // overwrite it. Programmatic sets (default application, form reset) are fenced by _applyingDefault
     // so they do not count as a user edit.
     private readonly IncidentSettings _settings;
+
+    /// <summary>
+    /// The Trupp-Typen as the Stammdaten describe them -- crew size and Einsatzzeit included.
+    /// <see cref="TruppTypeOptions"/> is only their names, for the picker; this is what the form
+    /// reads the rules from since #398 took them off the hard-coded designations.
+    /// </summary>
+    private readonly IReadOnlyList<TruppType> _truppTypes;
     private DateTimeOffset? _lastAlarmAnnouncedAt;
 
     private bool _maxDurationUserEdited;
@@ -221,14 +228,17 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         _onChanged = onChanged;
         _settings = masterData.Settings;
 
-        // Seed the add-Trupp form defaults from the configured settings (empty designation => AGT).
-        // Direct field writes so no OnChanged fires and the fields do not read as user-edited.
-        _newMaxDurationMinutes = _settings.AgtMaxDurationMinutes;
+        // Seed the add-Trupp form defaults. Direct field writes so no OnChanged fires and the
+        // fields do not read as user-edited. No Trupp-Typ is selected yet, so the Einsatzzeit is
+        // the same fallback an unlisted type gets -- "nothing selected" and "type the Stammdaten
+        // do not describe" must read identically, or the number would depend on how you got here.
+        _newMaxDurationMinutes = AtemschutzTrupp.DefaultMaxDurationMinutes;
         _newReturnPressureBar = _settings.ReturnPressureBar;
         _newEntryPressure = 300;
         _newTruppNumber = session.Incident.NextFreeScbaTruppNumber();
         IsReadOnly = session.IsReadOnly;
-        TruppTypeOptions = masterData.TruppTypes;
+        _truppTypes = masterData.TruppTypes;
+        TruppTypeOptions = masterData.TruppTypes.Select(t => t.Name).ToArray();
         CallSignOptions = masterData.RadioCallSigns;
         PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
         Trupps = new ObservableCollection<ScbaTruppRow>(session.Incident.ScbaTrupps.Select(CreateRow));
@@ -255,6 +265,10 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<string> TruppTypeOptions { get; }
 
+    /// <summary>Largest Einsatzzeit this form's spinner offers. Shared with the Stammdaten editor's
+    /// so a Trupp-Typ can always be registered at the Einsatzzeit its own row specifies.</summary>
+    public static int MaxDurationLimitMinutes => AtemschutzTrupp.MaxEditableDurationMinutes;
+
     public IReadOnlyList<string> CallSignOptions { get; }
 
     /// <summary>
@@ -271,10 +285,17 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     private string _newDesignation = string.Empty;
 
     /// <summary>
-    /// Whether the selected Trupp type is crewed by three. Drives the visibility of the third
-    /// name box, so the form matches the rule the domain enforces.
+    /// Whether the selected Trupp-Typ is crewed by three, according to the Stammdaten. Drives the
+    /// visibility of the third name box and, through <c>CanAddTrupp</c>, whether the form may be
+    /// submitted at all -- which is where the per-type crew rule is enforced now that the domain
+    /// only checks what it can prove without the Stammdaten it cannot see (#398).
+    /// <para>
+    /// A designation the Stammdaten do not list is an ordinary two-person Trupp. An Einsatz in
+    /// progress must never be blocked by a missing Stammdaten row.
+    /// </para>
     /// </summary>
-    public bool RequiresThirdMember => AtemschutzTrupp.IsChemicalTrupp(NewDesignation);
+    public bool RequiresThirdMember =>
+        StammdatenCatalogue.Find(NewDesignation, _truppTypes)?.MemberCount >= AtemschutzTrupp.MaxMemberCount;
 
     /// <summary>
     /// Truppführer. A Trupp always has one; the crew is never a single free-text field.
@@ -287,7 +308,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
     private string _newTruppmann = string.Empty;
 
-    /// <summary>Only used -- and only required -- for a CSA-Trupp.</summary>
+    /// <summary>Only used -- and only required -- for a Trupp-Typ crewed by three.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
     private string _newZweiterTruppmann = string.Empty;
@@ -340,8 +361,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         }
     }
 
-    // Switching the Trupp type re-suggests its Einsatzzeit (CSA is shorter, LPA is longer than an
-    // AGT), but only while the user has not overridden the field — a hand-typed value survives.
+    // Switching the Trupp-Typ re-suggests the Einsatzzeit its Stammdaten row carries, but only
+    // while the user has not overridden the field — a hand-typed value survives.
     partial void OnNewDesignationChanged(string value)
     {
         if (!_maxDurationUserEdited)
@@ -354,10 +375,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     {
         var previous = _applyingDefault;
         _applyingDefault = true;
-        NewMaxDurationMinutes =
-            AtemschutzTrupp.IsChemicalTrupp(NewDesignation) ? _settings.CsaMaxDurationMinutes
-            : AtemschutzTrupp.IsLpaTrupp(NewDesignation) ? _settings.LpaMaxDurationMinutes
-            : _settings.AgtMaxDurationMinutes;
+        NewMaxDurationMinutes = StammdatenCatalogue.Find(NewDesignation, _truppTypes)?.MaxDurationMinutes
+            ?? AtemschutzTrupp.DefaultMaxDurationMinutes;
         _applyingDefault = previous;
 
         // Called explicitly rather than left to OnNewMaxDurationMinutesChanged's cascade: the
@@ -478,8 +497,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         !IsReadOnly && !string.IsNullOrWhiteSpace(NewDesignation)
         && !string.IsNullOrWhiteSpace(NewTruppfuehrer) && !string.IsNullOrWhiteSpace(NewTruppmann)
 
-        // Mirrors the domain cardinality rule so an incomplete CSA-Trupp disables the button
-        // rather than throwing on click.
+        // The per-type crew rule (#398): the domain cannot see the Stammdaten, so this is where
+        // "this Trupp-Typ needs three people" is enforced. An incomplete three-person Trupp
+        // disables the button rather than throwing on click.
         && (!RequiresThirdMember || !string.IsNullOrWhiteSpace(NewZweiterTruppmann))
         && NewTruppNumber > 0 && NewEntryPressure > 0;
 

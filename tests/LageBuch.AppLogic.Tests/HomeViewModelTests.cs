@@ -321,7 +321,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
     {
         Roles = new[] { "EL" },
         ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("A?", false) },
-        TruppTypes = new[] { "Angriffstrupp" },
+        TruppTypes = new[] { new TruppType("Angriffstrupp") },
     };
 
     public void Save(MasterDataSet set)

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -11,6 +12,14 @@ public sealed class MasterDataStore
     /// its contents. Nothing is seeded: the app ships with no master data, so a fresh database comes
     /// back empty and is populated only by <see cref="Save"/> — i.e. the editor's Import.
     /// </summary>
+    /// <summary>
+    /// Marks a store as having had the one-time #398 Trupp-Typ translation applied. Kept in
+    /// md_settings, whose rows are arbitrary key/value pairs, rather than as a schema version --
+    /// this store deliberately has no version marker, and one flag is not a reason to grow one.
+    /// It is not part of <see cref="IncidentSettings"/> and never reaches the editor.
+    /// </summary>
+    private const string TruppTypeDefaultsMigratedKey = "trupp_type_defaults_migrated";
+
     public static MasterDataSet GetOrCreate(string path)
     {
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
@@ -31,7 +40,6 @@ public sealed class MasterDataStore
 
         ReplaceList(cn, tx, "md_roles", set.Roles);
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
-        ReplaceList(cn, tx, "md_trupp_types", set.TruppTypes);
 
         Run(cn, tx, "DELETE FROM md_links;", _ => { });
         foreach (var l in set.Links)
@@ -44,6 +52,21 @@ public sealed class MasterDataStore
                 {
                     p("$n", l.Name);
                     p("$u", l.Url);
+                });
+        }
+
+        Run(cn, tx, "DELETE FROM md_trupp_types;", _ => { });
+        foreach (var t in set.TruppTypes)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_trupp_types (value, member_count, max_duration_minutes) VALUES ($v,$m,$d);",
+                p =>
+                {
+                    p("$v", t.Name);
+                    p("$m", t.MemberCount);
+                    p("$d", t.MaxDurationMinutes);
                 });
         }
 
@@ -127,9 +150,6 @@ public sealed class MasterDataStore
     {
         ("ils_reminder_interval_minutes", s.IlsReminderIntervalMinutes),
         ("ils_reminder_follow_up_interval_minutes", s.IlsReminderFollowUpIntervalMinutes),
-        ("agt_max_duration_minutes", s.AgtMaxDurationMinutes),
-        ("csa_max_duration_minutes", s.CsaMaxDurationMinutes),
-        ("lpa_max_duration_minutes", s.LpaMaxDurationMinutes),
         ("return_pressure_bar", s.ReturnPressureBar),
     };
 
@@ -152,7 +172,11 @@ public sealed class MasterDataStore
                 is_mandatory INTEGER NOT NULL DEFAULT 0,
                 kind INTEGER NOT NULL DEFAULT 0
             );
-            CREATE TABLE IF NOT EXISTS md_trupp_types (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_trupp_types (
+                value TEXT NOT NULL,
+                member_count INTEGER NOT NULL DEFAULT 2,
+                max_duration_minutes INTEGER NOT NULL DEFAULT 30
+            );
             CREATE TABLE IF NOT EXISTS md_personnel (
                 last_name TEXT NOT NULL,
                 first_name TEXT NOT NULL,
@@ -171,12 +195,122 @@ public sealed class MasterDataStore
 
         // Widen a pre-existing md_vehicles that predates the ZF flag -- existing vehicles read as
         // "no Zugführer" rather than failing to load.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "seats", "INTEGER NOT NULL DEFAULT 0");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "has_zugfuehrer", "INTEGER NOT NULL DEFAULT 0");
+
+        // md_personnel's optional columns. No shipped version ever lacked them, so these repair
+        // nothing today -- they are here because #397's sweep below holds every repairable column
+        // to the same rule, and a line that is missing is only ever noticed by a user whose store
+        // already broke. Cheap and idempotent; the alternative is finding out in the field.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "role", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "call_sign", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "phone", "TEXT");
+
+        // Widen a pre-existing md_trupp_types that predates #398, when a Trupp-Typ was a bare name
+        // and the crew size and Einsatzzeit were decided by comparing that name against a literal.
+        // The constant DEFAULTs backfill every existing row as an ordinary two-person Trupp on the
+        // standard Einsatzzeit; MigrateTruppTypeDefaults then restores what the old rule gave the
+        // two named types. The literals here mirror AtemschutzTrupp.StandardMemberCount and
+        // DefaultMaxDurationMinutes, which a const string cannot interpolate -- they are only a
+        // backstop in any case, since Save always writes all three columns explicitly.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_trupp_types", "member_count", "INTEGER NOT NULL DEFAULT 2");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_trupp_types", "max_duration_minutes", "INTEGER NOT NULL DEFAULT 30");
+        MigrateTruppTypeDefaults(cn);
 
         // Wachen and Funkrufnamen used to be lists of their own; they are derived from md_vehicles
         // (and md_personnel) now. Drop the stale tables a pre-change store still carries -- their
         // rows were never more than the names already on the vehicles, and nothing reads them.
         Exec(cn, "DROP TABLE IF EXISTS md_call_signs; DROP TABLE IF EXISTS md_brigades;");
+
+        // Retired by #398: the Einsatzzeiten are per-Trupp-Typ now. Deleted rather than left to rot,
+        // like the stale tables above, so nobody opening this file in a SQLite browser mistakes them
+        // for live configuration. Order matters: MigrateTruppTypeDefaults above reads these three to
+        // carry the brigade's own Einsatzzeiten onto the rows, so deleting them first would lose
+        // exactly the values the migration exists to preserve.
+        const string dropRetiredSettings =
+            """
+            DELETE FROM md_settings WHERE key IN
+                ('agt_max_duration_minutes', 'csa_max_duration_minutes', 'lpa_max_duration_minutes');
+            """;
+        Exec(cn, dropRetiredSettings);
+    }
+
+    /// <summary>
+    /// Restores, exactly once per store, the crew size and Einsatzzeit that the two named Trupp-Typen
+    /// had before #398 moved those numbers onto the Stammdaten row. Everything else keeps the
+    /// two-person/30-minute backfill the ALTER gave it.
+    /// <para>
+    /// Gated on a marker row rather than on the column being absent: <see cref="EnsureSchema"/> runs
+    /// on every open, and a store whose column was dropped and restored -- which is exactly what the
+    /// schema-drift sweep in the tests does -- would otherwise be mistaken for a first migration and
+    /// have the brigade's own edits overwritten. Writing the marker on a fresh store too means a new
+    /// install can never be seeded later either.
+    /// </para>
+    /// </summary>
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: both CommandText branches are compile-time literals; the Trupp-Typ name and the two numbers are bound parameters.")]
+    private static void MigrateTruppTypeDefaults(SqliteConnection cn)
+    {
+        if (ReadSetting(cn, TruppTypeDefaultsMigratedKey) is not null)
+        {
+            return;
+        }
+
+        // Read before the retired rows are deleted further up the call: these are the brigade's own
+        // Einsatzzeiten, edited in Stammdaten -> Einstellungen, not the shipped defaults. Assuming
+        // the defaults here would hand a Wehr that had set its CSA-Trupp to 15 minutes a 20-minute
+        // countdown instead -- longer under air than it decided on, silently, on first launch.
+        var legacy = ReadLegacyEinsatzzeiten(cn);
+
+        // Every row first, because the ALTER's constant DEFAULT cannot know about this store's AGT
+        // setting; then the two named ones, which the old rule treated differently. This is the only
+        // comparison of a Trupp-Typ name against a literal left in the app, and it runs once.
+        // TRIM + NOCASE matches what AtemschutzTrupp.IsChemicalTrupp accepted, so a store migrates
+        // with the rule it actually ran -- no more and no less.
+        Update(null, AtemschutzTrupp.StandardMemberCount, legacy.Agt);
+        Update(LegacyTruppTypeDefaults.ChemicalName, AtemschutzTrupp.MaxMemberCount, legacy.Chemical);
+        Update(LegacyTruppTypeDefaults.LpaName, AtemschutzTrupp.StandardMemberCount, legacy.Lpa);
+
+        WriteSetting(cn, TruppTypeDefaultsMigratedKey, 1);
+
+        void Update(string? name, int memberCount, int minutes)
+        {
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = name is null
+                ? "UPDATE md_trupp_types SET member_count = $m, max_duration_minutes = $d;"
+                : """
+                  UPDATE md_trupp_types
+                     SET member_count = $m, max_duration_minutes = $d
+                   WHERE TRIM(value) = $n COLLATE NOCASE;
+                  """;
+            cmd.Parameters.AddWithValue("$m", memberCount);
+            cmd.Parameters.AddWithValue("$d", minutes);
+            if (name is not null)
+            {
+                cmd.Parameters.AddWithValue("$n", name);
+            }
+
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// The three retired per-name Einsatzzeit settings as this store still holds them, falling back
+    /// per key to what <c>IncidentSettings</c> used to default to. Only the one-time Trupp-Typ
+    /// migration reads these; <see cref="ReadSettings"/> no longer knows about them.
+    /// </summary>
+    private static LegacyEinsatzzeiten ReadLegacyEinsatzzeiten(SqliteConnection cn)
+    {
+        var d = LegacyEinsatzzeiten.Defaults;
+        return new LegacyEinsatzzeiten(
+            Minutes("agt_max_duration_minutes", d.Agt),
+            Minutes("csa_max_duration_minutes", d.Chemical),
+            Minutes("lpa_max_duration_minutes", d.Lpa));
+
+        int Minutes(string key, int fallback) =>
+            TruppType.ClampMaxDurationMinutes(ReadSetting(cn, key) ?? fallback);
     }
 
     private static MasterDataSet Read(SqliteConnection cn)
@@ -188,7 +322,7 @@ public sealed class MasterDataStore
             ReadLinks(cn),
             checklistAufbau,
             checklistAbbau,
-            ReadColumn(cn, "SELECT value FROM md_trupp_types;"),
+            ReadTruppTypes(cn),
             ReadPersonnel(cn),
             ReadVehicles(cn),
             ReadSettings(cn));
@@ -213,6 +347,26 @@ public sealed class MasterDataStore
         return (aufbau, abbau);
     }
 
+    /// <summary>One raw md_settings value, or null when the key has no row. For the internal
+    /// markers that are not part of <see cref="IncidentSettings"/>.</summary>
+    private static int? ReadSetting(SqliteConnection cn, string key)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT value FROM md_settings WHERE key = $k;";
+        cmd.Parameters.AddWithValue("$k", key);
+        return cmd.ExecuteScalar() is long v ? (int)v : null;
+    }
+
+    private static void WriteSetting(SqliteConnection cn, string key, int value)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText =
+            "INSERT INTO md_settings (key, value) VALUES ($k,$v) ON CONFLICT(key) DO UPDATE SET value=excluded.value;";
+        cmd.Parameters.AddWithValue("$k", key);
+        cmd.Parameters.AddWithValue("$v", value);
+        cmd.ExecuteNonQuery();
+    }
+
     private static IncidentSettings ReadSettings(SqliteConnection cn)
     {
         var stored = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -233,9 +387,6 @@ public sealed class MasterDataStore
         return new IncidentSettings(
             Get("ils_reminder_interval_minutes", d.IlsReminderIntervalMinutes),
             Get("ils_reminder_follow_up_interval_minutes", d.IlsReminderFollowUpIntervalMinutes),
-            Get("agt_max_duration_minutes", d.AgtMaxDurationMinutes),
-            Get("csa_max_duration_minutes", d.CsaMaxDurationMinutes),
-            Get("lpa_max_duration_minutes", d.LpaMaxDurationMinutes),
             Get("return_pressure_bar", d.ReturnPressureBar));
     }
 
@@ -274,6 +425,26 @@ public sealed class MasterDataStore
         while (r.Read())
         {
             list.Add(new Link(r.GetString(0), r.GetString(1)));
+        }
+
+        return list;
+    }
+
+    private static List<TruppType> ReadTruppTypes(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT value, member_count, max_duration_minutes FROM md_trupp_types;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<TruppType>();
+        while (r.Read())
+        {
+            // Clamped on the way out as well as on the way in: the columns are only defaulted, not
+            // constrained, so a file edited by hand outside the app cannot put an unreachable crew
+            // position on the Atemschutz form, nor an Einsatzzeit no countdown can run.
+            list.Add(new TruppType(
+                r.GetString(0),
+                TruppType.ClampMemberCount(r.GetInt32(1)),
+                TruppType.ClampMaxDurationMinutes(r.GetInt32(2))));
         }
 
         return list;

@@ -2,7 +2,15 @@
   "_comment": "Fiktive Demo-Stammdaten für die Probefahrt. Alle Wachen, Fahrzeuge, Namen und Nummern sind erfunden. Importieren über STAMMDATEN → IMPORTIEREN, dann SPEICHERN.",
   "roles": ["EL", "EAL", "ZF", "GF", "AS-Überwachung", "Presse"],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz", "Einsatzbereit über Funk", "Abgerückt"],
-  "truppTypes": ["Angriffstrupp", "Wassertrupp", "Schlauchtrupp", "Sicherheitstrupp", "CSA-Trupp", "LPA-Trupp"],
+  "truppTypes": [
+    { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 },
+    { "name": "Wassertrupp", "memberCount": 2, "maxDurationMinutes": 30 },
+    { "name": "Schlauchtrupp", "memberCount": 2, "maxDurationMinutes": 30 },
+    { "name": "Sicherheitstrupp", "memberCount": 2, "maxDurationMinutes": 30 },
+    { "name": "CSA-Trupp", "memberCount": 3, "maxDurationMinutes": 20 },
+    { "name": "Strahlenschutztrupp", "memberCount": 3, "maxDurationMinutes": 30 },
+    { "name": "LPA-Trupp", "memberCount": 2, "maxDurationMinutes": 60 }
+  ],
   "checklistTemplateAufbau": [
     { "text": "Aufstellort ELW weit genug weg, um nicht zu behindern?", "mandatory": true },
     { "text": "Rote Kennleuchte ein, Blaulicht aus?", "mandatory": false },
@@ -43,9 +51,6 @@
   "settings": {
     "ilsReminderIntervalMinutes": 15,
     "ilsReminderFollowUpIntervalMinutes": 30,
-    "agtMaxDurationMinutes": 30,
-    "csaMaxDurationMinutes": 20,
-    "lpaMaxDurationMinutes": 60,
     "returnPressureBar": 50
   }
 }

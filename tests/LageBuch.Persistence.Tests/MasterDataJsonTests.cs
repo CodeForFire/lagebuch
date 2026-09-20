@@ -16,7 +16,7 @@ public class MasterDataJsonTests
             {
               "roles": ["EL", "ZF"],
               "unitStatus": ["Alarmiert"],
-              "truppTypes": ["Angriffstrupp"],
+              "truppTypes": [{ "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 }],
               "checklistTemplateAufbau": [{ "text": "Schritt 1", "mandatory": true }],
               "checklistTemplateAbbau": [{ "text": "Abbauschritt", "mandatory": false }],
               "links": [{ "name": "Wetterdienst", "url": "https://dwd.de" }],
@@ -26,6 +26,7 @@ public class MasterDataJsonTests
 
         Assert.Equal(new[] { "EL", "ZF" }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
+        Assert.Equal(new TruppType("Angriffstrupp", 2, 30), Assert.Single(set.TruppTypes));
         Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplateAufbau));
         Assert.Equal(new ChecklistTemplateItem("Abbauschritt", false), Assert.Single(set.ChecklistTemplateAbbau));
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(set.Links));
@@ -289,15 +290,12 @@ public class MasterDataJsonTests
               "settings": {
                 "ilsReminderIntervalMinutes": 12,
                 "ilsReminderFollowUpIntervalMinutes": 33,
-                "agtMaxDurationMinutes": 25,
-                "csaMaxDurationMinutes": 18,
-                "lpaMaxDurationMinutes": 40,
                 "returnPressureBar": 55
               }
             }
             """);
 
-        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 55), set.Settings);
+        Assert.Equal(new IncidentSettings(12, 33, 55), set.Settings);
     }
 
     [Fact]
@@ -307,19 +305,121 @@ public class MasterDataJsonTests
     [Fact]
     public void Parse_fills_missing_settings_fields_from_the_defaults()
     {
-        var set = Parse("""{ "settings": { "agtMaxDurationMinutes": 25 } }""");
+        var set = Parse("""{ "settings": { "returnPressureBar": 25 } }""");
 
-        Assert.Equal(25, set.Settings.AgtMaxDurationMinutes);
+        Assert.Equal(25, set.Settings.ReturnPressureBar);
         Assert.Equal(IncidentSettings.Defaults.IlsReminderFollowUpIntervalMinutes, set.Settings.IlsReminderFollowUpIntervalMinutes);
-        Assert.Equal(IncidentSettings.Defaults.LpaMaxDurationMinutes, set.Settings.LpaMaxDurationMinutes);
-        Assert.Equal(IncidentSettings.Defaults.ReturnPressureBar, set.Settings.ReturnPressureBar);
         Assert.Equal(IncidentSettings.Defaults.IlsReminderIntervalMinutes, set.Settings.IlsReminderIntervalMinutes);
+    }
+
+    [Fact]
+    public void Parse_maps_a_legacy_bare_string_trupp_type_the_way_the_store_migration_does()
+    {
+        // A file exported before #398 lists names only, because the crew size and Einsatzzeit were
+        // still decided by comparing those names against compiled-in literals. Both entrances --
+        // this parser and MasterDataStore's widening -- must translate them identically, or a
+        // brigade restoring from a JSON backup would get different rules than one just reopening
+        // its masterdata.db. See MasterDataStoreTests for the other half of this pair.
+        // No settings object here, so each falls back to what IncidentSettings used to default to.
+        var set = Parse("""
+            { "truppTypes": ["Angriffstrupp", "CSA-Trupp", "LPA-Trupp", " csa-trupp "] }
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                new TruppType("Angriffstrupp", 2, 30),
+                new TruppType("CSA-Trupp", 3, 20),
+                new TruppType("LPA-Trupp", 2, 60),
+
+                // Trimmed and case-insensitive, matching what the old runtime rule accepted.
+                new TruppType("csa-trupp", 3, 20),
+            },
+            set.TruppTypes);
+    }
+
+    [Fact]
+    public void A_legacy_file_keeps_the_einsatzzeiten_it_had_configured()
+    {
+        // The same document that still lists bare names also still carries that brigade's own
+        // Einsatzzeiten. ParseSettings no longer reads them -- they left IncidentSettings -- but the
+        // Trupp-Typ translation must, or restoring a backup silently lengthens the CSA countdown.
+        // Mirrors MasterDataStoreTests.The_migration_carries_over_the_einsatzzeiten_the_brigade_had_configured:
+        // the two entrances have to agree, and agreeing on the wrong number is not agreement.
+        var set = Parse("""
+            {
+              "truppTypes": ["Angriffstrupp", "CSA-Trupp", "LPA-Trupp"],
+              "settings": {
+                "agtMaxDurationMinutes": 25,
+                "csaMaxDurationMinutes": 15,
+                "lpaMaxDurationMinutes": 45
+              }
+            }
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                new TruppType("Angriffstrupp", 2, 25),
+                new TruppType("CSA-Trupp", 3, 15),
+                new TruppType("LPA-Trupp", 2, 45),
+            },
+            set.TruppTypes);
+    }
+
+    [Fact]
+    public void Parse_clamps_an_unrunnable_einsatzzeit_rather_than_throwing()
+    {
+        // Same trust boundary as the crew size, and the same reason not to throw. Left unclamped,
+        // a zero would reach AtemschutzTrupp.Register's ThrowIfNegativeOrZero out of a
+        // fire-and-forget mutation and take the UI down -- the #217 crash shape.
+        var set = Parse("""
+            {
+              "truppTypes": [
+                { "name": "Null", "maxDurationMinutes": 0 },
+                { "name": "Negativ", "maxDurationMinutes": -5 },
+                { "name": "Lang", "maxDurationMinutes": 240 }
+              ]
+            }
+            """);
+
+        // No ceiling on the last one: a four-hour LPA is a real thing and must survive untouched.
+        Assert.Equal(new[] { 1, 1, 240 }, set.TruppTypes.Select(t => t.MaxDurationMinutes));
+    }
+
+    [Fact]
+    public void Parse_clamps_an_impossible_crew_size_rather_than_throwing()
+    {
+        // This runs on a payload that crossed a trust boundary, and HomeViewModel catches only the
+        // JSON exception types around a sync host's /masterdata -- throwing here would escape that
+        // catch and leak the open hub connection instead of failing the join cleanly.
+        var set = Parse("""
+            {
+              "truppTypes": [
+                { "name": "Zu gross", "memberCount": 9 },
+                { "name": "Zu klein", "memberCount": 1 }
+              ]
+            }
+            """);
+
+        Assert.Equal(new[] { 3, 2 }, set.TruppTypes.Select(t => t.MemberCount));
+    }
+
+    [Fact]
+    public void Serialize_round_trips_trupp_types()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TruppTypes = new[] { new TruppType("Angriffstrupp"), new TruppType("Chemietrupp", 3, 20) },
+        };
+
+        Assert.Equal(original.TruppTypes, Parse(MasterDataJson.Serialize(original)).TruppTypes);
     }
 
     [Fact]
     public void Serialize_round_trips_settings()
     {
-        var original = MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 55) };
+        var original = MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 55) };
 
         Assert.Equal(original.Settings, Parse(MasterDataJson.Serialize(original)).Settings);
     }
@@ -330,7 +430,7 @@ public class MasterDataJsonTests
         Assert.True(MasterDataSet.Empty.IsEmpty);
 
         // Settings always carry values, so they must not count toward emptiness (else Import hides).
-        Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3, 4, 5, 6) }).IsEmpty);
+        Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3) }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Roles = new[] { "EL" } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Links = new[] { new Link("N", "U") } }).IsEmpty);

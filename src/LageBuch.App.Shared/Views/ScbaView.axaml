@@ -59,8 +59,9 @@
           <TextBox Width="90" Text="{Binding NewTruppNumber, Mode=OneWay}"
                    IsReadOnly="True" HorizontalContentAlignment="Center" />
         </HeaderedContentControl>
-        <!-- One box per position rather than a single free-text field: a Trupp is two people
-             (three in CSA), and the third box only appears when the type calls for it. Crew names
+        <!-- One box per position rather than a single free-text field: a Trupp is two people,
+             or three where its Stammdaten-Eintrag says so, and the third box only appears when the
+             selected Trupp-Typ calls for it (#398). Crew names
              use the ad-hoc "whoever is entering data right now" persona, not the Stammdaten roster
              persona (#137). -->
         <HeaderedContentControl Classes="field suggest" Header="TRUPPFÜHRER">
@@ -79,7 +80,7 @@
                            Text="{Binding NewTruppmann}"
                            b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field suggest" Header="2. TRUPPMANN (CSA)" IsVisible="{Binding RequiresThirdMember}">
+        <HeaderedContentControl Classes="field suggest" Header="2. TRUPPMANN" IsVisible="{Binding RequiresThirdMember}">
           <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderThird}"
                            ItemsSource="{Binding PersonOptions}"
@@ -96,8 +97,11 @@
         </HeaderedContentControl>
         <HeaderedContentControl Classes="field" Header="EINSATZZEIT">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"
-                           FormatString="0" />
+            <!-- Maximum bound, not written in: it has to match the Stammdaten editor's own
+                 Einsatzzeit spinner, or a Trupp-Typ configured above this could not be registered
+                 at the Einsatzzeit its row specifies. -->
+            <NumericUpDown Width="100" Minimum="1" Maximum="{Binding MaxDurationLimitMinutes}"
+                           Value="{Binding NewMaxDurationMinutes}" FormatString="0" />
             <TextBlock Text="Min. max." Classes="secondary" VerticalAlignment="Center" />
           </StackPanel>
         </HeaderedContentControl>
@@ -115,9 +119,9 @@
 
     <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <!-- Rows size to their content here, unlike the other grids. A Trupp is two people and a
-           CSA-Trupp three, each on its own line, so the shared 40px RowHeight from Styles.axaml
-           would clip the last crew member. -->
+      <!-- Rows size to their content here, unlike the other grids. A Trupp is two people, or three
+           where its Trupp-Typ calls for it, each on its own line, so the shared 40px RowHeight from
+           Styles.axaml would clip the last crew member. -->
       <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
                 RowHeight="NaN">
         <DataGrid.Columns>

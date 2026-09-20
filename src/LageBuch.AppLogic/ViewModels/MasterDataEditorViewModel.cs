@@ -28,7 +28,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private EditableListSection _unitStatus = null!;
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _truppTypes = null!;
+    private TruppTypesSection _truppTypes = null!;
 
     private ChecklistTemplateSection _checklistAufbau = null!;
     private ChecklistTemplateSection _checklistAbbau = null!;
@@ -111,7 +111,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         {
             _roles = new EditableListSection("Rollen", "ROLLE", set.Roles, MarkDirty),
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
-            _truppTypes = new EditableListSection("Trupp-Typen", "TYP", set.TruppTypes, MarkDirty),
+            _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),
             _checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty),
             _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),

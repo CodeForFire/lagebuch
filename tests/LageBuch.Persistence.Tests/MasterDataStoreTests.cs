@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using LageBuch.Persistence.MasterData;
 using Microsoft.Data.Sqlite;
 
@@ -39,7 +40,7 @@ public class MasterDataStoreTests : IDisposable
         {
             Roles = new[] { "EL", "ZF" },
             UnitStatus = new[] { "Alarmiert" },
-            TruppTypes = new[] { "Angriffstrupp" },
+            TruppTypes = new[] { new TruppType("Angriffstrupp") },
             ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
             ChecklistTemplateAbbau = new[] { new ChecklistTemplateItem("Abbauschritt", true) },
             Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
@@ -279,15 +280,15 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void Save_then_GetOrCreate_round_trips_settings()
     {
-        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 55) });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 55) });
 
-        Assert.Equal(new IncidentSettings(12, 33, 25, 18, 40, 55), MasterDataStore.GetOrCreate(_path).Settings);
+        Assert.Equal(new IncidentSettings(12, 33, 55), MasterDataStore.GetOrCreate(_path).Settings);
     }
 
     [Fact]
     public void A_missing_setting_key_falls_back_to_its_default()
     {
-        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 25, 18, 40, 55) });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 55) });
 
         // Simulate a store written before a setting existed: drop one row, which read must backfill.
         using (var cn = new SqliteConnection($"Data Source={_path}"))
@@ -303,5 +304,273 @@ public class MasterDataStoreTests : IDisposable
         var settings = MasterDataStore.GetOrCreate(_path).Settings;
         Assert.Equal(IncidentSettings.Defaults.ReturnPressureBar, settings.ReturnPressureBar);
         Assert.Equal(12, settings.IlsReminderIntervalMinutes); // the other keys are untouched
+    }
+
+    // --- Trupp-Typen: the #398 widening and its one-time translation ---
+    [Fact]
+    public void A_pre_trupp_type_rules_database_widens_and_restores_what_the_old_rule_gave()
+    {
+        // Simulate a store written before the Staerke and Einsatzzeit moved onto the row, when
+        // "CSA-Trupp" and "LPA-Trupp" were matched as literals at registration time. The ALTER
+        // backfills everything as an ordinary Trupp; the one-time migration then restores the two
+        // names' old values, trimmed and ignoring case exactly as the runtime rule did.
+        WriteLegacyTruppTypes("Angriffstrupp", "CSA-Trupp", "LPA-Trupp", " csa-trupp ");
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(
+            new[]
+            {
+                new TruppType("Angriffstrupp", 2, 30),
+                new TruppType("CSA-Trupp", 3, 20),
+                new TruppType("LPA-Trupp", 2, 60),
+                new TruppType(" csa-trupp ", 3, 20),
+            },
+            set.TruppTypes);
+    }
+
+    [Fact]
+    public void The_trupp_type_migration_runs_once_and_never_overwrites_a_later_edit()
+    {
+        // The whole reason the migration is gated on a marker rather than on the column being
+        // absent. A brigade that decides its CSA-Trupp is two people on 45 minutes must keep that
+        // across every subsequent launch.
+        WriteLegacyTruppTypes("CSA-Trupp");
+        var migrated = MasterDataStore.GetOrCreate(_path);
+        Assert.Equal(new TruppType("CSA-Trupp", 3, 20), Assert.Single(migrated.TruppTypes));
+
+        MasterDataStore.Save(_path, migrated with { TruppTypes = new[] { new TruppType("CSA-Trupp", 2, 45) } });
+
+        Assert.Equal(
+            new TruppType("CSA-Trupp", 2, 45),
+            Assert.Single(MasterDataStore.GetOrCreate(_path).TruppTypes));
+    }
+
+    [Fact]
+    public void A_fresh_database_is_marked_migrated_so_it_can_never_be_seeded_later()
+    {
+        // A new install has no pre-#398 data to translate. If the marker were not written here,
+        // adding a CSA-Trupp by hand and reopening would silently rewrite its numbers.
+        MasterDataStore.GetOrCreate(_path);
+        MasterDataStore.Save(
+            _path, MasterDataSet.Empty with { TruppTypes = new[] { new TruppType("CSA-Trupp", 2, 45) } });
+
+        Assert.Equal(
+            new TruppType("CSA-Trupp", 2, 45),
+            Assert.Single(MasterDataStore.GetOrCreate(_path).TruppTypes));
+    }
+
+    [Fact]
+    public void A_stored_einsatzzeit_no_countdown_can_run_is_clamped_on_read()
+    {
+        // Save can no longer write such a row, so this has to be planted directly -- the point is
+        // a masterdata.db edited outside the app. Unclamped it would reach
+        // AtemschutzTrupp.Register's ThrowIfNegativeOrZero and crash the Atemschutz form.
+        //
+        // The migration marker goes in too: this is a store that already carries the new columns
+        // and was hand-edited afterwards, not a legacy one. Without it the one-time migration would
+        // run and overwrite both rows, which is correct for legacy data but not what is under test.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_trupp_types (
+                    value TEXT NOT NULL,
+                    member_count INTEGER NOT NULL DEFAULT 2,
+                    max_duration_minutes INTEGER NOT NULL DEFAULT 30);
+                INSERT INTO md_trupp_types (value, member_count, max_duration_minutes) VALUES
+                    ('Kaputt', 2, 0),
+                    ('Lang', 2, 240);
+                CREATE TABLE md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                INSERT INTO md_settings (key, value) VALUES ('trupp_type_defaults_migrated', 1);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        // Floor only: the four-hour entry is left exactly as the brigade wrote it.
+        Assert.Equal(new[] { 1, 240 }, set.TruppTypes.Select(t => t.MaxDurationMinutes));
+    }
+
+    [Fact]
+    public void The_retired_einsatzzeit_settings_are_removed_from_an_existing_store()
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                INSERT INTO md_settings (key, value) VALUES
+                    ('agt_max_duration_minutes', 35),
+                    ('csa_max_duration_minutes', 22),
+                    ('lpa_max_duration_minutes', 48),
+                    ('return_pressure_bar', 55);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(55, MasterDataStore.GetOrCreate(_path).Settings.ReturnPressureBar);
+        Assert.DoesNotContain(SettingKeys(), k => k.EndsWith("_max_duration_minutes", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_migration_carries_over_the_einsatzzeiten_the_brigade_had_configured()
+    {
+        // The three settings were edited in Stammdaten -> Einstellungen; they were never constants.
+        // Migrating with the shipped defaults instead would hand a Wehr that had shortened its
+        // CSA-Trupp to 15 minutes a 20-minute countdown -- longer under air than it decided on.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_trupp_types (value TEXT NOT NULL);
+                INSERT INTO md_trupp_types (value) VALUES ('Angriffstrupp'), ('CSA-Trupp'), ('LPA-Trupp');
+                CREATE TABLE md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                INSERT INTO md_settings (key, value) VALUES
+                    ('agt_max_duration_minutes', 25),
+                    ('csa_max_duration_minutes', 15),
+                    ('lpa_max_duration_minutes', 45);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(
+            new[]
+            {
+                new TruppType("Angriffstrupp", 2, 25),
+                new TruppType("CSA-Trupp", 3, 15),
+                new TruppType("LPA-Trupp", 2, 45),
+            },
+            set.TruppTypes);
+
+        // ... and only then are the retired keys dropped.
+        Assert.DoesNotContain(SettingKeys(), k => k.EndsWith("_max_duration_minutes", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_migration_falls_back_per_key_for_a_store_that_never_overrode_them()
+    {
+        WriteLegacyTruppTypes("Angriffstrupp", "CSA-Trupp", "LPA-Trupp");
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new[] { 30, 20, 60 }, set.TruppTypes.Select(t => t.MaxDurationMinutes));
+    }
+
+    /// <summary>
+    /// The drift guard from #397, pointed at this store. A column added to the CREATE TABLE block
+    /// without a matching AddColumnIfMissing line breaks every pre-existing database, silently --
+    /// and no existing test catches it, because a fresh store is built straight from those CREATE
+    /// statements and so always matches itself. Dropping every repairable column and reopening is
+    /// what exercises the widening path a real user's file takes.
+    /// </summary>
+    [Fact]
+    public void Every_repairable_column_is_restored_after_being_dropped()
+    {
+        MasterDataStore.GetOrCreate(_path);
+
+        var repairable = new List<(string Table, string Column)>();
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            foreach (var table in Query(cn, "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'md\\_%' ESCAPE '\\';"))
+            {
+                // Only a nullable column or one with a default can be re-added by ALTER TABLE;
+                // a primary key or a bare NOT NULL could not be, so it is not in scope here.
+                foreach (var column in Query(
+                    cn,
+                    $"SELECT name FROM pragma_table_info('{table}') WHERE pk = 0 AND (\"notnull\" = 0 OR dflt_value IS NOT NULL);"))
+                {
+                    repairable.Add((table, column));
+                }
+            }
+
+            DropColumns(cn, repairable);
+        }
+
+        SqliteConnection.ClearAllPools();
+        Assert.NotEmpty(repairable);
+
+        MasterDataStore.GetOrCreate(_path);
+
+        using var reopened = new SqliteConnection($"Data Source={_path}");
+        reopened.Open();
+        foreach (var (table, column) in repairable)
+        {
+            Assert.Contains(column, Query(reopened, $"SELECT name FROM pragma_table_info('{table}');"));
+        }
+    }
+
+    /// <summary>Writes a md_trupp_types in its pre-#398 shape: names only, no rules.</summary>
+    private void WriteLegacyTruppTypes(params string[] names)
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var create = cn.CreateCommand();
+            create.CommandText = "CREATE TABLE md_trupp_types (value TEXT NOT NULL);";
+            create.ExecuteNonQuery();
+
+            foreach (var name in names)
+            {
+                using var insert = cn.CreateCommand();
+                insert.CommandText = "INSERT INTO md_trupp_types (value) VALUES ($v);";
+                insert.Parameters.AddWithValue("$v", name);
+                insert.ExecuteNonQuery();
+            }
+        }
+
+        SqliteConnection.ClearAllPools();
+    }
+
+    private List<string> SettingKeys()
+    {
+        using var cn = new SqliteConnection($"Data Source={_path}");
+        cn.Open();
+        return Query(cn, "SELECT key FROM md_settings;");
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Test-only: the table and column names come from this database's own sqlite_master/pragma output, never from user input.")]
+    private static void DropColumns(SqliteConnection cn, IEnumerable<(string Table, string Column)> columns)
+    {
+        foreach (var (table, column) in columns)
+        {
+            using var drop = cn.CreateCommand();
+            drop.CommandText = $"ALTER TABLE {table} DROP COLUMN {column};";
+            drop.ExecuteNonQuery();
+        }
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Test-only: the SQL is built from schema identifiers this test just read back out of the same database, never from user input.")]
+    private static List<string> Query(SqliteConnection cn, string sql)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = sql;
+        using var r = cmd.ExecuteReader();
+        var list = new List<string>();
+        while (r.Read())
+        {
+            list.Add(r.GetString(0));
+        }
+
+        return list;
     }
 }

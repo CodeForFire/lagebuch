@@ -123,6 +123,9 @@ public class MasterDataEditorViewModelTests
     private static VehiclesSection Vehicles(MasterDataEditorViewModel vm) =>
         vm.Sections.OfType<VehiclesSection>().Single();
 
+    private static TruppTypesSection TruppTypes(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<TruppTypesSection>().Single();
+
     [Fact]
     public void Fahrzeuge_rows_suggest_the_waches_and_callsigns_derived_from_the_master_data()
     {
@@ -269,7 +272,7 @@ public class MasterDataEditorViewModelTests
     [Fact]
     public void Save_maps_every_category_to_its_own_list_in_BuildSet()
     {
-        var listTitles = new[] { "Rollen", "Einheiten-Status", "Trupp-Typen" };
+        var listTitles = new[] { "Rollen", "Einheiten-Status" };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var vm = Vm(provider);
@@ -303,12 +306,18 @@ public class MasterDataEditorViewModelTests
         vehicles.Rows[^1].Wache = "MARK-Wache";
         vehicles.Rows[^1].CallSign = "MARK-Funkrufname";
 
+        var truppTypes = TruppTypes(vm);
+        truppTypes.AddCommand.Execute(null);
+        truppTypes.Rows[^1].Name = "MARK-Trupp-Typen";
+        truppTypes.Rows[^1].MemberCount = 3;
+        truppTypes.Rows[^1].MaxDurationMinutes = 20;
+
         vm.SaveCommand.Execute(null);
 
         var set = provider.Get();
         Assert.Contains("MARK-Rollen", set.Roles);
         Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
-        Assert.Contains("MARK-Trupp-Typen", set.TruppTypes);
+        Assert.Contains(set.TruppTypes, t => t.Name == "MARK-Trupp-Typen" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
         Assert.Contains(set.Vehicles, v => v.Wache == "MARK-Wache" && v.CallSign == "MARK-Funkrufname");
 
         // The vehicle row is the one place Wachen and Funkrufnamen are maintained.
@@ -344,15 +353,12 @@ public class MasterDataEditorViewModelTests
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty with
         {
-            Settings = new IncidentSettings(12, 33, 25, 18, 40, 55),
+            Settings = new IncidentSettings(12, 33, 55),
         });
         var settings = Settings(Vm(provider));
 
         Assert.Equal(12, settings.IlsReminderIntervalMinutes);
         Assert.Equal(33, settings.IlsReminderFollowUpIntervalMinutes);
-        Assert.Equal(25, settings.AgtMaxDurationMinutes);
-        Assert.Equal(18, settings.CsaMaxDurationMinutes);
-        Assert.Equal(40, settings.LpaMaxDurationMinutes);
         Assert.Equal(55, settings.ReturnPressureBar);
     }
 
@@ -362,13 +368,13 @@ public class MasterDataEditorViewModelTests
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var vm = Vm(provider);
 
-        Settings(vm).AgtMaxDurationMinutes = 40;
+        Settings(vm).ReturnPressureBar = 40;
         Assert.True(vm.IsDirty);
 
         vm.SaveCommand.Execute(null);
 
         Assert.Equal(1, provider.SaveCount);
-        Assert.Equal(40, provider.Get().Settings.AgtMaxDurationMinutes);
+        Assert.Equal(40, provider.Get().Settings.ReturnPressureBar);
     }
 
     [Fact]
