@@ -162,7 +162,7 @@ public sealed class IncidentRepository
             Run(
                 cn,
                 tx,
-                "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time) " + "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit);",
+                "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time, safety_trupp_id) " + "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit,$safety);",
                 p =>
                 {
                     p("$id", t.Id.ToString());
@@ -179,6 +179,7 @@ public sealed class IncidentRepository
                     p("$ret", t.ReturnPressureBar);
                     p("$interval", t.PressureControlIntervalMinutes);
                     p("$exit", (object?)t.ExitTime?.ToString(Iso) ?? DBNull.Value);
+                    p("$safety", (object?)t.SafetyTruppId?.ToString() ?? DBNull.Value);
                 });
 
             for (var j = 0; j < t.Members.Count; j++)
@@ -518,7 +519,7 @@ public sealed class IncidentRepository
 
         var scbaTrupps = ReadAll(
             cn,
-            "SELECT id, trupp_number, designation, call_sign, task, registered_at, start_time, withdraw_time, entry_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time FROM scba_trupps ORDER BY ordinal;",
+            "SELECT id, trupp_number, designation, call_sign, task, registered_at, start_time, withdraw_time, entry_pressure, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time, safety_trupp_id FROM scba_trupps ORDER BY ordinal;",
             r =>
             {
                 var id = Guid.Parse(r.GetString(0));
@@ -537,7 +538,8 @@ public sealed class IncidentRepository
                     r.GetInt32(10),
                     r.GetInt32(11),
                     NullableDate(r, 12),
-                    readingsByTrupp.TryGetValue(id, out var rs) ? rs : Enumerable.Empty<Domain.Atemschutz.PressureReading>());
+                    readingsByTrupp.TryGetValue(id, out var rs) ? rs : Enumerable.Empty<Domain.Atemschutz.PressureReading>(),
+                    NullableGuid(r, 13));
             });
 
         var audit = ReadAll(
@@ -671,6 +673,12 @@ public sealed class IncidentRepository
     private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
     private static int? NullableInt(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt32(i);
+
+    // TryParse rather than Parse: an unreadable id degrades to "no Sicherheitstrupp recorded",
+    // which is the same stance Rehydrate takes on a stored crew -- a file that opens imperfectly
+    // beats one that will not open at all.
+    private static Guid? NullableGuid(SqliteDataReader r, int i) =>
+        !r.IsDBNull(i) && Guid.TryParse(r.GetString(i), out var g) ? g : null;
 
     private static DateTimeOffset? NullableDate(SqliteDataReader r, int i) =>
         r.IsDBNull(i) ? null : ParseDate(r.GetString(i));

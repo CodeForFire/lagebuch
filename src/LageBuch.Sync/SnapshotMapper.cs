@@ -179,7 +179,8 @@ public static class SnapshotMapper
         t.ReturnPressureBar,
         t.PressureControlIntervalMinutes,
         t.ExitTime,
-        t.PressureReadings.Select(p => new PressureReadingDto(p.Time, p.Bar)).ToList());
+        t.PressureReadings.Select(p => new PressureReadingDto(p.Time, p.Bar)).ToList(),
+        t.SafetyTruppId);
 
     private static AtemschutzTrupp FromDto(ScbaTruppDto d) => AtemschutzTrupp.Rehydrate(
         d.Id,
@@ -196,5 +197,6 @@ public static class SnapshotMapper
         d.ReturnPressureBar,
         d.PressureControlIntervalMinutes,
         d.ExitTime,
-        d.Readings.Select(p => new PressureReading(p.Time, p.Bar)));
+        d.Readings.Select(p => new PressureReading(p.Time, p.Bar)),
+        d.SafetyTruppId);
 }

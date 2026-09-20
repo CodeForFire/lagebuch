@@ -107,6 +107,9 @@ public static class CommandApplier
             case MarkScbaRemovedCommand c:
                 incident.MarkScbaRemoved(clock, c.TruppId);
                 break;
+            case SetScbaSafetyTruppCommand c:
+                incident.SetScbaSafetyTrupp(c.TruppId, c.SafetyTruppId);
+                break;
             case SetIncidentNumberCommand c:
                 incident.SetIncidentNumber(c.IncidentNumber is { } n ? new IncidentNumber(n) : null);
                 break;
