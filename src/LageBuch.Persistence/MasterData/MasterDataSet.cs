@@ -206,32 +206,71 @@ public sealed record TruppType(string Name, int MemberCount, int MaxDurationMinu
 /// with special needs is something the user configures, which is the entire point of the issue.
 /// </para>
 /// </summary>
+/// <summary>
+/// The Einsatzzeiten a pre-#398 store configured, one per hard-coded Trupp-Typ name. They lived in
+/// <c>md_settings</c> / the JSON <c>settings</c> object and were edited in Stammdaten -> Einstellungen,
+/// so they are the brigade's own numbers, not constants -- which is exactly why the migration has to
+/// read them instead of assuming the shipped defaults.
+/// </summary>
+/// <param name="Agt">Einsatzzeit for an ordinary Trupp (<c>agtMaxDurationMinutes</c>).</param>
+/// <param name="Chemical">Einsatzzeit for the CSA-Trupp (<c>csaMaxDurationMinutes</c>).</param>
+/// <param name="Lpa">Einsatzzeit for the LPA-Trupp (<c>lpaMaxDurationMinutes</c>).</param>
+internal readonly record struct LegacyEinsatzzeiten(int Agt, int Chemical, int Lpa)
+{
+    /// <summary>What the retired <c>IncidentSettings</c> defaulted to, for a store that never
+    /// overrode them.</summary>
+    public static LegacyEinsatzzeiten Defaults { get; } = new(
+        AtemschutzTrupp.DefaultMaxDurationMinutes, ChemicalDefaultMinutes, LpaDefaultMinutes);
+
+    /// <summary>The old <c>IncidentSettings.CsaMaxDurationMinutes</c> default.</summary>
+    public const int ChemicalDefaultMinutes = 20;
+
+    /// <summary>The old <c>IncidentSettings.LpaMaxDurationMinutes</c> default.</summary>
+    public const int LpaDefaultMinutes = 60;
+}
+
+/// <summary>
+/// Translates a pre-#398 Trupp-Typ -- a bare name, with its crew size and Einsatzzeit still decided
+/// by comparing that name against a compiled-in literal -- into a row that carries both itself.
+/// This is the <b>only</b> place in the codebase where a Trupp-Typ name is compared against a
+/// literal, and it is reached only while reading data written by an older version: the SQLite
+/// widening in <see cref="MasterDataStore"/>, which runs once per store, and the bare-string branch
+/// of <see cref="MasterDataJson"/>, which sees only pre-#398 exports.
+/// <para>
+/// Both entrances share it so a brigade restoring from a JSON backup and one opening its existing
+/// masterdata.db end up with identical rows. It must never gain a third name -- a new Trupp-Typ with
+/// special needs is something the user configures, which is the entire point of the issue.
+/// </para>
+/// </summary>
 internal static class LegacyTruppTypeDefaults
 {
-    /// <summary>The pre-#398 rules, keyed by the designation they used to be matched against.</summary>
-    public static IReadOnlyDictionary<string, (int MemberCount, int MaxDurationMinutes)> ByName { get; } =
-        new Dictionary<string, (int, int)>(StringComparer.OrdinalIgnoreCase)
-        {
-            // AtemschutzTrupp.RequiredMemberCount returned three for this one, and the Einsatzzeit
-            // came from IncidentSettings.CsaMaxDurationMinutes, which defaulted to 20.
-            ["CSA-Trupp"] = (3, 20),
+    /// <summary>The designation whose crew size the old rule raised to three.</summary>
+    public const string ChemicalName = "CSA-Trupp";
 
-            // Crewed normally; only the Einsatzzeit differed (LpaMaxDurationMinutes, default 60).
-            ["LPA-Trupp"] = (2, 60),
-        };
+    /// <summary>The designation that only ever differed in its Einsatzzeit.</summary>
+    public const string LpaName = "LPA-Trupp";
 
     /// <summary>
-    /// The row a bare pre-#398 name becomes. Trimmed and case-insensitive, matching exactly what
-    /// the old <c>IsChemicalTrupp</c>/<c>IsLpaTrupp</c> accepted, so a store migrates with the
-    /// rule it actually had -- no more and no less.
+    /// The row a bare pre-#398 name becomes, given the Einsatzzeiten that store actually had.
+    /// Trimmed and case-insensitive, matching exactly what the old <c>IsChemicalTrupp</c> /
+    /// <c>IsLpaTrupp</c> accepted, so a store migrates with the rule it really ran -- no more and
+    /// no less.
     /// </summary>
-    public static TruppType ToTruppType(string name)
+    public static TruppType ToTruppType(string name, LegacyEinsatzzeiten einsatzzeiten)
     {
         var trimmed = name?.Trim() ?? string.Empty;
-        return ByName.TryGetValue(trimmed, out var d)
-            ? new TruppType(trimmed, d.MemberCount, d.MaxDurationMinutes)
-            : new TruppType(trimmed);
+        if (Matches(trimmed, ChemicalName))
+        {
+            return new TruppType(trimmed, AtemschutzTrupp.MaxMemberCount, einsatzzeiten.Chemical);
+        }
+
+        return Matches(trimmed, LpaName)
+            ? new TruppType(trimmed, AtemschutzTrupp.StandardMemberCount, einsatzzeiten.Lpa)
+            : new TruppType(trimmed, AtemschutzTrupp.StandardMemberCount, einsatzzeiten.Agt);
     }
+
+    private static bool Matches(string trimmed, string legacyName) =>
+        string.Equals(trimmed, legacyName, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>
@@ -484,12 +523,17 @@ public static class MasterDataJson
             return Array.Empty<TruppType>();
         }
 
+        // Read from the same document, before ParseSettings drops them: a file old enough to list
+        // bare names also still carries that brigade's own Einsatzzeiten, and translating its
+        // Trupp-Typen with the shipped defaults instead would quietly hand back longer times under
+        // air than it had configured.
+        var legacy = ParseLegacyEinsatzzeiten(root);
         var result = new List<TruppType>();
         foreach (var x in arr.EnumerateArray())
         {
             if (x.ValueKind == JsonValueKind.String)
             {
-                result.Add(LegacyTruppTypeDefaults.ToTruppType(x.GetString()!));
+                result.Add(LegacyTruppTypeDefaults.ToTruppType(x.GetString()!, legacy));
                 continue;
             }
 
@@ -504,6 +548,32 @@ public static class MasterDataJson
 
         static int Int(JsonElement e, string prop, int fallback) =>
             e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : fallback;
+    }
+
+    /// <summary>
+    /// The three retired per-name Einsatzzeit settings, as an older file still carries them.
+    /// <see cref="ParseSettings"/> no longer reads them -- they are not part of
+    /// <see cref="IncidentSettings"/> any more -- but the legacy Trupp-Typ translation must, or a
+    /// brigade that had shortened its CSA-Einsatzzeit would silently get the longer default back.
+    /// Clamped like any other duration crossing this boundary.
+    /// </summary>
+    private static LegacyEinsatzzeiten ParseLegacyEinsatzzeiten(JsonElement root)
+    {
+        var d = LegacyEinsatzzeiten.Defaults;
+        if (!root.TryGetProperty("settings", out var s) || s.ValueKind != JsonValueKind.Object)
+        {
+            return d;
+        }
+
+        return new LegacyEinsatzzeiten(
+            Minutes("agtMaxDurationMinutes", d.Agt),
+            Minutes("csaMaxDurationMinutes", d.Chemical),
+            Minutes("lpaMaxDurationMinutes", d.Lpa));
+
+        int Minutes(string prop, int fallback) => TruppType.ClampMaxDurationMinutes(
+            s.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number
+                ? v.GetInt32()
+                : fallback);
     }
 
     /// <summary>

@@ -320,6 +320,7 @@ public class MasterDataJsonTests
         // this parser and MasterDataStore's widening -- must translate them identically, or a
         // brigade restoring from a JSON backup would get different rules than one just reopening
         // its masterdata.db. See MasterDataStoreTests for the other half of this pair.
+        // No settings object here, so each falls back to what IncidentSettings used to default to.
         var set = Parse("""
             { "truppTypes": ["Angriffstrupp", "CSA-Trupp", "LPA-Trupp", " csa-trupp "] }
             """);
@@ -333,6 +334,35 @@ public class MasterDataJsonTests
 
                 // Trimmed and case-insensitive, matching what the old runtime rule accepted.
                 new TruppType("csa-trupp", 3, 20),
+            },
+            set.TruppTypes);
+    }
+
+    [Fact]
+    public void A_legacy_file_keeps_the_einsatzzeiten_it_had_configured()
+    {
+        // The same document that still lists bare names also still carries that brigade's own
+        // Einsatzzeiten. ParseSettings no longer reads them -- they left IncidentSettings -- but the
+        // Trupp-Typ translation must, or restoring a backup silently lengthens the CSA countdown.
+        // Mirrors MasterDataStoreTests.The_migration_carries_over_the_einsatzzeiten_the_brigade_had_configured:
+        // the two entrances have to agree, and agreeing on the wrong number is not agreement.
+        var set = Parse("""
+            {
+              "truppTypes": ["Angriffstrupp", "CSA-Trupp", "LPA-Trupp"],
+              "settings": {
+                "agtMaxDurationMinutes": 25,
+                "csaMaxDurationMinutes": 15,
+                "lpaMaxDurationMinutes": 45
+              }
+            }
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                new TruppType("Angriffstrupp", 2, 25),
+                new TruppType("CSA-Trupp", 3, 15),
+                new TruppType("LPA-Trupp", 2, 45),
             },
             set.TruppTypes);
     }

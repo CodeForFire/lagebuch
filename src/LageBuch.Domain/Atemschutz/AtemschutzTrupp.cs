@@ -18,6 +18,17 @@ public sealed class AtemschutzTrupp
     /// carries its own <c>MaxDurationMinutes</c>; this is only what "no type at all" means.
     /// </summary>
     public const int DefaultMaxDurationMinutes = 30;
+
+    /// <summary>
+    /// The largest Einsatzzeit the spinners offer, in minutes. A UI affordance, not an Atemschutz
+    /// rule: the stored value is floored but deliberately not capped, so this only has to be
+    /// generous enough to cover a real long-duration apparatus (four hours) and, above all, to be
+    /// the <em>same</em> in the Stammdaten editor and on the Atemschutz form. They disagreed once --
+    /// the editor offered 180 while the form stopped at 120 -- which let a brigade configure a
+    /// Trupp-Typ it could then not register at its own Einsatzzeit.
+    /// </summary>
+    public const int MaxEditableDurationMinutes = 240;
+
     public const int DefaultReturnPressureBar = 50;
     public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;

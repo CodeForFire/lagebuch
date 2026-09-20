@@ -366,6 +366,10 @@ public class MasterDataStoreTests : IDisposable
         // Save can no longer write such a row, so this has to be planted directly -- the point is
         // a masterdata.db edited outside the app. Unclamped it would reach
         // AtemschutzTrupp.Register's ThrowIfNegativeOrZero and crash the Atemschutz form.
+        //
+        // The migration marker goes in too: this is a store that already carries the new columns
+        // and was hand-edited afterwards, not a legacy one. Without it the one-time migration would
+        // run and overwrite both rows, which is correct for legacy data but not what is under test.
         using (var cn = new SqliteConnection($"Data Source={_path}"))
         {
             cn.Open();
@@ -378,6 +382,8 @@ public class MasterDataStoreTests : IDisposable
                 INSERT INTO md_trupp_types (value, member_count, max_duration_minutes) VALUES
                     ('Kaputt', 2, 0),
                     ('Lang', 2, 240);
+                CREATE TABLE md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                INSERT INTO md_settings (key, value) VALUES ('trupp_type_defaults_migrated', 1);
                 """;
             cmd.ExecuteNonQuery();
         }
@@ -412,6 +418,55 @@ public class MasterDataStoreTests : IDisposable
 
         Assert.Equal(55, MasterDataStore.GetOrCreate(_path).Settings.ReturnPressureBar);
         Assert.DoesNotContain(SettingKeys(), k => k.EndsWith("_max_duration_minutes", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_migration_carries_over_the_einsatzzeiten_the_brigade_had_configured()
+    {
+        // The three settings were edited in Stammdaten -> Einstellungen; they were never constants.
+        // Migrating with the shipped defaults instead would hand a Wehr that had shortened its
+        // CSA-Trupp to 15 minutes a 20-minute countdown -- longer under air than it decided on.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_trupp_types (value TEXT NOT NULL);
+                INSERT INTO md_trupp_types (value) VALUES ('Angriffstrupp'), ('CSA-Trupp'), ('LPA-Trupp');
+                CREATE TABLE md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                INSERT INTO md_settings (key, value) VALUES
+                    ('agt_max_duration_minutes', 25),
+                    ('csa_max_duration_minutes', 15),
+                    ('lpa_max_duration_minutes', 45);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(
+            new[]
+            {
+                new TruppType("Angriffstrupp", 2, 25),
+                new TruppType("CSA-Trupp", 3, 15),
+                new TruppType("LPA-Trupp", 2, 45),
+            },
+            set.TruppTypes);
+
+        // ... and only then are the retired keys dropped.
+        Assert.DoesNotContain(SettingKeys(), k => k.EndsWith("_max_duration_minutes", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_migration_falls_back_per_key_for_a_store_that_never_overrode_them()
+    {
+        WriteLegacyTruppTypes("Angriffstrupp", "CSA-Trupp", "LPA-Trupp");
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new[] { 30, 20, 60 }, set.TruppTypes.Select(t => t.MaxDurationMinutes));
     }
 
     /// <summary>

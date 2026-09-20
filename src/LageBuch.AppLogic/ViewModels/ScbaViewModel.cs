@@ -265,6 +265,10 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     public IReadOnlyList<string> TruppTypeOptions { get; }
 
+    /// <summary>Largest Einsatzzeit this form's spinner offers. Shared with the Stammdaten editor's
+    /// so a Trupp-Typ can always be registered at the Einsatzzeit its own row specifies.</summary>
+    public static int MaxDurationLimitMinutes => AtemschutzTrupp.MaxEditableDurationMinutes;
+
     public IReadOnlyList<string> CallSignOptions { get; }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -223,7 +224,9 @@ public sealed class MasterDataStore
 
         // Retired by #398: the Einsatzzeiten are per-Trupp-Typ now. Deleted rather than left to rot,
         // like the stale tables above, so nobody opening this file in a SQLite browser mistakes them
-        // for live configuration. Runs after MigrateTruppTypeDefaults, which is allowed to read them.
+        // for live configuration. Order matters: MigrateTruppTypeDefaults above reads these three to
+        // carry the brigade's own Einsatzzeiten onto the rows, so deleting them first would lose
+        // exactly the values the migration exists to preserve.
         const string dropRetiredSettings =
             """
             DELETE FROM md_settings WHERE key IN
@@ -244,6 +247,10 @@ public sealed class MasterDataStore
     /// install can never be seeded later either.
     /// </para>
     /// </summary>
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: both CommandText branches are compile-time literals; the Trupp-Typ name and the two numbers are bound parameters.")]
     private static void MigrateTruppTypeDefaults(SqliteConnection cn)
     {
         if (ReadSetting(cn, TruppTypeDefaultsMigratedKey) is not null)
@@ -251,25 +258,59 @@ public sealed class MasterDataStore
             return;
         }
 
-        // The only comparison of a Trupp-Typ name against a literal left in the app, and it runs
-        // once. TRIM + NOCASE matches what the old AtemschutzTrupp.IsChemicalTrupp accepted, so a
-        // store migrates with the rule it actually had -- no more and no less.
-        foreach (var (name, defaults) in LegacyTruppTypeDefaults.ByName)
-        {
-            using var cmd = cn.CreateCommand();
-            cmd.CommandText =
-                """
-                UPDATE md_trupp_types
-                   SET member_count = $m, max_duration_minutes = $d
-                 WHERE TRIM(value) = $n COLLATE NOCASE;
-                """;
-            cmd.Parameters.AddWithValue("$m", defaults.MemberCount);
-            cmd.Parameters.AddWithValue("$d", defaults.MaxDurationMinutes);
-            cmd.Parameters.AddWithValue("$n", name);
-            cmd.ExecuteNonQuery();
-        }
+        // Read before the retired rows are deleted further up the call: these are the brigade's own
+        // Einsatzzeiten, edited in Stammdaten -> Einstellungen, not the shipped defaults. Assuming
+        // the defaults here would hand a Wehr that had set its CSA-Trupp to 15 minutes a 20-minute
+        // countdown instead -- longer under air than it decided on, silently, on first launch.
+        var legacy = ReadLegacyEinsatzzeiten(cn);
+
+        // Every row first, because the ALTER's constant DEFAULT cannot know about this store's AGT
+        // setting; then the two named ones, which the old rule treated differently. This is the only
+        // comparison of a Trupp-Typ name against a literal left in the app, and it runs once.
+        // TRIM + NOCASE matches what AtemschutzTrupp.IsChemicalTrupp accepted, so a store migrates
+        // with the rule it actually ran -- no more and no less.
+        Update(null, AtemschutzTrupp.StandardMemberCount, legacy.Agt);
+        Update(LegacyTruppTypeDefaults.ChemicalName, AtemschutzTrupp.MaxMemberCount, legacy.Chemical);
+        Update(LegacyTruppTypeDefaults.LpaName, AtemschutzTrupp.StandardMemberCount, legacy.Lpa);
 
         WriteSetting(cn, TruppTypeDefaultsMigratedKey, 1);
+
+        void Update(string? name, int memberCount, int minutes)
+        {
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = name is null
+                ? "UPDATE md_trupp_types SET member_count = $m, max_duration_minutes = $d;"
+                : """
+                  UPDATE md_trupp_types
+                     SET member_count = $m, max_duration_minutes = $d
+                   WHERE TRIM(value) = $n COLLATE NOCASE;
+                  """;
+            cmd.Parameters.AddWithValue("$m", memberCount);
+            cmd.Parameters.AddWithValue("$d", minutes);
+            if (name is not null)
+            {
+                cmd.Parameters.AddWithValue("$n", name);
+            }
+
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// The three retired per-name Einsatzzeit settings as this store still holds them, falling back
+    /// per key to what <c>IncidentSettings</c> used to default to. Only the one-time Trupp-Typ
+    /// migration reads these; <see cref="ReadSettings"/> no longer knows about them.
+    /// </summary>
+    private static LegacyEinsatzzeiten ReadLegacyEinsatzzeiten(SqliteConnection cn)
+    {
+        var d = LegacyEinsatzzeiten.Defaults;
+        return new LegacyEinsatzzeiten(
+            Minutes("agt_max_duration_minutes", d.Agt),
+            Minutes("csa_max_duration_minutes", d.Chemical),
+            Minutes("lpa_max_duration_minutes", d.Lpa));
+
+        int Minutes(string key, int fallback) =>
+            TruppType.ClampMaxDurationMinutes(ReadSetting(cn, key) ?? fallback);
     }
 
     private static MasterDataSet Read(SqliteConnection cn)

@@ -342,7 +342,8 @@
                                            Minimum="{Binding MinMemberCount}"
                                            Maximum="{Binding MaxMemberCount}"
                                            Value="{Binding MemberCount}" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Column="2" Width="110" Minimum="1" Maximum="180" Increment="1"
+                            <NumericUpDown Grid.Column="2" Width="110" Minimum="1" Increment="1"
+                                           Maximum="{Binding MaxDurationLimitMinutes}"
                                            FormatString="0" Value="{Binding MaxDurationMinutes}"
                                            VerticalAlignment="Center" />
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled

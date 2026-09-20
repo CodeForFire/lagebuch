@@ -557,6 +557,17 @@ public class ScbaViewModelTests
     }
 
     [Fact]
+    public void The_two_einsatzzeit_spinners_offer_the_same_range()
+    {
+        // They did not once: the Stammdaten editor went to 180 while this form stopped at 120, so a
+        // Trupp-Typ configured above 120 could not be registered at its own Einsatzzeit. Both bind
+        // this bound now, and the stored value is floored but never capped, so the bound only has
+        // to be generous and, above all, shared.
+        Assert.Equal(TruppTypeRow.MaxDurationLimitMinutes, ScbaViewModel.MaxDurationLimitMinutes);
+        Assert.True(ScbaViewModel.MaxDurationLimitMinutes >= 240, "must cover a four-hour LPA");
+    }
+
+    [Fact]
     public void A_three_person_type_that_is_not_the_CSA_one_also_reveals_the_third_name()
     {
         // #418, and the point of the whole change: nothing about the third crew position is tied

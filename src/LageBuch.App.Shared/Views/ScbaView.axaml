@@ -97,8 +97,11 @@
         </HeaderedContentControl>
         <HeaderedContentControl Classes="field" Header="EINSATZZEIT">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <NumericUpDown Width="100" Minimum="1" Maximum="120" Value="{Binding NewMaxDurationMinutes}"
-                           FormatString="0" />
+            <!-- Maximum bound, not written in: it has to match the Stammdaten editor's own
+                 Einsatzzeit spinner, or a Trupp-Typ configured above this could not be registered
+                 at the Einsatzzeit its row specifies. -->
+            <NumericUpDown Width="100" Minimum="1" Maximum="{Binding MaxDurationLimitMinutes}"
+                           Value="{Binding NewMaxDurationMinutes}" FormatString="0" />
             <TextBlock Text="Min. max." Classes="secondary" VerticalAlignment="Center" />
           </StackPanel>
         </HeaderedContentControl>

@@ -29,6 +29,10 @@ public sealed partial class TruppTypeRow : ObservableObject
     /// </summary>
     public static int MaxMemberCount => AtemschutzTrupp.MaxMemberCount;
 
+    /// <summary>Largest Einsatzzeit the spinner offers. Shared with the Atemschutz form's own
+    /// spinner so this editor cannot offer a value that form would then refuse.</summary>
+    public static int MaxDurationLimitMinutes => AtemschutzTrupp.MaxEditableDurationMinutes;
+
     [ObservableProperty]
     private string _name;
 
