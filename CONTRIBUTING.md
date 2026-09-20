@@ -42,9 +42,9 @@ What counts here:
   pins real behaviour, a page of documentation that did not exist. The
   `good first issue` list is exactly this kind of work.
 - **The normal rules, unchanged.** Signed commits (SSH or GPG), DCO sign-off
-  (`git commit -s`), Conventional Commit subjects, a `CHANGELOG.md` entry for
-  anything under `src/`, and green CI. These are enforced automatically, not
-  waived for October.
+  (`git commit -s`), Conventional Commit subjects, a changelog entry in
+  `changelog.d/` for anything under `src/`, and green CI. These are enforced
+  automatically, not waived for October.
 
 What does not count, and will be labelled `spam` or `invalid`:
 
@@ -176,9 +176,45 @@ A PR template with a short checklist will guide you:
 - `dotnet build` / `dotnet test` green locally
 - **UI changes**: include before/after screenshots so reviewers can see the
   change without running the app
-- **Changes under `src/`**: add an entry under `CHANGELOG.md`'s
-  `## [Unreleased]` section — CI checks for this and fails the PR otherwise
+- **Changes under `src/`**: add a changelog entry as a new file in
+  `changelog.d/` — CI checks for this and fails the PR otherwise
+  (see [Changelog entries](#changelog-entries))
 - No real master data committed (see below)
+
+## Changelog entries
+
+`CHANGELOG.md` is assembled, not edited. Each change brings its own file in
+`changelog.d/`, so two pull requests never touch the same lines and can never
+conflict over the changelog:
+
+```
+changelog.d/+<slug>.<type>.md
+```
+
+`<type>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed` or
+`security` — the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+sections. `<slug>` is a short kebab-case description. The leading `+` is
+required: it is what keeps every filename unique, so two pull requests cannot
+collide even when they describe the same ticket.
+
+Put the entry in the file as plain prose, with no leading `- `, and reference
+the issue or PR inline the way the existing entries do:
+
+```markdown
+The PDF's Aufgaben section marks a task "FÄLLIG" against the moment the export
+was taken, instead of reading the wall clock while the document renders. (#302)
+```
+
+Write it for someone reading the release notes rather than the commit log: what
+changed, and why it matters. Do not edit `CHANGELOG.md` directly — entries land
+there when a release is cut.
+
+### Cutting a release
+
+A maintainer task rather than a contributor one, and written up in
+[`docs/releasing.md`](docs/releasing.md): `towncrier build` folds `changelog.d/`
+into `CHANGELOG.md` under the new version heading, that goes up as its own pull
+request, and pushing the tag once it merges is what triggers the release.
 
 ## Master data and PII
 
