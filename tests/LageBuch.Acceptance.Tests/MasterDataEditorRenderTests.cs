@@ -78,11 +78,11 @@ public class MasterDataEditorRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var list = view.GetControl<ListBox>("CategoryList");
-
-        // 8 categories plus #76's Fahrzeuge, which also supply the Wachen and Funkrufnamen.
-        // Einstellungen + Navigation + 6 data categories + this fixture's 2 Checklisten.
-        Assert.Equal(10, list.ItemCount);
+        // Two rails: the app's own categories, then the brigade's own Checklisten under their
+        // own heading. Einstellungen + Navigation + 6 data categories, and this fixture's 2.
+        Assert.Equal(8, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
+        Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
 
         // Capture the PR screenshot (real Skia backend rasterizes the embedded fonts).
@@ -94,7 +94,6 @@ public class MasterDataEditorRenderTests
         Assert.True(new FileInfo(path).Length > 0);
     }
 
-    // The Checkliste template editor split into Aufbau/Abbau sections, each row gaining a
     // The ETB's checkbox being disabled is a promise the UI makes, not just a view-model flag:
     // it is the legally relevant record and every Systemmeldung lands there. The resolver ignores
     // a hidden ETB anyway, but this is where an operator is told why they cannot switch it off.
@@ -121,13 +120,13 @@ public class MasterDataEditorRenderTests
         Assert.True(locked.IsChecked);
     }
 
-    // mandatory checkbox alongside the text (#72) -- distinct from the single-string-per-row
-    // EditableListSection the other categories still use.
+    // A Checkliste's editor gives each row a mandatory checkbox alongside the text (#72) --
+    // distinct from the single-string-per-row EditableListSection the other categories use.
     [AvaloniaFact]
     public void Checkliste_aufbau_section_renders_text_and_mandatory_checkbox_per_row()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
-        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Aufbau");
+        vm.SelectedSection = vm.Checklists.Single(c => c.Title == "Aufbau");
         var view = new MasterDataEditorView { DataContext = vm };
         var window = new Window { Content = view, Width = 1080, Height = 680 };
         window.Show();
@@ -281,5 +280,61 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-fahrzeuge-after.png"));
+    }
+
+    // The rail is two ListBoxes over one SelectedSection, which only works because that property
+    // refuses a null write. This has to be driven through the controls: Avalonia's SelectedItem is
+    // a two-way direct property with no re-entrancy guard, so picking in one list makes the other
+    // clear itself and write null back. A view-model-only test passes even when the XAML is wrong.
+    [AvaloniaFact]
+    public void Picking_a_checklist_does_not_let_the_category_rail_clear_the_selection()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var categories = view.GetControl<ListBox>("CategoryList");
+        var checklists = view.GetControl<ListBox>("ChecklistList");
+
+        checklists.SelectedIndex = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(vm.Checklists[0], vm.SelectedSection);
+        Assert.Null(categories.SelectedItem);
+
+        // ...and back again, so neither direction leaves both rails blank.
+        categories.SelectedIndex = 0;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(vm.Sections[0], vm.SelectedSection);
+        Assert.Null(checklists.SelectedItem);
+    }
+
+    // A brigade may keep no Checklisten at all. The group then shows a line saying so rather than
+    // an empty box, and the list is collapsed so it is not a dead tab stop.
+    [AvaloniaFact]
+    public void An_editor_without_checklisten_shows_the_empty_state()
+    {
+        var vm = new MasterDataEditorViewModel(new EmptyProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
+        Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
+        Assert.True(view.GetControl<Button>("AddChecklistButton").IsVisible);
+        Assert.Equal(8, view.GetControl<ListBox>("CategoryList").ItemCount);
+    }
+
+    private sealed class EmptyProvider : IMasterDataProvider
+    {
+        public MasterDataSet Get() => MasterDataSet.Empty;
+
+        public void Save(MasterDataSet set)
+        {
+        }
     }
 }

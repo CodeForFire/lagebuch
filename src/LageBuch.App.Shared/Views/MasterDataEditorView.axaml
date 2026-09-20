@@ -51,19 +51,69 @@
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusMd}" Padding="6" Margin="0,0,16,0">
           <DockPanel>
-            <!-- Checklisten are user data now, so the rail needs a way to grow. The button docks
-                 below the list rather than sitting in it, so it never scrolls out of reach. -->
+            <!-- Docked, not a Grid row: on a short rail the star row below collapses first, and a
+                 clipped list is recoverable where a clipped "add" button is not. It still lands
+                 directly under the Checklisten, so it reads as part of that group. -->
             <Button x:Name="AddChecklistButton" DockPanel.Dock="Bottom"
                     Content="+ NEUE CHECKLISTE" HorizontalAlignment="Stretch"
                     Margin="0,6,0,0" Command="{Binding AddChecklistCommand}" />
-            <ListBox x:Name="CategoryList" ItemsSource="{Binding Sections}"
-                     SelectedItem="{Binding SelectedSection}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:EditorSection">
-                  <TextBlock Text="{Binding Title}" Padding="6,4" />
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
+
+            <!-- Two groups, because the rail holds two kinds of thing: the app's own categories,
+                 and the Checklisten this brigade wrote. Only the second is labelled — the screen
+                 title already says what the first group is.
+                 Both lists bind SelectedItem to the same SelectedSection; that property ignores a
+                 null write, which is what stops the list without the selection from clearing it.
+                 See MasterDataEditorViewModel.SelectedSection. -->
+            <Grid RowDefinitions="Auto,Auto,*">
+              <ListBox Grid.Row="0" x:Name="CategoryList"
+                       ItemsSource="{Binding Sections}"
+                       SelectedItem="{Binding SelectedSection}"
+                       AutomationProperties.Name="Kategorien"
+                       ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                <!-- An Auto row measures with infinite height, but the default
+                     VirtualizingStackPanel sizes itself from the effective viewport, which is
+                     empty on the first pass: it would report ~25px per item until a later layout
+                     pass corrected it, wobbling on open and under-realizing rows in headless
+                     render tests. These eight are finite and never need virtualizing. -->
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel />
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EditorSection">
+                    <TextBlock Text="{Binding Title}" Padding="6,4" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <!-- Group heading: the HomeView idiom, an overline plus a hairline rule. -->
+              <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="6,10,6,8">
+                <TextBlock Grid.Column="0" Text="CHECKLISTEN" Classes="overline" FontSize="10"
+                           VerticalAlignment="Center" />
+                <Border Grid.Column="1" Height="1" Background="{StaticResource HairlineBrush}"
+                        VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+
+              <!-- A brigade may keep none; that is an ordinary state, not an error. -->
+              <TextBlock Grid.Row="2" x:Name="NoChecklistsText" Text="Noch keine Checkliste."
+                         Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                         Margin="6,0" VerticalAlignment="Top"
+                         IsVisible="{Binding !Checklists.Count}" />
+
+              <!-- Collapsed rather than left empty: an empty list is still a tab stop. -->
+              <ListBox Grid.Row="2" x:Name="ChecklistList"
+                       ItemsSource="{Binding Checklists}"
+                       SelectedItem="{Binding SelectedSection}"
+                       AutomationProperties.Name="Checklisten"
+                       IsVisible="{Binding Checklists.Count}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EditorSection">
+                    <TextBlock Text="{Binding Title}" Padding="6,4" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
           </DockPanel>
         </Border>
 

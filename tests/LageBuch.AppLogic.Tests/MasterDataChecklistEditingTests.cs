@@ -66,7 +66,7 @@ public class MasterDataChecklistEditingTests
         vm.SaveCommand.Execute(null);
         return MasterDataSet.Empty with
         {
-            ChecklistTemplates = vm.Sections.OfType<ChecklistTemplateSection>()
+            ChecklistTemplates = vm.Checklists
                 .Select(c => new ChecklistTemplate(c.Id, c.Title, c.ToValues())).ToList(),
             Navigation = Nav(vm).ToValues(),
         };
@@ -77,7 +77,7 @@ public class MasterDataChecklistEditingTests
     {
         var vm = Vm();
 
-        Assert.Empty(vm.Sections.OfType<ChecklistTemplateSection>());
+        Assert.Empty(vm.Checklists);
         Assert.Contains(vm.Sections, s => s.Title == "Navigation");
     }
 
@@ -88,7 +88,7 @@ public class MasterDataChecklistEditingTests
 
         vm.AddChecklistCommand.Execute(null);
 
-        var section = Assert.Single(vm.Sections.OfType<ChecklistTemplateSection>());
+        var section = Assert.Single(vm.Checklists);
         Assert.Equal("Neue Checkliste", section.Title);
         Assert.Same(section, vm.SelectedSection);
         Assert.True(vm.IsDirty);
@@ -113,11 +113,11 @@ public class MasterDataChecklistEditingTests
     {
         var vm = Vm();
         vm.AddChecklistCommand.Execute(null);
-        var section = Assert.Single(vm.Sections.OfType<ChecklistTemplateSection>());
+        var section = Assert.Single(vm.Checklists);
 
         section.Title = "Nachbereitung";
 
-        Assert.Equal("Nachbereitung", vm.Sections.OfType<ChecklistTemplateSection>().Single().Title);
+        Assert.Equal("Nachbereitung", vm.Checklists.Single().Title);
         Assert.Equal("Nachbereitung", Assert.Single(Nav(vm).Rows, r => r.ChecklistId is not null).Label);
     }
 
@@ -129,7 +129,7 @@ public class MasterDataChecklistEditingTests
         vm.SaveCommand.Execute(null);
         Assert.False(vm.IsDirty);
 
-        vm.Sections.OfType<ChecklistTemplateSection>().Single().Title = "Nachbereitung";
+        vm.Checklists.Single().Title = "Nachbereitung";
 
         Assert.True(vm.IsDirty);
     }
@@ -139,12 +139,12 @@ public class MasterDataChecklistEditingTests
     {
         var vm = Vm();
         vm.AddChecklistCommand.Execute(null);
-        var section = Assert.Single(vm.Sections.OfType<ChecklistTemplateSection>());
+        var section = Assert.Single(vm.Checklists);
 
         vm.DeleteChecklistCommand.Execute(section);
 
         Assert.NotNull(vm.PendingConfirm);
-        Assert.Single(vm.Sections.OfType<ChecklistTemplateSection>());
+        Assert.Single(vm.Checklists);
     }
 
     [Fact]
@@ -152,12 +152,12 @@ public class MasterDataChecklistEditingTests
     {
         var vm = Vm();
         vm.AddChecklistCommand.Execute(null);
-        var section = Assert.Single(vm.Sections.OfType<ChecklistTemplateSection>());
+        var section = Assert.Single(vm.Checklists);
         vm.DeleteChecklistCommand.Execute(section);
 
         vm.PendingConfirm!.ConfirmCommand.Execute(null);
 
-        Assert.Empty(vm.Sections.OfType<ChecklistTemplateSection>());
+        Assert.Empty(vm.Checklists);
         Assert.DoesNotContain(Nav(vm).Rows, r => r.ChecklistId is not null);
         Assert.NotNull(vm.SelectedSection);
     }
@@ -167,7 +167,7 @@ public class MasterDataChecklistEditingTests
     {
         var vm = Vm();
         vm.AddChecklistCommand.Execute(null);
-        var section = Assert.Single(vm.Sections.OfType<ChecklistTemplateSection>());
+        var section = Assert.Single(vm.Checklists);
         section.AddCommand.Execute(null);
         section.Rows[0].Text = "Bericht schreiben";
         section.Title = "   ";
@@ -184,12 +184,12 @@ public class MasterDataChecklistEditingTests
     {
         var vm = Vm();
         vm.AddChecklistCommand.Execute(null);
-        var id = vm.Sections.OfType<ChecklistTemplateSection>().Single().Id;
-        vm.Sections.OfType<ChecklistTemplateSection>().Single().Title = "Nachbereitung";
+        var id = vm.Checklists.Single().Id;
+        vm.Checklists.Single().Title = "Nachbereitung";
 
         vm.SaveCommand.Execute(null);
 
-        Assert.Equal(id, vm.Sections.OfType<ChecklistTemplateSection>().Single().Id);
+        Assert.Equal(id, vm.Checklists.Single().Id);
     }
 
     // --- Navigation ---

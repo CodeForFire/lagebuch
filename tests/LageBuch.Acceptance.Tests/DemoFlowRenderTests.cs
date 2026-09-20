@@ -127,8 +127,9 @@ public class DemoFlowRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        // Einstellungen + Navigation + 6 data categories + the demo Stammdaten's 2 Checklisten.
-        Assert.Equal(10, vm.Sections.Count);
+        // The two rail groups: the app's own categories, then the brigade's own Checklisten.
+        Assert.Equal(8, vm.Sections.Count);
+        Assert.Equal(2, vm.Checklists.Count);
         Capture(window, "stammdaten-editor.png");
     }
 

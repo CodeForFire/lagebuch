@@ -20,10 +20,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private readonly IFileDialogService _dialogs;
     private readonly IMasterDataFileService _files;
 
-    // 0..n Checklisten, in Stammdaten order. Their rail entries sit together after the fixed
-    // categories, because that order is the operator's own rather than alphabetical.
-    private readonly List<ChecklistTemplateSection> _checklists = new();
-
     private MasterDataSet _original = MasterDataSet.Empty;
     private bool _originalIsEmpty = true;
 
@@ -50,9 +46,46 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Load();
     }
 
+    /// <summary>
+    /// The app's own categories — a fixed, finite set. The rail's first group, shown unlabelled
+    /// because the screen title already says what they are.
+    /// </summary>
     public ObservableCollection<EditorSection> Sections { get; } = new();
 
-    [ObservableProperty]
+    /// <summary>
+    /// The Checklisten this brigade wrote itself — 0..n, in Stammdaten order, which is the
+    /// operator's own rather than alphabetical. Kept apart from <see cref="Sections"/> so the rail
+    /// can group them under a heading: holding both kinds in one collection is exactly why the
+    /// view could not tell an entry the operator may rename and delete from one that is simply
+    /// part of Lagebuch.
+    /// </summary>
+    public ObservableCollection<ChecklistTemplateSection> Checklists { get; } = new();
+
+    /// <summary>
+    /// The section the detail pane shows.
+    /// </summary>
+    /// <remarks>
+    /// A null assignment is ignored: the editor always has exactly one section selected, and the
+    /// rail is two ListBoxes over this one property. <c>SelectedItem</c> is a two-way direct
+    /// property and Avalonia writes a target change straight back to the source with no
+    /// re-entrancy guard, so the list that does <em>not</em> hold the selected item reports null
+    /// here as it clears its own highlight. Honouring that null would instantly undo the selection
+    /// the other list just made and leave both rails blank.
+    /// </remarks>
+    public EditorSection? SelectedSection
+    {
+        get => _selectedSection;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            SetProperty(ref _selectedSection, value);
+        }
+    }
+
     private EditorSection? _selectedSection;
 
     [ObservableProperty]
@@ -104,9 +137,15 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     private void PopulateSections(MasterDataSet set)
     {
-        var previousIndex = SelectedSection is null ? 0 : Sections.IndexOf(SelectedSection);
+        // Restore by identity, not by index. Reload rebuilds every section object, and with the
+        // Checklisten in their own group an index no longer names a section across a reload --
+        // saving while editing "Aufbau ELW" would land you on Einstellungen. A Checkliste's id
+        // survives Save where its position need not.
+        var previousChecklistId = (SelectedSection as ChecklistTemplateSection)?.Id;
+        var previousTitle = SelectedSection?.Title;
 
         Sections.Clear();
+        Checklists.Clear();
 
         // Einstellungen and Navigation are meta sections (defaults, and what the Einsatz sidebar
         // shows), not data categories, so they stay pinned at the top in that order; the data
@@ -133,19 +172,18 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             Sections.Add(section);
         }
 
-        // The Checklisten come last and in Stammdaten order, not alphabetically: their order is
-        // the operator's own, expressed in the Navigation list, and no comparer can express that.
-        _checklists.Clear();
+        // The Checklisten are their own rail group, in Stammdaten order rather than alphabetical:
+        // that order is the operator's own, expressed in the Navigation list.
         foreach (var template in set.ChecklistTemplates)
         {
-            var section = new ChecklistTemplateSection(template.Id, template.Title, template.Items, MarkDirty);
-            _checklists.Add(section);
-            Sections.Add(section);
+            Checklists.Add(new ChecklistTemplateSection(template.Id, template.Title, template.Items, MarkDirty));
         }
 
-        _navigation.Rebuild(set.Navigation, _checklists);
+        _navigation.Rebuild(set.Navigation, Checklists);
 
-        SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
+        SelectedSection = previousChecklistId is { } id
+            ? Checklists.FirstOrDefault(c => c.Id == id) ?? Sections[0]
+            : Sections.FirstOrDefault(s => s.Title == previousTitle) ?? Sections[0];
     }
 
     private void OnVehiclesChanged()
@@ -186,7 +224,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     /// not the items, and losing their Checkliste over it would be indefensible.
     /// </summary>
     private List<ChecklistTemplate> ChecklistTemplatesFromSections() =>
-        _checklists
+        Checklists
             .Select(c => new ChecklistTemplate(
                 c.Id, ChecklistDefaults.TitleOrFallback(c.Title), c.ToValues()))
             .ToList();
@@ -200,12 +238,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     {
         var section = new ChecklistTemplateSection(
             Guid.NewGuid(), "Neue Checkliste", Array.Empty<ChecklistTemplateItem>(), MarkDirty);
-        _checklists.Add(section);
-        Sections.Add(section);
+        Checklists.Add(section);
 
         // Rebuilt rather than appended to, so the new list reaches the Navigation layout: the
         // resolver's append rule rescues an Einsatz's own lists, never a layout's missing rows.
-        _navigation.Rebuild(_navigation.ToValues(), _checklists);
+        _navigation.Rebuild(_navigation.ToValues(), Checklists);
         SelectedSection = section;
         MarkDirty();
     }
@@ -234,11 +271,15 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     private void RemoveChecklist(ChecklistTemplateSection section)
     {
-        var index = Sections.IndexOf(section);
-        _checklists.Remove(section);
-        Sections.Remove(section);
-        _navigation.Rebuild(_navigation.ToValues(), _checklists);
-        SelectedSection = Sections[Math.Clamp(index, 0, Sections.Count - 1)];
+        var index = Checklists.IndexOf(section);
+        Checklists.Remove(section);
+        _navigation.Rebuild(_navigation.ToValues(), Checklists);
+
+        // The nearest surviving neighbour, else the rail entry directly above the group. Clamping
+        // into Checklists unconditionally would index an empty collection when the last one goes.
+        SelectedSection = Checklists.Count > 0
+            ? Checklists[Math.Clamp(index, 0, Checklists.Count - 1)]
+            : Sections[^1];
         MarkDirty();
     }
 
