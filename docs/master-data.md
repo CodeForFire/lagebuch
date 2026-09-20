@@ -33,6 +33,29 @@ is a matching fictional incident. Both are regenerated with `make samples`;
 the round-trip test in `tests/LageBuch.Persistence.Tests/DemoIncidentTests.cs`
 keeps them valid as the schema evolves.
 
+## Checklisten und die Navigation
+
+Checklisten sind Stammdaten: Sie legen beliebig viele an — keine, zwei, fünf —
+geben jeder einen Namen, und jeder neue Einsatz startet mit einer eigenen Kopie
+davon. Ein späteres Umbenennen oder Löschen einer Vorlage rührt einen laufenden
+oder abgeschlossenen Einsatz nicht an; der trägt seine Listen selbst.
+
+Die Kategorie **Navigation** bestimmt, was die Seitenleiste eines Einsatzes
+zeigt und in welcher Reihenfolge: die eingebauten Module und jede Checkliste in
+einer Liste, jeweils ein- oder ausschaltbar. Das **ETB ist immer sichtbar** und
+lässt sich nicht abschalten — es ist die rechtlich relevante Aufzeichnung, und
+jede Systemmeldung landet dort. Verschieben lässt es sich sehr wohl.
+
+Eine leere Navigation bedeutet „Standard": die Reihenfolge, mit der Lagebuch
+ausgeliefert wird. Das ist Absicht — so taucht ein Modul, das eine spätere
+Version ergänzt, bei allen auf, die die Liste nie angefasst haben.
+
+Beim Öffnen eines älteren Einsatzes gilt: Was die Navigation nennt und der
+Einsatz hat, wird gezeigt; was sie nennt, der Einsatz aber nicht hat, entfällt;
+und eine Checkliste, die der Einsatz hat, die Navigation aber nicht kennt, wird
+hinten angehängt. Eine archivierte Einsatzdatei zeigt damit immer alle ihre
+Listen.
+
 ## Where it is stored
 
 On first start an empty `masterdata.db` is created. It is the live database the

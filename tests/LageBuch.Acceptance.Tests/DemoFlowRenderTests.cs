@@ -77,6 +77,9 @@ public class DemoFlowRenderTests
         return MasterDataJson.Parse(File.ReadAllText(path));
     }
 
+    private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
+        (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
+
     private static void Capture(Window window, string name)
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
@@ -90,18 +93,8 @@ public class DemoFlowRenderTests
         frame.SavePng(Path.Join(dir, name));
     }
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
-    private static void SelectTab(Window window, int index, string expectedHeader)
-    {
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = index;
-        Dispatcher.UIThread.RunJobs();
-        var header = ((TabItem)tabs.SelectedItem!).Header;
-        var text = header as string ?? (header as StackPanel)?.Children.OfType<TextBlock>().First().Text;
-        Assert.Equal(expectedHeader, text);
-    }
+    private static void SelectTab(Window window, string header) =>
+        WorkspaceRenderHelper.SelectTab(window, header);
 
     [AvaloniaFact]
     public void Home_screen_lists_recent_incidents()
@@ -134,7 +127,9 @@ public class DemoFlowRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(9, vm.Sections.Count);
+        // The two rail groups: the app's own categories, then the brigade's own Checklisten.
+        Assert.Equal(8, vm.Sections.Count);
+        Assert.Equal(2, vm.Checklists.Count);
         Capture(window, "stammdaten-editor.png");
     }
 
@@ -148,8 +143,8 @@ public class DemoFlowRenderTests
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, Elw),
             "/home/elw/Einsaetze/uebung.fwincident",
-            md.ChecklistTemplateAufbau.Select(i => (i.Text, i.IsMandatory)),
-            md.ChecklistTemplateAbbau.Select(i => (i.Text, i.IsMandatory)),
+            md.ChecklistTemplates.Select(t => new ChecklistSeed(
+                t.Id, t.Title, t.Items.Select(i => (i.Text, i.IsMandatory)).ToList())).ToList(),
             new IncidentNumber("B 1.2 260622 0042"),
             keyword: "B 3 – Zimmerbrand");
         session.SetAddress("Hauptstraße 12", "Musterstadt");
@@ -178,11 +173,11 @@ public class DemoFlowRenderTests
         // 2) Aufbau checklist, three of the mandatory items ticked.
         foreach (var index in new[] { 0, 2, 3 })
         {
-            session.ToggleChecklistItem(session.Incident.ChecklistAufbau[index].Id);
+            session.ToggleChecklistItem(session.Incident.Checklists[0].Items[index].Id);
         }
 
-        SelectTab(window, 0, "AUFBAU");
-        Assert.Equal(3, vm.ChecklistAufbau.Items.Count(i => i.IsDone));
+        SelectTab(window, "AUFBAU");
+        Assert.Equal(3, FirstChecklist(vm).Items.Count(i => i.IsDone));
         Capture(window, "checkliste.png");
 
         // 3) ETB: the first minutes of the incident.
@@ -203,24 +198,24 @@ public class DemoFlowRenderTests
         session.AddJournalEntry(EtbDirection.Incoming, "Florian Musterdorf 42/1 alarmiert, ETA 8 Minuten", "ILS", Elw);
         ticker.Pulse();
 
-        SelectTab(window, 1, "ETB");
+        SelectTab(window, "ETB");
         Assert.True(vm.Etb.Entries.Count(e => e.DirectionValue != EtbDirection.System) >= 5);
         Capture(window, "etb.png");
 
         // 4) Kräfte: four units, one still on its way.
-        SelectTab(window, 4, "KRÄFTE");
+        SelectTab(window, "KRÄFTE");
         Assert.Equal(4, vm.Forces.Forces.Count);
         Capture(window, "kraefte.png");
 
         // 5) Funktionen.
-        SelectTab(window, 3, "FUNKTIONEN");
+        SelectTab(window, "FUNKTIONEN");
         Assert.Equal(2, vm.Roles.Roles.Count);
         Capture(window, "funktionen.png");
 
         // 6) Atemschutz: Trupp 1 started at t0 and past its 30 minutes (Rückzugsalarm), Trupp 2
         //    started 20 minutes later and still counting down, Trupp 3 waiting. Driven through the
         //    ScbaViewModel so the rows carry the same live state the operator sees.
-        SelectTab(window, 5, "ATEMSCHUTZ");
+        SelectTab(window, "ATEMSCHUTZ");
         vm.Scba.NewDesignation = "Angriffstrupp";
         vm.Scba.NewTruppfuehrer = AnonymizedExampleData.OperatorSurnameAlt;
         vm.Scba.NewTruppmann = AnonymizedExampleData.OperatorSurnameThird;
@@ -271,7 +266,7 @@ public class DemoFlowRenderTests
         session.SetTaskCompleted(session.Incident.Tasks[1].Id, true);
         clock.Now = clock.Now.AddMinutes(15); // the 10-minute Nachbarwohnung task is now overdue
         ticker.Pulse();
-        SelectTab(window, 2, "AUFGABEN");
+        SelectTab(window, "AUFGABEN");
         Assert.Equal(3, session.Incident.Tasks.Count);
         Assert.Contains(vm.Tasks.Rows, r => r.IsOverdue);
         Capture(window, "aufgaben.png");
@@ -288,13 +283,13 @@ public class DemoFlowRenderTests
         session.SetDwellingStatus(haus, 1, 1, DwellingStatus.Searched);
         session.SetDwellingStatus(haus, 1, 2, DwellingStatus.Searched);
         session.SetDwellingDetails(haus, 0, 1, "Mustermann", false);
-        SelectTab(window, 6, "CO-MESSUNG");
+        SelectTab(window, "CO-MESSUNG");
         Assert.NotNull(vm.CoMessprotokoll.SelectedBuilding);
         Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);
         Capture(window, "co-messung.png");
 
         // 9) PDF export: the section picker that precedes the report.
-        SelectTab(window, 1, "ETB");
+        SelectTab(window, "ETB");
         vm.ExportPdfCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Assert.NotNull(vm.PendingPdfExportOptions);

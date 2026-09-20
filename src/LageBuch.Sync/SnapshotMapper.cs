@@ -32,8 +32,10 @@ public static class SnapshotMapper
             incident.Status,
             incident.ClosedAt,
             incident.ClosedBy,
-            incident.ChecklistAufbau.Select(c => new ChecklistItemDto(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)).ToList(),
-            incident.ChecklistAbbau.Select(c => new ChecklistItemDto(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)).ToList(),
+            incident.Checklists.Select(l => new ChecklistListDto(
+                l.Id,
+                l.Title,
+                l.Items.Select(c => new ChecklistItemDto(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)).ToList())).ToList(),
             incident.Journal.Select(e => new EtbEntryDto(
                 e.Id,
                 e.Timestamp,
@@ -105,8 +107,10 @@ public static class SnapshotMapper
             snapshot.Status,
             snapshot.ClosedAt,
             snapshot.ClosedBy,
-            snapshot.ChecklistAufbau.Select(c => ChecklistItem.Rehydrate(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)),
-            snapshot.ChecklistAbbau.Select(c => ChecklistItem.Rehydrate(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)),
+            snapshot.Checklists.Select(l => ChecklistList.Rehydrate(
+                l.Id,
+                l.Title,
+                l.Items.Select(c => ChecklistItem.Rehydrate(c.Id, c.Text, c.IsDone, c.Note, c.IsMandatory)))),
             snapshot.Journal.Select(e => EtbEntry.Rehydrate(
                 e.Id,
                 e.Timestamp,

@@ -10,12 +10,17 @@ public class IncidentWorkspaceViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
 
+    // The rail is built from Stammdaten now, so a test reaches its checklist through the nav
+    // items rather than a fixed ChecklistAufbau property.
+    private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
+        (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
+
     private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
 
     private static IncidentWorkspaceViewModel EditableWorkspace(IIncidentHostController host)
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -76,7 +81,7 @@ public class IncidentWorkspaceViewModelTests
     {
         store = new FakeStore();
         clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -99,7 +104,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -164,7 +169,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -182,7 +187,7 @@ public class IncidentWorkspaceViewModelTests
         vm.Etb.HideSystemEntries = false; // this asserts on a System entry, hidden by default (#223)
         var before = vm.Etb.Entries.Count;
 
-        vm.ChecklistAufbau.Items[0].IsDone = true;
+        FirstChecklist(vm).Items[0].IsDone = true;
 
         Assert.Equal(before + 1, vm.Etb.Entries.Count);
         Assert.Equal("Checkliste Aufbau abgeschlossen: alle Pflichtpunkte erledigt", vm.Etb.Entries[0].Text);
@@ -251,7 +256,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -280,7 +285,7 @@ public class IncidentWorkspaceViewModelTests
     {
         store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -353,7 +358,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -460,8 +465,8 @@ public class IncidentWorkspaceViewModelTests
         Assert.False(vm.CloseIncidentCommand.CanExecute(null));
         Assert.True(vm.Etb.IsReadOnly);
         Assert.False(vm.Etb.AddEntryCommand.CanExecute(null));
-        Assert.True(vm.ChecklistAufbau.IsReadOnly);
-        Assert.True(vm.ChecklistAufbau.Items[0].IsReadOnly);
+        Assert.True(FirstChecklist(vm).IsReadOnly);
+        Assert.True(FirstChecklist(vm).Items[0].IsReadOnly);
     }
 
     // The closing entry is appended after the ETB grid is already populated, so it only
@@ -638,7 +643,7 @@ public class IncidentWorkspaceViewModelTests
         var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -670,7 +675,7 @@ public class IncidentWorkspaceViewModelTests
         var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
         var dialogs = new FakeDialogs { ExportPath = exportPath };
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -701,7 +706,7 @@ public class IncidentWorkspaceViewModelTests
     public void ExportStatus_is_seeded_from_the_last_persisted_export_on_open()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -732,7 +737,7 @@ public class IncidentWorkspaceViewModelTests
     public void CanExport_is_false_when_the_platform_cannot_render_pdfs()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -783,7 +788,7 @@ public class IncidentWorkspaceViewModelTests
         var callSigns = new[] { "FFB 1/40/1", "Aich 42/1" };
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -869,7 +874,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -910,7 +915,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -957,7 +962,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -999,7 +1004,7 @@ public class IncidentWorkspaceViewModelTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -1083,7 +1088,7 @@ public class IncidentWorkspaceViewModelTests
     private static IncidentWorkspaceViewModel WorkspaceWithStore(IIncidentStore store, out FixedClock clock)
     {
         clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),

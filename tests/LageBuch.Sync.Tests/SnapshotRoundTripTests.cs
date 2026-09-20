@@ -18,9 +18,9 @@ public class SnapshotRoundTripTests
         var clock = new FixedClock();
         var op = new SessionOperator("Müller", "FFB 12/1");
         var incident = Incident.Start(clock, op, keyword: "Brand", incidentNumber: new IncidentNumber("B 1.2 260812 001"));
-        incident.SeedChecklist(
+        incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Aufstellort ELW?", true), ("Funk auf 0?", false) },
-            new[] { ("Fahrzeug abgerüstet?", false) });
+            new[] { ("Fahrzeug abgerüstet?", false) }));
         incident.SetAddress("Hauptstraße 1", "Bezirk 2");
         incident.SetStatus("Im Einsatz");
         incident.SetKeyword("Brand 2 – Wohnhaus");
@@ -28,7 +28,7 @@ public class SnapshotRoundTripTests
         clock.Now = clock.Now.AddMinutes(1);
         var journalEntry = incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Erstmeldung", from: "Leitstelle", to: "ELW");
         incident.EditJournalEntry(clock, op, journalEntry.Id, "Erstmeldung korrigiert");
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[0].Id);
         incident.AssignRole(clock, op, "EL", "Huber", callSign: "FFB 1", from: clock.Now, section: "Abschnitt 1", phone: "0171/1234567");
 
         var force = incident.AddForceUnit(
@@ -114,10 +114,10 @@ public class SnapshotRoundTripTests
         Assert.Equal("Hauptstraße 1", r.Street);
         Assert.Equal(original.ClosedAt, r.ClosedAt);
         Assert.Equal(original.ClosedBy, r.ClosedBy);
-        Assert.Equal(original.ChecklistAufbau.Count, r.ChecklistAufbau.Count);
-        Assert.True(r.ChecklistAufbau[0].IsDone);
-        Assert.True(r.ChecklistAufbau[0].IsMandatory);
-        Assert.Equal(original.ChecklistAbbau.Count, r.ChecklistAbbau.Count);
+        Assert.Equal(original.Checklists[0].Items.Count, r.Checklists[0].Items.Count);
+        Assert.True(r.Checklists[0].Items[0].IsDone);
+        Assert.True(r.Checklists[0].Items[0].IsMandatory);
+        Assert.Equal(original.Checklists[1].Items.Count, r.Checklists[1].Items.Count);
         Assert.Equal(original.Journal.Count, r.Journal.Count);
         var editedEntry = r.Journal.Single(e => e.Text == "Erstmeldung korrigiert");
         var history = Assert.Single(editedEntry.Edits);

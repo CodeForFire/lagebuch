@@ -4,7 +4,9 @@
              x:Class="LageBuch.App.Shared.Views.ChecklistView"
              x:DataType="vm:ChecklistViewModel">
   <DockPanel>
-    <TextBlock DockPanel.Dock="Top" Text="CHECKLISTE" Classes="overline" Margin="0,0,0,14" />
+    <!-- The list's own name, not a fixed "CHECKLISTE": an Einsatz can carry several, and this
+         view is what each of them is rendered through. -->
+    <TextBlock DockPanel.Dock="Top" Text="{Binding TitleDisplay}" Classes="overline" Margin="0,0,0,14" />
     <ScrollViewer>
       <ItemsControl ItemsSource="{Binding Items}" IsEnabled="{Binding !IsReadOnly}">
         <ItemsControl.ItemTemplate>

@@ -3,7 +3,6 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -17,7 +16,7 @@ public class RolesTabRenderTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
@@ -44,17 +43,11 @@ public class RolesTabRenderTests
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     [AvaloniaFact]
     public void Funktionen_tab_shows_a_running_assignment()
     {
         var (window, vm) = ShowWorkspace();
-        var tabs = Tabs(window);
-        tabs.SelectedIndex = 3; // FUNKTIONEN
-        Dispatcher.UIThread.RunJobs();
-        Assert.Equal("FUNKTIONEN", ((TabItem)tabs.SelectedItem!).Header);
+        WorkspaceRenderHelper.SelectTab(window, "FUNKTIONEN");
 
         vm.Roles.NewRole = AnonymizedExampleData.RoleExample;
         vm.Roles.NewPersonName = $"{AnonymizedExampleData.PersonLastName}, {AnonymizedExampleData.PersonFirstName}";

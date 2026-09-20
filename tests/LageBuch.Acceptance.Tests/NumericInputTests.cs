@@ -114,7 +114,7 @@ public class ForcesGridEditingTests
 {
     private static (ForcesView View, IncidentWorkspaceViewModel Vm) ShowForces(out LocalIncidentSession session)
     {
-        session = LocalIncidentSession.StartNew(
+        session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),

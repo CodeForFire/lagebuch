@@ -379,8 +379,14 @@
           <Grid ColumnDefinitions="3,*">
             <!-- active indicator rail -->
             <Border Name="Rail" Grid.Column="0" Background="Transparent" />
+            <!-- ContentTemplate must follow HeaderTemplate: the rail is ItemsSource-driven, so a
+                 tab's header is a view model and TabControl.ItemTemplate arrives here as
+                 HeaderTemplate. Without this the presenter has no template and the app-level
+                 ViewLocator claims it, rendering "Nicht gefunden: …View" in every tab. It was
+                 unnecessary while every header was a literal string or panel. -->
             <ContentPresenter Grid.Column="1"
                               Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}"
                               Margin="{TemplateBinding Padding}"
                               VerticalAlignment="Center" />
           </Grid>

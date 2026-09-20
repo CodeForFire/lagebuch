@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
+using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -18,6 +19,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     private readonly IMasterDataProvider _provider;
     private readonly IFileDialogService _dialogs;
     private readonly IMasterDataFileService _files;
+
     private MasterDataSet _original = MasterDataSet.Empty;
     private bool _originalIsEmpty = true;
 
@@ -30,8 +32,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private TruppTypesSection _truppTypes = null!;
 
-    private ChecklistTemplateSection _checklistAufbau = null!;
-    private ChecklistTemplateSection _checklistAbbau = null!;
+    private NavigationSection _navigation = null!;
     private LinksSection _links = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
@@ -45,9 +46,46 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         Load();
     }
 
+    /// <summary>
+    /// The app's own categories — a fixed, finite set. The rail's first group, shown unlabelled
+    /// because the screen title already says what they are.
+    /// </summary>
     public ObservableCollection<EditorSection> Sections { get; } = new();
 
-    [ObservableProperty]
+    /// <summary>
+    /// The Checklisten this brigade wrote itself — 0..n, in Stammdaten order, which is the
+    /// operator's own rather than alphabetical. Kept apart from <see cref="Sections"/> so the rail
+    /// can group them under a heading: holding both kinds in one collection is exactly why the
+    /// view could not tell an entry the operator may rename and delete from one that is simply
+    /// part of Lagebuch.
+    /// </summary>
+    public ObservableCollection<ChecklistTemplateSection> Checklists { get; } = new();
+
+    /// <summary>
+    /// The section the detail pane shows.
+    /// </summary>
+    /// <remarks>
+    /// A null assignment is ignored: the editor always has exactly one section selected, and the
+    /// rail is two ListBoxes over this one property. <c>SelectedItem</c> is a two-way direct
+    /// property and Avalonia writes a target change straight back to the source with no
+    /// re-entrancy guard, so the list that does <em>not</em> hold the selected item reports null
+    /// here as it clears its own highlight. Honouring that null would instantly undo the selection
+    /// the other list just made and leave both rails blank.
+    /// </remarks>
+    public EditorSection? SelectedSection
+    {
+        get => _selectedSection;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            SetProperty(ref _selectedSection, value);
+        }
+    }
+
     private EditorSection? _selectedSection;
 
     [ObservableProperty]
@@ -99,13 +137,21 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     private void PopulateSections(MasterDataSet set)
     {
-        var previousIndex = SelectedSection is null ? 0 : Sections.IndexOf(SelectedSection);
+        // Restore by identity, not by index. Reload rebuilds every section object, and with the
+        // Checklisten in their own group an index no longer names a section across a reload --
+        // saving while editing "Aufbau ELW" would land you on Einstellungen. A Checkliste's id
+        // survives Save where its position need not.
+        var previousChecklistId = (SelectedSection as ChecklistTemplateSection)?.Id;
+        var previousTitle = SelectedSection?.Title;
 
         Sections.Clear();
+        Checklists.Clear();
 
-        // Einstellungen is a meta section (numeric defaults), not a data category, so it stays
-        // pinned first; everything else sorts alphabetically below it.
+        // Einstellungen and Navigation are meta sections (defaults, and what the Einsatz sidebar
+        // shows), not data categories, so they stay pinned at the top in that order; the data
+        // categories sort alphabetically below them.
         Sections.Add(_settings = new SettingsSection("Einstellungen", set.Settings, MarkDirty));
+        Sections.Add(_navigation = new NavigationSection("Navigation", MarkDirty));
 
         EditorSection[] categories =
         {
@@ -113,8 +159,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),
-            _checklistAufbau = new ChecklistTemplateSection("Checkliste Aufbau", set.ChecklistTemplateAufbau, MarkDirty),
-            _checklistAbbau = new ChecklistTemplateSection("Checkliste Abbau", set.ChecklistTemplateAbbau, MarkDirty),
             _personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
@@ -123,25 +167,24 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
         };
 
-        foreach (var section in categories.OrderBy(s => s.Title, SectionTitleComparer))
+        foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
         {
             Sections.Add(section);
         }
 
-        SelectedSection = Sections[Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, Sections.Count - 1)];
-    }
-
-    /// <summary>
-    /// Alphabetical, except Checkliste Aufbau (setup) comes before Abbau (teardown) — the order
-    /// they happen in, which plain alphabetical sorting would otherwise reverse.
-    /// </summary>
-    private static readonly IComparer<string> SectionTitleComparer = Comparer<string>.Create((x, y) =>
-        (x, y) switch
+        // The Checklisten are their own rail group, in Stammdaten order rather than alphabetical:
+        // that order is the operator's own, expressed in the Navigation list.
+        foreach (var template in set.ChecklistTemplates)
         {
-            ("Checkliste Aufbau", "Checkliste Abbau") => -1,
-            ("Checkliste Abbau", "Checkliste Aufbau") => 1,
-            _ => string.Compare(x, y, StringComparison.OrdinalIgnoreCase),
-        });
+            Checklists.Add(new ChecklistTemplateSection(template.Id, template.Title, template.Items, MarkDirty));
+        }
+
+        _navigation.Rebuild(set.Navigation, Checklists);
+
+        SelectedSection = previousChecklistId is { } id
+            ? Checklists.FirstOrDefault(c => c.Id == id) ?? Sections[0]
+            : Sections.FirstOrDefault(s => s.Title == previousTitle) ?? Sections[0];
+    }
 
     private void OnVehiclesChanged()
     {
@@ -169,12 +212,76 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         UnitStatus = _unitStatus.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),
-        ChecklistTemplateAufbau = _checklistAufbau.ToValues(),
-        ChecklistTemplateAbbau = _checklistAbbau.ToValues(),
+        ChecklistTemplates = ChecklistTemplatesFromSections(),
+        Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
         Settings = _settings.ToSettings(),
     };
+
+    /// <summary>
+    /// A blank name gets a fallback rather than dropping the list: the operator cleared the name,
+    /// not the items, and losing their Checkliste over it would be indefensible.
+    /// </summary>
+    private List<ChecklistTemplate> ChecklistTemplatesFromSections() =>
+        Checklists
+            .Select(c => new ChecklistTemplate(
+                c.Id, ChecklistDefaults.TitleOrFallback(c.Title), c.ToValues()))
+            .ToList();
+
+    /// <summary>
+    /// Adds an empty Checkliste and selects it, so the operator lands in the new list's editor
+    /// with the name field ready.
+    /// </summary>
+    [RelayCommand]
+    private void AddChecklist()
+    {
+        var section = new ChecklistTemplateSection(
+            Guid.NewGuid(), "Neue Checkliste", Array.Empty<ChecklistTemplateItem>(), MarkDirty);
+        Checklists.Add(section);
+
+        // Rebuilt rather than appended to, so the new list reaches the Navigation layout: the
+        // resolver's append rule rescues an Einsatz's own lists, never a layout's missing rows.
+        _navigation.Rebuild(_navigation.ToValues(), Checklists);
+        SelectedSection = section;
+        MarkDirty();
+    }
+
+    /// <summary>
+    /// Deletes a Checkliste template after confirming. Einsätze already started from it are
+    /// untouched — each carries its own copy of the list, and the workspace appends any list its
+    /// file holds that the layout no longer names.
+    /// </summary>
+    [RelayCommand]
+    private void DeleteChecklist(ChecklistTemplateSection section)
+    {
+        if (section is null)
+        {
+            return;
+        }
+
+        var name = ChecklistDefaults.TitleOrFallback(section.Title);
+        var message = $"„{name}“ wird aus den Stammdaten entfernt. "
+            + "Bereits begonnene Einsätze behalten ihre Kopie.";
+        var dialog = new ConfirmDialogViewModel(
+            "Checkliste löschen?", message, "LÖSCHEN", () => RemoveChecklist(section));
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
+    }
+
+    private void RemoveChecklist(ChecklistTemplateSection section)
+    {
+        var index = Checklists.IndexOf(section);
+        Checklists.Remove(section);
+        _navigation.Rebuild(_navigation.ToValues(), Checklists);
+
+        // The nearest surviving neighbour, else the rail entry directly above the group. Clamping
+        // into Checklists unconditionally would index an empty collection when the last one goes.
+        SelectedSection = Checklists.Count > 0
+            ? Checklists[Math.Clamp(index, 0, Checklists.Count - 1)]
+            : Sections[^1];
+        MarkDirty();
+    }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()

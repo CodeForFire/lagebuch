@@ -14,14 +14,19 @@ public static class ChecklistSection
             column.Spacing(4);
             column.Item().Text("Checkliste").FontSize(14).SemiBold().FontColor(Colors.Blue.Darken1);
 
-            if (incident.ChecklistAufbau.Count == 0 && incident.ChecklistAbbau.Count == 0)
+            if (incident.Checklists.Sum(l => l.Items.Count) == 0)
             {
                 column.Item().Text("— keine Einträge —").Italic().FontColor(Colors.Grey.Medium);
                 return;
             }
 
-            ComposeList(column, "Aufbau", incident.ChecklistAufbau);
-            ComposeList(column, "Abbau", incident.ChecklistAbbau);
+            // Each list under its own name, taken from the incident file rather than from
+            // Stammdaten: exporting an Einsatz months later must not depend on a template that
+            // may since have been renamed or deleted.
+            foreach (var list in incident.Checklists)
+            {
+                ComposeList(column, ChecklistDefaults.TitleOrFallback(list.Title), list.Items);
+            }
         });
     }
 

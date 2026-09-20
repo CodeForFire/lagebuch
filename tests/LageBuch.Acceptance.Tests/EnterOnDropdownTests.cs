@@ -4,7 +4,6 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
@@ -18,7 +17,7 @@ public class EnterOnDropdownTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        ChecklistTemplateAufbau = new[] { new ChecklistTemplateItem("Blaulicht aus?", false) },
+        ChecklistTemplates = ChecklistTemplate.AufbauAbbau(new[] { new ChecklistTemplateItem("Blaulicht aus?", false) }, null),
         TruppTypes = new[] { new TruppType("Angriffstrupp") },
         Personnel = new[]
         {
@@ -30,7 +29,7 @@ public class EnterOnDropdownTests
     private static ScbaViewModel BuildScba()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),

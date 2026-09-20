@@ -5,6 +5,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- TreatWarningsAsErrors above is Roslyn-only: it already fails the build on CS0612/0618/0619
+         (obsolete C# API). Avalonia's XAML compiler logs through MSBuild instead, so AVLN5001
+         ("member is obsolete") only printed a warning, and a deprecated TextBox.Watermark
+         shipped unnoticed, because it surfaces only on a full rebuild. Escalating it here is what
+         gives the AGENTS.md "never call an obsolete API" rule teeth. Scoped to this one code on
+         purpose: the whole AVLN class also covers warnings that are not deprecations. -->
+    <MSBuildWarningsAsErrors>$(MSBuildWarningsAsErrors);AVLN5001</MSBuildWarningsAsErrors>
     <AnalysisMode>All</AnalysisMode>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>

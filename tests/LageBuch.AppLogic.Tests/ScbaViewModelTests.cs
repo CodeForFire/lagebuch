@@ -33,7 +33,7 @@ public class ScbaViewModelTests
     };
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -235,7 +235,7 @@ public class ScbaViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         seed.Close();
         var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
 
@@ -481,7 +481,7 @@ public class ScbaViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var seed = TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
         var seedVm = Vm(clock, seed);
         seedVm.NewControlIntervalMinutes = 5;
         var seedRow = Register(seedVm);

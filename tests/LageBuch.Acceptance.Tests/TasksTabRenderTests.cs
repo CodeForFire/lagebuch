@@ -18,7 +18,7 @@ public class TasksTabRenderTests
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session, ManualTicker Ticker, FixedClock Clock) ShowWorkspace()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -53,16 +53,14 @@ public class TasksTabRenderTests
         frame.SavePng(Path.Join(dir, name));
     }
 
-    private static TabControl Tabs(Window window) =>
-        ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-
     [AvaloniaFact]
-    public void Workspace_now_nine_tabs_with_aufgaben_third()
+    public void Workspace_rail_carries_an_aufgaben_tab()
     {
         var (window, _, _, _, _) = ShowWorkspace();
-        Assert.Equal(10, Tabs(window).Items.Count());
-        var aufgabenTab = (TabItem)Tabs(window).Items.ElementAt(2)!;
-        Assert.Equal("AUFGABEN", (string)aufgabenTab.Header!);
+        var headers = WorkspaceRenderHelper.RailHeaders(window);
+
+        Assert.Equal(10, headers.Count);
+        Assert.Contains("AUFGABEN", headers);
     }
 
     [AvaloniaFact]
@@ -77,8 +75,7 @@ public class TasksTabRenderTests
         ticker.Pulse();
         session.SetTaskCompleted(session.Incident.Tasks[1].Id, true);
 
-        Tabs(window).SelectedIndex = 2;
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
 
         // OFFEN is the default filter: the completed Kräftemeldung is not shown.
         Assert.DoesNotContain(vm.Tasks.Rows, r => r.Text == "Kräftemeldung nachholen");

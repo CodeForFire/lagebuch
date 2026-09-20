@@ -10,8 +10,7 @@ namespace LageBuch.Domain;
 
 public sealed class Incident
 {
-    private readonly List<ChecklistItem> _checklistAufbau = new();
-    private readonly List<ChecklistItem> _checklistAbbau = new();
+    private readonly List<ChecklistList> _checklists = new();
     private readonly List<EtbEntry> _journal = new();
     private readonly List<RoleAssignment> _roles = new();
     private readonly List<ForceUnit> _forces = new();
@@ -47,9 +46,8 @@ public sealed class Incident
 
     public string? ClosedBy { get; private set; }
 
-    public IReadOnlyList<ChecklistItem> ChecklistAufbau => _checklistAufbau;
-
-    public IReadOnlyList<ChecklistItem> ChecklistAbbau => _checklistAbbau;
+    /// <summary>The Einsatz's Checklisten, in order — 0..n of them, each its own copy of a template.</summary>
+    public IReadOnlyList<ChecklistList> Checklists => _checklists;
 
     public IReadOnlyList<EtbEntry> Journal => _journal;
 
@@ -130,8 +128,7 @@ public sealed class Incident
         string? status,
         DateTimeOffset? closedAt,
         string? closedBy,
-        IEnumerable<ChecklistItem> checklistAufbau,
-        IEnumerable<ChecklistItem> checklistAbbau,
+        IEnumerable<ChecklistList> checklists,
         IEnumerable<EtbEntry> journal,
         IEnumerable<RoleAssignment> roles,
         IEnumerable<ForceUnit> forces,
@@ -156,8 +153,7 @@ public sealed class Incident
             ClosedAt = closedAt,
             ClosedBy = closedBy,
         };
-        incident._checklistAufbau.AddRange(checklistAufbau);
-        incident._checklistAbbau.AddRange(checklistAbbau);
+        incident._checklists.AddRange(checklists);
         incident._journal.AddRange(journal);
         incident._roles.AddRange(roles);
         incident._forces.AddRange(forces);
@@ -277,17 +273,18 @@ public sealed class Incident
     /// <summary>Total Atemschutzgeräteträger across all units — how many Trupps can be formed.</summary>
     public int TotalScba => _forces.Sum(f => f.ScbaCount);
 
-    public void SeedChecklist(
-        IEnumerable<(string Text, bool IsMandatory)> aufbauItems,
-        IEnumerable<(string Text, bool IsMandatory)> abbauItems)
+    /// <summary>
+    /// Instantiates the Stammdaten Checklisten-Vorlagen for this Einsatz, in order. Seeding no
+    /// templates is ordinary: a brigade that does not use Checklisten gets an Einsatz without any.
+    /// </summary>
+    public void SeedChecklist(IEnumerable<ChecklistSeed> seeds)
     {
         EnsureOpen();
-        ArgumentNullException.ThrowIfNull(aufbauItems);
-        ArgumentNullException.ThrowIfNull(abbauItems);
-        foreach (var (text, isMandatory) in aufbauItems)
-            _checklistAufbau.Add(new ChecklistItem(text, isMandatory));
-        foreach (var (text, isMandatory) in abbauItems)
-            _checklistAbbau.Add(new ChecklistItem(text, isMandatory));
+        ArgumentNullException.ThrowIfNull(seeds);
+        foreach (var seed in seeds)
+        {
+            _checklists.Add(ChecklistList.FromSeed(seed));
+        }
     }
 
     /// <summary>
@@ -302,35 +299,30 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var (list, kind) = FindChecklistOwning(itemId);
-        var item = list.First(c => c.Id == itemId);
+        var list = FindChecklistOwning(itemId);
+        var item = list.Find(itemId)!;
 
-        var wasComplete = AllMandatoryDone(list);
+        var wasComplete = list.AllMandatoryDone;
         item.Toggle();
-        var isComplete = AllMandatoryDone(list);
+        var isComplete = list.AllMandatoryDone;
 
         if (!wasComplete && isComplete)
         {
-            AppendSystemEntry(clock, op, $"Checkliste {kind} abgeschlossen: alle Pflichtpunkte erledigt");
+            // The title, not a kind: it is stored bare, so this reads exactly as the enum
+            // interpolation did for the two lists that predate user-defined Checklisten.
+            AppendSystemEntry(
+                clock, op, $"Checkliste {list.Title} abgeschlossen: alle Pflichtpunkte erledigt");
         }
 
         return item;
     }
 
-    private (List<ChecklistItem> List, ChecklistKind Kind) FindChecklistOwning(Guid itemId)
-    {
-        if (_checklistAufbau.Any(c => c.Id == itemId))
-        {
-            return (_checklistAufbau, ChecklistKind.Aufbau);
-        }
+    private ChecklistList FindChecklistOwning(Guid itemId) =>
+        _checklists.FirstOrDefault(l => l.Find(itemId) is not null)
+        ?? throw new KeyNotFoundException($"Checklist item {itemId} not found.");
 
-        if (_checklistAbbau.Any(c => c.Id == itemId))
-        {
-            return (_checklistAbbau, ChecklistKind.Abbau);
-        }
-
-        throw new KeyNotFoundException($"Checklist item {itemId} not found.");
-    }
+    private IReadOnlyList<ChecklistItem> ItemsOf(Guid listId) =>
+        _checklists.FirstOrDefault(l => l.Id == listId)?.Items ?? Array.Empty<ChecklistItem>();
 
     private static bool AllMandatoryDone(IReadOnlyList<ChecklistItem> items) =>
         items.Where(i => i.IsMandatory).All(i => i.IsDone);

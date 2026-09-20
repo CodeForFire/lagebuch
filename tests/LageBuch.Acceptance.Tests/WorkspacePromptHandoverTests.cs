@@ -111,7 +111,7 @@ public class WorkspacePromptHandoverTests
     {
         var store = new FakeStore();
         var clock = new FixedClock();
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             clock,
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),

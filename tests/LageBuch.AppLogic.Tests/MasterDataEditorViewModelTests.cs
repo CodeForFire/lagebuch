@@ -168,18 +168,18 @@ public class MasterDataEditorViewModelTests
     {
         var vm = Vm(new InMemoryProvider());
 
-        // 8 categories plus #76's Fahrzeuge (which also supplies the Wachen and Funkrufnamen).
-        Assert.Equal(9, vm.Sections.Count);
         Assert.False(vm.IsDirty);
         Assert.False(vm.SaveCommand.CanExecute(null));
         Assert.NotNull(vm.SelectedSection);
 
-        // Einstellungen stays pinned first (a meta section, not a data category); the rest sort
-        // alphabetically below it, except Checkliste Aufbau (setup) comes before Abbau (teardown).
+        // Einstellungen and Navigation are pinned first, in that order -- both are meta sections
+        // (defaults, and what the Einsatz sidebar shows) rather than data categories. The data
+        // categories sort alphabetically below them. This provider has no Checklisten, and that is
+        // now an ordinary state rather than an impossible one: a brigade may use none.
         Assert.Equal(
             new[]
             {
-                "Einstellungen", "Checkliste Aufbau", "Checkliste Abbau", "Einheiten-Status",
+                "Einstellungen", "Navigation", "Einheiten-Status",
                 "Fahrzeuge", "Links", "Personal", "Rollen", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
@@ -284,11 +284,16 @@ public class MasterDataEditorViewModelTests
             section.Items[^1].Value = $"MARK-{title}";
         }
 
-        var checklistAufbau = ChecklistSection(vm, "Checkliste Aufbau");
+        // An empty set has no Checklisten at all now, so they are created rather than looked up.
+        vm.AddChecklistCommand.Execute(null);
+        var checklistAufbau = (ChecklistTemplateSection)vm.SelectedSection!;
+        checklistAufbau.Title = "Aufbau";
         checklistAufbau.AddCommand.Execute(null);
         checklistAufbau.Rows[^1].Text = "MARK-ChecklisteAufbau";
 
-        var checklistAbbau = ChecklistSection(vm, "Checkliste Abbau");
+        vm.AddChecklistCommand.Execute(null);
+        var checklistAbbau = (ChecklistTemplateSection)vm.SelectedSection!;
+        checklistAbbau.Title = "Abbau";
         checklistAbbau.AddCommand.Execute(null);
         checklistAbbau.Rows[^1].Text = "MARK-ChecklisteAbbau";
 
@@ -323,8 +328,8 @@ public class MasterDataEditorViewModelTests
         // The vehicle row is the one place Wachen and Funkrufnamen are maintained.
         Assert.Contains("MARK-Wache", set.Brigades);
         Assert.Contains("MARK-Funkrufname", set.RadioCallSigns);
-        Assert.Contains(set.ChecklistTemplateAufbau, i => i.Text == "MARK-ChecklisteAufbau");
-        Assert.Contains(set.ChecklistTemplateAbbau, i => i.Text == "MARK-ChecklisteAbbau");
+        Assert.Contains(set.ChecklistTemplates.SelectMany(t => t.Items), i => i.Text == "MARK-ChecklisteAufbau");
+        Assert.Contains(set.ChecklistTemplates.SelectMany(t => t.Items), i => i.Text == "MARK-ChecklisteAbbau");
         Assert.Contains(set.Personnel, p => p.LastName == "MarkPersonal");
         Assert.Contains(set.Links, l => l.Name == "MARK-Links" && l.Url == "https://example.org/mark");
     }

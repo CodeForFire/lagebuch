@@ -26,10 +26,10 @@ public class IncidentPdfTests
         incident.SetIncidentNumber(new IncidentNumber("B 1.2 260715 4242"));
         incident.SetAddress("Hauptstr. 12", "FFB");
         incident.SetStatus("aufgenommen");
-        incident.SeedChecklist(
+        incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Blaulicht aus?", true), ("Bei ILS gemeldet?", false) },
-            new[] { ("Fahrzeug abgerüstet?", true) });
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
+            new[] { ("Fahrzeug abgerüstet?", true) }));
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[0].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Lagemeldung erhalten", from: "ILS");
 

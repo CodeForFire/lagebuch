@@ -24,7 +24,7 @@ public class ForcesNotesFocusTests
     private static ForcesViewModel BuildForcesVm(out LocalIncidentSession session, out FakeStore store)
     {
         store = new FakeStore();
-        session = LocalIncidentSession.StartNew(
+        session = TestSession.StartNew(
             store,
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),

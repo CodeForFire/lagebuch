@@ -18,7 +18,7 @@ public class FilesDisplayNameFocusTests
         store = new FakeStore();
         var clock = new FixedClock();
         var op = new SessionOperator("Müller", "FFB 12/1");
-        session = LocalIncidentSession.StartNew(
+        session = TestSession.StartNew(
             store,
             clock,
             op,

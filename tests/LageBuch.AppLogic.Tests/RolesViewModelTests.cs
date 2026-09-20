@@ -19,7 +19,7 @@ public class RolesViewModelTests
 
     private static RolesViewModel NewVm(FixedClock clock, MasterDataSet md, Action? onChanged = null)
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -34,7 +34,7 @@ public class RolesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -77,7 +77,7 @@ public class RolesViewModelTests
     public void ReadOnly_disables_add()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -187,7 +187,7 @@ public class RolesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -210,7 +210,7 @@ public class RolesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -238,7 +238,7 @@ public class RolesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -261,7 +261,7 @@ public class RolesViewModelTests
     public void ShowAllRoles_defaults_to_hiding_ended_assignments()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),

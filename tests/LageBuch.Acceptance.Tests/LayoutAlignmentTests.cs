@@ -105,17 +105,15 @@ public class LayoutAlignmentTests
     public void Add_entry_docks_share_one_left_edge_across_tabs()
     {
         var window = ShowWorkspace();
-        var tabs = TabOf(window);
 
-        double LeftOfDockOnTab(int tabIndex)
+        double LeftOfDockOnTab(string header)
         {
-            tabs.SelectedIndex = tabIndex;
-            Dispatcher.UIThread.RunJobs();
+            WorkspaceRenderHelper.SelectTab(window, header);
 
             // TabControl keeps every visited tab's content realized (just hidden), so searching
             // the whole window can find a same-named control left over from an earlier tab.
-            // Scoping to SelectedContent's own subtree is unambiguous.
-            var content = (Visual)tabs.SelectedContent!;
+            // Scoping to the selected tab's own subtree is unambiguous.
+            var content = WorkspaceRenderHelper.SelectedTabContent(window);
             return LeftInWindow(
                 content.GetVisualDescendants().OfType<Control>().First(c => c.Name == "InputDock"), window);
         }
@@ -123,11 +121,11 @@ public class LayoutAlignmentTests
         // The tab content area starts to the right of the nav rail, not at the window's own
         // 24px gutter -- so the invariant here is that all five docks agree with each other, not
         // that they match Gutter directly.
-        var funktionen = LeftOfDockOnTab(3);
-        Assert.Equal(funktionen, LeftOfDockOnTab(4), precision: 0); // Kräfte
-        Assert.Equal(funktionen, LeftOfDockOnTab(5), precision: 0); // Atemschutz
-        Assert.Equal(funktionen, LeftOfDockOnTab(6), precision: 0); // CO-Messung
-        Assert.Equal(funktionen, LeftOfDockOnTab(7), precision: 0); // Dateien
+        var funktionen = LeftOfDockOnTab("FUNKTIONEN");
+        Assert.Equal(funktionen, LeftOfDockOnTab("KRÄFTE"), precision: 0);
+        Assert.Equal(funktionen, LeftOfDockOnTab("ATEMSCHUTZ"), precision: 0);
+        Assert.Equal(funktionen, LeftOfDockOnTab("CO-MESSUNG"), precision: 0);
+        Assert.Equal(funktionen, LeftOfDockOnTab("DATEIEN"), precision: 0);
     }
 
     private static TabControl TabOf(Window window) =>

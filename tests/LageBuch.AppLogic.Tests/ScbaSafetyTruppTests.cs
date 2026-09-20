@@ -21,7 +21,7 @@ public class ScbaSafetyTruppTests
     };
 
     private static LocalIncidentSession NewSession(FixedClock clock) =>
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),

@@ -23,8 +23,7 @@ public sealed record IncidentSnapshot(
     string? Status,
     DateTimeOffset? ClosedAt,
     string? ClosedBy,
-    IReadOnlyList<ChecklistItemDto> ChecklistAufbau,
-    IReadOnlyList<ChecklistItemDto> ChecklistAbbau,
+    IReadOnlyList<ChecklistListDto> Checklists,
     IReadOnlyList<EtbEntryDto> Journal,
     IReadOnlyList<RoleAssignmentDto> Roles,
     IReadOnlyList<ForceUnitDto> Forces,
@@ -42,6 +41,12 @@ public sealed record TimerDto(
     int IntervalMinutes,
     int RecurringIntervalMinutes,
     bool IsRunning);
+
+/// <summary>One of the Einsatz's Checklisten on the wire: its id, its name and its items.</summary>
+public sealed record ChecklistListDto(
+    Guid Id,
+    string Title,
+    IReadOnlyList<ChecklistItemDto> Items);
 
 public sealed record ChecklistItemDto(Guid Id, string Text, bool IsDone, string? Note, bool IsMandatory);
 

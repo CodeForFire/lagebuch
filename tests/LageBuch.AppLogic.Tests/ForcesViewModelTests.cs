@@ -18,7 +18,7 @@ public class ForcesViewModelTests
     public void AddForce_appends_and_updates_total()
     {
         var changes = 0;
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -193,7 +193,7 @@ public class ForcesViewModelTests
     [Fact]
     public void Vehicle_options_hide_taken_call_signs_until_their_row_is_removed()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -257,7 +257,7 @@ public class ForcesViewModelTests
     public void A_typed_duplicate_call_sign_blocks_adding_with_a_hint()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -289,7 +289,7 @@ public class ForcesViewModelTests
     public void Rows_without_a_call_sign_never_count_as_duplicates()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -325,7 +325,7 @@ public class ForcesViewModelTests
                 new Vehicle("FFB Wache 1", "ffb 1/44/1", 6),
             },
         };
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -409,7 +409,7 @@ public class ForcesViewModelTests
     public void Gf_and_mann_are_stored_as_total_with_officer_count()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -436,7 +436,7 @@ public class ForcesViewModelTests
     public void Editing_a_rows_strength_reaches_the_domain_with_an_etb_entry()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -489,7 +489,7 @@ public class ForcesViewModelTests
     public void Editing_a_rows_zugfuehrer_count_reaches_the_domain_with_an_etb_entry()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -520,7 +520,7 @@ public class ForcesViewModelTests
     {
         var changes = 0;
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -556,7 +556,7 @@ public class ForcesViewModelTests
     public void Removing_a_row_asks_for_confirmation_before_touching_the_session()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -594,7 +594,7 @@ public class ForcesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -617,7 +617,7 @@ public class ForcesViewModelTests
     public void A_noop_strength_resubmission_adds_neither_history_nor_etb_entry()
     {
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -645,7 +645,7 @@ public class ForcesViewModelTests
     {
         var clock = new FixedClock(T0);
         var store = new FakeStore();
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -691,7 +691,7 @@ public class ForcesViewModelTests
     public void Editing_a_row_status_reaches_the_domain_and_persists()
     {
         var changes = 0;
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -719,7 +719,7 @@ public class ForcesViewModelTests
     [Fact]
     public void Editing_a_row_bemerkung_reaches_the_domain()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -742,7 +742,7 @@ public class ForcesViewModelTests
     [Fact]
     public void Editing_a_row_leaves_the_rest_of_the_unit_alone()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -778,7 +778,7 @@ public class ForcesViewModelTests
         // Pins that the view model hands the real clock and operator down: the domain guarantees
         // an entry exists, but only this layer decides whose name is on it.
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -810,7 +810,7 @@ public class ForcesViewModelTests
         // A Bemerkung edit is a label correction, not a reportable event, so it must never add a
         // journal entry -- regardless of how many times Notes is set here.
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Müller"),
@@ -836,7 +836,7 @@ public class ForcesViewModelTests
 
     private static ForcesViewModel NewVm()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -853,7 +853,7 @@ public class ForcesViewModelTests
         // in the incident but missing from today's Stammdaten -- an older Einsatz, an imported
         // file, a joined client on different master data -- would have nothing to select and render
         // blank, hiding a value the incident actually holds. (#302, #337)
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -872,7 +872,7 @@ public class ForcesViewModelTests
     [Fact]
     public void A_row_whose_status_is_configured_gets_the_plain_vocabulary()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(T0),
             new SessionOperator("Müller"),

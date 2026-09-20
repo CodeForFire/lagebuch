@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using Microsoft.Data.Sqlite;
 
@@ -7,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 22;
+    public const int CurrentVersion = 23;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -147,6 +148,11 @@ public static class Migrations
         if (version < 22)
         {
             ApplyV22(cn, tx);
+        }
+
+        if (version < 23)
+        {
+            ApplyV23(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -661,6 +667,73 @@ public static class Migrations
     // rows are being re-inserted, and the load path tolerates a dangling id by design.
     private static void ApplyV22(SqliteConnection cn, SqliteTransaction tx) =>
         SchemaHelpers.AddColumnIfMissing(cn, tx, "scba_trupps", "safety_trupp_id", "TEXT");
+
+    /// <summary>
+    /// Gives the file its own list of Checklisten, so an Einsatz is no longer limited to the two
+    /// the <c>kind</c> column could name and knows what each of its lists is called.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The titles matter beyond display: the PDF export, a joined sync device and this file
+    /// reopened months from now all need to name a list without reaching for Stammdaten, which
+    /// may since have renamed or deleted the template it came from.
+    /// </para>
+    /// <para>
+    /// A list row is created only where items actually exist. A file whose Abbau list was never
+    /// filled therefore loses its permanently-empty ABBAU tab rather than carrying it forever.
+    /// </para>
+    /// <para>
+    /// <c>list_id</c> is nullable with no default on purpose. A <c>NOT NULL DEFAULT '&lt;aufbau
+    /// guid&gt;'</c> would silently file every future orphan row under Aufbau; nullable still
+    /// satisfies <see cref="SchemaGuard"/>'s repairability rule, and the reader treats a null as
+    /// Aufbau exactly once, where that decision is visible.
+    /// </para>
+    /// <para>
+    /// <c>kind</c> is kept, dormant. Dropping a column here means rebuilding the table (V3/V6/V17
+    /// are the only precedent), which is not worth it for one integer nothing reads —
+    /// <c>incident_meta.ils_number</c> made the same call. The <c>version &gt; CurrentVersion</c>
+    /// guard already refuses a downgrade, so a stale <c>kind</c> can never be misread.
+    /// </para>
+    /// </remarks>
+    private static void ApplyV23(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql = """
+            CREATE TABLE IF NOT EXISTS checklist_lists (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL DEFAULT 0,
+                title TEXT NOT NULL DEFAULT ''
+            );
+            """;
+        Exec(cn, tx, sql);
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "checklist_items", "list_id", "TEXT");
+
+        // A file that has no checklist_items at all has nothing to back-fill from, and the
+        // backfill below would fail on "no such table" rather than doing nothing. That is not
+        // only a fixture concern: SchemaGuard exists precisely because a file can reach this
+        // build missing a table this lineage assumes, and a migration that throws there leaves it
+        // unopenable.
+        if (!SchemaHelpers.TableExists(cn, tx, "checklist_items"))
+        {
+            return;
+        }
+
+        // "D" format, lowercase and dashed -- the same form Guid.ToString() writes everywhere else
+        // in this file, so Guid.Parse reads these back as the ids ChecklistDefaults froze.
+        var aufbau = ChecklistDefaults.AufbauListId.ToString();
+        var abbau = ChecklistDefaults.AbbauListId.ToString();
+
+        var backfill = $"""
+            INSERT OR IGNORE INTO checklist_lists (id, ordinal, title)
+              SELECT '{aufbau}', 0, '{ChecklistDefaults.AufbauTitle}'
+              WHERE EXISTS (SELECT 1 FROM checklist_items WHERE kind = 0);
+            INSERT OR IGNORE INTO checklist_lists (id, ordinal, title)
+              SELECT '{abbau}', 1, '{ChecklistDefaults.AbbauTitle}'
+              WHERE EXISTS (SELECT 1 FROM checklist_items WHERE kind = 1);
+            UPDATE checklist_items SET list_id = '{aufbau}' WHERE list_id IS NULL AND kind = 0;
+            UPDATE checklist_items SET list_id = '{abbau}'  WHERE list_id IS NULL AND kind = 1;
+            """;
+        Exec(cn, tx, backfill);
+    }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

@@ -40,10 +40,10 @@ public class IncidentRoundTripTests : IDisposable
         // Item 0 stays mandatory-and-unchecked deliberately: toggling it would complete Aufbau and
         // fire an extra ETB system entry, which this test isn't about — that's covered in
         // IncidentOperationsTests. Toggling the optional item still proves IsDone round-trips.
-        incident.SeedChecklist(
+        incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Blaulicht aus?", true), ("Bei ILS gemeldet?", false) },
-            new[] { ("Fahrzeug abgerüstet?", true) });
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[1].Id);
+            new[] { ("Fahrzeug abgerüstet?", true) }));
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[1].Id);
         clock.Now = clock.Now.AddMinutes(5);
         incident.AddJournalEntry(clock, op, EtbDirection.Incoming, "Meldung", from: "ILS");
         var journalTime = clock.Now;
@@ -92,12 +92,12 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("Hauptstr. 12", loaded.Street);
         Assert.Equal("FFB", loaded.District);
         Assert.Equal("aufgenommen", loaded.Status);
-        Assert.Equal(2, loaded.ChecklistAufbau.Count);
-        Assert.False(loaded.ChecklistAufbau[0].IsDone);
-        Assert.True(loaded.ChecklistAufbau[0].IsMandatory);
-        Assert.True(loaded.ChecklistAufbau[1].IsDone);
-        Assert.False(loaded.ChecklistAufbau[1].IsMandatory);
-        Assert.True(Assert.Single(loaded.ChecklistAbbau).IsMandatory);
+        Assert.Equal(2, loaded.Checklists[0].Items.Count);
+        Assert.False(loaded.Checklists[0].Items[0].IsDone);
+        Assert.True(loaded.Checklists[0].Items[0].IsMandatory);
+        Assert.True(loaded.Checklists[0].Items[1].IsDone);
+        Assert.False(loaded.Checklists[0].Items[1].IsMandatory);
+        Assert.True(Assert.Single(loaded.Checklists[1].Items).IsMandatory);
 
         // Journal[0] is the automatic "Einsatz begonnen" entry from Incident.Start; the manual one
         // follows it in chronological order, then the automatic entries for the role assignment,

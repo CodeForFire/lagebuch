@@ -50,14 +50,112 @@
         <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusMd}" Padding="6" Margin="0,0,16,0">
-          <ListBox x:Name="CategoryList" ItemsSource="{Binding Sections}"
-                   SelectedItem="{Binding SelectedSection}">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:EditorSection">
-                <TextBlock Text="{Binding Title}" Padding="6,4" />
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+          <DockPanel>
+            <!-- Docked outside the scroll region below. The Checklisten are the one part of this
+                 rail a brigade can grow without bound, so an "add" button living at the end of
+                 them would be the first thing to scroll out of reach on exactly the configuration
+                 that needs it — and this rail also renders on the Android head. The hairline turns
+                 the slack above the button into a footer rather than a gap. -->
+            <!-- Button before the rule: a DockPanel gives the FIRST Dock="Bottom" child the
+                 bottom-most strip, so declaring the rule first would draw it under the button. -->
+            <Button x:Name="AddChecklistButton" DockPanel.Dock="Bottom"
+                    Content="+ NEUE CHECKLISTE" HorizontalAlignment="Stretch"
+                    Margin="0,6,0,0" Command="{Binding AddChecklistCommand}" />
+            <Border DockPanel.Dock="Bottom" Height="1" Margin="0,8,0,0"
+                    Background="{StaticResource HairlineBrush}" />
+
+            <!-- ONE scroll region for the whole rail. Two lists in a 220px column each scrolling
+                 themselves is how the Checklisten ended up with their own scrollbar for a single
+                 entry, and a row clipped mid-card: whichever list lost the flexible row got a
+                 ~90px viewport. Here both lists size to their content and this ScrollViewer does
+                 all the scrolling.
+                 It is load-bearing. The lists below are set to Disabled, which means they clip
+                 rather than scroll — so if anything ever hands the rail a finite height without a
+                 ScrollViewer (a MaxHeight, a fixed-height host), rows vanish silently. -->
+            <ScrollViewer x:Name="RailScroll"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+              <!-- Two groups, because the rail holds two kinds of thing: the app's own categories,
+                   and the Checklisten this brigade wrote. Only the second is labelled — the screen
+                   title already says what the first group is.
+                   Both lists bind SelectedItem to the same SelectedSection; that property ignores a
+                   null write, which is what stops the list without the selection from clearing it.
+                   See MasterDataEditorViewModel.SelectedSection. -->
+              <StackPanel>
+                <!-- Disabled, not Hidden. Hidden leaves the list able to scroll, so it would
+                     silently swallow the wheel, a touch pan and the BringIntoView that arrow-keying
+                     raises, with no scrollbar to show where the content went. Disabled makes the
+                     list's own PART_ScrollViewer report Extent == Viewport, so its wheel handler
+                     early-outs without marking the event handled and RailScroll sees it, and
+                     BringDescendantIntoView returns false for an offset that cannot move — which
+                     is what lets the focused row scroll into view out here instead.
+                     Note what actually gives each list its full height: the infinite constraint
+                     from RailScroll plus the non-virtualizing panel below. Disabled is what stops
+                     the list building a scrollable extent of its own. -->
+                <ListBox x:Name="CategoryList"
+                         ItemsSource="{Binding Sections}"
+                         SelectedItem="{Binding SelectedSection}"
+                         AutomationProperties.Name="Kategorien"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  <!-- The default VirtualizingStackPanel sizes itself from the effective viewport,
+                       which is empty on the first pass: it reports ~25px per item until a later
+                       layout pass corrects it, wobbling on open and under-realizing rows in
+                       headless render tests. It also leaves containers unrealized, and an
+                       unrealized ListBoxItem cannot be brought into view. Both lists here are
+                       short — eight fixed sections, and the handful of Checklisten a brigade
+                       keeps — so neither needs virtualizing. -->
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel />
+                    </ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:EditorSection">
+                      <!-- ListBoxItem already pads 14,12; repeating the horizontal half made the
+                           rail the only list in the app whose text starts 26px in instead of 20.
+                           The vertical 4 stays: it keeps the row's hit target at 51px, above the
+                           48dp touch-target minimum the Android head needs. -->
+                      <TextBlock Text="{Binding Title}" Padding="0,4" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Group heading: the HomeView idiom, an overline plus a hairline rule. -->
+                <Grid ColumnDefinitions="Auto,*" Margin="6,10,6,8">
+                  <TextBlock Grid.Column="0" Text="CHECKLISTEN" Classes="overline" FontSize="10"
+                             VerticalAlignment="Center" />
+                  <Border Grid.Column="1" Height="1" Background="{StaticResource HairlineBrush}"
+                          VerticalAlignment="Center" Margin="10,0,0,0" />
+                </Grid>
+
+                <!-- A brigade may keep none; that is an ordinary state, not an error. These two are
+                     alternatives, never both: a collapsed control takes no space in a StackPanel,
+                     so they no longer need to share a Grid row in order to overlap. -->
+                <TextBlock x:Name="NoChecklistsText" Text="Noch keine Checkliste."
+                           Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                           Margin="6,0" IsVisible="{Binding !Checklists.Count}" />
+
+                <!-- Collapsed rather than left empty: an empty list is still a tab stop. -->
+                <ListBox x:Name="ChecklistList"
+                         ItemsSource="{Binding Checklists}"
+                         SelectedItem="{Binding SelectedSection}"
+                         AutomationProperties.Name="Checklisten"
+                         IsVisible="{Binding Checklists.Count}"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel />
+                    </ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:EditorSection">
+                      <TextBlock Text="{Binding Title}" Padding="0,4" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
         </Border>
 
         <Border Grid.Column="1" Background="#0C1119"
@@ -141,6 +239,21 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+
+                  <!-- The list's name. The overline keeps the context the rail label used to
+                       carry when it read "Checkliste Aufbau" rather than just "Aufbau". Editing
+                       here renames the rail entry and the Navigation row as you type. -->
+                  <TextBlock DockPanel.Dock="Top" Text="CHECKLISTE" Classes="overline"
+                             FontSize="10" Margin="0,0,0,4" />
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+                    <TextBox Grid.Column="0" x:Name="ChecklistTitleBox" Text="{Binding Title}"
+                             PlaceholderText="Name der Checkliste" Margin="0,0,8,0" />
+                    <Button Grid.Column="1" x:Name="DeleteChecklistButton" Content="LÖSCHEN"
+                            VerticalAlignment="Center"
+                            Command="{ReflectionBinding $parent[UserControl].DataContext.DeleteChecklistCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+
                   <!-- Column headers (#137): each row is unlabeled otherwise. -->
                   <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="TEXT" Classes="overline" FontSize="10" />
@@ -174,6 +287,50 @@
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
+              <!-- Navigation: the Einsatz sidebar's order and what it shows. Rows are derived
+                   (the modules this build has, plus every Checkliste), so there is nothing to add
+                   or remove here; only reorder, and switch on or off. -->
+              <DataTemplate x:DataType="vm:NavigationSection">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Top" Classes="overline" FontSize="10" Margin="0,0,0,4"
+                             Text="REITER IM EINSATZ" />
+                  <TextBlock DockPanel.Dock="Top" Margin="0,0,0,14" TextWrapping="Wrap"
+                             Foreground="{StaticResource TextSecondaryBrush}"
+                             Text="Reihenfolge und Sichtbarkeit der Seitenleiste. Das ETB ist immer sichtbar." />
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NavRow">
+                          <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,6">
+                            <CheckBox Grid.Column="0" IsChecked="{Binding IsVisible}"
+                                      IsEnabled="{Binding CanHide}"
+                                      ToolTip.Tip="Das ETB ist immer sichtbar."
+                                      AutomationProperties.Name="Sichtbar"
+                                      VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" />
+                            <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
+                                 DataContext, whose static type is object under compiled bindings, so a
+                                 compiled $parent cast path won't resolve. -->
+                            <Button Grid.Column="2" Classes="icon-btn" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            </Button>
+                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
                           </Grid>
                         </DataTemplate>

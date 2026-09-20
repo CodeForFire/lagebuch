@@ -18,12 +18,12 @@ public class IncidentOperationsTests
     public void Seed_and_toggle_checklist()
     {
         var incident = NewIncident(out var clock, out var op);
-        incident.SeedChecklist(
+        incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Blaulicht aus?", false), ("Bei ILS gemeldet?", false) },
-            Array.Empty<(string, bool)>());
-        Assert.Equal(2, incident.ChecklistAufbau.Count);
+            Array.Empty<(string, bool)>()));
+        Assert.Equal(2, incident.Checklists[0].Items.Count);
 
-        var first = incident.ChecklistAufbau[0];
+        var first = incident.Checklists[0].Items[0];
         Assert.True(incident.ToggleChecklistItem(clock, op, first.Id).IsDone);
     }
 
@@ -38,12 +38,12 @@ public class IncidentOperationsTests
     public void Aufbau_and_abbau_seed_independently()
     {
         var incident = NewIncident(out _, out _);
-        incident.SeedChecklist(
+        incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Fahrzeug prüfen", true) },
-            new[] { ("Standort räumen", true), ("Material zählen", false) });
+            new[] { ("Standort räumen", true), ("Material zählen", false) }));
 
-        Assert.Equal("Fahrzeug prüfen", Assert.Single(incident.ChecklistAufbau).Text);
-        Assert.Equal(2, incident.ChecklistAbbau.Count);
+        Assert.Equal("Fahrzeug prüfen", Assert.Single(incident.Checklists[0].Items).Text);
+        Assert.Equal(2, incident.Checklists[1].Items.Count);
     }
 
     // --- ETB logging for mandatory checklist completion -------------------------------------
@@ -53,12 +53,12 @@ public class IncidentOperationsTests
     public void Completing_all_mandatory_aufbau_items_logs_a_system_entry_once()
     {
         var incident = NewIncident(out var clock, out var op);
-        incident.SeedChecklist(
+        incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Fahrzeug prüfen", true), ("Kaffee kochen", false) },
-            Array.Empty<(string, bool)>());
+            Array.Empty<(string, bool)>()));
         var before = incident.Journal.Count;
 
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[0].Id);
 
         Assert.Equal(before + 1, incident.Journal.Count);
         var entry = incident.Journal[^1];
@@ -66,7 +66,7 @@ public class IncidentOperationsTests
         Assert.Equal("Checkliste Aufbau abgeschlossen: alle Pflichtpunkte erledigt", entry.Text);
 
         // The optional item still open afterward does not re-trigger logging.
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[1].Id);
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[1].Id);
         Assert.Equal(before + 1, incident.Journal.Count);
     }
 
@@ -74,8 +74,8 @@ public class IncidentOperationsTests
     public void Unchecking_a_mandatory_item_after_completion_logs_nothing()
     {
         var incident = NewIncident(out var clock, out var op);
-        incident.SeedChecklist(new[] { ("Fahrzeug prüfen", true) }, Array.Empty<(string, bool)>());
-        var id = incident.ChecklistAufbau[0].Id;
+        incident.SeedChecklist(TestChecklists.Pair(new[] { ("Fahrzeug prüfen", true) }, Array.Empty<(string, bool)>()));
+        var id = incident.Checklists[0].Items[0].Id;
         incident.ToggleChecklistItem(clock, op, id); // completes -> logs
         var before = incident.Journal.Count;
 
@@ -88,10 +88,10 @@ public class IncidentOperationsTests
     public void A_checklist_with_no_mandatory_items_is_vacuously_complete_and_never_logs()
     {
         var incident = NewIncident(out var clock, out var op);
-        incident.SeedChecklist(new[] { ("Optional", false) }, Array.Empty<(string, bool)>());
+        incident.SeedChecklist(TestChecklists.Pair(new[] { ("Optional", false) }, Array.Empty<(string, bool)>()));
         var before = incident.Journal.Count;
 
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[0].Id);
 
         Assert.Equal(before, incident.Journal.Count);
     }
@@ -100,15 +100,15 @@ public class IncidentOperationsTests
     public void Aufbau_and_abbau_completion_are_tracked_independently()
     {
         var incident = NewIncident(out var clock, out var op);
-        incident.SeedChecklist(
+        incident.SeedChecklist(TestChecklists.Pair(
             new[] { ("Aufbau Pflicht", true) },
-            new[] { ("Abbau Pflicht", true) });
+            new[] { ("Abbau Pflicht", true) }));
 
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAufbau[0].Id);
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[0].Items[0].Id);
         var afterAufbau = incident.Journal.Count;
         Assert.Equal("Checkliste Aufbau abgeschlossen: alle Pflichtpunkte erledigt", incident.Journal[^1].Text);
 
-        incident.ToggleChecklistItem(clock, op, incident.ChecklistAbbau[0].Id);
+        incident.ToggleChecklistItem(clock, op, incident.Checklists[1].Items[0].Id);
         Assert.Equal(afterAufbau + 1, incident.Journal.Count);
         Assert.Equal("Checkliste Abbau abgeschlossen: alle Pflichtpunkte erledigt", incident.Journal[^1].Text);
     }

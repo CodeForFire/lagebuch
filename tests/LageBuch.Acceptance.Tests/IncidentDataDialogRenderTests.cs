@@ -19,7 +19,7 @@ public class IncidentDataDialogRenderTests
 {
     private static LocalIncidentSession Session()
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),

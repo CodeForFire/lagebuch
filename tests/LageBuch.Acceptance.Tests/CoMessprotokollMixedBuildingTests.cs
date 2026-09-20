@@ -8,7 +8,6 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Controls;
 using LageBuch.App.Shared.Views;
-using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -25,7 +24,7 @@ public class CoMessprotokollMixedBuildingTests
 {
     private static (Window Window, IncidentWorkspaceViewModel Vm) Scenario(double width = 1920, double height = 1032)
     {
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             new FixedClock(),
             new SessionOperator("Müller", "FFB 12/1"),
@@ -93,9 +92,7 @@ public class CoMessprotokollMixedBuildingTests
         session.SetDwellingDetails(id, 3, 1, "Fam. Kellner", null);
         Dispatcher.UIThread.RunJobs();
 
-        var tabs = ((IncidentWorkspaceView)window.Content!).GetControl<TabControl>("ModuleTabs");
-        tabs.SelectedIndex = 6; // CO-MESSUNG
-        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
 
         return (window, vm);
     }

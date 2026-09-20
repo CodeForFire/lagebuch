@@ -52,8 +52,7 @@ public sealed class LocalIncidentSession : IIncidentSession
         IClock clock,
         SessionOperator op,
         string path,
-        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAufbau,
-        IEnumerable<(string Text, bool IsMandatory)> checklistTemplateAbbau,
+        IEnumerable<ChecklistSeed> checklistSeeds,
         IncidentNumber? incidentNumber = null,
         string? keyword = null)
     {
@@ -63,7 +62,7 @@ public sealed class LocalIncidentSession : IIncidentSession
         // The Einsatznummer goes through the factory rather than SetIncidentNumber afterwards, so the
         // automatic "Einsatz begonnen" entry can name it.
         var incident = Incident.Start(clock, op, keyword: keyword, incidentNumber: incidentNumber);
-        incident.SeedChecklist(checklistTemplateAufbau, checklistTemplateAbbau);
+        incident.SeedChecklist(checklistSeeds);
         var session = new LocalIncidentSession(store, clock, incident, path, op);
         session.Save();
         return session;

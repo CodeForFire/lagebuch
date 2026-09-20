@@ -13,7 +13,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -22,7 +22,7 @@ public class IncidentSessionTests
             Array.Empty<(string, bool)>());
 
         Assert.False(session.IsReadOnly);
-        Assert.Equal(2, session.Incident.ChecklistAufbau.Count);
+        Assert.Equal(2, session.Incident.Checklists[0].Items.Count);
         Assert.Equal(1, store.SaveCount);
     }
 
@@ -30,7 +30,7 @@ public class IncidentSessionTests
     public void Save_persists_to_the_session_path()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -47,7 +47,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -66,7 +66,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller", "FFB 12/1"),
@@ -92,7 +92,7 @@ public class IncidentSessionTests
         // blocked whatever thread called AddFileAsync) by the time this method's Task is observed.
         var release = new TaskCompletionSource();
         var store = new DelayedFileWriteStore(release.Task);
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -113,7 +113,7 @@ public class IncidentSessionTests
     public async Task GetFileBytesAsync_returns_null_for_an_unknown_file()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -128,7 +128,7 @@ public class IncidentSessionTests
     public async Task AddFileAsync_raises_Changed()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -148,7 +148,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -165,7 +165,7 @@ public class IncidentSessionTests
     public void Open_editable_incident_requires_operator()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -180,7 +180,7 @@ public class IncidentSessionTests
     public void OpenReadOnly_open_incident_is_readonly_without_operator()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -200,7 +200,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -217,7 +217,7 @@ public class IncidentSessionTests
     public void ContinueEditing_on_open_session_sets_operator_and_makes_editable()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -237,7 +237,7 @@ public class IncidentSessionTests
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
-        var seed = LocalIncidentSession.StartNew(
+        var seed = TestSession.StartNew(
             store,
             clock,
             new SessionOperator("Müller"),
@@ -255,7 +255,7 @@ public class IncidentSessionTests
     public void ContinueEditing_is_idempotent_when_editable()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -272,7 +272,7 @@ public class IncidentSessionTests
     public void ContinueEditing_appends_resumed_audit_event_with_operator_display()
     {
         var store = new FakeStore();
-        LocalIncidentSession.StartNew(
+        TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -291,7 +291,7 @@ public class IncidentSessionTests
     public void IsReadOnly_true_exactly_when_operator_is_null()
     {
         var store = new FakeStore();
-        var editable = LocalIncidentSession.StartNew(
+        var editable = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -308,7 +308,7 @@ public class IncidentSessionTests
     public async Task ExportPdfAsync_returns_a_pdf()
     {
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),
@@ -327,7 +327,7 @@ public class IncidentSessionTests
         // disk (FakeStore's thin disk shim), and ExportPdfAsync must resolve and merge it from
         // that real path rather than holding it in memory.
         var store = new FakeStore();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             new FixedClock(T0),
             new SessionOperator("Müller"),

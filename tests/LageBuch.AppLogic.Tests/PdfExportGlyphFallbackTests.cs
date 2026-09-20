@@ -26,7 +26,7 @@ public class PdfExportGlyphFallbackTests
         var store = new FakeStore();
         var clock = new FixedClock(T0);
         var op = new SessionOperator("Müller");
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             store,
             clock,
             op,
