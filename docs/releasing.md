@@ -21,6 +21,19 @@ new version heading before tagging. The heading has to match the tag exactly
 minus the `v` (`## [0.6.0-beta.1]` for `v0.6.0-beta.1`); otherwise the notes
 fall back to a "no changelog entry found" placeholder.
 
+Two things go with that move, both easy to forget because nothing fails without
+them:
+
+- **The link references at the bottom of `CHANGELOG.md`.** Repoint
+  `[Unreleased]` at `compare/v<new>...HEAD` and add a `[<new>]:
+  compare/v<previous>...v<new>` line above the existing ones. A missing line
+  renders the version heading as plain text instead of a diff link.
+- **The milestone.** Close the milestone the release corresponds to, and move
+  anything still open in it to the next one before closing — an issue that
+  silently loses its milestone is an issue nobody plans again. Nothing in CI
+  touches milestones; [`ROADMAP.md`](../ROADMAP.md) explains the grouping and
+  has to be updated in the same breath.
+
 ## After the tag: check the release
 
 The checksums and the provenance are what the README tells users to verify, and
