@@ -42,9 +42,9 @@ What counts here:
   pins real behaviour, a page of documentation that did not exist. The
   `good first issue` list is exactly this kind of work.
 - **The normal rules, unchanged.** Signed commits (SSH or GPG), DCO sign-off
-  (`git commit -s`), Conventional Commit subjects, a `CHANGELOG.md` entry for
-  anything under `src/`, and green CI. These are enforced automatically, not
-  waived for October.
+  (`git commit -s`), Conventional Commit subjects, a changelog entry in
+  `changelog.d/` for anything under `src/`, and green CI. These are enforced
+  automatically, not waived for October.
 
 What does not count, and will be labelled `spam` or `invalid`:
 
@@ -211,20 +211,10 @@ there when a release is cut.
 
 ### Cutting a release
 
-[towncrier](https://towncrier.readthedocs.io) folds `changelog.d/` into
-`CHANGELOG.md`:
-
-```bash
-pip install -r .github/requirements-changelog.txt
-towncrier build --draft --version X.Y.Z   # preview; writes nothing
-towncrier build --version X.Y.Z           # writes the section, removes the fragments
-```
-
-Two things stay manual afterwards: the summary paragraph under the new heading,
-if the release deserves one, and the link definitions at the bottom of the file
-(repoint `[Unreleased]` at the new tag and add an `[X.Y.Z]` line). Open that as
-its own pull request; pushing the `vX.Y.Z` tag once it merges is what triggers
-`release.yml`.
+A maintainer task rather than a contributor one, and written up in
+[`docs/releasing.md`](docs/releasing.md): `towncrier build` folds `changelog.d/`
+into `CHANGELOG.md` under the new version heading, that goes up as its own pull
+request, and pushing the tag once it merges is what triggers the release.
 
 ## Master data and PII
 

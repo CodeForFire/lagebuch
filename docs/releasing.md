@@ -11,19 +11,24 @@ builds and attaches one package per platform:
 | Android | `lagebuch-<version>.apk` |
 | macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
 
+## Cutting a release
+
+`CHANGELOG.md` is assembled from `changelog.d/`, never edited by hand, so a
+release starts by folding the fragments into a version section:
+
 ```bash
-git tag -s v0.6.0 -m "Lagebuch v0.6.0 — <Zusammenfassung>" && git push origin v0.6.0
+pip install -r .github/requirements-changelog.txt
+towncrier build --draft --version 0.6.0   # preview; writes nothing
+towncrier build --version 0.6.0           # writes the section, consumes the fragments
 ```
 
-The release notes are generated from the matching section of
-[`CHANGELOG.md`](../CHANGELOG.md), so move the `[Unreleased]` entries under a
-new version heading before tagging. The heading has to match the tag exactly
-minus the `v` (`## [0.6.0-beta.1]` for `v0.6.0-beta.1`); otherwise the notes
-fall back to a "no changelog entry found" placeholder.
+`title_format` in [`towncrier.toml`](../towncrier.toml) renders the heading as
+`## [0.6.0] - <Datum>`, and the version in it has to match the tag exactly minus
+the `v` — that is what the workflow looks for. Three things go with the build,
+none of which towncrier does for you:
 
-Two things go with that move, both easy to forget because nothing fails without
-them:
-
+- **The summary paragraph** under the new heading, if the release deserves one.
+  The earlier sections have one; towncrier writes the entries and nothing else.
 - **The link references at the bottom of `CHANGELOG.md`.** Repoint
   `[Unreleased]` at `compare/v<new>...HEAD` and add a `[<new>]:
   compare/v<previous>...v<new>` line above the existing ones. A missing line
@@ -33,6 +38,20 @@ them:
   silently loses its milestone is an issue nobody plans again. Nothing in CI
   touches milestones; [`ROADMAP.md`](../ROADMAP.md) explains the grouping and
   has to be updated in the same breath.
+
+Open that as its own pull request. Pushing the tag once it merges is what
+triggers the release:
+
+```bash
+git tag -s v0.6.0 -m "Lagebuch v0.6.0 — <Zusammenfassung>" && git push origin v0.6.0
+```
+
+The release body links to the version's section rather than inlining it, and a
+final release whose version has no section is refused by the workflow's `version`
+job, before any build minutes are spent — so a forgotten `towncrier build` costs
+seconds rather than a release with no notes. Prereleases (`v0.6.0-beta.1`) are
+exempt: they are cut from work in progress, before that version's section is
+assembled.
 
 ## After the tag: check the release
 
