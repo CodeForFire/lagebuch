@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -325,8 +326,94 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.True(view.GetControl<Button>("AddChecklistButton").IsVisible);
         Assert.Equal(8, view.GetControl<ListBox>("CategoryList").ItemCount);
+
+        // Laid out, not merely IsVisible -- that property stays true for a button clipped to
+        // nothing, which is exactly the failure a docked action is supposed to rule out.
+        Assert.True(view.GetControl<Button>("AddChecklistButton").Bounds.Height > 0);
+    }
+
+    // The rail used to be two ListBoxes each scrolling itself. Eight fixed categories ate the
+    // height, so the Checklisten got a ~90px viewport, grew their own scrollbar for a single
+    // entry, and clipped a row mid-card. One ScrollViewer owns the rail now; these pin that it
+    // stays that way, because the symptom only appears once the rail is too short.
+    [AvaloniaFact]
+    public void The_rail_has_exactly_one_scroll_region_when_it_overflows()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 480 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        // Captured before the assertions: on a build with the old nested scrollers this frame is
+        // the "before" screenshot, showing the inner scrollbar and the half-row.
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+            using var frame = window.CaptureRenderedFrame()!;
+            frame.SavePng(Path.Join(dir, "stammdaten-rail-scrolling.png"));
+        }
+
+        var rail = view.GetControl<ScrollViewer>("RailScroll");
+        var railMessage = $"the rail is {rail.Extent.Height:F0}px in a {rail.Viewport.Height:F0}px "
+            + "viewport -- it does not overflow at 480px, so this fixture proves nothing.";
+        Assert.True(rail.Extent.Height > rail.Viewport.Height, railMessage);
+
+        // Each list is as tall as its own rows. This is the assertion that matters: because the
+        // lists are set to Disabled they clip rather than scroll, so a squeezed list shows no
+        // scrollbar and an Extent-vs-Viewport check would pass while rows quietly vanished.
+        foreach (var name in new[] { "CategoryList", "ChecklistList" })
+        {
+            var list = view.GetControl<ListBox>(name);
+            var listRows = list.GetVisualDescendants().OfType<ListBoxItem>().ToArray();
+            Assert.NotEmpty(listRows);
+
+            var last = listRows[^1];
+            var needed = last.TranslatePoint(new Point(0, last.Bounds.Height), list)!.Value.Y;
+            var squeezedMessage = $"{name} is {list.Bounds.Height:F0}px tall but its rows need "
+                + $"{needed:F0}px -- it is squeezed inside the rail, which is how the Checklisten "
+                + "ended up with a viewport too small to show one entry.";
+            Assert.True(needed <= list.Bounds.Height + 0.5, squeezedMessage);
+
+            var inner = Assert.Single(list.GetVisualDescendants().OfType<ScrollViewer>());
+            var innerMessage = $"{name} is {inner.Extent.Height:F0}px in a "
+                + $"{inner.Viewport.Height:F0}px viewport -- it scrolls itself, so the rail has "
+                + "two scroll regions again.";
+            Assert.True(inner.Extent.Height <= inner.Viewport.Height + 0.5, innerMessage);
+        }
+
+        // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
+        var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
+        Assert.Equal(8, rows.Length);
+        var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
+        var clipMessage = $"the last category ends {lastBottom:F0}px into a "
+            + $"{rail.Extent.Height:F0}px extent -- it is clipped.";
+        Assert.True(lastBottom <= rail.Extent.Height + 0.5, clipMessage);
+
+        // The docked action survives a rail too short for its content.
+        var button = view.GetControl<Button>("AddChecklistButton");
+        Assert.True(button.Bounds.Height > 0);
+        Assert.True(
+            button.TranslatePoint(new Point(0, button.Bounds.Height), window)!.Value.Y <= window.Height,
+            "«+ NEUE CHECKLISTE» is pushed off the bottom of a short rail.");
+    }
+
+    [AvaloniaFact]
+    public void A_rail_that_fits_shows_no_scrollbar_at_all()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 1032 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var rail = view.GetControl<ScrollViewer>("RailScroll");
+        var message = $"the rail wants {rail.Extent.Height:F0}px in a "
+            + $"{rail.Viewport.Height:F0}px viewport -- it scrolls even though there is room "
+            + "for every entry.";
+        Assert.True(rail.Extent.Height <= rail.Viewport.Height + 0.5, message);
     }
 
     private sealed class EmptyProvider : IMasterDataProvider
