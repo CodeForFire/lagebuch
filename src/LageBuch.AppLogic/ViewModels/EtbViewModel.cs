@@ -143,9 +143,14 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
             .Select(d => new EtbDirectionOption(d, Formatting.Direction(d)))
             .ToArray();
 
+    // The dock and the edit panel below the grid are two separate forms, so each keeps its own
+    // "the operator has asked" state: pressing one must not light up a field in the other (#412).
+    private bool _addErrorsShown;
+
+    private bool _editErrorsShown;
+
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddEntryCommand))]
-    [NotifyCanExecuteChangedFor(nameof(AddEntryAndCreateTaskCommand))]
+    [NotifyPropertyChangedFor(nameof(NewTextError))]
     private string _newText = string.Empty;
 
     [ObservableProperty]
@@ -157,28 +162,59 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private EtbDirection _newDirection = EtbDirection.Incoming;
 
-    private bool CanAddEntry => !IsReadOnly && !string.IsNullOrWhiteSpace(NewText);
+    /// <summary>Whether the Eintrag is still missing, once the operator has asked (#412).</summary>
+    public string? NewTextError =>
+        _addErrorsShown && string.IsNullOrWhiteSpace(NewText) ? ValidationMessages.Required : null;
+
+    // Only the read-only rule gates the buttons; the empty field answers on the press (#412).
+    private bool CanAddEntry => !IsReadOnly;
 
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntry()
     {
+        if (!ValidateAdd())
+        {
+            return;
+        }
+
         _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo); // Changed → Sync() renders it
-        NewText = string.Empty;
-        NewFrom = null;
-        NewTo = null;
+        ClearNewEntry();
         _onChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntryAndCreateTask()
     {
+        if (!ValidateAdd())
+        {
+            return;
+        }
+
         _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo);
         var text = NewText;
+        ClearNewEntry();
+        _onChanged();
+        _createTaskFromEntry?.Invoke(text);
+    }
+
+    private void ClearNewEntry()
+    {
         NewText = string.Empty;
         NewFrom = null;
         NewTo = null;
-        _onChanged();
-        _createTaskFromEntry?.Invoke(text);
+        ShowAddErrors(false); // the cleared field must not read as a fresh complaint
+    }
+
+    private bool ValidateAdd()
+    {
+        ShowAddErrors(true);
+        return NewTextError is null;
+    }
+
+    private void ShowAddErrors(bool shown)
+    {
+        _addErrorsShown = shown;
+        OnPropertyChanged(nameof(NewTextError));
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
@@ -187,7 +223,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     private EtbEntryRow? _editingEntry;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveEditCommand))]
+    [NotifyPropertyChangedFor(nameof(EditTextError))]
     private string _editText = string.Empty;
 
     public bool IsEditing => EditingEntry is not null;
@@ -198,17 +234,30 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     {
         EditingEntry = row;
         EditText = row.Text;
+        ShowEditErrors(false); // a freshly opened panel starts quiet
         HistoryEntry = null; // editing and viewing history are separate panels; only one at a time
     }
 
-    private bool CanSaveEdit => IsEditing && !string.IsNullOrWhiteSpace(EditText);
+    /// <summary>Whether the edited Eintrag was emptied, once the operator has asked (#412).</summary>
+    public string? EditTextError =>
+        _editErrorsShown && string.IsNullOrWhiteSpace(EditText) ? ValidationMessages.Required : null;
+
+    // IsEditing stays: with no panel open there is no field to name, so there is nothing to explain.
+    private bool CanSaveEdit => IsEditing;
 
     [RelayCommand(CanExecute = nameof(CanSaveEdit))]
     private void SaveEdit()
     {
+        ShowEditErrors(true);
+        if (EditTextError is not null)
+        {
+            return;
+        }
+
         _session.EditJournalEntry(EditingEntry!.Id, EditText); // Changed → Sync() renders it
         EditingEntry = null;
         EditText = string.Empty;
+        ShowEditErrors(false);
         _onChanged();
     }
 
@@ -217,6 +266,13 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     {
         EditingEntry = null;
         EditText = string.Empty;
+        ShowEditErrors(false);
+    }
+
+    private void ShowEditErrors(bool shown)
+    {
+        _editErrorsShown = shown;
+        OnPropertyChanged(nameof(EditTextError));
     }
 
     // --- View an edited entry's history: available whenever WasEdited, independent of IsReadOnly

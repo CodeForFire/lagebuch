@@ -164,8 +164,14 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
 
     partial void OnShowAllRolesChanged(bool value) => ApplyFilter();
 
+    // The dock and the handover panel below the grid are two separate forms, so each keeps its own
+    // "the operator has asked" state: pressing one must not light up a field in the other (#412).
+    private bool _addErrorsShown;
+
+    private bool _transferErrorsShown;
+
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddRoleCommand))]
+    [NotifyPropertyChangedFor(nameof(NewRoleError))]
     [NotifyPropertyChangedFor(nameof(IsNewRoleUnknown))]
     private string _newRole = string.Empty;
 
@@ -178,7 +184,7 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     public bool IsNewRoleUnknown => StammdatenCatalogue.IsUnknown(NewRole, RoleOptions);
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddRoleCommand))]
+    [NotifyPropertyChangedFor(nameof(NewPersonNameError))]
     private string _newPersonName = string.Empty;
 
     [ObservableProperty]
@@ -193,12 +199,26 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     partial void OnNewPersonNameChanged(string value) =>
         PrefillFromRoster(value, () => NewPhone, v => NewPhone = v, () => NewCallSign, v => NewCallSign = v);
 
-    private bool CanAddRole =>
-        !IsReadOnly && !string.IsNullOrWhiteSpace(NewRole) && !string.IsNullOrWhiteSpace(NewPersonName);
+    /// <summary>Whether the Funktion is still missing, once the operator has asked (#412).</summary>
+    public string? NewRoleError =>
+        _addErrorsShown && string.IsNullOrWhiteSpace(NewRole) ? ValidationMessages.Required : null;
+
+    /// <summary>Whether the Name is still missing, once the operator has asked (#412).</summary>
+    public string? NewPersonNameError =>
+        _addErrorsShown && string.IsNullOrWhiteSpace(NewPersonName) ? ValidationMessages.Required : null;
+
+    // Only the read-only rule gates the button; the empty fields answer on the press (#412). Note
+    // this is separate from IsNewRoleUnknown, which never blocked anything and still does not.
+    private bool CanAddRole => !IsReadOnly;
 
     [RelayCommand(CanExecute = nameof(CanAddRole))]
     private void AddRole()
     {
+        if (!ValidateAdd())
+        {
+            return;
+        }
+
         // Von is stamped rather than typed: an assignment is recorded at the moment it happens,
         // and every other time in this application comes from the injected clock the same way.
         //
@@ -218,7 +238,21 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
         NewSection = null;
         NewCallSign = null;
         NewPhone = null;
+        ShowAddErrors(false); // the cleared fields must not read as a fresh complaint
         _onChanged();
+    }
+
+    private bool ValidateAdd()
+    {
+        ShowAddErrors(true);
+        return NewRoleError is null && NewPersonNameError is null;
+    }
+
+    private void ShowAddErrors(bool shown)
+    {
+        _addErrorsShown = shown;
+        OnPropertyChanged(nameof(NewRoleError));
+        OnPropertyChanged(nameof(NewPersonNameError));
     }
 
     // --- Rolle übertragen: a small panel below the grid, mirroring EtbViewModel's edit panel
@@ -233,7 +267,7 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     public bool IsTransferring => TransferringRow is not null;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmTransferCommand))]
+    [NotifyPropertyChangedFor(nameof(TransferPersonNameError))]
     private string _transferPersonName = string.Empty;
 
     [ObservableProperty]
@@ -251,20 +285,45 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
         TransferPersonName = string.Empty;
         TransferCallSign = null;
         TransferPhone = null;
+        ShowTransferErrors(false); // a freshly opened panel starts quiet
     }
 
-    private bool CanConfirmTransfer => IsTransferring && !string.IsNullOrWhiteSpace(TransferPersonName);
+    /// <summary>Whether the successor's name is still missing, once asked (#412).</summary>
+    public string? TransferPersonNameError =>
+        _transferErrorsShown && string.IsNullOrWhiteSpace(TransferPersonName)
+            ? ValidationMessages.Required
+            : null;
+
+    // IsTransferring stays: with no panel open there is no field to name.
+    private bool CanConfirmTransfer => IsTransferring;
 
     [RelayCommand(CanExecute = nameof(CanConfirmTransfer))]
     private void ConfirmTransfer()
     {
+        ShowTransferErrors(true);
+        if (TransferPersonNameError is not null)
+        {
+            return;
+        }
+
         _session.TransferRole(TransferringRow!.Id, TransferPersonName, TransferCallSign, TransferPhone); // Changed → RefreshRoles
         TransferringRow = null;
+        ShowTransferErrors(false);
         _onChanged();
     }
 
     [RelayCommand]
-    private void CancelTransfer() => TransferringRow = null;
+    private void CancelTransfer()
+    {
+        TransferringRow = null;
+        ShowTransferErrors(false);
+    }
+
+    private void ShowTransferErrors(bool shown)
+    {
+        _transferErrorsShown = shown;
+        OnPropertyChanged(nameof(TransferPersonNameError));
+    }
 
     /// <summary>
     /// Fills in what the roster knows about the person just picked, shared by the new-assignment

@@ -53,7 +53,27 @@ public class EtbViewModelTests
             Array.Empty<(string, bool)>());
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "  " };
 
-        Assert.False(vm.AddEntryCommand.CanExecute(null));
+        Assert.True(vm.AddEntryCommand.CanExecute(null)); // the press is the question (#412)
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.NewTextError);
+        Assert.Single(session.Incident.Journal); // only the automatic "Einsatz begonnen" entry
+
+        vm.NewText = "Lagemeldung";
+        Assert.Null(vm.NewTextError); // fixed as it is typed, without a second press
+    }
+
+    [Fact]
+    public void An_added_entry_leaves_the_dock_quiet_for_the_next_one()
+    {
+        var vm = NewVm();
+        vm.AddEntryCommand.Execute(null); // provokes the message
+        vm.NewText = "Lagemeldung";
+
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.Equal(string.Empty, vm.NewText);
+        Assert.Null(vm.NewTextError);
     }
 
     [Fact]
@@ -284,7 +304,7 @@ public class EtbViewModelTests
     }
 
     [Fact]
-    public void SaveEdit_is_disabled_when_edit_text_is_blank()
+    public void SaveEdit_names_the_emptied_entry_rather_than_going_grey()
     {
         var vm = NewVm();
         vm.NewText = "Lagemeldung";
@@ -292,7 +312,22 @@ public class EtbViewModelTests
         vm.Entries[0].BeginEditCommand.Execute(null);
 
         vm.EditText = "   ";
+        Assert.True(vm.SaveEditCommand.CanExecute(null));
+        vm.SaveEditCommand.Execute(null);
 
+        Assert.Equal(ValidationMessages.Required, vm.EditTextError);
+        Assert.True(vm.IsEditing); // the panel stays open on the emptied field
+        Assert.Null(vm.NewTextError); // the dock above it is a different form and stays quiet
+    }
+
+    [Fact]
+    public void SaveEdit_is_still_impossible_with_no_entry_being_edited()
+    {
+        var vm = NewVm();
+
+        // Not an input rule: with no panel open there is no field to name, so the command stays
+        // genuinely unavailable rather than becoming a press that explains itself.
+        Assert.False(vm.IsEditing);
         Assert.False(vm.SaveEditCommand.CanExecute(null));
     }
 

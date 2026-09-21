@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.TasksView"
              x:DataType="vm:TasksViewModel">
   <UserControl.Styles>
@@ -65,7 +66,7 @@
                            FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                            Text="{Binding NewAssignee}" b:EnterSubmit.Command="{Binding AddTaskCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="TIMER (MIN)">
+        <HeaderedContentControl Classes="field" Header="TIMER (MIN)" ctrl:Field.Error="{Binding NewTimerMinutesError}">
           <TextBox Width="70" Text="{Binding NewTimerMinutes}" b:IntegerOnly.IsEnabled="True"
                    PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}">
             <TextBox.KeyBindings>
@@ -73,7 +74,7 @@
             </TextBox.KeyBindings>
           </TextBox>
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="AUFGABE">
+        <HeaderedContentControl Classes="field" Header="AUFGABE" ctrl:Field.Error="{Binding NewTextError}">
           <!-- Freitext: kein Platzhalter, siehe #137 -->
           <TextBox x:Name="TaskNewTextBox" Width="320" Text="{Binding NewText}">
             <TextBox.KeyBindings>

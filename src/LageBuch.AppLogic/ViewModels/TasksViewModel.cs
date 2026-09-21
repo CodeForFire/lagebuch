@@ -153,8 +153,12 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     };
 
     // --- Input dock ---
+
+    // Quiet until the first press: a tab that opens already scolding teaches nothing.
+    private bool _errorsShown;
+
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
+    [NotifyPropertyChangedFor(nameof(NewTextError))]
     private string _newText = string.Empty;
 
     [ObservableProperty]
@@ -167,7 +171,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     private TaskUrgency _newUrgency = TaskUrgency.Medium;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
+    [NotifyPropertyChangedFor(nameof(NewTimerMinutesError))]
     private int? _newTimerMinutes = IncidentTask.DefaultTimerMinutes(TaskUrgency.Medium);
 
     // The minutes field follows the urgency's default; an explicit override survives until the
@@ -175,15 +179,43 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     partial void OnNewUrgencyChanged(TaskUrgency value) =>
         NewTimerMinutes = IncidentTask.DefaultTimerMinutes(value);
 
-    private bool CanAddTask =>
-        !IsReadOnly && !string.IsNullOrWhiteSpace(NewText) && NewTimerMinutes is >= 0;
+    /// <summary>Whether the Aufgabe is still missing, once the operator has asked (#412).</summary>
+    public string? NewTextError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewText) ? ValidationMessages.Required : null;
+
+    /// <summary>Whether the timer box is empty or negative, once the operator has asked (#412).</summary>
+    public string? NewTimerMinutesError =>
+        _errorsShown && NewTimerMinutes is not >= 0 ? ValidationMessages.TimerMinutes : null;
+
+    // Only the read-only rule gates the button; a missing field leaves it live and answers on the
+    // press instead, because a grey button names nothing (#412).
+    private bool CanAddTask => !IsReadOnly;
 
     [RelayCommand(CanExecute = nameof(CanAddTask))]
     private void AddTask()
     {
+        if (!Validate())
+        {
+            return;
+        }
+
         _session.AddTask(NewText, NewAssignee, NewImportance, NewUrgency, NewTimerMinutes!.Value);
         NewText = string.Empty; // priorities stay sticky for rapid follow-up entries
+        ShowErrors(false); // ...and the cleared text must not read as a fresh complaint
         _onChanged();
+    }
+
+    private bool Validate()
+    {
+        ShowErrors(true);
+        return NewTextError is null && NewTimerMinutesError is null;
+    }
+
+    private void ShowErrors(bool shown)
+    {
+        _errorsShown = shown;
+        OnPropertyChanged(nameof(NewTextError));
+        OnPropertyChanged(nameof(NewTimerMinutesError));
     }
 
     // --- Live countdown + one-shot due alarm ---

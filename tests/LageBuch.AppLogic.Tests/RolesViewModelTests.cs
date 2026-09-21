@@ -65,12 +65,60 @@ public class RolesViewModelTests
     }
 
     [Fact]
-    public void AddRole_disabled_when_role_or_person_blank()
+    public void AddRole_names_the_blank_person_and_leaves_the_filled_Funktion_alone()
     {
         var vm = NewVm(new FixedClock(T0), Md());
         vm.NewRole = "EL";
         vm.NewPersonName = string.Empty;
-        Assert.False(vm.AddRoleCommand.CanExecute(null));
+
+        Assert.True(vm.AddRoleCommand.CanExecute(null)); // the press is the question (#412)
+        vm.AddRoleCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.NewPersonNameError);
+        Assert.Null(vm.NewRoleError); // only the offending field is named
+        Assert.Empty(vm.Roles);
+
+        vm.NewPersonName = "Müller";
+        Assert.Null(vm.NewPersonNameError);
+    }
+
+    [Fact]
+    public void ConfirmTransfer_names_the_blank_successor_and_keeps_the_panel_open()
+    {
+        var vm = NewVm(new FixedClock(T0), Md());
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        Assert.Single(vm.Roles).BeginTransferCommand.Execute(null);
+
+        Assert.True(vm.ConfirmTransferCommand.CanExecute(null));
+        vm.ConfirmTransferCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.TransferPersonNameError);
+        Assert.True(vm.IsTransferring); // the handover panel stays open on the unfilled name
+        Assert.Null(vm.NewPersonNameError); // the dock above it is a different form
+    }
+
+    [Fact]
+    public void ConfirmTransfer_is_still_impossible_with_no_handover_running()
+    {
+        var vm = NewVm(new FixedClock(T0), Md());
+
+        // A state gate, not an input one: with no panel open there is no field to name.
+        Assert.False(vm.IsTransferring);
+        Assert.False(vm.ConfirmTransferCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void AddRole_names_a_blank_Funktion_too()
+    {
+        var vm = NewVm(new FixedClock(T0), Md());
+        vm.NewPersonName = "Müller";
+
+        vm.AddRoleCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.NewRoleError);
+        Assert.Empty(vm.Roles);
     }
 
     [Fact]

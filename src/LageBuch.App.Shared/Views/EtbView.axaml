@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              xmlns:etb="clr-namespace:LageBuch.Domain.Etb;assembly=LageBuch.Domain"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.EtbView"
@@ -46,7 +47,7 @@
                            FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                            Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="EINTRAG">
+        <HeaderedContentControl Classes="field" Header="EINTRAG" ctrl:Field.Error="{Binding NewTextError}">
           <!-- Freitext: kein Platzhalter, siehe #137 -->
           <TextBox x:Name="EtbTextBox" Width="320" Text="{Binding NewText}">
             <TextBox.KeyBindings>
@@ -69,7 +70,7 @@
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}">
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <HeaderedContentControl Classes="field" Header="EINTRAG">
+        <HeaderedContentControl Classes="field" Header="EINTRAG" ctrl:Field.Error="{Binding EditTextError}">
           <!-- Freitext: kein Platzhalter, siehe #137 -->
           <TextBox x:Name="EditTextBox" Width="420" Text="{Binding EditText}">
             <TextBox.KeyBindings>
