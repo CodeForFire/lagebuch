@@ -80,8 +80,14 @@
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsTransferring}">
       <StackPanel Spacing="10">
+        <!-- No Foreground here (#413): "mono" already paints TextSecondary, and the inline
+             override this line used to carry pushed it down to TextMuted. Muted is a
+             semi-transparent token (#65728580, ~40% alpha) meant for disabled text; over the
+             panel's #0F141D it composites to roughly 1,9:1 against WCAG AA's 4,5:1 — on the one
+             line that says which Funktion is being handed to whom. The arrow beside it takes
+             TextSecondary explicitly, since PathIcon is not covered by the "mono" style. -->
         <StackPanel Orientation="Horizontal" Spacing="6">
-          <TextBlock x:Name="TransferSummaryText" Classes="mono" Foreground="{StaticResource TextMutedBrush}">
+          <TextBlock x:Name="TransferSummaryText" Classes="mono">
             <TextBlock.Text>
               <MultiBinding StringFormat="Übergabe {0}: {1}">
                 <Binding Path="TransferringRow.Role" />
@@ -90,7 +96,7 @@
             </TextBlock.Text>
           </TextBlock>
           <PathIcon x:Name="TransferArrowIcon" Width="11" Height="11" VerticalAlignment="Center"
-                    Foreground="{StaticResource TextMutedBrush}"
+                    Foreground="{StaticResource TextSecondaryBrush}"
                     Data="M16.01 11H4v2h12.01v3L20 12l-3.99-4z" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8">
