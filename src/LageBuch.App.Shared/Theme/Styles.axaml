@@ -125,6 +125,34 @@
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
+  <!-- Bar button: a whole header banner made tappable (#422), keeping the banner's own colours.
+       The default button sets a fixed ControlHeight and a 16px side padding, neither of which
+       suits a full-width bar, and any background of its own would cover the banner behind it.
+       Each instance therefore brings the padding the Border used to carry. The hover tint is a
+       white wash rather than a fixed colour, so it reads on the amber Druckabfrage bar and on the
+       red Rückzugsalarm banner alike. -->
+  <Style Selector="Button.bar">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Height" Value="NaN" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.bar:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#26FFFFFF" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.bar:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#3DFFFFFF" />
+  </Style>
+  <!-- The default button's press shrinks itself by 3%, which on a full-width banner reads as the
+       whole header twitching. The background wash above is the press feedback here. -->
+  <Style Selector="Button.bar:pressed">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+
   <!-- Icon-only button: compact square, ghost background. Used for row actions (e.g. the ETB
        grid) where a labelled button would not fit. Give each instance a ToolTip.Tip, since the
        icon alone carries no text. -->
@@ -501,8 +529,13 @@
     <Setter Property="Fill" Value="#14202B" />
     <Setter Property="Opacity" Value="1" />
   </Style>
+  <!-- #422: selection is an answer to a question now ("which Trupp is the banner talking about?"),
+       not just a hover that stuck. The old #1C2A38 was a shade off the hover tint and all but
+       invisible on the grid's #0C1119 — two rows apart, nobody could say which one was picked.
+       Neutral blue-grey on purpose: the status column carries amber and red, and a highlight in
+       either would read as a state the Trupp is in. -->
   <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
-    <Setter Property="Fill" Value="#1C2A38" />
+    <Setter Property="Fill" Value="#2C4257" />
     <Setter Property="Opacity" Value="1" />
   </Style>
 

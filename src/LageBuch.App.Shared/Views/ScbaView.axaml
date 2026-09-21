@@ -122,7 +122,10 @@
       <!-- Rows size to their content here, unlike the other grids. A Trupp is two people, or three
            where its Trupp-Typ calls for it, each on its own line, so the shared 40px RowHeight from
            Styles.axaml would clip the last crew member. -->
-      <DataGrid ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
+      <!-- x:Name + SelectedItem: a jump from the header's Atemschutz bars selects the Trupp in the
+           view model and the code-behind scrolls this grid to it (#422). -->
+      <DataGrid x:Name="TruppGrid" ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
+                SelectedItem="{Binding SelectedTrupp}"
                 RowHeight="NaN">
         <DataGrid.Columns>
           <!-- Ten columns needed ~1460px and overflowed on a normal window, so related values are
