@@ -565,6 +565,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetApartmentCount(Guid buildingId, int floorOrdinal, int count) =>
         Send(new SetApartmentCountCommand(Op(), buildingId, floorOrdinal, count));
 
+    public void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers) =>
+        Send(new RemoveDwellingsCommand(Op(), buildingId, floorOrdinal, apartmentNumbers));
+
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 
     // Fire-and-forget: the command is POSTed; the host's broadcast (or a rejection the host swallows)

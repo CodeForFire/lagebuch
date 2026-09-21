@@ -172,6 +172,9 @@ public static class CommandApplier
             case SetApartmentCountCommand c:
                 incident.SetApartmentCount(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.Count);
                 break;
+            case RemoveDwellingsCommand c:
+                incident.RemoveDwellings(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumbers);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(command),

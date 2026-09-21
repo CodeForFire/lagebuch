@@ -331,6 +331,103 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
     }
 }
 
+/// <summary>One Wohnung in the removal picker, with what it is carrying spelled out (#419) — the
+/// crew decides which units go by reading this, so "leer" has to be visibly different from a unit
+/// holding a Messwert.</summary>
+public sealed partial class ApartmentRemovalRowViewModel : ObservableObject
+{
+    private readonly Action _onSelectionChanged;
+
+    public ApartmentRemovalRowViewModel(
+        int apartmentNumber, string label, string contents, bool carriesData, bool isSelected, Action onSelectionChanged)
+    {
+        ApartmentNumber = apartmentNumber;
+        Label = label;
+        Contents = contents;
+        CarriesData = carriesData;
+        _isSelected = isSelected;
+        _onSelectionChanged = onSelectionChanged;
+    }
+
+    public int ApartmentNumber { get; }
+
+    public string Label { get; }
+
+    /// <summary>"120 ppm · Bewohner erfasst", or "leer" for a Wohnung nobody has touched.</summary>
+    public string Contents { get; }
+
+    /// <summary>Drives the warning colour: ticking an empty Wohnung costs nothing, ticking this
+    /// one throws away recorded work.</summary>
+    public bool CarriesData { get; }
+
+    [ObservableProperty]
+    private bool _isSelected;
+
+    partial void OnIsSelectedChanged(bool value)
+    {
+        _ = value;
+        _onSelectionChanged();
+    }
+}
+
+/// <summary>The pending "which Wohnungen go?" question (#419), raised when shrinking a floor would
+/// destroy something a crew recorded. Nothing here has reached the session: until ENTFERNEN is
+/// pressed the floor is exactly as it was, which is what makes ABBRECHEN free.</summary>
+public sealed partial class ApartmentRemovalViewModel : ObservableObject
+{
+    public ApartmentRemovalViewModel(
+        Guid buildingId,
+        int floorOrdinal,
+        string floorLabel,
+        int committedCount,
+        int targetCount,
+        IReadOnlyList<ApartmentRemovalRowViewModel> rows)
+    {
+        BuildingId = buildingId;
+        FloorOrdinal = floorOrdinal;
+        FloorLabel = floorLabel;
+        CommittedCount = committedCount;
+        TargetCount = targetCount;
+        Rows = rows;
+    }
+
+    public Guid BuildingId { get; }
+
+    public int FloorOrdinal { get; }
+
+    public string FloorLabel { get; }
+
+    /// <summary>What the floor holds right now — the count ABBRECHEN returns the spinner to.</summary>
+    public int CommittedCount { get; }
+
+    /// <summary>What the crew typed. The picker resolves *which* units go, never how many.</summary>
+    public int TargetCount { get; }
+
+    public IReadOnlyList<ApartmentRemovalRowViewModel> Rows { get; }
+
+    public int RequiredCount => CommittedCount - TargetCount;
+
+    public int SelectedCount => Rows.Count(r => r.IsSelected);
+
+    public string Header => $"{FloorLabel} · {CommittedCount} → {TargetCount} WOHNUNGEN";
+
+    public string SelectionLabel => $"{SelectedCount} von {RequiredCount} ausgewählt";
+
+    /// <summary>Exactly as many as the typed count implies: confirming with fewer would leave the
+    /// floor at a number nobody asked for.</summary>
+    public bool CanConfirm => SelectedCount == RequiredCount;
+
+    public IReadOnlyList<int> SelectedApartmentNumbers =>
+        Rows.Where(r => r.IsSelected).Select(r => r.ApartmentNumber).ToList();
+
+    public void NotifySelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(SelectionLabel));
+        OnPropertyChanged(nameof(CanConfirm));
+    }
+}
+
 public sealed partial class FloorRowViewModel : ObservableObject
 {
     private readonly Action<int, int> _onApartmentCountChanged;
@@ -439,6 +536,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     public bool IsEditorOpen => Editor is not null;
 
+    /// <summary>The open "which Wohnungen go?" question, or null when none is pending (#419).
+    /// Like <see cref="Editor"/>, nothing it holds has reached the session.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsApartmentRemovalOpen))]
+    private ApartmentRemovalViewModel? _pendingApartmentRemoval;
+
+    public bool IsApartmentRemovalOpen => PendingApartmentRemoval is not null;
+
     /// <summary>Structure editing (each floor's Wohnungen count) is a setup job done once when the
     /// building is first described; measuring is what the view is for the rest of the incident.
     /// Keeping the count spinners permanently in the grid puts an edit control between the crew and
@@ -508,12 +613,22 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         {
             Filter = CoUnitFilter.All;
         }
+        else
+        {
+            // The spinner that raised the question is gone with the structure toolbar (#419).
+            PendingApartmentRemoval = null;
+        }
 
         BuildMatrix();
     }
 
     private void Refresh()
     {
+        // Any committed change — this device's or one pushed from a joined device — can move the
+        // floor the pending question was asked about, and a picker listing Wohnungen that have
+        // since shifted is worse than no picker at all. Drop it and let the crew re-type (#419).
+        PendingApartmentRemoval = null;
+
         // Capture the selection BEFORE clearing BuildingOptions: the "HAUS" ComboBox is two-way
         // bound to SelectedBuilding (SelectedItem="{Binding SelectedBuilding}") with BuildingOptions
         // as its ItemsSource. Clearing an ObservableCollection fires a Reset, and Avalonia's Selector
@@ -548,6 +663,9 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         // A pending edit belongs to a unit in the Haus being left; carrying it across would leave
         // the sidebar editing a tile that is no longer on screen. Switching discards, like ABBRECHEN.
         Editor = null;
+
+        // Same for a pending removal, which names a floor of the Haus being left (#419).
+        PendingApartmentRemoval = null;
         BuildMatrix();
         OnPropertyChanged(nameof(CanRemoveBuilding));
         AddUntergeschossCommand.NotifyCanExecuteChanged();
@@ -684,6 +802,9 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         OnPropertyChanged(nameof(OpenBarWidth));
     }
 
+    /// <summary>The floor spinner changed. Growing, or shrinking past Wohnungen nobody has touched,
+    /// commits straight through as before; a shrink that would destroy recorded work stops here and
+    /// asks which units go (#419).</summary>
     private void OnApartmentCountChanged(int floorOrdinal, int count)
     {
         if (SelectedBuilding is null)
@@ -691,8 +812,158 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
             return;
         }
 
-        _session.SetApartmentCount(SelectedBuilding.Id, floorOrdinal, count);
+        var building = SelectedBuilding;
+        var committed = building.ApartmentsFor(floorOrdinal);
+
+        // Typed back to where it started -- the crew's own way out of a half-made change.
+        if (count == committed)
+        {
+            PendingApartmentRemoval = null;
+            return;
+        }
+
+        var onFloor = _session.Incident.Dwellings
+            .Where(d => d.BuildingId == building.Id && d.FloorOrdinal == floorOrdinal)
+            .OrderBy(d => d.ApartmentNumber)
+            .ToList();
+
+        // A Wohnung is worth asking about if it carries anything a crew put there -- including a
+        // Bezeichnung, which lives on the Building rather than the Dwelling. Checking only
+        // Dwelling.HasData would let a floor of named shops ("Kiosk", "Bäckerei") be trimmed away
+        // without a word, which is the very failure this exists to stop.
+        bool CarriesAnything(Dwelling d) =>
+            d.HasData || building.HasApartmentLabel(floorOrdinal, d.ApartmentNumber);
+
+        var doomedByTruncation = onFloor.Skip(count).ToList();
+        if (count > committed || !doomedByTruncation.Exists(CarriesAnything))
+        {
+            PendingApartmentRemoval = null;
+            _session.SetApartmentCount(building.Id, floorOrdinal, count);
+            _onChanged();
+            Refresh();
+            return;
+        }
+
+        // The spinner fires per keystroke, so "14" -> "1" -> "12" lands here three times. Rebuild
+        // the question for the newest number, but leave an identical one alone so a repeat
+        // notification doesn't wipe the ticks the crew has already made.
+        if (PendingApartmentRemoval is { } pending
+            && pending.FloorOrdinal == floorOrdinal
+            && pending.TargetCount == count
+            && pending.BuildingId == building.Id)
+        {
+            return;
+        }
+
+        PendingApartmentRemoval = BuildApartmentRemoval(building, floorOrdinal, count, committed, onFloor, CarriesAnything);
+    }
+
+    /// <summary>Seeds the picker: empty Wohnungen from the right first, then the rightmost units
+    /// that do carry something, so the default selection is the least destructive one that still
+    /// reaches the count the crew typed.</summary>
+    private static ApartmentRemovalViewModel BuildApartmentRemoval(
+        Building building,
+        int floorOrdinal,
+        int count,
+        int committed,
+        IReadOnlyList<Dwelling> onFloor,
+        Func<Dwelling, bool> carriesAnything)
+    {
+        var required = committed - count;
+        var preselected = onFloor
+            .Where(d => !carriesAnything(d))
+            .OrderByDescending(d => d.ApartmentNumber)
+            .Concat(onFloor.Where(carriesAnything).OrderByDescending(d => d.ApartmentNumber))
+            .Take(required)
+            .Select(d => d.ApartmentNumber)
+            .ToHashSet();
+
+        ApartmentRemovalViewModel? built = null;
+        var rows = onFloor
+            .Select(d => new ApartmentRemovalRowViewModel(
+                d.ApartmentNumber,
+                CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber),
+                DescribeContents(d),
+                carriesAnything(d),
+                preselected.Contains(d.ApartmentNumber),
+                () => built?.NotifySelectionChanged()))
+            .ToList();
+
+        built = new ApartmentRemovalViewModel(
+            building.Id,
+            floorOrdinal,
+            CoMeasurementLabels.FloorLabel(floorOrdinal),
+            committed,
+            count,
+            rows);
+        return built;
+    }
+
+    private static string DescribeContents(Dwelling dwelling)
+    {
+        var parts = new List<string>();
+        if (dwelling.CoValue is { } ppm)
+        {
+            parts.Add($"{ppm} ppm");
+        }
+        else if (dwelling.Readings.Count > 0)
+        {
+            parts.Add("Messreihe");
+        }
+
+        if (dwelling.ResidentName is { } resident)
+        {
+            parts.Add(resident);
+        }
+
+        if (dwelling.Status == DwellingStatus.Searched)
+        {
+            parts.Add("durchsucht");
+        }
+        else if (dwelling.Status == DwellingStatus.Affected)
+        {
+            parts.Add("betroffen");
+        }
+
+        if (dwelling.KeyAvailable is true)
+        {
+            parts.Add("Schlüssel vorhanden");
+        }
+
+        return parts.Count > 0 ? string.Join(" · ", parts) : "leer";
+    }
+
+    [RelayCommand]
+    private void ConfirmApartmentRemoval()
+    {
+        if (PendingApartmentRemoval is not { } pending || !pending.CanConfirm)
+        {
+            return;
+        }
+
+        // Everything needed is read off into locals first: the session call below raises Changed,
+        // which runs Refresh and tears down MatrixRows and this very view model underneath us.
+        var buildingId = pending.BuildingId;
+        var floorOrdinal = pending.FloorOrdinal;
+        var selected = pending.SelectedApartmentNumbers;
+
+        // The open sidebar addresses its unit by position, so after the renumber below FERTIG would
+        // write to a different Wohnung than the one on screen. Discard it, as switching Haus does.
+        Editor = null;
+        PendingApartmentRemoval = null;
+
+        _session.RemoveDwellings(buildingId, floorOrdinal, selected);
         _onChanged();
+        Refresh();
+    }
+
+    [RelayCommand]
+    private void CancelApartmentRemoval()
+    {
+        PendingApartmentRemoval = null;
+
+        // Rebuilds every FloorRowViewModel from committed state, which seeds the spinner's backing
+        // field directly -- so the typed number snaps back without re-entering this whole path.
         Refresh();
     }
 

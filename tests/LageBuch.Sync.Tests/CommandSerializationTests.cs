@@ -57,6 +57,11 @@ public class CommandSerializationTests
         new AddTaskCommand(Op, "Nachfordern", string.Empty, TaskImportance.Low, TaskUrgency.Low, 30),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), true),
         new SetTaskCompletedCommand(Op, Guid.NewGuid(), false),
+        new AddCoBuildingCommand(Op, "Haus A", 2, 3, 1),
+        new UpdateCoBuildingStructureCommand(Op, Guid.NewGuid(), 3, 4, 1),
+        new SetApartmentCountCommand(Op, Guid.NewGuid(), -1, 14),
+        new RemoveDwellingsCommand(Op, Guid.NewGuid(), 0, new[] { 2, 4 }),
+        new RemoveDwellingsCommand(Op, Guid.NewGuid(), -1, new[] { 7 }),
     }.Select(c => new object[] { c });
 
     [Theory]
@@ -74,6 +79,21 @@ public class CommandSerializationTests
 
         // Re-serialize (records with list members lack structural equality, so compare the wire form).
         Assert.Equal(json, SyncJson.Serialize(back));
+    }
+
+    // The discriminator is a wire contract between joined devices, and this one carries a list --
+    // the first command to do so on the CO side (#419).
+    [Fact]
+    public void RemoveDwellings_discriminator_and_its_list_survive_the_wire()
+    {
+        var buildingId = Guid.NewGuid();
+        var json = SyncJson.Serialize<SyncCommand>(new RemoveDwellingsCommand(Op, buildingId, -1, new[] { 2, 4 }));
+        Assert.Contains("\"$type\":\"removeDwellings\"", json, StringComparison.Ordinal);
+
+        var back = Assert.IsType<RemoveDwellingsCommand>(SyncJson.Deserialize<SyncCommand>(json));
+        Assert.Equal(buildingId, back.BuildingId);
+        Assert.Equal(-1, back.FloorOrdinal);
+        Assert.Equal(new[] { 2, 4 }, back.ApartmentNumbers);
     }
 
     [Fact]

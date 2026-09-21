@@ -168,4 +168,8 @@ public interface IIncidentSession
     void SetApartmentLabel(Guid buildingId, int floorOrdinal, int apartmentNumber, string? label);
 
     void SetApartmentCount(Guid buildingId, int floorOrdinal, int count);
+
+    /// <summary>Removes the named Wohnungen from one floor, closing the gap behind them
+    /// (#419) -- the pick-which counterpart to <see cref="SetApartmentCount"/>.</summary>
+    void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers);
 }
