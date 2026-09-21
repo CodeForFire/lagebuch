@@ -223,7 +223,7 @@
                            Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
                 <TextBlock x:Name="ScbaControlText" Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
                            Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-                <Border Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
+                <Border x:Name="ScbaControlDuePill" Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
                         Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E"
                         IsVisible="{Binding IsAnyControlDue}">
                   <TextBlock Text="DRUCKABFRAGE!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
@@ -246,14 +246,21 @@
                       VerticalAlignment="Center"
                       Command="{Binding ShowAlarmingTruppCommand}"
                       ToolTip.Tip="Zum Trupp im Reiter ATEMSCHUTZ springen">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                  <PathIcon Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"
+              <!-- A Grid, not a StackPanel: a StackPanel measures its children with infinite width,
+                   so since the banner gained the Funkrufname (#417) the text simply ran past the
+                   button and was cut off mid-word on a narrow window - at 900px it overshot by
+                   65px, losing the alarm reason without a mark to say so. The star column bounds
+                   it, and because the Funkrufname leads, what the ellipsis eats is the Trupp-Typ
+                   and the reason, never the name of the crew being called back. -->
+                <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                  <PathIcon Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"
                             Foreground="#FFFFFF"
                             Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                  <TextBlock Text="{Binding AlarmDisplay}"
+                  <TextBlock Grid.Column="1" x:Name="ScbaAlarmText" Text="{Binding AlarmDisplay}"
                              FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
-                             LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center" />
-                </StackPanel>
+                             LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" />
+                </Grid>
               </Button>
               <Button Grid.Column="1" x:Name="ScbaAlarmAckButton" Content="ALARM QUITTIEREN"
                       Command="{Binding AcknowledgeAlarmCommand}"

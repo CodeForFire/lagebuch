@@ -50,12 +50,14 @@ public class ScbaViewModelTests
         string designation = "Angriffstrupp",
         string truppfuehrer = "Müller",
         string truppmann = "Schmidt",
-        string? zweiterTruppmann = null)
+        string? zweiterTruppmann = null,
+        string? callSign = null)
     {
         vm.NewDesignation = designation;
         vm.NewTruppfuehrer = truppfuehrer;
         vm.NewTruppmann = truppmann;
         vm.NewZweiterTruppmann = zweiterTruppmann ?? string.Empty;
+        vm.NewCallSign = callSign ?? string.Empty;
         vm.AddTruppCommand.Execute(null);
         return vm.Trupps[^1];
     }
@@ -173,6 +175,50 @@ public class ScbaViewModelTests
         Assert.True(vm.HasControlReminder);
         Assert.False(vm.IsAnyControlDue);
         Assert.Contains("Nächste Druckabfrage", vm.NextControlDisplay, StringComparison.Ordinal);
+    }
+
+    // #417: "Fahrzeug fehlt in der Beschreibung des Trupps - man kann sonst nicht erkennen welcher
+    // Trupp da gerade gerufen werden soll." The banner is visible from every tab and names only the
+    // most urgent Trupp, so the Funkrufname leads: it is the part that tells two crews apart.
+    [Fact]
+    public void Header_reminder_leads_with_the_funkrufname()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var session = NewSession(clock);
+        var vm = Vm(clock, session, ticker: ticker);
+        vm.NewControlIntervalMinutes = 5;
+        var row = Register(vm, callSign: "Florian Musterstadt 40/1");
+        row.StartCommand.Execute(null);
+
+        Assert.Equal(
+            "Nächste Druckabfrage: Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp) in "
+            + row.ControlRemainingDisplay,
+            vm.NextControlDisplay);
+
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+
+        Assert.Equal(
+            "Druckabfrage fällig: Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp)",
+            vm.NextControlDisplay);
+    }
+
+    // The Funkrufname is optional, so a brigade that types none still gets the old wording rather
+    // than a dangling separator.
+    [Fact]
+    public void Header_reminder_falls_back_to_the_plain_name_without_a_funkrufname()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        vm.NewControlIntervalMinutes = 5;
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        Assert.Equal(
+            "Nächste Druckabfrage: Trupp 1 (Angriffstrupp) in " + row.ControlRemainingDisplay,
+            vm.NextControlDisplay);
     }
 
     [Fact]
@@ -301,6 +347,31 @@ public class ScbaViewModelTests
         Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay, StringComparison.Ordinal);
         Assert.Contains("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay, StringComparison.Ordinal);
         Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
+    }
+
+    // The case from #417: two vehicles each send a "Trupp 1". The Rückzugsalarm names one of them,
+    // and without the Funkrufname nothing on screen says which crew to call back.
+    [Fact]
+    public void Alarm_banner_leads_with_the_funkrufname()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        var row = Register(vm, callSign: "Florian Musterstadt 40/1");
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+
+        Assert.Equal(
+            "RÜCKZUGSALARM Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp): Einsatzzeit erreicht",
+            vm.AlarmDisplay);
+        Assert.StartsWith(
+            "RÜCKZUGSALARM Florian Musterstadt 40/1",
+            vm.AlarmDisplay,
+            StringComparison.Ordinal);
     }
 
     [Fact]

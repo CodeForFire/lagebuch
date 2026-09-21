@@ -83,6 +83,10 @@ internal static class WorkspaceRenderHelper
         vm.Scba.NewDesignation = "Angriffstrupp";
         vm.Scba.NewTruppfuehrer = AnonymizedExampleData.OperatorSurname;
         vm.Scba.NewTruppmann = AnonymizedExampleData.OperatorSurnameAlt;
+
+        // The banners lead with the Funkrufname (#417), so the fixture has to carry one --
+        // without it every rendered bar falls back to the plain "Trupp N (Typ)".
+        vm.Scba.NewCallSign = "Florian Musterstadt 40/1";
         vm.Scba.AddTruppCommand.Execute(null);
         var row = vm.Scba.Trupps[^1];
         row.StartCommand.Execute(null);

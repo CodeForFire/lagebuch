@@ -66,6 +66,10 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     public string DisplayName => _trupp.DisplayName;
 
+    /// <summary>The name for the header banners, which have no Funkrufname column beside
+    /// them — see <see cref="AtemschutzTrupp.DisplayNameWithCallSign"/>.</summary>
+    public string DisplayNameWithCallSign => _trupp.DisplayNameWithCallSign;
+
     public string Members => _trupp.MembersDisplay;
 
     /// <summary>
@@ -505,9 +509,11 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
                 return "—";
             }
 
+            // The Funkrufname, not the Truppnummer, is what identifies the crew being called:
+            // two vehicles each send a "Trupp 1" (#417).
             return IsAnyControlDue
-                ? $"Druckabfrage fällig: {urgent.DisplayName}"
-                : $"Nächste Druckabfrage: {urgent.DisplayName} in {urgent.ControlRemainingDisplay}";
+                ? $"Druckabfrage fällig: {urgent.DisplayNameWithCallSign}"
+                : $"Nächste Druckabfrage: {urgent.DisplayNameWithCallSign} in {urgent.ControlRemainingDisplay}";
         }
     }
 
@@ -562,7 +568,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
                 return "—";
             }
 
-            var first = $"RÜCKZUGSALARM {trupps[0].DisplayName}: {AlarmReason(trupps[0])}";
+            var first = $"RÜCKZUGSALARM {trupps[0].DisplayNameWithCallSign}: {AlarmReason(trupps[0])}";
             return trupps.Count == 1 ? first : $"{first}  (+{trupps.Count - 1})";
         }
     }
@@ -826,12 +832,16 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
         // Read all three labels before mutating: the mutation raises Changed, which rebuilds every
         // row, and on a joined device the local snapshot is replaced wholesale.
-        var covered = trupp.DisplayName;
+        var covered = trupp.DisplayNameWithCallSign;
         var coveredCallSign = trupp.CallSign;
         var previous = trupp.SafetyTruppId is { } previousId
             ? incident.FindScbaTruppOrDefault(previousId)
             : null;
         var next = safetyTruppId is { } nextId ? incident.FindScbaTruppOrDefault(nextId) : null;
+
+        // Whoever the entry is radioed from: the newly posted Sicherheitstrupp, or the one
+        // being stood down when there is no successor.
+        var origin = next ?? previous;
 
         var text = previous is null
             ? $"Sicherheitstrupp für {covered} festgelegt: {Label(next)}"
@@ -841,10 +851,16 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
         _session.SetScbaSafetyTrupp(truppId, safetyTruppId);
         _session.AddJournalEntry(
-            EtbDirection.System, text, from: (next ?? previous)?.CallSign, to: coveredCallSign);
+            EtbDirection.System, text, from: origin?.CallSign, to: coveredCallSign);
         _onChanged();
 
-        static string Label(AtemschutzTrupp? t) => t?.DisplayName ?? "unbekannt";
+        // The Trupp the line is *from* already has its Funkrufname in the Von column, so it
+        // stays short; every other Trupp named here carries its own (#417). A "gewechselt"
+        // line names three Trupps and there are only two columns, so "bisher ..." would
+        // otherwise be the one crew nothing on the row identifies.
+        string Label(AtemschutzTrupp? t) => t is null
+            ? "unbekannt"
+            : ReferenceEquals(t, origin) ? t.DisplayName : t.DisplayNameWithCallSign;
     }
 
     // Display name/call-sign for the ETB line are read from the current snapshot before mutating
@@ -872,7 +888,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         var uncovered = incident.ScbaTrupps
             .Where(t => t.Id != truppId && t.SafetyTruppId == truppId && !t.IsReturned)
             .OrderBy(t => t.TruppNumber)
-            .Select(t => (t.DisplayName, t.CallSign))
+            .Select(t => (Name: t.DisplayNameWithCallSign, t.CallSign))
             .ToList();
 
         _session.StartScbaTrupp(truppId);
@@ -881,7 +897,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         // point of #399: this is the line the Einsatzbericht is read for afterwards.
         var startText = safety is null
             ? $"{displayName} im Einsatz, ohne Sicherheitstrupp"
-            : $"{displayName} im Einsatz, Sicherheitstrupp: {safety.DisplayName}";
+            : $"{displayName} im Einsatz, Sicherheitstrupp: {safety.DisplayNameWithCallSign}";
         _session.AddJournalEntry(EtbDirection.System, startText, from: callSign, to: null);
 
         foreach (var (uncoveredName, uncoveredCallSign) in uncovered)

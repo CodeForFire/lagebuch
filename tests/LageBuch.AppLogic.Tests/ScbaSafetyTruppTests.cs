@@ -121,33 +121,17 @@ public class ScbaSafetyTruppTests
 
         var entry = session.Incident.Journal.Last();
         Assert.Equal(
-            "Sicherheitstrupp für Trupp 1 (Angriffstrupp) festgelegt: Trupp 2 (Sicherheitstrupp)",
+            "Sicherheitstrupp für FFB 1/40/1 · Trupp 1 (Angriffstrupp) festgelegt: Trupp 2 (Sicherheitstrupp)",
             entry.Text);
         Assert.Equal("FFB 1/44/1", entry.From);
         Assert.Equal("FFB 1/40/1", entry.To);
         Assert.Equal(sicherheit.Id, session.Incident.ScbaTrupps[0].SafetyTruppId);
     }
 
+    // The Funkrufname is optional, so the line has to read the same as it always did when the
+    // brigade did not type one -- no dangling separator, nothing missing (#417).
     [Fact]
-    public void Changing_writes_the_gewechselt_line_naming_both()
-    {
-        var clock = new FixedClock(T0);
-        var session = NewSession(clock);
-        var vm = Vm(clock, session);
-        var angriff = Register(vm, "Angriffstrupp");
-        var first = Register(vm, "Sicherheitstrupp");
-        var relief = Register(vm, "Wassertrupp");
-
-        Assign(vm, angriff.Id, first.Id);
-        Assign(vm, angriff.Id, relief.Id);
-
-        Assert.Equal(
-            "Sicherheitstrupp für Trupp 1 (Angriffstrupp) gewechselt: bisher Trupp 2 (Sicherheitstrupp), jetzt Trupp 3 (Wassertrupp)",
-            session.Incident.Journal.Last().Text);
-    }
-
-    [Fact]
-    public void Clearing_writes_the_aufgehoben_line()
+    public void Lines_keep_their_old_wording_when_no_funkrufname_was_entered()
     {
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
@@ -156,10 +140,51 @@ public class ScbaSafetyTruppTests
         var sicherheit = Register(vm, "Sicherheitstrupp");
 
         Assign(vm, angriff.Id, sicherheit.Id);
-        Assign(vm, angriff.Id, null);
 
         Assert.Equal(
-            "Sicherheitstrupp für Trupp 1 (Angriffstrupp) aufgehoben: bisher Trupp 2 (Sicherheitstrupp)",
+            "Sicherheitstrupp für Trupp 1 (Angriffstrupp) festgelegt: Trupp 2 (Sicherheitstrupp)",
+            session.Incident.Journal.Last().Text);
+    }
+
+    [Fact]
+    public void Changing_writes_the_gewechselt_line_naming_both()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp", "FFB 1/40/1");
+        var first = Register(vm, "Sicherheitstrupp", "FFB 1/44/1");
+        var relief = Register(vm, "Wassertrupp", "FFB 1/42/1");
+
+        Assign(vm, angriff.Id, first.Id);
+        Assign(vm, angriff.Id, relief.Id);
+
+        // Three Trupps on one line but only a Von and an An column: without the Funkrufname in
+        // the text, "bisher" is the one crew the row does not identify (#417).
+        var entry = session.Incident.Journal.Last();
+        Assert.Equal(
+            "Sicherheitstrupp für FFB 1/40/1 · Trupp 1 (Angriffstrupp) gewechselt: "
+            + "bisher FFB 1/44/1 · Trupp 2 (Sicherheitstrupp), jetzt Trupp 3 (Wassertrupp)",
+            entry.Text);
+        Assert.Equal("FFB 1/42/1", entry.From);
+        Assert.Equal("FFB 1/40/1", entry.To);
+    }
+
+    [Fact]
+    public void Clearing_writes_the_aufgehoben_line()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var angriff = Register(vm, "Angriffstrupp", "FFB 1/40/1");
+        var sicherheit = Register(vm, "Sicherheitstrupp", "FFB 1/44/1");
+
+        Assign(vm, angriff.Id, sicherheit.Id);
+        Assign(vm, angriff.Id, null);
+
+        // The stood-down Trupp is who the entry is from, so the Von column already names it.
+        Assert.Equal(
+            "Sicherheitstrupp für FFB 1/40/1 · Trupp 1 (Angriffstrupp) aufgehoben: bisher Trupp 2 (Sicherheitstrupp)",
             session.Incident.Journal.Last().Text);
         Assert.Null(session.Incident.ScbaTrupps[0].SafetyTruppId);
     }
@@ -170,14 +195,16 @@ public class ScbaSafetyTruppTests
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
         var vm = Vm(clock, session);
-        var angriff = Register(vm, "Angriffstrupp");
-        var sicherheit = Register(vm, "Sicherheitstrupp");
+        var angriff = Register(vm, "Angriffstrupp", "FFB 1/40/1");
+        var sicherheit = Register(vm, "Sicherheitstrupp", "FFB 1/44/1");
         Assign(vm, angriff.Id, sicherheit.Id);
 
         Row(vm, angriff.Id).StartCommand.Execute(null);
 
+        // The Sicherheitstrupp is named in neither the Von nor the An column of this line, so
+        // the text is the only place its Funkrufname can appear (#417).
         Assert.Contains(
-            "Trupp 1 (Angriffstrupp) im Einsatz, Sicherheitstrupp: Trupp 2 (Sicherheitstrupp)",
+            "Trupp 1 (Angriffstrupp) im Einsatz, Sicherheitstrupp: FFB 1/44/1 · Trupp 2 (Sicherheitstrupp)",
             Journal(session));
     }
 
@@ -202,9 +229,9 @@ public class ScbaSafetyTruppTests
         var clock = new FixedClock(T0);
         var session = NewSession(clock);
         var vm = Vm(clock, session);
-        var first = Register(vm, "Angriffstrupp");
-        var second = Register(vm, "Wassertrupp");
-        var sicherheit = Register(vm, "Sicherheitstrupp");
+        var first = Register(vm, "Angriffstrupp", "FFB 1/40/1");
+        var second = Register(vm, "Wassertrupp", "FFB 1/42/1");
+        var sicherheit = Register(vm, "Sicherheitstrupp", "FFB 1/44/1");
         Assign(vm, first.Id, sicherheit.Id);
         Assign(vm, second.Id, sicherheit.Id);
         Row(vm, first.Id).StartCommand.Execute(null);
@@ -214,10 +241,12 @@ public class ScbaSafetyTruppTests
 
         var journal = Journal(session);
         Assert.Contains(
-            "Trupp 3 (Sicherheitstrupp) geht selbst unter Atemschutz — Trupp 1 (Angriffstrupp) ist ohne Sicherheitstrupp",
+            "Trupp 3 (Sicherheitstrupp) geht selbst unter Atemschutz — "
+            + "FFB 1/40/1 · Trupp 1 (Angriffstrupp) ist ohne Sicherheitstrupp",
             journal);
         Assert.Contains(
-            "Trupp 3 (Sicherheitstrupp) geht selbst unter Atemschutz — Trupp 2 (Wassertrupp) ist ohne Sicherheitstrupp",
+            "Trupp 3 (Sicherheitstrupp) geht selbst unter Atemschutz — "
+            + "FFB 1/42/1 · Trupp 2 (Wassertrupp) ist ohne Sicherheitstrupp",
             journal);
     }
 
