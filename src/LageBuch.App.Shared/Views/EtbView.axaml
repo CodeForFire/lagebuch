@@ -118,7 +118,13 @@
         <ItemsControl x:Name="HistoryList" ItemsSource="{Binding HistoryEntry.Edits}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="etb:EtbEntryEdit">
-              <TextBlock Classes="mono" Foreground="{StaticResource TextMutedBrush}" Margin="0,2">
+              <!-- No Foreground here (#438): "mono" already paints TextSecondary, and the inline
+                   override these rows used to carry pushed them down to TextMuted — a
+                   semi-transparent token (#65728580, ~40% alpha) meant for disabled text, which
+                   over the panel's #0F141D lands at roughly 1,9:1 against WCAG AA's 4,5:1. These
+                   rows are the audit trail this panel exists for: the previous wording, who
+                   rewrote it and when. Same fix as the Übergabe heading in #436. -->
+              <TextBlock Classes="mono" Margin="0,2">
                 <TextBlock.Text>
                   <MultiBinding StringFormat="{}{0}: „{1}“ ({2})">
                     <Binding Path="EditedAt" />
