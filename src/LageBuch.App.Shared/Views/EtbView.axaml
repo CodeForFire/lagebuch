@@ -19,47 +19,56 @@
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <HeaderedContentControl Classes="field" Header="RICHTUNG">
-          <ComboBox x:Name="DirectionBox" Width="130"
-                    ItemsSource="{Binding DirectionOptions}"
-                    SelectedValue="{Binding NewDirection}"
-                    SelectedValueBinding="{Binding Value}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:EtbDirectionOption">
-                <TextBlock Text="{Binding Label}" />
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-        </HeaderedContentControl>
-        <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
-             a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
-             ComboBox, mirroring ForcesView's Brigade field. -->
-        <HeaderedContentControl Classes="field suggest" Header="VON">
-          <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                           ItemsSource="{Binding CallSignOptions}"
-                           FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                           Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field suggest" Header="AN">
-          <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
-                           ItemsSource="{Binding CallSignOptions}"
-                           FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                           Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
-        </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="EINTRAG" ctrl:Field.Error="{Binding NewTextError}">
-          <!-- Freitext: kein Platzhalter, siehe #137 -->
-          <TextBox x:Name="EtbTextBox" Width="320" Text="{Binding NewText}">
-            <TextBox.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
-            </TextBox.KeyBindings>
-          </TextBox>
-        </HeaderedContentControl>
-        <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        <Button x:Name="EtbAddAndTaskButton" Classes="ghost" Content="HINZUFÜGEN &amp; AUFGABE"
-                Command="{Binding AddEntryAndCreateTaskCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
+      <StackPanel Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <HeaderedContentControl Classes="field" Header="RICHTUNG">
+            <ComboBox x:Name="DirectionBox" Width="130"
+                      ItemsSource="{Binding DirectionOptions}"
+                      SelectedValue="{Binding NewDirection}"
+                      SelectedValueBinding="{Binding Value}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:EtbDirectionOption">
+                  <TextBlock Text="{Binding Label}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </HeaderedContentControl>
+          <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
+               a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
+               ComboBox, mirroring ForcesView's Brigade field. -->
+          <HeaderedContentControl Classes="field suggest" Header="VON">
+            <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field suggest" Header="AN">
+            <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
+                             ItemsSource="{Binding CallSignOptions}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="EINTRAG"
+                                    Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <!-- Freitext: kein Platzhalter, siehe #137 -->
+            <TextBox x:Name="EtbTextBox" Width="320" Text="{Binding NewText}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </HeaderedContentControl>
+          <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+          <Button x:Name="EtbAddAndTaskButton" Classes="ghost" Content="HINZUFÜGEN &amp; AUFGABE"
+                  Command="{Binding AddEntryAndCreateTaskCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        </StackPanel>
+        <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
+             selbst dieses so breit machen wuerde wie ihren Text und den Knopf aus dem
+             Fenster schoebe. Die Felder sagen welche, diese Zeile sagt was. -->
+        <TextBlock x:Name="DockErrorSummary" Classes="field-error"
+                   Text="{Binding ErrorSummary}"
+                   IsVisible="{Binding ErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
     </Border>
 
@@ -69,19 +78,28 @@
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <HeaderedContentControl Classes="field" Header="EINTRAG" ctrl:Field.Error="{Binding EditTextError}">
-          <!-- Freitext: kein Platzhalter, siehe #137 -->
-          <TextBox x:Name="EditTextBox" Width="420" Text="{Binding EditText}">
-            <TextBox.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
-            </TextBox.KeyBindings>
-          </TextBox>
-        </HeaderedContentControl>
-        <Button x:Name="SaveEditButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        <Button x:Name="CancelEditButton" Content="ABBRECHEN" Command="{Binding CancelEditCommand}"
-                VerticalAlignment="Bottom" Margin="0,0,0,1" />
+      <StackPanel Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <HeaderedContentControl Classes="field" Header="EINTRAG"
+                                    Classes.invalid="{Binding EditTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <!-- Freitext: kein Platzhalter, siehe #137 -->
+            <TextBox x:Name="EditTextBox" Width="420" Text="{Binding EditText}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </HeaderedContentControl>
+          <Button x:Name="SaveEditButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+          <Button x:Name="CancelEditButton" Content="ABBRECHEN" Command="{Binding CancelEditCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        </StackPanel>
+        <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
+             selbst dieses so breit machen wuerde wie ihren Text und den Knopf aus dem
+             Fenster schoebe. Die Felder sagen welche, diese Zeile sagt was. -->
+        <TextBlock x:Name="EditErrorSummary" Classes="field-error"
+                   Text="{Binding EditErrorSummary}"
+                   IsVisible="{Binding EditErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
     </Border>
 

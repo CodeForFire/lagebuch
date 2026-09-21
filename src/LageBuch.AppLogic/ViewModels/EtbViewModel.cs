@@ -151,6 +151,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewTextError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newText = string.Empty;
 
     [ObservableProperty]
@@ -163,6 +164,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     private EtbDirection _newDirection = EtbDirection.Incoming;
 
     /// <summary>Whether the Eintrag is still missing, once the operator has asked (#412).</summary>
+    /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? ErrorSummary => ValidationMessages.Summarize(
+        NewTextError);
+
     public string? NewTextError =>
         _addErrorsShown && string.IsNullOrWhiteSpace(NewText) ? ValidationMessages.Required : null;
 
@@ -215,6 +220,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     {
         _addErrorsShown = shown;
         OnPropertyChanged(nameof(NewTextError));
+        OnPropertyChanged(nameof(ErrorSummary));
     }
 
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
@@ -224,6 +230,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EditTextError))]
+    [NotifyPropertyChangedFor(nameof(EditErrorSummary))]
     private string _editText = string.Empty;
 
     public bool IsEditing => EditingEntry is not null;
@@ -239,6 +246,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Whether the edited Eintrag was emptied, once the operator has asked (#412).</summary>
+    /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? EditErrorSummary => ValidationMessages.Summarize(
+        EditTextError);
+
     public string? EditTextError =>
         _editErrorsShown && string.IsNullOrWhiteSpace(EditText) ? ValidationMessages.Required : null;
 
@@ -273,6 +284,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     {
         _editErrorsShown = shown;
         OnPropertyChanged(nameof(EditTextError));
+        OnPropertyChanged(nameof(EditErrorSummary));
     }
 
     // --- View an edited entry's history: available whenever WasEdited, independent of IsReadOnly

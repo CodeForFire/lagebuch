@@ -343,6 +343,25 @@
     <Setter Property="IsVisible" Value="True" />
   </Style>
 
+  <!-- A field the form is waiting on (#412). Set with Classes.invalid from the same error string
+       that feeds the message, so the input says *which* field while the text says what is needed.
+       Costs no layout at all, which is the point: in a dense horizontal dock a message under each
+       field makes that field as wide as its text and pushes the action button out of reach.
+       The BorderBrush transition on the inputs above carries it in, so it reads as the answer to
+       the press rather than as something that was always there. -->
+  <Style Selector="HeaderedContentControl.field.invalid TextBox">
+    <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+  </Style>
+  <Style Selector="HeaderedContentControl.field.invalid ComboBox">
+    <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+  </Style>
+  <Style Selector="HeaderedContentControl.field.invalid AutoCompleteBox TextBox">
+    <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+  </Style>
+  <Style Selector="HeaderedContentControl.field.invalid NumericUpDown">
+    <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+  </Style>
+
   <!-- =========================================================
        CHECKBOX
        ========================================================= -->

@@ -159,6 +159,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewTextError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newText = string.Empty;
 
     [ObservableProperty]
@@ -172,6 +173,7 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewTimerMinutesError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newTimerMinutes = IncidentTask.DefaultTimerMinutes(TaskUrgency.Medium);
 
     // The minutes field follows the urgency's default; an explicit override survives until the
@@ -180,6 +182,10 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         NewTimerMinutes = IncidentTask.DefaultTimerMinutes(value);
 
     /// <summary>Whether the Aufgabe is still missing, once the operator has asked (#412).</summary>
+    /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? ErrorSummary => ValidationMessages.Summarize(
+        NewTextError, NewTimerMinutesError);
+
     public string? NewTextError =>
         _errorsShown && string.IsNullOrWhiteSpace(NewText) ? ValidationMessages.Required : null;
 
@@ -215,7 +221,9 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     {
         _errorsShown = shown;
         OnPropertyChanged(nameof(NewTextError));
+        OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTimerMinutesError));
+        OnPropertyChanged(nameof(ErrorSummary));
     }
 
     // --- Live countdown + one-shot due alarm ---

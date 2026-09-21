@@ -354,7 +354,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewDesignationError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     [NotifyPropertyChangedFor(nameof(NewZweiterTruppmannError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     [NotifyPropertyChangedFor(nameof(RequiresThirdMember))]
     private string _newDesignation = string.Empty;
 
@@ -376,15 +378,18 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewTruppfuehrerError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newTruppfuehrer = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewTruppmannError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newTruppmann = string.Empty;
 
     /// <summary>Only used -- and only required -- for a Trupp-Typ crewed by three.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewZweiterTruppmannError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newZweiterTruppmann = string.Empty;
 
     [ObservableProperty]
@@ -400,6 +405,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewEntryPressureError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int _newEntryPressure;
 
     [ObservableProperty]
@@ -606,6 +612,10 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     private bool CanAddTrupp => !IsReadOnly;
 
     /// <summary>Whether the Trupp-Art is still missing, once the operator has asked (#412).</summary>
+    /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? ErrorSummary => ValidationMessages.Summarize(
+        NewDesignationError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError);
+
     public string? NewDesignationError =>
         _errorsShown && string.IsNullOrWhiteSpace(NewDesignation) ? ValidationMessages.Required : null;
 
@@ -654,10 +664,15 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     {
         _errorsShown = shown;
         OnPropertyChanged(nameof(NewDesignationError));
+        OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTruppfuehrerError));
+        OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewTruppmannError));
+        OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewZweiterTruppmannError));
+        OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewEntryPressureError));
+        OnPropertyChanged(nameof(ErrorSummary));
     }
 
     [RelayCommand(CanExecute = nameof(CanAddTrupp))]

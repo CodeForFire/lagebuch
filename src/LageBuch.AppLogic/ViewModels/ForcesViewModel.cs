@@ -301,30 +301,36 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewBrigadeError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newBrigade = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewCallSignError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string? _newCallSign;
 
     /// <summary>Nullable: an empty field means 0 and keeps the placeholder visible.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewStrengthError))]
     [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newZugfuehrerCount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewStrengthError))]
     [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newOfficerCount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewStrengthError))]
     [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newMannschaftCount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newScbaCount;
 
     [ObservableProperty]
@@ -422,8 +428,18 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         NewScbaCount = 0;
     }
 
+    /// <summary>
+    /// Every active message on one line beneath the fields row, or null while there is nothing to
+    /// say (#412). The dock cannot carry a message under each field: its fields sit in a horizontal
+    /// StackPanel, which measures children at infinite width, so a message never wraps and instead
+    /// makes its field as wide as the text -- which pushed HINZUFÜGEN clean off the right edge.
+    /// The fields themselves say <em>which</em> by turning red; this line says what is needed.
+    /// </summary>
+    public string? ErrorSummary => ValidationMessages.Summarize(
+        NewBrigadeError, NewCallSignError, NewStrengthError, NewScbaCountError);
+
     // Only the read-only rule gates the button. Every input rule below answers on the press
-    // instead, under the field it is about, because a grey button names none of them (#412).
+    // instead, because a grey button names none of them (#412).
     private bool CanAddForce => !IsReadOnly;
 
     // Lifted comparisons throughout: null >= 0 is false, so every operand coalesces first.
@@ -494,6 +510,13 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
                 return ValidationMessages.NegativeStrength;
             }
 
+            // An AGT count over a Stärke that is itself missing is the same fault reported twice;
+            // say what is wrong, not what follows from it.
+            if (NewStrengthError is not null)
+            {
+                return null;
+            }
+
             return Scba > Strength ? ValidationMessages.ScbaExceedsStrength : null;
         }
     }
@@ -549,6 +572,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(NewCallSignError));
         OnPropertyChanged(nameof(NewStrengthError));
         OnPropertyChanged(nameof(NewScbaCountError));
+        OnPropertyChanged(nameof(ErrorSummary));
     }
 
     private ForceRow ToRow(Domain.ForceUnit f) =>

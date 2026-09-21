@@ -23,7 +23,8 @@
           <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
                make editable) — mirrors PersonNameBox below. -->
-          <HeaderedContentControl Classes="field suggest" Header="FUNKTION" ctrl:Field.Error="{Binding NewRoleError}">
+          <HeaderedContentControl Classes="field suggest" Header="FUNKTION"
+                                  Classes.invalid="{Binding NewRoleError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="RoleBox" Width="120"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
                              ItemsSource="{Binding RoleOptions}"
@@ -31,7 +32,8 @@
                              MinimumPrefixLength="0"
                              Text="{Binding NewRole}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field suggest" Header="NAME" ctrl:Field.Error="{Binding NewPersonNameError}">
+          <HeaderedContentControl Classes="field suggest" Header="NAME"
+                                  Classes.invalid="{Binding NewPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="PersonNameBox" Width="200"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
                              ItemsSource="{Binding PersonOptions}"
@@ -63,6 +65,10 @@
           <Button x:Name="AddRoleButton" Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </StackPanel>
+        <!-- Was noch fehlt (#412): eigene Zeile, damit keine Meldung ihr Feld verbreitert. -->
+        <TextBlock x:Name="DockErrorSummary" Classes="field-error"
+                   Text="{Binding ErrorSummary}"
+                   IsVisible="{Binding ErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
         <!-- Funktion ist bewusst Freitext (ad hoc, überörtliche Hilfe), also nur ein Hinweis:
              die Zuweisung wird so oder so übernommen. Gleiche Darstellung wie ForcesView's
              DuplicateHint. -->
@@ -101,7 +107,8 @@
                     Data="M16.01 11H4v2h12.01v3L20 12l-3.99-4z" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <HeaderedContentControl Classes="field suggest" Header="NAME" ctrl:Field.Error="{Binding TransferPersonNameError}">
+          <HeaderedContentControl Classes="field suggest" Header="NAME"
+                                  Classes.invalid="{Binding TransferPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="TransferPersonNameBox" Width="200"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
                              ItemsSource="{Binding PersonOptions}"
@@ -128,6 +135,10 @@
           <Button x:Name="CancelTransferButton" Content="ABBRECHEN" Command="{Binding CancelTransferCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </StackPanel>
+        <!-- Was noch fehlt (#412): eigene Zeile, damit keine Meldung ihr Feld verbreitert. -->
+        <TextBlock x:Name="TransferErrorSummary" Classes="field-error"
+                   Text="{Binding TransferErrorSummary}"
+                   IsVisible="{Binding TransferErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
     </Border>
 

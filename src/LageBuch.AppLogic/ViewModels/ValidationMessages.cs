@@ -51,4 +51,27 @@ public static class ValidationMessages
 
     /// <summary>A PDF export with every section unticked, which would produce an empty document.</summary>
     public const string NoPdfSection = "Mindestens einen Abschnitt wählen";
+
+    /// <summary>
+    /// One form's active messages on a single line, or null when it has nothing to say.
+    /// <para>
+    /// An input dock cannot put a message under each field: its fields sit in a horizontal
+    /// StackPanel, which measures children at infinite width, so a message never wraps and instead
+    /// makes its field as wide as the text -- far enough to push the dock's action button out of
+    /// the window. The fields there say <em>which</em> by turning red, and this says what is
+    /// needed. Dialogs, whose fields are stacked vertically inside a fixed-width card, keep the
+    /// message under the field where it points more precisely.
+    /// </para>
+    /// <para>
+    /// The separator is the one the status bar already uses ("gespeichert 17:19:35 | Zuletzt
+    /// exportiert: …"), rather than introducing a second convention for the same job.
+    /// </para>
+    /// </summary>
+    public static string? Summarize(params string?[] messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+
+        var active = messages.Where(m => !string.IsNullOrEmpty(m)).ToArray();
+        return active.Length == 0 ? null : string.Join(" | ", active);
+    }
 }

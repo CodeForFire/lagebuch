@@ -86,19 +86,25 @@ public class FieldErrorRenderTests
         vm.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        // Three different rules, three different fields, each stated where it applies.
-        var brigade = FieldErrorOf(view, "FEUERWEHR / WACHE");
-        var callSign = FieldErrorOf(view, "FUNKRUFNAME");
-        var strength = FieldErrorOf(view, "STÄRKE ZF / GF / MANN");
-        Assert.True(brigade.IsVisible);
-        Assert.Equal(ValidationMessages.BrigadeRequired, brigade.Text);
-        Assert.True(callSign.IsVisible);
-        Assert.Equal(ValidationMessages.CallSignRequired, callSign.Text);
-        Assert.True(strength.IsVisible);
-        Assert.Equal(ValidationMessages.NoPersonnel, strength.Text);
+        // A dock cannot carry a message under each field without growing sideways, so it splits the
+        // job: every offending field turns red, and one line beneath the row says what is needed.
+        Assert.True(IsMarkedInvalid(view, "FEUERWEHR / WACHE"));
+        Assert.True(IsMarkedInvalid(view, "FUNKRUFNAME"));
+        Assert.True(IsMarkedInvalid(view, "STÄRKE ZF / GF / MANN"));
 
-        // A field with nothing wrong with it stays silent.
+        // The AGT count (3) does exceed the Stärke (0), but saying so here would report the missing
+        // crew twice. The cause is named; the consequence stays quiet until the cause is fixed.
+        Assert.False(IsMarkedInvalid(view, "DAVON AGT"));
+
+        // A field with nothing wrong with it is left alone.
+        Assert.False(IsMarkedInvalid(view, "BEMERKUNG"));
         Assert.False(FieldErrorOf(view, "BEMERKUNG").IsVisible);
+
+        var summary = view.GetControl<TextBlock>("DockErrorSummary");
+        Assert.True(summary.IsVisible);
+        Assert.Contains(ValidationMessages.BrigadeRequired, summary.Text, StringComparison.Ordinal);
+        Assert.Contains(ValidationMessages.CallSignRequired, summary.Text, StringComparison.Ordinal);
+        Assert.Contains(ValidationMessages.NoPersonnel, summary.Text, StringComparison.Ordinal);
         Capture(window, "field-error-forces.png");
     }
 
@@ -121,15 +127,23 @@ public class FieldErrorRenderTests
         return (window, view, vm);
     }
 
+    // What a dock marks instead of writing under the field: the wrapper carries the "invalid"
+    // class, which reddens whatever input sits inside it.
+    private static bool IsMarkedInvalid(Visual root, string header) =>
+        WrapperOf(root, header).Classes.Contains("invalid");
+
     // The message is part of the shared field template, so it is reached through the wrapper it
     // belongs to rather than by a per-view x:Name -- the wrapper's Header is what identifies it.
     private static TextBlock FieldErrorOf(Visual root, string header) =>
-        root.GetVisualDescendants()
-            .OfType<HeaderedContentControl>()
-            .Single(field => (field.Header as string) == header)
+        WrapperOf(root, header)
             .GetVisualDescendants()
             .OfType<TextBlock>()
             .Single(text => text.Name == "FieldError");
+
+    private static HeaderedContentControl WrapperOf(Visual root, string header) =>
+        root.GetVisualDescendants()
+            .OfType<HeaderedContentControl>()
+            .Single(field => (field.Header as string) == header);
 
     private static void Capture(Window window, string name)
     {

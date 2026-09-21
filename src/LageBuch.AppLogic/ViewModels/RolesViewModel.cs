@@ -172,6 +172,7 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewRoleError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     [NotifyPropertyChangedFor(nameof(IsNewRoleUnknown))]
     private string _newRole = string.Empty;
 
@@ -185,6 +186,7 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewPersonNameError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newPersonName = string.Empty;
 
     [ObservableProperty]
@@ -200,6 +202,10 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
         PrefillFromRoster(value, () => NewPhone, v => NewPhone = v, () => NewCallSign, v => NewCallSign = v);
 
     /// <summary>Whether the Funktion is still missing, once the operator has asked (#412).</summary>
+    /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? ErrorSummary => ValidationMessages.Summarize(
+        NewRoleError, NewPersonNameError);
+
     public string? NewRoleError =>
         _addErrorsShown && string.IsNullOrWhiteSpace(NewRole) ? ValidationMessages.Required : null;
 
@@ -252,7 +258,9 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     {
         _addErrorsShown = shown;
         OnPropertyChanged(nameof(NewRoleError));
+        OnPropertyChanged(nameof(ErrorSummary));
         OnPropertyChanged(nameof(NewPersonNameError));
+        OnPropertyChanged(nameof(ErrorSummary));
     }
 
     // --- Rolle übertragen: a small panel below the grid, mirroring EtbViewModel's edit panel
@@ -268,6 +276,7 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TransferPersonNameError))]
+    [NotifyPropertyChangedFor(nameof(TransferErrorSummary))]
     private string _transferPersonName = string.Empty;
 
     [ObservableProperty]
@@ -289,6 +298,10 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Whether the successor's name is still missing, once asked (#412).</summary>
+    /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? TransferErrorSummary => ValidationMessages.Summarize(
+        TransferPersonNameError);
+
     public string? TransferPersonNameError =>
         _transferErrorsShown && string.IsNullOrWhiteSpace(TransferPersonName)
             ? ValidationMessages.Required
@@ -323,6 +336,7 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     {
         _transferErrorsShown = shown;
         OnPropertyChanged(nameof(TransferPersonNameError));
+        OnPropertyChanged(nameof(TransferErrorSummary));
     }
 
     /// <summary>
