@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -768,5 +769,40 @@ public class WorkspaceAcceptanceTests
         // transfer panel's own suggestion fields, so the arrow is no longer unique there).
         var icon = view.GetControl<PathIcon>("TransferArrowIcon");
         Assert.True(icon.Bounds.Width > 0, "the transfer summary's arrow icon has zero width -- nothing is drawn");
+    }
+
+    // Issue #413, straight from the field: "Farbe der Überschrift beim Übertragen der Funktion zu
+    // dunkel." The summary line carried an inline Foreground="{StaticResource TextMutedBrush}"
+    // that overrode the TextSecondary its own Classes="mono" already supplies. TextMuted is
+    // #65728580 -- 8-digit ARGB, so ~40% alpha -- which over the panel's #0F141D composites to
+    // roughly 1.9:1 against WCAG AA's 4.5:1, on the one line that says which Funktion is being
+    // handed to whom. The arrow beside it wore the same token and is pinned here with it.
+    [AvaloniaFact]
+    public void Transfer_panel_summary_and_arrow_are_not_painted_with_the_muted_disabled_token()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.AssignRole("EL", "Müller", callSign: "FFB 12/1", section: "Abschnitt Nord");
+        var view = new RolesView { DataContext = vm.Roles };
+        var window = new Window { Content = view, Width = 1200, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Roles.Roles);
+        row.BeginTransferCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var expected = (Color)Application.Current!.FindResource("TextSecondaryColor")!;
+        var summary = Assert.IsAssignableFrom<ISolidColorBrush>(
+            view.GetControl<TextBlock>("TransferSummaryText").Foreground).Color;
+        var arrow = Assert.IsAssignableFrom<ISolidColorBrush>(
+            view.GetControl<PathIcon>("TransferArrowIcon").Foreground).Color;
+
+        Assert.Equal(expected, summary);
+        Assert.Equal(expected, arrow);
+
+        // Pinned apart from the token's exact hex, so this keeps saying the right thing if
+        // TextSecondary is ever retuned: what must not come back is see-through text here.
+        Assert.Equal(255, summary.A);
+        Assert.Equal(255, arrow.A);
     }
 }
