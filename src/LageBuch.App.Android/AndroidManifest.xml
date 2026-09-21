@@ -3,6 +3,12 @@
           android:versionCode="1" android:versionName="0.1.0"
           package="de.codeforfire.lagebuch">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="36" />
+    <!-- Required to join a hosted Einsatz. The Android SDK adds INTERNET to Debug builds by
+         itself so the debugger can attach, which is why every development device had it and no
+         released one did: a Release APK declared no permission at all and the connection could
+         never be opened. Declaring it here is what makes the two configurations agree. The
+         connection is TLS, so usesCleartextTraffic stays false. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application android:label="Lagebuch" android:icon="@drawable/icon" android:usesCleartextTraffic="false">
         <provider android:name="androidx.core.content.FileProvider"
                   android:authorities="de.codeforfire.lagebuch.fileprovider"
