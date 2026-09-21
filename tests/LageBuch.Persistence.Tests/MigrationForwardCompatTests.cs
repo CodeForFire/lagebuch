@@ -446,7 +446,7 @@ public class MigrationForwardCompatTests : IDisposable
     [Fact]
     public void V21_file_gains_an_empty_co_readings_table_and_keeps_its_co_value()
     {
-        // V23 adds co_readings (per-Wohnung CO measurement history, #424). A v21 file must upgrade
+        // V24 adds co_readings (per-Wohnung CO measurement history, #424). A v21 file must upgrade
         // cleanly, keep the reading it already has, and gain an EMPTY series: nothing is
         // backfilled. The readings such an incident took survive only as German ETB prose, and
         // guessing a (building, floor, apartment) triple back out of that text -- past renamed
