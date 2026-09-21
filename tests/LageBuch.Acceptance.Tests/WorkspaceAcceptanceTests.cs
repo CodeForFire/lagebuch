@@ -805,4 +805,45 @@ public class WorkspaceAcceptanceTests
         Assert.Equal(255, summary.A);
         Assert.Equal(255, arrow.A);
     }
+
+    // Issue #438, the half #413 deferred: the Verlauf rows carried an inline
+    // Foreground="{StaticResource TextMutedBrush}" that overrode the TextSecondary their own
+    // Classes="mono" already supplies. TextMuted is #65728580 -- 8-digit ARGB, so ~40% alpha --
+    // which over the panel's #0F141D lands at roughly 1.9:1 against WCAG AA's 4.5:1. These rows
+    // are the audit trail the panel exists for ("a rewrite must stay auditable after the fact"):
+    // the superseded wording, who rewrote it, and when.
+    [AvaloniaFact]
+    public void Etb_history_rows_are_not_painted_with_the_muted_disabled_token()
+    {
+        var vm = BuildWorkspace(out var session);
+        session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung erhalten", from: "Leitstelle");
+        var view = new EtbView { DataContext = vm.Etb };
+        var window = new Window { Content = view, Width = 1000, Height = 700 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var row = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung erhalten");
+        row.BeginEditCommand.Execute(null);
+        vm.Etb.EditText = "Lagemeldung korrigiert";
+        vm.Etb.SaveEditCommand.Execute(null);
+
+        var edited = Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung korrigiert");
+        edited.ShowHistoryCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        // The row's TextBlock lives inside HistoryList's DataTemplate, so it has no x:Name of its
+        // own to reach for -- the named ItemsControl around it is the anchor.
+        var history = view.GetControl<ItemsControl>("HistoryList");
+        var line = Assert.Single(history.GetVisualDescendants().OfType<TextBlock>());
+        Assert.Contains("Lagemeldung erhalten", line.Text, StringComparison.Ordinal);
+
+        var expected = (Color)Application.Current!.FindResource("TextSecondaryColor")!;
+        var actual = Assert.IsAssignableFrom<ISolidColorBrush>(line.Foreground).Color;
+
+        Assert.Equal(expected, actual);
+
+        // Pinned apart from the token's exact hex, so this keeps saying the right thing if
+        // TextSecondary is ever retuned: what must not come back is see-through audit text.
+        Assert.Equal(255, actual.A);
+    }
 }
