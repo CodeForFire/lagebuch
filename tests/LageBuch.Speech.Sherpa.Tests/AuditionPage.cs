@@ -10,9 +10,13 @@ namespace LageBuch.Speech.Sherpa.Tests;
 /// <para>
 /// Built for one job: comparing many voices on the same sentence, quickly. The native
 /// <c>&lt;audio&gt;</c> control is the wrong shape for that -- a 20 px target, identical on every
-/// row, and with <c>preload="none"</c> every press costs a load before it makes a sound. So each
-/// row is its own play button, only one clip plays at a time, and the arrow keys walk the rows so a
-/// ten-voice comparison is ten keypresses rather than twenty clicks and a scroll.
+/// row -- so each row is its own play button, only one clip plays at a time, and the arrow keys
+/// walk the rows.
+/// </para>
+/// <para>
+/// Every row also carries its <b>synthesis time</b>, because for a Lagebuch cue that is the number
+/// that decides: the audio length is a property of the sentence, but the synthesis time is the
+/// delay between the alarm firing and the voice starting.
 /// </para>
 /// <para>
 /// Everything is inline: the page is opened over <c>file://</c> with no server and no network, so
@@ -21,16 +25,22 @@ namespace LageBuch.Speech.Sherpa.Tests;
 /// </remarks>
 internal static class AuditionPage
 {
+    // The markup is assembled with InvariantCulture; the numbers a German reader sees are not.
+    // A property rather than a field so it can sit above the big markup constants; GetCultureInfo
+    // is cached by the runtime, so this costs nothing per call.
+    private static CultureInfo De => CultureInfo.GetCultureInfo("de-DE");
+
     public static void Write(
         string path,
         IReadOnlyList<SpeechVoice> voices,
         IReadOnlyList<Clip> clips,
-        IReadOnlyList<AbbreviationClip> abbreviations)
+        IReadOnlyList<AbbreviationClip> abbreviations,
+        IReadOnlyDictionary<string, VoiceTiming> timings)
     {
         var html = new StringBuilder();
         html.Append(Head);
 
-        AppendVoiceTable(html, voices);
+        AppendVoiceTable(html, voices, timings);
         AppendAbbreviations(html, abbreviations);
         AppendTexts(html, voices, clips);
 
@@ -39,14 +49,41 @@ internal static class AuditionPage
         File.WriteAllText(path, html.ToString(), Encoding.UTF8);
     }
 
-    private static void AppendVoiceTable(StringBuilder html, IReadOnlyList<SpeechVoice> voices)
+    private static void AppendVoiceTable(
+        StringBuilder html,
+        IReadOnlyList<SpeechVoice> voices,
+        IReadOnlyDictionary<string, VoiceTiming> timings)
     {
-        html.Append("<h2>Stimmen</h2>\n<table class=\"voices\">\n");
+        html.Append(
+            """
+            <h2>Stimmen</h2>
+            <p class="sub"><b>Laden</b> fällt einmal beim Start an. <b>Synthese</b> fällt bei jeder
+            Ansage an — das ist die Wartezeit zwischen Alarm und erstem Ton. <b>RTF</b> ist
+            Synthesezeit geteilt durch Audiolänge; ab 1,0 erzeugt die Stimme langsamer, als sie
+            spricht.</p>
+            <table class="voices">
+            <tr class="hd"><th>Stimme</th><th>Lizenz</th><th>Laden</th><th>Synthese</th><th>RTF</th><th>Quelle</th></tr>
+
+            """);
+
         foreach (var v in voices)
         {
             var warn = v.IsRestrictivelyLicensed ? " warn" : string.Empty;
             html.Append(CultureInfo.InvariantCulture, $"<tr><td>{Esc(v.DisplayName)}</td>");
             html.Append(CultureInfo.InvariantCulture, $"<td><span class=\"lic{warn}\">{Esc(v.Licence)}</span></td>");
+
+            if (timings.TryGetValue(v.Id, out var t))
+            {
+                var slow = t.MedianRtf >= 1 ? " slow" : string.Empty;
+                html.Append(CultureInfo.InvariantCulture, $"<td class=\"num\">{Secs(t.LoadTime)}</td>");
+                html.Append(CultureInfo.InvariantCulture, $"<td class=\"num{slow}\">{Secs(t.MedianSynthesis)}</td>");
+                html.Append(CultureInfo.InvariantCulture, $"<td class=\"num{slow}\">{Rtf(t.MedianRtf)}</td>");
+            }
+            else
+            {
+                html.Append("<td class=\"num\">—</td><td class=\"num\">—</td><td class=\"num\">—</td>");
+            }
+
             html.Append(CultureInfo.InvariantCulture, $"<td class=\"attr\">{Esc(v.Attribution)}</td></tr>\n");
         }
 
@@ -72,8 +109,8 @@ internal static class AuditionPage
         {
             html.Append(CultureInfo.InvariantCulture, $"<h3>{Esc(a.Abbreviation)}</h3>\n");
             html.Append("<table class=\"clips\">\n");
-            AppendRow(html, "buchstabiert", a.Spelled.File, a.Spelled.Spoken, a.Spelled.Duration);
-            AppendRow(html, "ausgeschrieben", a.Expanded.File, a.Expanded.Spoken, a.Expanded.Duration);
+            AppendRow(html, "buchstabiert", a.Spelled);
+            AppendRow(html, "ausgeschrieben", a.Expanded);
             html.Append("</table>\n");
         }
     }
@@ -109,28 +146,43 @@ internal static class AuditionPage
             {
                 var name = byVoice.TryGetValue(clip.VoiceId, out var display) ? display : clip.VoiceId;
                 var label = clip.Normalized ? name : name + " — roh";
-                AppendRow(html, label, clip.File, clip.Spoken, clip.Duration, raw: !clip.Normalized);
+                AppendRow(
+                    html,
+                    label,
+                    new RenderedClip(clip.File, clip.Spoken, clip.Duration, clip.Generation),
+                    raw: !clip.Normalized);
             }
 
             html.Append("</table>\n");
         }
     }
 
-    private static void AppendRow(
-        StringBuilder html,
-        string label,
-        string file,
-        string spoken,
-        TimeSpan duration,
-        bool raw = false)
+    private static void AppendRow(StringBuilder html, string label, RenderedClip clip, bool raw = false)
     {
-        var cls = raw ? " class=\"raw\"" : string.Empty;
-        html.Append(CultureInfo.InvariantCulture, $"<tr{cls} tabindex=\"0\" data-src=\"{Esc(file)}\" title=\"{Esc(spoken)}\">");
+        var rtf = clip.Duration > TimeSpan.Zero ? clip.Generation / clip.Duration : 0;
+        var classes = raw ? "raw" : string.Empty;
+        if (rtf >= 1)
+        {
+            classes = (classes + " slow").Trim();
+        }
+
+        var attr = classes.Length == 0 ? string.Empty : $" class=\"{classes}\"";
+
+        html.Append(CultureInfo.InvariantCulture, $"<tr{attr} tabindex=\"0\" data-src=\"{Esc(clip.File)}\" title=\"{Esc(clip.Spoken)}\">");
         html.Append("<td class=\"btn\"><span class=\"icon\" aria-hidden=\"true\"></span></td>");
         html.Append(CultureInfo.InvariantCulture, $"<td class=\"name\">{Esc(label)}</td>");
         html.Append("<td class=\"bar\"><span></span></td>");
-        html.Append(CultureInfo.InvariantCulture, $"<td class=\"dur\">{duration.TotalSeconds:F1}s</td></tr>\n");
+
+        // The synthesis time is the one that decides, so it gets the emphasis and the audio length
+        // drops back to the muted treatment.
+        html.Append(CultureInfo.InvariantCulture, $"<td class=\"gen\">{Secs(clip.Generation)}<span class=\"rtf\"> · RTF {Rtf(rtf)}</span></td>");
+        html.Append(CultureInfo.InvariantCulture, $"<td class=\"dur\">{Secs(clip.Duration)} Audio</td></tr>\n");
     }
+
+    private static string Secs(TimeSpan t) =>
+        t.TotalSeconds.ToString(t.TotalSeconds < 10 ? "0.00" : "0.0", De) + " s";
+
+    private static string Rtf(double rtf) => rtf.ToString("0.00", De);
 
     private static string Esc(string s) => s
         .Replace("&", "&amp;", StringComparison.Ordinal)
@@ -168,8 +220,15 @@ internal static class AuditionPage
           .said code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
           table { width: 100%; border-collapse: collapse; }
           td { border-top: 1px solid var(--line); padding: 0; }
-          table.voices td { padding: 6px 10px 6px 0; font-size: .85rem; }
+          table.voices td, table.voices th { padding: 6px 10px 6px 0; font-size: .85rem;
+                                             text-align: left; }
+          table.voices tr.hd th { font-size: .72rem; font-weight: 600; color: var(--muted);
+                                  text-transform: uppercase; letter-spacing: .04em;
+                                  border-bottom: 1px solid var(--line); }
           table.voices td.attr { color: var(--muted); font-size: .78rem; }
+          table.voices td.num { text-align: right; white-space: nowrap;
+                                font-variant-numeric: tabular-nums; }
+          table.voices td.num.slow { color: var(--accent); font-weight: 600; }
           .lic { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: .7rem;
                  border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
           .lic.warn { color: var(--accent); border-color: var(--accent); }
@@ -190,11 +249,16 @@ internal static class AuditionPage
                                      border: none; background: var(--accent);
                                      box-shadow: 5px 0 0 var(--accent); }
           td.name { font-size: .87rem; white-space: nowrap; }
-          td.bar { width: 45%; }
+          td.bar { width: 32%; }
           td.bar span { display: block; height: 3px; width: 0; background: var(--accent);
                         border-radius: 2px; transition: width .1s linear; }
-          td.dur { color: var(--muted); font-size: .78rem; text-align: right;
-                   white-space: nowrap; padding-right: 2px; }
+          td.gen { font-size: .82rem; text-align: right; white-space: nowrap;
+                   font-variant-numeric: tabular-nums; font-weight: 600; }
+          td.gen .rtf { font-weight: 400; color: var(--muted); }
+          tr.slow td.gen { color: var(--accent); }
+          td.dur { color: var(--muted); font-size: .75rem; text-align: right;
+                   white-space: nowrap; padding-right: 2px;
+                   font-variant-numeric: tabular-nums; }
           tr.raw td.name { color: var(--muted); font-style: italic; }
 
           .allbtn { font: inherit; font-size: .8rem; cursor: pointer; margin: 0 0 10px;
@@ -206,13 +270,14 @@ internal static class AuditionPage
                   padding: 7px 16px; text-align: center; }
           kbd { font: inherit; border: 1px solid var(--line); border-bottom-width: 2px;
                 border-radius: 4px; padding: 0 5px; margin: 0 1px; }
-          @media (max-width: 720px) { td.bar { display: none; } td.name { white-space: normal; } }
+          @media (max-width: 720px) { td.bar, td.dur { display: none; } td.name { white-space: normal; } }
         </style>
         </head>
         <body><div class="wrap">
         <h1>Stimmenauswahl für die Sprachausgabe</h1>
-        <p class="sub">Zeile anklicken zum Abspielen. Jede Zeile ist echter Text aus Lagebuch;
-        <em>roh</em> = ohne Normalisierung, sonst durch <code>SpeechText.Normalize</code>.</p>
+        <p class="sub">Zeile anklicken zum Abspielen. Die fette Zahl ist die <b>Synthesezeit</b> —
+        die Wartezeit, bis der Ton einsetzt; dahinter die Audiolänge. Jede Zeile ist echter Text aus
+        Lagebuch; <em>roh</em> = ohne Normalisierung, sonst durch <code>SpeechText.Normalize</code>.</p>
 
         """;
 
@@ -289,7 +354,6 @@ internal static class AuditionPage
             stop();
             const all = Array.from(table.querySelectorAll('tr'));
             if (!all.length) return;
-            queue = all.slice(1);
             focus(all[0]);
             play(all[0]);
             // play() cleared the queue via stop(); restore it.

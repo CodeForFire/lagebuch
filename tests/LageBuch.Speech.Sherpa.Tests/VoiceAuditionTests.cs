@@ -52,24 +52,30 @@ public class VoiceAuditionTests
 
         var clips = new List<Clip>();
         var abbreviations = new List<AbbreviationClip>();
+        var timings = new Dictionary<string, VoiceTiming>(StringComparer.Ordinal);
         foreach (var voice in voices)
         {
-            clips.AddRange(RenderVoice(root!, voice, outDir, abbreviations));
+            clips.AddRange(RenderVoice(root!, voice, outDir, abbreviations, timings));
         }
 
-        AuditionPage.Write(Path.Join(outDir, "index.html"), voices, clips, abbreviations);
+        AuditionPage.Write(Path.Join(outDir, "index.html"), voices, clips, abbreviations, timings);
     }
 
     private static List<Clip> RenderVoice(
         string root,
         SpeechVoice voice,
         string outDir,
-        List<AbbreviationClip> abbreviations)
+        List<AbbreviationClip> abbreviations,
+        Dictionary<string, VoiceTiming> timings)
     {
         var rendered = new List<Clip>();
         var total = Stopwatch.StartNew();
 
+        // Timed separately from synthesis: loading is paid once, at app start or on the first cue,
+        // while a synthesis time is paid on every announcement.
+        var loading = Stopwatch.StartNew();
         using var synth = SherpaSpeechSynthesizer.Load(root, voice);
+        loading.Stop();
         foreach (var item in AuditionTexts.All)
         {
             rendered.Add(Render(synth, voice, item, normalized: true, outDir));
@@ -94,9 +100,13 @@ public class VoiceAuditionTests
             }
         }
 
-        Console.WriteLine(string.Create(
+        timings[voice.Id] = VoiceTiming.From(loading.Elapsed, rendered);
+
+        var t = timings[voice.Id];
+        var line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{voice.Id,-28} {rendered.Count + extra,3} clips  {synth.SampleRate} Hz  {total.Elapsed.TotalSeconds,6:F1}s"));
+            $"{voice.Id,-28} {rendered.Count + extra,3} clips  {synth.SampleRate} Hz  load {loading.Elapsed.TotalSeconds,5:F1}s  synth~{t.MedianSynthesis.TotalSeconds,5:F2}s  RTF {t.MedianRtf,4:F2}  total {total.Elapsed.TotalSeconds,6:F1}s");
+        Console.WriteLine(line);
 
         return rendered;
     }
@@ -111,7 +121,7 @@ public class VoiceAuditionTests
         var spoken = normalized ? SpeechText.Normalize(item.Text) : item.Text;
         var suffix = normalized ? "norm" : "raw";
         var one = RenderOne(synth, voice, $"{item.Key}__{suffix}", spoken, outDir);
-        return new Clip(voice.Id, item.Key, normalized, one.File, spoken, one.Duration);
+        return new Clip(voice.Id, item.Key, normalized, one.File, spoken, one.Duration, one.Generation);
     }
 
     private static RenderedClip RenderOne(
@@ -122,9 +132,14 @@ public class VoiceAuditionTests
         string outDir)
     {
         var file = $"{voice.Id}__{name}.wav";
+
+        // Only the synthesis is timed -- writing the WAV is the harness's cost, not the engine's.
+        var watch = Stopwatch.StartNew();
         var audio = synth.Synthesize(spoken);
+        watch.Stop();
+
         File.WriteAllBytes(Path.Join(outDir, file), audio.ToWav());
-        return new RenderedClip(file, spoken, audio.Duration);
+        return new RenderedClip(file, spoken, audio.Duration, watch.Elapsed);
     }
 
     // Walks up from the test binary to the repo root. The models are a sibling of the solution in a
@@ -147,7 +162,7 @@ public class VoiceAuditionTests
     }
 }
 
-internal sealed record RenderedClip(string File, string Spoken, TimeSpan Duration);
+internal sealed record RenderedClip(string File, string Spoken, TimeSpan Duration, TimeSpan Generation);
 
 internal sealed record Clip(
     string VoiceId,
@@ -155,6 +170,46 @@ internal sealed record Clip(
     bool Normalized,
     string File,
     string Spoken,
-    TimeSpan Duration);
+    TimeSpan Duration,
+    TimeSpan Generation)
+{
+    /// <summary>Synthesis time over audio length. At 1.0 the voice only just keeps up with itself.</summary>
+    public double Rtf => Duration > TimeSpan.Zero ? Generation / Duration : 0;
+}
+
+/// <summary>What one voice costs: once to load, and then per announcement.</summary>
+internal sealed record VoiceTiming(
+    TimeSpan LoadTime,
+    TimeSpan MedianSynthesis,
+    TimeSpan MaxSynthesis,
+    double MedianRtf)
+{
+    /// <remarks>
+    /// Median rather than mean: the first Synthesize on a freshly loaded model absorbs the lazy
+    /// ONNX session warm-up and is several times the steady-state cost. A median over fifteen clips
+    /// ignores that outlier without special-casing it, and <see cref="MaxSynthesis"/> keeps the
+    /// worst case visible anyway.
+    /// </remarks>
+    public static VoiceTiming From(TimeSpan loadTime, IReadOnlyList<Clip> clips)
+    {
+        if (clips.Count == 0)
+        {
+            return new VoiceTiming(loadTime, TimeSpan.Zero, TimeSpan.Zero, 0);
+        }
+
+        return new VoiceTiming(
+            loadTime,
+            Median(clips.Select(c => c.Generation.TotalSeconds)) is var s ? TimeSpan.FromSeconds(s) : default,
+            clips.Max(c => c.Generation),
+            Median(clips.Select(c => c.Rtf)));
+    }
+
+    private static double Median(IEnumerable<double> values)
+    {
+        var sorted = values.Order().ToList();
+        var mid = sorted.Count / 2;
+        return sorted.Count % 2 == 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+    }
+}
 
 internal sealed record AbbreviationClip(string Abbreviation, RenderedClip Spelled, RenderedClip Expanded);
