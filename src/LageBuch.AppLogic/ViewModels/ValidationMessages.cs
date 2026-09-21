@@ -35,4 +35,13 @@ public static class ValidationMessages
 
     /// <summary>More Atemschutzgeräteträger than people, which the domain rejects outright.</summary>
     public const string ScbaExceedsStrength = "AGT darf die Stärke nicht überschreiten";
+
+    /// <summary>
+    /// A Trupp bereitgestellt without a starting pressure. Zero is not a reading: the whole
+    /// Überwachung -- Restzeit, Alarm, Druckabfrage -- is computed from this number.
+    /// </summary>
+    public const string EntryPressure = "Einstiegsdruck eintragen";
+
+    /// <summary>A PDF export with every section unticked, which would produce an empty document.</summary>
+    public const string NoPdfSection = "Mindestens einen Abschnitt wählen";
 }

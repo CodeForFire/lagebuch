@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.OperatorPromptView"
              x:DataType="vm:OperatorPromptViewModel">
   <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
@@ -22,20 +23,24 @@
                requires Tailscale, #59 follow-up), entered alongside "who documents here" so a
                joining device provides both in one prompt. -->
           <StackPanel IsVisible="{Binding CollectsHost}" Spacing="3">
-            <TextBlock Text="GERÄT (NAME ODER IP-ADRESSE)" Classes="overline" FontSize="10" Margin="0,4,0,3" />
-            <TextBox x:Name="HostBox" PlaceholderText="z. B. elw-1 oder 192.168.1.10" Text="{Binding Host}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+            <HeaderedContentControl Classes="field" Header="GERÄT (NAME ODER IP-ADRESSE)"
+                                    Margin="0,4,0,0" ctrl:Field.Error="{Binding HostError}">
+              <TextBox x:Name="HostBox" PlaceholderText="z. B. elw-1 oder 192.168.1.10" Text="{Binding Host}">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </HeaderedContentControl>
             <!-- The 4-digit PIN the hosting device shows; required to join (#64). -->
-            <TextBlock Text="PIN" Classes="overline" FontSize="10" Margin="0,8,0,3" />
-            <TextBox x:Name="PinBox" PlaceholderText="4-stellig" MaxLength="4" Text="{Binding Pin}"
-                     b:IntegerOnly.IsEnabled="True">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+            <HeaderedContentControl Classes="field" Header="PIN" Margin="0,8,0,0"
+                                    ctrl:Field.Error="{Binding PinError}">
+              <TextBox x:Name="PinBox" PlaceholderText="4-stellig" MaxLength="4" Text="{Binding Pin}"
+                       b:IntegerOnly.IsEnabled="True">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </HeaderedContentControl>
             <!-- #182: a failed join stays on this dialog instead of closing it, reporting the
                  error here so Host/Name/Funkrufname aren't lost; only the PIN above is cleared. -->
             <Border x:Name="PromptErrorBanner" Background="#241608"
@@ -57,19 +62,22 @@
               </Grid>
             </Border>
           </StackPanel>
-          <TextBlock Text="NAME" Classes="overline" FontSize="10" Margin="0,4,0,3" />
-          <TextBox x:Name="OperatorNameBox"
-                   PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorFullNamePlaceholder}"
-                   Text="{Binding OperatorName}">
-            <TextBox.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-            </TextBox.KeyBindings>
-          </TextBox>
-          <TextBlock Text="FUNKRUFNAME" Classes="overline" FontSize="10" Margin="0,8,0,3" />
+          <HeaderedContentControl Classes="field" Header="NAME" Margin="0,4,0,0"
+                                  ctrl:Field.Error="{Binding OperatorNameError}">
+            <TextBox x:Name="OperatorNameBox"
+                     PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorFullNamePlaceholder}"
+                     Text="{Binding OperatorName}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </HeaderedContentControl>
           <!-- Call sign is a suggestion list, not a closed set: an operator's Funkrufname need
                not be in the master list, so this is an AutoCompleteBox (Avalonia's ComboBox
-               cannot be made editable) mirroring RolesView's personnel-name field. -->
-          <Grid>
+               cannot be made editable) mirroring RolesView's personnel-name field. The chevron
+               affordance (#259) comes from the shared "suggest" variant rather than a hand-rolled
+               overlay, which is what every other suggestion field in the app already uses. -->
+          <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME" Margin="0,8,0,0">
             <AutoCompleteBox x:Name="CallSignBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OptionalCallSignPlaceholder}"
                              ItemsSource="{Binding CallSignOptions}"
@@ -77,14 +85,7 @@
                              MinimumPrefixLength="0"
                              Text="{Binding OperatorCallSign}"
                              b:EnterSubmit.Command="{Binding ConfirmCommand}" />
-            <!-- Chevron affordance (#259): signals this field is backed by a suggestion list, not
-                 free text. Overlaid rather than templated into AutoCompleteBox itself, which needs
-                 its own template intact for the popup/suggestion-list wiring. -->
-            <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
-                      Margin="0,0,9,0" IsHitTestVisible="False"
-                      Foreground="{StaticResource TextMutedBrush}"
-                      Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-          </Grid>
+          </HeaderedContentControl>
           <!-- Join-in-progress status (#196): a stuck/slow connect attempt otherwise has no way out
                but to wait for the network layer's own timeout — the Cancel button below aborts it
                without leaving this dialog. -->

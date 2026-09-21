@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.ScbaView"
              x:DataType="vm:ScbaViewModel">
   <UserControl.Styles>
@@ -49,7 +50,7 @@
                            MinimumPrefixLength="0"
                            Text="{Binding NewCallSign}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="TRUPP-ART">
+        <HeaderedContentControl Classes="field" Header="TRUPP-ART" ctrl:Field.Error="{Binding NewDesignationError}">
           <ComboBox Width="150" ItemsSource="{Binding TruppTypeOptions}"
                     SelectedItem="{Binding NewDesignation}" />
         </HeaderedContentControl>
@@ -64,7 +65,7 @@
              selected Trupp-Typ calls for it (#398). Crew names
              use the ad-hoc "whoever is entering data right now" persona, not the Stammdaten roster
              persona (#137). -->
-        <HeaderedContentControl Classes="field suggest" Header="TRUPPFÜHRER">
+        <HeaderedContentControl Classes="field suggest" Header="TRUPPFÜHRER" ctrl:Field.Error="{Binding NewTruppfuehrerError}">
           <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                            ItemsSource="{Binding PersonOptions}"
@@ -72,7 +73,7 @@
                            Text="{Binding NewTruppfuehrer}"
                            b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field suggest" Header="TRUPPMANN">
+        <HeaderedContentControl Classes="field suggest" Header="TRUPPMANN" ctrl:Field.Error="{Binding NewTruppmannError}">
           <AutoCompleteBox x:Name="TruppmannBox" Width="170"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderAlt}"
                            ItemsSource="{Binding PersonOptions}"
@@ -80,7 +81,7 @@
                            Text="{Binding NewTruppmann}"
                            b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field suggest" Header="2. TRUPPMANN" IsVisible="{Binding RequiresThirdMember}">
+        <HeaderedContentControl Classes="field suggest" Header="2. TRUPPMANN" IsVisible="{Binding RequiresThirdMember}" ctrl:Field.Error="{Binding NewZweiterTruppmannError}">
           <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170"
                            PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderThird}"
                            ItemsSource="{Binding PersonOptions}"
@@ -88,7 +89,7 @@
                            Text="{Binding NewZweiterTruppmann}"
                            b:EnterSubmit.Command="{Binding AddTruppCommand}" />
         </HeaderedContentControl>
-        <HeaderedContentControl Classes="field" Header="EINSTIEGSDRUCK">
+        <HeaderedContentControl Classes="field" Header="EINSTIEGSDRUCK" ctrl:Field.Error="{Binding NewEntryPressureError}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <NumericUpDown Width="100" Minimum="1" Maximum="400" Value="{Binding NewEntryPressure}"
                            FormatString="0" />

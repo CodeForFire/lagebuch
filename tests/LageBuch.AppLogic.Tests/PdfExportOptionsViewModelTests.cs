@@ -18,7 +18,7 @@ public class PdfExportOptionsViewModelTests
     }
 
     [Fact]
-    public void CanExport_is_false_once_every_section_is_unchecked()
+    public async Task Exporting_with_every_section_unchecked_says_so_instead_of_going_grey()
     {
         var vm = NewVm();
         Assert.True(vm.ExportCommand.CanExecute(null));
@@ -28,7 +28,14 @@ public class PdfExportOptionsViewModelTests
             item.IsSelected = false;
         }
 
-        Assert.False(vm.ExportCommand.CanExecute(null));
+        Assert.True(vm.ExportCommand.CanExecute(null)); // the press is the question (#412)
+        Assert.Null(vm.SelectionError); // quiet until asked
+        await vm.ExportCommand.ExecuteAsync(null);
+
+        Assert.Equal(ValidationMessages.NoPdfSection, vm.SelectionError);
+
+        vm.Items[0].IsSelected = true;
+        Assert.Null(vm.SelectionError); // fixed as it is ticked, without a second press
     }
 
     [Fact]

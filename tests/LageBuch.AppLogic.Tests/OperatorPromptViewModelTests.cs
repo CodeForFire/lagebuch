@@ -5,12 +5,21 @@ namespace LageBuch.AppLogic.Tests;
 public class OperatorPromptViewModelTests
 {
     [Fact]
-    public void Confirm_disabled_until_name_entered()
+    public void Confirm_names_the_missing_operator_instead_of_going_grey()
     {
         var vm = new OperatorPromptViewModel();
-        Assert.False(vm.ConfirmCommand.CanExecute(null));
+
+        Assert.True(vm.ConfirmCommand.CanExecute(null)); // the press is the question (#412)
+        Assert.Null(vm.OperatorNameError); // quiet until asked
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.OperatorNameError);
+        Assert.Null(vm.Result); // nobody is documenting yet, so the prompt stays up
+
         vm.OperatorName = "Müller";
-        Assert.True(vm.ConfirmCommand.CanExecute(null));
+        Assert.Null(vm.OperatorNameError);
+        vm.ConfirmCommand.Execute(null);
+        Assert.NotNull(vm.Result);
     }
 
     [Fact]
@@ -68,21 +77,33 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
-    public void Join_flow_requires_both_host_and_pin_to_confirm()
+    public void Join_flow_names_the_missing_pin()
     {
         var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1" };
-        Assert.False(vm.ConfirmCommand.CanExecute(null)); // host given, PIN still missing
+
+        vm.ConfirmCommand.Execute(null);
+        Assert.Equal(ValidationMessages.Required, vm.PinError); // host given, PIN still missing
+        Assert.Null(vm.HostError); // only the offending field is named
+        Assert.Null(vm.Result);
 
         vm.Pin = "1234";
-        Assert.True(vm.ConfirmCommand.CanExecute(null));
+        Assert.Null(vm.PinError);
+        vm.ConfirmCommand.Execute(null);
+        Assert.NotNull(vm.Result);
     }
 
     [Fact]
     public void Pin_is_not_required_when_not_joining()
     {
-        // The new-incident / continue-editing flows never show the PIN field, so it must not gate them.
+        // The new-incident / continue-editing flows never show the PIN field, so it must not
+        // refuse them -- and must not be named as missing either.
         var vm = new OperatorPromptViewModel { OperatorName = "Müller" };
-        Assert.True(vm.ConfirmCommand.CanExecute(null));
+
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.NotNull(vm.Result);
+        Assert.Null(vm.PinError);
+        Assert.Null(vm.HostError);
     }
 
     [Fact]

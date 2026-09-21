@@ -41,11 +41,29 @@ public sealed partial class PdfExportOptionsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
     private bool _isBusy;
 
-    private bool CanExport => !IsBusy && Items.Any(i => i.IsSelected);
+    // Quiet until the first press: a dialog that opens already scolding teaches nothing.
+    private bool _errorsShown;
+
+    /// <summary>
+    /// Whether every section is unticked, once the operator has asked (#412). There is no field to
+    /// hang this on -- the form is a list of checkboxes -- so the view shows it above the buttons.
+    /// </summary>
+    public string? SelectionError =>
+        _errorsShown && !Items.Any(i => i.IsSelected) ? ValidationMessages.NoPdfSection : null;
+
+    // IsBusy stays: an export is already running, so there is nothing a message could add.
+    private bool CanExport => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanExport))]
     private async Task Export()
     {
+        _errorsShown = true;
+        OnPropertyChanged(nameof(SelectionError));
+        if (SelectionError is not null)
+        {
+            return;
+        }
+
         var sections = Items.Where(i => i.IsSelected).Aggregate(IncidentPdfSections.None, (acc, i) => acc | i.Section);
         IsBusy = true;
         try
@@ -77,7 +95,8 @@ public sealed partial class PdfExportOptionsViewModel : ObservableObject
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void NotifyCanExecuteChanged() => ExportCommand.NotifyCanExecuteChanged();
+    // A ticked or unticked section can clear the message as it is ticked, without a second press.
+    private void NotifyCanExecuteChanged() => OnPropertyChanged(nameof(SelectionError));
 }
 
 public sealed partial class PdfSectionOptionViewModel : ObservableObject

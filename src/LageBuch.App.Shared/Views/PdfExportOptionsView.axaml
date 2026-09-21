@@ -31,6 +31,11 @@
               <TextBlock Text="PDF wird erstellt…" VerticalAlignment="Center" Classes="secondary" />
             </StackPanel>
           </Border>
+          <!-- #412: no field to hang this on, the form being a list of checkboxes, so it sits
+               where the eye already is on the way to EXPORTIEREN. -->
+          <TextBlock x:Name="SelectionError" Classes="field-error" Margin="0,8,0,0"
+                     Text="{Binding SelectionError}"
+                     IsVisible="{Binding SelectionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
             <Button x:Name="ExportButton" Classes="signal" Content="EXPORTIEREN" Command="{Binding ExportCommand}" />
