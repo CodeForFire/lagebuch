@@ -135,6 +135,63 @@
       </StackPanel>
     </Border>
 
+    <!-- Wohnungen entfernen (#419): raised when shrinking a floor would throw away something a
+         crew recorded. Deliberately an inline panel rather than the shared ConfirmDialogView
+         overlay: that one focuses its Cancel button on attach, and NumericUpDown commits its
+         pending text on LostFocus, so opening it would push another value through the spinner's
+         binding and re-enter the very handler that raised the question. A Border takes no focus,
+         so the crew can keep typing the count they meant. -->
+    <Border x:Name="ApartmentRemovalPanel"
+            DockPanel.Dock="Top"
+            IsVisible="{Binding IsApartmentRemovalOpen}"
+            Background="#0F141D"
+            BorderBrush="{StaticResource HairlineBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}"
+            Padding="14" Margin="0,0,0,14">
+      <StackPanel Spacing="8" DataContext="{Binding PendingApartmentRemoval}"
+                  x:CompileBindings="False">
+        <TextBlock Text="{Binding Header}" Classes="overline" />
+        <TextBlock Text="Welche Wohnungen sollen entfallen? Die übrigen rücken auf."
+                   TextWrapping="Wrap" />
+        <ScrollViewer MaxHeight="220" HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Spacing="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <CheckBox IsChecked="{Binding IsSelected}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                    <!-- Amber, not the red signal colour: red means "Person(en) betroffen" on
+                         every tile below, and this only says "something would be lost here". -->
+                    <TextBlock Text="{Binding Contents}" FontSize="11" VerticalAlignment="Center"
+                               Foreground="{StaticResource AmberBrush}"
+                               IsVisible="{Binding CarriesData}" />
+                    <TextBlock Text="{Binding Contents}" FontSize="11" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               IsVisible="{Binding !CarriesData}" />
+                  </StackPanel>
+                </CheckBox>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+        <TextBlock Text="{Binding SelectionLabel}" FontSize="11"
+                   Foreground="{StaticResource TextSecondaryBrush}" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="ConfirmApartmentRemovalButton" Classes="signal" Content="ENTFERNEN"
+                  IsEnabled="{Binding CanConfirm}"
+                  Command="{Binding $parent[UserControl].((vm:CoMessprotokollViewModel)DataContext).ConfirmApartmentRemovalCommand}" />
+          <Button x:Name="CancelApartmentRemovalButton" Content="ABBRECHEN"
+                  Command="{Binding $parent[UserControl].((vm:CoMessprotokollViewModel)DataContext).CancelApartmentRemovalCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
     <!-- Empty state -->
     <TextBlock DockPanel.Dock="Top"
                Text="Keine Häuser erfasst. Klicken Sie auf „HAUS HINZUFÜGEN“, um zu beginnen."
@@ -394,7 +451,11 @@
                     <TextBlock Text="&#x2297;" FontSize="11" Foreground="#FF0000"
                                IsVisible="{Binding HasAffected}" />
                   </StackPanel>
-                  <NumericUpDown Minimum="1" Maximum="30" FormatString="0" FontSize="11"
+                  <!-- ClipValueToMinMax for the same reason CoValueInput has it: without it a
+                       typed value above Maximum throws inside the control, the exception is
+                       swallowed, and Value silently never updates: no warning, no feedback. -->
+                  <NumericUpDown Minimum="1" Maximum="30" ClipValueToMinMax="True"
+                                 FormatString="0" FontSize="11"
                                  Value="{Binding ApartmentCount}" IsEnabled="{Binding !IsReadOnly}"
                                  IsVisible="{ReflectionBinding $parent[ItemsControl].DataContext.IsStructureMode}"
                                  Margin="0,4,0,0" />

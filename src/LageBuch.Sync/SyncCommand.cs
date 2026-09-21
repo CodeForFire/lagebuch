@@ -48,6 +48,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetFloorDescriptionCommand), "setFloorDescription")]
 [JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
 [JsonDerivedType(typeof(SetApartmentCountCommand), "setApartmentCount")]
+[JsonDerivedType(typeof(RemoveDwellingsCommand), "removeDwellings")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -175,3 +176,8 @@ public sealed record SetApartmentLabelCommand(
 // like UpdateCoBuildingStructure, since it changes structure rather than just a label.
 public sealed record SetApartmentCountCommand(
     OperatorDto Operator, Guid BuildingId, int FloorOrdinal, int Count) : SyncCommand;
+
+// #419: which Wohnungen go, rather than how many are left -- the count alone can only ever
+// mean "drop the ones on the right". Attributed like SetApartmentCount: it writes an ETB line.
+public sealed record RemoveDwellingsCommand(
+    OperatorDto Operator, Guid BuildingId, int FloorOrdinal, IReadOnlyList<int> ApartmentNumbers) : SyncCommand;

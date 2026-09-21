@@ -311,6 +311,30 @@ public class CommandApplierTests
         Assert.Equal(9, incident.Dwellings.Count);
     }
 
+    // #419: the removal has to survive the wire as a selection, not a count -- a joined device
+    // must delete the same Wohnungen the host's crew ticked, not the ones on the right-hand end.
+    [Fact]
+    public void Apply_RemoveDwellings_RemovesThePickedUnitsAndRenumbersTheRest()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Test", null);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 4);
+        var buildingId = incident.Buildings[0].Id;
+        incident.SetDwellingDetails(buildingId, 0, 3, "Müller", null);
+
+        var cmd = new RemoveDwellingsCommand(new OperatorDto("Test", null), buildingId, 0, new[] { 1, 2 });
+        ApplyOverWire(cmd, incident, clock);
+
+        var floor = incident.Dwellings
+            .Where(d => d.FloorOrdinal == 0)
+            .OrderBy(d => d.ApartmentNumber)
+            .ToList();
+        Assert.Equal(new[] { 1, 2 }, floor.Select(d => d.ApartmentNumber));
+        Assert.Equal("Müller", floor[0].ResidentName);
+        Assert.Equal(2, incident.Buildings[0].ApartmentsFor(0));
+    }
+
     [Fact]
     public void Apply_RecordCoValue_SetsValue()
     {

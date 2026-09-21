@@ -108,6 +108,36 @@ public class CoMeasurementPersistenceTests : IDisposable
         Assert.Empty(loaded.Dwellings.Single(d => d.FloorOrdinal == 2 && d.ApartmentNumber == 1).Readings);
     }
 
+    // #419: removing a Wohnung renumbers the survivors. That has to move the records rather than
+    // rebuild them — co_readings rows hang off Dwelling.Id, so a survivor recreated under a new id
+    // would come back from disk with an empty Messreihe.
+    [Fact]
+    public void SaveLoad_AfterRemovingAWohnung_KeepsTheSurvivorsMessreihen()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 4);
+        var haus = incident.Buildings[0].Id;
+        incident.SetApartmentLabel(haus, 0, 4, "Kiosk");
+        incident.RecordCoValue(clock, op, haus, 0, 4, 120);
+        clock.Now = clock.Now.AddMinutes(5);
+        incident.RecordCoValue(clock, op, haus, 0, 4, 40);
+
+        incident.RemoveDwellings(clock, op, haus, 0, new[] { 2 });
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        // Whg. 4 is Whg. 3 now, with both readings and its Bezeichnung still attached.
+        var moved = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 3);
+        Assert.Equal(40, moved.CoValue);
+        Assert.Equal(2, moved.Readings.Count);
+        Assert.Equal("Kiosk", CoMeasurementLabels.ApartmentLabel(loaded.Buildings[0], 0, 3));
+        Assert.Equal(3, loaded.Buildings[0].ApartmentsFor(0));
+        Assert.Equal(3, loaded.Dwellings.Count(d => d.FloorOrdinal == 0));
+    }
+
     [Fact]
     public void SaveLoad_RoundTrip_BuildingsAndDwellings()
     {

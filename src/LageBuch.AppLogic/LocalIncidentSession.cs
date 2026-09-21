@@ -318,6 +318,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetApartmentCount(Guid buildingId, int floorOrdinal, int count) =>
         Mutate(() => Incident.SetApartmentCount(_clock, RequireOperator(), buildingId, floorOrdinal, count));
 
+    public void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers) =>
+        Mutate(() => Incident.RemoveDwellings(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumbers));
+
     public void Close()
     {
         if (IsReadOnly)

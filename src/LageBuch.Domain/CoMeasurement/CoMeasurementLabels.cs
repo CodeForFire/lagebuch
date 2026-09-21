@@ -49,6 +49,12 @@ public static class CoMeasurementLabels
     public static string ApartmentLabelKey(int floorOrdinal, int apartmentNumber) =>
         $"{floorOrdinal.ToString(CultureInfo.InvariantCulture)}:{apartmentNumber.ToString(CultureInfo.InvariantCulture)}";
 
+    /// <summary>The <see cref="ApartmentLabelKey"/> prefix identifying one floor's entries (#419).
+    /// The trailing colon is what keeps the match exact: without it, floor 1 would also claim
+    /// floor 12's keys.</summary>
+    public static string ApartmentLabelKeyPrefix(int floorOrdinal) =>
+        $"{floorOrdinal.ToString(CultureInfo.InvariantCulture)}:";
+
     /// <summary>Pre-#265 saved incidents keyed ApartmentLabels by apartment number alone (one
     /// label shared across every floor's same-numbered column, e.g. "2" → "Müller"). #265 makes
     /// labels per-floor, so an old label needs to fan out across every floor that existed when it

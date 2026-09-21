@@ -72,7 +72,26 @@ public sealed record Dwelling
         Readings = new List<CoReading>(Readings) { new(measuredAt, coValue, recordedBy) },
     };
 
+    /// <summary>Whether a crew ever recorded anything here — what makes deleting this Wohnung
+    /// worth asking about rather than doing silently (#419). <see cref="Readings"/> is checked in
+    /// its own right and not folded into <see cref="CoValue"/>: clearing a measurement is itself
+    /// recorded as a reading (see <see cref="CoReading"/>), so a corrected Wohnung has a null
+    /// value and a real history behind it.</summary>
+    public bool HasData =>
+        ResidentName is not null
+        || Status != DwellingStatus.NotSearched
+        || KeyAvailable is not null
+        || CoValue is not null
+        || Readings.Count > 0;
+
     public Dwelling WithStatus(DwellingStatus status) => this with { Status = status };
+
+    /// <summary>Renumbers this Wohnung within its floor (#419). A <c>with</c>-expression rather
+    /// than a fresh <see cref="Create"/> on purpose: <see cref="Id"/> is what the persisted
+    /// <c>co_readings</c> rows hang off, so recreating the record would orphan the Messreihe.
+    /// </summary>
+    public Dwelling WithApartmentNumber(int apartmentNumber) =>
+        this with { ApartmentNumber = apartmentNumber };
 
     public Dwelling WithDetails(string? residentName, bool? keyAvailable) => this with
     {

@@ -899,4 +899,7 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void SetApartmentCount(Guid buildingId, int floorOrdinal, int count) =>
         _inner.SetApartmentCount(buildingId, floorOrdinal, count);
+
+    public void RemoveDwellings(Guid buildingId, int floorOrdinal, IReadOnlyList<int> apartmentNumbers) =>
+        _inner.RemoveDwellings(buildingId, floorOrdinal, apartmentNumbers);
 }

@@ -980,18 +980,26 @@ public sealed class Incident
         var index = _buildings.IndexOf(building);
         _buildings[index] = updated;
 
-        // Remove dwellings outside the new structure...
+        // Remove dwellings outside the new structure. The apartment bound is the floor's own
+        // count, not the building default: a floor carrying a #265 override (a 14-Wohnungen
+        // Kellergeschoss under a 3-per-floor default) is still inside the structure, and reading
+        // the default here is what let OG HINZUFUEGEN -- a button that only adds a floor -- delete
+        // that floor's Wohnungen and every Messwert on them (#419).
         var removed = _dwellings.RemoveAll(d =>
             d.BuildingId == buildingId &&
-            (d.FloorOrdinal > floorCount || d.FloorOrdinal < -undergroundFloorCount || d.ApartmentNumber > apartmentsPerFloor));
+            (d.FloorOrdinal > floorCount || d.FloorOrdinal < -undergroundFloorCount || d.ApartmentNumber > updated.ApartmentsFor(d.FloorOrdinal)));
 
-        // ...and add any newly covered by a grown structure (more OG/UG floors or apartments) --
+        // Then add any newly covered by a grown structure (more OG/UG floors or apartments) --
         // Dwelling.Create is idempotent-safe here since the removal pass above already cleared
         // anything out of bounds, so no (floor, apartment) pair can already exist twice.
         var added = 0;
         for (var floor = -undergroundFloorCount; floor <= floorCount; floor++)
         {
-            for (var apt = 1; apt <= apartmentsPerFloor; apt++)
+            // Same per-floor count as the removal pass above, so a floor that keeps its override
+            // also gets its full set back -- including a floor whose Wohnungen an earlier build
+            // already dropped, which is how a file damaged by the bug above heals itself (#419).
+            var apartmentsOnFloor = updated.ApartmentsFor(floor);
+            for (var apt = 1; apt <= apartmentsOnFloor; apt++)
             {
                 if (!_dwellings.Any(d => d.BuildingId == buildingId && d.FloorOrdinal == floor && d.ApartmentNumber == apt))
                 {
@@ -1152,5 +1160,128 @@ public sealed class Incident
         }
 
         AppendSystemEntry(clock, op, text);
+    }
+
+    /// <summary>Removes named Wohnungen from one floor and closes the gap behind them (#419).
+    /// <para>The counterpart to <see cref="SetApartmentCount"/>, which can only drop units off the
+    /// right-hand end: a crew shrinking a floor from 6 to 4 rarely means "delete 5 and 6", and
+    /// doing it silently cost them Bewohner, Absuchstatus and whole Messreihen. Here they say
+    /// which units go.</para>
+    /// <para>Survivors are renumbered densely, because everything downstream addresses a Wohnung
+    /// by (Haus, Geschoss, Nummer) and assumes a floor holds exactly 1..n: leaving a hole would
+    /// drop a unit off the screen while the PDF still printed it. Their labels follow them, and
+    /// their Ids and Messreihen survive untouched.</para></summary>
+    public void RemoveDwellings(IClock clock, SessionOperator op, Guid buildingId, int floorOrdinal, IReadOnlyCollection<int> apartmentNumbers)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+        ArgumentNullException.ThrowIfNull(apartmentNumbers);
+
+        var building = FindBuilding(buildingId);
+        if (floorOrdinal > building.FloorCount || floorOrdinal < -building.UndergroundFloorCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(floorOrdinal), "Das Geschoss existiert nicht.");
+        }
+
+        var onFloor = _dwellings
+            .Where(d => d.BuildingId == buildingId && d.FloorOrdinal == floorOrdinal)
+            .OrderBy(d => d.ApartmentNumber)
+            .ToList();
+
+        var doomed = apartmentNumbers.Distinct().ToList();
+        if (doomed.Count != apartmentNumbers.Count)
+        {
+            throw new ArgumentException("Eine Wohnung wurde doppelt angegeben.", nameof(apartmentNumbers));
+        }
+
+        if (doomed.Count == 0)
+        {
+            throw new ArgumentException("Es wurde keine Wohnung angegeben.", nameof(apartmentNumbers));
+        }
+
+        // Against the Wohnungen that actually exist, not against ApartmentsFor: a file damaged by
+        // the structure bug above can claim 14 units on a floor holding 3, and a range check would
+        // happily accept a number naming nothing. Deriving the new count from the survivors below
+        // also repairs that mismatch rather than carrying it forward.
+        if (doomed.Exists(n => !onFloor.Exists(d => d.ApartmentNumber == n)))
+        {
+            throw new ArgumentOutOfRangeException(nameof(apartmentNumbers), "Die Wohnung existiert nicht.");
+        }
+
+        var survivors = onFloor.Where(d => !doomed.Contains(d.ApartmentNumber)).ToList();
+        if (survivors.Count == 0)
+        {
+            throw new ArgumentException("Ein Geschoss braucht mindestens eine Wohnung.", nameof(apartmentNumbers));
+        }
+
+        // Both maps are read off the building as it stands, before anything moves. The labels for
+        // the ETB are the effective ones -- what the crew has on screen -- and they stop being
+        // that the moment the count changes, since a floor of exactly three units labels itself
+        // Links/Mitte/Rechts. The labels that get carried over are the raw overrides: writing an
+        // effective label back would freeze "Rechts" onto a survivor as if a crew had typed it.
+        var removedLabels = onFloor
+            .Where(d => doomed.Contains(d.ApartmentNumber))
+            .Select(d => $"{CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber)}{DwellingContentSuffix(d)}")
+            .ToList();
+
+        var carriedLabels = new Dictionary<int, string?>();
+        for (var i = 0; i < survivors.Count; i++)
+        {
+            var key = CoMeasurementLabels.ApartmentLabelKey(floorOrdinal, survivors[i].ApartmentNumber);
+            if (building.ApartmentLabels.TryGetValue(key, out var raw))
+            {
+                carriedLabels[i + 1] = raw;
+            }
+        }
+
+        var updated = building
+            .WithFloorApartmentLabels(floorOrdinal, carriedLabels)
+            .WithApartmentCount(floorOrdinal, survivors.Count);
+        var index = _buildings.IndexOf(building);
+        _buildings[index] = updated;
+
+        _dwellings.RemoveAll(d => d.BuildingId == buildingId && d.FloorOrdinal == floorOrdinal);
+        for (var i = 0; i < survivors.Count; i++)
+        {
+            _dwellings.Add(survivors[i].WithApartmentNumber(i + 1));
+        }
+
+        AppendSystemEntry(
+            clock,
+            op,
+            $"CO-Struktur geändert: {building.Name}, {CoMeasurementLabels.FloorLabel(floorOrdinal)} jetzt {survivors.Count} Wohnungen, entfernt: {string.Join(", ", removedLabels)}");
+    }
+
+    /// <summary>What a Wohnung was carrying, for the ETB line that records its removal (#419) --
+    /// the point being that the log says what was lost, not just how many.</summary>
+    private static string DwellingContentSuffix(Dwelling dwelling)
+    {
+        var carried = new List<string>();
+        if (dwelling.ResidentName is not null)
+        {
+            carried.Add("Bewohner erfasst");
+        }
+
+        if (dwelling.Status != DwellingStatus.NotSearched)
+        {
+            carried.Add(dwelling.Status == DwellingStatus.Searched ? "durchsucht" : "betroffen");
+        }
+
+        if (dwelling.CoValue is { } ppm)
+        {
+            carried.Add($"{ppm} ppm");
+        }
+        else if (dwelling.Readings.Count > 0)
+        {
+            carried.Add("Messreihe");
+        }
+
+        if (dwelling.KeyAvailable is true)
+        {
+            carried.Add("Schlüssel vorhanden");
+        }
+
+        return carried.Count > 0 ? $" ({string.Join(", ", carried)})" : string.Empty;
     }
 }

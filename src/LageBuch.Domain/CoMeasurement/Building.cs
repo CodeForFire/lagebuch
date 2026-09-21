@@ -152,6 +152,40 @@ public sealed record Building
         return this with { ApartmentCounts = dict };
     }
 
+    /// <summary>Whether this unit carries a crew-given Bezeichnung (#419). The label lives here
+    /// rather than on the Dwelling, so a unit that is otherwise untouched still holds something
+    /// worth confirming before it is deleted — a "Kiosk" with no Messwert is not an empty
+    /// Wohnung.</summary>
+    public bool HasApartmentLabel(int floorOrdinal, int apartmentNumber) =>
+        ApartmentLabels.ContainsKey(CoMeasurementLabels.ApartmentLabelKey(floorOrdinal, apartmentNumber));
+
+    /// <summary>Replaces one floor's unit labels wholesale (#419), dropping every existing entry
+    /// for that floor before re-adding <paramref name="labelsByApartment"/>.
+    /// <para>Atomic on purpose. Renumbering survivors after a removal shifts labels downward, and
+    /// applying that shift as a sequence of <see cref="WithApartmentLabel"/> calls clobbers: on a
+    /// floor labelled A/B/C/D, removing unit 2 moves "C" onto key 2 — which still holds "B" —
+    /// before "B"'s own key is rewritten. Replacing the floor in one pass is also the only way the
+    /// vacated tail keys go away instead of resurfacing on a later grow.</para></summary>
+    public Building WithFloorApartmentLabels(int floorOrdinal, IReadOnlyDictionary<int, string?> labelsByApartment)
+    {
+        ArgumentNullException.ThrowIfNull(labelsByApartment);
+
+        var prefix = CoMeasurementLabels.ApartmentLabelKeyPrefix(floorOrdinal);
+        var dict = ApartmentLabels
+            .Where(kv => !kv.Key.StartsWith(prefix, StringComparison.Ordinal))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        foreach (var (apartmentNumber, label) in labelsByApartment)
+        {
+            if (!string.IsNullOrWhiteSpace(label))
+            {
+                dict[CoMeasurementLabels.ApartmentLabelKey(floorOrdinal, apartmentNumber)] = label.Trim();
+            }
+        }
+
+        return this with { ApartmentLabels = dict };
+    }
+
     public Building WithApartmentLabel(int floorOrdinal, int apartmentNumber, string? label)
     {
         var dict = new Dictionary<string, string?>(ApartmentLabels);
