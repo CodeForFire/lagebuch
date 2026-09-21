@@ -304,6 +304,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     private string _newBrigade = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewCallSignError))]
     private string? _newCallSign;
 
     /// <summary>Nullable: an empty field means 0 and keeps the placeholder visible.</summary>
@@ -386,8 +387,10 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Der Freitext im Funkrufname-Feld kann trotzdem einen vergebenen Namen treffen (etwa bei
-    /// Fremdwehren ohne Stammdaten) — dann sperrt das Flag HINZUFÜGEN, statt dass der Domain-Aufruf
-    /// später ins Leere läuft. Leere Rufnamen zählen nie als Duplikat.
+    /// Fremdwehren ohne Stammdaten) — dann verweigert das Flag die Aufnahme, statt dass der
+    /// Domain-Aufruf später ins Leere läuft. Leere Rufnamen zählen nie als Duplikat: das Dock
+    /// erzeugt seit #220 keine mehr, aber eine ältere Einsatzdatei, ein Snapshot oder ein
+    /// verbundenes Gerät auf älterem Stand kann eine solche Zeile mitbringen.
     /// </summary>
     public bool IsDuplicateCallSign =>
         !string.IsNullOrWhiteSpace(NewCallSign)
@@ -439,9 +442,21 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         _errorsShown && string.IsNullOrWhiteSpace(NewBrigade) ? ValidationMessages.BrigadeRequired : null;
 
     /// <summary>
+    /// Whether the Funkrufname is still missing, once the operator has asked. Together with
+    /// <see cref="NewBrigadeError"/> this is the identity rule #220 asked for: a Kraft is either a
+    /// Fahrzeug out of the Stammdaten, or a Wache and a Funkrufname typed by hand. A unit nobody
+    /// can call is not a unit.
+    /// <para>
+    /// The Fahrzeug branch needs no check of its own: picking one derives both fields and the view
+    /// locks them while it is selected, so a satisfied dropdown is already a satisfied pair.
+    /// </para>
+    /// </summary>
+    public string? NewCallSignError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewCallSign) ? ValidationMessages.CallSignRequired : null;
+
+    /// <summary>
     /// What is wrong with the three Stärke boxes, once the operator has asked. A row with a Wache
-    /// but nobody counted reports nothing and is almost always a stray click (#220). Funkrufname
-    /// stays optional on purpose -- Fremdwehr headcounts without a specific vehicle are real.
+    /// but nobody counted reports nothing and is almost always a stray click (#220).
     /// </summary>
     public string? NewStrengthError
     {
@@ -521,6 +536,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     {
         ShowErrors(true);
         return NewBrigadeError is null
+               && NewCallSignError is null
                && NewStrengthError is null
                && NewScbaCountError is null
                && !IsDuplicateCallSign;
@@ -530,6 +546,7 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     {
         _errorsShown = shown;
         OnPropertyChanged(nameof(NewBrigadeError));
+        OnPropertyChanged(nameof(NewCallSignError));
         OnPropertyChanged(nameof(NewStrengthError));
         OnPropertyChanged(nameof(NewScbaCountError));
     }

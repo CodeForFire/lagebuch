@@ -86,11 +86,14 @@ public class FieldErrorRenderTests
         vm.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        // Two different rules, two different fields, each stated where it applies.
+        // Three different rules, three different fields, each stated where it applies.
         var brigade = FieldErrorOf(view, "FEUERWEHR / WACHE");
+        var callSign = FieldErrorOf(view, "FUNKRUFNAME");
         var strength = FieldErrorOf(view, "STÄRKE ZF / GF / MANN");
         Assert.True(brigade.IsVisible);
         Assert.Equal(ValidationMessages.BrigadeRequired, brigade.Text);
+        Assert.True(callSign.IsVisible);
+        Assert.Equal(ValidationMessages.CallSignRequired, callSign.Text);
         Assert.True(strength.IsVisible);
         Assert.Equal(ValidationMessages.NoPersonnel, strength.Text);
 

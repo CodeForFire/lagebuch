@@ -24,6 +24,13 @@ public static class ValidationMessages
     /// <summary>The Wache a Kräfte row belongs to, without which the row reports nobody.</summary>
     public const string BrigadeRequired = "Wache eingeben";
 
+    /// <summary>
+    /// A Kräfte row nobody can call. The message names the dropdown because picking a Fahrzeug
+    /// fills this field and the Wache together -- the Wache's own message stays terse rather than
+    /// printing the same advice twice (#220).
+    /// </summary>
+    public const string CallSignRequired = "Funkrufname eingeben oder Fahrzeug wählen";
+
     /// <summary>A headcount below zero, which no Stärke box can mean.</summary>
     public const string NegativeStrength = "Stärke darf nicht negativ sein";
 

@@ -116,6 +116,7 @@ public class ForcesTabRenderTests
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
 
@@ -142,9 +143,11 @@ public class ForcesTabRenderTests
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
         vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/2";
         vm.Forces.NewMannschaftCount = 9;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -165,9 +168,10 @@ public class ForcesTabRenderTests
         Assert.Equal(9, vm.Forces.TotalPersonnel);
 
         // The journal (and thus the ETB tab) names the removed unit -- it's a System entry,
-        // hidden by default (#223).
+        // hidden by default (#223). The Funkrufname rides along in that label, now that a Kraft
+        // always carries one (#220).
         vm.Etb.HideSystemEntries = false;
-        Assert.Contains(vm.Etb.Entries, e => e.Text == "Einheit entfernt: FFB Wache 1");
+        Assert.Contains(vm.Etb.Entries, e => e.Text == "Einheit entfernt: FFB Wache 1 (FFB 11/1)");
 
         Capture(window, "forces-row-removed.png");
     }
@@ -183,6 +187,7 @@ public class ForcesTabRenderTests
     {
         var view = HostForcesView(out var vm, out var window);
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -214,6 +219,7 @@ public class ForcesTabRenderTests
     {
         var view = HostForcesView(out var vm, out var window);
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();

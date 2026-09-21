@@ -28,6 +28,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB",
+            NewCallSign = "FFB 11/1",
             NewOfficerCount = 1,
             NewMannschaftCount = 11,
         };
@@ -35,6 +36,7 @@ public class ForcesViewModelTests
         Assert.True(vm.AddForceCommand.CanExecute(null));
         vm.AddForceCommand.Execute(null);
         vm.NewBrigade = "Emmering";
+        vm.NewCallSign = "FFB 11/2";
         vm.NewMannschaftCount = 9;
         vm.AddForceCommand.Execute(null);
 
@@ -43,8 +45,10 @@ public class ForcesViewModelTests
         Assert.Equal(2, changes);
     }
 
+    // --- A Kraft needs an identity: a Fahrzeug from the Stammdaten, or a Wache and a Funkrufname
+    // typed by hand. A unit nobody can call is not a unit (#220's original wording). ---
     [Fact]
-    public void AddForce_names_the_blank_Wache()
+    public void AddForce_names_both_identity_fields_when_neither_is_given()
     {
         var vm = NewVm();
         vm.NewBrigade = "  ";
@@ -54,7 +58,42 @@ public class ForcesViewModelTests
         vm.AddForceCommand.Execute(null);
 
         Assert.Equal(ValidationMessages.BrigadeRequired, vm.NewBrigadeError);
+        Assert.Equal(ValidationMessages.CallSignRequired, vm.NewCallSignError);
         Assert.Empty(vm.Forces);
+    }
+
+    [Fact]
+    public void AddForce_names_the_Funkrufname_when_only_the_Wache_was_typed()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FF Musterdorf"; // a Fremdwehr with no Stammdaten vehicle
+        vm.NewMannschaftCount = 6;
+
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.CallSignRequired, vm.NewCallSignError);
+        Assert.Null(vm.NewBrigadeError); // only the offending field is named
+        Assert.Empty(vm.Forces);
+
+        vm.NewCallSign = "Musterdorf 40/1";
+        Assert.Null(vm.NewCallSignError); // fixed as it is typed, without a second press
+        vm.AddForceCommand.Execute(null);
+        Assert.Single(vm.Forces);
+    }
+
+    [Fact]
+    public void Picking_a_Fahrzeug_satisfies_the_identity_rule_on_its_own()
+    {
+        var vm = NewVm();
+
+        // The dropdown fills Wache, Funkrufname and the seat-derived Stärke in one go, and locks
+        // the two text fields -- so the "or" branch of the rule needs nothing of its own.
+        vm.SelectedVehicle = vm.VehicleOptions[0];
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Single(vm.Forces);
+        Assert.Null(vm.NewBrigadeError);
+        Assert.Null(vm.NewCallSignError);
     }
 
     // --- Issue #220: a row with no counted personnel is not a real entry ---
@@ -63,6 +102,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
 
         // Brigade alone -- Führungskräfte and Mannschaft both left blank (0) -- is not an entry:
         // an empty unit reports nothing and is almost always a stray click (#220). It now says so.
@@ -88,6 +128,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
 
         // A row reporting a single Zugführer with no Führungskräfte/Mannschaft is still a real,
         // counted entry (#220 only rules out entirely empty rows).
@@ -103,6 +144,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewMannschaftCount = -1;
 
         vm.AddForceCommand.Execute(null);
@@ -155,6 +197,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewMannschaftCount = 9;
         vm.NewStatus = "Im Einsatz";
         vm.NewNotes = "über Drehleiter angefordert";
@@ -171,10 +214,12 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewMannschaftCount = 9;
         vm.NewScbaCount = 4;
         vm.AddForceCommand.Execute(null);
         vm.NewBrigade = "Aich";
+        vm.NewCallSign = "FFB 11/2";
         vm.NewMannschaftCount = 6;
         vm.NewScbaCount = 2;
         vm.AddForceCommand.Execute(null);
@@ -189,6 +234,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewOfficerCount = 1;
         vm.NewMannschaftCount = 3;
         vm.NewScbaCount = 5;
@@ -209,6 +255,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewOfficerCount = 1;
         vm.NewMannschaftCount = 8;
         vm.NewScbaCount = 4;
@@ -325,7 +372,7 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void Rows_without_a_call_sign_never_count_as_duplicates()
+    public void Rows_that_arrived_without_a_call_sign_neither_duplicate_nor_reserve_a_vehicle()
     {
         var clock = new FixedClock(T0);
         var session = TestSession.StartNew(
@@ -335,19 +382,25 @@ public class ForcesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
+
+        // The dock no longer produces a row without a Funkrufname (#220), but the domain still
+        // permits one -- an older Einsatzdatei, a snapshot, a joined client on an older build. Such
+        // a row has to render, has to collide with nothing, and must not reserve a Fahrzeug.
+        session.AddForceUnit("Emmering", 6);
+        session.AddForceUnit("Emmering", 9);
         var vm = new ForcesViewModel(session, clock, Md(), () => { });
 
-        // Two units without any call sign must remain possible.
-        foreach (var mannschaft in new[] { 6, 9 })
-        {
-            vm.NewBrigade = "Emmering";
-            vm.NewMannschaftCount = mannschaft;
-            Assert.True(vm.AddForceCommand.CanExecute(null));
-            Assert.False(vm.IsDuplicateCallSign);
-            vm.AddForceCommand.Execute(null);
-        }
-
         Assert.Equal(2, vm.Forces.Count);
+        Assert.All(vm.Forces, r => Assert.Null(r.CallSign));
+
+        Assert.False(vm.IsDuplicateCallSign); // a blank input matches nothing
+        vm.NewCallSign = "FFB 1/40/1";
+        Assert.False(vm.IsDuplicateCallSign); // ...and neither do the blank rows
+
+        // Nothing was taken, so every Stammdaten vehicle is still on offer.
+        Assert.Equal(
+            new[] { "FFB 1/40/1", "FFB 1/44/1", "Aich 42/1" },
+            vm.VehicleOptions.Select(v => v.CallSign));
     }
 
     [Fact]
@@ -485,6 +538,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
+            NewCallSign = "FFB 11/1",
             NewMannschaftCount = 6,
         };
         vm.AddForceCommand.Execute(null);
@@ -512,6 +566,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewZugfuehrerCount = 1;
         vm.NewOfficerCount = 2;
         vm.NewMannschaftCount = 18;
@@ -538,6 +593,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
+            NewCallSign = "FFB 11/1",
             NewMannschaftCount = 6,
         };
         vm.AddForceCommand.Execute(null);
@@ -574,6 +630,7 @@ public class ForcesViewModelTests
         };
         vm.AddForceCommand.Execute(null);
         vm.NewBrigade = "Aich";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewMannschaftCount = 9;
         vm.AddForceCommand.Execute(null);
         Assert.Equal(2, vm.Forces.Count);
@@ -666,6 +723,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "Aich",
+            NewCallSign = "FFB 11/1",
             NewMannschaftCount = 6,
         };
         vm.AddForceCommand.Execute(null);
@@ -713,6 +771,7 @@ public class ForcesViewModelTests
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 11/1";
         vm.NewZugfuehrerCount = 1;
         vm.NewOfficerCount = 1;
         vm.NewMannschaftCount = 8;
@@ -740,6 +799,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++)
         {
             NewBrigade = "FFB Wache 1",
+            NewCallSign = "FFB 11/1",
             NewMannschaftCount = 9,
             NewStatus = "Alarmiert",
         };
@@ -768,6 +828,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
+            NewCallSign = "FFB 11/1",
             NewMannschaftCount = 9,
         };
         vm.AddForceCommand.Execute(null);
@@ -859,6 +920,7 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, clock, Md(), () => { })
         {
             NewBrigade = "FFB Wache 1",
+            NewCallSign = "FFB 11/1",
             NewMannschaftCount = 9,
             NewStatus = "Alarmiert",
         };

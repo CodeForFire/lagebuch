@@ -168,6 +168,7 @@ public class ForcesGridEditingTests
     {
         var (_, vm) = ShowForces(out var session);
         vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 9;
         vm.Forces.NewStatus = "Alarmiert";
         vm.Forces.AddForceCommand.Execute(null);

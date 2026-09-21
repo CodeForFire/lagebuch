@@ -81,8 +81,9 @@
             </TextBox>
           </HeaderedContentControl>
           <!-- Same reasoning as Feuerwehr/Wache above: free text for vehicles outside the Stammdaten,
-               readonly while a Fahrzeug is selected. -->
-          <HeaderedContentControl Classes="field" Header="FUNKRUFNAME">
+               readonly while a Fahrzeug is selected. Required together with the Wache (#220): a
+               Kraft is a Fahrzeug from den Stammdaten oder eine Wache samt Funkrufname. -->
+          <HeaderedContentControl Classes="field" Header="FUNKRUFNAME" ctrl:Field.Error="{Binding NewCallSignError}">
             <TextBox x:Name="CallSignBox" Width="140"
                      IsEnabled="{Binding !IsVehicleSelected}"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
@@ -120,8 +121,8 @@
           <Button x:Name="AddForceButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </StackPanel>
-        <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den
-             Hinzufügen-Button (Freitext-Duplikat), und der Dropdown blendet Vergebene ohnehin aus. -->
+        <!-- Ein Fahrzeug ist einzig: steht sein Funkrufname schon in der Liste, verweigert das Flag
+             die Aufnahme (Freitext-Duplikat), und der Dropdown blendet Vergebene ohnehin aus. -->
         <TextBlock x:Name="DuplicateHint" Text="Fahrzeug ist bereits aufgenommen"
                    FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
                    TextWrapping="Wrap"
