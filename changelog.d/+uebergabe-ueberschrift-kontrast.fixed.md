@@ -1,1 +1,0 @@
-Funktionen: die Überschrift des Übergabe-Panels und der Pfeil daneben waren mit dem halbtransparenten `TextMuted`-Token gezeichnet und auf dem dunklen Panel-Hintergrund praktisch unlesbar (rund 1,9:1 statt der von WCAG AA geforderten 4,5:1). Beide nutzen jetzt `TextSecondary`. (#413)
