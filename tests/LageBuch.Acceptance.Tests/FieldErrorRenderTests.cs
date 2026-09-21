@@ -62,6 +62,43 @@ public class FieldErrorRenderTests
         Assert.False(FieldErrorOf(view, "TIMER (MIN)").IsVisible);
     }
 
+    [AvaloniaFact]
+    public void Several_fields_can_be_named_at_once_and_each_says_its_own_rule()
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new ForcesViewModel(
+            session,
+            new FixedClock(),
+            MasterDataSet.Empty with { Vehicles = AnonymizedExampleData.Vehicles },
+            () => { });
+        var view = new ForcesView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1460, Height = 620 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        vm.NewScbaCount = 3; // AGT without any crew to draw them from
+        vm.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        // Two different rules, two different fields, each stated where it applies.
+        var brigade = FieldErrorOf(view, "FEUERWEHR / WACHE");
+        var strength = FieldErrorOf(view, "STÄRKE ZF / GF / MANN");
+        Assert.True(brigade.IsVisible);
+        Assert.Equal(ValidationMessages.BrigadeRequired, brigade.Text);
+        Assert.True(strength.IsVisible);
+        Assert.Equal(ValidationMessages.NoPersonnel, strength.Text);
+
+        // A field with nothing wrong with it stays silent.
+        Assert.False(FieldErrorOf(view, "BEMERKUNG").IsVisible);
+        Capture(window, "field-error-forces.png");
+    }
+
     private static (Window Window, TaskDialogView View, TaskDialogViewModel Vm) ShowTaskDialog(string text)
     {
         var session = TestSession.StartNew(
