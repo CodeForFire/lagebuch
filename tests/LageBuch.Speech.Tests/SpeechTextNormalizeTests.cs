@@ -8,14 +8,16 @@ namespace LageBuch.Speech.Tests;
 // auto-generated sentences in LageBuch.Domain/Incident.cs, and ScbaViewModel's announcements.
 public class SpeechTextNormalizeTests
 {
+    // German letter names, written out. Bare Latin letters ("I L S") left espeak-ng to guess, and it
+    // both rushed them and drifted into English.
     [Theory]
-    [InlineData("ILS", "I L S")]
-    [InlineData("CSA-Trupp", "C S A-Trupp")]
-    [InlineData("LPA-Trupp", "L P A-Trupp")]
-    [InlineData("AGT", "A G T")]
-    [InlineData("DLK", "D L K")]
-    [InlineData("ELW", "E L W")]
-    public void An_abbreviation_that_is_spoken_as_letters_is_spaced_out(string input, string expected) =>
+    [InlineData("ILS", "Ih Ell Ess")]
+    [InlineData("CSA-Trupp", "Tseh Ess Ah-Trupp")]
+    [InlineData("LPA-Trupp", "Ell Peh Ah-Trupp")]
+    [InlineData("AGT", "Ah Geh Teh")]
+    [InlineData("DLK", "Deh Ell Kah")]
+    [InlineData("ELW", "Eh Ell Weh")]
+    public void An_abbreviation_spoken_as_letters_uses_the_German_letter_names(string input, string expected) =>
         Assert.Equal(expected, SpeechText.Normalize(input));
 
     [Theory]
@@ -37,7 +39,7 @@ public class SpeechTextNormalizeTests
     [Fact]
     public void The_under_air_warning_keeps_its_abbreviation() =>
         Assert.Equal(
-            "ACHTUNG: 2 Atemschutztrupp noch unter P A.",
+            "ACHTUNG: 2 Atemschutztrupp noch unter Peh Ah.",
             SpeechText.Normalize("ACHTUNG: 2 Atemschutztrupp(s) noch unter PA."));
 
     [Theory]
@@ -71,17 +73,14 @@ public class SpeechTextNormalizeTests
     public void An_apartment_is_spoken_in_full() =>
         Assert.Equal("Wohnung 1", SpeechText.Normalize("Whg. 1"));
 
-    // A four-part group is a Stärke: each part is a count, so "12" stays "12", not "eins zwo".
-    [Fact]
-    public void A_four_part_group_is_read_as_counts() =>
-        Assert.Equal("Stärke 2, 1, 9, 12", SpeechText.Normalize("Stärke 2/1/9/12"));
-
-    // Anything shorter is a Funkrufname, and those go digit by digit.
-    [Fact]
-    public void A_shorter_group_is_read_as_a_call_sign() =>
-        Assert.Equal(
-            "Florian Musterstadt vier null, eins",
-            SpeechText.Normalize("Florian Musterstadt 40/1"));
+    // A Funkrufname and a Stärke are read the same way, so Normalize needs no heuristic to tell
+    // them apart -- which is the whole reason the four-group special case could be deleted.
+    [Theory]
+    [InlineData("Stärke 2/1/9/12", "Stärke zwo, 1, 9, 12")]
+    [InlineData("Florian Musterstadt 40/1", "Florian Musterstadt 40, 1")]
+    [InlineData("FFB 1/40/1", "Eff Eff Beh 1, 40, 1")]
+    public void Every_slash_group_is_read_as_a_number(string input, string expected) =>
+        Assert.Equal(expected, SpeechText.Normalize(input));
 
     [Theory]
     [InlineData("Müller — Schmidt", "Müller, Schmidt")]
@@ -103,7 +102,7 @@ public class SpeechTextNormalizeTests
 
     [Fact]
     public void A_co_reading_keeps_its_unit_pronounceable() =>
-        Assert.Equal("C O-Messung: 120 p p m", SpeechText.Normalize("CO-Messung: 120 ppm"));
+        Assert.Equal("Tseh Oh-Messung: 120 Peh Peh Emm", SpeechText.Normalize("CO-Messung: 120 ppm"));
 
     [Theory]
     [InlineData(null)]
@@ -125,7 +124,7 @@ public class SpeechTextNormalizeTests
             + "Rückzugsdruck erreicht (45 bar)";
 
         Assert.Equal(
-            "Rückzugsalarm Florian Musterstadt vier null, eins, Trupp 1 (Angriffstrupp): "
+            "Rückzugsalarm Florian Musterstadt 40, 1, Trupp 1 (Angriffstrupp): "
             + "Rückzugsdruck erreicht (45 bar)",
             SpeechText.Normalize(Raw));
     }

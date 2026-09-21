@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Text;
 
 namespace LageBuch.Speech.Sherpa.Tests;
 
@@ -22,9 +21,12 @@ namespace LageBuch.Speech.Sherpa.Tests;
 /// </remarks>
 public class VoiceAuditionTests
 {
+    // The abbreviation A/B asks about the lexicon, not the voice, so one voice carries it.
+    private const string AbbreviationVoiceId = "thorsten-medium";
+
     // Rendered raw as well as normalized, so the normalizer's effect is audible rather than
     // asserted. One Piper and one Supertonic, because the two engines phonemize differently.
-    private static readonly string[] ReferenceVoiceIds = ["thorsten-medium", "supertonic-3-sid00"];
+    private static readonly string[] ReferenceVoiceIds = [AbbreviationVoiceId, "supertonic-3-sid00"];
 
     [Fact]
     public void Render_the_audition()
@@ -43,27 +45,30 @@ public class VoiceAuditionTests
         Directory.CreateDirectory(outDir);
 
         var voices = VoiceCatalog.Candidates
-            .Concat(VoiceCatalog.MlsCandidates(VoiceCatalog.MlsProbeSpeakerIds))
             .Where(v => Directory.Exists(SpeechModelLocator.VoiceDirectory(root!, v)))
             .ToList();
 
         Assert.NotEmpty(voices);
 
         var clips = new List<Clip>();
+        var abbreviations = new List<AbbreviationClip>();
         foreach (var voice in voices)
         {
-            clips.AddRange(RenderVoice(root!, voice, outDir));
+            clips.AddRange(RenderVoice(root!, voice, outDir, abbreviations));
         }
 
-        AuditionPage.Write(Path.Join(outDir, "index.html"), voices, clips);
+        AuditionPage.Write(Path.Join(outDir, "index.html"), voices, clips, abbreviations);
     }
 
-    private static List<Clip> RenderVoice(string root, SpeechVoice voice, string outDir)
+    private static List<Clip> RenderVoice(
+        string root,
+        SpeechVoice voice,
+        string outDir,
+        List<AbbreviationClip> abbreviations)
     {
         var rendered = new List<Clip>();
         var total = Stopwatch.StartNew();
 
-        Console.WriteLine($"loading {voice.Id} ({voice.Engine}, sid {voice.SpeakerId})...");
         using var synth = SherpaSpeechSynthesizer.Load(root, voice);
         foreach (var item in AuditionTexts.All)
         {
@@ -76,9 +81,22 @@ public class VoiceAuditionTests
             }
         }
 
+        var extra = 0;
+        if (string.Equals(voice.Id, AbbreviationVoiceId, StringComparison.Ordinal))
+        {
+            foreach (var probe in AuditionTexts.Abbreviations())
+            {
+                abbreviations.Add(new AbbreviationClip(
+                    probe.Abbreviation,
+                    RenderOne(synth, voice, $"abk-{probe.Abbreviation}-buchstaben", probe.Spelled, outDir),
+                    RenderOne(synth, voice, $"abk-{probe.Abbreviation}-ausgeschrieben", probe.Expanded, outDir)));
+                extra += 2;
+            }
+        }
+
         Console.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
-            $"{voice.Id,-28} {rendered.Count,3} clips  {synth.SampleRate} Hz  {total.Elapsed.TotalSeconds,6:F1}s"));
+            $"{voice.Id,-28} {rendered.Count + extra,3} clips  {synth.SampleRate} Hz  {total.Elapsed.TotalSeconds,6:F1}s"));
 
         return rendered;
     }
@@ -92,12 +110,21 @@ public class VoiceAuditionTests
     {
         var spoken = normalized ? SpeechText.Normalize(item.Text) : item.Text;
         var suffix = normalized ? "norm" : "raw";
-        var file = $"{voice.Id}__{item.Key}__{suffix}.wav";
+        var one = RenderOne(synth, voice, $"{item.Key}__{suffix}", spoken, outDir);
+        return new Clip(voice.Id, item.Key, normalized, one.File, spoken, one.Duration);
+    }
 
+    private static RenderedClip RenderOne(
+        SherpaSpeechSynthesizer synth,
+        SpeechVoice voice,
+        string name,
+        string spoken,
+        string outDir)
+    {
+        var file = $"{voice.Id}__{name}.wav";
         var audio = synth.Synthesize(spoken);
         File.WriteAllBytes(Path.Join(outDir, file), audio.ToWav());
-
-        return new Clip(voice.Id, item.Key, normalized, file, spoken, audio.Duration);
+        return new RenderedClip(file, spoken, audio.Duration);
     }
 
     // Walks up from the test binary to the repo root. The models are a sibling of the solution in a
@@ -120,6 +147,8 @@ public class VoiceAuditionTests
     }
 }
 
+internal sealed record RenderedClip(string File, string Spoken, TimeSpan Duration);
+
 internal sealed record Clip(
     string VoiceId,
     string TextKey,
@@ -128,106 +157,4 @@ internal sealed record Clip(
     string Spoken,
     TimeSpan Duration);
 
-/// <summary>Writes the page you actually listen to.</summary>
-internal static class AuditionPage
-{
-    public static void Write(string path, IReadOnlyList<SpeechVoice> voices, IReadOnlyList<Clip> clips)
-    {
-        var html = new StringBuilder();
-        html.Append(
-            """
-            <!DOCTYPE html>
-            <html lang="de">
-            <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Lagebuch — Stimmenauswahl</title>
-            <style>
-              :root { color-scheme: light dark; --fg: #16181d; --bg: #fdfdfc; --muted: #6b7280;
-                      --line: #e3e3e0; --card: #fff; --accent: #b91c1c; }
-              @media (prefers-color-scheme: dark) {
-                :root { --fg: #e8e8e6; --bg: #16181d; --muted: #9aa0ab; --line: #2c2f36;
-                        --card: #1d2026; --accent: #f87171; }
-              }
-              * { box-sizing: border-box; }
-              body { margin: 0; padding: 0 16px 64px; background: var(--bg); color: var(--fg);
-                     font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-              .wrap { max-width: 1040px; margin: 0 auto; }
-              h1 { font-size: 1.6rem; margin: 32px 0 4px; }
-              h2 { font-size: 1.15rem; margin: 40px 0 2px; }
-              .sub { color: var(--muted); font-size: .85rem; margin: 0 0 16px; }
-              .said { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent);
-                      border-radius: 6px; padding: 10px 12px; margin: 10px 0 16px; font-size: .9rem; }
-              .said code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85rem; }
-              table { width: 100%; border-collapse: collapse; }
-              td { border-top: 1px solid var(--line); padding: 7px 8px 7px 0; vertical-align: middle; }
-              td.v { white-space: nowrap; font-size: .85rem; }
-              td.d { color: var(--muted); font-size: .8rem; text-align: right; white-space: nowrap; }
-              audio { width: 100%; max-width: 340px; height: 34px; vertical-align: middle; }
-              .lic { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 99px;
-                     font-size: .7rem; border: 1px solid var(--line); color: var(--muted); }
-              .warn { color: var(--accent); border-color: var(--accent); }
-              .raw td.v { color: var(--muted); font-style: italic; }
-              @media (max-width: 720px) { td.d { display: none; } }
-            </style>
-            </head>
-            <body><div class="wrap">
-            <h1>Stimmenauswahl für die Sprachausgabe</h1>
-            <p class="sub">Jede Zeile ist echter Text aus Lagebuch. <em>roh</em> = ohne Normalisierung,
-            sonst durch <code>SpeechText.Normalize</code>.</p>
-
-            """);
-
-        html.Append("<h2>Stimmen</h2><table>\n");
-        foreach (var v in voices)
-        {
-            var warn = v.IsRestrictivelyLicensed ? " warn" : string.Empty;
-            html.Append(CultureInfo.InvariantCulture, $"<tr><td class=\"v\">{Esc(v.DisplayName)}</td>");
-            html.Append(CultureInfo.InvariantCulture, $"<td><span class=\"lic{warn}\">{Esc(v.Licence)}</span> ");
-            html.Append(CultureInfo.InvariantCulture, $"<span class=\"sub\">{Esc(v.Attribution)}</span></td></tr>\n");
-        }
-
-        html.Append("</table>\n");
-
-        var byVoice = voices.ToDictionary(v => v.Id, v => v, StringComparer.Ordinal);
-        foreach (var item in AuditionTexts.All)
-        {
-            var forText = clips.Where(c => c.TextKey == item.Key).ToList();
-            if (forText.Count == 0)
-            {
-                continue;
-            }
-
-            html.Append(CultureInfo.InvariantCulture, $"<h2>{Esc(item.Text)}</h2>\n");
-            html.Append(CultureInfo.InvariantCulture, $"<p class=\"sub\">{Esc(item.Probes)}</p>\n");
-
-            var normalizedSpoken = forText.FirstOrDefault(c => c.Normalized)?.Spoken;
-            if (normalizedSpoken is not null && !string.Equals(normalizedSpoken, item.Text, StringComparison.Ordinal))
-            {
-                html.Append(CultureInfo.InvariantCulture, $"<div class=\"said\">gesprochen: <code>{Esc(normalizedSpoken)}</code></div>\n");
-            }
-
-            html.Append("<table>\n");
-            foreach (var clip in forText.OrderBy(c => c.Normalized ? 0 : 1).ThenBy(c => c.VoiceId, StringComparer.Ordinal))
-            {
-                var name = byVoice.TryGetValue(clip.VoiceId, out var v) ? v.DisplayName : clip.VoiceId;
-                var label = clip.Normalized ? Esc(name) : Esc(name) + " — roh";
-                var cls = clip.Normalized ? string.Empty : " class=\"raw\"";
-                html.Append(CultureInfo.InvariantCulture, $"<tr{cls}><td class=\"v\">{label}</td>");
-                html.Append(CultureInfo.InvariantCulture, $"<td><audio controls preload=\"none\" src=\"{Esc(clip.File)}\"></audio></td>");
-                html.Append(CultureInfo.InvariantCulture, $"<td class=\"d\">{clip.Duration.TotalSeconds:F1}s</td></tr>\n");
-            }
-
-            html.Append("</table>\n");
-        }
-
-        html.Append("</div></body></html>\n");
-        File.WriteAllText(path, html.ToString(), Encoding.UTF8);
-    }
-
-    private static string Esc(string s) => s
-        .Replace("&", "&amp;", StringComparison.Ordinal)
-        .Replace("<", "&lt;", StringComparison.Ordinal)
-        .Replace(">", "&gt;", StringComparison.Ordinal)
-        .Replace("\"", "&quot;", StringComparison.Ordinal);
-}
+internal sealed record AbbreviationClip(string Abbreviation, RenderedClip Spelled, RenderedClip Expanded);

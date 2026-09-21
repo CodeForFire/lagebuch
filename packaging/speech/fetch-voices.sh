@@ -21,7 +21,6 @@ OUT_DIR="${1:-speech-models}"
 shift || true
 
 SHERPA_RELEASE="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models"
-PIPER_VOICES="https://huggingface.co/rhasspy/piper-voices/resolve/main"
 
 # archive-stem <TAB> sha256.  Piper archives all unpack to a dir named after the stem.
 read -r -d '' PINS <<'EOF' || true
@@ -47,7 +46,7 @@ ramona-low	vits-piper-de_DE-ramona-low-int8
 supertonic-3	sherpa-onnx-supertonic-3-tts-int8-2026-05-11
 EOF
 
-AUDITION_SET="thorsten-medium thorsten-high thorsten-low karlsson-low kerstin-low eva_k-x_low ramona-low supertonic-3 mls-medium"
+AUDITION_SET="thorsten-medium thorsten-high thorsten-low karlsson-low kerstin-low eva_k-x_low ramona-low supertonic-3"
 
 # Filled in after the audition picks a winner; until then `make audition` drives the fetch.
 SHIPPING_SET="thorsten-medium"
@@ -133,48 +132,6 @@ fetch_supertonic() {
   cp "$tmp/$stem"/* "$OUT_DIR/$id/"
 }
 
-# mls is the only medium-quality German voice with female speakers under a permissive licence
-# (CC-BY 4.0, trained from scratch). sherpa-onnx does not republish it, so it comes from the Piper
-# voices repo and needs its tokens.txt derived from the model's own phoneme_id_map.
-fetch_mls() {
-  local dir="$OUT_DIR/mls-medium"
-  local stem="de_DE-mls-medium"
-  local base="$PIPER_VOICES/de/de_DE/mls/medium/$stem.onnx"
-
-  # The pristine download is kept in the cache and never modified, because the metadata step below
-  # appends to the file and must not run twice on the same bytes.
-  if [ ! -f "$CACHE/$stem.onnx" ]; then
-    log "downloading mls-medium (73 MB, from piper-voices)"
-    curl --fail --location --silent --show-error --output "$CACHE/$stem.onnx.part" "$base"
-    mv "$CACHE/$stem.onnx.part" "$CACHE/$stem.onnx"
-    curl --fail --location --silent --show-error --output "$CACHE/$stem.onnx.json" "$base.json"
-    curl --fail --location --silent --show-error --output "$CACHE/$stem.MODEL_CARD" \
-      "$PIPER_VOICES/de/de_DE/mls/medium/MODEL_CARD"
-  fi
-
-  rm -rf "${OUT_DIR:?}/mls-medium"
-  mkdir -p "$dir"
-  cp "$CACHE/$stem.onnx" "$dir/$stem.onnx"
-  cp "$CACHE/$stem.onnx.json" "$dir/$stem.onnx.json"
-  cp "$CACHE/$stem.MODEL_CARD" "$dir/MODEL_CARD"
-
-  # Stock Piper voices carry none of the ONNX metadata sherpa-onnx reads, so it has to be added.
-  python3 "$(dirname "$0")/piper_onnx_meta.py" "$dir/$stem.onnx" German
-
-  # mls is a Piper voice like any other, so it shares the pruned espeak data. Make sure it exists
-  # even when mls is fetched on its own.
-  if [ ! -d "$OUT_DIR/espeak-ng-data" ]; then
-    local tmp
-    tmp="$(mktemp -d)"
-    tar -xf "$(download vits-piper-de_DE-thorsten-medium-int8 \
-      "$SHERPA_RELEASE/vits-piper-de_DE-thorsten-medium-int8.tar.bz2")" -C "$tmp"
-    log "pruning espeak-ng-data to German"
-    prune_espeak_data "$tmp/vits-piper-de_DE-thorsten-medium-int8/espeak-ng-data" \
-      "$OUT_DIR/espeak-ng-data"
-    rm -rf "$tmp"
-  fi
-}
-
 mkdir -p "$CACHE" "$OUT_DIR"
 
 requested=("$@")
@@ -187,7 +144,6 @@ fi
 for id in "${requested[@]}"; do
   case "$id" in
     supertonic-3) fetch_supertonic "$id" ;;
-    mls-medium)   fetch_mls ;;
     *)            fetch_piper "$id" ;;
   esac
   log "ready: $OUT_DIR/$id"

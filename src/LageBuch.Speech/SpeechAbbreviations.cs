@@ -1,15 +1,23 @@
+using System.Text;
+
 namespace LageBuch.Speech;
 
 /// <summary>
 /// How a Feuerwehr abbreviation should be spoken. Two shapes, because German fire-service usage is
-/// not consistent: some abbreviations <em>are</em> the spoken form and only need spacing out into
-/// letters ("I L S"), while others are written short but always said in full ("Zugführer").
+/// not consistent: some abbreviations <em>are</em> the spoken form and only need spelling out into
+/// letters ("Ih Ell Ess"), while others are written short but always said in full ("Zugführer").
 /// </summary>
 /// <remarks>
 /// <para>
-/// This table is deliberately one flat, editable constant. Which side an abbreviation belongs on is
-/// a judgement that only survives contact with ears, so <c>make audition</c> renders every entry
-/// and the table is expected to be tuned afterwards -- a one-line diff per change.
+/// <b>Why the letters are written phonetically.</b> Emitting the bare Latin letters -- "I L S" --
+/// leaves the letter names to espeak-ng, which resolves an isolated letter loosely and audibly
+/// drifts into English, on top of rattling through them too fast to follow. Spelling the German
+/// letter names out as pseudo-words removes the guesswork and lengthens them, which fixes both.
+/// </para>
+/// <para>
+/// Which side an abbreviation belongs on is a judgement that only survives contact with ears, so
+/// <c>make audition</c> renders every entry both ways and the tables are expected to be tuned
+/// afterwards -- a one-line move between <see cref="Spelled"/> and <see cref="Expanded"/>.
 /// </para>
 /// <para>
 /// Matching is case-sensitive and whole-word. That matters: <c>EL</c> must not fire inside
@@ -18,22 +26,45 @@ namespace LageBuch.Speech;
 /// </remarks>
 public static class SpeechAbbreviations
 {
-    /// <summary>Abbreviations said as letters. The value is the letters, space-separated.</summary>
-    public static IReadOnlyDictionary<string, string> Spelled { get; } =
-        new Dictionary<string, string>(StringComparer.Ordinal)
+    /// <summary>
+    /// The German name of each letter, spelled the way it sounds so a German voice reads it as the
+    /// letter rather than as a foreign word.
+    /// </summary>
+    public static IReadOnlyDictionary<char, string> GermanLetters { get; } =
+        new Dictionary<char, string>
         {
-            ["ILS"] = "I L S",
-            ["CSA"] = "C S A",
-            ["LPA"] = "L P A",
-            ["PA"] = "P A",
-            ["AGT"] = "A G T",
-            ["DLK"] = "D L K",
-            ["ELW"] = "E L W",
-            ["LF"] = "L F",
-            ["FFB"] = "F F B",
-            ["CO"] = "C O",
-            ["ppm"] = "p p m",
+            ['A'] = "Ah",
+            ['B'] = "Beh",
+            ['C'] = "Tseh",
+            ['D'] = "Deh",
+            ['E'] = "Eh",
+            ['F'] = "Eff",
+            ['G'] = "Geh",
+            ['H'] = "Hah",
+            ['I'] = "Ih",
+            ['J'] = "Jott",
+            ['K'] = "Kah",
+            ['L'] = "Ell",
+            ['M'] = "Emm",
+            ['N'] = "Enn",
+            ['O'] = "Oh",
+            ['P'] = "Peh",
+            ['Q'] = "Kuh",
+            ['R'] = "Err",
+            ['S'] = "Ess",
+            ['T'] = "Teh",
+            ['U'] = "Uh",
+            ['V'] = "Fau",
+            ['W'] = "Weh",
+            ['X'] = "Iks",
+            ['Y'] = "Üpsilon",
+            ['Z'] = "Tsett",
         };
+
+    /// <summary>Abbreviations said as letters, keyed by the written form.</summary>
+    public static IReadOnlyDictionary<string, string> Spelled { get; } =
+        new[] { "ILS", "CSA", "LPA", "PA", "AGT", "DLK", "ELW", "LF", "FFB", "CO", "ppm" }
+            .ToDictionary(a => a, SpellOut, StringComparer.Ordinal);
 
     /// <summary>Abbreviations written short but always spoken in full.</summary>
     public static IReadOnlyDictionary<string, string> Expanded { get; } =
@@ -49,4 +80,48 @@ public static class SpeechAbbreviations
             ["FF"] = "Freiwillige Feuerwehr",
             ["AS-Überwachung"] = "Atemschutzüberwachung",
         };
+
+    /// <summary>
+    /// The full German wording of the letter-spoken abbreviations. Not used in normalization -- it
+    /// is the other half of the audition's A/B, so each one can be judged as letters against its
+    /// full form before the lexicon is settled.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> LongForms { get; } =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ILS"] = "Integrierte Leitstelle",
+            ["CSA"] = "Chemikalienschutzanzug",
+            ["LPA"] = "Langzeit-Pressluftatmer",
+            ["PA"] = "Pressluftatmer",
+            ["AGT"] = "Atemschutzgeräteträger",
+            ["DLK"] = "Drehleiter",
+            ["ELW"] = "Einsatzleitwagen",
+            ["LF"] = "Löschfahrzeug",
+            ["FFB"] = "Freiwillige Feuerwehr Musterstadt",
+            ["CO"] = "Kohlenmonoxid",
+            ["ppm"] = "Teile pro Million",
+        };
+
+    /// <summary>
+    /// Spells one abbreviation as German letter names: <c>ILS</c> becomes <c>Ih Ell Ess</c>.
+    /// A character with no German letter name (a digit, a hyphen) is passed through unchanged.
+    /// </summary>
+    public static string SpellOut(string abbreviation)
+    {
+        ArgumentNullException.ThrowIfNull(abbreviation);
+
+        var spoken = new StringBuilder();
+        foreach (var c in abbreviation)
+        {
+            if (spoken.Length > 0)
+            {
+                spoken.Append(' ');
+            }
+
+            spoken.Append(
+                GermanLetters.TryGetValue(char.ToUpperInvariant(c), out var name) ? name : c.ToString());
+        }
+
+        return spoken.ToString();
+    }
 }

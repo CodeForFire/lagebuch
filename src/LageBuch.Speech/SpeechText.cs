@@ -15,18 +15,20 @@ namespace LageBuch.Speech;
 /// number means is already gone.
 /// </para>
 /// <para>
-/// The engine is left to read ordinary numerals: espeak-ng and Supertonic both say "240" and "45"
-/// correctly in German, so spelling those out would only add ways to be wrong. What the engines
-/// cannot guess is which digits are a <em>quantity</em> and which are an <em>identifier</em> --
-/// "40/1" is a Funkrufname read "vier null, eins", while "0/1/8/9" is a Stärke read as four counts.
-/// That distinction is this class's real job.
+/// Ordinary numerals are left to the engine: espeak-ng and Supertonic both say "240" and "45"
+/// correctly in German, so spelling them out would only add ways to be wrong. A slash-separated
+/// group is split into its parts and each part left as a numeral -- "40/1" is "vierzig, eins", the
+/// way a Funkrufname is announced, and "0/1/8/9" is "null, eins, acht, neun". Both are the same
+/// operation, which is why <see cref="CallSign"/> and <see cref="Strength"/> share one
+/// implementation.
 /// </para>
 /// </remarks>
 public static class SpeechText
 {
-    // Funk convention: digits go one at a time, and 2 is "zwo" so it cannot be heard as "drei".
-    private static readonly string[] DigitWords =
-        ["null", "eins", "zwo", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"];
+    // The one surviving piece of Funk convention: a group that is exactly "2" is said "zwo", so it
+    // cannot be heard as "drei". It cannot apply inside a larger number -- 42 is "zweiundvierzig",
+    // whose "zwei" is a syllable, not a digit -- so this is a whole-group rule, not a digit rule.
+    private const string Zwo = "zwo";
 
     private static readonly string[] MonthWords =
     [
@@ -67,19 +69,19 @@ public static class SpeechText
 
         var spoken = callSign
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(token => IsDigitGroup(token) ? SpeakDigitGroup(token) : Normalize(token));
+            .Select(token => IsDigitGroup(token) ? SpeakGroups(token) : Normalize(token));
 
         return Tidy(string.Join(' ', spoken));
     }
 
     /// <summary>
-    /// Speaks a Stärke such as "0/1/8/9". Each part is a head count, not an identifier, so it stays
-    /// a numeral the engine reads as a number -- "0/1/10/11" must be "zehn, elf", never "eins null".
+    /// Speaks a Stärke such as "0/1/8/9" -- "null, eins, acht, neun". Each part is a head count, so
+    /// it stays a numeral the engine reads as a number: "0/1/10/11" is "zehn, elf", never "eins
+    /// null". Identical to <see cref="CallSign"/>'s handling of a group; kept as its own name
+    /// because the call sites mean different things by it.
     /// </summary>
     public static string Strength(string? strengthText) =>
-        string.IsNullOrWhiteSpace(strengthText)
-            ? string.Empty
-            : Tidy(string.Join(", ", strengthText.Split('/', StringSplitOptions.TrimEntries)));
+        string.IsNullOrWhiteSpace(strengthText) ? string.Empty : Tidy(SpeakGroups(strengthText));
 
     /// <summary>
     /// Speaks a floor label: "EG" becomes "Erdgeschoss", "2. OG" becomes "Obergeschoss 2".
@@ -109,10 +111,9 @@ public static class SpeechText
         s = DateOnly.Replace(s, m => SpeakDate(m, 1, 2, 3));
         s = ClockTime.Replace(s, m => SpeakClock(m, 1, 2));
 
-        // A four-part group is a Stärke (ZF/GF/Mann/Gesamt); anything shorter is a Funkrufname.
-        s = DigitGroup.Replace(
-            s,
-            m => m.Value.Count(c => c == '/') == 3 ? Strength(m.Value) : SpeakDigitGroup(m.Value));
+        // A Funkrufname and a Stärke are read the same way -- each group as a number -- so nothing
+        // here has to tell them apart.
+        s = DigitGroup.Replace(s, m => SpeakGroups(m.Value));
 
         s = s.Replace("z. B.", "zum Beispiel", StringComparison.Ordinal);
         s = s.Replace("Whg.", "Wohnung", StringComparison.Ordinal);
@@ -137,11 +138,13 @@ public static class SpeechText
     private static bool IsDigitGroup(string token) =>
         token.Length > 0 && token.All(c => char.IsAsciiDigit(c) || c == '/');
 
-    private static string SpeakDigitGroup(string group) =>
+    // "40/1" -> "vierzig, eins". The comma is a short pause between the groups, which keeps a
+    // three-part Funkrufname from running together into one blur.
+    private static string SpeakGroups(string groups) =>
         string.Join(
             ", ",
-            group.Split('/', StringSplitOptions.RemoveEmptyEntries)
-                 .Select(part => string.Join(' ', part.Select(d => DigitWords[d - '0']))));
+            groups.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                  .Select(part => part == "2" ? Zwo : part));
 
     private static string SpeakDate(Match m, int day, int month, int year)
     {
