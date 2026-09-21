@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors">
+        xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+        xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls">
 
   <Styles.Resources>
     <ResourceDictionary>
@@ -38,6 +39,16 @@
 
   <Style Selector="TextBlock.secondary">
     <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+
+  <!-- A field's "you still have to fill this in" line (#412). Same shape as the amber hints that
+       sit under ForcesView's and RolesView's forms, red because those describe something the app
+       will accept anyway and this describes the reason a press did nothing. -->
+  <Style Selector="TextBlock.field-error">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
   </Style>
 
   <!-- Tactical monospace: timestamps, call-signs, numbers -->
@@ -296,37 +307,40 @@
        built-in HeaderedContentControl rather than a bespoke control means a field can't be added
        without a Header showing up somewhere in the tree — an empty label slot is visually obvious
        in review, unlike a bare input silently missing its TextBlock sibling. -->
+  <!-- One template for every variant, with the parts switched on by the class selectors below.
+       It used to be copied per combination, which was already a near-duplicate at two variants and
+       would have become four the moment mandatory fields (#414) wanted a marker of their own. -->
   <Style Selector="HeaderedContentControl.field">
-    <Setter Property="Template">
-      <ControlTemplate>
-        <StackPanel Spacing="2">
-          <TextBlock Classes="overline" FontSize="10" Text="{TemplateBinding Header}" />
-          <ContentPresenter Content="{TemplateBinding Content}" />
-        </StackPanel>
-      </ControlTemplate>
-    </Setter>
-  </Style>
-
-  <!-- Suggestion field variant (#259): same "field" wrapper, but overlays a small chevron on the
-       content's top-right corner to signal it's backed by a suggestion list (AutoCompleteBox),
-       not free text. A non-hit-testable overlay rather than a template override on AutoCompleteBox
-       itself, which needs its own template intact for the popup/suggestion-list wiring. Opt in per
-       field with Classes="field suggest". -->
-  <Style Selector="HeaderedContentControl.field.suggest">
     <Setter Property="Template">
       <ControlTemplate>
         <StackPanel Spacing="2">
           <TextBlock Classes="overline" FontSize="10" Text="{TemplateBinding Header}" />
           <Grid>
             <ContentPresenter Content="{TemplateBinding Content}" />
-            <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+            <!-- Suggestion marker (#259): signals the input is backed by a suggestion list
+                 (AutoCompleteBox), not free text. A non-hit-testable overlay rather than a template
+                 override on AutoCompleteBox itself, which needs its own template intact for the
+                 popup wiring. Opt in per field with Classes="field suggest". -->
+            <PathIcon x:Name="SuggestChevron" Width="9" Height="9" IsVisible="False"
+                      HorizontalAlignment="Right" VerticalAlignment="Center"
                       Margin="0,0,9,0" IsHitTestVisible="False"
                       Foreground="{StaticResource TextMutedBrush}"
                       Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
           </Grid>
+          <!-- Missing-input message (#412), bound per field with ctrl:Field.Error. Not a
+               TemplateBinding: that takes a single property name and would bind nothing at all
+               here, silently, because an attached property is a path. -->
+          <TextBlock x:Name="FieldError" Classes="field-error"
+                     Text="{Binding (ctrl:Field.Error), RelativeSource={RelativeSource TemplatedParent}}"
+                     IsVisible="{Binding (ctrl:Field.Error), RelativeSource={RelativeSource TemplatedParent},
+                                         Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
       </ControlTemplate>
     </Setter>
+  </Style>
+
+  <Style Selector="HeaderedContentControl.field.suggest /template/ PathIcon#SuggestChevron">
+    <Setter Property="IsVisible" Value="True" />
   </Style>
 
   <!-- =========================================================

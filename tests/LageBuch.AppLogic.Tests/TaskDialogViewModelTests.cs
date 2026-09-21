@@ -107,15 +107,66 @@ public class TaskDialogViewModelTests
     }
 
     [Fact]
-    public void Save_canExecute_needs_text()
+    public void An_empty_Aufgabe_names_the_field_instead_of_refusing_silently()
+    {
+        var (session, _) = NewSession();
+        var closed = false;
+        var dialog = new TaskDialogViewModel(session, MasterData(), string.Empty, () => { });
+        dialog.Closed += (_, _) => closed = true;
+
+        // The button is live: a press is how the operator asks what is missing (#412).
+        Assert.True(dialog.SaveCommand.CanExecute(null));
+        Assert.Null(dialog.TextError); // nothing said before the first press
+
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, dialog.TextError);
+        Assert.Empty(session.Incident.Tasks);
+        Assert.False(closed); // the dialog stays open on the unfilled field
+    }
+
+    [Fact]
+    public void Filling_the_Aufgabe_clears_the_message_without_a_second_press()
     {
         var (session, _) = NewSession();
         var dialog = new TaskDialogViewModel(session, MasterData(), string.Empty, () => { });
+        dialog.SaveCommand.Execute(null);
+        Assert.Equal(ValidationMessages.Required, dialog.TextError);
 
-        Assert.False(dialog.SaveCommand.CanExecute(null));
-        Assert.False(dialog.SaveAndCreateAnotherCommand.CanExecute(null));
         dialog.Text = "Jetzt ja";
-        Assert.True(dialog.SaveCommand.CanExecute(null));
+
+        Assert.Null(dialog.TextError);
+        dialog.SaveCommand.Execute(null);
+        Assert.Single(session.Incident.Tasks);
+    }
+
+    [Fact]
+    public void A_cleared_timer_names_the_timer_field()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Riegelstellung setzen", () => { });
+        dialog.TimerMinutes = null; // the operator emptied the TIMER box
+
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.TimerMinutes, dialog.TimerMinutesError);
+        Assert.Null(dialog.TextError); // only the offending field is named
+        Assert.Empty(session.Incident.Tasks);
+    }
+
+    [Fact]
+    public void A_saved_task_leaves_the_next_one_quiet()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), string.Empty, () => { });
+        dialog.SaveCommand.Execute(null); // provokes the message
+        dialog.Text = "Erster Auftrag";
+
+        dialog.SaveAndCreateAnotherCommand.Execute(null);
+
+        // Text is cleared for the next entry, so a stale "Pflichtfeld" must not be left standing.
+        Assert.Equal(string.Empty, dialog.Text);
+        Assert.Null(dialog.TextError);
     }
 
     [Fact]
