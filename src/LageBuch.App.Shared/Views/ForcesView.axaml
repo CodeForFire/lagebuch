@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.ForcesView"
              x:DataType="vm:ForcesViewModel">
   <DockPanel>
@@ -69,7 +70,7 @@
                mutual aid from outside the Landkreis). A suggestion list here would just re-offer
                what the dropdown already has. Readonly while a Fahrzeug is selected, since its Wache
                derived this field (#215). -->
-          <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE">
+          <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE" ctrl:Field.Error="{Binding NewBrigadeError}">
             <TextBox x:Name="BrigadeBox" Width="160"
                      IsEnabled="{Binding !IsVehicleSelected}"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
@@ -91,7 +92,7 @@
               </TextBox.KeyBindings>
             </TextBox>
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN">
+          <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN" ctrl:Field.Error="{Binding NewStrengthError}">
             <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
                  0 und lässt den Platzhalter stehen. Kein Beispiel-Platzhalter: das Label sagt bereits,
                  was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden. -->
@@ -104,7 +105,7 @@
                        Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
             </StackPanel>
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="DAVON AGT">
+          <HeaderedContentControl Classes="field" Header="DAVON AGT" ctrl:Field.Error="{Binding NewScbaCountError}">
             <TextBox x:Name="ScbaBox" Width="90"
                      Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
           </HeaderedContentControl>
@@ -117,7 +118,6 @@
             <TextBox x:Name="NotesBox" Width="170" Text="{Binding NewNotes}" />
           </HeaderedContentControl>
           <Button x:Name="AddForceButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
-                  ToolTip.Tip="{Binding AddDisabledReason}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </StackPanel>
         <!-- Ein Fahrzeug ist einzig: ist sein Funkrufname schon in der Liste, sperrt das Flag den

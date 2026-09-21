@@ -20,4 +20,19 @@ public static class ValidationMessages
 
     /// <summary>A timer box emptied, or holding something that is not a count of minutes.</summary>
     public const string TimerMinutes = "Minuten eintragen (0 oder mehr)";
+
+    /// <summary>The Wache a Kräfte row belongs to, without which the row reports nobody.</summary>
+    public const string BrigadeRequired = "Wache eingeben";
+
+    /// <summary>A headcount below zero, which no Stärke box can mean.</summary>
+    public const string NegativeStrength = "Stärke darf nicht negativ sein";
+
+    /// <summary>
+    /// A Kräfte row with a Wache but nobody counted: it reports nothing, and is almost always a
+    /// stray click rather than an intentional entry (#220).
+    /// </summary>
+    public const string NoPersonnel = "Mindestens eine Person eintragen";
+
+    /// <summary>More Atemschutzgeräteträger than people, which the domain rejects outright.</summary>
+    public const string ScbaExceedsStrength = "AGT darf die Stärke nicht überschreiten";
 }

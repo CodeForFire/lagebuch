@@ -44,35 +44,47 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void AddForce_disabled_when_brigade_blank()
+    public void AddForce_names_the_blank_Wache()
     {
         var vm = NewVm();
         vm.NewBrigade = "  ";
         vm.NewMannschaftCount = 5;
-        Assert.False(vm.AddForceCommand.CanExecute(null));
+
+        Assert.True(vm.AddForceCommand.CanExecute(null)); // the press is the question (#412)
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.BrigadeRequired, vm.NewBrigadeError);
+        Assert.Empty(vm.Forces);
     }
 
     // --- Issue #220: a row with no counted personnel is not a real entry ---
     [Fact]
-    public void AddForce_disabled_when_no_personnel_is_entered()
+    public void AddForce_names_the_Staerke_when_no_personnel_is_entered()
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
 
-        // Brigade alone -- Führungskräfte and Mannschaft both left blank (0) -- must not be
-        // addable: an empty unit reports nothing and is almost always a stray click (#220).
-        Assert.False(vm.AddForceCommand.CanExecute(null));
+        // Brigade alone -- Führungskräfte and Mannschaft both left blank (0) -- is not an entry:
+        // an empty unit reports nothing and is almost always a stray click (#220). It now says so.
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(ValidationMessages.NoPersonnel, vm.NewStrengthError);
+        Assert.Null(vm.NewBrigadeError); // only the offending field is named
+        Assert.Empty(vm.Forces);
 
         vm.NewOfficerCount = 0;
         vm.NewMannschaftCount = 0;
-        Assert.False(vm.AddForceCommand.CanExecute(null));
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(ValidationMessages.NoPersonnel, vm.NewStrengthError);
+        Assert.Empty(vm.Forces);
 
         vm.NewMannschaftCount = 1;
-        Assert.True(vm.AddForceCommand.CanExecute(null));
+        Assert.Null(vm.NewStrengthError); // fixed as it is typed
+        vm.AddForceCommand.Execute(null);
+        Assert.Single(vm.Forces);
     }
 
     [Fact]
-    public void AddForce_enabled_when_only_zugfuehrer_count_is_entered()
+    public void AddForce_accepts_a_lone_Zugfuehrer()
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
@@ -80,34 +92,55 @@ public class ForcesViewModelTests
         // A row reporting a single Zugführer with no Führungskräfte/Mannschaft is still a real,
         // counted entry (#220 only rules out entirely empty rows).
         vm.NewZugfuehrerCount = 1;
-        Assert.True(vm.AddForceCommand.CanExecute(null));
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Single(vm.Forces);
+        Assert.Null(vm.NewStrengthError);
     }
 
-    // --- AddDisabledReason mirrors CanAddForce so a blocked HINZUFÜGEN is never a silent guess
-    // (#UX) ---
     [Fact]
-    public void AddDisabledReason_explains_each_blocking_condition_in_priority_order()
+    public void AddForce_names_a_negative_Staerke_and_an_AGT_over_it()
     {
         var vm = NewVm();
-        Assert.Equal("Wache eingeben", vm.AddDisabledReason);
-
         vm.NewBrigade = "FFB Wache 1";
-        Assert.Equal("Mindestens eine Person eintragen", vm.AddDisabledReason);
+        vm.NewMannschaftCount = -1;
+
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(ValidationMessages.NegativeStrength, vm.NewStrengthError);
 
         vm.NewMannschaftCount = 6;
         vm.NewScbaCount = 7;
-        Assert.Equal("AGT darf die Stärke nicht überschreiten", vm.AddDisabledReason);
-
-        vm.NewScbaCount = 2;
-        vm.NewCallSign = "FFB 1/40/1";
         vm.AddForceCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.ScbaExceedsStrength, vm.NewScbaCountError);
+        Assert.Null(vm.NewStrengthError); // the Stärke itself is fine; the AGT count is not
+        Assert.Empty(vm.Forces);
+    }
+
+    [Fact]
+    public void A_duplicate_Funkrufname_is_refused_by_the_hint_that_is_already_on_screen()
+    {
+        var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
         vm.NewMannschaftCount = 6;
         vm.NewCallSign = "FFB 1/40/1";
-        Assert.Equal("Funkrufname ist bereits vergeben", vm.AddDisabledReason);
+        vm.AddForceCommand.Execute(null);
+
+        vm.NewBrigade = "FFB Wache 1";
+        vm.NewMannschaftCount = 6;
+        vm.NewCallSign = "FFB 1/40/1";
+
+        // IsDuplicateCallSign already drives a live hint under the form, so the press is refused
+        // without a second, redder copy of the same sentence under the field (#412).
+        Assert.True(vm.IsDuplicateCallSign);
+        vm.AddForceCommand.Execute(null);
+        Assert.Single(vm.Forces);
+        Assert.Null(vm.NewBrigadeError);
+        Assert.Null(vm.NewStrengthError);
 
         vm.NewCallSign = "Some other name";
-        Assert.Null(vm.AddDisabledReason);
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(2, vm.Forces.Count);
     }
 
     [Fact]
@@ -152,7 +185,7 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void Add_is_disabled_when_agt_or_gf_exceed_the_crew()
+    public void Add_names_the_AGT_when_it_exceeds_the_crew()
     {
         var vm = NewVm();
         vm.NewBrigade = "FFB Wache 1";
@@ -160,11 +193,15 @@ public class ForcesViewModelTests
         vm.NewMannschaftCount = 3;
         vm.NewScbaCount = 5;
 
-        // The button disables rather than letting the click throw out of the domain guard.
-        Assert.False(vm.AddForceCommand.CanExecute(null));
+        // The AGT field says so rather than letting the click throw out of the domain guard.
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(ValidationMessages.ScbaExceedsStrength, vm.NewScbaCountError);
+        Assert.Empty(vm.Forces);
 
         vm.NewScbaCount = 4;
-        Assert.True(vm.AddForceCommand.CanExecute(null));
+        Assert.Null(vm.NewScbaCountError);
+        vm.AddForceCommand.Execute(null);
+        Assert.Single(vm.Forces);
     }
 
     [Fact]
@@ -254,7 +291,7 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void A_typed_duplicate_call_sign_blocks_adding_with_a_hint()
+    public void A_typed_duplicate_call_sign_is_refused_by_its_hint()
     {
         var clock = new FixedClock(T0);
         var session = TestSession.StartNew(
@@ -273,16 +310,18 @@ public class ForcesViewModelTests
         vm.AddForceCommand.Execute(null);
 
         // Free text can still name an already taken vehicle (e.g. no master data): trimmed and
-        // case-insensitively it is recognized and blocks HINZUFÜGEN instead of failing later.
+        // case-insensitively it is recognized and refuses HINZUFÜGEN instead of failing later.
         vm.NewBrigade = "Aich";
         vm.NewMannschaftCount = 6;
         vm.NewCallSign = " ffb 1/40/1 ";
-        Assert.True(vm.IsDuplicateCallSign);
-        Assert.False(vm.AddForceCommand.CanExecute(null));
+        Assert.True(vm.IsDuplicateCallSign); // the live hint under the form
+        vm.AddForceCommand.Execute(null);
+        Assert.Single(vm.Forces);
 
         vm.NewCallSign = "Aich 42/1";
         Assert.False(vm.IsDuplicateCallSign);
-        Assert.True(vm.AddForceCommand.CanExecute(null));
+        vm.AddForceCommand.Execute(null);
+        Assert.Equal(2, vm.Forces.Count);
     }
 
     [Fact]

@@ -364,14 +364,18 @@ public class ForcesTabRenderTests
         // The taken vehicle no longer appears in the dropdown, regardless of Wache (#215).
         Assert.Equal(new[] { "FFB 1/44/1", "Aich 42/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
 
-        // Free-typing the taken call sign blocks HINZUFÜGEN and shows the hint.
+        // Free-typing the taken call sign shows the hint and refuses the add. The button itself
+        // stays live (#412) -- what refuses the row is the hint, which is already on screen.
         vm.Forces.NewBrigade = "FFB Wache 1"; // AddForceCommand cleared it after the first add
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.NewCallSign = "FFB 1/40/1";
         Dispatcher.UIThread.RunJobs();
-        Assert.False(vm.Forces.AddForceCommand.CanExecute(null));
         var hint = view.GetControl<TextBlock>("DuplicateHint"); // the view owns the name scope
         Assert.True(hint.IsVisible);
+
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(vm.Forces.Forces);
 
         // The hint used to sit at the end of the fields' horizontal StackPanel, where a window
         // narrower than this test's 1920px could clip it off the right edge. It now renders on
