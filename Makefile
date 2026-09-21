@@ -54,7 +54,8 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
         android-image android-image-rebuild apk emulator install run-android \
-        logcat uninstall package-linux logo-assets samples screenshots demo-gif
+        logcat uninstall package-linux logo-assets samples screenshots demo-gif \
+        voices audition
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -187,6 +188,16 @@ package-linux: ## Build a local .deb (VERSION=x.y.z)
 
 logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
 	packaging/logo/build-logo-assets.sh
+
+## Sprachausgabe (voice models, audition)
+
+voices: ## Fetch the TTS voice models into speech-models/ (VOICES="all" for the audition set)
+	packaging/speech/fetch-voices.sh speech-models $(VOICES)
+
+audition: voices ## Render the voice audition to dist/audition/index.html -- open it and choose
+	AUDITION_OUT=$(CURDIR)/dist/audition $(DOTNET) test tests/LageBuch.Speech.Sherpa.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~VoiceAuditionTests
+	@echo "open file://$(CURDIR)/dist/audition/index.html"
 
 ## Docs (README samples, screenshots, demo GIF)
 
