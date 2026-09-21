@@ -12,7 +12,9 @@ namespace LageBuch.AppLogic.Tests;
 
 public class CoMessprotokollViewModelTests
 {
-    private static readonly FixedClock Clock = new(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+    private static readonly DateTimeOffset ClockBase = new(2026, 8, 25, 10, 0, 0, TimeSpan.Zero);
+
+    private static readonly FixedClock Clock = new(ClockBase);
 
     private static (LocalIncidentSession Session, CoMessprotokollViewModel Vm) CreateVm()
     {
@@ -74,6 +76,122 @@ public class CoMessprotokollViewModelTests
 
         // A same-numbered unit on a different floor is untouched (#265's whole point).
         Assert.NotEqual("Müller", CoMeasurementLabels.ApartmentLabel(building, 1, cell.ApartmentNumber));
+    }
+
+    // --- Issue #424: the Messreihe -----------------------------------------------------------
+    [Fact]
+    public void Editor_ShowsTheCommittedMessreihe_NewestFirst()
+    {
+        // The clock is shared across this class, so a test that advances it resets it first --
+        // otherwise the expected times depend on which tests ran before.
+        Clock.Now = ClockBase;
+        var (session, vm) = CreateVm();
+        var haus = session.Incident.Buildings[0].Id;
+        var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0];
+
+        session.RecordCoValue(haus, 0, cell.ApartmentNumber, 250);
+        Clock.Now = Clock.Now.AddMinutes(27);
+        session.RecordCoValue(haus, 0, cell.ApartmentNumber, 120);
+        Clock.Now = Clock.Now.AddMinutes(21);
+        session.RecordCoValue(haus, 0, cell.ApartmentNumber, 40);
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
+
+        Assert.True(vm.Editor!.HasReadings);
+        Assert.Equal(new[] { "40 ppm", "120 ppm", "250 ppm" }, vm.Editor.Readings.Select(r => r.Value));
+        Assert.Equal(new[] { "10:48", "10:27", "10:00" }, vm.Editor.Readings.Select(r => r.Time));
+        Assert.All(vm.Editor.Readings, r => Assert.Equal("Test", r.RecordedBy));
+
+        // Each row keeps its own reading's severity (bands: 30 / 200 / 800 ppm), so a value that
+        // has since fallen still reads as having been dangerous when it was taken.
+        Assert.True(vm.Editor.Readings[2].IsCoDangerous);
+        Assert.True(vm.Editor.Readings[1].IsCoElevated);
+        Assert.True(vm.Editor.Readings[0].IsCoElevated);
+    }
+
+    [Fact]
+    public void Editor_ShowsNoMessreihe_ForAnUnmeasuredWohnung()
+    {
+        var (_, vm) = CreateVm();
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
+
+        Assert.False(vm.Editor!.HasReadings);
+        Assert.Empty(vm.Editor.Readings);
+    }
+
+    [Fact]
+    public void Editor_ShowsAClearedValueAsGeloescht()
+    {
+        var (session, vm) = CreateVm();
+        var haus = session.Incident.Buildings[0].Id;
+        var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0];
+
+        session.RecordCoValue(haus, 0, cell.ApartmentNumber, 120);
+        session.RecordCoValue(haus, 0, cell.ApartmentNumber, null);
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
+
+        Assert.Equal(new[] { "gelöscht", "120 ppm" }, vm.Editor!.Readings.Select(r => r.Value));
+    }
+
+    // A keystroke is not a measurement. Typing then cancelling must leave no trace, and the
+    // timestamp of the pending value does not even exist yet -- it is minted at FERTIG.
+    [Fact]
+    public void APendingCoValue_DoesNotEnterTheMessreihe()
+    {
+        var (session, vm) = CreateVm();
+        var haus = session.Incident.Buildings[0].Id;
+        var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0];
+        session.RecordCoValue(haus, 0, cell.ApartmentNumber, 120);
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
+        vm.Editor!.CoValue = 999;
+
+        Assert.Single(vm.Editor.Readings);
+        Assert.Equal("120 ppm", vm.Editor.Readings[0].Value);
+
+        vm.CloseEditorCommand.Execute(null);
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
+        Assert.Single(vm.Editor!.Readings);
+    }
+
+    [Fact]
+    public void ConfirmingTheEditor_AppendsExactlyOneReading()
+    {
+        var (session, vm) = CreateVm();
+        var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0];
+
+        cell.OpenEditorCommand.Execute(null);
+        vm.Editor!.CoValue = 120;
+        vm.ConfirmEditorCommand.Execute(null);
+
+        var dwelling = session.Incident.Dwellings.Single(
+            d => d.FloorOrdinal == 0 && d.ApartmentNumber == cell.ApartmentNumber);
+        Assert.Single(dwelling.Readings);
+        Assert.Equal(120, dwelling.Readings[0].Value);
+    }
+
+    [Fact]
+    public void TileTooltip_CarriesTheSeries_FromTwoReadingsUp()
+    {
+        Clock.Now = ClockBase;
+        var (session, vm) = CreateVm();
+        var haus = session.Incident.Buildings[0].Id;
+        var apt = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].ApartmentNumber;
+
+        session.RecordCoValue(haus, 0, apt, 120);
+        Assert.DoesNotContain(
+            "Messreihe",
+            vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].TileTooltip,
+            StringComparison.Ordinal);
+
+        Clock.Now = Clock.Now.AddMinutes(27);
+        session.RecordCoValue(haus, 0, apt, 40);
+
+        var tooltip = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].TileTooltip;
+        Assert.Contains("Messreihe: 10:00 120 ppm · 10:27 40 ppm", tooltip, StringComparison.Ordinal);
     }
 
     // --- Issue #218: Untergeschoss (UG) floors below EG --------------------------------------

@@ -238,6 +238,57 @@ public class SnapshotRoundTripTests
             d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
         Assert.Equal(45, dwelling.CoValue);
     }
+
+    // #424: a joined device has to see the Verlauf, not just the current number -- the series is
+    // what the CO tab and the report render.
+    [Fact]
+    public void SnapshotRoundTrip_CarriesTheReadingSeries()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Huber", "FFB 12/1");
+        var original = Incident.Start(clock, op);
+        original.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = original.Buildings[0].Id;
+        original.RecordCoValue(clock, op, haus, 0, 1, 120);
+        clock.Now = clock.Now.AddMinutes(27);
+        original.RecordCoValue(clock, op, haus, 0, 1, 40);
+        clock.Now = clock.Now.AddMinutes(21);
+        original.RecordCoValue(clock, op, haus, 0, 1, null);
+
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(original))));
+
+        var dwelling = restored.Dwellings.First(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(new int?[] { 120, 40, null }, dwelling.Readings.Select(r => r.Value));
+        Assert.All(dwelling.Readings, r => Assert.Equal("Huber (FFB 12/1)", r.RecordedBy));
+        Assert.Equal(27, (dwelling.Readings[1].MeasuredAt - dwelling.Readings[0].MeasuredAt).TotalMinutes);
+    }
+
+    // The wire has no schema version of its own, so the trailing default IS the compatibility
+    // story: a payload from before #424 carries no readings key and must land as an empty series,
+    // never as a null that throws on the first render.
+    [Fact]
+    public void A_DwellingDto_without_readings_restores_an_empty_series()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Test", null);
+        var original = Incident.Start(clock, op);
+        original.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        original.RecordCoValue(clock, op, original.Buildings[0].Id, 0, 1, 45);
+
+        var full = SyncJson.Serialize(SnapshotMapper.ToSnapshot(original));
+
+        // Guard against this test passing vacuously if the property is ever renamed on the wire.
+        Assert.Contains("\"readings\"", full, StringComparison.Ordinal);
+
+        var json = full.Replace("\"readings\"", "\"readingsRemoved\"", StringComparison.Ordinal);
+
+        var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(json));
+
+        var dwelling = restored.Dwellings.First(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Empty(dwelling.Readings);
+        Assert.Equal(45, dwelling.CoValue);
+    }
 }
 
 internal sealed class FixedClock : IClock

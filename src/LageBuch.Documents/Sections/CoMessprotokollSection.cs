@@ -72,6 +72,19 @@ public static class CoMessprotokollSection
                             t.Span($", Schlüssel: {key}, {CoMeasurementLabels.StatusText(unit.Status)}")
                                 .FontSize(8).FontColor(GetColor(unit.Status));
                         });
+
+                        // #424: the Verlauf the Einsatzleiter is actually looking for, indented
+                        // under its unit. Only from two readings up -- with one it just repeats
+                        // the ppm on the line above. Deliberately grey rather than
+                        // severity-coloured: this page is scanned as a whole for red, and a red
+                        // historical value would announce a danger that has already passed. The
+                        // current value one line up carries the coloured statement.
+                        if (unit.Readings.Count >= 2)
+                        {
+                            var series = string.Join(" · ", unit.Readings.Select(CoMeasurementLabels.ReadingLabel));
+                            column.Item().PaddingLeft(10).Text($"Messreihe: {series}")
+                                .FontSize(7).FontColor(Colors.Grey.Darken1);
+                        }
                     }
                 }
             }

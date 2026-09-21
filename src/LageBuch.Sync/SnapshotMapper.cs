@@ -90,7 +90,8 @@ public static class SnapshotMapper
                 d.ResidentName,
                 d.Status,
                 d.KeyAvailable,
-                d.CoValue)).ToList());
+                d.CoValue,
+                d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList())).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -165,7 +166,8 @@ public static class SnapshotMapper
                 d.ResidentName,
                 d.Status,
                 d.KeyAvailable,
-                d.CoValue)));
+                d.CoValue,
+                d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)))));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

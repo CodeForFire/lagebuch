@@ -10,12 +10,17 @@ public static class Formatting
 
     public static string Timestamp(DateTimeOffset t) => t.ToString("dd.MM.yyyy HH:mm", De);
 
+    /// <summary>Clock time alone, for series read within one Einsatz (a CO-Messreihe), where the
+    /// date is the same on every line and only the minute carries information.</summary>
+    public static string TimeOfDay(DateTimeOffset t) => t.ToString("HH:mm", De);
+
     public static string Direction(EtbDirection direction) => direction switch
     {
         EtbDirection.Incoming => "Eingang",
         EtbDirection.Outgoing => "Ausgang",
         EtbDirection.Internal => "Intern",
         EtbDirection.System => "System",
+        EtbDirection.Measurement => "Messung",
         _ => direction.ToString(),
     };
 

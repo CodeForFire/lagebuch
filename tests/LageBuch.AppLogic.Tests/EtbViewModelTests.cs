@@ -82,8 +82,56 @@ public class EtbViewModelTests
         Assert.Contains(EtbDirection.Outgoing, vm.DirectionOptions.Select(o => o.Value));
         Assert.Contains(EtbDirection.Internal, vm.DirectionOptions.Select(o => o.Value));
 
-        // System is written only by the app, never picked by a human.
+        // App-written directions are never picked by a human.
         Assert.DoesNotContain(EtbDirection.System, vm.DirectionOptions.Select(o => o.Value));
+        Assert.DoesNotContain(EtbDirection.Measurement, vm.DirectionOptions.Select(o => o.Value));
+    }
+
+    // #424, the user-visible half: a CO reading must survive the default filter. Practitioners
+    // reported the change as "not documented" precisely because it did not.
+    [Fact]
+    public void Measurement_entries_survive_the_default_system_filter()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        Assert.True(vm.HideSystemEntries);
+
+        session.AddCoBuilding("Haus A", 2, 3);
+        session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 45);
+
+        var texts = vm.Entries.Select(e => e.Text).ToList();
+        Assert.Contains(texts, t => t.Contains("45 ppm", StringComparison.Ordinal));
+
+        // ... while the bookkeeping around it stays hidden, which is what #223 asked for.
+        Assert.DoesNotContain(texts, t => t.Contains("Einsatz begonnen", StringComparison.Ordinal));
+        Assert.DoesNotContain(texts, t => t.Contains("CO-Messprotokoll eröffnet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Measurement_entries_are_not_editable()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+
+        session.AddCoBuilding("Haus A", 2, 3);
+        session.RecordCoValue(session.Incident.Buildings[0].Id, 0, 1, 45);
+
+        var row = vm.Entries.First(e => e.DirectionValue == EtbDirection.Measurement);
+        Assert.False(row.IsEditable);
     }
 
     [Fact]

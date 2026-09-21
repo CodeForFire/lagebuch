@@ -117,6 +117,11 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     // System-generated lines (Kräfte, Atemschutz, Einsatz-Lebenszyklus) are usually less important
     // than human entries, so the operator can hide them. On by default (#223): a fresh incident
     // should open on an empty-looking journal, not the "Einsatz begonnen" trace.
+    //
+    // Deliberately narrower than EtbDirections.IsAppWritten: EtbDirection.Measurement is
+    // app-written too, but it is a professional record of what a Trupp measured, not bookkeeping.
+    // Hiding CO readings behind a checkbox nobody knows about is exactly what made them look
+    // undocumented (#424), so this filter tests for System alone.
     [ObservableProperty]
     private bool _hideSystemEntries = true;
 
@@ -131,10 +136,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     private bool IsVisible(EtbEntryRow row) =>
         !HideSystemEntries || row.DirectionValue != EtbDirection.System;
 
-    // System is written only by the app, never chosen by a human, so it is omitted from the picker.
+    // App-written directions are never chosen by a human, so they are omitted from the picker.
     public IReadOnlyList<EtbDirectionOption> DirectionOptions { get; } =
         Enum.GetValues<EtbDirection>()
-            .Where(d => d != EtbDirection.System)
+            .Where(d => !EtbDirections.IsAppWritten(d))
             .Select(d => new EtbDirectionOption(d, Formatting.Direction(d)))
             .ToArray();
 
@@ -268,7 +273,7 @@ public sealed class EtbEntryRow
         DirectionValue = entry.Direction;
         WasEdited = entry.Edits.Count > 0;
         Edits = entry.Edits;
-        IsEditable = entry.Direction != EtbDirection.System;
+        IsEditable = !EtbDirections.IsAppWritten(entry.Direction);
         BeginEditCommand = new RelayCommand(() => beginEdit(this), () => canEdit(this));
 
         // Deliberately not gated on IsReadOnly/IsEditable like BeginEditCommand: a closed or

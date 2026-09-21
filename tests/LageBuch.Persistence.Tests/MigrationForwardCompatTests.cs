@@ -1,3 +1,4 @@
+using System.Globalization;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
@@ -439,6 +440,50 @@ public class MigrationForwardCompatTests : IDisposable
             using var read = cn.CreateCommand();
             read.CommandText = "SELECT count(*) FROM incident_timers;";
             Assert.Equal(0L, (long)read.ExecuteScalar()!);
+        }
+    }
+
+    [Fact]
+    public void V21_file_gains_an_empty_co_readings_table_and_keeps_its_co_value()
+    {
+        // V24 adds co_readings (per-Wohnung CO measurement history, #424). A v21 file must upgrade
+        // cleanly, keep the reading it already has, and gain an EMPTY series: nothing is
+        // backfilled. The readings such an incident took survive only as German ETB prose, and
+        // guessing a (building, floor, apartment) triple back out of that text -- past renamed
+        // buildings and the Links/Mitte/Rechts labels -- would invent timestamps. An honest gap
+        // is better than a fabricated Messreihe in a document a Kommandant relies on.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE schema_version (version INTEGER NOT NULL);
+                INSERT INTO schema_version (version) VALUES (21);
+                CREATE TABLE co_dwellings (
+                    id TEXT PRIMARY KEY, building_id TEXT NOT NULL, floor_ordinal INTEGER NOT NULL,
+                    apartment_number INTEGER NOT NULL, resident_name TEXT, status INTEGER NOT NULL,
+                    key_available INTEGER, co_value INTEGER
+                );
+                INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, status, co_value)
+                VALUES ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 0, 1, 0, 45);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Assert.Equal(21, Migrations.GetVersion(cn));
+            Migrations.Migrate(cn);
+            Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn));
+
+            using var readings = cn.CreateCommand();
+            readings.CommandText = "SELECT count(*) FROM co_readings;";
+            Assert.Equal(0L, (long)readings.ExecuteScalar()!);
+
+            using var value = cn.CreateCommand();
+            value.CommandText = "SELECT co_value FROM co_dwellings;";
+            Assert.Equal(45L, Convert.ToInt64(value.ExecuteScalar()!, CultureInfo.InvariantCulture));
         }
     }
 

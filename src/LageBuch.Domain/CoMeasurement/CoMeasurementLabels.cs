@@ -86,6 +86,16 @@ public static class CoMeasurementLabels
         return $"{building.Name}, {FloorLabel(floorOrdinal)}, {ApartmentLabel(building, floorOrdinal, apartmentNumber)}";
     }
 
+    /// <summary>One reading of a Messreihe as "08:41 40 ppm", or "09:02 gelöscht" where the value
+    /// was cleared. Lives here rather than in either renderer so the CO tab and the report cannot
+    /// word the same series differently.</summary>
+    public static string ReadingLabel(CoReading reading)
+    {
+        ArgumentNullException.ThrowIfNull(reading);
+        var value = reading.Value is { } v ? $"{v} ppm" : "gelöscht";
+        return $"{Formatting.TimeOfDay(reading.MeasuredAt)} {value}";
+    }
+
     public static string StatusText(DwellingStatus status) => status switch
     {
         DwellingStatus.NotSearched => "noch nicht abgesucht",

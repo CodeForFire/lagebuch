@@ -36,6 +36,78 @@ public class CoMeasurementPersistenceTests : IDisposable
         return incident;
     }
 
+    // --- Issue #424: the Messreihe ---
+    [Fact]
+    public void SaveLoad_RoundTrips_TheReadingSeries()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+
+        incident.RecordCoValue(clock, op, haus, 0, 1, 120);
+        clock.Now = clock.Now.AddMinutes(27);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 40);
+        clock.Now = clock.Now.AddMinutes(21);
+        incident.RecordCoValue(clock, op, haus, 0, 1, null);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var dwelling = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(new int?[] { 120, 40, null }, dwelling.Readings.Select(r => r.Value));
+        Assert.All(dwelling.Readings, r => Assert.Equal("Huber (FFB 12/1)", r.RecordedBy));
+        Assert.Equal(
+            new[] { "10:00", "10:27", "10:48" },
+            dwelling.Readings.Select(r => Formatting.TimeOfDay(r.MeasuredAt.ToUniversalTime())));
+        Assert.Null(dwelling.CoValue);
+    }
+
+    // The ApplyV21 lesson: force_unit_edits needed a cleanup migration because Save's DELETE list
+    // did not list it, so every save stacked another copy of the history onto the file. This is
+    // the test that keeps co_readings from repeating it.
+    [Fact]
+    public void Save_Twice_DoesNotDuplicateTheSeries()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+        incident.RecordCoValue(clock, op, haus, 0, 1, 120);
+        clock.Now = clock.Now.AddMinutes(27);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 40);
+
+        IncidentRepository.Save(_path, incident);
+        IncidentRepository.Save(_path, incident);
+
+        var loaded = IncidentRepository.Load(_path);
+        var dwelling = loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
+        Assert.Equal(new int?[] { 120, 40 }, dwelling.Readings.Select(r => r.Value));
+    }
+
+    [Fact]
+    public void SaveLoad_KeepsEachDwellingsSeriesApart()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Huber", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        var haus = incident.Buildings[0].Id;
+        incident.RecordCoValue(clock, op, haus, 0, 1, 120);
+        clock.Now = clock.Now.AddMinutes(5);
+        incident.RecordCoValue(clock, op, haus, 0, 1, 40);
+        incident.RecordCoValue(clock, op, haus, 1, 2, 8);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(2, loaded.Dwellings.Single(d => d.FloorOrdinal == 0 && d.ApartmentNumber == 1).Readings.Count);
+        Assert.Single(loaded.Dwellings.Single(d => d.FloorOrdinal == 1 && d.ApartmentNumber == 2).Readings);
+        Assert.Empty(loaded.Dwellings.Single(d => d.FloorOrdinal == 2 && d.ApartmentNumber == 1).Readings);
+    }
+
     [Fact]
     public void SaveLoad_RoundTrip_BuildingsAndDwellings()
     {
