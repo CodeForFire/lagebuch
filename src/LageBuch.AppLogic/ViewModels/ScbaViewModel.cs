@@ -397,8 +397,11 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Internally assigned, never user-edited (#217): a hand-typed duplicate crashed
-    /// <see cref="Domain.Incident.AddScbaTrupp"/>, so the view shows this as read-only text and
-    /// only the constructor, <see cref="AddTrupp"/>, and <see cref="RefreshTrupps"/> ever set it.
+    /// <see cref="Domain.Incident.AddScbaTrupp"/>, so only the constructor,
+    /// <see cref="AddTrupp"/>, and <see cref="RefreshTrupps"/> ever set it. The registration
+    /// dock does not show it at all (#416) -- a read-only TextBox still took focus and a tab
+    /// stop while ignoring every keystroke. The number first becomes visible on the registered
+    /// Trupp, through <see cref="Domain.Atemschutz.AtemschutzTrupp.FormatDisplayName"/>.
     /// </summary>
     [ObservableProperty]
     private int _newTruppNumber;

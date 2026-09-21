@@ -44,7 +44,7 @@
                enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). This is the
                vehicle/unit the Trupp rides with, hence leading the form (#78). -->
           <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
-            <AutoCompleteBox Width="140"
+            <AutoCompleteBox x:Name="CallSignBox" Width="140"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                              ItemsSource="{Binding CallSignOptions}"
                              FilterMode="ContainsOrdinal"
@@ -53,14 +53,8 @@
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="TRUPP-ART"
                                     Classes.invalid="{Binding NewDesignationError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <ComboBox Width="150" ItemsSource="{Binding TruppTypeOptions}"
+            <ComboBox x:Name="TruppTypeBox" Width="150" ItemsSource="{Binding TruppTypeOptions}"
                       SelectedItem="{Binding NewDesignation}" />
-          </HeaderedContentControl>
-          <!-- Internal, not user-editable (#217): a hand-typed duplicate crashed the app, so this is
-               read-only and always shows the next free number. -->
-          <HeaderedContentControl Classes="field" Header="TRUPPNUMMER">
-            <TextBox Width="90" Text="{Binding NewTruppNumber, Mode=OneWay}"
-                     IsReadOnly="True" HorizontalContentAlignment="Center" />
           </HeaderedContentControl>
           <!-- One box per position rather than a single free-text field: a Trupp is two people,
                or three where its Stammdaten-Eintrag says so, and the third box only appears when the

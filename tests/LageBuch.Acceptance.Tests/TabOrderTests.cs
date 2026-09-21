@@ -14,7 +14,7 @@ namespace LageBuch.Acceptance.Tests;
 
 // #262 (UX review, "No accessibility support"): no explicit TabIndex exists anywhere in the app,
 // so keyboard-only navigation relies entirely on Avalonia's default declaration-order tab
-// navigation. Rather than sprinkling TabIndex speculatively, these tests verify the two riskiest
+// navigation. Rather than sprinkling TabIndex speculatively, these tests verify the riskiest
 // layouts (many same-row fields/buttons) already tab in reading order -- if one of these starts
 // failing, that specific spot needs an explicit TabIndex fix, not a blanket sweep.
 public class TabOrderTests
@@ -154,5 +154,54 @@ public class TabOrderTests
         Tab(window);
         Dispatcher.UIThread.RunJobs();
         Assert.True(removeButton.IsKeyboardFocusWithin);
+    }
+
+    // #416: TRUPPNUMMER used to sit between TRUPP-ART and TRUPPFÜHRER as a TextBox with
+    // IsReadOnly="True". IsReadOnly blocks typing but not focus, so tabbing through the dock
+    // stopped in a field that swallowed every keystroke -- which is exactly what the practitioner
+    // feedback described. The field is gone (the number is assigned internally and shows on the
+    // registered Trupp); this pins that nothing dead takes its place in the tab chain.
+    [AvaloniaFact]
+    public void Scba_registration_dock_tabs_from_trupp_art_straight_to_truppfuehrer()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var md = MasterDataSet.Empty with
+        {
+            TruppTypes = new[] { new TruppType("Angriffstrupp") },
+            Personnel = new[] { new Person("Mustermann", "Max", "ZF", null, null) },
+        };
+        var vm = new ScbaViewModel(session, md, clock, new NoopTicker(), new NoopAlarmService(), () => { });
+
+        var view = new ScbaView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1400, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        view.GetControl<AutoCompleteBox>("CallSignBox").Focus();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(view.GetControl<AutoCompleteBox>("CallSignBox").IsKeyboardFocusWithin);
+
+        Tab(window);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(view.GetControl<ComboBox>("TruppTypeBox").IsKeyboardFocusWithin);
+
+        Tab(window);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(view.GetControl<AutoCompleteBox>("TruppfuehrerBox").IsKeyboardFocusWithin);
+
+        Tab(window);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(view.GetControl<AutoCompleteBox>("TruppmannBox").IsKeyboardFocusWithin);
+
+        // The chain stops here on purpose. ZweiterTruppmannBox is collapsed
+        // (IsVisible="{Binding RequiresThirdMember}") for a two-person Trupp-Typ and so is no tab
+        // stop, and the gap this test guards sat before TRUPPFÜHRER, not after TRUPPMANN.
     }
 }
