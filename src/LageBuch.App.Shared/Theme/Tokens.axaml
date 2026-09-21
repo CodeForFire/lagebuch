@@ -34,6 +34,10 @@
        drifts the midtones through grey instead of dimming the hue. -->
   <Color x:Key="SignalFadedColor">#00FF3D2E</Color>
 
+  <!-- Blocking red, softer than SignalColor, which is reserved for the emergency accent. Already
+       the colour of every "this cannot be saved" message in the app; now it has a name (#412). -->
+  <Color x:Key="ErrorColor">#F87171</Color>
+
   <Color x:Key="AmberColor">#FFB23E</Color>
   <Color x:Key="AmberDeepColor">#7A4A07</Color>
   <Color x:Key="ActiveColor">#37D17C</Color>
@@ -53,6 +57,7 @@
 
   <SolidColorBrush x:Key="SignalBrush" Color="{StaticResource SignalColor}" />
   <SolidColorBrush x:Key="SignalHotBrush" Color="{StaticResource SignalHotColor}" />
+  <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
   <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
   <SolidColorBrush x:Key="ActiveBrush" Color="{StaticResource ActiveColor}" />
   <SolidColorBrush x:Key="IncomingBrush" Color="{StaticResource IncomingColor}" />

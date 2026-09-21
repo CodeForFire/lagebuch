@@ -73,18 +73,55 @@ public class TasksViewModelTests
     }
 
     [Fact]
-    public void AddTask_canExecute_requires_text_and_nonnegative_minutes()
+    public void AddTask_names_the_empty_text_rather_than_going_grey()
     {
         var (session, clock, _) = NewSession();
         var vm = NewVm(session, clock);
 
-        Assert.False(vm.AddTaskCommand.CanExecute(null));
+        Assert.True(vm.AddTaskCommand.CanExecute(null)); // the press is the question (#412)
+        vm.AddTaskCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.NewTextError);
+        Assert.Empty(session.Incident.Tasks);
+
         vm.NewText = "X";
-        Assert.True(vm.AddTaskCommand.CanExecute(null));
+        Assert.Null(vm.NewTextError); // fixed as it is typed, without a second press
+        vm.AddTaskCommand.Execute(null);
+        Assert.Single(session.Incident.Tasks);
+    }
+
+    [Fact]
+    public void AddTask_accepts_a_zero_timer_and_names_a_negative_one()
+    {
+        var (session, clock, _) = NewSession();
+        var vm = NewVm(session, clock);
+        vm.NewText = "X";
+
         vm.NewTimerMinutes = 0;
-        Assert.True(vm.AddTaskCommand.CanExecute(null)); // timer=0 is allowed (no due date)
+        vm.AddTaskCommand.Execute(null);
+        Assert.Single(session.Incident.Tasks); // timer=0 is allowed (no due date)
+        Assert.Null(vm.NewTimerMinutesError);
+
+        vm.NewText = "Y";
         vm.NewTimerMinutes = -1;
-        Assert.False(vm.AddTaskCommand.CanExecute(null)); // negative is rejected
+        vm.AddTaskCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.TimerMinutes, vm.NewTimerMinutesError);
+        Assert.Single(session.Incident.Tasks); // the negative one was not added
+    }
+
+    [Fact]
+    public void A_added_task_leaves_the_dock_quiet_for_the_next_one()
+    {
+        var (session, clock, _) = NewSession();
+        var vm = NewVm(session, clock);
+        vm.AddTaskCommand.Execute(null); // provokes the message
+        vm.NewText = "Erster Auftrag";
+
+        vm.AddTaskCommand.Execute(null);
+
+        Assert.Equal(string.Empty, vm.NewText); // cleared for rapid follow-up entries
+        Assert.Null(vm.NewTextError); // ...and that clearing must not read as a fresh complaint
     }
 
     [Fact]

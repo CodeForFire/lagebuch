@@ -79,28 +79,44 @@ public class ScbaViewModelTests
     }
 
     [Fact]
-    public void AddTrupp_disabled_when_required_fields_blank()
+    public void AddTrupp_names_the_blank_Truppfuehrer()
     {
         var clock = new FixedClock(T0);
-        var vm = Vm(clock, NewSession(clock));
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
         vm.NewDesignation = "Angriffstrupp";
         vm.NewTruppfuehrer = "  ";
         vm.NewTruppmann = "Schmidt";
-        Assert.False(vm.AddTruppCommand.CanExecute(null));
+
+        Assert.True(vm.AddTruppCommand.CanExecute(null)); // the press is the question (#412)
+        vm.AddTruppCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.NewTruppfuehrerError);
+        Assert.Null(vm.NewTruppmannError); // only the offending field is named
+        Assert.Null(vm.NewDesignationError);
+        Assert.Empty(session.Incident.ScbaTrupps);
     }
 
     [Fact]
-    public void AddTrupp_disabled_when_entry_pressure_is_not_positive()
+    public void AddTrupp_names_an_emptied_Einstiegsdruck()
     {
         var clock = new FixedClock(T0);
-        var vm = Vm(clock, NewSession(clock));
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
         vm.NewDesignation = "Angriffstrupp";
         vm.NewTruppfuehrer = "Müller";
         vm.NewTruppmann = "Schmidt";
-        Assert.True(vm.AddTruppCommand.CanExecute(null)); // default entry pressure is positive
 
         vm.NewEntryPressure = 0;
-        Assert.False(vm.AddTruppCommand.CanExecute(null));
+        vm.AddTruppCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.EntryPressure, vm.NewEntryPressureError);
+        Assert.Empty(session.Incident.ScbaTrupps);
+
+        vm.NewEntryPressure = 300;
+        Assert.Null(vm.NewEntryPressureError);
+        vm.AddTruppCommand.Execute(null);
+        Assert.Single(session.Incident.ScbaTrupps);
     }
 
     [Fact]
@@ -529,20 +545,28 @@ public class ScbaViewModelTests
     [Fact]
     public void A_trupp_needs_both_crew_names_before_it_can_be_registered()
     {
-        var vm = Vm(new FixedClock(T0), NewSession(new FixedClock(T0)));
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
         vm.NewDesignation = "Angriffstrupp";
 
         vm.NewTruppfuehrer = "Müller";
-        Assert.False(vm.AddTruppCommand.CanExecute(null)); // a Trupp is never one person
+        vm.AddTruppCommand.Execute(null);
+        Assert.Equal(ValidationMessages.Required, vm.NewTruppmannError); // a Trupp is never one person
+        Assert.Empty(session.Incident.ScbaTrupps);
 
         vm.NewTruppmann = "Schmidt";
-        Assert.True(vm.AddTruppCommand.CanExecute(null));
+        Assert.Null(vm.NewTruppmannError);
+        vm.AddTruppCommand.Execute(null);
+        Assert.Single(session.Incident.ScbaTrupps);
     }
 
     [Fact]
     public void A_three_person_trupp_type_reveals_and_requires_the_third_name()
     {
-        var vm = Vm(new FixedClock(T0), NewSession(new FixedClock(T0)));
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
         vm.NewDesignation = "Angriffstrupp";
         Assert.False(vm.RequiresThirdMember);
 
@@ -551,10 +575,14 @@ public class ScbaViewModelTests
 
         vm.NewTruppfuehrer = "Müller";
         vm.NewTruppmann = "Schmidt";
-        Assert.False(vm.AddTruppCommand.CanExecute(null));
+        vm.AddTruppCommand.Execute(null);
+        Assert.Equal(ValidationMessages.Required, vm.NewZweiterTruppmannError);
+        Assert.Empty(session.Incident.ScbaTrupps);
 
         vm.NewZweiterTruppmann = "Huber";
-        Assert.True(vm.AddTruppCommand.CanExecute(null));
+        Assert.Null(vm.NewZweiterTruppmannError);
+        vm.AddTruppCommand.Execute(null);
+        Assert.Single(session.Incident.ScbaTrupps);
     }
 
     [Fact]
@@ -584,10 +612,11 @@ public class ScbaViewModelTests
 
         vm.NewTruppfuehrer = "Müller";
         vm.NewTruppmann = "Schmidt";
-        Assert.False(vm.AddTruppCommand.CanExecute(null));
+        vm.AddTruppCommand.Execute(null);
+        Assert.Equal(ValidationMessages.Required, vm.NewZweiterTruppmannError);
 
         vm.NewZweiterTruppmann = "Huber";
-        Assert.True(vm.AddTruppCommand.CanExecute(null));
+        Assert.Null(vm.NewZweiterTruppmannError);
     }
 
     [Fact]

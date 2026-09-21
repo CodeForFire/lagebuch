@@ -349,8 +349,14 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private ScbaTruppRow? _selectedTrupp;
 
+    // Quiet until the first press: a tab that opens already scolding teaches nothing.
+    private bool _errorsShown;
+
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    [NotifyPropertyChangedFor(nameof(NewDesignationError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
+    [NotifyPropertyChangedFor(nameof(NewZweiterTruppmannError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     [NotifyPropertyChangedFor(nameof(RequiresThirdMember))]
     private string _newDesignation = string.Empty;
 
@@ -371,16 +377,19 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     /// Truppführer. A Trupp always has one; the crew is never a single free-text field.
     /// </summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    [NotifyPropertyChangedFor(nameof(NewTruppfuehrerError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newTruppfuehrer = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    [NotifyPropertyChangedFor(nameof(NewTruppmannError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newTruppmann = string.Empty;
 
     /// <summary>Only used -- and only required -- for a Trupp-Typ crewed by three.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    [NotifyPropertyChangedFor(nameof(NewZweiterTruppmannError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newZweiterTruppmann = string.Empty;
 
     [ObservableProperty]
@@ -392,11 +401,11 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     /// only the constructor, <see cref="AddTrupp"/>, and <see cref="RefreshTrupps"/> ever set it.
     /// </summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
     private int _newTruppNumber;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
+    [NotifyPropertyChangedFor(nameof(NewEntryPressureError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int _newEntryPressure;
 
     [ObservableProperty]
@@ -599,22 +608,81 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         AcknowledgeAlarmCommand.NotifyCanExecuteChanged();
     }
 
-    private bool CanAddTrupp =>
-        !IsReadOnly && !string.IsNullOrWhiteSpace(NewDesignation)
-        && !string.IsNullOrWhiteSpace(NewTruppfuehrer) && !string.IsNullOrWhiteSpace(NewTruppmann)
+    // Only the read-only rule gates the button; every empty field answers on the press (#412).
+    private bool CanAddTrupp => !IsReadOnly;
 
-        // The per-type crew rule (#398): the domain cannot see the Stammdaten, so this is where
-        // "this Trupp-Typ needs three people" is enforced. An incomplete three-person Trupp
-        // disables the button rather than throwing on click.
-        && (!RequiresThirdMember || !string.IsNullOrWhiteSpace(NewZweiterTruppmann))
-        && NewTruppNumber > 0 && NewEntryPressure > 0;
+    /// <summary>Whether the Trupp-Art is still missing, once the operator has asked (#412).</summary>
+    /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? ErrorSummary => ValidationMessages.Summarize(
+        NewDesignationError, NewTruppfuehrerError, NewTruppmannError, NewZweiterTruppmannError, NewEntryPressureError);
+
+    public string? NewDesignationError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewDesignation) ? ValidationMessages.Required : null;
+
+    /// <summary>Whether the Truppführer is still missing, once asked (#412).</summary>
+    public string? NewTruppfuehrerError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewTruppfuehrer) ? ValidationMessages.Required : null;
+
+    /// <summary>Whether the Truppmann is still missing, once asked (#412).</summary>
+    public string? NewTruppmannError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewTruppmann) ? ValidationMessages.Required : null;
+
+    /// <summary>
+    /// The per-type crew rule (#398): the domain cannot see the Stammdaten, so this is where "this
+    /// Trupp-Typ needs three people" is enforced. An incomplete three-person Trupp now says which
+    /// name is missing instead of throwing on the click or greying the button.
+    /// </summary>
+    public string? NewZweiterTruppmannError =>
+        _errorsShown && RequiresThirdMember && string.IsNullOrWhiteSpace(NewZweiterTruppmann)
+            ? ValidationMessages.Required
+            : null;
+
+    /// <summary>Whether the Einstiegsdruck box was emptied or zeroed, once asked (#412).</summary>
+    public string? NewEntryPressureError =>
+        _errorsShown && NewEntryPressure <= 0 ? ValidationMessages.EntryPressure : null;
 
     private IReadOnlyList<TruppMember> BuildCrew() =>
         TruppMember.Crew(NewTruppfuehrer, NewTruppmann, RequiresThirdMember ? NewZweiterTruppmann : null);
 
+    /// <summary>
+    /// Turns the field messages on and reports whether the Trupp may be bereitgestellt. The Trupp
+    /// number is checked without a message: it is assigned internally and never user-edited
+    /// (#217), so there is no field for an operator to correct.
+    /// </summary>
+    private bool Validate()
+    {
+        ShowErrors(true);
+        return NewDesignationError is null
+               && NewTruppfuehrerError is null
+               && NewTruppmannError is null
+               && NewZweiterTruppmannError is null
+               && NewEntryPressureError is null
+               && NewTruppNumber > 0;
+    }
+
+    private void ShowErrors(bool shown)
+    {
+        _errorsShown = shown;
+        OnPropertyChanged(nameof(NewDesignationError));
+        OnPropertyChanged(nameof(ErrorSummary));
+        OnPropertyChanged(nameof(NewTruppfuehrerError));
+        OnPropertyChanged(nameof(ErrorSummary));
+        OnPropertyChanged(nameof(NewTruppmannError));
+        OnPropertyChanged(nameof(ErrorSummary));
+        OnPropertyChanged(nameof(NewZweiterTruppmannError));
+        OnPropertyChanged(nameof(ErrorSummary));
+        OnPropertyChanged(nameof(NewEntryPressureError));
+        OnPropertyChanged(nameof(ErrorSummary));
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddTrupp))]
     private void AddTrupp()
     {
+        if (!Validate())
+        {
+            return;
+        }
+
         // Compose the ETB line from the inputs, not from a return value — the mutation is
         // fire-and-forget, and the row itself is rendered by RefreshTrupps on the Changed event.
         var crew = BuildCrew();
@@ -651,6 +719,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         NewReturnPressureBar = _settings.ReturnPressureBar;
 
         NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber(); // sets up the *next* Trupp's number
+        ShowErrors(false); // the cleared form must not read as a fresh complaint
         ApplyDefaultMaxDuration(); // empty designation => AGT default; also re-derives the interval
         RefreshHeader();
         _onChanged();

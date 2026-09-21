@@ -715,11 +715,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
 
     private bool CanAddBuilding => !IsReadOnly;
 
+    // Quiet until the first press: a dialog that opens already scolding teaches nothing.
+    private bool _errorsShown;
+
     [ObservableProperty]
     private bool _isAddBuildingDialogOpen;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmAddBuildingCommand))]
+    [NotifyPropertyChangedFor(nameof(NewBuildingNameError))]
     private string _newBuildingName = string.Empty;
 
     [ObservableProperty]
@@ -734,23 +737,42 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
     [ObservableProperty]
     private int _newBuildingUndergroundFloors = 1;
 
-    private bool CanConfirmAddBuilding => !string.IsNullOrWhiteSpace(NewBuildingName);
+    /// <summary>Whether the Haus still has no Bezeichnung, once the operator has asked (#412).</summary>
+    public string? NewBuildingNameError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewBuildingName) ? ValidationMessages.Required : null;
 
-    [RelayCommand(CanExecute = nameof(CanConfirmAddBuilding))]
+    [RelayCommand]
     private void ConfirmAddBuilding()
     {
+        ShowErrors(true);
+        if (NewBuildingNameError is not null)
+        {
+            return;
+        }
+
         _session.AddCoBuilding(NewBuildingName, NewBuildingFloors, NewBuildingApartments, NewBuildingUndergroundFloors);
         NewBuildingName = string.Empty;
         NewBuildingFloors = 8;
         NewBuildingApartments = 10;
         NewBuildingUndergroundFloors = 1;
         IsAddBuildingDialogOpen = false;
+        ShowErrors(false); // the cleared dialog must not reopen already complaining
         _onChanged();
         Refresh();
     }
 
     [RelayCommand]
-    private void CancelAddBuilding() => IsAddBuildingDialogOpen = false;
+    private void CancelAddBuilding()
+    {
+        IsAddBuildingDialogOpen = false;
+        ShowErrors(false);
+    }
+
+    private void ShowErrors(bool shown)
+    {
+        _errorsShown = shown;
+        OnPropertyChanged(nameof(NewBuildingNameError));
+    }
 
     [RelayCommand(CanExecute = nameof(CanRemoveBuilding))]
     private void RemoveBuilding()

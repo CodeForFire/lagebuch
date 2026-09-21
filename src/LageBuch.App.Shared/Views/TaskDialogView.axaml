@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.TaskDialogView"
              x:DataType="vm:TaskDialogViewModel">
   <Border Background="#B3070A10" Padding="40">
@@ -16,7 +17,7 @@
                 CornerRadius="12,12,0,0" />
         <StackPanel Margin="26,22,26,24" Spacing="12">
           <TextBlock Text="TASK ERSTELLEN" Classes="display" FontSize="20" />
-          <HeaderedContentControl Classes="field" Header="AUFGABE">
+          <HeaderedContentControl Classes="field" Header="AUFGABE" ctrl:Field.Error="{Binding TextError}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
             <TextBox x:Name="TaskDialogText" Text="{Binding Text}" AcceptsReturn="False" />
           </HeaderedContentControl>
@@ -37,7 +38,8 @@
                 </ComboBox.ItemTemplate>
               </ComboBox>
             </HeaderedContentControl>
-            <HeaderedContentControl Grid.Column="2" Classes="field" Header="TIMER (MIN)">
+            <HeaderedContentControl Grid.Column="2" Classes="field" Header="TIMER (MIN)"
+                                    ctrl:Field.Error="{Binding TimerMinutesError}">
               <TextBox Width="60" Text="{Binding TimerMinutes}" b:IntegerOnly.IsEnabled="True"
                        PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}" />
             </HeaderedContentControl>

@@ -256,8 +256,6 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         TotalStrengthText = $"{TotalZugfuehrer}/{TotalOfficer}/{total - TotalOfficer - TotalZugfuehrer}/{total}";
         RefreshVehicleOptions(); // taken vehicles reappear once their row is gone
         OnPropertyChanged(nameof(IsDuplicateCallSign));
-        OnPropertyChanged(nameof(AddDisabledReason));
-        AddForceCommand.NotifyCanExecuteChanged();
     }
 
     public bool IsReadOnly { get; }
@@ -298,33 +296,41 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     /// </summary>
     public string TotalStrengthPrefixText => $"{TotalZugfuehrer}/{TotalOfficer}/{TotalPersonnel - TotalOfficer - TotalZugfuehrer}/";
 
+    // Quiet until the first press: a tab that opens already scolding teaches nothing.
+    private bool _errorsShown;
+
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
+    [NotifyPropertyChangedFor(nameof(NewBrigadeError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newBrigade = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NewCallSignError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string? _newCallSign;
 
     /// <summary>Nullable: an empty field means 0 and keeps the placeholder visible.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
+    [NotifyPropertyChangedFor(nameof(NewStrengthError))]
+    [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newZugfuehrerCount;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
+    [NotifyPropertyChangedFor(nameof(NewStrengthError))]
+    [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newOfficerCount;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
+    [NotifyPropertyChangedFor(nameof(NewStrengthError))]
+    [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newMannschaftCount;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddForceCommand))]
-    [NotifyPropertyChangedFor(nameof(AddDisabledReason))]
+    [NotifyPropertyChangedFor(nameof(NewScbaCountError))]
+    [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newScbaCount;
 
     [ObservableProperty]
@@ -387,8 +393,10 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Der Freitext im Funkrufname-Feld kann trotzdem einen vergebenen Namen treffen (etwa bei
-    /// Fremdwehren ohne Stammdaten) — dann sperrt das Flag HINZUFÜGEN, statt dass der Domain-Aufruf
-    /// später ins Leere läuft. Leere Rufnamen zählen nie als Duplikat.
+    /// Fremdwehren ohne Stammdaten) — dann verweigert das Flag die Aufnahme, statt dass der
+    /// Domain-Aufruf später ins Leere läuft. Leere Rufnamen zählen nie als Duplikat: das Dock
+    /// erzeugt seit #220 keine mehr, aber eine ältere Einsatzdatei, ein Snapshot oder ein
+    /// verbundenes Gerät auf älterem Stand kann eine solche Zeile mitbringen.
     /// </summary>
     public bool IsDuplicateCallSign =>
         !string.IsNullOrWhiteSpace(NewCallSign)
@@ -397,8 +405,6 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     partial void OnNewCallSignChanged(string? value)
     {
         OnPropertyChanged(nameof(IsDuplicateCallSign));
-        OnPropertyChanged(nameof(AddDisabledReason));
-        AddForceCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedVehicleChanged(Vehicle? value)
@@ -422,66 +428,107 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         NewScbaCount = 0;
     }
 
-    private bool CanAddForce =>
-        !IsReadOnly && !string.IsNullOrWhiteSpace(NewBrigade)
+    /// <summary>
+    /// Every active message on one line beneath the fields row, or null while there is nothing to
+    /// say (#412). The dock cannot carry a message under each field: its fields sit in a horizontal
+    /// StackPanel, which measures children at infinite width, so a message never wraps and instead
+    /// makes its field as wide as the text -- which pushed HINZUFÜGEN clean off the right edge.
+    /// The fields themselves say <em>which</em> by turning red; this line says what is needed.
+    /// </summary>
+    public string? ErrorSummary => ValidationMessages.Summarize(
+        NewBrigadeError, NewCallSignError, NewStrengthError, NewScbaCountError);
 
-        // Lifted comparisons: null >= 0 is false, so every operand coalesces first.
-        && (NewZugfuehrerCount ?? 0) >= 0 && (NewOfficerCount ?? 0) >= 0
-        && (NewMannschaftCount ?? 0) >= 0 && (NewScbaCount ?? 0) >= 0
+    // Only the read-only rule gates the button. Every input rule below answers on the press
+    // instead, because a grey button names none of them (#412).
+    private bool CanAddForce => !IsReadOnly;
 
-        // A row with Brigade but no counted personnel reports nothing and is almost always a
-        // stray click, not an intentional entry (#220). Funkrufname stays optional on purpose --
-        // Fremdwehr headcounts without a specific vehicle are a real, supported case.
-        && (NewZugfuehrerCount ?? 0) + (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0) > 0
+    // Lifted comparisons throughout: null >= 0 is false, so every operand coalesces first.
+    private int Zugfuehrer => NewZugfuehrerCount ?? 0;
 
-        // Mirrors the domain rule, so an over-count disables the button instead of throwing on click.
-        && (NewScbaCount ?? 0) <= (NewZugfuehrerCount ?? 0) + (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0)
+    private int Officers => NewOfficerCount ?? 0;
 
-        // Ein Fahrzeug ist einzig — sein Funkrufname darf nicht schon in der Liste stehen.
-        && !IsDuplicateCallSign;
+    private int Mannschaft => NewMannschaftCount ?? 0;
+
+    private int Scba => NewScbaCount ?? 0;
+
+    private int Strength => Zugfuehrer + Officers + Mannschaft;
+
+    /// <summary>Whether the Wache is still missing, once the operator has asked (#412).</summary>
+    public string? NewBrigadeError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewBrigade) ? ValidationMessages.BrigadeRequired : null;
 
     /// <summary>
-    /// Explains a disabled HINZUFÜGEN in the same priority order as <see cref="CanAddForce"/>,
-    /// so a blocked add is never a silent guess — bound to the button's tooltip. Null (not an
-    /// empty string) once every condition is satisfied, so no empty tooltip pops up while the
-    /// button is enabled.
+    /// Whether the Funkrufname is still missing, once the operator has asked. Together with
+    /// <see cref="NewBrigadeError"/> this is the identity rule #220 asked for: a Kraft is either a
+    /// Fahrzeug out of the Stammdaten, or a Wache and a Funkrufname typed by hand. A unit nobody
+    /// can call is not a unit.
+    /// <para>
+    /// The Fahrzeug branch needs no check of its own: picking one derives both fields and the view
+    /// locks them while it is selected, so a satisfied dropdown is already a satisfied pair.
+    /// </para>
     /// </summary>
-    public string? AddDisabledReason
+    public string? NewCallSignError =>
+        _errorsShown && string.IsNullOrWhiteSpace(NewCallSign) ? ValidationMessages.CallSignRequired : null;
+
+    /// <summary>
+    /// What is wrong with the three Stärke boxes, once the operator has asked. A row with a Wache
+    /// but nobody counted reports nothing and is almost always a stray click (#220).
+    /// </summary>
+    public string? NewStrengthError
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(NewBrigade))
+            if (!_errorsShown)
             {
-                return "Wache eingeben";
+                return null;
             }
 
-            var zf = NewZugfuehrerCount ?? 0;
-            var gf = NewOfficerCount ?? 0;
-            var mann = NewMannschaftCount ?? 0;
-            var agt = NewScbaCount ?? 0;
-
-            if (zf < 0 || gf < 0 || mann < 0 || agt < 0)
+            if (Zugfuehrer < 0 || Officers < 0 || Mannschaft < 0)
             {
-                return "Stärke darf nicht negativ sein";
+                return ValidationMessages.NegativeStrength;
             }
 
-            if (zf + gf + mann == 0)
+            return Strength == 0 ? ValidationMessages.NoPersonnel : null;
+        }
+    }
+
+    /// <summary>
+    /// What is wrong with the AGT count, once asked. Mirrors the domain rule, so an over-count is
+    /// explained here instead of throwing on the click.
+    /// </summary>
+    public string? NewScbaCountError
+    {
+        get
+        {
+            if (!_errorsShown)
             {
-                return "Mindestens eine Person eintragen";
+                return null;
             }
 
-            if (agt > zf + gf + mann)
+            if (Scba < 0)
             {
-                return "AGT darf die Stärke nicht überschreiten";
+                return ValidationMessages.NegativeStrength;
             }
 
-            return IsDuplicateCallSign ? "Funkrufname ist bereits vergeben" : null;
+            // An AGT count over a Stärke that is itself missing is the same fault reported twice;
+            // say what is wrong, not what follows from it.
+            if (NewStrengthError is not null)
+            {
+                return null;
+            }
+
+            return Scba > Strength ? ValidationMessages.ScbaExceedsStrength : null;
         }
     }
 
     [RelayCommand(CanExecute = nameof(CanAddForce))]
     private void AddForce()
     {
+        if (!Validate())
+        {
+            return;
+        }
+
         _session.AddForceUnit(
             NewBrigade,
             (NewZugfuehrerCount ?? 0) + (NewOfficerCount ?? 0) + (NewMannschaftCount ?? 0),
@@ -499,7 +546,33 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         NewScbaCount = null;
         NewStatus = null;
         NewNotes = null;
+        ShowErrors(false); // the cleared form must not read as a fresh complaint
         _onChanged();
+    }
+
+    /// <summary>
+    /// Turns the field messages on and reports whether the row may be added. The duplicate
+    /// Funkrufname is deliberately not among them: <see cref="IsDuplicateCallSign"/> already drives
+    /// a live hint under the form, and saying it twice in two colours explains nothing extra.
+    /// </summary>
+    private bool Validate()
+    {
+        ShowErrors(true);
+        return NewBrigadeError is null
+               && NewCallSignError is null
+               && NewStrengthError is null
+               && NewScbaCountError is null
+               && !IsDuplicateCallSign;
+    }
+
+    private void ShowErrors(bool shown)
+    {
+        _errorsShown = shown;
+        OnPropertyChanged(nameof(NewBrigadeError));
+        OnPropertyChanged(nameof(NewCallSignError));
+        OnPropertyChanged(nameof(NewStrengthError));
+        OnPropertyChanged(nameof(NewScbaCountError));
+        OnPropertyChanged(nameof(ErrorSummary));
     }
 
     private ForceRow ToRow(Domain.ForceUnit f) =>

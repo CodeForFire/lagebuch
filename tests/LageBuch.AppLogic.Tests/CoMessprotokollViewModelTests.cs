@@ -392,18 +392,27 @@ public class CoMessprotokollViewModelTests
     // Hausname called straight through to Building.Create, which throws ArgumentException and
     // takes the whole desktop app down (unhandled on the UI thread).
     [Fact]
-    public void ConfirmAddBuildingCommand_IsDisabled_WhenNameIsEmpty()
+    public void ConfirmAddBuilding_NamesTheMissingBezeichnung_InsteadOfGoingGrey()
     {
         var (_, vm) = CreateVm();
+        var before = vm.BuildingOptions.Count;
         vm.NewBuildingName = string.Empty;
 
-        Assert.False(vm.ConfirmAddBuildingCommand.CanExecute(null));
+        Assert.True(vm.ConfirmAddBuildingCommand.CanExecute(null)); // the press is the question (#412)
+        vm.ConfirmAddBuildingCommand.Execute(null);
+
+        Assert.Equal(ValidationMessages.Required, vm.NewBuildingNameError);
+        Assert.Equal(before, vm.BuildingOptions.Count);
 
         vm.NewBuildingName = "Haus B";
-        Assert.True(vm.ConfirmAddBuildingCommand.CanExecute(null));
+        Assert.Null(vm.NewBuildingNameError); // fixed as it is typed
+        vm.ConfirmAddBuildingCommand.Execute(null);
+        Assert.Equal(before + 1, vm.BuildingOptions.Count);
 
         vm.NewBuildingName = "   ";
-        Assert.False(vm.ConfirmAddBuildingCommand.CanExecute(null));
+        vm.ConfirmAddBuildingCommand.Execute(null);
+        Assert.Equal(ValidationMessages.Required, vm.NewBuildingNameError);
+        Assert.Equal(before + 1, vm.BuildingOptions.Count);
     }
 
     // Reproduces issue: entering a ppm value on a joined/synced device switched the selected Haus

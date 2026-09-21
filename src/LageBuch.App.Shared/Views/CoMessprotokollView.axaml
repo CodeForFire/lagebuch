@@ -91,11 +91,11 @@
             Padding="14">
       <StackPanel Spacing="8">
         <TextBlock Text="NEUES HAUS HINZUFÜGEN" Classes="overline" />
-        <StackPanel Spacing="2">
-          <TextBlock Text="BEZEICHNUNG" Classes="overline" FontSize="10" />
-          <TextBox Text="{Binding NewBuildingName}"
+        <HeaderedContentControl Classes="field" Header="BEZEICHNUNG"
+                                ctrl:Field.Error="{Binding NewBuildingNameError}">
+          <TextBox x:Name="NewBuildingNameBox" Text="{Binding NewBuildingName}"
                    PlaceholderText="{x:Static md:AnonymizedExampleData.BuildingNamePlaceholder}" />
-        </StackPanel>
+        </HeaderedContentControl>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <StackPanel Spacing="2">
             <TextBlock Text="GESCHOOSSE" Classes="overline" FontSize="10" />

@@ -38,9 +38,11 @@ public class TabOrderTests
         };
         var vm = new ForcesViewModel(session, new FixedClock(), md, () => { });
 
-        // HINZUFÜGEN is disabled (no tab stop) without a brigade and a counted person (#220) --
-        // fill both so the button stays reachable for the rest of this Tab sequence.
+        // Fill the dock so it sits in its ordinary state for the Tab sequence below. HINZUFÜGEN is
+        // no longer disabled by missing input at all (#412) -- an empty field is answered on the
+        // press instead -- so this is arrangement, not a precondition for reaching the button.
         vm.NewBrigade = "FFB Wache 1";
+        vm.NewCallSign = "FFB 1/40/1";
         vm.NewMannschaftCount = 6;
 
         var view = new ForcesView { DataContext = vm };

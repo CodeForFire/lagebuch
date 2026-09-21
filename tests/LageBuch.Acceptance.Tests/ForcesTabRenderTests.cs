@@ -116,6 +116,7 @@ public class ForcesTabRenderTests
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
 
@@ -142,9 +143,11 @@ public class ForcesTabRenderTests
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
         vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/2";
         vm.Forces.NewMannschaftCount = 9;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -165,9 +168,10 @@ public class ForcesTabRenderTests
         Assert.Equal(9, vm.Forces.TotalPersonnel);
 
         // The journal (and thus the ETB tab) names the removed unit -- it's a System entry,
-        // hidden by default (#223).
+        // hidden by default (#223). The Funkrufname rides along in that label, now that a Kraft
+        // always carries one (#220).
         vm.Etb.HideSystemEntries = false;
-        Assert.Contains(vm.Etb.Entries, e => e.Text == "Einheit entfernt: FFB Wache 1");
+        Assert.Contains(vm.Etb.Entries, e => e.Text == "Einheit entfernt: FFB Wache 1 (FFB 11/1)");
 
         Capture(window, "forces-row-removed.png");
     }
@@ -183,6 +187,7 @@ public class ForcesTabRenderTests
     {
         var view = HostForcesView(out var vm, out var window);
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -214,6 +219,7 @@ public class ForcesTabRenderTests
     {
         var view = HostForcesView(out var vm, out var window);
         vm.Forces.NewBrigade = "Aich";
+        vm.Forces.NewCallSign = "FFB 11/1";
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.AddForceCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
@@ -364,14 +370,18 @@ public class ForcesTabRenderTests
         // The taken vehicle no longer appears in the dropdown, regardless of Wache (#215).
         Assert.Equal(new[] { "FFB 1/44/1", "Aich 42/1" }, vm.Forces.VehicleOptions.Select(v => v.CallSign));
 
-        // Free-typing the taken call sign blocks HINZUFÜGEN and shows the hint.
+        // Free-typing the taken call sign shows the hint and refuses the add. The button itself
+        // stays live (#412) -- what refuses the row is the hint, which is already on screen.
         vm.Forces.NewBrigade = "FFB Wache 1"; // AddForceCommand cleared it after the first add
         vm.Forces.NewMannschaftCount = 6;
         vm.Forces.NewCallSign = "FFB 1/40/1";
         Dispatcher.UIThread.RunJobs();
-        Assert.False(vm.Forces.AddForceCommand.CanExecute(null));
         var hint = view.GetControl<TextBlock>("DuplicateHint"); // the view owns the name scope
         Assert.True(hint.IsVisible);
+
+        vm.Forces.AddForceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(vm.Forces.Forces);
 
         // The hint used to sit at the end of the fields' horizontal StackPanel, where a window
         // narrower than this test's 1920px could clip it off the right edge. It now renders on

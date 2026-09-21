@@ -18,15 +18,18 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     // so the joining device says who documents here and which host to reach in one step.
     public bool CollectsHost { get; }
 
+    // Quiet until the first press: a prompt that opens already scolding teaches nothing.
+    private bool _errorsShown;
+
     // The host's LAN or Tailscale address/name, entered only in the join flow. Mandatory there (gates Confirm).
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    [NotifyPropertyChangedFor(nameof(HostError))]
     private string _host = string.Empty;
 
     // The share PIN the host displays, entered only in the join flow. Mandatory there (gates Confirm).
     // Read separately by the caller after Confirm — it is not part of SessionOperator.
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    [NotifyPropertyChangedFor(nameof(PinError))]
     private string _pin = string.Empty;
 
     // Radio call signs offered as dropdown suggestions for the Funkrufname field. The field stays
@@ -35,7 +38,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     public IReadOnlyList<string> CallSignOptions { get; }
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    [NotifyPropertyChangedFor(nameof(OperatorNameError))]
     private string _operatorName = string.Empty;
 
     [ObservableProperty]
@@ -70,14 +73,34 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
         private set => SetProperty(ref _result, value);
     }
 
-    private bool CanConfirm =>
-        !IsBusy &&
-        !string.IsNullOrWhiteSpace(OperatorName) &&
-        (!CollectsHost || (!string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(Pin)));
+    /// <summary>Whether the documenting operator's name is missing, once asked (#412).</summary>
+    public string? OperatorNameError =>
+        _errorsShown && string.IsNullOrWhiteSpace(OperatorName) ? ValidationMessages.Required : null;
+
+    /// <summary>Whether the host address is missing in the join flow, once asked (#412).</summary>
+    public string? HostError =>
+        _errorsShown && CollectsHost && string.IsNullOrWhiteSpace(Host) ? ValidationMessages.Required : null;
+
+    /// <summary>Whether the share PIN is missing in the join flow, once asked (#412).</summary>
+    public string? PinError =>
+        _errorsShown && CollectsHost && string.IsNullOrWhiteSpace(Pin) ? ValidationMessages.Required : null;
+
+    // IsBusy stays: a join attempt is in flight, so there is genuinely nothing to press again and
+    // nothing a field could explain. The empty fields answer on the press instead (#412).
+    private bool CanConfirm => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanConfirm))]
     private void Confirm()
     {
+        _errorsShown = true;
+        OnPropertyChanged(nameof(OperatorNameError));
+        OnPropertyChanged(nameof(HostError));
+        OnPropertyChanged(nameof(PinError));
+        if (OperatorNameError is not null || HostError is not null || PinError is not null)
+        {
+            return;
+        }
+
         Result = new SessionOperator(OperatorName, OperatorCallSign);
     }
 
