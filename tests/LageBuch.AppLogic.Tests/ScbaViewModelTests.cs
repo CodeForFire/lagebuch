@@ -2,6 +2,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -851,5 +852,119 @@ public class ScbaViewModelTests
         // Override cleared: picking a type re-suggests its own Einsatzzeit again.
         vm.NewDesignation = CsaTrupp;
         Assert.Equal(22, vm.NewMaxDurationMinutes);
+    }
+
+    // ----- #422: the Atemschutz header bars lead to the Trupp they are talking about -----
+
+    /// <summary>
+    /// Registers and starts a Trupp with an explicit Einsatzzeit and Abfrage-Intervall. Order
+    /// matters: the designation applies the type's defaults, so both overrides come after it.
+    /// </summary>
+    private static ScbaTruppRow StartTrupp(
+        ScbaViewModel vm,
+        string truppfuehrer,
+        int maxDurationMinutes,
+        int controlIntervalMinutes)
+    {
+        vm.NewDesignation = "Angriffstrupp";
+        vm.NewMaxDurationMinutes = maxDurationMinutes;
+        vm.NewControlIntervalMinutes = controlIntervalMinutes;
+        vm.NewTruppfuehrer = truppfuehrer;
+        vm.NewTruppmann = "Schmidt";
+        vm.AddTruppCommand.Execute(null);
+        var row = vm.Trupps[^1];
+        row.StartCommand.Execute(null);
+        return row;
+    }
+
+    [Fact]
+    public void ShowMostUrgentControl_selects_the_trupp_whose_druckabfrage_is_soonest()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var relaxed = StartTrupp(vm, "Müller", maxDurationMinutes: 60, controlIntervalMinutes: 30);
+        var urgent = StartTrupp(vm, "Huber", maxDurationMinutes: 60, controlIntervalMinutes: 5);
+
+        vm.ShowMostUrgentControlCommand.Execute(null);
+
+        Assert.Same(urgent, vm.SelectedTrupp);
+        Assert.NotSame(relaxed, vm.SelectedTrupp);
+    }
+
+    [Fact]
+    public void ShowAlarmingTrupp_selects_the_alarming_trupp_not_the_one_due_for_a_druckabfrage()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+
+        // Long Einsatzzeit, very short interval: overdue for a Druckabfrage, never in Alarm.
+        var overdue = StartTrupp(vm, "Müller", maxDurationMinutes: 60, controlIntervalMinutes: 1);
+
+        // Short Einsatzzeit, long interval: in Rückzugsalarm, not due for a Druckabfrage.
+        var alarming = StartTrupp(vm, "Huber", maxDurationMinutes: 20, controlIntervalMinutes: 30);
+
+        clock.Now = T0.AddMinutes(25);
+
+        Assert.True(alarming.IsAlarm);
+        Assert.False(overdue.IsAlarm);
+
+        vm.ShowMostUrgentControlCommand.Execute(null);
+        Assert.Same(overdue, vm.SelectedTrupp);
+
+        vm.ShowAlarmingTruppCommand.Execute(null);
+        Assert.Same(alarming, vm.SelectedTrupp);
+    }
+
+    [Fact]
+    public void Showing_the_same_trupp_twice_asks_to_reveal_it_again()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var row = StartTrupp(vm, "Müller", maxDurationMinutes: 60, controlIntervalMinutes: 5);
+
+        var reveals = 0;
+        vm.RevealRequested += (_, _) => reveals++;
+
+        vm.ShowMostUrgentControlCommand.Execute(null);
+        vm.ShowMostUrgentControlCommand.Execute(null);
+
+        // The second tap changes no property, so a selection-change notification alone would not
+        // fire. Scrolling back to a row the operator has since scrolled away from is the point.
+        Assert.Same(row, vm.SelectedTrupp);
+        Assert.Equal(2, reveals);
+    }
+
+    [Fact]
+    public void Showing_a_trupp_when_there_is_none_selects_nothing_and_reveals_nothing()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        Register(vm);   // bereitgestellt, never started: not active, not alarming
+
+        var reveals = 0;
+        vm.RevealRequested += (_, _) => reveals++;
+
+        vm.ShowMostUrgentControlCommand.Execute(null);
+        vm.ShowAlarmingTruppCommand.Execute(null);
+
+        Assert.Null(vm.SelectedTrupp);
+        Assert.Equal(0, reveals);
+    }
+
+    [Fact]
+    public void The_selected_trupp_survives_an_incident_wide_change()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = Vm(clock, session);
+        var row = StartTrupp(vm, "Müller", maxDurationMinutes: 60, controlIntervalMinutes: 5);
+        vm.ShowMostUrgentControlCommand.Execute(null);
+
+        // #294: rows are reconciled in place rather than cleared, so a change made anywhere in the
+        // incident must not throw away what the operator has just been sent to look at.
+        session.AddJournalEntry(EtbDirection.Outgoing, "Lagemeldung", from: null, to: null);
+
+        Assert.Same(row, Assert.Single(vm.Trupps));
+        Assert.Same(row, vm.SelectedTrupp);
     }
 }

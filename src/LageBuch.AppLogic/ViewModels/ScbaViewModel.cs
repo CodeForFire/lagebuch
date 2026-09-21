@@ -341,6 +341,14 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<ScbaTruppRow> Trupps { get; }
 
+    /// <summary>
+    /// The row the Trupp table has selected, and the row a jump from the header bars lands on
+    /// (#422). Survives an incident-wide change because <see cref="RefreshTrupps"/> reconciles the
+    /// rows in place rather than replacing them (#294).
+    /// </summary>
+    [ObservableProperty]
+    private ScbaTruppRow? _selectedTrupp;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddTruppCommand))]
     [NotifyPropertyChangedFor(nameof(RequiresThirdMember))]
@@ -489,6 +497,42 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
                 ? $"Druckabfrage fällig: {urgent.DisplayName}"
                 : $"Nächste Druckabfrage: {urgent.DisplayName} in {urgent.ControlRemainingDisplay}";
         }
+    }
+
+    // ----- #422: the header bars lead to the Trupp they name -----
+
+    /// <summary>
+    /// Raised after <see cref="SelectedTrupp"/> has been pointed at the Trupp the operator asked
+    /// for, so the workspace can bring the Atemschutz tab forward and the view can scroll its row
+    /// into sight. Raised on every request, not only when the selection changes: tapping the bar
+    /// again after scrolling away has to scroll back.
+    /// </summary>
+    public event EventHandler? RevealRequested;
+
+    /// <summary>
+    /// The header's Druckabfrage bar was tapped: go to the Trupp whose pressure check is closest
+    /// — the same one the bar names.
+    /// </summary>
+    [RelayCommand]
+    private void ShowMostUrgentControl() => Reveal(MostUrgentActive);
+
+    /// <summary>
+    /// The Rückzugsalarm banner was tapped: go to the Trupp in alarm. Resolved through the rows'
+    /// own <see cref="ScbaTruppRow.IsAlarm"/> rather than <see cref="AlarmingTrupps"/>, so there is
+    /// no domain lookup that could miss a row mid-reconciliation.
+    /// </summary>
+    [RelayCommand]
+    private void ShowAlarmingTrupp() => Reveal(Trupps.FirstOrDefault(r => r.IsAlarm));
+
+    private void Reveal(ScbaTruppRow? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        SelectedTrupp = row;
+        RevealRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private IEnumerable<AtemschutzTrupp> AlarmingTrupps =>

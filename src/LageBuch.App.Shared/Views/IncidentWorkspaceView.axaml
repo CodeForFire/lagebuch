@@ -202,27 +202,35 @@
             </StackPanel>
           </Border>
 
-          <!-- Atemschutz pressure-control reminder (soonest-due Trupp across all tabs) -->
+          <!-- Atemschutz pressure-control reminder (soonest-due Trupp across all tabs).
+               #422: the whole bar is the button — it was read as one long before it was one, and
+               the tap now opens ATEMSCHUTZ on the very Trupp the bar names. The padding lives on
+               the Button, not the Border, so the hover wash covers the bar edge to edge. -->
           <Border x:Name="ScbaControlBar" Background="#241608"
                   BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,6"
+                  CornerRadius="{StaticResource RadiusSm}"
                   IsVisible="{Binding Scba.HasControlReminder}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
-                        DataContext="{Binding Scba}">
-              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
-                        Foreground="{StaticResource AmberBrush}"
-                        Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
-              <TextBlock Text="ATEMSCHUTZ" Classes="overline" FontSize="10"
-                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-              <TextBlock x:Name="ScbaControlText" Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
-                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-              <Border Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
-                      Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E"
-                      IsVisible="{Binding IsAnyControlDue}">
-                <TextBlock Text="DRUCKABFRAGE!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
-                           LetterSpacing="1.5" Foreground="#FFFFFF" VerticalAlignment="Center" />
-              </Border>
-            </StackPanel>
+            <Button x:Name="ScbaControlJumpButton" Classes="bar" Padding="14,6"
+                    CornerRadius="{StaticResource RadiusSm}"
+                    DataContext="{Binding Scba}"
+                    Command="{Binding ShowMostUrgentControlCommand}"
+                    ToolTip.Tip="Zum Trupp im Reiter ATEMSCHUTZ springen">
+              <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <PathIcon Width="15" Height="15" VerticalAlignment="Center"
+                          Foreground="{StaticResource AmberBrush}"
+                          Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                <TextBlock Text="ATEMSCHUTZ" Classes="overline" FontSize="10"
+                           Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+                <TextBlock x:Name="ScbaControlText" Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
+                           Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+                <Border Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
+                        Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E"
+                        IsVisible="{Binding IsAnyControlDue}">
+                  <TextBlock Text="DRUCKABFRAGE!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
+                             LetterSpacing="1.5" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                </Border>
+              </StackPanel>
+            </Button>
           </Border>
 
           <!-- Atemschutz Rückzugsalarm: unmissable red banner + audible alarm (life-safety) -->
@@ -231,14 +239,24 @@
                   CornerRadius="{StaticResource RadiusSm}" Padding="16,10"
                   BoxShadow="0 0 22 -2 #CCFF3D2E"
                   IsVisible="{Binding Scba.IsAnyAlarm}">
-            <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Scba}">
-              <PathIcon Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"
-                        Foreground="#FFFFFF"
-                        Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-              <TextBlock Grid.Column="1" Text="{Binding AlarmDisplay}"
-                         FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
-                         LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center" />
-              <Button Grid.Column="2" Content="ALARM QUITTIEREN" Command="{Binding AcknowledgeAlarmCommand}"
+            <Grid ColumnDefinitions="*,Auto" DataContext="{Binding Scba}">
+              <!-- #422: the icon and the alarm text are the jump; ALARM QUITTIEREN keeps its own
+                   column, because a button inside a button is neither clickable nor honest. -->
+              <Button Grid.Column="0" x:Name="ScbaAlarmJumpButton" Classes="bar"
+                      VerticalAlignment="Center"
+                      Command="{Binding ShowAlarmingTruppCommand}"
+                      ToolTip.Tip="Zum Trupp im Reiter ATEMSCHUTZ springen">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                  <PathIcon Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"
+                            Foreground="#FFFFFF"
+                            Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                  <TextBlock Text="{Binding AlarmDisplay}"
+                             FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
+                             LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <Button Grid.Column="1" x:Name="ScbaAlarmAckButton" Content="ALARM QUITTIEREN"
+                      Command="{Binding AcknowledgeAlarmCommand}"
                       VerticalAlignment="Center" />
             </Grid>
           </Border>
@@ -306,7 +324,10 @@
              a module, so only a Checkliste shows a status dot. Binding the dots through a nullable
              checklist instead would leave IsVisible at its default (true) wherever the binding
              resolved to nothing, putting a dot on every tab. -->
-        <TabControl x:Name="ModuleTabs" ItemsSource="{Binding NavItems}">
+        <!-- SelectedItem is bound so the header's Atemschutz bars can open this tab (#422); the
+             binding is two-way, so it also follows the operator's own taps. -->
+        <TabControl x:Name="ModuleTabs" ItemsSource="{Binding NavItems}"
+                    SelectedItem="{Binding SelectedNavItem}">
           <TabControl.Background>
             <SolidColorBrush Color="Transparent" />
           </TabControl.Background>

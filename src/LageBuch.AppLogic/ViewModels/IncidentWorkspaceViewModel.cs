@@ -233,6 +233,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     public ObservableCollection<WorkspaceNavItemViewModel> NavItems { get; } = new();
 
+    /// <summary>
+    /// The rail entry currently open. Two-way bound: it has to follow the operator's own taps as
+    /// well as drive them, or a jump to a tab this property already names (#422) would raise no
+    /// change and move nothing.
+    /// </summary>
+    [ObservableProperty]
+    private WorkspaceNavItemViewModel? _selectedNavItem;
+
     public EtbViewModel Etb { get; private set; } = null!;
 
     public RolesViewModel Roles { get; private set; } = null!;
@@ -392,9 +400,21 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         _checklists.Clear();
 
+        // The rail is gone with NavItems, so whatever it had open is gone too; BuildNavItems
+        // repopulates and the view selects the first entry again.
+        SelectedNavItem = null;
+
         Etb?.Dispose();
         Roles?.Dispose();
         Forces?.Dispose();
+        if (Scba is not null)
+        {
+            // Not covered by Dispose: the workspace owns this subscription, and an outgoing
+            // Atemschutz view model must not go on steering the rail of the workspace that
+            // replaced it.
+            Scba.RevealRequested -= OnScbaRevealRequested;
+        }
+
         Scba?.Dispose();
         Files?.Dispose();
         CoMessprotokoll?.Dispose();
@@ -418,6 +438,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
+        Scba.RevealRequested += OnScbaRevealRequested;
 
         Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
@@ -491,6 +512,25 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             {
                 NavItems.Add(new WorkspaceNavItemViewModel(ModuleHeaders[spec.ModuleKey], content));
             }
+        }
+    }
+
+    /// <summary>
+    /// One of the Atemschutz header bars was tapped (#422): bring the Atemschutz tab forward. The
+    /// Trupp itself is already selected by <see cref="ScbaViewModel"/>; scrolling its row into
+    /// sight is the view's part.
+    /// </summary>
+    /// <remarks>
+    /// The rail is resolved from Stammdaten, so there is no fixed tab index — the entry is found
+    /// by the module view model it carries. A brigade may have switched Atemschutz off entirely
+    /// while the header bars, driven by the view model rather than the rail, still appear; then
+    /// there is no tab to open and the selected Trupp is all this leaves behind.
+    /// </remarks>
+    private void OnScbaRevealRequested(object? sender, EventArgs e)
+    {
+        if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, Scba)) is { } navItem)
+        {
+            SelectedNavItem = navItem;
         }
     }
 

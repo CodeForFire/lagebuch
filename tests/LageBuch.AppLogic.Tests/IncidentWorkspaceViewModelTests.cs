@@ -1182,6 +1182,89 @@ public class IncidentWorkspaceViewModelTests
         store.RaiseSaveFailed(new InvalidOperationException("gehört zum nächsten Einsatz"));
         Assert.Null(vm.PersistenceError);
     }
+
+    // --- #422: the Atemschutz header bars lead to the Atemschutz tab --------------------------
+
+    /// <summary>Puts one Trupp under air, which is what makes the header's Druckabfrage bar live.</summary>
+    private static void StartATrupp(IncidentWorkspaceViewModel vm)
+    {
+        vm.Scba.NewDesignation = "Angriffstrupp";
+        vm.Scba.NewTruppfuehrer = "Müller";
+        vm.Scba.NewTruppmann = "Schmidt";
+        vm.Scba.AddTruppCommand.Execute(null);
+        vm.Scba.Trupps[^1].StartCommand.Execute(null);
+    }
+
+    private static WorkspaceNavItemViewModel? NavItemFor(IncidentWorkspaceViewModel vm, object content) =>
+        vm.NavItems.FirstOrDefault(i => ReferenceEquals(i.Content, content));
+
+    [Fact]
+    public void Showing_a_trupp_moves_the_rail_to_the_atemschutz_tab()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+        StartATrupp(vm);
+        vm.SelectedNavItem = NavItemFor(vm, vm.Etb);
+
+        vm.Scba.ShowMostUrgentControlCommand.Execute(null);
+
+        Assert.Same(NavItemFor(vm, vm.Scba), vm.SelectedNavItem);
+        Assert.Same(vm.Scba.Trupps[0], vm.Scba.SelectedTrupp);
+    }
+
+    [Fact]
+    public void A_rebuilt_workspace_stops_listening_to_the_atemschutz_view_model_it_replaced()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+        StartATrupp(vm);
+        var replaced = vm.Scba;
+
+        // Closing the Einsatz rebuilds every child; the outgoing Atemschutz view model must not
+        // keep steering the rail of the workspace that outlived it.
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        Assert.NotSame(replaced, vm.Scba);
+
+        var etb = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = etb;
+        replaced.ShowMostUrgentControlCommand.Execute(null);
+
+        Assert.Same(etb, vm.SelectedNavItem);
+    }
+
+    [Fact]
+    public void Showing_a_trupp_leaves_the_rail_alone_when_atemschutz_is_switched_off()
+    {
+        // A brigade can hide the module in the Stammdaten Navigation list. The header bars are
+        // driven by the Atemschutz view model rather than by the rail, so they still appear —
+        // there is simply no tab to send the operator to.
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md() with { Navigation = new[] { new NavEntry(NavModules.Scba, null, false) } },
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new FakeHostController());
+        StartATrupp(vm);
+        var etb = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = etb;
+
+        vm.Scba.ShowMostUrgentControlCommand.Execute(null);
+
+        Assert.Null(NavItemFor(vm, vm.Scba));
+        Assert.Same(etb, vm.SelectedNavItem);
+
+        // The Trupp is still selected, so switching the module back on lands on the right row.
+        Assert.Same(vm.Scba.Trupps[0], vm.Scba.SelectedTrupp);
+    }
 }
 
 // Controls exactly when FlushAsync's task completes, and records call order, so
