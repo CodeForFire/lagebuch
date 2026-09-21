@@ -30,7 +30,7 @@ public class CoMessprotokollEditorReachabilityTests
         int readings, double height = ShortHeight)
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Huber", "FFB 12/1"),

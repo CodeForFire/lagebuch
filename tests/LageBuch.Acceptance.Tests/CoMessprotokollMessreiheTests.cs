@@ -20,7 +20,7 @@ public class CoMessprotokollMessreiheTests
     private static (Window Window, CoMessprotokollView View, CoMessprotokollViewModel Vm, LocalIncidentSession Session, FixedClock Clock) Show()
     {
         var clock = new FixedClock();
-        var session = LocalIncidentSession.StartNew(
+        var session = TestSession.StartNew(
             new FakeStore(),
             clock,
             new SessionOperator("Huber", "FFB 12/1"),
