@@ -1,1 +1,0 @@
-ETB: die Verlaufszeilen einer nachträglich geänderten Eintragung — vorheriger Wortlaut, wer geändert hat und wann — waren mit dem halbtransparenten `TextMuted`-Token gezeichnet und auf dem dunklen Panel-Hintergrund praktisch unlesbar (rund 1,9:1 statt der von WCAG AA geforderten 4,5:1). Sie nutzen jetzt `TextSecondary`. (#438)
