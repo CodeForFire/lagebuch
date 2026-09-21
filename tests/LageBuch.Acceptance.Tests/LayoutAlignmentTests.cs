@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -27,13 +28,13 @@ public class LayoutAlignmentTests
             .GetVisualDescendants().OfType<ItemsPresenter>()
             .First(p => p.Name == "PART_ItemsPresenter");
 
-    private static Window ShowWorkspace()
+    private static Window ShowWorkspace(double width = 1920)
     {
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
         var window = new Window
         {
             Content = new IncidentWorkspaceView { DataContext = vm },
-            Width = 1920,
+            Width = width,
             Height = 1032,
         };
         window.Show();
@@ -232,5 +233,49 @@ public class LayoutAlignmentTests
         Assert.True(
             total <= grid.Bounds.Width + 1,
             $"columns need {total:F0}px in a {grid.Bounds.Width:F0}px grid — the row overflows.");
+    }
+
+    // #417 lengthened both Atemschutz banners by a Funkrufname. They sat in horizontal StackPanels,
+    // which measure their children with infinite width -- so a longer text does not ellipsise, it
+    // pushes DRUCKABFRAGE! and ALARM QUITTIEREN out of the bar. Those two are the urgency signal
+    // and the only way to silence the alarm, so losing them is worse than losing a few characters.
+    [AvaloniaTheory]
+    [InlineData(900)]
+    [InlineData(1100)]
+    [InlineData(1280)]
+    [InlineData(1920)]
+    public void Atemschutz_banners_keep_their_buttons_inside_the_bar(double width)
+    {
+        var window = ShowWorkspace(width);
+        var view = (IncidentWorkspaceView)window.Content!;
+
+        AssertInside(view.GetControl<Border>("ScbaControlDuePill"), view.GetControl<Border>("ScbaControlBar"));
+        AssertInside(view.GetControl<Button>("ScbaAlarmAckButton"), view.GetControl<Border>("ScbaAlarmBar"));
+
+        static void AssertInside(Visual child, Border bar)
+        {
+            var left = child.TranslatePoint(new Point(0, 0), bar)!.Value.X;
+            var right = left + child.Bounds.Width;
+            Assert.True(
+                left >= -1.0 && right <= bar.Bounds.Width + 1.0,
+                $"'{child.GetType().Name}' spans {left:F0}..{right:F0}px in a {bar.Bounds.Width:F0}px bar — pushed out.");
+        }
+    }
+
+    // The Funkrufname leads the banner precisely so that it survives when the rest is trimmed away.
+    [AvaloniaFact]
+    public void Atemschutz_alarm_banner_trims_its_text_rather_than_overflowing()
+    {
+        var window = ShowWorkspace(900);
+        var view = (IncidentWorkspaceView)window.Content!;
+
+        var text = view.GetControl<TextBlock>("ScbaAlarmText");
+        var jump = view.GetControl<Button>("ScbaAlarmJumpButton");
+
+        Assert.Equal(TextTrimming.CharacterEllipsis, text.TextTrimming);
+        var right = text.TranslatePoint(new Point(0, 0), jump)!.Value.X + text.Bounds.Width;
+        Assert.True(
+            right <= jump.Bounds.Width + 1.0,
+            $"the alarm text reaches {right:F0}px in a {jump.Bounds.Width:F0}px button — not trimmed.");
     }
 }
