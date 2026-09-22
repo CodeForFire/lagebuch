@@ -338,7 +338,23 @@ internal sealed class FakeAlarmService : IAlarmService
 {
     public List<AlarmSound> Played { get; } = new();
 
-    public void Play(AlarmSound sound) => Played.Add(sound);
+    /// <summary>
+    /// The spoken detail passed with each cue, index-aligned with <see cref="Played"/>.
+    /// </summary>
+    /// <remarks>
+    /// Recorded because <c>IAlarmService.Play(sound, detail)</c> has a default implementation that
+    /// throws the detail away. A fake that did not override it would keep passing while a call site
+    /// quietly stopped saying which Trupp the alarm is about.
+    /// </remarks>
+    public List<string?> Details { get; } = new();
+
+    public void Play(AlarmSound sound) => Play(sound, spokenDetail: null);
+
+    public void Play(AlarmSound sound, string? spokenDetail)
+    {
+        Played.Add(sound);
+        Details.Add(spokenDetail);
+    }
 }
 
 // Synchronous fake ticker — tests call Fire() to advance a "tick".

@@ -344,6 +344,13 @@ public class ScbaViewModelTests
 
         Assert.True(vm.IsAnyAlarm);
         Assert.Contains(AlarmSound.RetreatAlarm, alarm.Played);
+
+        // Says which Trupp and why, not merely that something is alarming. This fixture's Trupp has
+        // no Funkrufname, so the detail falls back to the Trupp name alone -- when one is set it
+        // leads, because two vehicles each send a "Trupp 1" (#417).
+        var spoken = alarm.Details[alarm.Played.IndexOf(AlarmSound.RetreatAlarm)];
+        Assert.StartsWith("Trupp 1", spoken, StringComparison.Ordinal);
+        Assert.Contains("erreicht", spoken, StringComparison.Ordinal);
         Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay, StringComparison.Ordinal);
         Assert.Contains("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay, StringComparison.Ordinal);
         Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
@@ -534,6 +541,9 @@ public class ScbaViewModelTests
 
         Assert.Single(alarm.Played);
         Assert.Equal(AlarmSound.PressureCheckDue, alarm.Played[0]);
+
+        // The cue has to say which Trupp, or it is useless with more than one deployed.
+        Assert.Contains("Trupp 1", alarm.Details[0], StringComparison.Ordinal);
     }
 
     [Fact]

@@ -245,7 +245,8 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
             {
                 if (!task.IsCompleted && task.DueAt <= now && _dueAnnounced.Add(task.Id))
                 {
-                    _alarm.Play(AlarmSound.TaskDue);
+                    // The task text, so a due cue says which of several it is about.
+                    _alarm.Play(AlarmSound.TaskDue, task.Text);
                 }
             }
         }

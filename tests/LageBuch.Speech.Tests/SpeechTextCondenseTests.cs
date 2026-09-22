@@ -76,6 +76,29 @@ public class SpeechTextCondenseTests
             SpeechText.Spoken(Written));
     }
 
+    // The Rückzugsalarm exactly as SystemAlarmService composes it: the cue sentence from
+    // AlarmAnnouncements, a full stop, then the detail ScbaViewModel supplies. This is the sentence
+    // the whole feature exists to say, so it is pinned end to end.
+    [Fact]
+    public void The_retreat_cue_reads_as_the_service_composes_it()
+    {
+        const string Composed =
+            "Rückzugsalarm. Florian Musterstadt 40/1, Trupp 1 (Angriffstrupp). "
+            + "Rückzugsdruck erreicht (45 bar)";
+
+        Assert.Equal(
+            "Rückzugsalarm. Florian Musterstadt 40 1, Trupp 1 (Angriffs Trupp). "
+            + "Rückzugsdruck erreicht (45 bar)",
+            SpeechText.Spoken(Composed));
+    }
+
+    // A Trupp without a Funkrufname falls back to its name alone, and the cue still says which.
+    [Fact]
+    public void The_pressure_cue_survives_a_missing_call_sign() =>
+        Assert.Equal(
+            "Druckabfrage fällig. Trupp 1 (Angriffs Trupp)",
+            SpeechText.Spoken("Druckabfrage fällig. Trupp 1 (Angriffstrupp)"));
+
     // Spoken is Condense then Normalize, and Normalize alone must stay faithful -- a caller that
     // needs every fact still has one.
     [Fact]

@@ -4,12 +4,40 @@ using LageBuch.App.Services;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain.Time;
+using LageBuch.Speech;
+using LageBuch.Speech.Sherpa;
 using LageBuch.Sync;
 
 namespace LageBuch.App;
 
 internal static class Program
 {
+    /// <summary>
+    /// Loads the shipped voice, or returns null if anything about it is wrong.
+    /// </summary>
+    /// <remarks>
+    /// Called on the audio worker at the first cue, never on the UI thread. A missing or broken
+    /// model degrades to the bundled clips rather than taking the app down -- the same contract the
+    /// clips have always had.
+    /// </remarks>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A voice that will not load must leave the bundled cue clips working, not crash the app mid-Einsatz.")]
+    private static SherpaSpeechSynthesizer? LoadShippedVoice()
+    {
+        try
+        {
+            return SpeechModelLocator.TryLocate(out var root, out _)
+                ? SherpaSpeechSynthesizer.Load(root, VoiceCatalog.Shipped)
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {
@@ -31,7 +59,13 @@ internal static class Program
         // CA2000: an app-lifetime singleton, disposed via the desktopLifetime.Exit hook below rather
         // than a using block — same shape as SerialAudioQueue's own CA1001 suppression.
 #pragma warning disable CA2000
-        var alarms = new SystemAlarmService();
+        var voice = SpeechModelLocator.TryLocate(out var modelsRoot, out _)
+            && Directory.Exists(SpeechModelLocator.VoiceDirectory(modelsRoot, VoiceCatalog.Shipped));
+
+        // The factory is not called here: SystemAlarmService loads the voice on its audio worker,
+        // the first time a cue actually fires. Loading a Piper model takes about two seconds, and
+        // paying that at startup would delay the window for something that may never be needed.
+        var alarms = new SystemAlarmService(voice ? LoadShippedVoice : null) { CanSpeak = voice };
 #pragma warning restore CA2000
 
         // Best-effort: drain IncidentStore's background writer (issue #167 P0 #1) before the process

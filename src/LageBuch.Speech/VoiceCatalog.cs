@@ -25,6 +25,17 @@ public static class VoiceCatalog
     private const string Supertone = "Supertone Inc., huggingface.co/Supertone/supertonic-3";
 
     /// <summary>
+    /// The voice the app ships and speaks with.
+    /// </summary>
+    /// <remarks>
+    /// Chosen by ear from the audition: Thorsten medium is the one genuinely good German voice
+    /// under a permissive licence (CC0), at 22 kHz and RTF ~0.27 -- fast enough that a cue starts
+    /// speaking about a second and a half after the alarm fires. thorsten-high was ruled out on
+    /// speed alone, at RTF 1.91 it cannot generate as fast as it speaks.
+    /// </remarks>
+    public static SpeechVoice Shipped => Candidates.First(v => v.Id == "thorsten-medium");
+
+    /// <summary>
     /// Everything the audition renders. Ordered so the page groups by licence route, then gender.
     /// </summary>
     public static IReadOnlyList<SpeechVoice> Candidates { get; } =
