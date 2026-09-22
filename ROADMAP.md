@@ -11,26 +11,26 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.5.0, with a release every one to two weeks. The app is in real use,
+Version 0.6.0, with a release every one to two weeks. The app is in real use,
 but the `.fwincident` file format can still change between versions. That caveat
 is what 1.0 removes.
 
-## v0.6 — Field fixes and verifiable releases
+## v0.6 — Field fixes and verifiable releases — **released**
 
-0.6 is mostly already written. Since 0.5.0 the tree has gained the Einsatzdaten
-dialog — Stichwort, Einsatznummer and Adresse in one place, which the PDF's
-"Adresse" line had been waiting for — `SHA256SUMS.txt` and a Sigstore-backed
-attestation on every artefact, the German Datenschutz- und Sicherheitsseite,
-fictional sample data to try the app out with, the Sicherheitstrupp, Trupp-Typ
-rules that live in the Stammdaten instead of in a Trupp's name, and a long row
-of fixes to the PDF export, the Übersicht and the Stammdaten.
+Shipped 2026-09-22. Since 0.5.0 the tree gained the Einsatzdaten dialog —
+Stichwort, Einsatznummer and Adresse in one place, which the PDF's "Adresse"
+line had been waiting for — `SHA256SUMS.txt` and a Sigstore-backed attestation
+on every artefact, the German Datenschutz- und Sicherheitsseite, fictional
+sample data to try the app out with, the Sicherheitstrupp, Trupp-Typ rules that
+live in the Stammdaten instead of in a Trupp's name, and a long row of fixes to
+the PDF export, the Übersicht and the Stammdaten.
 
-What it is still waiting on is the first Übung's findings: the CO-Messreihe per
-Wohnung, the places where the app loses input or a click without saying so, and
-an Android APK that declares no `INTERNET` permission, which means joining an
-incident cannot work in a released build at all.
+The first Übung's findings landed in it too: the CO-Messreihe per Wohnung, the
+places where the app lost input or a click without saying so, and the Android
+APK that declared no `INTERNET` permission, which had made joining an incident
+impossible in a released build (#381).
 
-Issues: #381, #412, #413, #416, #417, #419, #422, #424
+See [CHANGELOG.md](CHANGELOG.md#060---2026-09-22) for the full list.
 
 ## v0.7 — Stability, performance and field polish
 
