@@ -54,6 +54,7 @@ public class SpeechTextCallSignTests
 
     // A Stärke is read exactly the same way -- each group a count -- which is why the two share an
     // implementation and Normalize needs no heuristic to tell them apart.
+    // The leading "0" here is a head count of zero Zugführer, not padding, so it stays.
     [Theory]
     [InlineData("0/1/8/9", "0, 1, 8, 9")]
     [InlineData("2/1/9/12", "zwo, 1, 9, 12")]
@@ -64,14 +65,26 @@ public class SpeechTextCallSignTests
     // A hyphen groups just like a slash, and it must never survive: espeak speaks a bare hyphen
     // aloud as "Strich".
     [Theory]
-    [InlineData("06/34-01", "06 34 01")]
-    [InlineData("Florian München 06/34-01", "Florian München 06 34 01")]
+    [InlineData("06/34-01", "6 34 1")]
+    [InlineData("Florian München 06/34-01", "Florian München 6 34 1")]
     public void A_hyphen_groups_like_a_slash(string input, string expected) =>
         Assert.Equal(expected, SpeechText.CallSign(input));
 
-    // Leading zeros are left to the engine, which already says "null sechs" for 06.
+    // The padding is a column width in the Funkrufname scheme; nobody says "null sechs" for 06.
+    [Theory]
+    [InlineData("06/34-01", "6 34 1")]
+    [InlineData("02/1", "zwo 1")] // stripped first, so it is still "zwo"
+    [InlineData("007/1", "7 1")]
+    public void A_zero_padded_group_drops_its_padding(string input, string expected) =>
+        Assert.Equal(expected, SpeechText.CallSign(input));
+
+    // But a group that *is* zero is a number, not padding.
     [Fact]
-    public void A_leading_zero_is_left_for_the_engine() =>
+    public void A_group_that_is_zero_survives() =>
+        Assert.Equal("0 1", SpeechText.CallSign("0/1"));
+
+    [Fact]
+    public void The_Funk_zwo_survives_in_a_leading_group() =>
         Assert.Equal("Florian Fürstenfeldbruck zwo 40 1", SpeechText.CallSign("Florian Fürstenfeldbruck 2/40/1"));
 
     [Theory]

@@ -244,7 +244,24 @@ public static class SpeechText
             groups.Split(
                       GroupSeparators,
                       StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                  .Select(part => part == "2" ? Zwo : part));
+                  .Select(SpeakGroup));
+
+    // A zero-padded group is written "06" and said "sechs": the padding is a column width in the
+    // Funkrufname scheme, not something anyone pronounces. Stripping runs before the "zwo" check,
+    // so "02" is "zwo" exactly like a bare "2".
+    //
+    // The guard keeps a group that *is* zero. "0" must stay "null" -- it is the leading position of
+    // a Stärke more often than not, where it is a real count rather than padding.
+    private static string SpeakGroup(string part)
+    {
+        var trimmed = part.TrimStart('0');
+        if (trimmed.Length == 0)
+        {
+            trimmed = "0";
+        }
+
+        return trimmed == "2" ? Zwo : trimmed;
+    }
 
     private static string SpeakDate(Match m, int day, int month, int year)
     {
