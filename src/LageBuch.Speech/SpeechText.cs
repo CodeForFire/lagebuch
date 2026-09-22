@@ -50,11 +50,23 @@ public static class SpeechText
     private static readonly Regex FloorRange =
         new(@"(EG|\d{1,2}\.\s?[OU]G)\s*[–—-]\s*(EG|\d{1,2}\.\s?[OU]G)", RegexOptions.Compiled);
 
+    private static readonly Regex ListSeparator = new(@"\s*/\s*", RegexOptions.Compiled);
+
+    // "FF Musterstadt (Florian Musterstadt 40/1)" -- a label followed by a parenthesised Funkrufname.
+    private static readonly Regex LabelledCallSign =
+        new(@"([^\s,;:()][^,;:()]*?)\s*\(([^)]*\d+/\d+[^)]*)\)", RegexOptions.Compiled);
+
+    // ", Stärke 0/1/8/9," -- ZF/GF/Mann/Gesamt; the last group is the total.
+    private static readonly Regex StrengthPhrase =
+        new(@",?\s*Stärke\s+\d+/\d+/\d+/(\d+)\s*,?", RegexOptions.Compiled);
+
     private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
 
     private static readonly Regex SpaceBeforePunctuation = new(@"\s+([,.:;])", RegexOptions.Compiled);
 
     private static readonly Regex RepeatedComma = new(@",(\s*,)+", RegexOptions.Compiled);
+
+    private static readonly Regex RedundantStop = new(@"[,;.]?\s*\.(\s*\.)*", RegexOptions.Compiled);
 
     /// <summary>
     /// Speaks a Funkrufname: the name part unchanged, every digit group one digit at a time.
@@ -90,8 +102,54 @@ public static class SpeechText
         string.IsNullOrWhiteSpace(label) ? string.Empty : Tidy(ExpandFloors(label));
 
     /// <summary>
-    /// Best-effort pass over already-rendered German. Prefer the typed helpers wherever the
-    /// structured data is still to hand.
+    /// What a caller should use to speak an ETB line: <see cref="Condense"/> then
+    /// <see cref="Normalize"/>.
+    /// </summary>
+    public static string Spoken(string? text) => Normalize(Condense(text));
+
+    /// <summary>
+    /// Shortens a written line for the ear. <b>Lossy on purpose</b>, and deliberately not part of
+    /// <see cref="Normalize"/> so that a caller choosing to lose detail has to say so.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The ETB text itself never changes -- it is the record, and the PDF keeps every field. But
+    /// listening has a constraint reading does not: you cannot go back over a sentence you just
+    /// heard. Detail that helps on the page is noise in the ear, so the spoken rendering is allowed
+    /// to be shorter than the written one.
+    /// </para>
+    /// <para>
+    /// It works on the rendered string rather than on structured data, which means it also applies
+    /// to entries written long before this existed -- by the time an ETB line is read back, the
+    /// ForceUnit it came from is long gone.
+    /// </para>
+    /// </remarks>
+    public static string Condense(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        // "FF Musterstadt (Florian Musterstadt 40/1)" says Musterstadt twice. When the label's words
+        // already appear inside the Funkrufname, the label is redundant and only the call sign is
+        // spoken -- it is the identifier that tells two crews apart anyway. A label that shares
+        // nothing with the call sign is kept, because then it is carrying information.
+        var s = LabelledCallSign.Replace(
+            text,
+            m => SharesAWord(m.Groups[1].Value, m.Groups[2].Value) ? m.Groups[2].Value : m.Value);
+
+        // "Stärke 0/1/8/9" is four numbers where one will do aloud: the last group is the total.
+        // The comma before it becomes "mit" and the one after is dropped, so the clause reads
+        // "... 40/1 mit 9 Mann davon 4 AGT" rather than a list of bare numerals.
+        s = StrengthPhrase.Replace(s, m => $" mit {m.Groups[1].Value} Mann ");
+
+        return Tidy(s);
+    }
+
+    /// <summary>
+    /// Best-effort pass over already-rendered German, preserving every fact. Prefer the typed
+    /// helpers wherever the structured data is still to hand.
     /// </summary>
     public static string Normalize(string? text)
     {
@@ -127,12 +185,38 @@ public static class SpeechText
         s = s.Replace("„", string.Empty, StringComparison.Ordinal)
              .Replace("“", string.Empty, StringComparison.Ordinal);
 
-        // The three separator glyphs all mean "short pause" once spoken.
-        s = s.Replace("—", ",", StringComparison.Ordinal)
+        // Pauses, measured with espeak-ng on identical words (bytes of 22050 Hz audio, ~44100/s):
+        //   none 81622 | "/" 81622 | "," 94154 | ":" 97916 | "." 101224
+        //
+        // A slash adds *nothing* -- "Müller / Schmidt / Huber" runs together exactly as if it were
+        // written without any separator at all. Every digit group has already been consumed by
+        // SpeakGroups above, so a slash surviving to here is always a list separator.
+        s = ListSeparator.Replace(s, ", ");
+
+        // A colon becomes a full stop. The extra 75 ms is not the point: a sentence boundary also
+        // resets the intonation contour, and that reset is what "grouping" actually sounds like.
+        // Ordered after ClockTime on purpose, or 09:17 would be split here.
+        s = s.Replace(":", ".", StringComparison.Ordinal);
+
+        // The em-dash separates whole clauses ("... 4 AGT — Status: Im Einsatz"), so it earns a full
+        // stop too. The middle dot only ever joins a Funkrufname to its Trupp, where a full stop
+        // would cut a single thought in half.
+        s = s.Replace("—", ".", StringComparison.Ordinal)
              .Replace("–", ",", StringComparison.Ordinal)
              .Replace("·", ",", StringComparison.Ordinal);
 
         return Tidy(s);
+    }
+
+    // Case-insensitive because a label is written "FF Musterstadt" and the call sign
+    // "Florian Musterstadt"; only words of real length count, or "an"/"in" would match anything.
+    private static bool SharesAWord(string label, string callSign)
+    {
+        var words = callSign.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return label
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(w => w.Length > 3)
+            .Any(w => words.Contains(w, StringComparer.OrdinalIgnoreCase));
     }
 
     private static bool IsDigitGroup(string token) =>
@@ -195,6 +279,10 @@ public static class SpeechText
         var s = Whitespace.Replace(text, " ");
         s = SpaceBeforePunctuation.Replace(s, "$1");
         s = RepeatedComma.Replace(s, ",");
+
+        // Turning separators into full stops can leave a comma butting against one, or two stops in
+        // a row where a clause ended in punctuation already.
+        s = RedundantStop.Replace(s, ".");
         return s.Trim().Trim(',').Trim();
     }
 }

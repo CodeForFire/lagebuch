@@ -36,10 +36,11 @@ public class SpeechTextNormalizeTests
         Assert.Equal("Beispiel Gefahr", SpeechText.Normalize("Beispiel Gefahr"));
 
     // "unter PA" is how the under-air warning reads; "PA" must not be swallowed by "Pause".
+    // The colon after ACHTUNG becomes a full stop like any other -- a warning prefix wants the break.
     [Fact]
     public void The_under_air_warning_keeps_its_abbreviation() =>
         Assert.Equal(
-            "ACHTUNG: 2 Atemschutztrupp noch unter Peh Ah.",
+            "ACHTUNG. 2 Atemschutztrupp noch unter Peh Ah.",
             SpeechText.Normalize("ACHTUNG: 2 Atemschutztrupp(s) noch unter PA."));
 
     [Theory]
@@ -82,11 +83,36 @@ public class SpeechTextNormalizeTests
     public void Every_slash_group_is_read_as_a_number(string input, string expected) =>
         Assert.Equal(expected, SpeechText.Normalize(input));
 
+    // Measured with espeak-ng, identical words, only the punctuation differing (bytes of 22050 Hz
+    // audio, ~44100/s):  none 81622 | "/" 81622 | "," 94154 | ":" 97916 | "." 101224.
+    //
+    // A slash adds nothing at all, which is why a list of names used to run together.
     [Theory]
-    [InlineData("Müller — Schmidt", "Müller, Schmidt")]
-    [InlineData("Trupp 1 · Angriffstrupp", "Trupp 1, Angriffstrupp")]
-    public void Separator_glyphs_become_a_pause(string input, string expected) =>
+    [InlineData("Müller / Schmidt / Huber", "Müller, Schmidt, Huber")]
+    [InlineData("Müller/Schmidt", "Müller, Schmidt")]
+    public void A_slash_between_names_becomes_a_real_pause(string input, string expected) =>
         Assert.Equal(expected, SpeechText.Normalize(input));
+
+    // A colon earns a full stop: the extra 75 ms is minor, but a sentence boundary also resets the
+    // intonation, and that reset is what grouping sounds like.
+    [Theory]
+    [InlineData("bereitgestellt: Müller", "bereitgestellt. Müller")]
+    [InlineData("Status: Im Einsatz", "Status. Im Einsatz")]
+    public void A_colon_becomes_a_full_stop(string input, string expected) =>
+        Assert.Equal(expected, SpeechText.Normalize(input));
+
+    // The em-dash separates whole clauses, so it gets a stop too; the middle dot only joins a
+    // Funkrufname to its Trupp, where a stop would cut one thought in half.
+    [Theory]
+    [InlineData("4 AGT — Status", "4 Ah Geh Teh. Status")]
+    [InlineData("Trupp 1 · Angriffstrupp", "Trupp 1, Angriffstrupp")]
+    public void Separator_glyphs_break_by_weight(string input, string expected) =>
+        Assert.Equal(expected, SpeechText.Normalize(input));
+
+    // A clock time must survive the colon rule, which is why it runs first.
+    [Fact]
+    public void The_colon_rule_does_not_reach_a_clock_time() =>
+        Assert.Equal("9 Uhr 17 Ausgang", SpeechText.Normalize("09:17 Ausgang"));
 
     [Fact]
     public void A_handover_arrow_is_spoken() =>
@@ -94,7 +120,7 @@ public class SpeechTextNormalizeTests
 
     [Fact]
     public void German_quotation_marks_are_dropped() =>
-        Assert.Equal("zuvor: Lage erkundet", SpeechText.Normalize("zuvor: „Lage erkundet“"));
+        Assert.Equal("zuvor. Lage erkundet", SpeechText.Normalize("zuvor: „Lage erkundet“"));
 
     [Fact]
     public void An_abbreviated_example_marker_is_expanded() =>
@@ -102,7 +128,7 @@ public class SpeechTextNormalizeTests
 
     [Fact]
     public void A_co_reading_keeps_its_unit_pronounceable() =>
-        Assert.Equal("Zeh Oh-Messung: 120 Peh Peh Emm", SpeechText.Normalize("CO-Messung: 120 ppm"));
+        Assert.Equal("Zeh Oh-Messung. 120 Peh Peh Emm", SpeechText.Normalize("CO-Messung: 120 ppm"));
 
     [Theory]
     [InlineData(null)]
@@ -124,7 +150,7 @@ public class SpeechTextNormalizeTests
             + "Rückzugsdruck erreicht (45 bar)";
 
         Assert.Equal(
-            "Rückzugsalarm Florian Musterstadt 40, 1, Trupp 1 (Angriffstrupp): "
+            "Rückzugsalarm Florian Musterstadt 40, 1, Trupp 1 (Angriffstrupp). "
             + "Rückzugsdruck erreicht (45 bar)",
             SpeechText.Normalize(Raw));
     }

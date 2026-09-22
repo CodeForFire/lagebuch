@@ -65,6 +65,7 @@ public sealed class SherpaSpeechSynthesizer : ISpeechSynthesizer
         {
             Sid = Voice.SpeakerId,
             Speed = speed * Voice.DefaultSpeed,
+            SilenceScale = Voice.SilenceScale,
         };
 
         // Supertonic is multilingual and needs telling; a Piper voice speaks one language by

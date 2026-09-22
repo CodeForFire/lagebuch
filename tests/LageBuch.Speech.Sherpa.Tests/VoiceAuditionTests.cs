@@ -109,7 +109,9 @@ public class VoiceAuditionTests
         bool normalized,
         string outDir)
     {
-        var spoken = normalized ? SpeechText.Normalize(item.Text) : item.Text;
+        // Spoken, not Normalize: the audition has to exercise what the app will actually say,
+        // condensing included, or it is auditioning a sentence nobody will ever hear.
+        var spoken = normalized ? SpeechText.Spoken(item.Text) : item.Text;
         var suffix = normalized ? "norm" : "raw";
         var one = RenderOne(synth, voice, $"{item.Key}__{suffix}", spoken, outDir);
         return new Clip(voice.Id, item.Key, normalized, one.File, spoken, one.Duration, one.Generation);

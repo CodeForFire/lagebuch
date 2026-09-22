@@ -52,6 +52,17 @@ public sealed record SpeechVoice(
     /// <summary>Folder under the models root holding this voice's files. Defaults to <see cref="Id"/>.</summary>
     public string DirectoryName { get; init; } = Id;
 
+    /// <summary>
+    /// How much silence the engine puts between sentences, as a multiplier.
+    /// </summary>
+    /// <remarks>
+    /// sherpa-onnx splits text into sentences and inserts silence between them scaled by this, and
+    /// its own default is 0.2 -- low enough that the full stops <see cref="SpeechText.Normalize"/>
+    /// deliberately creates get squashed back together. 1.0 gives the grouping an announcement
+    /// needs. This is the knob to turn first if a cue still sounds run-together.
+    /// </remarks>
+    public float SilenceScale { get; init; } = 1.0f;
+
     /// <summary>True when the licence is not an OSI/FSF-free one and so needs a carve-out in the README.</summary>
     public bool IsRestrictivelyLicensed => Licence.Contains("RAIL", StringComparison.OrdinalIgnoreCase);
 }
