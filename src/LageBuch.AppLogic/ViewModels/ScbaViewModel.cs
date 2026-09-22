@@ -586,25 +586,16 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         IsAlarmAcknowledged = true;
     }
 
-    /// <summary>
-    /// Names the Trupp a cue is about, for the spoken announcement.
-    /// </summary>
-    /// <remarks>
-    /// The Funkrufname comes first and the Trupp name second, for the same reason the banner puts
-    /// it there: two vehicles each send a "Trupp 1", so the call sign is the part that identifies
-    /// the crew being called (#417). Plain written German -- the speech service normalizes it.
-    /// </remarks>
-    private static string SpokenTrupp(AtemschutzTrupp trupp) =>
-        string.IsNullOrWhiteSpace(trupp.CallSign)
-            ? trupp.DisplayName
-            : $"{trupp.CallSign}, {trupp.DisplayName}";
-
     // The first alarming Trupp and why it is alarming. Only the first: a spoken cue that listed
     // every one would still be talking when the next repeat came round.
+    //
+    // DisplayNameWithCallSign is the same string the banner shows (#441), deliberately: the
+    // Funkrufname leads because two vehicles each send a "Trupp 1", and what is announced should
+    // not drift from what is displayed. Its "·" becomes a comma in the spoken form.
     private string AlarmDetail()
     {
         var trupp = AlarmingTrupps.FirstOrDefault();
-        return trupp is null ? string.Empty : $"{SpokenTrupp(trupp)}. {AlarmReason(trupp)}";
+        return trupp is null ? string.Empty : $"{trupp.DisplayNameWithCallSign}. {AlarmReason(trupp)}";
     }
 
     private string AlarmReason(AtemschutzTrupp trupp) => trupp.IsTimeAlarm(_clock.Now)
@@ -1066,7 +1057,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             {
                 if (_controlDueAnnounced.Add(trupp.Id))
                 {
-                    _alarm.Play(AlarmSound.PressureCheckDue, SpokenTrupp(trupp));
+                    _alarm.Play(AlarmSound.PressureCheckDue, trupp.DisplayNameWithCallSign);
                 }
             }
             else
