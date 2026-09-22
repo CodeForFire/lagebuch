@@ -30,13 +30,21 @@ public static class SpeechText
     // whose "zwei" is a syllable, not a digit -- so this is a whole-group rule, not a digit rule.
     private const string Zwo = "zwo";
 
+    private static readonly char[] GroupSeparators = ['/', '-'];
+
     private static readonly string[] MonthWords =
     [
         string.Empty, "Januar", "Februar", "März", "April", "Mai", "Juni",
         "Juli", "August", "September", "Oktober", "November", "Dezember",
     ];
 
-    private static readonly Regex DigitGroup = new(@"\d+(?:/\d+)+", RegexOptions.Compiled);
+    // "40/1", "1/40/1", "06/34-01" -- a Funkrufname groups its numbers with either separator, and
+    // a bare hyphen is spoken "Strich" if it survives. Only a hyphen *between digits* counts, so
+    // "AS-Überwachung" and "CSA-Trupp" are untouched.
+    private static readonly Regex DigitGroup = new(@"\d+(?:[/-]\d+)+", RegexOptions.Compiled);
+
+    private static readonly Regex StrengthGroups =
+        new(@"\bStärke\s+(\d+(?:/\d+){3})\b", RegexOptions.Compiled);
 
     private static readonly Regex Timestamp =
         new(@"\b(\d{2})\.(\d{2})\.(\d{4})[ ,]+(\d{1,2}):(\d{2})\b", RegexOptions.Compiled);
@@ -93,7 +101,7 @@ public static class SpeechText
     /// because the call sites mean different things by it.
     /// </summary>
     public static string Strength(string? strengthText) =>
-        string.IsNullOrWhiteSpace(strengthText) ? string.Empty : Tidy(SpeakGroups(strengthText));
+        string.IsNullOrWhiteSpace(strengthText) ? string.Empty : Tidy(SpeakGroups(strengthText, ", "));
 
     /// <summary>
     /// Speaks a floor label: "EG" becomes "Erdgeschoss", "2. OG" becomes "Obergeschoss 2".
@@ -169,8 +177,10 @@ public static class SpeechText
         s = DateOnly.Replace(s, m => SpeakDate(m, 1, 2, 3));
         s = ClockTime.Replace(s, m => SpeakClock(m, 1, 2));
 
-        // A Funkrufname and a Stärke are read the same way -- each group as a number -- so nothing
-        // here has to tell them apart.
+        // A Stärke is four separate counts and wants the pauses between them; a Funkrufname is one
+        // identifier spoken as a unit, so its groups run together. Ordered Stärke first, because the
+        // general rule would otherwise swallow it.
+        s = StrengthGroups.Replace(s, m => "Stärke " + SpeakGroups(m.Groups[1].Value, ", "));
         s = DigitGroup.Replace(s, m => SpeakGroups(m.Value));
 
         s = s.Replace("z. B.", "zum Beispiel", StringComparison.Ordinal);
@@ -223,14 +233,17 @@ public static class SpeechText
     }
 
     private static bool IsDigitGroup(string token) =>
-        token.Length > 0 && token.All(c => char.IsAsciiDigit(c) || c == '/');
+        token.Length > 0 && token.All(c => char.IsAsciiDigit(c) || c == '/' || c == '-');
 
-    // "40/1" -> "vierzig, eins". The comma is a short pause between the groups, which keeps a
-    // three-part Funkrufname from running together into one blur.
-    private static string SpeakGroups(string groups) =>
+    // "40/1" -> "vierzig eins", spoken as one identifier. A comma here costs about 210 ms per gap
+    // (measured), which is far too much: a Funkrufname is said briskly on the radio, not dictated.
+    // A space costs nothing at all.
+    private static string SpeakGroups(string groups, string separator = " ") =>
         string.Join(
-            ", ",
-            groups.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            separator,
+            groups.Split(
+                      GroupSeparators,
+                      StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                   .Select(part => part == "2" ? Zwo : part));
 
     private static string SpeakDate(Match m, int day, int month, int year)

@@ -71,7 +71,7 @@ public class SpeechTextCondenseTests
             SpeechText.Condense(Written));
 
         Assert.Equal(
-            "Einheit aufgenommen. Florian Musterstadt 40, 1 mit 9 Mann davon 4 Ah Geh Teh. "
+            "Einheit aufgenommen. Florian Musterstadt 40 1 mit 9 Mann davon 4 Ah Geh Teh. "
             + "Status. Im Einsatz",
             SpeechText.Spoken(Written));
     }

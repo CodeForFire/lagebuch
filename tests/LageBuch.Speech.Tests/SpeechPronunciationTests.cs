@@ -47,7 +47,7 @@ public class SpeechPronunciationTests
     [Fact]
     public void The_retreat_alarm_says_Angriffs_Trupp() =>
         Assert.Equal(
-            "Rückzugsalarm Florian Musterstadt 40, 1, Trupp 1 (Angriffs Trupp). "
+            "Rückzugsalarm Florian Musterstadt 40 1, Trupp 1 (Angriffs Trupp). "
             + "Rückzugsdruck erreicht (45 bar)",
             SpeechText.Spoken(
                 "Rückzugsalarm Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp): "

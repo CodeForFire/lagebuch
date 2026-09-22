@@ -74,12 +74,13 @@ public class SpeechTextNormalizeTests
     public void An_apartment_is_spoken_in_full() =>
         Assert.Equal("Wohnung 1", SpeechText.Normalize("Whg. 1"));
 
-    // A Funkrufname and a Stärke are read the same way, so Normalize needs no heuristic to tell
-    // them apart -- which is the whole reason the four-group special case could be deleted.
+    // A Stärke keeps its commas: four separate counts want the pauses. A Funkrufname is one
+    // identifier and runs together, because a comma per gap costs ~210 ms and turns it into
+    // dictation.
     [Theory]
     [InlineData("Stärke 2/1/9/12", "Stärke zwo, 1, 9, 12")]
-    [InlineData("Florian Musterstadt 40/1", "Florian Musterstadt 40, 1")]
-    [InlineData("FFB 1/40/1", "Eff Eff Beh 1, 40, 1")]
+    [InlineData("Florian Musterstadt 40/1", "Florian Musterstadt 40 1")]
+    [InlineData("FFB 1/40/1", "Eff Eff Beh 1 40 1")]
     public void Every_slash_group_is_read_as_a_number(string input, string expected) =>
         Assert.Equal(expected, SpeechText.Normalize(input));
 
@@ -150,7 +151,7 @@ public class SpeechTextNormalizeTests
             + "Rückzugsdruck erreicht (45 bar)";
 
         Assert.Equal(
-            "Rückzugsalarm Florian Musterstadt 40, 1, Trupp 1 (Angriffs Trupp). "
+            "Rückzugsalarm Florian Musterstadt 40 1, Trupp 1 (Angriffs Trupp). "
             + "Rückzugsdruck erreicht (45 bar)",
             SpeechText.Normalize(Raw));
     }

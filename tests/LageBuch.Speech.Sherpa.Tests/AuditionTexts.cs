@@ -104,6 +104,19 @@ internal static class AuditionTexts
         },
         new()
         {
+            Key = "funkrufname-muenchen",
+            Text = "Druckabfrage Florian München 06/34-01, Trupp 2 Wassertrupp",
+            Probes = "a four-group call sign with a hyphen and leading zeros",
+        },
+        new()
+        {
+            Key = "funkrufname-ffb",
+            Text = "Einheit aufgenommen: FF Fürstenfeldbruck (Florian Fürstenfeldbruck 2/40/1), "
+                + "Stärke 0/1/8/9, davon 4 AGT — Status: Im Einsatz",
+            Probes = "a three-group call sign starting with the Funk \"zwo\", plus the condensing",
+        },
+        new()
+        {
             Key = "nachforderung",
             Text = "Nachforderung: 1 LF zur Ablösung, RD zur Absicherung",
             Probes = "LF, RD",
