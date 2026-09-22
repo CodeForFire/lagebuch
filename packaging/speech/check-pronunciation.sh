@@ -2,9 +2,15 @@
 #
 # Shows how espeak-ng will pronounce a phrase in German, as IPA.
 #
-# The Piper voices phonemize through espeak-ng, so this is the exact same text-to-phoneme step the
-# app performs -- just printed instead of spoken. It turns "that abbreviation sounds wrong" from a
-# matter of opinion into something you can read.
+# The Piper voices phonemize through espeak-ng, so this prints roughly the text-to-phoneme step the
+# app performs. It turns "that abbreviation sounds wrong" into something you can read.
+#
+# INDICATIVE, NOT AUTHORITATIVE. This runs the espeak-ng on PATH; the app uses the copy compiled
+# into libsherpa-onnx-c-api.so, and the two versions differ (system 1.52.0 here against
+# espeak-ng-data dated Nov 2023 in the bundle). That gap is not theoretical: "Angriffstrupp" reads
+# as a clean /s/+/t/ below and is nonetheless heard as "Angriffschtrupp" from the model. So when
+# this disagrees with your ear, the ear wins -- the tool is for catching a spelling that is broken
+# on its face, like "Tseh" coming out as two syllables.
 #
 # It earned its keep immediately: the letter C had been written "Tseh", which looks like /tseː/ but
 # is actually /tˈeːzˈeː/ -- two syllables, "te-se" -- so CSA came out as "Te-Se Ess Ah". German has

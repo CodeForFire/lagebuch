@@ -179,6 +179,9 @@ public static class SpeechText
         // "Atemschutztrupp(s)" -- the written plural marker is noise when spoken.
         s = s.Replace("(s)", string.Empty, StringComparison.Ordinal);
 
+        // Before the abbreviations, so a respelling cannot land inside a letter sequence.
+        s = SpeechPronunciation.Apply(s);
+
         s = ReplaceAbbreviations(s);
 
         s = s.Replace("→", " an ", StringComparison.Ordinal);

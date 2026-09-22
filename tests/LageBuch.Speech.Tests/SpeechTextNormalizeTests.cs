@@ -105,7 +105,7 @@ public class SpeechTextNormalizeTests
     // Funkrufname to its Trupp, where a stop would cut one thought in half.
     [Theory]
     [InlineData("4 AGT — Status", "4 Ah Geh Teh. Status")]
-    [InlineData("Trupp 1 · Angriffstrupp", "Trupp 1, Angriffstrupp")]
+    [InlineData("Trupp 1 · Angriffstrupp", "Trupp 1, Angriffs Trupp")]
     public void Separator_glyphs_break_by_weight(string input, string expected) =>
         Assert.Equal(expected, SpeechText.Normalize(input));
 
@@ -150,7 +150,7 @@ public class SpeechTextNormalizeTests
             + "Rückzugsdruck erreicht (45 bar)";
 
         Assert.Equal(
-            "Rückzugsalarm Florian Musterstadt 40, 1, Trupp 1 (Angriffstrupp). "
+            "Rückzugsalarm Florian Musterstadt 40, 1, Trupp 1 (Angriffs Trupp). "
             + "Rückzugsdruck erreicht (45 bar)",
             SpeechText.Normalize(Raw));
     }
