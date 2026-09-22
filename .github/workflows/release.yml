@@ -32,17 +32,20 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       msi_version: ${{ steps.v.outputs.msi_version }}
-      deb_version: ${{ steps.v.outputs.deb_version }}
       prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       # tag push -> strip the leading 'v' from the tag; dispatch -> the supplied input.
       #
-      # A prerelease tag (v0.6.0-beta.1) needs three spellings of that one version, because the
+      # A prerelease tag (v0.6.0-beta.1) needs two spellings of that one version, because the
       # packaging formats disagree about what a suffix means:
-      #   version      0.6.0-beta.1   filenames, APK, -p:Version=, the CHANGELOG.md heading
+      #   version      0.6.0-beta.1   every file name, the APK, -p:Version=, the CHANGELOG heading
       #   msi_version  0.6.0          WiX rejects a non-numeric ProductVersion outright
-      #   deb_version  0.6.0~beta.1   '-' opens a Debian revision, which sorts ABOVE a plain
-      #                               0.6.0; '~' sorts below it, so apt sees the final as newer
+      #
+      # The .deb needs a third, 0.6.0~beta.1, for its control field only — but that one is derived
+      # inside packaging/linux/build-deb.sh, next to the control file it serves, so the file name
+      # and the field cannot drift apart. It is deliberately NOT a file name: GitHub rewrites a '~'
+      # in a release asset name to '.', which once left SHA256SUMS.txt naming a download that did
+      # not exist (#448).
       - id: v
         env:
           REF_NAME: ${{ github.ref_name }}
@@ -61,7 +64,6 @@ jobs:
           {
             echo "version=$v"
             echo "msi_version=${v%%-*}"
-            echo "deb_version=$(printf '%s' "$v" | tr '-' '~')"
             echo "prerelease=$prerelease"
           } >> "$GITHUB_OUTPUT"
 
@@ -145,7 +147,7 @@ jobs:
         run: |
           chmod +x packaging/linux/build-deb.sh
           packaging/linux/build-deb.sh \
-            "${{ needs.version.outputs.deb_version }}" \
+            "${{ needs.version.outputs.version }}" \
             publish \
             src/LageBuch.App.Shared/Assets/icon-1024.png \
             src/LageBuch.App/Assets/icon.svg \
@@ -229,7 +231,6 @@ jobs:
       - name: Build release notes
         env:
           VERSION: ${{ needs.version.outputs.version }}
-          DEB_VERSION: ${{ needs.version.outputs.deb_version }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
         run: |
           : > release-notes.md
@@ -252,7 +253,7 @@ jobs:
           | Plattform | Datei |
           |-----------|-------|
           | Windows   | \`lagebuch-${VERSION}-x64.msi\` |
-          | Linux     | \`lagebuch_${DEB_VERSION}_amd64.deb\` |
+          | Linux     | \`lagebuch_${VERSION}_amd64.deb\` |
           | Android   | \`lagebuch-${VERSION}.apk\` |
 
           Ein macOS-Build (Apple Silicon, \`.dmg\`) wird auf Anfrage bereitgestellt und dann hier
