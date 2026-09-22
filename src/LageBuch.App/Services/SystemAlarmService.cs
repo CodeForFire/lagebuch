@@ -30,8 +30,8 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
         {
             [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-ils.wav",
 
-            // Generic tone (already bundled) -- a task falling due is frequent enough that a spoken
-            // sentence would be more noise than signal.
+            // A plain tone, and the only cue whose clip is not speech. It is the fallback for when
+            // there is no voice; with one, the cue says which task fell due, which is the point.
             [AlarmSound.TaskDue] = "alarm.wav",
             [AlarmSound.PressureCheckDue] = "voice-druckabfrage.wav",
             [AlarmSound.RetreatAlarm] = "voice-rueckzugsalarm.wav",
@@ -68,6 +68,12 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
     /// exists to avoid.
     /// </remarks>
     public bool CanSpeak { get; init; }
+
+    /// <summary>
+    /// Why speech is off, when it is -- for the Stammdaten settings screen to show instead of
+    /// leaving the switch quietly ineffective.
+    /// </summary>
+    public string? SpeechUnavailableReason { get; init; }
 
     public void Play(AlarmSound sound) => Play(sound, spokenDetail: null);
 

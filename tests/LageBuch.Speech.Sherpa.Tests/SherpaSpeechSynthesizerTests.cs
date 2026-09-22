@@ -55,7 +55,7 @@ public class SherpaSpeechSynthesizerTests
     [Fact]
     public void A_missing_voice_names_the_file_it_wanted()
     {
-        if (ModelsRoot() is not { } root)
+        if (!SpeechModelLocator.TryLocate(out var root, out _))
         {
             return;
         }
@@ -69,7 +69,7 @@ public class SherpaSpeechSynthesizerTests
 
     private static SherpaSpeechSynthesizer? TryLoad(string voiceId)
     {
-        if (ModelsRoot() is not { } root)
+        if (!SpeechModelLocator.TryLocate(out var root, out _))
         {
             return null;
         }
@@ -78,22 +78,5 @@ public class SherpaSpeechSynthesizerTests
         return Directory.Exists(SpeechModelLocator.VoiceDirectory(root, voice))
             ? SherpaSpeechSynthesizer.Load(root, voice)
             : null;
-    }
-
-    private static string? ModelsRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null)
-        {
-            var candidate = Path.Join(dir.FullName, SpeechModelLocator.ModelsDirectoryName);
-            if (Directory.Exists(candidate))
-            {
-                return candidate;
-            }
-
-            dir = dir.Parent;
-        }
-
-        return null;
     }
 }

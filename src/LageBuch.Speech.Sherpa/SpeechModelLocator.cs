@@ -26,6 +26,12 @@ public static class SpeechModelLocator
     /// <summary>Directory name holding the voices, both in the publish output and in a checkout.</summary>
     public const string ModelsDirectoryName = "speech-models";
 
+    // How far above the binary to look. A published install has the models beside the executable
+    // and never walks at all; a development run sits in bin/Debug/net10.0 and needs about six
+    // levels to reach the repository root. Bounded on purpose -- an unbounded walk in a published
+    // app could wander into an unrelated "speech-models" somewhere above the install directory.
+    private const int MaxLevelsAbove = 8;
+
     /// <summary>The espeak-ng data shared by every Piper voice, pruned to German.</summary>
     public const string EspeakDataDirectoryName = "espeak-ng-data";
 
@@ -41,11 +47,12 @@ public static class SpeechModelLocator
         string? baseDirectory = null)
     {
         root = null;
-        var candidate = Path.Join(baseDirectory ?? AppContext.BaseDirectory, ModelsDirectoryName);
+        var start = baseDirectory ?? AppContext.BaseDirectory;
+        var candidate = Find(start);
 
-        if (!Directory.Exists(candidate))
+        if (candidate is null)
         {
-            reason = $"Keine Sprachmodelle gefunden ({candidate}).";
+            reason = $"Keine Sprachmodelle gefunden (gesucht ab {start}).";
             return false;
         }
 
@@ -82,6 +89,33 @@ public static class SpeechModelLocator
         Directory.Exists(voiceDirectory)
             ? Directory.EnumerateFiles(voiceDirectory, "*.onnx").Order(StringComparer.Ordinal).FirstOrDefault()
             : null;
+
+    /// <summary>
+    /// The models directory beside <paramref name="start"/>, or above it, or null.
+    /// </summary>
+    /// <remarks>
+    /// <b>This is the only resolver.</b> The audition harness used to carry its own copy that
+    /// walked up the tree while this one did not, so the harness always found the voices and the
+    /// app never could -- every test and every rendered audition passed while nothing spoke. Two
+    /// resolvers for one question was the real defect; the wrong path was only its symptom.
+    /// </remarks>
+    private static string? Find(string start)
+    {
+        var dir = new DirectoryInfo(start);
+
+        for (var level = 0; dir is not null && level <= MaxLevelsAbove; level++)
+        {
+            var candidate = Path.Join(dir.FullName, ModelsDirectoryName);
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            dir = dir.Parent;
+        }
+
+        return null;
+    }
 
     private static bool IsAscii(string value)
     {

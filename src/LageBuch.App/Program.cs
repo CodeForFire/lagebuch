@@ -59,13 +59,39 @@ internal static class Program
         // CA2000: an app-lifetime singleton, disposed via the desktopLifetime.Exit hook below rather
         // than a using block — same shape as SerialAudioQueue's own CA1001 suppression.
 #pragma warning disable CA2000
-        var voice = SpeechModelLocator.TryLocate(out var modelsRoot, out _)
-            && Directory.Exists(SpeechModelLocator.VoiceDirectory(modelsRoot, VoiceCatalog.Shipped));
+        // The reason is reported, not discarded. Speech failing open -- falling back to the bundled
+        // clips with no signal at all -- is how this shipped silent once already: the models were
+        // never where the app looked, every test passed, and the only symptom was a task cue that
+        // still beeped.
+        var located = false;
+        string? speechReason;
+
+        if (SpeechModelLocator.TryLocate(out var modelsRoot, out var missingModels))
+        {
+            located = Directory.Exists(SpeechModelLocator.VoiceDirectory(modelsRoot, VoiceCatalog.Shipped));
+            speechReason = located
+                ? null
+                : $"Stimme '{VoiceCatalog.Shipped.Id}' fehlt in {modelsRoot} "
+                    + "(packaging/speech/fetch-voices.sh).";
+        }
+        else
+        {
+            speechReason = missingModels;
+        }
+
+        if (!located)
+        {
+            Console.Error.WriteLine($"Sprachausgabe nicht verfügbar: {speechReason}");
+        }
 
         // The factory is not called here: SystemAlarmService loads the voice on its audio worker,
         // the first time a cue actually fires. Loading a Piper model takes about two seconds, and
         // paying that at startup would delay the window for something that may never be needed.
-        var alarms = new SystemAlarmService(voice ? LoadShippedVoice : null) { CanSpeak = voice };
+        var alarms = new SystemAlarmService(located ? LoadShippedVoice : null)
+        {
+            CanSpeak = located,
+            SpeechUnavailableReason = located ? null : speechReason,
+        };
 #pragma warning restore CA2000
 
         // Best-effort: drain IncidentStore's background writer (issue #167 P0 #1) before the process

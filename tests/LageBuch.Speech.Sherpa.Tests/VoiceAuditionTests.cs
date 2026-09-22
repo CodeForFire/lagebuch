@@ -34,7 +34,7 @@ public class VoiceAuditionTests
             return; // a plain test run writes nothing
         }
 
-        var root = FindModelsRoot();
+        SpeechModelLocator.TryLocate(out var root, out _);
         Assert.True(
             root is not null,
             "No speech-models/ directory found. Run: packaging/speech/fetch-voices.sh speech-models all");
@@ -133,25 +133,6 @@ public class VoiceAuditionTests
 
         File.WriteAllBytes(Path.Join(outDir, file), audio.ToWav());
         return new RenderedClip(file, spoken, audio.Duration, watch.Elapsed);
-    }
-
-    // Walks up from the test binary to the repo root. The models are a sibling of the solution in a
-    // checkout, and a sibling of the executable once published.
-    private static string? FindModelsRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null)
-        {
-            var candidate = Path.Join(dir.FullName, SpeechModelLocator.ModelsDirectoryName);
-            if (Directory.Exists(candidate))
-            {
-                return candidate;
-            }
-
-            dir = dir.Parent;
-        }
-
-        return null;
     }
 }
 
