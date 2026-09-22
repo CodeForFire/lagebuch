@@ -105,8 +105,8 @@ public class MasterDataJsonTests
                 new[] { new ChecklistTemplateItem("Abbau Ä ö ü", false) }),
             Personnel = new[]
             {
-                new Person("Mustermann", "Max", "ZF", "Land 1", "0171"),
-                new Person("Musterfrau", "Erika", null, null, null),
+                new Person("Mustermann", "Max", "ZF", "Land 1", "0171", "max@example.org", "KBM Gefahrgut"),
+                new Person("Musterfrau", "Erika", null, null, null, null, null),
             },
         };
 
@@ -455,5 +455,43 @@ public class MasterDataJsonTests
         Assert.Equal(fromStream.Personnel, fromString.Personnel);
         Assert.Equal(fromStream.Settings, fromString.Settings);
         Assert.Equal(70, fromString.Settings.ReturnPressureBar);
+    }
+
+    [Fact]
+    public void Personnel_email_and_note_survive_a_round_trip()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Personnel = new[]
+            {
+                new Person(
+                    "Mustermann",
+                    "Max",
+                    "KBM",
+                    "Land 2/3",
+                    "01 71 / 6 53 58 23",
+                    "max.mustermann@example.org",
+                    "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz"),
+            },
+        };
+
+        var person = Assert.Single(Parse(MasterDataJson.Serialize(set)).Personnel);
+
+        Assert.Equal("max.mustermann@example.org", person.Email);
+        Assert.Equal("KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz", person.Note);
+    }
+
+    // Both keys are optional, as every other personnel field is: a Stammdaten file written before
+    // the Kontakte module existed still has to parse.
+    [Fact]
+    public void Personnel_without_the_new_keys_parse_as_absent()
+    {
+        var person = Assert.Single(
+            Parse("""{"personnel":[{"lastName":"Mustermann","firstName":"Max"}]}""").Personnel);
+
+        Assert.Null(person.Email);
+        Assert.Null(person.Note);
+        Assert.False(person.HasEmail);
+        Assert.False(person.HasNote);
     }
 }

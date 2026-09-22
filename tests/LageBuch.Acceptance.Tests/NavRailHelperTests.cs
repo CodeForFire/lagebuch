@@ -37,7 +37,7 @@ public class NavRailHelperTests
             new[]
             {
                 "AUFBAU", "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE",
-                "ATEMSCHUTZ", "CO-MESSUNG", "DATEIEN", "LINKS", "ABBAU",
+                "ATEMSCHUTZ", "CO-MESSUNG", "DATEIEN", "LINKS", "KONTAKTE", "ABBAU",
             },
             WorkspaceRenderHelper.RailHeaders(window));
     }
@@ -49,7 +49,7 @@ public class NavRailHelperTests
 
         foreach (var (header, expectedIndex) in new[]
                  {
-                     ("ATEMSCHUTZ", 5), ("AUFBAU", 0), ("ABBAU", 9), ("ETB", 1), ("CO-MESSUNG", 6),
+                     ("ATEMSCHUTZ", 5), ("AUFBAU", 0), ("ABBAU", 10), ("ETB", 1), ("CO-MESSUNG", 6),
                  })
         {
             var tabs = WorkspaceRenderHelper.SelectTab(window, header);

@@ -44,6 +44,7 @@
     { "module": "co", "visible": false },
     { "module": "files", "visible": true },
     { "module": "links", "visible": true },
+    { "module": "contacts", "visible": true },
     { "module": "checklist", "checklistId": "9d81e5b2-73c6-4f08-a1d4-2e6b93f5c8a7", "visible": true },
     { "module": "checklist", "checklistId": "b7f3c611-2a58-4c9e-8d40-5f1a2b3c4d5e", "visible": true }
   ],
@@ -57,8 +58,8 @@
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false }
   ],
   "personnel": [
-    { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000" },
-    { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null }
+    { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000", "email": "max.mustermann@ff-musterstadt.example", "note": "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz" },
+    { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null, "email": null, "note": null }
   ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,

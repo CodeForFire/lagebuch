@@ -53,6 +53,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Co] = "CO-MESSUNG",
             [NavModules.Files] = "DATEIEN",
             [NavModules.Links] = "LINKS",
+            [NavModules.Contacts] = "KONTAKTE",
         };
 
     public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null)
@@ -253,6 +254,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public LinksViewModel Links { get; private set; } = null!;
 
+    public ContactsViewModel Contacts { get; private set; } = null!;
+
     public TasksViewModel Tasks { get; private set; } = null!;
 
     public ReminderViewModel? Reminder { get; private set; }
@@ -443,6 +446,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
         Links = new LinksViewModel(_masterData.Links, _dialogs);
+        Contacts = new ContactsViewModel(_masterData.Personnel, _dialogs);
 
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
 
@@ -470,6 +474,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
         OnPropertyChanged(nameof(Links));
+        OnPropertyChanged(nameof(Contacts));
         OnPropertyChanged(nameof(Tasks));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
@@ -495,6 +500,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Co] = CoMessprotokoll,
             [NavModules.Files] = Files,
             [NavModules.Links] = Links,
+            [NavModules.Contacts] = Contacts,
         };
 
         foreach (var spec in NavigationLayout.Resolve(_masterData.Navigation, _session.Incident.Checklists))

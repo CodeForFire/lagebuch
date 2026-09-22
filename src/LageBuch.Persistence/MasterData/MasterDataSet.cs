@@ -171,10 +171,34 @@ public sealed record IncidentSettings(
 /// The roster is empty until then — every consumer must treat that as normal rather than as a
 /// configuration error, and must still accept a freely typed name.
 /// </summary>
-public sealed record Person(string LastName, string FirstName, string? Role, string? CallSign, string? Phone)
+public sealed record Person(
+    string LastName,
+    string FirstName,
+    string? Role,
+    string? CallSign,
+    string? Phone,
+    string? Email = null,
+    string? Note = null)
 {
     /// <summary>How the person is offered in pickers and stored on an assignment.</summary>
     public string DisplayName => string.IsNullOrWhiteSpace(FirstName) ? LastName : $"{LastName}, {FirstName}";
+
+    /// <summary>
+    /// Whether a value is really there, for the Kontakte view's per-field visibility.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not a null check. <c>MasterDataJson</c>'s optional-string reader hands through
+    /// whatever the file holds, so a blank field arrives as "" or "   " rather than as null -- the
+    /// roster has a person whose Funkrufname is exactly that. Binding a button's IsVisible to
+    /// ObjectConverters.IsNotNull would light it up for an address nobody can write to.
+    /// </remarks>
+    public bool HasEmail => !string.IsNullOrWhiteSpace(Email);
+
+    /// <inheritdoc cref="HasEmail"/>
+    public bool HasPhone => !string.IsNullOrWhiteSpace(Phone);
+
+    /// <inheritdoc cref="HasEmail"/>
+    public bool HasNote => !string.IsNullOrWhiteSpace(Note);
 }
 
 /// <summary>
@@ -335,6 +359,16 @@ public static class AnonymizedExampleData
     public const string PhoneNumber = "01 71 / 1 23 45 67";
     public const string PhoneNumberAlt = "01 71 / 7 65 43 21";
 
+    // .example is the RFC 2606 reserved TLD: an invented "@ff-musterstadt.de" could well be a
+    // real domain, and these strings end up in screenshots and in the published sample Stammdaten.
+    public const string EmailAddress = "max.mustermann@ff-musterstadt.example";
+    public const string EmailAddressAlt = "erika.musterfrau@ff-musterstadt.example";
+
+    // The two shapes a roster Notiz actually takes: a Fachgebiet, and the Feuerwehren somebody
+    // covers. Both are here so a fixture can exercise the Kontakte search against either.
+    public const string PersonNote = "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz";
+    public const string PersonNoteAlt = "Musterdorf, Beispielried, Vorlagenhofen, Schemastetten";
+
     // Ad-hoc persona: whoever is entering data right now (operator, Truppführer/-mann).
     // Deliberately a different fictional surname from the roster persona above, so a screenshot
     // never shows the same invented person as both "the roster entry" and "today's operator".
@@ -371,6 +405,8 @@ public static class AnonymizedExampleData
     public const string PersonFirstNamePlaceholder = "z. B. " + PersonFirstName;
     public const string PersonDisplayNamePlaceholder = "z. B. " + PersonLastName + ", " + PersonFirstName;
     public const string PhoneNumberPlaceholder = "z. B. " + PhoneNumber;
+    public const string EmailPlaceholder = "z. B. " + EmailAddress;
+    public const string PersonNotePlaceholder = "z. B. " + PersonNote;
     public const string OperatorNamePlaceholder = "z. B. " + OperatorSurname;
     public const string OperatorNamePlaceholderAlt = "z. B. " + OperatorSurnameAlt;
     public const string OperatorNamePlaceholderThird = "z. B. " + OperatorSurnameThird;
@@ -403,8 +439,8 @@ public static class AnonymizedExampleData
 
     public static readonly IReadOnlyList<Person> Personnel = new[]
     {
-        new Person(PersonLastName, PersonFirstName, "ZF", "Land 1", PhoneNumber),
-        new Person(PersonLastNameAlt, PersonFirstNameAlt, "GF", null, PhoneNumberAlt),
+        new Person(PersonLastName, PersonFirstName, "ZF", "Land 1", PhoneNumber, EmailAddress, PersonNote),
+        new Person(PersonLastNameAlt, PersonFirstNameAlt, "GF", null, PhoneNumberAlt, EmailAddressAlt, PersonNoteAlt),
     };
 
     public static readonly IReadOnlyList<Link> Links = new[]
@@ -713,7 +749,9 @@ public static class MasterDataJson
                 p.TryGetProperty("firstName", out var f) ? f.GetString() ?? string.Empty : string.Empty,
                 Opt(p, "role"),
                 Opt(p, "callSign"),
-                Opt(p, "phone")))
+                Opt(p, "phone"),
+                Opt(p, "email"),
+                Opt(p, "note")))
             .ToList();
 
         static string? Opt(JsonElement e, string prop) =>
@@ -748,6 +786,8 @@ public static class MasterDataJson
                 role = p.Role,
                 callSign = p.CallSign,
                 phone = p.Phone,
+                email = p.Email,
+                note = p.Note,
             }),
             settings = new
             {

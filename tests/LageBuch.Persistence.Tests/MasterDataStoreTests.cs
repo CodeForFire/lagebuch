@@ -45,7 +45,17 @@ public class MasterDataStoreTests : IDisposable
                 new[] { new ChecklistTemplateItem("Abbauschritt", true) }),
             TruppTypes = new[] { new TruppType("Angriffstrupp") },
             Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
-            Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
+            Personnel = new[]
+            {
+                new Person(
+                    "Mustermann",
+                    "Max",
+                    "ZF",
+                    "Land 1",
+                    "01 71 / 1 23 45 67",
+                    "max.mustermann@example.org",
+                    "KBM Gefahrgut"),
+            },
         };
         MasterDataStore.Save(_path, set);
 
@@ -58,6 +68,8 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("Land 1", max.CallSign);
+        Assert.Equal("max.mustermann@example.org", max.Email);
+        Assert.Equal("KBM Gefahrgut", max.Note);
         Assert.Equal("01 71 / 1 23 45 67", max.Phone);
     }
 
@@ -118,6 +130,33 @@ public class MasterDataStoreTests : IDisposable
         var set = MasterDataStore.GetOrCreate(_path);
 
         Assert.Equal(new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
+    }
+
+    // Unlike md_personnel's other optional columns, these two really are absent from every store a
+    // released build wrote: without the AddColumnIfMissing lines, opening one fails with
+    // "no such column: email" and takes the whole roster with it.
+    [Fact]
+    public void A_database_written_before_kontakte_widens_in_place_and_keeps_its_roster()
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_personnel (last_name TEXT NOT NULL, first_name TEXT NOT NULL, role TEXT, call_sign TEXT, phone TEXT);
+                INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone) VALUES ('Mustermann', 'Max', 'ZF', 'Land 1', '0171');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var person = Assert.Single(MasterDataStore.GetOrCreate(_path).Personnel);
+
+        Assert.Equal("Mustermann", person.LastName);
+        Assert.Equal("0171", person.Phone);
+        Assert.Null(person.Email);
+        Assert.Null(person.Note);
     }
 
     [Fact]

@@ -51,12 +51,12 @@
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 47/1", "seats": 6, "hasZugfuehrer": false }
   ],
   "personnel": [
-    { "lastName": "Mustermann", "firstName": "Max", "role": "EL", "callSign": "Florian Musterstadt 11/1", "phone": "01 71 / 1 23 45 67" },
-    { "lastName": "Musterfrau", "firstName": "Erika", "role": "ZF", "callSign": null, "phone": "01 71 / 7 65 43 21" },
-    { "lastName": "Müller", "firstName": "Jens", "role": "GF", "callSign": "Florian Musterstadt 40/1", "phone": null },
-    { "lastName": "Schmidt", "firstName": "Lena", "role": "GF", "callSign": "Florian Musterstadt 41/1", "phone": null },
-    { "lastName": "Wagner", "firstName": "Tobias", "role": "AS-Überwachung", "callSign": null, "phone": null },
-    { "lastName": "Mustermann", "firstName": "Anna", "role": "GF", "callSign": "Florian Musterdorf 42/1", "phone": null }
+    { "lastName": "Mustermann", "firstName": "Max", "role": "EL", "callSign": "Florian Musterstadt 11/1", "phone": "01 71 / 1 23 45 67", "email": "max.mustermann@ff-musterstadt.example", "note": "Kreisbrandrat, KBI Vertretung" },
+    { "lastName": "Musterfrau", "firstName": "Erika", "role": "ZF", "callSign": null, "phone": "01 71 / 7 65 43 21", "email": "erika.musterfrau@ff-musterstadt.example", "note": "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz" },
+    { "lastName": "Müller", "firstName": "Jens", "role": "GF", "callSign": "Florian Musterstadt 40/1", "phone": null, "email": "jens.mueller@ff-musterstadt.example", "note": "Fachberater EDV" },
+    { "lastName": "Schmidt", "firstName": "Lena", "role": "GF", "callSign": "Florian Musterstadt 41/1", "phone": null, "email": null, "note": "Musterdorf, Beispielried, Vorlagenhofen, Schemastetten" },
+    { "lastName": "Wagner", "firstName": "Tobias", "role": "AS-Überwachung", "callSign": null, "phone": null, "email": null, "note": null },
+    { "lastName": "Mustermann", "firstName": "Anna", "role": "GF", "callSign": "Florian Musterdorf 42/1", "phone": null, "email": null, "note": null }
   ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,

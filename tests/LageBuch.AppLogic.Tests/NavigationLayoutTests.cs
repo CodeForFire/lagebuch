@@ -35,7 +35,7 @@ public class NavigationLayoutTests
             new[]
             {
                 "checklist:Aufbau", "etb", "tasks", "roles", "forces",
-                "scba", "co", "files", "links", "checklist:Abbau",
+                "scba", "co", "files", "links", "contacts", "checklist:Abbau",
             },
             Keys(specs));
     }

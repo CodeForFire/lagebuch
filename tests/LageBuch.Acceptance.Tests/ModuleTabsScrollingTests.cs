@@ -17,8 +17,8 @@ namespace LageBuch.Acceptance.Tests;
 // stays in ONE column and overflows into a scrollbar instead of wrapping (#146).
 public class ModuleTabsScrollingTests
 {
-    // Short enough to force wrap regardless of which header banners are visible: 10 tabs at
-    // MinHeight=50 need 500px, and the header/footer stacks eat most of the rest.
+    // Short enough to force wrap regardless of which header banners are visible: 11 tabs at
+    // MinHeight=50 need 550px, and the header/footer stacks eat most of the rest.
     private const double ShortHeight = 400.0;
 
     [AvaloniaFact]
@@ -48,7 +48,7 @@ public class ModuleTabsScrollingTests
         var tabItems = tabs.GetVisualDescendants().OfType<TabItem>().ToArray();
 
         // Nothing lost: every declared rail tab is still realized.
-        Assert.Equal(10, tabItems.Length);
+        Assert.Equal(11, tabItems.Length);
 
         // One column, not side-by-side columns: every tab shares the same horizontal origin.
         var columns = tabItems

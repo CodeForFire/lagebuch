@@ -87,6 +87,10 @@ public class AboutViewModelTests
 
         public Task OpenUrlAsync(string url) => throw new InvalidOperationException("Kein Handler registriert.");
 
+        public Task OpenMailAsync(string address) => Task.CompletedTask;
+
+        public Task OpenPhoneAsync(string number) => Task.CompletedTask;
+
         public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 }

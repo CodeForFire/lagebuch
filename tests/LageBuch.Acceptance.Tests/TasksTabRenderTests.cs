@@ -59,7 +59,7 @@ public class TasksTabRenderTests
         var (window, _, _, _, _) = ShowWorkspace();
         var headers = WorkspaceRenderHelper.RailHeaders(window);
 
-        Assert.Equal(10, headers.Count);
+        Assert.Equal(11, headers.Count);
         Assert.Contains("AUFGABEN", headers);
     }
 

@@ -79,6 +79,52 @@ public class MasterDataSectionTests
         Assert.Equal(4, changes); // add + last name + first name + phone, one onChanged each
     }
 
+    // The regression that matters most in the Kontakte change: the editor round-trips every
+    // Person, so a section that forgets a field silently deletes hand-transcribed roster data on
+    // the next save -- and the operator gets no hint that it happened.
+    [Fact]
+    public void Personnel_email_and_note_survive_an_unrelated_edit()
+    {
+        var s = new PersonnelSection(
+            "Personal",
+            new[]
+            {
+                new Person(
+                    "Mustermann",
+                    "Max",
+                    "KBM",
+                    "Land 2/3",
+                    "01 71 / 6 53 58 23",
+                    "max.mustermann@example.org",
+                    "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz"),
+            },
+            () => { });
+
+        s.Rows[0].Phone = "01 71 / 9 99 99 99";
+
+        var person = Assert.Single(s.ToPeople());
+        Assert.Equal("max.mustermann@example.org", person.Email);
+        Assert.Equal("KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz", person.Note);
+    }
+
+    [Fact]
+    public void Personnel_email_and_note_are_editable_and_normalized()
+    {
+        var changes = 0;
+        var s = new PersonnelSection(
+            "Personal",
+            new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "0171", "alt@example.org", "alt") },
+            () => changes++);
+
+        s.Rows[0].Email = "  neu@example.org  ";
+        s.Rows[0].Note = "   ";                    // blank optional -> null
+
+        var person = Assert.Single(s.ToPeople());
+        Assert.Equal("neu@example.org", person.Email);
+        Assert.Null(person.Note);
+        Assert.Equal(2, changes);
+    }
+
     [Fact]
     public void Personnel_rows_without_a_last_name_are_dropped()
     {
@@ -91,7 +137,7 @@ public class MasterDataSectionTests
     public void PersonRow_Role_change_flags_a_change()
     {
         var changes = 0;
-        var row = new PersonRow("Mustermann", "Max", null, null, null, () => changes++);
+        var row = new PersonRow("Mustermann", "Max", null, null, null, null, null, () => changes++);
 
         row.Role = "GF";
 
@@ -103,7 +149,7 @@ public class MasterDataSectionTests
     public void PersonRow_CallSign_change_flags_a_change()
     {
         var changes = 0;
-        var row = new PersonRow("Mustermann", "Max", null, null, null, () => changes++);
+        var row = new PersonRow("Mustermann", "Max", null, null, null, null, null, () => changes++);
 
         row.CallSign = "Land 1";
 

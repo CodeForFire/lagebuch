@@ -38,6 +38,9 @@ public static class NavModules
     /// <summary>Links.</summary>
     public const string Links = "links";
 
+    /// <summary>Kontakte.</summary>
+    public const string Contacts = "contacts";
+
     /// <summary>
     /// Not a module of its own: the marker for an entry that names one of the Einsatz's
     /// Checklisten through <see cref="NavEntry.ChecklistId"/>.
@@ -46,7 +49,7 @@ public static class NavModules
 
     /// <summary>Every built-in module, in the order the rail shipped with.</summary>
     public static IReadOnlyList<string> All { get; } =
-        new[] { Etb, Tasks, Roles, Forces, Scba, Co, Files, Links };
+        new[] { Etb, Tasks, Roles, Forces, Scba, Co, Files, Links, Contacts };
 
     /// <summary>
     /// Whether this build knows the key. A layout written by a newer build may name a module that
@@ -77,7 +80,7 @@ public sealed record NavEntry(string ModuleKey, Guid? ChecklistId, bool IsVisibl
 public static class NavLayout
 {
     /// <summary>
-    /// The rail exactly as it shipped before it was configurable: Aufbau, the eight modules in
+    /// The rail exactly as it shipped before it was configurable: Aufbau, the nine modules in
     /// their original order, then Abbau.
     /// </summary>
     /// <remarks>
@@ -97,6 +100,7 @@ public static class NavLayout
         new NavEntry(NavModules.Co, null, true),
         new NavEntry(NavModules.Files, null, true),
         new NavEntry(NavModules.Links, null, true),
+        new NavEntry(NavModules.Contacts, null, true),
         new NavEntry(NavModules.Checklist, ChecklistDefaults.AbbauListId, true),
     };
 }
