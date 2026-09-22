@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             x:Class="LageBuch.App.Shared.Views.ContactsView"
+             x:DataType="vm:ContactsViewModel">
+  <DockPanel>
+    <!-- Search on the section header line, as the Links tab does (#262): a band of its own would
+         push the list down by a control height on a tab whose whole point is finding one row. -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="0,0,0,14">
+      <TextBlock Grid.Column="0" Text="KONTAKTE" Classes="overline" VerticalAlignment="Center" />
+      <!-- Star column with MaxWidth, never a fixed width in an Auto column: an Auto column never
+           shrinks, so a pinned width runs off the right edge on a phone-width window (#146). -->
+      <TextBox Grid.Column="1" x:Name="ContactSearchBox" MinWidth="130" MaxWidth="280" Margin="16,0,0,0"
+               HorizontalAlignment="Right" VerticalAlignment="Center"
+               Text="{Binding FilterText}"
+               PlaceholderText="Name, Funktion oder Ort suchen"
+               IsVisible="{Binding Contacts.Count}">
+        <!-- InnerRightContent, not a sibling: as a sibling the button's appearance widens the row
+             and shoves the focused box left under the operator's caret on the first keystroke. -->
+        <TextBox.InnerRightContent>
+          <Button x:Name="ClearContactSearchButton" Classes="icon-btn" ToolTip.Tip="Suche zurücksetzen"
+                  AutomationProperties.Name="Suche zurücksetzen"
+                  Command="{Binding ClearFilterCommand}" IsVisible="{Binding IsFiltered}">
+            <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+          </Button>
+        </TextBox.InnerRightContent>
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
+    </Grid>
+
+    <Border DockPanel.Dock="Top" x:Name="ErrorBanner" Background="#241608" Margin="0,0,0,14"
+            BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Grid.Column="0" Width="15" Height="15" VerticalAlignment="Top" Margin="0,0,12,0"
+                  Foreground="{StaticResource AmberBrush}"
+                  Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+        <TextBlock Grid.Column="1" x:Name="ErrorMessageText" Text="{Binding ErrorMessage}"
+                   FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{StaticResource AmberBrush}" />
+      </Grid>
+    </Border>
+
+    <TextBlock DockPanel.Dock="Top" x:Name="EmptyText"
+               Text="Keine Kontakte hinterlegt — Personal steht in den Stammdaten."
+               Foreground="{StaticResource TextMutedBrush}"
+               IsVisible="{Binding !Contacts.Count}" />
+
+    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14"
+            IsVisible="{Binding Contacts.Count}">
+      <ScrollViewer>
+        <Panel>
+          <!-- Distinct from EmptyText above: the Stammdaten do hold people, this search just found
+               none. Inside the panel so the frame doesn't collapse mid-keystroke. -->
+          <TextBlock x:Name="NoMatchesText" Text="{Binding NoMatchesMessage}"
+                     Foreground="{StaticResource TextMutedBrush}"
+                     IsVisible="{Binding !VisibleContacts.Count}" />
+          <!-- ItemsControl, not ItemsRepeater: a Landkreis roster is tens of people, not
+               thousands, and virtualizing would cost the content-sized row height. -->
+          <!-- Capped and left-aligned: stretched across a 1920px ELW monitor the action buttons
+               end up a screen's width from the name they belong to, and the eye has to travel the
+               whole row to pair them up. IsSharedSizeScope lets every row agree on the two action
+               column widths, so the buttons form clean columns instead of a ragged right edge. -->
+          <ItemsControl x:Name="ContactsList" ItemsSource="{Binding VisibleContacts}"
+                        MaxWidth="1180" HorizontalAlignment="Left" Grid.IsSharedSizeScope="True"
+                        IsVisible="{Binding VisibleContacts.Count}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="md:Person">
+                <Grid RowDefinitions="Auto,Auto" Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ContactPhone" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ContactMail" />
+                  </Grid.ColumnDefinitions>
+                  <!-- #441: the Funkrufname leads. Its own column rather than a prefix on the
+                       name, so the names still line up for the entries carrying no call sign. -->
+                  <TextBlock Grid.Row="0" Grid.Column="0" Classes="mono" Text="{Binding CallSign}"
+                             Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="10"
+                              Margin="10,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Role}" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                  </StackPanel>
+
+                  <!-- The button's content is the number itself: one control both shows it and
+                       dials it, and it stays readable where no dialer is registered. The glyph,
+                       not just the tooltip, carries "this leaves Lagebuch" (#262) — on Android
+                       there is no hover, so a tooltip alone reaches nobody. -->
+                  <Button Grid.Row="0" Grid.Column="2" IsVisible="{Binding HasPhone}"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.CallCommand}"
+                          CommandParameter="{Binding}"
+                          ToolTip.Tip="In der Telefon-App des Geräts wählen — verlässt Lagebuch">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <PathIcon Width="12" Height="12" VerticalAlignment="Center"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                Data="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
+                      <TextBlock Text="{Binding Phone}" Classes="mono" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+
+                  <Button Grid.Row="0" Grid.Column="3" IsVisible="{Binding HasEmail}" Margin="8,0,0,0"
+                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.MailCommand}"
+                          CommandParameter="{Binding}"
+                          ToolTip.Tip="Im E-Mail-Programm des Geräts verfassen — verlässt Lagebuch">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <PathIcon Width="12" Height="12" VerticalAlignment="Center"
+                                Foreground="{StaticResource TextSecondaryBrush}"
+                                Data="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
+                      <TextBlock Text="{Binding Email}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+
+                  <!-- The Notiz is what the search exists to hit, so it is on screen rather than in
+                       a tooltip: the operator has to see *why* somebody matched "Gefahrgut".
+                       TextSecondary, not TextMuted — that token is 50% alpha and #439 already
+                       moved content lines off it. In a Grid cell, not a StackPanel: a wrapping
+                       TextBlock inside a horizontal StackPanel measures at infinite width and
+                       never wraps. -->
+                  <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="10,5,0,0"
+                             Text="{Binding Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap"
+                             Foreground="{StaticResource TextSecondaryBrush}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</UserControl>

@@ -439,5 +439,9 @@ internal sealed class OpenPathDialogs : IFileDialogService
 
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
 
+    public Task OpenMailAsync(string address) => Task.CompletedTask;
+
+    public Task OpenPhoneAsync(string number) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }

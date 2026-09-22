@@ -36,6 +36,15 @@
                   IsVisible="{Binding VehicleConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding VehicleConflicts}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
           </Border>
+          <!-- Eine Adresse, die Lagebuch nicht öffnen würde, wäre im Kontakte-Modul ein Knopf,
+               der nichts tut. Gleiche Form wie die Funkrufnamen-Meldung daneben: sie nennt die
+               Person und blockiert das Speichern, bis die Adresse stimmt. -->
+          <Border x:Name="PersonnelConflictsBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding PersonnelConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding PersonnelConflicts}" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#F87171" TextWrapping="Wrap" MaxWidth="520" />
+          </Border>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
           <Button x:Name="ImportButton" Content="IMPORTIEREN" Command="{Binding ImportCommand}" />
@@ -537,18 +546,27 @@
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- Column headers (#137): each row is unlabeled otherwise. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
-                    <TextBlock Grid.Column="0" Text="NACHNAME" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="1" Text="VORNAME" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="2" Text="ROLLE" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="3" Text="RUFNAME" Classes="overline" FontSize="10" />
-                    <TextBlock Grid.Column="4" Text="TELEFON" Classes="overline" FontSize="10" />
-                  </Grid>
+                  <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="*,*,110,120,150,Auto">
+                      <TextBlock Grid.Column="0" Text="NACHNAME" Classes="overline" FontSize="10" />
+                      <TextBlock Grid.Column="1" Text="VORNAME" Classes="overline" FontSize="10" />
+                      <TextBlock Grid.Column="2" Text="ROLLE" Classes="overline" FontSize="10" />
+                      <TextBlock Grid.Column="3" Text="RUFNAME" Classes="overline" FontSize="10" />
+                      <TextBlock Grid.Column="4" Text="TELEFON" Classes="overline" FontSize="10" />
+                    </Grid>
+                    <!-- Second header line, over each row's second line (#137: no field is left
+                         unlabeled, and a PlaceholderText disappears once the field is filled). -->
+                    <Grid ColumnDefinitions="*,2*" Margin="0,6,0,0">
+                      <TextBlock Grid.Column="0" Text="E-MAIL" Classes="overline" FontSize="10" />
+                      <TextBlock Grid.Column="1" Text="NOTIZ / ZUSTÄNDIGKEIT" Classes="overline" FontSize="10" />
+                    </Grid>
+                  </StackPanel>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PersonRow">
-                          <Grid ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
+                          <Grid RowDefinitions="Auto,Auto" Margin="0,0,0,12">
+                            <Grid Grid.Row="0" ColumnDefinitions="*,*,110,120,150,Auto">
                             <TextBox Grid.Column="0"
                                      PlaceholderText="{x:Static md:AnonymizedExampleData.PersonLastNamePlaceholder}"
                                      Text="{Binding LastName}" Margin="0,0,6,0" />
@@ -570,6 +588,19 @@
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
                             </Button>
+                            </Grid>
+                            <!-- A second line rather than a seventh and eighth column: the first
+                                 line already carries 380px of fixed columns, and an Auto column
+                                 never shrinks, so two more would run off the right edge on a
+                                 narrow window (#146). -->
+                            <Grid Grid.Row="1" ColumnDefinitions="*,2*" Margin="0,6,0,0">
+                              <TextBox Grid.Column="0"
+                                       PlaceholderText="{x:Static md:AnonymizedExampleData.EmailPlaceholder}"
+                                       Text="{Binding Email}" Margin="0,0,6,0" />
+                              <TextBox Grid.Column="1"
+                                       PlaceholderText="{x:Static md:AnonymizedExampleData.PersonNotePlaceholder}"
+                                       Text="{Binding Note}" Margin="0,0,6,0" />
+                            </Grid>
                           </Grid>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>

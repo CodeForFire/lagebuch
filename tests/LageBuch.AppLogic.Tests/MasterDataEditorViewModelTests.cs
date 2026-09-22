@@ -61,6 +61,10 @@ public class MasterDataEditorViewModelTests
 
         public Task OpenUrlAsync(string url) => Task.CompletedTask;
 
+        public Task OpenMailAsync(string address) => Task.CompletedTask;
+
+        public Task OpenPhoneAsync(string number) => Task.CompletedTask;
+
         public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 
@@ -615,6 +619,154 @@ public class MasterDataEditorViewModelTests
 
         Assert.Null(vm.VehicleConflicts);
         Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    private static MasterDataSet SetWithPersonnel(params Person[] people) => MasterDataSet.Empty with
+    {
+        Personnel = people,
+    };
+
+    // Eine Adresse, die Lagebuch nicht oeffnen wuerde, waere im Kontakte-Modul ein Knopf, der
+    // nichts tut -- und zwar erst dort, wo sie niemand mehr korrigieren kann.
+    [Fact]
+    public void An_unusable_email_address_blocks_saving_and_names_the_person()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, "max.mustermann@ff-musterstadt.example"))));
+
+        Personnel(vm).Rows[0].Email = "max@@ff-musterstadt.example";
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.True(vm.HasPersonnelConflicts);
+        Assert.Contains("Mustermann, Max", vm.PersonnelConflicts, StringComparison.Ordinal);
+    }
+
+    // Die Meldung steht in einer schmalen Leiste; der Name findet die Zeile, die Adresse nicht.
+    [Fact]
+    public void The_message_names_the_person_rather_than_the_address()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, "kaputt@@sehr.lange.example"))));
+
+        Assert.NotNull(vm.PersonnelConflicts);
+        Assert.DoesNotContain("@", vm.PersonnelConflicts, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("a@b.de?bcc=opfer@example.org")]
+    [InlineData("Max <max@example.org>")]
+    [InlineData("kein-at-zeichen")]
+    [InlineData("max@example")]
+    public void Every_address_the_launcher_would_refuse_is_refused_here_too(string address)
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, address))));
+
+        Assert.True(vm.HasPersonnelConflicts);
+        Assert.False(vm.SaveCommand.CanExecute(null));
+    }
+
+    // Keine Adresse ist der Normalfall, kein Fehler.
+    [Fact]
+    public void A_blank_address_never_counts_as_a_conflict()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, null),
+            new Person("Musterfrau", "Erika", "GF", null, null, "   "))));
+
+        Personnel(vm).AddCommand.Execute(null); // dirty, so CanSave is not merely "nothing changed"
+
+        Assert.Null(vm.PersonnelConflicts);
+        Assert.False(vm.HasPersonnelConflicts);
+        Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    // ToPeople verwirft Zeilen ohne Nachnamen; ueber einen Wert, der nie in der Datei landet,
+    // darf sich der Editor nicht beschweren.
+    [Fact]
+    public void A_row_without_a_last_name_is_dropped_and_its_address_raises_nothing()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, "max.mustermann@ff-musterstadt.example"))));
+
+        var section = Personnel(vm);
+        section.AddCommand.Execute(null);
+        section.Rows[1].Email = "voellig@@kaputt.example"; // no Nachname on this row
+
+        Assert.Null(vm.PersonnelConflicts);
+        Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Fixing_the_address_re_enables_saving()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, "max@@ff-musterstadt.example"))));
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+
+        Personnel(vm).Rows[0].Email = "max.mustermann@ff-musterstadt.example";
+
+        Assert.Null(vm.PersonnelConflicts);
+        Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void A_valid_address_does_not_block_saving()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, "max.mustermann@ff-musterstadt.example"))));
+
+        Personnel(vm).Rows[0].Phone = "01 71 / 1 23 45 67";
+
+        Assert.Null(vm.PersonnelConflicts);
+        Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    // Ein Import ist der wahrscheinlichste Weg, wie eine unbrauchbare Adresse in die Stammdaten
+    // kommt -- und der Editor muss das sagen, bevor irgendetwas angefasst wurde. Beide Regeln
+    // liefen frueher erst nach einer Zeilenaenderung, weil Import zwar PopulateSections aufrief,
+    // die Konfliktpruefung aber nur in Load stand.
+    [Fact]
+    public async Task An_imported_unusable_address_blocks_saving_before_anything_is_edited()
+    {
+        var vm = Vm(
+            new InMemoryProvider(MasterDataSet.Empty),
+            new FakeDialogs { ImportPath = "/import.json" },
+            new FakeFileService(read: MasterDataSet.Empty with
+            {
+                Personnel = new[]
+                {
+                    new Person("Mustermann", "Max", "ZF", null, null, "a@b.de\r\nBcc: opfer@example.org"),
+                },
+            }));
+
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasPersonnelConflicts);
+        Assert.Contains("Mustermann, Max", vm.PersonnelConflicts, StringComparison.Ordinal);
+        Assert.False(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task An_imported_duplicate_call_sign_blocks_saving_before_anything_is_edited()
+    {
+        var vm = Vm(
+            new InMemoryProvider(MasterDataSet.Empty),
+            new FakeDialogs { ImportPath = "/import.json" },
+            new FakeFileService(read: MasterDataSet.Empty with
+            {
+                Vehicles = new[]
+                {
+                    new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                    new Vehicle("Aich", "FFB 1/40/1", 6),
+                },
+            }));
+
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasVehicleConflicts);
+        Assert.False(vm.SaveCommand.CanExecute(null));
     }
 
     [Fact]

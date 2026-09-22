@@ -116,7 +116,21 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string? _vehicleConflicts;
 
+    /// <summary>
+    /// E-Mail-Adressen, die Lagebuch nicht öffnen würde. Eine Adresse aus den Stammdaten landet
+    /// im Kontakte-Modul hinter einem Knopf, der sie an die Mail-App des Geräts übergibt, und
+    /// <see cref="MailAddressValidator"/> lehnt dort ab, was in einer mailto:-URI etwas bedeutet.
+    /// Das hier ist dieselbe Prüfung an der Stelle, an der die Adresse eingegeben wird -- sonst
+    /// merkt es erst, wer an der Einsatzstelle jemanden erreichen will, und dort ist sie nicht
+    /// mehr zu korrigieren.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private string? _personnelConflicts;
+
     public bool HasVehicleConflicts => VehicleConflicts is not null;
+
+    public bool HasPersonnelConflicts => PersonnelConflicts is not null;
 
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
@@ -130,7 +144,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         FileError = null;
         FileNotice = null;
         PopulateSections(_original);
-        RefreshVehicleConflicts();
         IsDirty = false;
         ImportCommand.NotifyCanExecuteChanged();
     }
@@ -159,7 +172,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),
-            _personnel = new PersonnelSection("Personal", set.Personnel, MarkDirty),
+            _personnel = new PersonnelSection("Personal", set.Personnel, OnPersonnelChanged),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
             // rows (plus the roster), so the vehicle list is the single place to maintain them.
@@ -184,12 +197,25 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         SelectedSection = previousChecklistId is { } id
             ? Checklists.FirstOrDefault(c => c.Id == id) ?? Sections[0]
             : Sections.FirstOrDefault(s => s.Title == previousTitle) ?? Sections[0];
+
+        // Here rather than in Load: Import populates the sections too, and used to leave both
+        // conflict rules unevaluated until the operator happened to edit a row. An imported file
+        // is exactly where a duplicate Funkrufname or an unusable address comes from, so the
+        // answer has to be on screen before anything is touched.
+        RefreshVehicleConflicts();
+        RefreshPersonnelConflicts();
     }
 
     private void OnVehiclesChanged()
     {
         IsDirty = true;
         RefreshVehicleConflicts();
+    }
+
+    private void OnPersonnelChanged()
+    {
+        IsDirty = true;
+        RefreshPersonnelConflicts();
     }
 
     /// <summary>Recomputes the Funkrufnamen conflict list from the current rows.</summary>
@@ -204,6 +230,25 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
         VehicleConflicts = duplicates.Length == 0
             ? null
             : $"Doppelte Funkrufnamen: {string.Join(", ", duplicates)}";
+    }
+
+    /// <summary>Recomputes the list of people whose address Lagebuch could not open.</summary>
+    /// <remarks>
+    /// Über <see cref="PersonnelSection.ToPeople"/> statt über die Zeilen: das ist, was SPEICHERN
+    /// wirklich schreibt. Zeilen ohne Nachnamen fallen dort weg und eine nur aus Leerzeichen
+    /// bestehende Adresse wird zu null -- beides darf keine Meldung über einen Wert auslösen, der
+    /// nie in der Datei landet. Genannt wird die Person, nie die Adresse: die Meldung steht in
+    /// einer schmalen Leiste, und der Name ist es, der die Zeile findet.
+    /// </remarks>
+    private void RefreshPersonnelConflicts()
+    {
+        var invalid = _personnel.ToPeople()
+            .Where(p => p.HasEmail && !MailAddressValidator.TryGetMailtoUri(p.Email, out _))
+            .Select(p => p.DisplayName)
+            .ToArray();
+        PersonnelConflicts = invalid.Length == 0
+            ? null
+            : $"Ungültige E-Mail-Adresse: {string.Join(", ", invalid)}";
     }
 
     private MasterDataSet BuildSet() => _original with
@@ -292,7 +337,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
 
     // Dirty alone is not enough: a duplicate Funkrufname must be resolved before the set can be
     // written (#76 follow-up).
-    private bool CanSave => IsDirty && !HasVehicleConflicts;
+    private bool CanSave => IsDirty && !HasVehicleConflicts && !HasPersonnelConflicts;
 
     [RelayCommand(CanExecute = nameof(IsDirty))]
     private void Discard() => Load();

@@ -35,6 +35,31 @@ public interface IFileDialogService
     Task OpenUrlAsync(string url);
 
     /// <summary>
+    /// Opens the device's mail app on a new message to <paramref name="address"/> — a bare address
+    /// ("a.b@c.de"), never a URI.
+    /// </summary>
+    /// <remarks>
+    /// Taking the address rather than a "mailto:..." string is the point: the scheme is this
+    /// implementation's to add, which makes it structurally impossible for a caller to smuggle a
+    /// different one through. Contrast <see cref="OpenUrlAsync"/>, which takes a whole URL and
+    /// therefore has to defend itself with <see cref="HttpUrlValidator"/> in every implementation.
+    /// The address is still validated here as well as at the call site — see
+    /// <see cref="MailAddressValidator"/> for what a CR/LF or a '?' in one would otherwise do.
+    /// </remarks>
+    Task OpenMailAsync(string address);
+
+    /// <summary>
+    /// Opens the device's dialer prefilled with <paramref name="number"/>, a bare number written as
+    /// the roster writes it ("01 71 / 6 53 58 23"). Never places the call itself.
+    /// </summary>
+    /// <remarks>
+    /// Same contract as <see cref="OpenMailAsync"/>: the scheme belongs to the implementation, and
+    /// <see cref="PhoneNumberValidator"/> both normalizes the separators away and refuses anything
+    /// that is not a plain number.
+    /// </remarks>
+    Task OpenPhoneAsync(string number);
+
+    /// <summary>
     /// Offers a written file to the user for hand-off (share sheet, "reveal in folder", or a no-op
     /// where the destination the user already picked via <see cref="PickExportPdfAsync"/>/
     /// <see cref="PickExportJsonAsync"/> is itself the final destination). Called once the file at

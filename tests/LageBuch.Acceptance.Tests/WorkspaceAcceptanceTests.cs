@@ -98,6 +98,10 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
 
+    public Task OpenMailAsync(string address) => Task.CompletedTask;
+
+    public Task OpenPhoneAsync(string number) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -112,6 +116,10 @@ internal sealed class AttachmentDialogs : IFileDialogService
     public string? LastOpenedPath { get; private set; }
 
     public string? LastOpenedUrl { get; private set; }
+
+    public string? LastMailAddress { get; private set; }
+
+    public string? LastPhoneNumber { get; private set; }
 
     public Task<string?> PickSaveAsync(string s, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
 
@@ -134,6 +142,18 @@ internal sealed class AttachmentDialogs : IFileDialogService
     public Task OpenUrlAsync(string url)
     {
         LastOpenedUrl = url;
+        return Task.CompletedTask;
+    }
+
+    public Task OpenMailAsync(string address)
+    {
+        LastMailAddress = address;
+        return Task.CompletedTask;
+    }
+
+    public Task OpenPhoneAsync(string number)
+    {
+        LastPhoneNumber = number;
         return Task.CompletedTask;
     }
 
@@ -223,14 +243,14 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_with_eight_tabs()
+    public void Workspace_renders_the_whole_rail()
     {
         var vm = BuildWorkspace(out _);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(10, tabs.Items.Count);
+        Assert.Equal(11, tabs.Items.Count);
     }
 
     [AvaloniaFact]

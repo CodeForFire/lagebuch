@@ -375,6 +375,10 @@ internal sealed class OpenReturningDialogs : IFileDialogService
 
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
 
+    public Task OpenMailAsync(string address) => Task.CompletedTask;
+
+    public Task OpenPhoneAsync(string number) => Task.CompletedTask;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -407,6 +411,10 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     public Task OpenFileAsync(string path) => Task.CompletedTask;
 
     public Task OpenUrlAsync(string url) => Task.CompletedTask;
+
+    public Task OpenMailAsync(string address) => Task.CompletedTask;
+
+    public Task OpenPhoneAsync(string number) => Task.CompletedTask;
 
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
