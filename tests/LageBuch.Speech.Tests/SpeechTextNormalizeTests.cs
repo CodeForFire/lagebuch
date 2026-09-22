@@ -56,18 +56,34 @@ public class SpeechTextNormalizeTests
 
     [Theory]
     [InlineData("EG", "Erdgeschoss")]
-    [InlineData("2. OG", "Obergeschoss 2")]
-    [InlineData("1. OG", "Obergeschoss 1")]
-    [InlineData("1. UG", "Untergeschoss 1")]
+    [InlineData("2. OG", "zweites Obergeschoss")]
+    [InlineData("1. OG", "erstes Obergeschoss")]
+    [InlineData("1. UG", "erstes Untergeschoss")]
+    [InlineData("3. OG", "drittes Obergeschoss")]
     public void Floor_labels_are_spoken_in_full(string input, string expected) =>
         Assert.Equal(expected, SpeechText.Normalize(input));
+
+    // A German ordinal declines, and a fixed ending would be wrong half the time: the corpus has
+    // both "Rauch aus dem 2. OG" (dative) and "Hauptstraße 12, 2. OG, Whg. 1" (apposition).
+    [Theory]
+    [InlineData("im 2. OG", "im zweiten Obergeschoss")]
+    [InlineData("aus dem 2. OG", "aus dem zweiten Obergeschoss")]
+    [InlineData("vom 1. UG", "vom ersten Untergeschoss")]
+    [InlineData("Im 3. OG", "Im dritten Obergeschoss")]
+    public void An_article_before_the_floor_makes_it_dative(string input, string expected) =>
+        Assert.Equal(expected, SpeechText.Normalize(input));
+
+    // Past the table a numeral reads better than a wrong word.
+    [Fact]
+    public void A_floor_beyond_the_ordinal_table_falls_back_to_a_numeral() =>
+        Assert.Equal("Obergeschoss 34", SpeechText.Normalize("34. OG"));
 
     // The en-dash in a floor range means "bis", not a pause -- and it must win over the generic
     // dash-to-comma rule below.
     [Fact]
     public void A_floor_range_is_read_as_a_range() =>
         Assert.Equal(
-            "Erdgeschoss bis Obergeschoss 2",
+            "Erdgeschoss bis zweites Obergeschoss",
             SpeechText.Normalize("EG–2. OG"));
 
     [Fact]

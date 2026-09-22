@@ -16,11 +16,10 @@ namespace LageBuch.Speech;
 /// </para>
 /// <para>
 /// Ordinary numerals are left to the engine: espeak-ng and Supertonic both say "240" and "45"
-/// correctly in German, so spelling them out would only add ways to be wrong. A slash-separated
-/// group is split into its parts and each part left as a numeral -- "40/1" is "vierzig, eins", the
-/// way a Funkrufname is announced, and "0/1/8/9" is "null, eins, acht, neun". Both are the same
-/// operation, which is why <see cref="CallSign"/> and <see cref="Strength"/> share one
-/// implementation.
+/// correctly in German, so spelling them out would only add ways to be wrong. A grouped number is
+/// split into its parts and each part left as a numeral, but the two kinds are joined differently:
+/// a Funkrufname is one identifier and runs together ("40/1" is "vierzig eins"), while a Stärke is
+/// four separate counts that want the pauses ("0/1/8/9" is "null, eins, acht, neun").
 /// </para>
 /// </remarks>
 public static class SpeechText
@@ -31,6 +30,24 @@ public static class SpeechText
     private const string Zwo = "zwo";
 
     private static readonly char[] GroupSeparators = ['/', '-'];
+
+    // German ordinals decline. Standing alone or in apposition the neuter nominative is right
+    // ("..., zweites Obergeschoss, Wohnung 1"); after a dative article it is not ("im zweiten
+    // Obergeschoss"). Both forms appear in the corpus, so both are kept and the article picks.
+    // Index 0 is unused so the number indexes the table directly.
+    private static readonly string[] OrdinalNominative =
+    [
+        string.Empty, "erstes", "zweites", "drittes", "viertes", "fünftes", "sechstes", "siebtes",
+        "achtes", "neuntes", "zehntes", "elftes", "zwölftes", "dreizehntes", "vierzehntes",
+        "fünfzehntes", "sechzehntes", "siebzehntes", "achtzehntes", "neunzehntes", "zwanzigstes",
+    ];
+
+    private static readonly string[] OrdinalDative =
+    [
+        string.Empty, "ersten", "zweiten", "dritten", "vierten", "fünften", "sechsten", "siebten",
+        "achten", "neunten", "zehnten", "elften", "zwölften", "dreizehnten", "vierzehnten",
+        "fünfzehnten", "sechzehnten", "siebzehnten", "achtzehnten", "neunzehnten", "zwanzigsten",
+    ];
 
     private static readonly string[] MonthWords =
     [
@@ -53,7 +70,10 @@ public static class SpeechText
 
     private static readonly Regex ClockTime = new(@"\b(\d{1,2}):(\d{2})\b", RegexOptions.Compiled);
 
-    private static readonly Regex FloorLabel = new(@"\b(\d{1,2})\.\s?([OU])G\b", RegexOptions.Compiled);
+    // The optional leading article is what decides the ordinal's ending, so it is captured with the
+    // floor rather than left behind: "im 2. OG" is dative, a bare "2. OG" is not.
+    private static readonly Regex FloorLabel =
+        new(@"((?i:im|vom|zum|beim|dem|der|den)\s+)?\b(\d{1,2})\.\s?([OU])G\b", RegexOptions.Compiled);
 
     private static readonly Regex FloorRange =
         new(@"(EG|\d{1,2}\.\s?[OU]G)\s*[–—-]\s*(EG|\d{1,2}\.\s?[OU]G)", RegexOptions.Compiled);
@@ -77,8 +97,9 @@ public static class SpeechText
     private static readonly Regex RedundantStop = new(@"[,;.]?\s*\.(\s*\.)*", RegexOptions.Compiled);
 
     /// <summary>
-    /// Speaks a Funkrufname: the name part unchanged, every digit group one digit at a time.
-    /// "Florian Musterstadt 40/1" becomes "Florian Musterstadt vier null, eins".
+    /// Speaks a Funkrufname: the name part unchanged, the number groups run together as one
+    /// identifier. "Florian Musterstadt 40/1" becomes "Florian Musterstadt 40 1", and
+    /// "Florian München 06/34-01" becomes "Florian München 6 34 1".
     /// </summary>
     public static string CallSign(string? callSign)
     {
@@ -97,14 +118,15 @@ public static class SpeechText
     /// <summary>
     /// Speaks a Stärke such as "0/1/8/9" -- "null, eins, acht, neun". Each part is a head count, so
     /// it stays a numeral the engine reads as a number: "0/1/10/11" is "zehn, elf", never "eins
-    /// null". Identical to <see cref="CallSign"/>'s handling of a group; kept as its own name
-    /// because the call sites mean different things by it.
+    /// null". Unlike <see cref="CallSign"/> the groups are comma-separated, because four counts
+    /// want the pauses that one identifier does not.
     /// </summary>
     public static string Strength(string? strengthText) =>
         string.IsNullOrWhiteSpace(strengthText) ? string.Empty : Tidy(SpeakGroups(strengthText, ", "));
 
     /// <summary>
-    /// Speaks a floor label: "EG" becomes "Erdgeschoss", "2. OG" becomes "Obergeschoss 2".
+    /// Speaks a floor label: "EG" becomes "Erdgeschoss", "2. OG" becomes "zweites Obergeschoss",
+    /// and "im 2. OG" becomes "im zweiten Obergeschoss".
     /// </summary>
     public static string Floor(string? label) =>
         string.IsNullOrWhiteSpace(label) ? string.Empty : Tidy(ExpandFloors(label));
@@ -278,17 +300,27 @@ public static class SpeechText
 
     private static string ExpandFloors(string text)
     {
-        // "Obergeschoss 2", not "zweites Obergeschoss". A German ordinal is declined, and the
-        // correct ending depends on what precedes it: "im zweiten Obergeschoss" after a
-        // preposition, "zweites Obergeschoss" standing alone. The corpus has both -- "Rauch aus
-        // dem 2. OG" and "Hauptstraße 12, 2. OG, Whg. 1" -- so any fixed ending is wrong half the
-        // time. The uninflected form is never wrong, and the engine reads the numeral correctly.
+        // "zweites Obergeschoss", with the ending chosen by what precedes it. A German ordinal is
+        // declined, and the corpus contains both cases: "Rauch aus dem 2. OG" needs the dative
+        // "zweiten", while the apposition in "Hauptstraße 12, 2. OG, Whg. 1" needs "zweites".
+        // Picking one ending would be wrong half the time, so the preceding article decides.
         var s = FloorLabel.Replace(
             text,
             m =>
             {
-                var storey = m.Groups[2].Value == "O" ? "Obergeschoss" : "Untergeschoss";
-                return $"{storey} {m.Groups[1].Value}";
+                var storey = m.Groups[3].Value == "O" ? "Obergeschoss" : "Untergeschoss";
+                var n = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+                var article = m.Groups[1].Value;
+
+                if (n >= OrdinalNominative.Length)
+                {
+                    // Past the table a numeral reads better than a wrong word, and no Einsatzstelle
+                    // in this corpus has a twenty-first floor.
+                    return $"{article}{storey} {n}";
+                }
+
+                var ordinal = article.Length > 0 ? OrdinalDative[n] : OrdinalNominative[n];
+                return $"{article}{ordinal} {storey}";
             });
 
         return Regex.Replace(s, @"\bEG\b", "Erdgeschoss");
