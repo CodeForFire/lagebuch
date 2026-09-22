@@ -78,9 +78,20 @@ the version the way each packaging format requires:
 
 | | `v0.6.0-beta.1` | why |
 |---|---|---|
-| File names, APK, assembly | `0.6.0-beta.1` | |
+| File names — every artefact, `.deb` included | `0.6.0-beta.1` | |
+| APK, assembly | `0.6.0-beta.1` | |
 | MSI `ProductVersion` | `0.6.0` | a ProductVersion must be numeric |
-| `.deb` version | `0.6.0~beta.1` | `~` sorts *below* `0.6.0`, so `apt` treats the final release as an upgrade — a `-` would sort above it |
+| `.deb` control `Version:` | `0.6.0~beta.1` | `~` sorts *below* `0.6.0`, so `apt` treats the final release as an upgrade — a `-` would sort above it |
+
+The last two rows are the same version spelled two ways, and only the control
+field gets the tilde. It is deliberately kept out of the file name: GitHub
+rewrites a `~` in a release asset name to `.`, so the release once offered
+`lagebuch_0.6.0.rc.1_amd64.deb` while `SHA256SUMS.txt` named
+`lagebuch_0.6.0~rc.1_amd64.deb`, and `sha256sum -c` failed on a download that
+did not exist (#448). `apt` reads the control field, never the file name, so
+the sort order is unaffected. Both spellings are now derived inside
+[`build-deb.sh`](../packaging/linux/build-deb.sh) from the one version it is
+passed, so they cannot drift apart again.
 
 The MSI carrying the numeric core means a beta and the eventual final share a
 ProductVersion; `AllowSameVersionUpgrades` in

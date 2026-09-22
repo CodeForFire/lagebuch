@@ -3,9 +3,24 @@
 # dpkg-deb, so the CI leg and a local smoke test run the exact same steps.
 #
 #   build-deb.sh <version> <publish-dir> <icon-png> <icon-svg> <out-dir>
+#
+# <version> is the semver spelling, e.g. 0.6.0 or 0.6.0-rc.2. The two spellings a .deb needs are
+# derived from it here rather than by the caller, so the file name and the control field cannot
+# drift apart.
 set -euo pipefail
 
 VERSION="$1"
+# The file name keeps the semver spelling. It used to carry the Debian one, and GitHub rewrites a
+# '~' in a release asset name to '.': the release then offered lagebuch_0.6.0.rc.1_amd64.deb while
+# SHA256SUMS.txt named lagebuch_0.6.0~rc.1_amd64.deb, so `sha256sum -c` failed on a file nobody
+# could download (#448). Only pre-release tags ever produced a '~', which is why it took the first
+# rc to surface.
+#
+# The control field keeps the Debian spelling. Debian reads '-' as opening a Debian revision, which
+# sorts ABOVE the plain version, so apt would see 0.6.0 as older than 0.6.0-rc.2 and refuse the
+# final release as a downgrade. '~' sorts below, which is what makes the final an upgrade over its
+# own pre-releases. apt reads this field, never the file name.
+DEB_VERSION="${VERSION//-/\~}"
 PUBLISH_DIR="$2"
 ICON_PNG="$3"
 ICON_SVG="$4"
@@ -159,7 +174,7 @@ SIZE_KB=$(du -sk "$ROOT/usr" | cut -f1)
 install -d "$ROOT/DEBIAN"
 cat > "$ROOT/DEBIAN/control" <<CONTROL
 Package: $PKG
-Version: $VERSION
+Version: $DEB_VERSION
 Section: utils
 Priority: optional
 Architecture: amd64
