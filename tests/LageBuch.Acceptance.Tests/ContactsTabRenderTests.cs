@@ -193,6 +193,38 @@ public class ContactsTabRenderTests
         Capture(window, "stammdaten-personal.png");
     }
 
+    // Eine Adresse, die Lagebuch nicht oeffnen wuerde, waere im Kontakte-Modul ein Knopf, der
+    // nichts tut. Der Editor sagt es deshalb an der Stelle, an der sie eingegeben wird, und
+    // laesst sich bis dahin nicht speichern -- genau wie bei doppelten Funkrufnamen.
+    [AvaloniaFact]
+    public void An_unusable_address_names_the_person_and_blocks_saving()
+    {
+        var vm = new MasterDataEditorViewModel(
+            new ContactsSampleProvider(), new FakeDialogs(), new ContactsNoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var categories = view.GetControl<ListBox>("CategoryList");
+        categories.SelectedIndex = Enumerable.Range(0, categories.ItemCount)
+            .First(i => vm.Sections[i].Title == "Personal");
+        Dispatcher.UIThread.RunJobs();
+
+        var banner = view.GetControl<Border>("PersonnelConflictsBanner");
+        Assert.False(banner.IsEffectivelyVisible);
+
+        vm.Sections.OfType<PersonnelSection>().Single().Rows[0].Email = "max@@ff-musterstadt.example";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(banner.IsEffectivelyVisible);
+
+        // IsEffectivelyEnabled, nicht IsEnabled: ein Command, dessen CanExecute false ist, laesst
+        // die lokale Eigenschaft unberuehrt und graut den Knopf ueber den effektiven Zustand aus.
+        Assert.False(view.GetControl<Button>("SaveButton").IsEffectivelyEnabled);
+        Capture(window, "stammdaten-email-ungueltig.png");
+    }
+
     private sealed class ContactsSampleProvider : IMasterDataProvider
     {
         public MasterDataSet Get() => WorkspaceRenderHelper.MasterData();

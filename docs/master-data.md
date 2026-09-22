@@ -48,6 +48,12 @@ carrying a USSD code, is refused rather than launched.
 Both fields are optional everywhere. A roster that has neither still works, and
 a person without an address simply shows no mail button.
 
+The Stammdaten editor checks an address against the same rules the launcher
+applies, and names anyone whose address could not be opened instead of letting
+SPEICHERN write it — the operator who typed it is the one who can still fix it.
+The same check runs right after an import, which is where an unusable address
+most often comes from.
+
 ## Sample data
 
 [`samples/demo-stammdaten.json`](samples/demo-stammdaten.json) is a complete,
