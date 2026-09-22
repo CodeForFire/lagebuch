@@ -197,17 +197,40 @@ sections. `<slug>` is a short kebab-case description. The leading `+` is
 required: it is what keeps every filename unique, so two pull requests cannot
 collide even when they describe the same ticket.
 
-Put the entry in the file as plain prose, with no leading `- `, and reference
-the issue or PR inline the way the existing entries do:
+Put the entry in the file as plain prose, with no leading `- ` and **no link**:
 
 ```markdown
 The PDF's Aufgaben section marks a task "FÄLLIG" against the moment the export
 was taken, instead of reading the wall clock while the document renders. (#302)
 ```
 
-Write it for someone reading the release notes rather than the commit log: what
-changed, and why it matters. Do not edit `CHANGELOG.md` directly — entries land
-there when a release is cut.
+A release turns that into one bullet, with a link to the pull request the
+fragment arrived in:
+
+```markdown
+- [#334](https://github.com/CodeForFire/lagebuch/pull/334) - The PDF's Aufgaben
+  section marks a task "FÄLLIG" against the moment the export was taken,
+  instead of reading the wall clock while the document renders. (#302)
+```
+
+You do not write that link and cannot: while your pull request is open it has no
+number yet. `scripts/changelog-prlinks.py` recovers it from git when the release
+is cut. An **issue** may still be cited inline, as `(#302)` is above — that is a
+different thing from the pull request link, and it stays in the prose.
+
+Two rules about the prose itself:
+
+- **English.** `CHANGELOG.md` is one language throughout, the way `README.md` is
+  German for ELW crews and `SECURITY.md` is English for security researchers.
+  German terms of art stay German — Atemschutz, Stammdaten, Einsatzdaten,
+  Messreihe — because that is what the app says on screen. CI warns when an
+  entry looks German, but it is only a hint: it cannot tell a Fachbegriff from a
+  sentence, so a reviewer decides.
+- **One sentence.** The pull request holds the detail; the entry says what
+  changed for the reader. If one sentence genuinely will not hold it, the change
+  is probably two entries — which means two pull requests.
+
+Do not edit `CHANGELOG.md` directly — entries land there when a release is cut.
 
 **One entry per pull request**, not one per commit. The entry describes what the
 change does for the reader, never the layers it was built in, so a feature split
