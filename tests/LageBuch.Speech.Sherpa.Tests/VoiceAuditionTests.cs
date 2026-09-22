@@ -44,7 +44,15 @@ public class VoiceAuditionTests
 
         Directory.CreateDirectory(outDir);
 
+        // AUDITION_VOICES restricts the render to a comma-separated set of voice ids. Once a voice
+        // is chosen, tuning pronunciation means re-rendering constantly, and 45 s on one voice is a
+        // usable loop where 8 minutes on seventeen is not.
+        var only = (Environment.GetEnvironmentVariable("AUDITION_VOICES") ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var voices = VoiceCatalog.Candidates
+            .Where(v => only.Count == 0 || only.Contains(v.Id))
             .Where(v => Directory.Exists(SpeechModelLocator.VoiceDirectory(root!, v)))
             .ToList();
 
@@ -55,7 +63,7 @@ public class VoiceAuditionTests
         var timings = new Dictionary<string, VoiceTiming>(StringComparer.Ordinal);
         foreach (var voice in voices)
         {
-            clips.AddRange(RenderVoice(root!, voice, outDir, abbreviations, timings));
+            clips.AddRange(RenderVoice(root!, voice, outDir, abbreviations, timings, voices.Count == 1));
         }
 
         AuditionPage.Write(Path.Join(outDir, "index.html"), voices, clips, abbreviations, timings);
@@ -66,7 +74,8 @@ public class VoiceAuditionTests
         SpeechVoice voice,
         string outDir,
         List<AbbreviationClip> abbreviations,
-        Dictionary<string, VoiceTiming> timings)
+        Dictionary<string, VoiceTiming> timings,
+        bool onlyVoice)
     {
         var rendered = new List<Clip>();
         var total = Stopwatch.StartNew();
@@ -80,7 +89,7 @@ public class VoiceAuditionTests
         {
             rendered.Add(Render(synth, voice, item, normalized: true, outDir));
 
-            if (ReferenceVoiceIds.Contains(voice.Id, StringComparer.Ordinal)
+            if ((ReferenceVoiceIds.Contains(voice.Id, StringComparer.Ordinal) || onlyVoice)
                 && AuditionTexts.RawComparisonKeys.Contains(item.Key, StringComparer.Ordinal))
             {
                 rendered.Add(Render(synth, voice, item, normalized: false, outDir));
@@ -88,7 +97,7 @@ public class VoiceAuditionTests
         }
 
         var extra = 0;
-        if (string.Equals(voice.Id, AbbreviationVoiceId, StringComparison.Ordinal))
+        if (onlyVoice || string.Equals(voice.Id, AbbreviationVoiceId, StringComparison.Ordinal))
         {
             foreach (var probe in AuditionTexts.Abbreviations())
             {

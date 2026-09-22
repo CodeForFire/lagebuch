@@ -12,7 +12,7 @@ public class SpeechTextNormalizeTests
     // both rushed them and drifted into English.
     [Theory]
     [InlineData("ILS", "Ih Ell Ess")]
-    [InlineData("CSA-Trupp", "Tseh Ess Ah-Trupp")]
+    [InlineData("CSA-Trupp", "Zeh Ess Ah-Trupp")]
     [InlineData("LPA-Trupp", "Ell Peh Ah-Trupp")]
     [InlineData("AGT", "Ah Geh Teh")]
     [InlineData("DLK", "Deh Ell Kah")]
@@ -102,7 +102,7 @@ public class SpeechTextNormalizeTests
 
     [Fact]
     public void A_co_reading_keeps_its_unit_pronounceable() =>
-        Assert.Equal("Tseh Oh-Messung: 120 Peh Peh Emm", SpeechText.Normalize("CO-Messung: 120 ppm"));
+        Assert.Equal("Zeh Oh-Messung: 120 Peh Peh Emm", SpeechText.Normalize("CO-Messung: 120 ppm"));
 
     [Theory]
     [InlineData(null)]

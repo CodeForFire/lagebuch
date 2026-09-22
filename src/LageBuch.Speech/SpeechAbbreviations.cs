@@ -27,15 +27,29 @@ namespace LageBuch.Speech;
 public static class SpeechAbbreviations
 {
     /// <summary>
-    /// The German name of each letter, spelled the way it sounds so a German voice reads it as the
-    /// letter rather than as a foreign word.
+    /// The German name of each letter, spelled so that a German voice reads it as the letter.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// These are <em>verified</em>, not guessed. Check any change with espeak-ng directly:
+    /// </para>
+    /// <code>espeak-ng -v de -q --ipa "Zeh. Ess. Ah."   →   tsˈeː ˈɛs ˈɑː</code>
+    /// <para>
+    /// The trap is writing the affricate as "ts": German has no such onset, so <c>Tseh</c> comes out
+    /// /tˈeːzˈeː/ -- two syllables, "te-se" -- which is what made CSA unintelligible. The letter
+    /// <c>z</c> already <em>is</em> /ts/, so C is "Zeh" and Z is "Zett".
+    /// </para>
+    /// <para>
+    /// The same check rules the other way for V: "Fau" is /fˈaʊ/ and correct, while the
+    /// orthographically tempting "Vau" is /vˈaʊ/ and wrong.
+    /// </para>
+    /// </remarks>
     public static IReadOnlyDictionary<char, string> GermanLetters { get; } =
         new Dictionary<char, string>
         {
             ['A'] = "Ah",
             ['B'] = "Beh",
-            ['C'] = "Tseh",
+            ['C'] = "Zeh",
             ['D'] = "Deh",
             ['E'] = "Eh",
             ['F'] = "Eff",
@@ -57,8 +71,8 @@ public static class SpeechAbbreviations
             ['V'] = "Fau",
             ['W'] = "Weh",
             ['X'] = "Iks",
-            ['Y'] = "Üpsilon",
-            ['Z'] = "Tsett",
+            ['Y'] = "Ypsilon",
+            ['Z'] = "Zett",
         };
 
     /// <summary>Abbreviations said as letters, keyed by the written form.</summary>

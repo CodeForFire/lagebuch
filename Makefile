@@ -19,6 +19,7 @@ APP          := src/LageBuch.App/LageBuch.App.csproj
 ANDROID_PROJ := src/LageBuch.App.Android/LageBuch.App.Android.csproj
 APP_ID       := de.codeforfire.lagebuch
 FILTER       ?=
+VOICE        ?=
 PROJECT      ?=
 VERSION      ?= 0.1.0
 
@@ -191,12 +192,12 @@ logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs Ima
 
 ## Sprachausgabe (voice models, audition)
 
-voices: ## Fetch the TTS voice models into speech-models/ (VOICES="all" for the audition set)
+voices: ## Fetch the TTS voice models into speech-models/ (VOICES="all" for every candidate)
 	packaging/speech/fetch-voices.sh speech-models $(VOICES)
 
-audition: voices ## Render the voice audition to dist/audition/index.html -- open it and choose
-	AUDITION_OUT=$(CURDIR)/dist/audition $(DOTNET) test tests/LageBuch.Speech.Sherpa.Tests -c $(CONFIG) \
-	  --filter FullyQualifiedName~VoiceAuditionTests
+audition: ## Render the voice audition to dist/audition/index.html (VOICE=thorsten-medium for a fast loop)
+	AUDITION_OUT=$(CURDIR)/dist/audition AUDITION_VOICES=$(VOICE) $(DOTNET) test \
+	  tests/LageBuch.Speech.Sherpa.Tests -c $(CONFIG) --filter FullyQualifiedName~VoiceAuditionTests
 	@echo "open file://$(CURDIR)/dist/audition/index.html"
 
 ## Docs (README samples, screenshots, demo GIF)
