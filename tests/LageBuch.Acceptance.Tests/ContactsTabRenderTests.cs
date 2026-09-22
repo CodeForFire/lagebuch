@@ -183,7 +183,7 @@ public class ContactsTabRenderTests
 
         var categories = view.GetControl<ListBox>("CategoryList");
         var personal = Enumerable.Range(0, categories.ItemCount)
-            .First(i => (vm.Sections[i] as EditorSection)?.Title == "Personal");
+            .First(i => vm.Sections[i].Title == "Personal");
         categories.SelectedIndex = personal;
         Dispatcher.UIThread.RunJobs();
 
