@@ -117,45 +117,6 @@ internal static class AuditionTexts
     /// </summary>
     public static IReadOnlyList<string> RawComparisonKeys { get; } =
         ["rueckzugsalarm", "einheit", "co-messung", "etb-zeile", "einsatznummer", "unter-pa"];
-
-    /// <summary>
-    /// The abbreviation A/B: each letter-spoken abbreviation in a carrier sentence, once spelled as
-    /// German letter names and once in full. Rendered on the reference voice only -- this is a
-    /// question about the lexicon, not about the voice.
-    /// </summary>
-    /// <remarks>
-    /// A carrier sentence rather than the bare abbreviation, because an abbreviation alone is read
-    /// with different prosody than one sitting inside a clause, and the clause is how it will
-    /// actually be spoken.
-    /// </remarks>
-    public static IEnumerable<AbbreviationProbe> Abbreviations() =>
-        SpeechAbbreviations.Spelled.Keys
-            .Where(SpeechAbbreviations.LongForms.ContainsKey)
-            .Select(a => new AbbreviationProbe
-            {
-                Abbreviation = a,
-                Spelled = Carrier(a, SpeechAbbreviations.Spelled[a]),
-                Expanded = Carrier(a, SpeechAbbreviations.LongForms[a]),
-            });
-
-    private static string Carrier(string abbreviation, string spoken) => abbreviation switch
-    {
-        "ILS" => $"Rückmeldung an {spoken} fällig",
-        "PA" => $"Zwei Trupps noch unter {spoken}",
-        "ppm" => $"Der Messwert beträgt 120 {spoken}",
-        "CO" => $"{spoken}-Messung im Treppenhaus",
-        _ => $"Der {spoken} ist im Einsatz",
-    };
-}
-
-/// <summary>One abbreviation, rendered both ways.</summary>
-internal sealed record AbbreviationProbe
-{
-    public required string Abbreviation { get; init; }
-
-    public required string Spelled { get; init; }
-
-    public required string Expanded { get; init; }
 }
 
 /// <summary>One line the audition speaks, and what it is there to expose.</summary>

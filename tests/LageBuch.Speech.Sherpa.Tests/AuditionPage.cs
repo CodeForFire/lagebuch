@@ -34,14 +34,12 @@ internal static class AuditionPage
         string path,
         IReadOnlyList<SpeechVoice> voices,
         IReadOnlyList<Clip> clips,
-        IReadOnlyList<AbbreviationClip> abbreviations,
         IReadOnlyDictionary<string, VoiceTiming> timings)
     {
         var html = new StringBuilder();
         html.Append(Head);
 
         AppendVoiceTable(html, voices, timings);
-        AppendAbbreviations(html, abbreviations);
         AppendTexts(html, voices, clips);
 
         html.Append(Script);
@@ -88,31 +86,6 @@ internal static class AuditionPage
         }
 
         html.Append("</table>\n");
-    }
-
-    private static void AppendAbbreviations(StringBuilder html, IReadOnlyList<AbbreviationClip> abbreviations)
-    {
-        if (abbreviations.Count == 0)
-        {
-            return;
-        }
-
-        html.Append(
-            """
-            <h2>Abkürzungen — buchstabiert oder ausgeschrieben?</h2>
-            <p class="sub">Jeweils dieselbe Stimme (Thorsten). Entscheide je Abkürzung; die Wahl
-            landet in <code>SpeechAbbreviations</code>.</p>
-
-            """);
-
-        foreach (var a in abbreviations)
-        {
-            html.Append(CultureInfo.InvariantCulture, $"<h3>{Esc(a.Abbreviation)}</h3>\n");
-            html.Append("<table class=\"clips\">\n");
-            AppendRow(html, "buchstabiert", a.Spelled);
-            AppendRow(html, "ausgeschrieben", a.Expanded);
-            html.Append("</table>\n");
-        }
     }
 
     private static void AppendTexts(
@@ -211,8 +184,6 @@ internal static class AuditionPage
           .wrap { max-width: 1040px; margin: 0 auto; }
           h1 { font-size: 1.6rem; margin: 32px 0 4px; }
           h2 { font-size: 1.15rem; margin: 40px 0 2px; }
-          h3 { font-size: .95rem; margin: 22px 0 2px; color: var(--muted);
-               font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
           .sub { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
           .said { background: var(--card); border: 1px solid var(--line);
                   border-left: 3px solid var(--accent); border-radius: 6px;

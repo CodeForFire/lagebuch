@@ -76,6 +76,26 @@ public static class SpeechAbbreviations
         };
 
     /// <summary>Abbreviations said as letters, keyed by the written form.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Decided by ear, and the answer was "all of them".</b> Every one of these was auditioned
+    /// spelled against its full German wording, and the spelled form won each time: it is what is
+    /// actually said on the radio, and the full forms are long enough to bury the rest of an alarm
+    /// sentence -- "Rückmeldung an die Integrierte Leitstelle fällig" against "an Ih Ell Ess".
+    /// </para>
+    /// <para>
+    /// <b>FFB is Fürstenfeldbruck</b>, a place, not a Feuerwehr term. It reaches this table through
+    /// Funkrufnamen like <c>FFB 1/40/1</c> and <c>FFB Wache 1</c>. That is also why spelling it is
+    /// the only sensible treatment -- there is no wording to expand it into.
+    /// </para>
+    /// <para>
+    /// <b>Genus, for whenever something does get expanded.</b> These abbreviations take the article
+    /// of their head noun, and it is not guessable: <c>die</c> DLK (die Drehleiter), <c>das</c> LF
+    /// (das Löschfahrzeug), <c>der</c> ELW (der Einsatzleitwagen). <see cref="SpeechText.Normalize"/>
+    /// substitutes in place and never introduces an article, so today this cannot go wrong; anything
+    /// that starts building sentences around an expansion has to agree with the head noun itself.
+    /// </para>
+    /// </remarks>
     public static IReadOnlyDictionary<string, string> Spelled { get; } =
         new[] { "ILS", "CSA", "LPA", "PA", "AGT", "DLK", "ELW", "LF", "FFB", "CO", "ppm" }
             .ToDictionary(a => a, SpellOut, StringComparer.Ordinal);
@@ -93,27 +113,6 @@ public static class SpeechAbbreviations
             ["KdoW"] = "Kommandowagen",
             ["FF"] = "Freiwillige Feuerwehr",
             ["AS-Überwachung"] = "Atemschutzüberwachung",
-        };
-
-    /// <summary>
-    /// The full German wording of the letter-spoken abbreviations. Not used in normalization -- it
-    /// is the other half of the audition's A/B, so each one can be judged as letters against its
-    /// full form before the lexicon is settled.
-    /// </summary>
-    public static IReadOnlyDictionary<string, string> LongForms { get; } =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["ILS"] = "Integrierte Leitstelle",
-            ["CSA"] = "Chemikalienschutzanzug",
-            ["LPA"] = "Langzeit-Pressluftatmer",
-            ["PA"] = "Pressluftatmer",
-            ["AGT"] = "Atemschutzgeräteträger",
-            ["DLK"] = "Drehleiter",
-            ["ELW"] = "Einsatzleitwagen",
-            ["LF"] = "Löschfahrzeug",
-            ["FFB"] = "Freiwillige Feuerwehr Musterstadt",
-            ["CO"] = "Kohlenmonoxid",
-            ["ppm"] = "Teile pro Million",
         };
 
     /// <summary>

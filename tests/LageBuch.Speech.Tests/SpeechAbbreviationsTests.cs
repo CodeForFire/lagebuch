@@ -74,9 +74,4 @@ public class SpeechAbbreviationsTests
     [Fact]
     public void No_abbreviation_is_both_spelled_and_expanded() =>
         Assert.Empty(SpeechAbbreviations.Spelled.Keys.Intersect(SpeechAbbreviations.Expanded.Keys));
-
-    // LongForms is the audition's A/B partner for Spelled, so it has to cover it.
-    [Fact]
-    public void Every_spelled_abbreviation_has_a_long_form_to_compare_against() =>
-        Assert.Empty(SpeechAbbreviations.Spelled.Keys.Except(SpeechAbbreviations.LongForms.Keys));
 }

@@ -21,12 +21,9 @@ namespace LageBuch.Speech.Sherpa.Tests;
 /// </remarks>
 public class VoiceAuditionTests
 {
-    // The abbreviation A/B asks about the lexicon, not the voice, so one voice carries it.
-    private const string AbbreviationVoiceId = "thorsten-medium";
-
     // Rendered raw as well as normalized, so the normalizer's effect is audible rather than
     // asserted. One Piper and one Supertonic, because the two engines phonemize differently.
-    private static readonly string[] ReferenceVoiceIds = [AbbreviationVoiceId, "supertonic-3-sid00"];
+    private static readonly string[] ReferenceVoiceIds = ["thorsten-medium", "supertonic-3-sid00"];
 
     [Fact]
     public void Render_the_audition()
@@ -59,21 +56,19 @@ public class VoiceAuditionTests
         Assert.NotEmpty(voices);
 
         var clips = new List<Clip>();
-        var abbreviations = new List<AbbreviationClip>();
         var timings = new Dictionary<string, VoiceTiming>(StringComparer.Ordinal);
         foreach (var voice in voices)
         {
-            clips.AddRange(RenderVoice(root!, voice, outDir, abbreviations, timings, voices.Count == 1));
+            clips.AddRange(RenderVoice(root!, voice, outDir, timings, voices.Count == 1));
         }
 
-        AuditionPage.Write(Path.Join(outDir, "index.html"), voices, clips, abbreviations, timings);
+        AuditionPage.Write(Path.Join(outDir, "index.html"), voices, clips, timings);
     }
 
     private static List<Clip> RenderVoice(
         string root,
         SpeechVoice voice,
         string outDir,
-        List<AbbreviationClip> abbreviations,
         Dictionary<string, VoiceTiming> timings,
         bool onlyVoice)
     {
@@ -96,25 +91,12 @@ public class VoiceAuditionTests
             }
         }
 
-        var extra = 0;
-        if (onlyVoice || string.Equals(voice.Id, AbbreviationVoiceId, StringComparison.Ordinal))
-        {
-            foreach (var probe in AuditionTexts.Abbreviations())
-            {
-                abbreviations.Add(new AbbreviationClip(
-                    probe.Abbreviation,
-                    RenderOne(synth, voice, $"abk-{probe.Abbreviation}-buchstaben", probe.Spelled, outDir),
-                    RenderOne(synth, voice, $"abk-{probe.Abbreviation}-ausgeschrieben", probe.Expanded, outDir)));
-                extra += 2;
-            }
-        }
+        var t = VoiceTiming.From(loading.Elapsed, rendered);
+        timings[voice.Id] = t;
 
-        timings[voice.Id] = VoiceTiming.From(loading.Elapsed, rendered);
-
-        var t = timings[voice.Id];
         var line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{voice.Id,-28} {rendered.Count + extra,3} clips  {synth.SampleRate} Hz  load {loading.Elapsed.TotalSeconds,5:F1}s  synth~{t.MedianSynthesis.TotalSeconds,5:F2}s  RTF {t.MedianRtf,4:F2}  total {total.Elapsed.TotalSeconds,6:F1}s");
+            $"{voice.Id,-28} {rendered.Count,3} clips  {synth.SampleRate} Hz  load {loading.Elapsed.TotalSeconds,5:F1}s  synth~{t.MedianSynthesis.TotalSeconds,5:F2}s  RTF {t.MedianRtf,4:F2}  total {total.Elapsed.TotalSeconds,6:F1}s");
         Console.WriteLine(line);
 
         return rendered;
@@ -220,5 +202,3 @@ internal sealed record VoiceTiming(
         return sorted.Count % 2 == 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
     }
 }
-
-internal sealed record AbbreviationClip(string Abbreviation, RenderedClip Spelled, RenderedClip Expanded);
