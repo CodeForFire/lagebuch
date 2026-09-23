@@ -12,6 +12,19 @@ namespace LageBuch.Sync;
 /// <see cref="Incident.Rehydrate"/> exactly, so <see cref="SnapshotMapper"/> is a JSON-shaped
 /// sibling of the SQL mapping in <c>LageBuch.Persistence.IncidentRepository</c>.
 /// </summary>
+/// <remarks>
+/// <c>Revision</c> is the host's change counter, and the one member here a client compares rather
+/// than displays: it discards any pushed snapshot whose revision it has already applied, which is
+/// what makes two broadcasts racing each other harmless (#295). Monotonic within one host
+/// <em>process</em> only — a host that stops and restarts sharing counts from zero again, which is
+/// why a client that finds the host <em>behind</em> re-baselines instead of ignoring it.
+/// <para>
+/// <c>0</c> means nobody attached one. <see cref="SnapshotMapper.ToSnapshot"/> leaves it at the
+/// default and only <c>IncidentHost</c> fills it in, so the persistence path (<c>IncidentStore</c>,
+/// which round-trips this type in memory and never reads it) is untouched. Appending a defaulted
+/// trailing parameter is this type's documented compat convention.
+/// </para>
+/// </remarks>
 public sealed record IncidentSnapshot(
     Guid Id,
     DateTimeOffset StartedAt,
@@ -33,7 +46,8 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<IncidentFileDto> Files,
     IReadOnlyList<TaskDto> Tasks,
     IReadOnlyList<BuildingDto> Buildings,
-    IReadOnlyList<DwellingDto> Dwellings);
+    IReadOnlyList<DwellingDto> Dwellings,
+    long Revision = 0);
 
 public sealed record TimerDto(
     string Key,

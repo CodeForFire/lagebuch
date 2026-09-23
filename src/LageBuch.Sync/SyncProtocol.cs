@@ -11,6 +11,14 @@ public static class SyncProtocol
     public const string VersionPath = "/version";
     public const string HubPath = "/hub";
 
+    /// <summary>
+    /// The host's current snapshot revision, and nothing else. A joined client polls this as an
+    /// anti-entropy net (#295): a broadcast that never arrived leaves the host's revision ahead of
+    /// the client's, and the next poll re-fetches <see cref="SnapshotPath"/> to catch up. Deliberately
+    /// tiny — it is requested every few seconds per client, unlike the whole-incident snapshot.
+    /// </summary>
+    public const string RevisionPath = "/revision";
+
     /// <summary>Route template for the on-demand attachment-bytes pull, keyed by <see cref="LageBuch.Domain.Files.IncidentFile.Id"/>.</summary>
     public const string FilesRouteTemplate = "/files/{id:guid}";
 
@@ -36,6 +44,13 @@ public static class SyncProtocol
 
 /// <summary>Exchanged on connect; a client refuses a host whose <see cref="Version"/> differs (§7).</summary>
 public sealed record VersionInfo(string Version);
+
+/// <summary>
+/// The host's current <see cref="IncidentSnapshot.Revision"/>, served by
+/// <see cref="SyncProtocol.RevisionPath"/>. A joined client compares it against the revision it last
+/// applied; any difference means re-fetch the snapshot (#295).
+/// </summary>
+public sealed record RevisionInfo(long Revision);
 
 /// <summary>
 /// Thrown when the host rejects the join because the supplied share PIN is wrong or missing (§ #64).
