@@ -773,6 +773,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public event Action? Changed;
 
+    public void ChangeOperator(SessionOperator op) => _inner.ChangeOperator(op);
+
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         _inner.AddJournalEntry(direction, text, from, to);
 

@@ -228,6 +228,18 @@ public sealed class Incident
         AppendSystemEntry(clock, resumedBy, "Bearbeitung fortgesetzt");
     }
 
+    // A new Lagebuchführer takes over mid-incident (#469). Credited to the incoming one: from here
+    // on every entry is theirs, and the handover line is the first of them.
+    public void ChangeOperator(IClock clock, SessionOperator from, SessionOperator to)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+        EnsureOpen();
+        _audit.Add(new AuditEvent(clock.Now, "operator-changed", to.Display));
+        AppendSystemEntry(clock, to, $"Lagebuchführerwechsel: {from.Display} → {to.Display}");
+    }
+
     public void Close(IClock clock, SessionOperator closedBy)
     {
         ArgumentNullException.ThrowIfNull(clock);

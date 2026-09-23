@@ -415,6 +415,33 @@ public class IncidentOperationsTests
     }
 
     [Fact]
+    public void Change_operator_logs_a_system_entry_credited_to_the_new_operator()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        clock.Now = T0.AddHours(2);
+        var next = new SessionOperator("Schmidt", "FFB 12/2");
+
+        incident.ChangeOperator(clock, op, next);
+
+        var entry = Assert.Single(incident.Journal, e => e.Text.StartsWith("Lagebuchführerwechsel", StringComparison.Ordinal));
+        Assert.Equal("Lagebuchführerwechsel: Müller (FFB 12/1) → Schmidt (FFB 12/2)", entry.Text);
+        Assert.Equal(EtbDirection.System, entry.Direction);
+        Assert.Equal(T0.AddHours(2), entry.Timestamp);
+        Assert.Equal("Schmidt (FFB 12/2)", entry.EnteredBy);
+        Assert.Contains(incident.Audit, a => a.Action == "operator-changed" && a.By == "Schmidt (FFB 12/2)");
+    }
+
+    [Fact]
+    public void Change_operator_throws_when_incident_closed()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.Close(clock, op);
+
+        Assert.Throws<IncidentClosedException>(
+            () => incident.ChangeOperator(clock, op, new SessionOperator("Schmidt")));
+    }
+
+    [Fact]
     public void Total_personnel_sums_force_units()
     {
         var incident = NewIncident(out var clock, out var op);

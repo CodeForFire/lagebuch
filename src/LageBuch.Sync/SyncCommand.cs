@@ -34,6 +34,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetAddressCommand), "setAddress")]
 [JsonDerivedType(typeof(SetStatusCommand), "setStatus")]
 [JsonDerivedType(typeof(CloseIncidentCommand), "close")]
+[JsonDerivedType(typeof(ChangeOperatorCommand), "changeOperator")]
 [JsonDerivedType(typeof(AddFileCommand), "addFile")]
 [JsonDerivedType(typeof(RenameFileCommand), "renameFile")]
 [JsonDerivedType(typeof(RemoveFileCommand), "removeFile")]
@@ -58,6 +59,10 @@ public sealed record AddJournalEntryCommand(
     OperatorDto Operator, EtbDirection Direction, string Text, string? From, string? To) : SyncCommand;
 
 public sealed record EditJournalEntryCommand(OperatorDto Operator, Guid EntryId, string Text) : SyncCommand;
+
+/// <summary>A new Lagebuchführer takes over at the sending device (#469). Only the ETB line and
+/// the audit event need the host: every later command already carries the new operator.</summary>
+public sealed record ChangeOperatorCommand(OperatorDto From, OperatorDto To) : SyncCommand;
 
 public sealed record ToggleChecklistItemCommand(OperatorDto Operator, Guid ItemId) : SyncCommand;
 

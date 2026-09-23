@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using LageBuch.Domain.Time;
 
 namespace LageBuch.AppLogic.Tests;
@@ -266,6 +267,68 @@ public class IncidentSessionTests
         session.ContinueEditing(new SessionOperator("Schmidt"));
 
         Assert.Equal("Müller", session.Operator!.Display); // unchanged
+    }
+
+    [Fact]
+    public void ChangeOperator_credits_later_entries_to_the_new_operator_and_saves()
+    {
+        var store = new FakeStore();
+        var session = TestSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var saves = store.SaveCount;
+        var changed = 0;
+        session.Changed += () => changed++;
+
+        session.ChangeOperator(new SessionOperator("Schmidt", "FFB 1"));
+        session.AddJournalEntry(EtbDirection.Incoming, "Lagemeldung");
+
+        Assert.Equal("Schmidt (FFB 1)", session.Operator!.Display);
+        var handover = Assert.Single(session.Incident.Journal, e => e.Text == "Lagebuchführerwechsel: Müller → Schmidt (FFB 1)");
+        Assert.Equal("Schmidt (FFB 1)", handover.EnteredBy);
+        Assert.Equal("Schmidt (FFB 1)", session.Incident.Journal[^1].EnteredBy);
+        Assert.True(store.SaveCount > saves);
+        Assert.Equal(2, changed);
+    }
+
+    [Fact]
+    public void ChangeOperator_to_the_same_operator_logs_nothing()
+    {
+        var store = new FakeStore();
+        var session = TestSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var entries = session.Incident.Journal.Count;
+        var saves = store.SaveCount;
+
+        session.ChangeOperator(new SessionOperator(" Müller ", "FFB 1"));
+
+        Assert.Equal(entries, session.Incident.Journal.Count);
+        Assert.Equal(saves, store.SaveCount);
+    }
+
+    [Fact]
+    public void ChangeOperator_on_a_read_only_session_throws()
+    {
+        var store = new FakeStore();
+        TestSession.StartNew(
+            store,
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var ro = LocalIncidentSession.OpenReadOnly(store, new FixedClock(T0), "/x.fwincident");
+
+        Assert.Throws<InvalidOperationException>(() => ro.ChangeOperator(new SessionOperator("Schmidt")));
     }
 
     [Fact]

@@ -12,6 +12,7 @@ public class CommandSerializationTests
     {
         new AddJournalEntryCommand(Op, EtbDirection.Outgoing, "Text", "Von", "An"),
         new EditJournalEntryCommand(Op, Guid.NewGuid(), "Korrigierter Text"),
+        new ChangeOperatorCommand(Op, new OperatorDto("Schmidt", null)),
         new ToggleChecklistItemCommand(Op, Guid.NewGuid()),
         new AssignRoleCommand(Op, "EL", "Huber", "FFB 1", DateTimeOffset.UnixEpoch, null, "Abschnitt", "0171"),
         new TransferRoleCommand(Op, Guid.NewGuid(), "Schmidt", "FFB 12/2", "0172"),

@@ -41,7 +41,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private readonly object _cacheEvictionGate = new();
     private Incident _incident;
 
-    public SessionOperator? Operator { get; }
+    public SessionOperator? Operator { get; private set; }
 
     /// <summary>
     /// The host's Stammdaten, verbatim, in the <c>MasterDataJson</c> interchange format (#183).
@@ -297,6 +297,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     // --- IIncidentSession mutation surface: every call is a fire-and-forget command to the host;
     //     the resulting state arrives via the broadcast, never from these calls. ---
+    // The new operator is only a client-side fact: each later command carries it through Op(), so
+    // the host learns nothing beyond the logged handover itself (#469).
+    public void ChangeOperator(SessionOperator op)
+    {
+        ArgumentNullException.ThrowIfNull(op);
+        if (Operator == op)
+        {
+            return;
+        }
+
+        Send(new ChangeOperatorCommand(Op(), new OperatorDto(op.Name, op.CallSign)));
+        Operator = op;
+    }
+
     public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
         Send(new AddJournalEntryCommand(Op(), direction, text, from, to));
 
