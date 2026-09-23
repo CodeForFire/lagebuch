@@ -171,6 +171,19 @@ holds the entry text as plain prose, with no leading `- `; reference issues
 inline (`(#302)`). CI enforces that an entry exists — the `changelog entry` job
 runs `towncrier check` — so do it in the same PR, not as a follow-up.
 
+The entry is **English** and **one sentence**. `CHANGELOG.md` is one language
+throughout, the way `README.md` is German for ELW crews and `SECURITY.md` is
+English for security researchers; German terms of art stay German — Atemschutz,
+Stammdaten, Einsatzdaten, Messreihe — because that is what the app says on
+screen. The same job warns when an entry looks German, but only warns: it
+cannot tell a Fachbegriff from a German sentence.
+
+**Never write a pull request link into the fragment.** The rendered bullet
+carries one — `- [#334](…/pull/334) - The PDF's Aufgaben section marks …` — but
+it is recovered from git by `scripts/changelog-prlinks.py` when the release is
+cut, because the number does not exist while the PR is open. An *issue*
+reference inline is a different thing and stays in the prose.
+
 One entry, not one per commit. A pull request is one change as far as the
 release notes are concerned, and the entry describes what it does for the
 reader, never the layers it was built in: a feature split across domain,

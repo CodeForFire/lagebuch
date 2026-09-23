@@ -141,3 +141,23 @@ jobs:
           else
             echo "No src/ changes in this pull request — changelog fragment not required."
           fi
+
+      # Advisory, never a gate. CHANGELOG.md is English (CONTRIBUTING.md), but
+      # every correct entry here carries German Fachbegriffe — Atemschutz,
+      # Stammdaten, Messreihe — so a detector strict enough to block on would
+      # fail hardest on the entries that are right. The script exits 0 rather
+      # than the job using continue-on-error, so this job's conclusion keeps its
+      # one meaning: a changelog fragment exists.
+      - name: Hint if a changelog fragment looks German
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          mapfile -t fragments < <(
+            git diff --name-only --diff-filter=AM \
+              "origin/${BASE_REF}...HEAD" -- changelog.d
+          )
+          if [ ${#fragments[@]} -eq 0 ]; then
+            echo "No changelog fragments added or changed in this pull request."
+          else
+            python scripts/changelog-language-hint.py "${fragments[@]}"
+          fi

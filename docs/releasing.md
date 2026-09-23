@@ -18,9 +18,27 @@ release starts by folding the fragments into a version section:
 
 ```bash
 pip install -r .github/requirements-changelog.txt
-towncrier build --draft --version 0.6.0   # preview; writes nothing
-towncrier build --version 0.6.0           # writes the section, consumes the fragments
+python scripts/changelog-prlinks.py --check   # rehearse; writes nothing
+towncrier build --draft --version 0.6.0       # preview; writes nothing
+
+python scripts/changelog-prlinks.py           # prepends each entry's PR link
+towncrier build --version 0.6.0               # writes the section, consumes the fragments
 ```
+
+Every bullet opens with a link to the pull request the entry arrived in. Nobody
+writes that link by hand — the number does not exist while the pull request that
+carries the fragment is still open — so
+[`scripts/changelog-prlinks.py`](../scripts/changelog-prlinks.py) recovers it
+first: after a squash-merge exactly one commit adds a given fragment, and its
+subject ends in `(#NNN)`. The script rewrites each fragment in place, which is
+safe because `towncrier build` consumes them in the next command, and it is
+idempotent, so rehearsing with `--draft` and then building for real does not
+prefix the link twice.
+
+**If it cannot resolve a fragment it says so and exits non-zero — stop there.**
+A fragment that is not committed yet, or one whose commit subject carries no
+`(#NNN)`, has no link to find; commit it, or add the link by hand, rather than
+cutting a release with one entry silently unlinked.
 
 `title_format` in [`towncrier.toml`](../towncrier.toml) renders the heading as
 `## [0.6.0] - <Datum>`, and the version in it has to match the tag exactly minus
@@ -29,6 +47,8 @@ none of which towncrier does for you:
 
 - **The summary paragraph** under the new heading, if the release deserves one.
   The earlier sections have one; towncrier writes the entries and nothing else.
+  It is English like the rest of the file — the German summary a Kommandant
+  reads is the GitHub release body, not this.
 - **The link references at the bottom of `CHANGELOG.md`.** Repoint
   `[Unreleased]` at `compare/v<new>...HEAD` and add a `[<new>]:
   compare/v<previous>...v<new>` line above the existing ones. A missing line
