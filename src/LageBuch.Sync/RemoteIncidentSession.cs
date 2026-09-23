@@ -39,7 +39,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private readonly string? _cacheRoot;
     private readonly long _cacheMaxBytes;
     private readonly object _cacheEvictionGate = new();
+
+    // Guards the (_incident, _lastRevision) pair, which must move together: the guard below is a
+    // read-modify-write, so Interlocked on the field alone would not do. It is contended for real,
+    // not defensively — ImmediateUiDispatcher.Post runs inline, so under it "the UI thread" is
+    // whichever thread called, and SignalR's receive loop, a command's response and the reconcile
+    // poll genuinely race here. (A long is not atomic on the 32-bit Android head either.)
+    private readonly object _applyGate = new();
     private Incident _incident;
+    private long _lastRevision;
 
     public SessionOperator? Operator { get; private set; }
 
@@ -90,6 +98,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         IUiDispatcher ui,
         SessionOperator op,
         Incident initial,
+        long initialRevision,
         string? cacheRoot,
         long cacheMaxBytes,
         string hostMasterDataJson)
@@ -100,6 +109,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         _ui = ui;
         Operator = op;
         _incident = initial;
+        _lastRevision = initialRevision;
         _cacheRoot = cacheRoot;
         _cacheMaxBytes = cacheMaxBytes;
         HostMasterDataJson = hostMasterDataJson;
@@ -244,8 +254,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             var hostMasterDataJson = await http.GetStringAsync(
                 new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute), ct);
 
-            var initial = SnapshotMapper.FromSnapshot(
-                SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct)));
+            // Kept as the snapshot, not just the mapped Incident: its revision seeds _lastRevision, so
+            // the client starts level with the host instead of treating everything up to the joined-at
+            // revision as new.
+            var initialSnapshot = SyncJson.Deserialize<IncidentSnapshot>(
+                await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct));
+            var initial = SnapshotMapper.FromSnapshot(initialSnapshot);
 
             var hub = new HubConnectionBuilder()
                 .WithUrl(new Uri(baseUri, SyncProtocol.HubPath), o =>
@@ -261,7 +275,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, handler, hub, ui, op, initial, cacheRoot, cacheMaxBytes, hostMasterDataJson);
+            var session = new RemoteIncidentSession(
+                http, handler, hub, ui, op, initial, initialSnapshot.Revision, cacheRoot, cacheMaxBytes, hostMasterDataJson);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -276,7 +291,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             };
             hub.Reconnected += async _ =>
             {
-                await session.ResyncAsync();
+                await session.ResyncAsync(SnapshotOrigin.Rebaseline);
                 session._ui.Post(() => session.Reconnected?.Invoke());
             };
             hub.Closed += _ =>
@@ -596,17 +611,52 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         response.EnsureSuccessStatusCode();
     }
 
+    /// <summary>Where a snapshot came from, which decides whether the revision guard applies.</summary>
+    private enum SnapshotOrigin
+    {
+        /// <summary>
+        /// A hub broadcast, or the body a command's own round trip returned. Newer-only: a copy of a
+        /// revision already applied is dropped, which is what makes two broadcasts racing each other —
+        /// or a broadcast and a command response carrying the same revision — harmless (#295).
+        /// </summary>
+        Push,
+
+        /// <summary>
+        /// A full re-fetch taken because the host's revision disagreed with ours, and it turned out to
+        /// be <em>lower</em>: the host restarted sharing and is counting from zero again. Accepted
+        /// as-is, because newer-only would otherwise ignore that host forever.
+        /// </summary>
+        Rebaseline,
+    }
+
     // Arrives on SignalR's receive loop. Swap the cached incident and raise Changed on the UI thread:
     // the subscribers (EtbViewModel.Sync et al.) mutate Avalonia-bound collections, which Avalonia
     // rejects off-thread — so a broadcast raised here would otherwise never reach the view.
-    private void OnSnapshot(IncidentSnapshot snapshot) => _ui.Post(() =>
+    private void OnSnapshot(IncidentSnapshot snapshot) => ApplySnapshot(snapshot, SnapshotOrigin.Push);
+
+    private void ApplySnapshot(IncidentSnapshot snapshot, SnapshotOrigin origin) => _ui.Post(() =>
     {
-        _incident = SnapshotMapper.FromSnapshot(snapshot);
+        lock (_applyGate)
+        {
+            if (origin == SnapshotOrigin.Push && snapshot.Revision <= _lastRevision)
+            {
+                return;
+            }
+
+            _incident = SnapshotMapper.FromSnapshot(snapshot);
+            _lastRevision = snapshot.Revision;
+        }
+
+        // Outside the lock: subscribers re-enter this object and touch the UI, and holding a lock
+        // across that is how a deadlock gets built.
         Changed?.Invoke();
     });
 
-    private async Task ResyncAsync() =>
-        OnSnapshot(SyncJson.Deserialize<IncidentSnapshot>(await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))));
+    private async Task ResyncAsync(SnapshotOrigin origin, CancellationToken ct = default) =>
+        ApplySnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(
+                await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct)),
+            origin);
 
     // .NET wraps an exception thrown inside ServerCertificateCustomValidationCallback in an
     // HttpRequestException, keeping it as an inner cause rather than letting it propagate as-is; walk
