@@ -37,6 +37,7 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly IHubContext<IncidentHub> _hub;
+    private int _commandsReceived;
 
     private ScriptedSnapshotHost(WebApplication app, int port, IHubContext<IncidentHub> hub)
     {
@@ -54,6 +55,18 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     /// </summary>
     public IncidentSnapshot Current { get; set; } = null!;
 
+    /// <summary>
+    /// When set, <c>POST /command</c> answers 400 with this reason instead of applying anything —
+    /// the shape the real host produces from a domain guard.
+    /// </summary>
+    public string? RejectCommandsWith { get; set; }
+
+    /// <summary>
+    /// How many commands reached <c>POST /command</c>. Lets a test prove a command was actually sent
+    /// rather than inferring it from state that something else might have produced.
+    /// </summary>
+    public int CommandsReceived => _commandsReceived;
+
     public static async Task<ScriptedSnapshotHost> StartAsync(IncidentSnapshot initial, string version = "1.0.0")
     {
         var builder = WebApplication.CreateSlimBuilder();
@@ -64,6 +77,8 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         builder.WebHost.UseKestrel(o => o.Listen(IPAddress.Loopback, port, l => l.UseHttps(cert)));
         builder.Services.AddSignalR().AddJsonProtocol(o =>
             o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        builder.Services.ConfigureHttpJsonOptions(o =>
+            o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         var app = builder.Build();
         var host = new ScriptedSnapshotHost(app, port, app.Services.GetRequiredService<IHubContext<IncidentHub>>())
@@ -77,6 +92,18 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         app.MapGet(SyncProtocol.RevisionPath, () => Results.Json(new RevisionInfo(host.Current.Revision), SyncJson.Options));
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(
             MasterDataJson.Serialize(MasterDataSet.Empty), "application/json"));
+
+        // Answers like the real host -- the fresh snapshot as the 200 body, or a 400 carrying the
+        // reason -- but deliberately pushes nothing. That is what makes "the sender converges from its
+        // own response" observable at all: on the real host a broadcast is dispatched before the
+        // response is written, so it could always have been the broadcast that did it.
+        app.MapPost(SyncProtocol.CommandPath, (SyncCommand _) =>
+        {
+            Interlocked.Increment(ref host._commandsReceived);
+            return host.RejectCommandsWith is { } reason
+                ? Results.BadRequest(reason)
+                : Results.Json(host.Current, SyncJson.Options);
+        });
 
         await app.StartAsync();
         return host;

@@ -82,6 +82,30 @@ public sealed class PinRejectedException : Exception
 }
 
 /// <summary>
+/// Thrown when the host refused a command with 400 — a domain guard, a closed incident, or an id it
+/// does not know. <see cref="Exception.Message"/> is the host's own German reason, verbatim, because
+/// that sentence is what the operator needs to read; the alternative they used to get was nothing at
+/// all (#295).
+/// </summary>
+public sealed class CommandRejectedException : Exception
+{
+    public CommandRejectedException()
+        : this("Die Änderung wurde vom Host abgelehnt.")
+    {
+    }
+
+    public CommandRejectedException(string message)
+        : base(message)
+    {
+    }
+
+    public CommandRejectedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// Thrown when a joining client's app version differs from the host's. Mixed versions across a
 /// volunteer-run, un-auto-updated fleet are a realistic scenario to guard against explicitly (§7).
 /// </summary>

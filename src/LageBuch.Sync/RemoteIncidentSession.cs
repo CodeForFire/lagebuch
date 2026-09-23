@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
@@ -103,6 +104,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </summary>
     [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
     public event Action? ReconcileFailed;
+
+    /// <summary>
+    /// Raised when the host refused one of the fire-and-forget mutations, carrying its own reason. The
+    /// workspace shows it as a banner. Only the <c>void</c> mutations report here; the awaited ones
+    /// (<see cref="AddFileAsync"/>, <see cref="RemoveFileAsync"/>) throw
+    /// <see cref="CommandRejectedException"/> to their caller instead, so nothing is reported twice.
+    /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
+    public event Action<string>? CommandRejected;
 
     /// <summary>
     /// Raised when the connection is gone for good — reconnect attempts were exhausted or the host
@@ -667,16 +677,111 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 
-    // Fire-and-forget: the command is POSTed; the host's broadcast (or a rejection the host swallows)
-    // is what the UI ultimately reflects. Connection loss surfaces separately via Disconnected.
-    private void Send(SyncCommand command) => _ = SendAsync(command);
+    // The ~40 void mutations all land here. Still fire-and-forget -- they cannot await -- but the task
+    // is observed now rather than discarded (#295).
+    private void Send(SyncCommand command) => _ = SendAndReportAsync(command);
 
-    /// <summary>Sends one command to the host. The resulting state arrives via the broadcast, not this call.</summary>
+    /// <summary>
+    /// Send half of <see cref="Send"/>: reports a refusal on <see cref="CommandRejected"/> instead of
+    /// dropping it with the task. Kept separate from <see cref="SendAsync"/> so the awaited callers keep
+    /// getting an exception and the operator is never told the same thing twice.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "This is the end of a fire-and-forget path: a refusal surfaces on CommandRejected (a workspace banner) and anything else is already covered by Disconnected/Ended plus the reconcile poll. Rethrowing would fault a discarded task and take the process down mid-Einsatz.")]
+    private async Task SendAndReportAsync(SyncCommand command)
+    {
+        try
+        {
+            await SendAsync(command);
+        }
+        catch (CommandRejectedException ex)
+        {
+            _ui.Post(() => CommandRejected?.Invoke(ex.Message));
+        }
+        catch (Exception)
+        {
+            // A transport failure is not reported here on purpose: losing the connection already shows
+            // on Disconnected/Ended, and once it is back the reconcile poll restores the true state. A
+            // second banner saying the same thing would only add noise at the worst possible moment.
+        }
+    }
+
+    /// <summary>
+    /// Sends one command to the host and adopts the snapshot it answers with.
+    /// </summary>
+    /// <remarks>
+    /// The host has always returned the snapshot its apply produced; it used to be thrown away, leaving
+    /// the sender to wait for the broadcast. Applying it costs nothing and makes a device that is
+    /// actually being used converge from its own round trip. The broadcast that follows carries the same
+    /// revision, so whichever arrives second is dropped by the guard in
+    /// <see cref="ApplySnapshot"/>.
+    /// </remarks>
+    /// <exception cref="CommandRejectedException">
+    /// The host refused the command (400) — a domain guard, a closed incident, an unknown id.
+    /// </exception>
     public async Task SendAsync(SyncCommand command, CancellationToken ct = default)
     {
         using var content = new StringContent(SyncJson.Serialize(command), Encoding.UTF8, "application/json");
         var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            throw new CommandRejectedException(await ReadRejectionAsync(response, ct));
+        }
+
         response.EnsureSuccessStatusCode();
+        ApplySnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(await response.Content.ReadAsStringAsync(ct)),
+            SnapshotOrigin.Push);
+    }
+
+    /// <summary>
+    /// Pulls the host's reason out of a 400 body.
+    /// </summary>
+    /// <remarks>
+    /// <c>Results.BadRequest(string)</c> in a minimal API goes through <c>TypedResults.BadRequest&lt;T&gt;</c>
+    /// and is written as JSON, so the reason arrives as a string <em>literal</em> — quotes and all —
+    /// rather than as plain text. Both shapes are accepted anyway, so a later change at the host cannot
+    /// put quotation marks on an operator's screen. Length-capped because this ends up in a banner, not
+    /// a log viewer.
+    /// </remarks>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A body that cannot be read at all must still produce a readable German sentence for the banner; the alternative is the silent loss this change exists to remove.")]
+    private static async Task<string> ReadRejectionAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        const int maxLength = 300;
+
+        string body;
+        try
+        {
+            body = (await response.Content.ReadAsStringAsync(ct)).Trim();
+        }
+        catch (Exception)
+        {
+            return "Die Änderung wurde vom Host abgelehnt.";
+        }
+
+        if (body.Length > 1 && body.StartsWith('"') && body.EndsWith('"'))
+        {
+            try
+            {
+                body = SyncJson.Deserialize<string>(body);
+            }
+            catch (JsonException)
+            {
+                // Not a JSON string after all — fall through and use it as it came.
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return "Die Änderung wurde vom Host abgelehnt.";
+        }
+
+        return body.Length > maxLength ? body[..maxLength] : body;
     }
 
     /// <summary>Where a snapshot came from, which decides whether the revision guard applies.</summary>

@@ -1,4 +1,3 @@
-using System.Net;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
@@ -214,14 +213,17 @@ public class RemoteClientTests
         await using var attacker = await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
 
-        var rejected = await Assert.ThrowsAsync<HttpRequestException>(() => attacker.SendAsync(new AddFileCommand(
+        var rejected = await Assert.ThrowsAsync<CommandRejectedException>(() => attacker.SendAsync(new AddFileCommand(
             new OperatorDto("A", "RUF 1"),
             Guid.NewGuid(),
             "Lageplan.hta",
             "image/png",
             4)));
 
-        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        // A rejection now carries the host's own reason rather than an HttpRequestException whose message
+        // was "Response status code does not indicate success: 400" (#295) -- this is what the operator
+        // reads, so the assertion is on the sentence, not the status code.
+        Assert.Contains("passt nicht zum Dateityp", rejected.Message, StringComparison.Ordinal);
         Assert.Empty(hostSession.Incident.Files);
     }
 
