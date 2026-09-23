@@ -40,6 +40,13 @@ public static class SyncProtocol
     /// HTTP calls and the SignalR hub connection alike — so a single host middleware gates them all.
     /// </summary>
     public const string PinHeader = "X-Lagebuch-Pin";
+
+    /// <summary>
+    /// How often a joined client polls <see cref="RevisionPath"/>. This is the ceiling on how long a
+    /// device can sit on stale state after a lost broadcast, so it is chosen to be shorter than anyone
+    /// would spend reading a screen before acting on it — and the request is a few bytes over a LAN.
+    /// </summary>
+    public static readonly TimeSpan DefaultReconcileInterval = TimeSpan.FromSeconds(10);
 }
 
 /// <summary>Exchanged on connect; a client refuses a host whose <see cref="Version"/> differs (§7).</summary>

@@ -12,4 +12,11 @@
     <ProjectReference Include="..\LageBuch.Domain\LageBuch.Domain.csproj" />
   </ItemGroup>
 
+  <!-- The reconcile pass (RemoteIncidentSession.ReconcileAsync) is internal so the tests can drive one
+       deterministically instead of racing the poll timer. The client's tests live in the Hosting test
+       project, because they need a real Kestrel host to talk to. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="LageBuch.Sync.Hosting.Tests" />
+  </ItemGroup>
+
 </Project>

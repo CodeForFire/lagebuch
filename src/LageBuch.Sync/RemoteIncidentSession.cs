@@ -46,8 +46,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // whichever thread called, and SignalR's receive loop, a command's response and the reconcile
     // poll genuinely race here. (A long is not atomic on the 32-bit Android head either.)
     private readonly object _applyGate = new();
+    private readonly CancellationTokenSource _reconcileCts = new();
+    private readonly TimeSpan _reconcileInterval;
     private Incident _incident;
     private long _lastRevision;
+    private Task? _reconcileLoop;
+    private int _disposed;
 
     public SessionOperator? Operator { get; private set; }
 
@@ -85,6 +89,22 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public event Action? Reconnected;
 
     /// <summary>
+    /// Raised after a reconcile pass confirmed this device is on the host's revision — whether or not
+    /// it had to fetch anything. The workspace stamps its "Stand" from this: it is the only positive
+    /// evidence that what is on screen is current, as opposed to merely un-contradicted.
+    /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
+    public event Action? Reconciled;
+
+    /// <summary>
+    /// Raised when a reconcile pass could not reach the host, so currency is unconfirmed. Deliberately
+    /// not <see cref="Disconnected"/>: SignalR owns that, and this fires in the case SignalR cannot see
+    /// — the hub believing it is connected while the host is in fact unreachable.
+    /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
+    public event Action? ReconcileFailed;
+
+    /// <summary>
     /// Raised when the connection is gone for good — reconnect attempts were exhausted or the host
     /// stopped sharing. The UI returns to Home (§7); nothing further arrives on this session.
     /// </summary>
@@ -101,8 +121,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         long initialRevision,
         string? cacheRoot,
         long cacheMaxBytes,
-        string hostMasterDataJson)
+        string hostMasterDataJson,
+        TimeSpan reconcileInterval)
     {
+        _reconcileInterval = reconcileInterval;
         _http = http;
         _handler = handler;
         _hub = hub;
@@ -152,7 +174,17 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// until it is back under. Defaults to <see cref="DefaultCacheMaxBytes"/>; irrelevant when
     /// <paramref name="cacheRoot"/> is null.
     /// </param>
+    /// <param name="reconcileInterval">
+    /// How often to poll <c>GET /revision</c> and re-fetch when it disagrees with what this device has
+    /// applied — the net that catches a broadcast lost without the connection dropping (#295). Defaults
+    /// to <see cref="SyncProtocol.DefaultReconcileInterval"/>; tests shorten it, or push it past the end
+    /// of the test and drive <see cref="ReconcileAsync"/> directly.
+    /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The reconnect handler's catch-up failure surfaces on ReconcileFailed (an unconfirmed-state footer) and is retried by the poll; rethrowing inside a SignalR callback would instead leave Reconnected un-raised, which strands the workspace with its input disabled.")]
     public static async Task<RemoteIncidentSession> ConnectAsync(
         string host,
         SessionOperator op,
@@ -164,6 +196,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         IRetryPolicy? reconnectPolicy = null,
         string? cacheRoot = null,
         long cacheMaxBytes = DefaultCacheMaxBytes,
+        TimeSpan? reconcileInterval = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(trustStore);
@@ -276,7 +309,17 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 .Build();
 
             var session = new RemoteIncidentSession(
-                http, handler, hub, ui, op, initial, initialSnapshot.Revision, cacheRoot, cacheMaxBytes, hostMasterDataJson);
+                http,
+                handler,
+                hub,
+                ui,
+                op,
+                initial,
+                initialSnapshot.Revision,
+                cacheRoot,
+                cacheMaxBytes,
+                hostMasterDataJson,
+                reconcileInterval ?? SyncProtocol.DefaultReconcileInterval);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -291,7 +334,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             };
             hub.Reconnected += async _ =>
             {
-                await session.ResyncAsync(SnapshotOrigin.Rebaseline);
+                // Reconcile rather than resync blindly: the host may have restarted while we were away,
+                // in which case its revision is *lower* and only a rebaseline heals it. Wrapped, and
+                // Reconnected raised regardless, because a throwing catch-up used to leave Reconnected
+                // un-raised — which left IsConnected false and the workspace's input disabled for good.
+                // A pass that fails here is exactly what the poll retries.
+                try
+                {
+                    await session.ReconcileAsync(session._reconcileCts.Token);
+                }
+                catch (Exception)
+                {
+                    session._ui.Post(() => session.ReconcileFailed?.Invoke());
+                }
+
                 session._ui.Post(() => session.Reconnected?.Invoke());
             };
             hub.Closed += _ =>
@@ -300,6 +356,18 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 return Task.CompletedTask;
             };
             await hub.StartAsync(ct);
+
+            // Task.Run, not a bare call: ConnectAsync is awaited from the UI thread, so a bare call
+            // would capture Avalonia's SynchronizationContext and resume every continuation in the loop
+            // — the HTTP GET included — on the UI thread. CA2007 is off repo-wide, so ConfigureAwait
+            // is not the house style; Task.Run clears the context and hands back a Task to await in
+            // DisposeAsync.
+            // CancellationToken.None to Run on purpose: the loop observes the token itself and must be
+            // allowed to finish, because DisposeAsync awaits this task before disposing the HttpClient it
+            // uses. Handing the token to Run instead could leave the task cancelled-before-start, and
+            // that await would then throw on a perfectly ordinary teardown.
+            session._reconcileLoop = Task.Run(
+                () => session.ReconcileLoopAsync(session._reconcileCts.Token), CancellationToken.None);
             return session;
         }
         catch
@@ -652,6 +720,90 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Changed?.Invoke();
     });
 
+    /// <summary>
+    /// Polls the host's revision forever, healing whenever the two disagree. A tick's failure is
+    /// reported and the loop carries on — the whole point of this net is to keep trying when something
+    /// nobody enumerated has gone wrong.
+    /// </summary>
+    /// <remarks>
+    /// Runs while disconnected too. A succeeding poll during SignalR's reconnect window is real
+    /// information, and a failing one is what puts the footer in its "nicht bestätigt" state. The
+    /// notifications go out through <see cref="IUiDispatcher.Post"/> and never
+    /// <c>InvokeAsync</c>: the workspace awaits <see cref="DisposeAsync"/> from the UI thread and
+    /// disposal awaits this loop, so a loop that awaited the UI thread would deadlock there.
+    /// <para>
+    /// On Android the process freezes while backgrounded. <see cref="PeriodicTimer"/> simply does not
+    /// tick then and does not replay what it missed, so resuming costs exactly one catch-up pass —
+    /// which is the wanted behaviour. Nothing here derives state from a wall-clock delta, because a
+    /// frozen process would make that lie.
+    /// </para>
+    /// </remarks>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A reconcile tick must never fault the loop: every failure surfaces on ReconcileFailed, which the workspace shows as an unconfirmed-state footer, and the next tick retries.")]
+    private async Task ReconcileLoopAsync(CancellationToken ct)
+    {
+        // A using local, not a field: a disposable field would owe CA2213 an answer, and its lifetime is
+        // exactly this loop's anyway.
+        using var timer = new PeriodicTimer(_reconcileInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                try
+                {
+                    await ReconcileAsync(ct);
+                    _ui.Post(() => Reconciled?.Invoke());
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception)
+                {
+                    _ui.Post(() => ReconcileFailed?.Invoke());
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutdown: DisposeAsync cancelled the token, which WaitForNextTickAsync throws on.
+        }
+    }
+
+    /// <summary>
+    /// One reconcile pass: ask the host its revision and re-fetch the snapshot when it differs from what
+    /// this device has applied.
+    /// </summary>
+    /// <remarks>
+    /// The comparison is <c>!=</c>, not <c>&gt;</c>. A host ahead of us means a broadcast was lost, and
+    /// that re-fetch is ordered as a <see cref="SnapshotOrigin.Push"/> so a fresher broadcast overtaking
+    /// it still wins and the next tick tries again. A host *behind* us restarted sharing and is counting
+    /// from zero, which only a <see cref="SnapshotOrigin.Rebaseline"/> can heal.
+    /// <para>
+    /// Internal so tests can drive exactly one pass instead of racing the timer.
+    /// </para>
+    /// </remarks>
+    internal async Task ReconcileAsync(CancellationToken ct = default)
+    {
+        var hostRevision = SyncJson.Deserialize<RevisionInfo>(
+            await _http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute), ct)).Revision;
+
+        long applied;
+        lock (_applyGate)
+        {
+            applied = _lastRevision;
+        }
+
+        if (hostRevision == applied)
+        {
+            return;
+        }
+
+        await ResyncAsync(hostRevision > applied ? SnapshotOrigin.Push : SnapshotOrigin.Rebaseline, ct);
+    }
+
     private async Task ResyncAsync(SnapshotOrigin origin, CancellationToken ct = default) =>
         ApplySnapshot(
             SyncJson.Deserialize<IncidentSnapshot>(
@@ -677,12 +829,31 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Idempotent on purpose: IncidentWorkspaceViewModel.LeaveAsync disposes the session and then
+        // whoever owns it disposes it again (the shell on shutdown, an `await using` in a test).
+        // Everything below has always tolerated a second call; the CancellationTokenSource would not,
+        // and it would throw from a thread-pool thread and take the process with it.
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+        {
+            return;
+        }
+
+        // Stop the reconcile loop and *wait for it* before disposing anything it holds: a tick with a
+        // GET in flight would otherwise land on a disposed HttpClient, in a task nobody observes.
+        // Deliberately no timeout on that await — capping it would put the hazard straight back.
+        await _reconcileCts.CancelAsync();
+        if (_reconcileLoop is { } loop)
+        {
+            await loop;
+        }
+
         // The hub's transport uses _handler (via HttpMessageHandlerFactory) for as long as it's
         // running, so it must be torn down first; only then are the HttpClient and the handler it
         // doesn't own (disposeHandler: false, above) both disposed here explicitly.
         await _hub.DisposeAsync();
         _http.Dispose();
         _handler.Dispose();
+        _reconcileCts.Dispose();
     }
 
     // SignalR's default policy gives up after ~30s; on a callout a device's mobile data can blip for
