@@ -1,5 +1,38 @@
 # Agent instructions
 
+## Language
+
+Issues, pull requests and commit messages are written in **English** — title and
+body. This is the collaboration surface, and keeping it English is what lets
+someone who does not speak German read the backlog and work here.
+
+German terms of art stay German: Atemschutz, Stammdaten, Einsatzkraft, Trupp,
+Funkrufname, Einsatzdaten, Messreihe. They are what the app says on screen and
+what a Kommandant says out loud, so translating them makes the text describe a
+product that does not exist. `Atemschutz: If the Truppnummer already exists, the
+application crashes` is exactly right. Quoted UI strings, wording proposed for a
+screen, and log output are reproduced verbatim — never translated.
+
+A pull request title becomes the squash-merge commit subject, so this is one
+rule in both places; see [Git commits](#git-commits).
+
+What is English is the workbench, not the product:
+
+| English | German |
+|---|---|
+| issues, pull requests, commit messages | the UI and every string in it |
+| `CHANGELOG.md`, the code and its comments | the German half of `README.md` |
+| `CONTRIBUTING.md`, `AGENTS.md`, `SECURITY.md` | the GitHub release body |
+| the bug report and feature request forms | the issue chooser, `docs/datenschutz-und-sicherheit.md`, the website |
+
+**Discussions are deliberately exempt — German and English are both fine there.**
+A Kommandant arriving from the README or the issue chooser is routed to
+Discussions in German, which is what
+[`.github/ISSUE_TEMPLATE/config.yml`](.github/ISSUE_TEMPLATE/config.yml) is for.
+Feedback from an Übung is worth more than the language it arrives in. Turning a
+German discussion into an English issue is a maintainer's job, not a hurdle put
+in front of the person who found the bug.
+
 ## Pull requests
 
 Every PR that touches the UI must include screenshots. The flow is:
@@ -52,6 +85,8 @@ All commits must be:
 - DCO signed-off: always pass `-s` to `git commit`
 - Cryptographically signed, SSH or GPG: always pass `-S`, or set
   `commit.gpgsign = true`
+- Written in English, subject and body — a squash-merge makes the pull request
+  title the commit subject, so it is one rule; see [Language](#language)
 
 The last two are project requirements, not local conventions — `main`'s branch
 protection rejects a pull request carrying an unsigned commit, and the DCO

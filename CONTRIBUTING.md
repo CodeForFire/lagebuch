@@ -27,9 +27,40 @@ the markup.
 Stuck? Ask in the issue, or in
 [Fragen & Antworten](https://github.com/CodeForFire/lagebuch/discussions/categories/fragen-antworten).
 Asking early is cheaper for everyone than a pull request that goes the wrong
-way. German and English are both fine there.
+way. In Discussions, German and English are both fine — see
+[Language](#language).
 
 Where the project is going is written up in [`ROADMAP.md`](ROADMAP.md).
+
+## Language
+
+**Issues, pull requests and commit messages are written in English** — title and
+body.
+
+Not because the project is English. The UI is German, the README opens in
+German, the data-protection page is German, and the release notes a Kommandant
+reads when downloading are German. But the issue tracker is where someone who
+does not speak German has to be able to work, and a project that wants
+contributors beyond one Landkreis cannot keep its backlog in a language they
+cannot read.
+
+German terms of art stay German — Atemschutz, Stammdaten, Trupp, Funkrufname,
+Einsatzkraft — because that is what the app says on screen. This is the house
+style and it is exactly right:
+
+> Atemschutz: If the Truppnummer already exists, the application crashes
+
+Text you are quoting is never translated: a string as it appears in the UI,
+wording you are proposing for a screen, an error message, log output. Reproduce
+it as it is.
+
+**Discussions are different — German and English are both fine there.** If you
+are a firefighter rather than a developer, that is the front door: ask under
+[Fragen & Antworten](https://github.com/CodeForFire/lagebuch/discussions/categories/fragen-antworten),
+say what went wrong at the last Übung under
+[Aus der Praxis](https://github.com/CodeForFire/lagebuch/discussions/categories/aus-der-praxis).
+Nobody should have to write English to report that something failed on the ELW.
+Someone will open the issue.
 
 ## Hacktoberfest
 
