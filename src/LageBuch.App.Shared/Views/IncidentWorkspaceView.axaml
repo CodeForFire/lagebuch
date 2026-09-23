@@ -50,6 +50,28 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <!-- Who documents on this device, and the handover to the next Lagebuchführer (#469).
+                   Each element gates its own IsVisible, for the same zero-width reason as the
+                   sharing row below: OperatorDisplay arrives in the same update that shows it. -->
+              <StackPanel x:Name="OperatorReadout" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Text="LAGEBUCHFÜHRER" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                           IsVisible="{Binding OperatorDisplay, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock x:Name="OperatorValue" Classes="body" VerticalAlignment="Center"
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           Text="{Binding OperatorDisplay}"
+                           IsVisible="{Binding OperatorDisplay, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <Button x:Name="ChangeOperatorButton" Classes="ghost" ToolTip.Tip="Lagebuchführer wechseln"
+                        AutomationProperties.Name="Lagebuchführer wechseln"
+                        IsVisible="{Binding OperatorDisplay, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        Command="{Binding ChangeOperatorCommand}">
+                  <PathIcon Width="13" Height="13" VerticalAlignment="Center"
+                            Data="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" />
+                </Button>
+              </StackPanel>
+
+              <Border Width="1" Height="18" Background="{StaticResource HairlineBrush}" VerticalAlignment="Center"
+                      IsVisible="{Binding OperatorDisplay, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
               <!-- Multi-device sharing (#52): expose this open incident to other devices over the
                    network (loopback, LAN, or a tailnet) — a compact icon button on the status line
                    rather than a labelled button on its own row. -->

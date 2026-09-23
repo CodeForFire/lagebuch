@@ -127,6 +127,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [NotifyCanExecuteChangedFor(nameof(CloseIncidentCommand))]
     [NotifyCanExecuteChangedFor(nameof(ContinueEditingCommand))]
     [NotifyCanExecuteChangedFor(nameof(EditIncidentDataCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
+    [NotifyPropertyChangedFor(nameof(OperatorDisplay))]
     private bool _isReadOnly;
 
     [ObservableProperty]
@@ -222,7 +224,21 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         KeywordDisplay = incident.Keyword;
         IncidentNumberInput = incident.IncidentNumber?.Value ?? string.Empty;
         AddressDisplay = Formatting.Address(incident.Street, incident.District);
+        OnPropertyChanged(nameof(OperatorDisplay));
     }
+
+    /// <summary>Who documents on this device, shown in the header; null while read-only.</summary>
+    public string? OperatorDisplay => IsReadOnly ? null : _session.Operator?.Display;
+
+    public bool CanChangeOperator => !IsReadOnly && IsInputEnabled;
+
+    // A new Lagebuchführer takes over without leaving the incident (#469).
+    [RelayCommand(CanExecute = nameof(CanChangeOperator))]
+    private void ChangeOperator() =>
+        PendingPrompt = new OperatorPromptViewModel(
+            callSignOptions: _masterData.RadioCallSigns,
+            personnel: _masterData.Personnel,
+            previous: _session.Operator);
 
     public CoMessprotokollViewModel CoMessprotokoll { get; private set; } = null!;
 
@@ -269,6 +285,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // it tracks the SignalR link so the view can grey out input while reconnecting. =====
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsInputEnabled))]
+    [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
     private bool _isConnected = true;
 
     /// <summary>Modules are interactive only while connected — a reconnecting client can't send commands.</summary>
@@ -593,25 +610,36 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     [RelayCommand(CanExecute = nameof(CanContinueEditing))]
     private void ContinueEditing() =>
-        PendingPrompt = new OperatorPromptViewModel(callSignOptions: _masterData.RadioCallSigns);
+        PendingPrompt = new OperatorPromptViewModel(
+            callSignOptions: _masterData.RadioCallSigns,
+            personnel: _masterData.Personnel);
 
-    // Called by the view when the prompt confirms (Result set).
-    public void ConfirmContinueEditing()
+    // Called by the view when the prompt confirms (Result set). The one overlay serves both
+    // "Weiter bearbeiten" and a Lagebuchführer handover; the prompt knows which it was opened for.
+    public void ConfirmPendingPrompt()
     {
-        var op = PendingPrompt?.Result;
+        var prompt = PendingPrompt;
+        var op = prompt?.Result;
         PendingPrompt = null;
         if (op is null)
         {
             return;
         }
 
+        if (prompt!.IsHandover)
+        {
+            _session.ChangeOperator(op);
+            OnPropertyChanged(nameof(OperatorDisplay));
+            return;
+        }
+
         _local!.ContinueEditing(op); // CanContinueEditing guarantees _local is not null
-        IsReadOnly = false; // notifies CanContinueEditing + both commands
+        IsReadOnly = false; // notifies CanContinueEditing, OperatorDisplay + the commands
         LastSavedAt = _clock.Now;
         BuildChildren();
     }
 
-    public void CancelContinueEditing() => PendingPrompt = null;
+    public void CancelPendingPrompt() => PendingPrompt = null;
 
     // PDF export renders from the local .fwincident, so it belongs to the host that owns the file;
     // a joined client (_local is null) hides the button and lets the host export instead. It also

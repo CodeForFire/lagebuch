@@ -18,7 +18,12 @@
                 CornerRadius="12,12,0,0" />
         <StackPanel Margin="26,22,26,24" Spacing="6">
           <TextBlock Text="DOKUMENTATION" Classes="overline" />
-          <TextBlock Text="Wer dokumentiert?" Classes="display" FontSize="22" Margin="0,0,0,8" />
+          <TextBlock x:Name="PromptTitle" Text="{Binding Title}" Classes="display" FontSize="22" Margin="0,0,0,8" />
+          <!-- Handover only (#469): who is being replaced, so the prompt cannot be mistaken for
+               the one that starts an incident. -->
+          <TextBlock x:Name="PreviousOperatorLine" Classes="secondary" Margin="0,-4,0,8"
+                     IsVisible="{Binding IsHandover}"
+                     Text="{Binding PreviousOperatorDisplay, StringFormat='Bisher: {0}'}" />
           <!-- Join flow only (§6): the host's LAN or Tailscale address/name (hosting no longer
                requires Tailscale, #59 follow-up), entered alongside "who documents here" so a
                joining device provides both in one prompt. -->
@@ -62,15 +67,16 @@
               </Grid>
             </Border>
           </StackPanel>
-          <HeaderedContentControl Classes="field" Header="NAME" Margin="0,4,0,0"
+          <!-- Suggests own personnel (#469) but stays free text, like CallSignBox below. -->
+          <HeaderedContentControl Classes="field suggest" Header="NAME" Margin="0,4,0,0"
                                   ctrl:Field.Error="{Binding OperatorNameError}">
-            <TextBox x:Name="OperatorNameBox"
-                     PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorFullNamePlaceholder}"
-                     Text="{Binding OperatorName}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+            <AutoCompleteBox x:Name="OperatorNameBox"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorFullNamePlaceholder}"
+                             ItemsSource="{Binding PersonOptions}"
+                             FilterMode="ContainsOrdinal"
+                             MinimumPrefixLength="0"
+                             Text="{Binding OperatorName}"
+                             b:EnterSubmit.Command="{Binding ConfirmCommand}" />
           </HeaderedContentControl>
           <!-- Call sign is a suggestion list, not a closed set: an operator's Funkrufname need
                not be in the master list, so this is an AutoCompleteBox (Avalonia's ComboBox

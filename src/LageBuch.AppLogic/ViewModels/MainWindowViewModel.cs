@@ -102,7 +102,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private Task RequestNewIncident() => NavigateAwayAsync(() =>
     {
         _pending = PendingAction.New;
-        PendingPrompt = new OperatorPromptViewModel(callSignOptions: _home.CallSignOptions);
+        PendingPrompt = new OperatorPromptViewModel(callSignOptions: _home.CallSignOptions, personnel: _home.Personnel);
     });
 
     // Opening is read-only and prompt-free; the workspace handles upgrading to editable.
@@ -117,7 +117,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _pending = PendingAction.Join;
         PendingPrompt = new OperatorPromptViewModel(
             collectHost: true,
-            callSignOptions: _home.CallSignOptions)
+            callSignOptions: _home.CallSignOptions,
+            personnel: _home.Personnel)
         {
             // The host address rarely changes once set up (a station's ELW, a fixed Tailscale
             // node) -- prefill last time's so the operator doesn't retype it every join.

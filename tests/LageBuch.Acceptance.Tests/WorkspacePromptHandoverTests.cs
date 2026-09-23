@@ -35,7 +35,7 @@ public class WorkspacePromptHandoverTests
         firstPrompt!.CancelCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        // The stale handler used to run CancelContinueEditing on `second`, closing the prompt the
+        // The stale handler used to run CancelPendingPrompt on `second`, closing the prompt the
         // operator was actually looking at while the first incident kept its own.
         Assert.NotNull(second.PendingPrompt);
     }

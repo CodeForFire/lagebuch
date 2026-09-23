@@ -90,6 +90,9 @@ public sealed partial class HomeViewModel : ObservableObject
     /// <summary>Radio call signs offered as dropdown suggestions in the new-incident operator prompt.</summary>
     public IReadOnlyList<string> CallSignOptions => _masterData.Get().RadioCallSigns;
 
+    /// <summary>Own personnel offered as name suggestions in the operator prompt (#469).</summary>
+    public IReadOnlyList<Person> Personnel => _masterData.Get().Personnel;
+
     /// <summary>The host address last used for a successful join, to prefill the join dialog with.</summary>
     public string? LastJoinHost => _lastJoinHost?.GetLastHost();
 

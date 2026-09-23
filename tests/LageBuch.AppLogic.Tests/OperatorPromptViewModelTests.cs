@@ -1,4 +1,6 @@
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -20,6 +22,60 @@ public class OperatorPromptViewModelTests
         Assert.Null(vm.OperatorNameError);
         vm.ConfirmCommand.Execute(null);
         Assert.NotNull(vm.Result);
+    }
+
+    private static readonly Person[] Roster =
+    {
+        new("Schmidt", "Anna", null, "FFB 12/2", null),
+        new("Huber", "Max", null, null, null),
+    };
+
+    [Fact]
+    public void Offers_own_personnel_as_name_suggestions()
+    {
+        var vm = new OperatorPromptViewModel(personnel: Roster);
+
+        Assert.Equal(new[] { "Schmidt, Anna", "Huber, Max" }, vm.PersonOptions);
+    }
+
+    [Fact]
+    public void Picking_a_person_fills_a_blank_call_sign()
+    {
+        var vm = new OperatorPromptViewModel(personnel: Roster);
+
+        vm.OperatorName = "Schmidt, Anna";
+
+        Assert.Equal("FFB 12/2", vm.OperatorCallSign);
+    }
+
+    [Fact]
+    public void Picking_a_person_keeps_a_call_sign_typed_by_hand()
+    {
+        var vm = new OperatorPromptViewModel(personnel: Roster) { OperatorCallSign = "ELW 1" };
+
+        vm.OperatorName = "Schmidt, Anna";
+
+        Assert.Equal("ELW 1", vm.OperatorCallSign);
+    }
+
+    [Fact]
+    public void A_name_outside_the_roster_stays_allowed()
+    {
+        var vm = new OperatorPromptViewModel(personnel: Roster) { OperatorName = "Gast" };
+
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.Equal("Gast", vm.Result!.Display);
+    }
+
+    [Fact]
+    public void A_handover_prompt_names_the_operator_being_replaced()
+    {
+        var vm = new OperatorPromptViewModel(previous: new SessionOperator("Müller", "FFB 12/1"));
+
+        Assert.True(vm.IsHandover);
+        Assert.Equal("Lagebuchführer wechseln", vm.Title);
+        Assert.Equal("Müller (FFB 12/1)", vm.PreviousOperatorDisplay);
     }
 
     [Fact]

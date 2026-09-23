@@ -35,7 +35,7 @@ public partial class IncidentWorkspaceView : UserControl
         }
     }
 
-    // When the continue-editing prompt appears, watch it for confirmation (Result set),
+    // When an operator prompt appears (Weiter bearbeiten or a handover), watch it for confirmation (Result set),
     // then let the workspace VM apply it. Mirrors MainView's operator-prompt wiring.
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -76,9 +76,9 @@ public partial class IncidentWorkspaceView : UserControl
     {
         if (e.PropertyName == nameof(OperatorPromptViewModel.Result) && _prompt?.Result is not null)
         {
-            _vm?.ConfirmContinueEditing();
+            _vm?.ConfirmPendingPrompt();
         }
     }
 
-    private void OnPromptCancelled(object? sender, EventArgs e) => _vm?.CancelContinueEditing();
+    private void OnPromptCancelled(object? sender, EventArgs e) => _vm?.CancelPendingPrompt();
 }

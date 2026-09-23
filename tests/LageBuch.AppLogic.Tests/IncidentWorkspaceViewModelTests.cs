@@ -498,7 +498,7 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingPrompt!.OperatorName = "Schmidt";
         vm.PendingPrompt.ConfirmCommand.Execute(null);
 
-        vm.ConfirmContinueEditing();
+        vm.ConfirmPendingPrompt();
 
         // Rebuilt by resuming, so this must be set on the *new* Etb instance -- it's a System
         // entry, hidden by default (#223).
@@ -768,6 +768,86 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
+    public void Header_shows_who_documents_and_offers_the_handover()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.Equal("Müller", vm.OperatorDisplay);
+        Assert.True(vm.ChangeOperatorCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void A_read_only_workspace_shows_no_operator_and_offers_no_handover()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+
+        Assert.Null(vm.OperatorDisplay);
+        Assert.False(vm.ChangeOperatorCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ChangeOperator_opens_a_handover_prompt_naming_the_current_operator()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        vm.ChangeOperatorCommand.Execute(null);
+
+        var prompt = Assert.IsType<OperatorPromptViewModel>(vm.PendingPrompt);
+        Assert.True(prompt.IsHandover);
+        Assert.Equal("Lagebuchführer wechseln", prompt.Title);
+        Assert.Equal("Müller", prompt.PreviousOperatorDisplay);
+        Assert.Equal(string.Empty, prompt.OperatorName); // the successor is typed, not edited
+    }
+
+    [Fact]
+    public void Confirming_the_handover_switches_the_operator_and_logs_it()
+    {
+        var vm = NewWorkspace(out var store, out _);
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        vm.ChangeOperatorCommand.Execute(null);
+        vm.PendingPrompt!.OperatorName = "Schmidt";
+        vm.PendingPrompt.OperatorCallSign = "FFB 12/2";
+        vm.PendingPrompt.ConfirmCommand.Execute(null);
+        vm.ConfirmPendingPrompt();
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.False(vm.IsReadOnly);
+        Assert.Equal("Schmidt (FFB 12/2)", vm.OperatorDisplay);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.OperatorDisplay), changes);
+        var entry = Assert.Single(
+            store.Load("/x.fwincident").Journal,
+            e => e.Text == "Lagebuchführerwechsel: Müller → Schmidt (FFB 12/2)");
+        Assert.Equal("Schmidt (FFB 12/2)", entry.EnteredBy);
+    }
+
+    [Fact]
+    public void Cancelling_the_handover_keeps_the_operator()
+    {
+        var vm = NewWorkspace(out var store, out _);
+        var entries = store.Load("/x.fwincident").Journal.Count;
+
+        vm.ChangeOperatorCommand.Execute(null);
+        vm.CancelPendingPrompt();
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.Equal("Müller", vm.OperatorDisplay);
+        Assert.Equal(entries, store.Load("/x.fwincident").Journal.Count);
+    }
+
+    [Fact]
+    public void Continue_editing_prompt_is_not_a_handover()
+    {
+        var vm = ReadOnlyWorkspace(out _);
+
+        vm.ContinueEditingCommand.Execute(null);
+
+        Assert.False(vm.PendingPrompt!.IsHandover);
+        Assert.Equal("Wer dokumentiert?", vm.PendingPrompt.Title);
+    }
+
+    [Fact]
     public void ContinueEditing_command_disabled_for_closed_incident()
     {
         var vm = ReadOnlyWorkspace(out _, closed: true);
@@ -822,7 +902,7 @@ public class IncidentWorkspaceViewModelTests
         Assert.NotNull(vm.PendingPrompt);
         vm.PendingPrompt!.OperatorName = "Schmidt";
         vm.PendingPrompt.ConfirmCommand.Execute(null);
-        vm.ConfirmContinueEditing();
+        vm.ConfirmPendingPrompt();
 
         Assert.Null(vm.PendingPrompt);
         Assert.False(vm.IsReadOnly);
@@ -839,7 +919,7 @@ public class IncidentWorkspaceViewModelTests
 
         vm.ContinueEditingCommand.Execute(null);
         Assert.NotNull(vm.PendingPrompt);
-        vm.CancelContinueEditing();
+        vm.CancelPendingPrompt();
 
         Assert.Null(vm.PendingPrompt);
         Assert.True(vm.IsReadOnly);
@@ -855,7 +935,7 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingPrompt!.OperatorName = "Schmidt";
         vm.PendingPrompt.OperatorCallSign = "FFB 1";
         vm.PendingPrompt.ConfirmCommand.Execute(null);
-        vm.ConfirmContinueEditing();
+        vm.ConfirmPendingPrompt();
 
         vm.Etb.NewText = "Lagemeldung";
         vm.Etb.NewDirection = EtbDirection.Internal;
@@ -938,7 +1018,7 @@ public class IncidentWorkspaceViewModelTests
         vm.ContinueEditingCommand.Execute(null); // rebuild #2
         vm.PendingPrompt!.OperatorName = "Schmidt";
         vm.PendingPrompt.ConfirmCommand.Execute(null);
-        vm.ConfirmContinueEditing();
+        vm.ConfirmPendingPrompt();
         var afterFirstRebuild = ChangedSubscriberCount(session);
 
         vm.CloseIncidentCommand.Execute(null); // rebuild #3
@@ -1028,7 +1108,7 @@ public class IncidentWorkspaceViewModelTests
         vm.ContinueEditingCommand.Execute(null); // rebuild #2
         vm.PendingPrompt!.OperatorName = "Schmidt";
         vm.PendingPrompt.ConfirmCommand.Execute(null);
-        vm.ConfirmContinueEditing();
+        vm.ConfirmPendingPrompt();
 
         vm.CloseIncidentCommand.Execute(null); // rebuild #3
         vm.PendingConfirm!.ConfirmCommand.Execute(null);

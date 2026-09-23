@@ -23,13 +23,13 @@ public class ControlBorderConsistencyTests
     [AvaloniaFact]
     public void The_operator_prompt_callsign_field_borders_match_its_textboxes()
     {
-        var vm = new OperatorPromptViewModel(callSignOptions: new[] { "FFB 1/40/1", "Aich 42/1" });
+        var vm = new OperatorPromptViewModel(callSignOptions: new[] { "FFB 1/40/1", "Aich 42/1" }, collectHost: true);
         var view = new OperatorPromptView { DataContext = vm };
         var window = new Window { Content = view, Width = 520, Height = 420 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var textBox = view.GetControl<TextBox>("OperatorNameBox");
+        var textBox = view.GetControl<TextBox>("HostBox");
         var callSign = view.GetControl<AutoCompleteBox>("CallSignBox");
 
         Assert.Equal(BorderColor(textBox), BorderColor(callSign));
