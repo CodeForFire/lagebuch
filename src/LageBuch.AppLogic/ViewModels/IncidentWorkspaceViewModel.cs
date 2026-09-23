@@ -111,14 +111,47 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             remote.Disconnected += OnRemoteDisconnected;
             remote.Reconnected += OnRemoteReconnected;
             remote.Ended += OnRemoteEnded;
+            remote.Reconciled += OnRemoteReconciled;
+            remote.ReconcileFailed += OnRemoteReconcileFailed;
+            remote.CommandRejected += OnRemoteCommandRejected;
         }
+
+        // A joined client mirrors; it never saves. Which of the two the footer may claim is fixed here,
+        // at construction, from the session it was handed.
+        SyncState = session.IsRemote ? WorkspaceSyncState.Current : WorkspaceSyncState.Local;
     }
 
-    private void OnRemoteDisconnected() => IsConnected = false;
+    private void OnRemoteDisconnected()
+    {
+        IsConnected = false;
 
+        // Said immediately rather than one poll interval later: while the link is down the Stand on
+        // screen is the last one we could confirm, and nothing may imply it is still live.
+        SyncState = WorkspaceSyncState.Unconfirmed;
+    }
+
+    // SyncState is deliberately not set back here — the reconcile that follows the reconnect is what
+    // actually establishes currency, and it raises Reconciled.
     private void OnRemoteReconnected() => IsConnected = true;
 
     private void OnRemoteEnded() => GoHomeRequested?.Invoke();
+
+    private void OnRemoteReconciled() => MarkSynced();
+
+    private void OnRemoteReconcileFailed() => SyncState = WorkspaceSyncState.Unconfirmed;
+
+    // Stays up until the operator dismisses it. Deliberately not cleared by the next applied snapshot:
+    // an unrelated change from another device would then wipe the notice before anyone had read it, and
+    // an input that silently did not take effect is the thing being fixed here, not something to
+    // half-report.
+    private void OnRemoteCommandRejected(string reason) =>
+        CommandRejected = $"Änderung nicht übernommen: {reason}";
+
+    private void MarkSynced()
+    {
+        LastSyncedAt = _clock.Now;
+        SyncState = WorkspaceSyncState.Current;
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanContinueEditing))]
@@ -139,7 +172,45 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // save actually succeeds (SaveSucceeded), because a save that silently never reached disk is
     // exactly what an incident logbook must never let the operator miss.
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowLocalSavedStatus))]
     private string? _persistenceError;
+
+    // ===== Joined-client sync state (#295). A joined device saves nothing locally, so the footer shows
+    // the host's Stand and whether that Stand is still confirmed, rather than a save that never
+    // happened. Settable so a render test can drive the footer without a live host. =====
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowLocalSavedStatus))]
+    [NotifyPropertyChangedFor(nameof(ShowSyncCurrentStatus))]
+    [NotifyPropertyChangedFor(nameof(ShowSyncUnconfirmedStatus))]
+    private WorkspaceSyncState _syncState;
+
+    /// <summary>
+    /// When the host's state last landed on this device — the joined client's "Stand". Separate from
+    /// <see cref="LastSavedAt"/> on purpose: that one is stamped by local activity in
+    /// <c>OnChanged</c>, which on a joined client is exactly the misleading value this replaces.
+    /// </summary>
+    [ObservableProperty]
+    private DateTimeOffset? _lastSyncedAt;
+
+    /// <summary>
+    /// Null = nothing was refused. The host's own reason for turning down the last change, shown as a
+    /// banner until the operator dismisses it or a later change lands (#295).
+    /// </summary>
+    [ObservableProperty]
+    private string? _commandRejected;
+
+    /// <summary>The three footer states are mutually exclusive; the view binds one flag each, because
+    /// Avalonia bindings have no <c>&amp;&amp;</c> and this keeps the condition in one testable place.</summary>
+    public bool ShowLocalSavedStatus => SyncState == WorkspaceSyncState.Local && PersistenceError is null;
+
+    /// <inheritdoc cref="ShowLocalSavedStatus"/>
+    public bool ShowSyncCurrentStatus => SyncState == WorkspaceSyncState.Current;
+
+    /// <inheritdoc cref="ShowLocalSavedStatus"/>
+    public bool ShowSyncUnconfirmedStatus => SyncState == WorkspaceSyncState.Unconfirmed;
+
+    [RelayCommand]
+    private void DismissCommandRejected() => CommandRejected = null;
 
     [ObservableProperty]
     private OperatorPromptViewModel? _pendingPrompt;
@@ -406,6 +477,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             remote.Disconnected -= OnRemoteDisconnected;
             remote.Reconnected -= OnRemoteReconnected;
             remote.Ended -= OnRemoteEnded;
+            remote.Reconciled -= OnRemoteReconciled;
+            remote.ReconcileFailed -= OnRemoteReconcileFailed;
+            remote.CommandRejected -= OnRemoteCommandRejected;
         }
 
         DisposeChildren();
@@ -417,6 +491,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // RefreshIncidentData, which is wired for local and remote sessions alike.
     private void OnRemoteLifecycle()
     {
+        // An applied snapshot is itself proof of currency — the strongest kind, since it came from the
+        // host — so it stamps the Stand just as a reconcile pass does.
+        MarkSynced();
         OnPropertyChanged(nameof(StatusDisplay));
         if (_session.IsReadOnly != IsReadOnly)
         {

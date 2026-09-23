@@ -175,6 +175,26 @@
             </StackPanel>
           </Border>
 
+          <!-- Rejected-command banner (#295): the host turned an input down: a domain guard, a closed
+               Einsatz, an id it doesn't know, and its own reason is shown verbatim. Amber, not the red
+               used above: nothing is being lost right now, but something the operator typed did not take
+               effect, and before this they were told nothing at all. Stays until dismissed. -->
+          <Border x:Name="CommandRejectedBanner" Background="#241608"
+                  BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
+                  IsVisible="{Binding CommandRejected, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Grid.Column="0" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,12,0"
+                        Foreground="{StaticResource AmberBrush}"
+                        Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+              <TextBlock Grid.Column="1" x:Name="CommandRejectedText" Text="{Binding CommandRejected}"
+                         FontWeight="SemiBold" TextWrapping="Wrap"
+                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+              <Button Grid.Column="2" x:Name="DismissCommandRejectedButton" Content="VERSTANDEN"
+                      Command="{Binding DismissCommandRejectedCommand}" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+
           <!-- Joined-client disconnect banner (#52 §7): auto-reconnect is running; input is greyed
                out until it succeeds. "Zur Startseite" lets the user give up without waiting. -->
           <Border x:Name="DisconnectedBanner" Background="#241608"
@@ -335,10 +355,29 @@
                  same time as PersistenceError, which would flatly contradict the red banner above.
                  That contradiction is exactly the bug this pair of mutually exclusive panels fixes. -->
             <StackPanel x:Name="SavedStatus" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
-                        IsVisible="{Binding PersistenceError, Converter={x:Static ObjectConverters.IsNull}}">
+                        IsVisible="{Binding ShowLocalSavedStatus}">
               <Ellipse Width="7" Height="7" Fill="{StaticResource ActiveBrush}" VerticalAlignment="Center" />
               <TextBlock Classes="mono" FontSize="12" VerticalAlignment="Center"
                          Text="{Binding LastSavedAt, StringFormat='gespeichert {0:HH:mm:ss}'}" />
+            </StackPanel>
+            <!-- A joined client saves nothing locally, so it reports the host's Stand instead of a save it never made; this slot
+                 used to claim "gespeichert" on a device that had never written a byte (#295). Same green
+                 dot and mono type as above, because it means the same thing to the reader: all good. -->
+            <StackPanel x:Name="SyncCurrentStatus" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                        IsVisible="{Binding ShowSyncCurrentStatus}">
+              <Ellipse Width="7" Height="7" Fill="{StaticResource ActiveBrush}" VerticalAlignment="Center" />
+              <TextBlock Classes="mono" FontSize="12" VerticalAlignment="Center"
+                         Text="{Binding LastSyncedAt, StringFormat='Stand {0:HH:mm:ss}'}" />
+            </StackPanel>
+            <!-- The dangerous case, and the reason any of this is on screen: the Stand shown is the last
+                 one that could be confirmed, and it may no longer be the Lage. Amber rather than red:
+                 the data is intact, it is its freshness that is in doubt. -->
+            <StackPanel x:Name="SyncUnconfirmedStatus" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                        IsVisible="{Binding ShowSyncUnconfirmedStatus}">
+              <Ellipse Width="7" Height="7" Fill="{StaticResource AmberBrush}" VerticalAlignment="Center" />
+              <TextBlock Classes="mono" FontSize="12" VerticalAlignment="Center"
+                         Foreground="{StaticResource AmberBrush}"
+                         Text="{Binding LastSyncedAt, StringFormat='Stand {0:HH:mm:ss} · nicht bestätigt'}" />
             </StackPanel>
             <!-- Failed: same red brushes as PersistenceErrorBanner above, so the footer and the
                  banner read as one consistent statement rather than two disagreeing ones. -->
