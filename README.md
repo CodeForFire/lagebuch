@@ -223,8 +223,9 @@ Lagebuch is an offline-first incident documentation app for fire brigades:
 .NET 10 + Avalonia (desktop and Android), SQLite storage (one `.fwincident`
 file per incident), SignalR sync with TLS trust-on-first-use, and
 [QuestPDF](https://www.questpdf.com/) reports. The code and its documentation
-are in English; the UI is German. Conventions, commit rules and the PII policy
-are in [CONTRIBUTING.md](CONTRIBUTING.md).
+are in English, as are issues, pull requests and commit messages; the UI is
+German. Conventions, commit rules and the PII policy are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Build & Test
 
