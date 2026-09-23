@@ -5,7 +5,11 @@ namespace LageBuch.App.Shared.Views;
 
 public partial class MainWindow : Window
 {
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        WindowsTitleBar.ApplyDarkMode(this);
+    }
 
     public MainWindow(MainWindowViewModel viewModel)
         : this() =>
