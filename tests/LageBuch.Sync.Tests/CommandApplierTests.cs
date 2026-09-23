@@ -246,6 +246,24 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void ChangeOperatorCommand_logs_the_handover_credited_to_the_new_operator()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        ApplyOverWire(
+            new ChangeOperatorCommand(new OperatorDto("Client", "RUF 1"), new OperatorDto("Schmidt", "RUF 2")),
+            incident,
+            clock);
+
+        var entry = incident.Journal.Last();
+        Assert.Equal("Lagebuchführerwechsel: Client (RUF 1) → Schmidt (RUF 2)", entry.Text);
+        Assert.Equal(EtbDirection.System, entry.Direction);
+        Assert.Equal("Schmidt (RUF 2)", entry.EnteredBy);
+        Assert.Contains(incident.Audit, a => a.Action == "operator-changed");
+    }
+
+    [Fact]
     public void EditJournalEntryCommand_on_a_System_entry_throws()
     {
         var clock = new FixedClock();

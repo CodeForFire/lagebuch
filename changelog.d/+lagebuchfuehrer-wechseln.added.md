@@ -1,0 +1,1 @@
+The incident header now shows who documents on this device, and a new Lagebuchführer can take over without leaving the incident, with the handover logged in the ETB and the name picked from own personnel (#469).

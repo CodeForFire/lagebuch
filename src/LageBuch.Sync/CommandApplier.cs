@@ -41,6 +41,9 @@ public static class CommandApplier
             case EditJournalEntryCommand c:
                 incident.EditJournalEntry(clock, Operator(c.Operator), c.EntryId, c.Text);
                 break;
+            case ChangeOperatorCommand c:
+                incident.ChangeOperator(clock, Operator(c.From), Operator(c.To));
+                break;
             case ToggleChecklistItemCommand c:
                 incident.ToggleChecklistItem(clock, Operator(c.Operator), c.ItemId);
                 break;

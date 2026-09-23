@@ -62,6 +62,40 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task A_changed_operator_is_credited_on_every_later_command()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
+            TestHost.DefaultPin,
+            port);
+
+        var change = NextChange(client);
+        client.ChangeOperator(new SessionOperator("Schmidt", "RUF 2"));
+        await change;
+        change = NextChange(client);
+        client.AddJournalEntry(EtbDirection.Incoming, "Nach dem Wechsel");
+        await change;
+
+        Assert.Equal("Schmidt (RUF 2)", client.Operator!.Display);
+        var handover = Assert.Single(
+            hostSession.Incident.Journal,
+            e => e.Text == "Lagebuchführerwechsel: Client (RUF 1) → Schmidt (RUF 2)");
+        Assert.Equal("Schmidt (RUF 2)", handover.EnteredBy);
+        var later = Assert.Single(hostSession.Incident.Journal, e => e.Text == "Nach dem Wechsel");
+        Assert.Equal("Schmidt (RUF 2)", later.EnteredBy);
+        Assert.Contains(hostSession.Incident.Audit, a => a.Action == "operator-changed");
+    }
+
+    [Fact]
     public async Task Two_clients_converge_on_the_hosts_state()
     {
         var clock = new FixedClock();

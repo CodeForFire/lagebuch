@@ -333,6 +333,22 @@ public sealed class LocalIncidentSession : IIncidentSession
         Changed?.Invoke();
     }
 
+    public void ChangeOperator(SessionOperator op)
+    {
+        ArgumentNullException.ThrowIfNull(op);
+        var from = RequireOperator();
+        if (from == op)
+        {
+            return;
+        }
+
+        Mutate(() =>
+        {
+            Incident.ChangeOperator(_clock, from, op);
+            Operator = op;
+        });
+    }
+
     private void Mutate(Action apply)
     {
         if (IsReadOnly)

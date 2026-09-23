@@ -39,6 +39,13 @@ public interface IIncidentSession
     [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; Action matches the pervasive Action event convention (GoHomeRequested etc.).")]
     event Action? Changed;
 
+    /// <summary>
+    /// Hands the session to a new Lagebuchführer (#469): every later mutation is credited to
+    /// <paramref name="op"/>, and the handover is logged. A no-op when <paramref name="op"/> is the
+    /// current operator.
+    /// </summary>
+    void ChangeOperator(SessionOperator op);
+
     void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
 
     void EditJournalEntry(Guid entryId, string text);

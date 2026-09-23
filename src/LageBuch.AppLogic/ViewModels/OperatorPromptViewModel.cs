@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.Domain;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
 
@@ -8,11 +9,30 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
 {
     public OperatorPromptViewModel(
         IReadOnlyList<string>? callSignOptions = null,
-        bool collectHost = false)
+        bool collectHost = false,
+        IReadOnlyList<Person>? personnel = null,
+        SessionOperator? previous = null)
     {
         CollectsHost = collectHost;
         CallSignOptions = callSignOptions ?? Array.Empty<string>();
+        _personnel = personnel ?? Array.Empty<Person>();
+        PersonOptions = _personnel.Select(p => p.DisplayName).ToArray();
+        PreviousOperatorDisplay = previous?.Display;
     }
+
+    private readonly IReadOnlyList<Person> _personnel;
+
+    // Own personnel offered as suggestions for the NAME field (#469, a first step of #459). Free
+    // text stays allowed: whoever documents need not be in the roster, which is empty until imported.
+    public IReadOnlyList<string> PersonOptions { get; }
+
+    // Set only when a Lagebuchführer hands over mid-incident (#469): the prompt then asks for the
+    // successor, and says who is being replaced so nobody confirms the wrong handover.
+    public string? PreviousOperatorDisplay { get; }
+
+    public bool IsHandover => PreviousOperatorDisplay is not null;
+
+    public string Title => IsHandover ? "Lagebuchführer wechseln" : "Wer dokumentiert?";
 
     // True only for the join flow (§6): show the host address field on top of the operator prompt,
     // so the joining device says who documents here and which host to reach in one step.
@@ -40,6 +60,23 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OperatorNameError))]
     private string _operatorName = string.Empty;
+
+    // Picking a person from the roster fills in their Funkrufname, but only into a blank field: a
+    // call sign typed by hand outranks the roster, as in RolesViewModel.PrefillFromRoster.
+    partial void OnOperatorNameChanged(string value)
+    {
+        if (!string.IsNullOrWhiteSpace(OperatorCallSign))
+        {
+            return;
+        }
+
+        var person = _personnel.FirstOrDefault(
+            p => string.Equals(p.DisplayName, value, StringComparison.OrdinalIgnoreCase));
+        if (person is not null)
+        {
+            OperatorCallSign = person.CallSign;
+        }
+    }
 
     [ObservableProperty]
     private string? _operatorCallSign;
