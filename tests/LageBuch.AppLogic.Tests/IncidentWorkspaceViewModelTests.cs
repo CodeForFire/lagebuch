@@ -93,6 +93,71 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal(new[] { "EL" }, host.LastMasterData!.Roles);
     }
 
+    // #463: the host controller outlives the workspace, so leaving without stopping it kept the
+    // old session served -- clients stayed attached and sharing again showed the old PIN.
+    [Fact]
+    public async Task Leaving_the_workspace_stops_sharing()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        await vm.LeaveAsync();
+
+        Assert.True(host.StopCalled);
+        Assert.False(host.IsHosting);
+        Assert.False(vm.IsSharing);
+        Assert.Null(vm.SharePin);
+    }
+
+    [Fact]
+    public async Task Leaving_for_master_data_while_sharing_offers_to_stop_sharing_and_stays()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        var left = false;
+
+        vm.ConfirmLeaveThen(toMasterData: true, () => left = true);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.False(left);
+        Assert.False(vm.IsSharing);
+        Assert.True(host.StopCalled);
+    }
+
+    [Fact]
+    public void Leaving_for_master_data_on_a_joined_client_offers_to_disconnect()
+    {
+        var clock = new FixedClock(T0);
+        var local = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        using var vm = new IncidentWorkspaceViewModel(
+            new SnapshotRoundTrippingSession(local),
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+        var wentHome = false;
+        var left = false;
+        vm.GoHomeRequested = () => wentHome = true;
+
+        Assert.True(vm.IsNetworked);
+        vm.ConfirmLeaveThen(toMasterData: true, () => left = true);
+        Assert.Equal("VERBINDUNG TRENNEN", vm.PendingConfirm!.ConfirmLabel);
+        vm.PendingConfirm.ConfirmCommand.Execute(null);
+
+        Assert.True(wentHome); // the ordinary disconnect path, not the way to Stammdaten
+        Assert.False(left);
+    }
+
     private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
     {
         store = new FakeStore();
@@ -1530,8 +1595,11 @@ internal sealed class FakeHostController : IIncidentHostController
         return Task.CompletedTask;
     }
 
+    public bool StopCalled { get; private set; }
+
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
+        StopCalled = true;
         IsHosting = false;
         SharePin = null;
         return Task.CompletedTask;

@@ -77,7 +77,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // command bar's ÜBERSICHT/STAMMDATEN/ÖFFNEN/NEUER EINSATZ/VERBINDEN buttons (unlike the
     // workspace's own "ZUR STARTSEITE", which already routes through GoHomeRequested -> LeaveAsync)
     // would drop the old workspace from CurrentView while it stayed subscribed forever.
-    private async Task NavigateAwayAsync(Action proceed)
+    // Leaving an open workspace asks first (#463) when it is headed for Stammdaten, or when leaving
+    // cuts off other devices; the workspace owns that prompt, since only it knows which case it is.
+    private async Task NavigateAwayAsync(Action proceed, bool toMasterData = false)
     {
         if (ReferenceEquals(CurrentView, _editor))
         {
@@ -92,9 +94,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (CurrentView is IncidentWorkspaceViewModel ws)
         {
+            if (ws.PendingConfirm is not null)
+            {
+                return; // a prompt is already up — don't stack a second one
+            }
+
+            if (toMasterData || ws.IsNetworked)
+            {
+                // Fire-and-forget like GoHomeRequested: a failed final save surfaces through the
+                // store's SaveFailed, not through this task.
+                ws.ConfirmLeaveThen(toMasterData, () => _ = LeaveThenAsync(ws, proceed));
+                return;
+            }
+
             await ws.LeaveAsync();
         }
 
+        proceed();
+    }
+
+    private static async Task LeaveThenAsync(IncidentWorkspaceViewModel ws, Action proceed)
+    {
+        await ws.LeaveAsync();
         proceed();
     }
 
@@ -127,7 +148,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     });
 
     [RelayCommand]
-    private Task ShowMasterData() => NavigateAwayAsync(() => CurrentView = _editor);
+    private Task ShowMasterData() => NavigateAwayAsync(() => CurrentView = _editor, toMasterData: true);
 
     [RelayCommand]
     private async Task ConfirmOperatorAsync()

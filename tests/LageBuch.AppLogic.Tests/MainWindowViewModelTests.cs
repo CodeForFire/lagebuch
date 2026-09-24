@@ -174,6 +174,7 @@ public class MainWindowViewModelTests
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
 
         await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving for Stammdaten asks first
 
         Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
         store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
@@ -343,6 +344,112 @@ public class MainWindowViewModelTests
 
         Assert.Same(firstPrompt, editor.PendingConfirm); // still the same dialog, not a second one
         Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView); // navigation did not proceed
+    }
+
+    // #463: STAMMDATEN leaves the incident, so it asks first -- a stray tap mid-Einsatz must not
+    // throw the Lagebuchführer out of the incident.
+    private static MainWindowViewModel NewWithHost(IIncidentHostController host)
+    {
+        var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), host, "1.0.0");
+        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+    }
+
+    [Fact]
+    public async Task Show_master_data_from_an_open_incident_asks_first()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Equal("STAMMDATEN ÖFFNEN", workspace.PendingConfirm!.ConfirmLabel);
+    }
+
+    [Fact]
+    public async Task Confirming_the_prompt_opens_master_data()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_prompt_keeps_the_incident_open()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.CancelCommand.Execute(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Null(workspace.PendingConfirm);
+    }
+
+    [Fact]
+    public async Task Going_home_from_an_unshared_incident_does_not_ask()
+    {
+        var vm = New();
+        OpenNewIncident(vm);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+    }
+
+    [Fact]
+    public async Task Show_master_data_while_sharing_does_not_leave_the_incident()
+    {
+        var host = new FakeHostController();
+        var vm = NewWithHost(host);
+        var workspace = OpenNewIncident(vm);
+        await workspace.ToggleSharingCommand.ExecuteAsync(null);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        Assert.Equal("FREIGABE BEENDEN", workspace.PendingConfirm!.ConfirmLabel);
+        workspace.PendingConfirm.ConfirmCommand.Execute(null);
+
+        Assert.Same(workspace, vm.CurrentView); // blocked: the confirm only ends the sharing
+        Assert.False(workspace.IsSharing);
+        Assert.True(host.StopCalled);
+    }
+
+    [Fact]
+    public async Task Going_home_while_sharing_asks_first_and_stops_sharing_on_confirm()
+    {
+        var host = new FakeHostController();
+        var vm = NewWithHost(host);
+        var workspace = OpenNewIncident(vm);
+        await workspace.ToggleSharingCommand.ExecuteAsync(null);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.False(host.StopCalled);
+
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+        Assert.True(host.StopCalled);
+        Assert.False(host.IsHosting);
+    }
+
+    [Fact]
+    public async Task A_second_navigation_while_the_leave_prompt_is_up_does_not_stack_another()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        var firstPrompt = workspace.PendingConfirm;
+        await vm.GoHomeCommand.ExecuteAsync(null);
+
+        Assert.Same(firstPrompt, workspace.PendingConfirm);
+        Assert.Same(workspace, vm.CurrentView);
     }
 
     [Fact]

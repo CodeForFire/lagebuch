@@ -1,0 +1,1 @@
+Leaving an open incident for Stammdaten now asks first and is blocked while the incident is shared or joined, every other exit asks while other devices are connected, and leaving an incident always ends its sharing, so clients no longer stay attached to a session the host has left and a new share gets a fresh PIN (#463).
