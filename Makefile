@@ -64,7 +64,8 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
         android-image android-image-rebuild apk aab emulator install run-android \
-        logcat uninstall package-linux logo-assets samples screenshots demo-gif
+        logcat uninstall package-linux logo-assets samples screenshots demo-gif \
+        play-listing-check play-screenshots
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -230,6 +231,17 @@ package-linux: ## Build a local .deb (VERSION=x.y.z)
 	packaging/linux/build-deb.sh "$(VERSION)" publish \
 	  src/LageBuch.App.Shared/Assets/icon-1024.png \
 	  src/LageBuch.App/Assets/icon.svg dist
+
+play-listing-check: ## Check the Play Store listing text against the Console's limits
+	packaging/play/check-listing.sh
+
+# Google Play rejects a store screenshot that is not exactly 16:9 or 9:16, which is why these
+# are not the README's 1920x1032 images reused: those are 1.86:1. Same harness, same fictional
+# Einsatz, 1080 rows instead of 1032.
+play-screenshots: ## Regenerate docs/play/screenshots/*.png at 16:9 for the Play listing
+	RENDER_OUT=$(CURDIR)/docs/play/screenshots RENDER_WIDTH=1920 RENDER_HEIGHT=1080 \
+	  $(DOTNET) test tests/LageBuch.Acceptance.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoFlowRenderTests
 
 logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
 	packaging/logo/build-logo-assets.sh

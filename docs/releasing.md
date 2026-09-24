@@ -270,6 +270,48 @@ notes → roll out.
 to *any* track burns its `versionCode` forever, so use the real derived number
 even for a throwaway test upload.
 
+### The listing itself
+
+Everything the Console asks for lives in `docs/play/`, so the listing is
+reproducible instead of being retyped from memory each time:
+
+| | Where | Regenerate |
+|---|---|---|
+| Text — name, short and full description, reviewer notes | [`docs/play/listing-de-DE.md`](play/listing-de-DE.md) | by hand; `make play-listing-check` |
+| Icon, 512x512, 32-bit | `docs/play/icon-512.png` | `make logo-assets` |
+| Feature graphic, 1024x500, no alpha | `docs/play/feature-graphic-1024x500.png` | `make logo-assets` |
+| Screenshots, 1920x1080 | `docs/play/screenshots/*.png` | `make play-screenshots` |
+
+`make play-listing-check` counts characters against the Console's limits — it
+truncates silently rather than warning — and greps the text for the wording in
+*What the listing must not say* below. Run it before pasting.
+
+Two things about these assets are deliberate and easy to undo by accident:
+
+- **The icon is the text-free emblem, not the full badge.** The badge carries a
+  wordmark, a tagline and a `github.com` URL. At the 48-192 px Play actually
+  renders an icon, that is unreadable, and Play's icon guidance disallows
+  promotional text and URLs. The badge is right for the feature graphic, where it
+  is large enough to read, and wrong for the icon.
+- **Neither image goes through `shrink()`** in `build-logo-assets.sh`. That
+  function quantises to 256 colours, which turns the output into an 8-bit palette
+  PNG; Play specifies a 32-bit icon. It is why `docs/logo/lagebuch-logo.png`
+  cannot be uploaded as the store icon even though it is already 512x512.
+
+**The screenshots are harness renders, not device captures.** They come from
+`DemoFlowRenderTests` — the same fictional Einsatz as the README grid, the same
+Avalonia views the Android app draws, rendered at 1920x1080 instead of the
+README's 1920x1032 because Play insists on exactly 16:9 and rejects 1.86:1. They
+are honest for the 7-inch and 10-inch tablet slots, which is the form factor an
+ELW actually uses.
+
+They are **not** a substitute for phone captures. The phone layout has a known
+limitation — see the skipped `CommandBarReachabilityTests` — and a landscape
+tablet render in the phone slot would promise a phone experience nobody has
+checked. Capture those from a real device or an accelerated emulator before
+filling the phone slot. (An emulator needs `/dev/kvm`; without it an x86_64
+system image is too slow to drive.)
+
 ### The declarations, frozen
 
 These are answered once and must be answered the same way every time; re-deciding
