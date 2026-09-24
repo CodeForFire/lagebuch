@@ -33,6 +33,28 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task Close_on_a_remote_session_throws_and_the_host_incident_stays_open()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
+            TestHost.DefaultPin,
+            port);
+
+        Assert.Throws<InvalidOperationException>(client.Close);
+        Assert.Equal(IncidentState.Open, hostSession.Incident.State);
+        Assert.False(client.IsReadOnly);
+    }
+
+    [Fact]
     public async Task Client_sees_its_own_command_reflected_via_the_host_broadcast()
     {
         var clock = new FixedClock();

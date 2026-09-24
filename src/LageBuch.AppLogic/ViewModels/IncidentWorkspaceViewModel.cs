@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -14,8 +15,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 {
     private readonly IIncidentSession _session;
 
-    // The concrete local session, or null on a joined client. Guards the two capabilities that only
-    // exist on the device that owns the .fwincident file: PDF export and resuming a read-only file.
+    // The concrete local session, or null on a joined client. Guards what only exists on the device
+    // that owns the .fwincident file: resuming a read-only file, and exporting straight from its disk.
     private readonly LocalIncidentSession? _local;
     private readonly IClock _clock;
     private readonly ITicker _ticker;
@@ -602,7 +603,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         PendingConfirm = dialog;
     }
 
-    private bool CanClose => !IsReadOnly;
+    /// <summary>
+    /// True on a joined client. Closing the incident is the host's call alone (#465), so the
+    /// EINSATZ ABSCHLIESSEN button is hidden here — and the host refuses a client's close anyway.
+    /// </summary>
+    public bool IsClient => _session.IsRemote;
+
+    private bool CanClose => !IsReadOnly && !IsClient;
 
     // Closing is permanent (the incident becomes read-only), so confirm first. If a Trupp is
     // still under air, call that out — closing mid-Atemschutz is a serious mistake.
@@ -680,11 +687,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public void CancelPendingPrompt() => PendingPrompt = null;
 
-    // PDF export renders from the local .fwincident, so it belongs to the host that owns the file;
-    // a joined client (_local is null) hides the button and lets the host export instead. It also
-    // needs a platform that can actually render one -- QuestPDF doesn't support Android
-    // (QuestPDF/QuestPDF#1432), so that head supplies NoopIncidentPdfExporter and hides the button too.
-    public bool CanExport => _local is not null && _pdfExporter.CanExport;
+    // The host renders from its own .fwincident; a joined client renders the synced state with
+    // attachments from its cache (#465, SessionPdfExport). Either way it needs a platform that can
+    // actually render one -- QuestPDF doesn't support Android (QuestPDF/QuestPDF#1432), so that head
+    // supplies NoopIncidentPdfExporter and hides the button.
+    public bool CanExport => _pdfExporter.CanExport;
 
     // The one-line export outcome: a fresh success/failure message, or (before any export this
     // session) seeded from ILastPdfExportStore in the constructor. Shows only the file name --
@@ -723,10 +730,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Justification = "Export can fail in several ways (disk full, exporter throwing, etc.); surfaces in the status line.")]
     private async Task RunExportAsync(IncidentPdfSections sections)
     {
-        // Reuse the incident's own name -- its .fwincident file's base name (date+time+Stichwort,
-        // see HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually
-        // still unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf".
-        var suggested = Path.GetFileNameWithoutExtension(_local!.Path) + ".pdf";
+        // Reuse the incident's own name -- its .fwincident file's base name (date+time, see
+        // HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually still
+        // unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf". A
+        // joined client has no file, so it names the PDF the same way from the incident's start.
+        var baseName = _local is not null
+            ? Path.GetFileNameWithoutExtension(_local.Path)
+            : _session.Incident.StartedAt.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+        var suggested = baseName + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -735,10 +746,22 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         try
         {
-            var bytes = await _local!.ExportPdfAsync(_pdfExporter, sections);
+            byte[] bytes;
+            var missing = 0;
+            if (_local is not null)
+            {
+                bytes = await _local.ExportPdfAsync(_pdfExporter, sections);
+            }
+            else
+            {
+                (bytes, missing) = await SessionPdfExport.ExportAsync(_session, _pdfExporter, _clock, sections);
+            }
+
             await File.WriteAllBytesAsync(path, bytes);
             await _dialogs.ShareFileAsync(path, "application/pdf");
-            ExportStatus = $"PDF exportiert: {Path.GetFileName(path)}";
+            ExportStatus = missing == 0
+                ? $"PDF exportiert: {Path.GetFileName(path)}"
+                : $"PDF exportiert: {Path.GetFileName(path)} ({missing} {(missing == 1 ? "Anhang" : "Anhänge")} nicht verfügbar)";
             ExportStatusDetail = path;
             _lastPdfExportStore?.SetLastExport(path, _clock.Now);
         }

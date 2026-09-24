@@ -408,7 +408,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     {
     }
 
-    public void Close() => Send(new CloseIncidentCommand(Op()));
+    // Closing the incident is the host's call alone (#465). The workspace hides the button on a
+    // joined client and the host refuses the command with 403 anyway; throwing here keeps a
+    // future caller from firing one off and losing the refusal in the fire-and-forget Send.
+    public void Close() => throw new InvalidOperationException("Nur das Host-Gerät kann den Einsatz abschließen.");
 
     // Unlike every other mutation, this is a real upload — genuinely awaited (per IIncidentSession's
     // doc comment) rather than fire-and-forget, so the caller can show a spinner and catch a

@@ -176,6 +176,34 @@ public class IncidentHostTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Host_refuses_a_close_command_from_a_client_with_403_and_the_incident_stays_open()
+    {
+        // #465: any joined device could permanently close the host's incident. An older client
+        // still sends CloseIncidentCommand, so the host has to refuse it, not just the new UI.
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        var command = new CloseIncidentCommand(new OperatorDto("Client", null));
+        var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(IncidentState.Open, session.Incident.State);
+    }
+
     [Theory]
     [InlineData(null)] // no PIN header at all
     [InlineData("9999")] // wrong PIN
