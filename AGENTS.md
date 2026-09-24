@@ -140,6 +140,229 @@ they need a paid Avalonia Plus licence, which a contributor cannot be expected
 to have. For looking at a rendered view, the headless harness under
 [Pull requests](#pull-requests) does the job.
 
+## Architecture
+
+These sections hold the standards you would otherwise have to ask for with an
+"act as a senior .NET architect / security engineer" prompt. They are the
+defaults for every change. Where the codebase already solves a problem one way,
+use that way. Consistency beats a locally cleverer idea.
+
+Dependencies point one way, and nothing may invert them:
+
+- `Domain` references nothing.
+- `Persistence`, `Documents` and `Sync` reference only `Domain`.
+- `AppLogic` holds the view models and has **no Avalonia reference**, which is
+  what makes it testable without a UI.
+- `App.Shared` holds the views.
+- `App` (desktop) and `App.Android` are thin hosts.
+
+A project reference that breaks this order needs a reason in the PR.
+
+- **View models** live in `src/LageBuch.AppLogic/ViewModels/`.
+  - Write them as `sealed partial` classes over CommunityToolkit.Mvvm's
+    `ObservableObject`, using `[ObservableProperty]` and `[RelayCommand]`.
+  - They never touch `Dispatcher.UIThread`. Marshal through `IUiDispatcher`,
+    and drive timers through `ITicker`.
+- **No DI container.** Wiring is by hand, through constructor injection:
+  - the desktop app in `CompositionRoot.cs` and `Program.cs`;
+  - Android in `MainActivity.cs`.
+  
+  An optional dependency is a nullable constructor parameter with a default,
+  e.g. `uiDispatcher ?? new ImmediateUiDispatcher()`. Do not introduce
+  `ServiceCollection`.
+- **Time is injected.**
+  - Domain code takes an `IClock`; newer code takes a `TimeProvider`.
+  - Never read `DateTime.Now` or `DateTimeOffset.Now` directly. `SystemClock`
+    is the one place that does.
+- **Types:**
+  - Non-view classes are `sealed`.
+  - Domain values are `sealed record`s.
+  - Persisted state comes back through a `Rehydrate` factory, not public
+    setters.
+- **Smallest change that fits.**
+  - Extend the existing pattern before inventing an abstraction.
+  - Add an interface only when there is a second implementation, and a test
+    double counts as one.
+  - No speculative generality, and no drive-by refactors in a feature PR.
+
+## C# and .NET
+
+The analyzers already enforce formatting and naming. The rules below are about
+what they cannot see.
+
+- **Nullability is real.**
+  - Never add `#nullable disable`.
+  - Never use `!` to silence a warning. Fix the flow, or annotate it with
+    `[MaybeNullWhen]` or `[NotNullWhen]`.
+  - Public entry points start with `ArgumentNullException.ThrowIfNull`.
+- **Failure has three shapes here.** Pick one of them; do not bring in a
+  `Result<T>` library.
+  - `bool TryX(..., out T)` with `[MaybeNullWhen(false)]`.
+  - A nullable return whose `null` is documented.
+  - A typed exception, such as `CertificateChangedException`.
+- **Failures surface, they are not logged.** There is no logging framework.
+  - A failure becomes a bound German status or error property on the view
+    model, as `ExportStatus` and `PersistenceError` do.
+  - A `catch` that ends in neither that nor a rethrow is a bug.
+- **Async:**
+  - No `async void` outside event handlers.
+  - No `.Result` or `.Wait()`. The one audited exception is the Exit hook in
+    `Program.cs`.
+  - Write deliberate fire-and-forget as `_ = Task`, and only where the failure
+    surfaces somewhere else.
+  - No `ConfigureAwait(false)`: CA2007 is off because continuations must stay
+    on the UI context.
+  - New I/O or network APIs take `CancellationToken cancellationToken =
+    default` and pass it on.
+- **Culture:**
+  - Anything the user reads is formatted through the fixed `de-DE` culture in
+    `src/LageBuch.Domain/Formatting.cs`.
+  - Anything persisted or sent over the wire uses `InvariantCulture`.
+  - Keys and identifiers compare with `StringComparison.Ordinal`.
+- **Dispose deterministically.** Use `using` or `await using` for every
+  `IDisposable` you own.
+- **Packages:**
+  - Versions live in `Directory.Packages.props` (central package management).
+    Never put a `Version` on a `PackageReference` in a `.csproj`.
+  - Android and `LageBuch.Acceptance.Tests` keep their own nested props file.
+  - A new dependency must earn its place in the PR description: it is
+    maintained, it is licence-compatible, and its transitive tree is small.
+
+## Avalonia UI
+
+Use the `avalonia-docs` MCP described above before reaching for an API from
+memory. The rules below are the ones this app has learned the hard way.
+
+- **Compiled bindings are on by default.**
+  - Every `.axaml` declares `x:DataType`.
+  - `x:CompileBindings="False"` needs a comment saying why.
+- **Code-behind is view-only.** It may handle focus and forward events to
+  commands. No state and no decisions live in `.axaml.cs`; anything a test
+  should cover belongs in the view model.
+- **UI text is German and inline.** There are no `.resx` files.
+  - The person documenting is the *Lagebuchführer*, never "Bediener". Code
+    names stay `Operator`.
+  - Keep wording short and imperative. It is read in a command vehicle during
+    an operation.
+- **Accessibility:** every icon-only or otherwise text-less control gets an
+  `AutomationProperties.Name`. `AutomationPropertiesTests` holds the line.
+- **Every new top-level `Window`** calls `WindowsTitleBar.ApplyDarkMode`.
+  Windows 10 gets no dark title bar otherwise.
+- **Layout traps that have shipped before:**
+  - **Content-sized columns over virtualized lists.** A column with
+    `MaxWidth` and `HorizontalAlignment="Center"` that contains a
+    virtualizing list changes width while the user scrolls. Use `Stretch`
+    instead.
+  - **`Transparent` gradient stops.** A stop at `Transparent` fades through
+    grey. Fade to a zero-alpha stop of the same hue, as `SignalFadedColor`
+    in `Theme/Tokens.axaml` does.
+  - **Ragged `Auto` columns.** Row `Grid`s inside an `ItemsControl` do not
+    share `Auto` widths. Use `Grid.IsSharedSizeScope` with a
+    `SharedSizeGroup`.
+- **Views are shared with Android.** Anything in `App.Shared` must also work
+  on a phone. A desktop-only API goes behind a service interface
+  implemented in `App` and `App.Android`, the way the file dialogs are.
+
+## Security
+
+**Threat model.** Three kinds of input arrive from outside:
+
+- a sync peer on a shared LAN;
+- an `.fwincident` file someone handed over;
+- a Stammdaten JSON import.
+
+Treat all three as hostile. The data inside them is personal data about people
+at an Einsatz, so confidentiality is a requirement, not a nice-to-have.
+
+- **SQL.**
+  - Values are always bound as `$name` parameters.
+  - An identifier may be interpolated only from a compile-time schema
+    constant, and the site carries a `CA2100` justification that says so.
+  - Nothing that came from input ever reaches the SQL text.
+- **Paths.** Beyond the `Path.Join` and sanitiser rules under
+  [Static analysis](#static-analysis), a path built from outside input must be
+  resolved with `Path.GetFullPath` and checked to start with the root plus a
+  separator. `AttachmentTempPaths` shows the pattern.
+- **Size.** Every input that crosses the trust boundary has a cap, enforced on
+  both ends. An attachment, for example, is checked against
+  `IncidentFile.MaxSizeBytes` in both the view model and the host.
+- **Deserialization.**
+  - Use System.Text.Json only, and `SyncJson.Options` for anything on the
+    wire.
+  - Polymorphism goes through a closed `[JsonDerivedType]` allowlist, as on
+    `SyncCommand`.
+  - Never use `BinaryFormatter`, Newtonsoft `TypeNameHandling`, or
+    `Type.GetType` on input.
+- **Sync transport.**
+  - Certificates are pinned on first use through `ITrustStore`. Never add a
+    certificate callback that accepts anything, not even temporarily and not
+    even in a debug build.
+  - PIN attempts stay rate-limited by `PinRateLimiter`.
+  - Anything secret comes from `RandomNumberGenerator`, never `Random`.
+- **Launching things.**
+  - A URL is validated before it is opened (`HttpUrlValidator`, reached via
+    `UrlLauncher`), and only its schemes are allowlisted.
+  - A process started with `UseShellExecute = false` quotes its argument.
+  - Nothing from input is ever concatenated into a command line.
+- **No hand-rolled crypto.** Use BCL primitives only. Compare secret material
+  with `CryptographicOperations.FixedTimeEquals`. The sync PIN is the
+  documented exception; see the comment on `IncidentHost.PinMatches`.
+- **Personal data stays out of diagnostics.**
+  - No names, phone numbers or incident content in trace output.
+  - Test fixtures and screenshots use fictional data (`AnonymizedExampleData`,
+    `docs/samples/`).
+  - Real Einsatzdateien are never committed.
+
+## Tests
+
+- **Tooling:**
+  - xUnit with plain `Assert`, and handwritten test doubles. There is no
+    mocking library and no FluentAssertions; do not add either.
+  - Headless UI tests use `[AvaloniaFact]` in `LageBuch.Acceptance.Tests`.
+- **Naming:** a test's name is a sentence in snake_case stating the behaviour,
+  e.g. `Join_prompt_focuses_the_host_field_not_the_name_field`.
+- **Bug fixes:** write the failing test first.
+  - A security fix gets a test that replays the attack and shows it fail: the
+    traversal name, the oversized body, the wrong PIN.
+- **Time and waiting:** control time with `FakeTimeProvider` or a fixed
+  `IClock`. A real `Task.Delay` or sleep in a test is a flake waiting to
+  happen.
+
+## Before you call it done
+
+Before saying a task is finished, and again before opening a pull request,
+review your whole diff through each of the following lenses. This review is the
+standing replacement for the persona prompts.
+
+**Architect**
+- Does every project reference still point the way
+  [Architecture](#architecture) says?
+- Did I reuse the existing pattern, or invent a parallel one?
+- Is every new type, interface and parameter needed by this change, not by an
+  imagined future one?
+- Is the diff as small as the change allows?
+
+**Security**
+- Does new input cross a trust boundary? If so, is it validated, size-capped,
+  parameterized and path-contained?
+- Can a failure surface to the user without leaking personal data or crashing
+  the app mid-Einsatz?
+- Did I weaken pinning, rate limiting or a sanitiser, even temporarily?
+
+**UI** (when any `.axaml` changed)
+- Does the view declare `x:DataType`, and do text-less controls carry
+  automation names?
+- Is the wording German and uses *Lagebuchführer*?
+- Does it still work on Android?
+- Is there a before/after screenshot pair ready for the PR?
+
+**Evidence**
+- Run a clean build with `make clean ci`. An incremental build hides XAML
+  deprecations.
+- When a test fails, search the log for `Test Run Failed`. The tail of the log
+  says `0 Error(s)` even when a test assembly failed.
+- "Done" means you saw the output, not that you expect it to pass.
+
 ## Static analysis
 
 Two tools police this code and they overlap: the build runs the .NET analyzers
