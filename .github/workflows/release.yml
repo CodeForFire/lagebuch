@@ -32,6 +32,7 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       msi_version: ${{ steps.v.outputs.msi_version }}
+      version_code: ${{ steps.v.outputs.version_code }}
       prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       # tag push -> strip the leading 'v' from the tag; dispatch -> the supplied input.
@@ -46,6 +47,11 @@ jobs:
       # and the field cannot drift apart. It is deliberately NOT a file name: GitHub rewrites a '~'
       # in a release asset name to '.', which once left SHA256SUMS.txt naming a download that did
       # not exist (#448).
+      # Before `v`, and unconditionally: that step derives the Android versionCode with
+      # scripts/android-version-code.sh, so the checkout has to have happened. It used to sit
+      # after `v` and only on a push, which was fine while the step was self-contained.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - id: v
         env:
           REF_NAME: ${{ github.ref_name }}
@@ -61,14 +67,27 @@ jobs:
             *-*) prerelease=true ;;
             *)   prerelease=false ;;
           esac
+
+          # Android needs a fourth spelling of the version, and an integer one. Google Play
+          # refuses any upload whose versionCode is not strictly greater than every versionCode
+          # already uploaded -- to any track, forever -- so it is derived, never typed. It faces
+          # the same ordering problem the .deb solves with '~': a prerelease must sort BELOW the
+          # final release of the same version.
+          #
+          # The formula lives in scripts/android-version-code.sh rather than here, because
+          # `make aab` needs the same number when it builds the bundle that actually goes to
+          # Play. Two copies that could disagree is the one thing this must not be.
+          code=$(scripts/android-version-code.sh "$v") || {
+            echo "::error::$v has no versionCode under this scheme - see docs/releasing.md"
+            exit 1
+          }
           {
             echo "version=$v"
             echo "msi_version=${v%%-*}"
+            echo "version_code=$code"
             echo "prerelease=$prerelease"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name == 'push'
       # The release body links to this section, and a tag without one would publish
       # notes-less. Checked here, in the only job that runs before the Windows (2x) and
       # Android builds, so a forgotten release section costs seconds rather than minutes.
@@ -177,19 +196,34 @@ jobs:
       - name: Publish
         run: >
           dotnet publish src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Release
-          -p:AndroidPackageFormat=apk -p:ApplicationDisplayVersion=${{ needs.version.outputs.version }}
+          -p:ApplicationVersion=${{ needs.version.outputs.version_code }}
+          -p:ApplicationDisplayVersion=${{ needs.version.outputs.version }}
+          -p:Version=${{ needs.version.outputs.version }}
           -o publish-android
-      - name: Locate and rename the APK
+      # The publish emits both formats: the .aab, and the universal .apk bundletool extracts
+      # from that same signed bundle. The .apk goes on the release as before; the .aab is kept
+      # as a build artifact for the manual Google Play upload (docs/releasing.md).
+      - name: Locate and rename the packages
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           apk=$(find publish-android -name "*-Signed.apk" -o -name "*.apk" | head -n1)
-          mkdir -p dist
+          aab=$(find publish-android -name "*.aab" | head -n1)
+          test -n "$aab" || { echo "::error::No .aab was produced - check AndroidPackageFormats"; exit 1; }
+          mkdir -p dist play
           cp "$apk" "dist/lagebuch-${VERSION}.apk"
+          cp "$aab" "play/lagebuch-${VERSION}.aab"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: apk
           path: dist/*.apk
+          if-no-files-found: error
+      # Deliberately not a release asset: it is signed with the CI debug key, so it is only good
+      # for inspection. The bundle that goes to Play is built on a laptop with the upload key.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aab
+          path: play/*.aab
           if-no-files-found: error
 
   release:

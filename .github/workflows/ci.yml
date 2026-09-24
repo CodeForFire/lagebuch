@@ -63,6 +63,13 @@ jobs:
         if: matrix.android
         run: dotnet workload install android
 
+      # Cheap, and it guards a number that cannot be taken back: the Android versionCode is
+      # derived by this script for both `make aab` and the release workflow, and Google Play
+      # refuses any upload that does not raise it, on any track, permanently.
+      - name: Android versionCode self-test
+        if: matrix.android
+        run: scripts/android-version-code.sh --self-test
+
       - name: Restore
         run: dotnet restore ${{ matrix.solution }}
 
