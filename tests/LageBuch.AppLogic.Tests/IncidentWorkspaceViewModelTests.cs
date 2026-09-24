@@ -93,6 +93,52 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal(new[] { "EL" }, host.LastMasterData!.Roles);
     }
 
+    // #463: the host controller outlives the workspace, so leaving without stopping it kept the
+    // old session served -- clients stayed attached and sharing again showed the old PIN.
+    [Fact]
+    public async Task Leaving_the_workspace_stops_sharing()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        await vm.LeaveAsync();
+
+        Assert.True(host.StopCalled);
+        Assert.False(host.IsHosting);
+        Assert.False(vm.IsSharing);
+        Assert.Null(vm.SharePin);
+    }
+
+    [Fact]
+    public void Leaving_a_joined_incident_says_the_connection_is_dropped()
+    {
+        var clock = new FixedClock(T0);
+        var local = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        using var vm = new IncidentWorkspaceViewModel(
+            new SnapshotRoundTrippingSession(local),
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+        var left = false;
+
+        vm.ConfirmLeaveThen(() => left = true);
+        Assert.Equal("Verbindung trennen?", vm.PendingConfirm!.Title);
+        Assert.Equal("TRENNEN", vm.PendingConfirm.ConfirmLabel);
+        vm.PendingConfirm.ConfirmCommand.Execute(null);
+
+        Assert.True(left);
+    }
+
     private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
     {
         store = new FakeStore();
@@ -1530,8 +1576,11 @@ internal sealed class FakeHostController : IIncidentHostController
         return Task.CompletedTask;
     }
 
+    public bool StopCalled { get; private set; }
+
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
+        StopCalled = true;
         IsHosting = false;
         SharePin = null;
         return Task.CompletedTask;

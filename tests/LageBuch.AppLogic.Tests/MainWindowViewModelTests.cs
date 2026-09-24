@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -264,6 +265,7 @@ public class MainWindowViewModelTests
         var entriesBefore = etb.Entries.Count;
 
         vm.GoHomeCommand.Execute(null);
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving asks first
 
         Assert.IsType<HomeViewModel>(vm.CurrentView);
         Assert.Equal(0, ticker.SubscriberCount); // Scba/Tasks/Reminder unsubscribed
@@ -343,6 +345,168 @@ public class MainWindowViewModelTests
 
         Assert.Same(firstPrompt, editor.PendingConfirm); // still the same dialog, not a second one
         Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView); // navigation did not proceed
+    }
+
+    // #463: STAMMDATEN leaves the incident, so it asks first -- a stray tap mid-Einsatz must not
+    // throw the Lagebuchführer out of the incident.
+    private static MainWindowViewModel NewWithHost(IIncidentHostController host)
+    {
+        var home = new HomeViewModel(new FakeStore(), new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), host, "1.0.0");
+        return new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+    }
+
+    [Fact]
+    public async Task Show_master_data_from_an_open_incident_asks_first()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Equal("VERLASSEN", workspace.PendingConfirm!.ConfirmLabel); // same prompt as every exit
+    }
+
+    [Fact]
+    public async Task Confirming_the_prompt_opens_master_data()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_prompt_keeps_the_incident_open()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.CancelCommand.Execute(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Null(workspace.PendingConfirm);
+    }
+
+    [Fact]
+    public async Task Going_home_from_an_open_incident_asks_first()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Equal("VERLASSEN", workspace.PendingConfirm!.ConfirmLabel);
+
+        workspace.PendingConfirm.ConfirmCommand.Execute(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+    }
+
+    public static TheoryData<string> CommandBarExits => new()
+    {
+        nameof(MainWindowViewModel.GoHomeCommand),
+        nameof(MainWindowViewModel.ShowMasterDataCommand),
+        nameof(MainWindowViewModel.RequestOpenFileCommand),
+        nameof(MainWindowViewModel.RequestNewIncidentCommand),
+        nameof(MainWindowViewModel.RequestJoinDeviceCommand),
+    };
+
+    private static IAsyncRelayCommand CommandBarExit(MainWindowViewModel vm, string name) => name switch
+    {
+        nameof(MainWindowViewModel.GoHomeCommand) => vm.GoHomeCommand,
+        nameof(MainWindowViewModel.ShowMasterDataCommand) => vm.ShowMasterDataCommand,
+        nameof(MainWindowViewModel.RequestOpenFileCommand) => vm.RequestOpenFileCommand,
+        nameof(MainWindowViewModel.RequestNewIncidentCommand) => vm.RequestNewIncidentCommand,
+        nameof(MainWindowViewModel.RequestJoinDeviceCommand) => vm.RequestJoinDeviceCommand,
+        _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
+    };
+
+    [Theory]
+    [MemberData(nameof(CommandBarExits))]
+    public async Task Every_exit_from_an_open_incident_asks_first(string exit)
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await CommandBarExit(vm, exit).ExecuteAsync(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.NotNull(workspace.PendingConfirm);
+        Assert.Null(vm.PendingPrompt); // neither the operator nor the join prompt is up yet
+    }
+
+    [Fact]
+    public async Task A_read_only_incident_leaves_without_asking()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+        await vm.OpenRecent("/x.fwincident");
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        Assert.True(workspace.IsReadOnly);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView); // nothing to lose, so nothing to confirm
+        Assert.Null(workspace.PendingConfirm);
+    }
+
+    [Fact]
+    public async Task Show_master_data_while_sharing_asks_like_any_exit_and_ends_sharing()
+    {
+        var host = new FakeHostController();
+        var vm = NewWithHost(host);
+        var workspace = OpenNewIncident(vm);
+        await workspace.ToggleSharingCommand.ExecuteAsync(null);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        Assert.Equal("Freigabe beenden?", workspace.PendingConfirm!.Title);
+        workspace.PendingConfirm.ConfirmCommand.Execute(null);
+
+        // No Stammdaten lock needed: the editor only opens once the clients are cut off.
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
+        Assert.False(workspace.IsSharing);
+        Assert.True(host.StopCalled);
+    }
+
+    [Fact]
+    public async Task Going_home_while_sharing_asks_first_and_stops_sharing_on_confirm()
+    {
+        var host = new FakeHostController();
+        var vm = NewWithHost(host);
+        var workspace = OpenNewIncident(vm);
+        await workspace.ToggleSharingCommand.ExecuteAsync(null);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.False(host.StopCalled);
+
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+        Assert.True(host.StopCalled);
+        Assert.False(host.IsHosting);
+    }
+
+    [Fact]
+    public async Task A_second_navigation_while_the_leave_prompt_is_up_does_not_stack_another()
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await vm.ShowMasterDataCommand.ExecuteAsync(null);
+        var firstPrompt = workspace.PendingConfirm;
+        await vm.GoHomeCommand.ExecuteAsync(null);
+
+        Assert.Same(firstPrompt, workspace.PendingConfirm);
+        Assert.Same(workspace, vm.CurrentView);
     }
 
     [Fact]

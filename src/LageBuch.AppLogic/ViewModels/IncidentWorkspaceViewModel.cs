@@ -298,13 +298,52 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private void LeaveToHome() => GoHomeRequested?.Invoke();
 
     /// <summary>
-    /// Called by the shell when this workspace is being left. Tears down a joined client's
-    /// SignalR/HTTP connection; a local session owns no such resources and is a no-op. Also drops
-    /// this workspace's subscription to the (app-lifetime, singleton) store, so a closed workspace
-    /// doesn't keep reacting to saves it can no longer show.
+    /// Asks before the shell leaves this workspace (#463), and runs <paramref name="leave"/> on
+    /// confirm. The dialog is the same whatever the destination; its wording only says whether
+    /// leaving also cuts off other devices -- which is also why Stammdaten need no lock of their
+    /// own: <see cref="LeaveAsync"/> ends the sharing or the connection before the editor opens.
+    /// </summary>
+    public void ConfirmLeaveThen(Action leave)
+    {
+        ArgumentNullException.ThrowIfNull(leave);
+        var dialog = (IsSharing, _session.IsRemote) switch
+        {
+            (true, _) => new ConfirmDialogViewModel(
+                "Freigabe beenden?",
+                "Beim Verlassen wird die Freigabe beendet — verbundene Geräte werden getrennt.",
+                "VERLASSEN",
+                leave),
+            (_, true) => new ConfirmDialogViewModel(
+                "Verbindung trennen?",
+                "Beim Verlassen wird die Verbindung zum Einsatz getrennt.",
+                "TRENNEN",
+                leave),
+            _ => new ConfirmDialogViewModel(
+                "Einsatz verlassen?",
+                "Der Einsatz wird verlassen. Er ist gespeichert und lässt sich über die Übersicht wieder öffnen.",
+                "VERLASSEN",
+                leave),
+        };
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
+    }
+
+    /// <summary>
+    /// Called by the shell when this workspace is being left. Stops sharing it, tears down a joined
+    /// client's SignalR/HTTP connection, and drops this workspace's subscription to the
+    /// (app-lifetime, singleton) store, so a closed workspace doesn't keep reacting to saves it can
+    /// no longer show.
     /// </summary>
     public async ValueTask LeaveAsync()
     {
+        // The host controller is app-lifetime too (#463): left running, it would keep serving this
+        // incident to its clients after the operator moved on, and a later share would come back
+        // with the old PIN and the Stammdaten it serialized at the start.
+        if (IsSharing)
+        {
+            await StopSharingAsync();
+        }
+
         if (_store is not null)
         {
             // IncidentStore is an app-lifetime singleton and its SaveFailed/SaveSucceeded carry no
@@ -753,11 +792,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         if (IsSharing)
         {
-            await _hostController.StopAsync();
-            IsSharing = false;
-            ShareStatus = null;
-            ShareAddress = null;
-            SharePin = null;
+            await StopSharingAsync();
             return;
         }
 
@@ -780,5 +815,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         ShareStatus = null; // clears a previous attempt's failure
         ShareAddress = _hostController.ShareHint;
         SharePin = _hostController.SharePin;
+    }
+
+    private async Task StopSharingAsync()
+    {
+        await _hostController.StopAsync();
+        IsSharing = false;
+        ShareStatus = null;
+        ShareAddress = null;
+        SharePin = null;
     }
 }

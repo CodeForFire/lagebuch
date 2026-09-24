@@ -1,0 +1,1 @@
+Leaving an open, editable incident through ÜBERSICHT, STAMMDATEN, ÖFFNEN, NEUER EINSATZ or VERBINDEN now asks first, and leaving an incident always ends its sharing, so clients no longer stay attached to a session the host has left and a new share gets a fresh PIN (#463).

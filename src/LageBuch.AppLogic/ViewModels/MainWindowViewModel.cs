@@ -72,11 +72,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private AboutViewModel? _pendingAbout;
 
     // Every path that leaves the editor or an open workspace goes through here. Unsaved Stammdaten
-    // edits prompt first; leaving an open IncidentWorkspaceViewModel drains and unsubscribes it from
-    // the app-lifetime IIncidentStore singleton first (review follow-up to #280) -- otherwise the top
-    // command bar's ÜBERSICHT/STAMMDATEN/ÖFFNEN/NEUER EINSATZ/VERBINDEN buttons (unlike the
-    // workspace's own "ZUR STARTSEITE", which already routes through GoHomeRequested -> LeaveAsync)
-    // would drop the old workspace from CurrentView while it stayed subscribed forever.
+    // edits prompt first. Leaving an open, editable incident asks first (#463) -- a stray tap on the
+    // command bar mid-Einsatz must not throw the Lagebuchführer out of it; a read-only one has
+    // nothing at stake and leaves directly. The workspace owns that prompt, since only it knows
+    // whether it is shared or joined. On confirm (or directly), LeaveAsync drains
+    // and unsubscribes the workspace from the app-lifetime IIncidentStore singleton (review follow-up
+    // to #280) -- otherwise the command bar's ÜBERSICHT/STAMMDATEN/ÖFFNEN/NEUER EINSATZ/VERBINDEN
+    // buttons (unlike the workspace's own "ZUR STARTSEITE", which already routes through
+    // GoHomeRequested -> LeaveAsync) would drop the old workspace from CurrentView while it stayed
+    // subscribed forever.
     private async Task NavigateAwayAsync(Action proceed)
     {
         if (ReferenceEquals(CurrentView, _editor))
@@ -92,9 +96,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (CurrentView is IncidentWorkspaceViewModel ws)
         {
+            if (ws.PendingConfirm is not null)
+            {
+                return; // a prompt is already up — don't stack a second one
+            }
+
+            if (!ws.IsReadOnly)
+            {
+                // Fire-and-forget like GoHomeRequested: a failed final save surfaces through the
+                // store's SaveFailed, not through this task.
+                ws.ConfirmLeaveThen(() => _ = LeaveThenAsync(ws, proceed));
+                return;
+            }
+
             await ws.LeaveAsync();
         }
 
+        proceed();
+    }
+
+    private static async Task LeaveThenAsync(IncidentWorkspaceViewModel ws, Action proceed)
+    {
+        await ws.LeaveAsync();
         proceed();
     }
 
