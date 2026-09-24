@@ -299,7 +299,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     /// <summary>
     /// Asks before the shell leaves this workspace (#463), and runs <paramref name="leave"/> on
-    /// confirm; the wording says whether leaving also cuts off other devices. Stammdaten are not
+    /// confirm; the wording is the same for every exit and only says whether leaving also cuts off
+    /// other devices. Stammdaten are not
     /// reachable at all while the incident is shared or joined: the host serves its set to the
     /// clients and a client runs on the host's, so the dialog then offers to end the sharing or the
     /// connection instead, and never runs <paramref name="leave"/>.
@@ -319,11 +320,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 "Solange dieses Gerät mit einem Einsatz verbunden ist, bleiben die Stammdaten gesperrt. Zuerst die Verbindung trennen.",
                 "VERBINDUNG TRENNEN",
                 () => GoHomeRequested?.Invoke()),
-            (true, _, _) => new ConfirmDialogViewModel(
-                "Einsatz verlassen?",
-                "Für die Stammdaten wird der Einsatz verlassen. Er ist gespeichert und lässt sich über die Übersicht wieder öffnen.",
-                "STAMMDATEN ÖFFNEN",
-                leave),
             (_, true, _) => new ConfirmDialogViewModel(
                 "Freigabe beenden?",
                 "Beim Verlassen wird die Freigabe beendet — verbundene Geräte werden getrennt.",

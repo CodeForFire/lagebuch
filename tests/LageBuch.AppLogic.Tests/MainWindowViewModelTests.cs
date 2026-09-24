@@ -155,7 +155,6 @@ public class MainWindowViewModelTests
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
 
         await vm.GoHomeCommand.ExecuteAsync(null);
-        workspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving asks first
 
         Assert.IsType<HomeViewModel>(vm.CurrentView);
         store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
@@ -176,7 +175,6 @@ public class MainWindowViewModelTests
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
 
         await vm.ShowMasterDataCommand.ExecuteAsync(null);
-        workspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving for Stammdaten asks first
 
         Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
         store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
@@ -199,7 +197,6 @@ public class MainWindowViewModelTests
         var firstWorkspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
 
         await vm.RequestOpenFileCommand.ExecuteAsync(null);
-        firstWorkspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving asks first
         var secondWorkspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
         Assert.NotSame(firstWorkspace, secondWorkspace);
 
@@ -367,7 +364,7 @@ public class MainWindowViewModelTests
         await vm.ShowMasterDataCommand.ExecuteAsync(null);
 
         Assert.Same(workspace, vm.CurrentView);
-        Assert.Equal("STAMMDATEN ÖFFNEN", workspace.PendingConfirm!.ConfirmLabel);
+        Assert.Equal("VERLASSEN", workspace.PendingConfirm!.ConfirmLabel); // same prompt as every exit
     }
 
     [Fact]
@@ -444,7 +441,7 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task A_read_only_incident_asks_before_leaving_too()
+    public async Task A_read_only_incident_leaves_without_asking()
     {
         var store = new FakeStore();
         var clock = new FixedClock(T0);
@@ -457,8 +454,8 @@ public class MainWindowViewModelTests
 
         await vm.GoHomeCommand.ExecuteAsync(null);
 
-        Assert.Same(workspace, vm.CurrentView);
-        Assert.NotNull(workspace.PendingConfirm);
+        Assert.IsType<HomeViewModel>(vm.CurrentView); // nothing to lose, so nothing to confirm
+        Assert.Null(workspace.PendingConfirm);
     }
 
     [Fact]
