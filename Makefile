@@ -27,6 +27,9 @@ VERSION      ?= 0.1.0
 KEYSTORE      ?= $(HOME)/.config/lagebuch/lagebuch-upload.p12
 KEYSTORE_PASS ?= $(HOME)/.config/lagebuch/lagebuch-upload.pass
 KEY_ALIAS     ?= lagebuch-upload
+# Derived from VERSION by scripts/android-version-code.sh, which the release workflow uses too.
+# Set it only to override that; Google Play burns a versionCode permanently on first upload, so
+# a number typed by hand is a mistake that cannot be taken back.
 CODE          ?=
 
 ANDROID_HOME ?= $(HOME)/Android/Sdk
@@ -153,31 +156,32 @@ apk: android-image ## Build an installable APK in Docker
 #
 # One publish emits both files: the .aab, and the universal .apk that bundletool extracts from
 # that same signed bundle. The .apk is therefore worth installing as a check on the bundle.
-aab: android-image ## Build the signed .aab for Google Play (VERSION=x.y.z CODE=<versionCode>)
+aab: android-image ## Build the signed .aab for Google Play (VERSION=x.y.z)
 	@test -f "$(KEYSTORE)" \
 	  || { echo "No upload keystore at $(KEYSTORE) — see docs/releasing.md, 'Google Play'."; exit 1; }
 	@test -f "$(KEYSTORE_PASS)" \
 	  || { echo "No keystore password file at $(KEYSTORE_PASS) — see docs/releasing.md."; exit 1; }
-	@test -n "$(CODE)" \
-	  || { echo "CODE=<versionCode> is required — docs/releasing.md has the formula."; exit 1; }
 	@mkdir -p "$(DOCKER_HOME)"
-	docker run --rm \
-	  -u $$(id -u):$$(id -g) \
-	  -e HOME=/home/build -e DOTNET_CLI_HOME=/home/build \
-	  -e DOTNET_NOLOGO=1 -e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-	  -v "$(DOCKER_HOME)":/home/build \
-	  -v "$$HOME/.nuget":/home/build/.nuget \
-	  -v "$$PWD":/src \
-	  -v "$(dir $(KEYSTORE))":/keys:ro \
-	  $(IMAGE) \
-	  publish $(ANDROID_PROJ) -c Release -f net10.0-android \
-	  -p:EmbedAssembliesIntoApk=true \
-	  -p:ApplicationVersion=$(CODE) \
-	  -p:ApplicationDisplayVersion=$(VERSION) -p:Version=$(VERSION) \
-	  -p:AndroidSigningKeyStore=/keys/$(notdir $(KEYSTORE)) \
-	  -p:AndroidSigningKeyAlias=$(KEY_ALIAS) \
-	  -p:AndroidSigningStorePass=file:/keys/$(notdir $(KEYSTORE_PASS)) \
-	  -p:AndroidSigningKeyPass=file:/keys/$(notdir $(KEYSTORE_PASS))
+	@code="$(CODE)"; \
+	  if [ -z "$$code" ]; then code=$$(scripts/android-version-code.sh "$(VERSION)") || exit 1; fi; \
+	  echo "versionCode $$code   ($(VERSION))"; \
+	  docker run --rm \
+	    -u $$(id -u):$$(id -g) \
+	    -e HOME=/home/build -e DOTNET_CLI_HOME=/home/build \
+	    -e DOTNET_NOLOGO=1 -e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+	    -v "$(DOCKER_HOME)":/home/build \
+	    -v "$$HOME/.nuget":/home/build/.nuget \
+	    -v "$$PWD":/src \
+	    -v "$(dir $(KEYSTORE))":/keys:ro \
+	    $(IMAGE) \
+	    publish $(ANDROID_PROJ) -c Release -f net10.0-android \
+	    -p:EmbedAssembliesIntoApk=true \
+	    -p:ApplicationVersion=$$code \
+	    -p:ApplicationDisplayVersion=$(VERSION) -p:Version=$(VERSION) \
+	    -p:AndroidSigningKeyStore=/keys/$(notdir $(KEYSTORE)) \
+	    -p:AndroidSigningKeyAlias=$(KEY_ALIAS) \
+	    -p:AndroidSigningStorePass=file:/keys/$(notdir $(KEYSTORE_PASS)) \
+	    -p:AndroidSigningKeyPass=file:/keys/$(notdir $(KEYSTORE_PASS))
 	@echo "AAB: $(AAB)"
 	@echo "APK: $(RELEASE_APK)   (universal, extracted from that bundle)"
 

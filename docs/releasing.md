@@ -133,6 +133,10 @@ offset:  alpha.N -> 100+N    beta.N -> 200+N    rc.N -> 300+N    final -> 999
 | `v0.7.0` | 700999 |
 | `v1.0.0` | 10000999 |
 
+[`scripts/android-version-code.sh`](../scripts/android-version-code.sh) is the
+source of truth for this — the table is worked examples, not the rule, and
+`--self-test` covers every row of it plus the project's whole release history.
+
 A prerelease sorts below its final release, exactly as the `.deb`'s `~` does.
 The ceiling — `209.99.99` — lands on `2099999999`, one below Play's limit of
 `2100000000`, and the job fails the build rather than silently wrapping past it.
@@ -253,22 +257,47 @@ package name already matches the sideloaded APK; keep it.
 
 ### Per release
 
+Build from the tag, not from `main`, so the bundle is the code that was released:
+
 ```bash
-make aab VERSION=0.7.0 CODE=700999      # CODE from the table above
+git checkout v0.6.1
+make aab VERSION=0.6.1
 ```
+
+The `versionCode` is **derived, not typed** —
+[`scripts/android-version-code.sh`](../scripts/android-version-code.sh) computes
+it from `VERSION`, and the release workflow calls the same script, so the two
+cannot disagree. The target prints the number before it builds:
+
+```
+versionCode 601999   (0.6.1)
+```
+
+`CODE=` overrides it, and should stay unused. Play burns a `versionCode`
+permanently on first sight — a number typed by hand is a mistake that cannot be
+taken back, which is the whole reason the script exists.
 
 The keystore path, password file and alias are overridable (`KEYSTORE=`,
 `KEYSTORE_PASS=`, `KEY_ALIAS=`) but default to the locations above. The target
-refuses to run without all three of a keystore, a password file and a `CODE`.
+refuses to run without a keystore and a password file.
 
-Then, in the Play Console: *Production* (or *Internal testing* first) → *Create
-new release* → upload `de.codeforfire.lagebuch-Signed.aab` → German release
-notes → roll out.
+Then, in the Play Console: pick the track → *Create new release* → upload
+`de.codeforfire.lagebuch-Signed.aab` → German release notes → roll out.
 
-**Full releases only**, the same rule as winget: a prerelease belongs on the
-*Internal testing* track, if anywhere. And note the ratchet — a build uploaded
-to *any* track burns its `versionCode` forever, so use the real derived number
-even for a throwaway test upload.
+**Which track takes what**
+
+*Production is full releases only*, the same rule as winget: a version that
+reaches the Play Store is one that exists as a tag and a GitHub release.
+
+A **prerelease may go to internal or closed testing**, and for this project it
+has to be able to. A *personal* Play developer account cannot reach production
+until a closed test has run **12 testers opted in for 14 continuous days**, and
+seeding that gate with a release candidate is exactly what a release candidate
+is for — `v0.6.1-rc.1` gives `601301`, which stays below `0.6.1`'s `601999`, so
+the real release still installs over it as an upgrade.
+
+And note the ratchet once more: a build uploaded to *any* track burns its
+`versionCode` forever, so even a throwaway test upload uses the derived number.
 
 ### The listing itself
 
@@ -403,7 +432,7 @@ that release's `SHA256SUMS.txt`; it carries a `.dmg.sha256` next to it instead.
 ```bash
 make package-linux VERSION=0.6.0   # builds a local .deb into dist/
 make apk                           # builds an installable APK in Docker (debug key)
-make aab VERSION=0.7.0 CODE=700999 # builds the signed Play bundle (needs the upload key)
+make aab VERSION=0.6.1             # builds the signed Play bundle (needs the upload key)
 ```
 
 `make apk` is the fast loop — Debug, debug key, `make install` puts it on the

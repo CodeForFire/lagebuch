@@ -47,6 +47,11 @@ jobs:
       # and the field cannot drift apart. It is deliberately NOT a file name: GitHub rewrites a '~'
       # in a release asset name to '.', which once left SHA256SUMS.txt naming a download that did
       # not exist (#448).
+      # Before `v`, and unconditionally: that step derives the Android versionCode with
+      # scripts/android-version-code.sh, so the checkout has to have happened. It used to sit
+      # after `v` and only on a push, which was fine while the step was self-contained.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - id: v
         env:
           REF_NAME: ${{ github.ref_name }}
@@ -65,42 +70,24 @@ jobs:
 
           # Android needs a fourth spelling of the version, and an integer one. Google Play
           # refuses any upload whose versionCode is not strictly greater than every versionCode
-          # already uploaded -- to any track, forever -- so it has to be derived, never typed.
-          # It faces the same ordering problem the .deb solves with '~': a prerelease must sort
-          # BELOW the final release of the same version.
+          # already uploaded -- to any track, forever -- so it is derived, never typed. It faces
+          # the same ordering problem the .deb solves with '~': a prerelease must sort BELOW the
+          # final release of the same version.
           #
-          #   MAJOR*10000000 + MINOR*100000 + PATCH*1000 + offset
-          #   offset:  alpha.N -> 100+N   beta.N -> 200+N   rc.N -> 300+N   final -> 999
-          #
-          #   0.6.0-rc.1 600301 < 0.6.0-rc.2 600302 < 0.6.0 600999 < 0.6.1 601999 < 0.7.0 700999
-          #
-          # The ceiling, 209.99.99, lands on 2099999999 -- one below Play's 2100000000 limit.
-          core="${v%%-*}"
-          suffix=""
-          case "$v" in *-*) suffix="${v#*-}" ;; esac
-          major="${core%%.*}"
-          rest="${core#*.}"
-          minor="${rest%%.*}"
-          patch="${rest##*.}"
-          case "$suffix" in
-            "")      offset=999 ;;
-            alpha.*) offset=$((100 + ${suffix#alpha.})) ;;
-            beta.*)  offset=$((200 + ${suffix#beta.})) ;;
-            rc.*)    offset=$((300 + ${suffix#rc.})) ;;
-            *) echo "::error::Unsupported prerelease suffix '$suffix' - see docs/releasing.md"; exit 1 ;;
-          esac
-          if [ "$major" -gt 209 ] || [ "$minor" -gt 99 ] || [ "$patch" -gt 99 ]; then
-            echo "::error::Version $v does not fit the versionCode scheme (max 209.99.99)"; exit 1
-          fi
+          # The formula lives in scripts/android-version-code.sh rather than here, because
+          # `make aab` needs the same number when it builds the bundle that actually goes to
+          # Play. Two copies that could disagree is the one thing this must not be.
+          code=$(scripts/android-version-code.sh "$v") || {
+            echo "::error::$v has no versionCode under this scheme - see docs/releasing.md"
+            exit 1
+          }
           {
             echo "version=$v"
             echo "msi_version=${v%%-*}"
-            echo "version_code=$((major * 10000000 + minor * 100000 + patch * 1000 + offset))"
+            echo "version_code=$code"
             echo "prerelease=$prerelease"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name == 'push'
       # The release body links to this section, and a tag without one would publish
       # notes-less. Checked here, in the only job that runs before the Windows (2x) and
       # Android builds, so a forgotten release section costs seconds rather than minutes.
