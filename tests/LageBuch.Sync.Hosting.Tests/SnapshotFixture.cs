@@ -49,7 +49,7 @@ internal static class SnapshotFixture
         client.Incident.Journal.Select(e => e.Text).ToArray();
 
     public static Task<RemoteIncidentSession> ConnectAsync(
-        ScriptedSnapshotHost host, TimeSpan? reconcileInterval = null) =>
+        ScriptedSnapshotHost host, TimeSpan? reconcileInterval = null, TimeProvider? timeProvider = null) =>
         RemoteIncidentSession.ConnectAsync(
             "127.0.0.1",
             new SessionOperator("Client", "RUF 1"),
@@ -57,7 +57,8 @@ internal static class SnapshotFixture
             new ImmediateUiDispatcher(),
             new InMemoryTrustStore(),
             port: host.Port,
-            reconcileInterval: reconcileInterval);
+            reconcileInterval: reconcileInterval,
+            timeProvider: timeProvider);
 
     /// <summary>
     /// Waits until <paramref name="condition"/> holds on the client. Polls the predicate on every

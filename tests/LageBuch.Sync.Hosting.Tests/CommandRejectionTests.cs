@@ -150,6 +150,43 @@ public class CommandRejectionTests
     }
 
     [Fact]
+    public async Task A_command_the_host_fails_with_a_server_error_reaches_the_operator()
+    {
+        // Not a 400, so not a domain guard -- but the connection stays up and the revision does not
+        // move, so neither Disconnected nor the reconcile poll would ever notice. Swallowing this would
+        // lose the operator's input silently while the footer kept reporting a confirmed Stand.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var scripted = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var client = await SnapshotFixture.ConnectAsync(scripted, Never);
+
+        scripted.FailCommandsWith = System.Net.HttpStatusCode.InternalServerError;
+
+        var rejection = NextRejection(client);
+        client.AddJournalEntry(EtbDirection.Incoming, "Geht verloren");
+
+        Assert.Equal("Der Host hat die Änderung nicht angenommen (Fehler 500).", await rejection);
+        Assert.DoesNotContain("Geht verloren", SnapshotFixture.JournalOf(client));
+    }
+
+    [Fact]
+    public async Task An_oversized_rejection_reason_is_cut_to_banner_length()
+    {
+        // The 400 body comes from a sync peer, which is outside the trust boundary; it ends up on a
+        // banner, so however much the host sends, only a banner's worth is read and shown.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var scripted = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var client = await SnapshotFixture.ConnectAsync(scripted, Never);
+
+        scripted.RejectCommandsWith = new string('x', 1_000_000);
+
+        var rejection = NextRejection(client);
+        client.AddJournalEntry(EtbDirection.Incoming, "Wird abgelehnt");
+
+        var reason = await rejection;
+        Assert.InRange(reason.Length, 1, 300);
+    }
+
+    [Fact]
     public async Task A_rejected_command_leaves_the_clients_state_alone()
     {
         var basis = SnapshotFixture.BaseSnapshot();

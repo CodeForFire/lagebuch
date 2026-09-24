@@ -68,11 +68,89 @@ internal sealed class InMemoryStore : IIncidentStore
 
 internal sealed class FakeTimeProvider : TimeProvider
 {
+    private readonly object _gate = new();
+    private readonly List<FakeTimer> _timers = new();
+
     public DateTimeOffset UtcNow { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
 
     public override DateTimeOffset GetUtcNow() => UtcNow;
 
-    public void Advance(TimeSpan by) => UtcNow += by;
+    /// <summary>Moves the clock on and fires every timer that came due, once each, on the caller's thread.</summary>
+    public void Advance(TimeSpan by)
+    {
+        FakeTimer[] timers;
+        lock (_gate)
+        {
+            UtcNow += by;
+            timers = _timers.ToArray();
+        }
+
+        foreach (var timer in timers)
+        {
+            timer.FireIfDue(UtcNow);
+        }
+    }
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new FakeTimer(this, callback, state);
+        lock (_gate)
+        {
+            _timers.Add(timer);
+        }
+
+        timer.Change(dueTime, period);
+        return timer;
+    }
+
+    private void Remove(FakeTimer timer)
+    {
+        lock (_gate)
+        {
+            _timers.Remove(timer);
+        }
+    }
+
+    private sealed class FakeTimer(FakeTimeProvider owner, TimerCallback callback, object? state) : ITimer
+    {
+        private readonly object _gate = new();
+        private DateTimeOffset? _next;
+        private TimeSpan _period;
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            lock (_gate)
+            {
+                _next = dueTime == Timeout.InfiniteTimeSpan ? null : owner.UtcNow + dueTime;
+                _period = period;
+            }
+
+            return true;
+        }
+
+        public void FireIfDue(DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                if (_next is not { } next || next > now)
+                {
+                    return;
+                }
+
+                _next = _period == Timeout.InfiniteTimeSpan || _period == TimeSpan.Zero ? null : now + _period;
+            }
+
+            callback(state);
+        }
+
+        public void Dispose() => owner.Remove(this);
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
 }
 
 internal sealed class FixedClock : IClock

@@ -48,7 +48,11 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // poll genuinely race here. (A long is not atomic on the 32-bit Android head either.)
     private readonly object _applyGate = new();
     private readonly CancellationTokenSource _reconcileCts = new();
-    private readonly TimeSpan _reconcileInterval;
+
+    // Created with the session rather than inside the loop, so it exists the moment ConnectAsync returns:
+    // a tick that comes due before Task.Run has scheduled the loop is then held by the timer rather than
+    // lost, which is what lets a test advance a fake clock straight away.
+    private readonly PeriodicTimer _reconcileTimer;
     private Incident _incident;
     private long _lastRevision;
     private Task? _reconcileLoop;
@@ -132,9 +136,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? cacheRoot,
         long cacheMaxBytes,
         string hostMasterDataJson,
-        TimeSpan reconcileInterval)
+        TimeSpan reconcileInterval,
+        TimeProvider time)
     {
-        _reconcileInterval = reconcileInterval;
+        _reconcileTimer = new PeriodicTimer(reconcileInterval, time);
         _http = http;
         _handler = handler;
         _hub = hub;
@@ -190,6 +195,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// to <see cref="SyncProtocol.DefaultReconcileInterval"/>; tests shorten it, or push it past the end
     /// of the test and drive <see cref="ReconcileAsync"/> directly.
     /// </param>
+    /// <param name="timeProvider">
+    /// Drives the reconcile timer. Defaults to <see cref="TimeProvider.System"/>; tests pass a fake and
+    /// advance it instead of waiting on the wall clock.
+    /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
     [SuppressMessage(
         "Design",
@@ -207,6 +216,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         string? cacheRoot = null,
         long cacheMaxBytes = DefaultCacheMaxBytes,
         TimeSpan? reconcileInterval = null,
+        TimeProvider? timeProvider = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(trustStore);
@@ -329,7 +339,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 cacheRoot,
                 cacheMaxBytes,
                 hostMasterDataJson,
-                reconcileInterval ?? SyncProtocol.DefaultReconcileInterval);
+                reconcileInterval ?? SyncProtocol.DefaultReconcileInterval,
+                timeProvider ?? TimeProvider.System);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -689,7 +700,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     [SuppressMessage(
         "Design",
         "CA1031",
-        Justification = "This is the end of a fire-and-forget path: a refusal surfaces on CommandRejected (a workspace banner) and anything else is already covered by Disconnected/Ended plus the reconcile poll. Rethrowing would fault a discarded task and take the process down mid-Einsatz.")]
+        Justification = "This is the end of a fire-and-forget path: a refusal or any other HTTP error status surfaces on CommandRejected (a workspace banner); a transport failure surfaces on Disconnected/Ended, and an unreadable success body on the reconcile poll, because the host's revision has moved. Rethrowing would fault a discarded task and take the process down mid-Einsatz.")]
     private async Task SendAndReportAsync(SyncCommand command)
     {
         try
@@ -699,6 +710,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         catch (CommandRejectedException ex)
         {
             _ui.Post(() => CommandRejected?.Invoke(ex.Message));
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is { } status)
+        {
+            // The host answered, but not with a domain guard's 400: a server error, a PIN the rate
+            // limiter now refuses, an oversized body. The connection stays up and the revision does
+            // not move, so nothing else would ever notice that this input was lost.
+            _ui.Post(() => CommandRejected?.Invoke(
+                $"Der Host hat die Änderung nicht angenommen (Fehler {(int)status})."));
         }
         catch (Exception)
         {
@@ -724,7 +743,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public async Task SendAsync(SyncCommand command, CancellationToken ct = default)
     {
         using var content = new StringContent(SyncJson.Serialize(command), Encoding.UTF8, "application/json");
-        var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
+        using var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
             throw new CommandRejectedException(await ReadRejectionAsync(response, ct));
@@ -744,7 +763,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// and is written as JSON, so the reason arrives as a string <em>literal</em> — quotes and all —
     /// rather than as plain text. Both shapes are accepted anyway, so a later change at the host cannot
     /// put quotation marks on an operator's screen. Length-capped because this ends up in a banner, not
-    /// a log viewer.
+    /// a log viewer, and read-capped because the body comes from a sync peer: however much it sends,
+    /// only <c>maxBodyBytes</c> of it is ever buffered.
     /// </remarks>
     [SuppressMessage(
         "Design",
@@ -753,11 +773,23 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private static async Task<string> ReadRejectionAsync(HttpResponseMessage response, CancellationToken ct)
     {
         const int maxLength = 300;
+        const int maxBodyBytes = 4096;
 
         string body;
+        bool truncated;
         try
         {
-            body = (await response.Content.ReadAsStringAsync(ct)).Trim();
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            var buffer = new byte[maxBodyBytes];
+            var read = 0;
+            int n;
+            while (read < buffer.Length && (n = await stream.ReadAsync(buffer.AsMemory(read), ct)) > 0)
+            {
+                read += n;
+            }
+
+            truncated = read == buffer.Length;
+            body = Encoding.UTF8.GetString(buffer, 0, read).Trim();
         }
         catch (Exception)
         {
@@ -774,6 +806,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             {
                 // Not a JSON string after all — fall through and use it as it came.
             }
+        }
+        else if (truncated && body.StartsWith('"'))
+        {
+            // A JSON string literal cut off by the read cap has lost its closing quote; drop the
+            // opening one too rather than show half a pair.
+            body = body[1..];
         }
 
         if (string.IsNullOrWhiteSpace(body))
@@ -849,12 +887,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Justification = "A reconcile tick must never fault the loop: every failure surfaces on ReconcileFailed, which the workspace shows as an unconfirmed-state footer, and the next tick retries.")]
     private async Task ReconcileLoopAsync(CancellationToken ct)
     {
-        // A using local, not a field: a disposable field would owe CA2213 an answer, and its lifetime is
-        // exactly this loop's anyway.
-        using var timer = new PeriodicTimer(_reconcileInterval);
         try
         {
-            while (await timer.WaitForNextTickAsync(ct))
+            while (await _reconcileTimer.WaitForNextTickAsync(ct))
             {
                 try
                 {
@@ -958,6 +993,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         await _hub.DisposeAsync();
         _http.Dispose();
         _handler.Dispose();
+        _reconcileTimer.Dispose();
         _reconcileCts.Dispose();
     }
 

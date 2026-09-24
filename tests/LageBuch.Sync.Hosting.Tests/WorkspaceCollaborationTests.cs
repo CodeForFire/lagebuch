@@ -524,7 +524,9 @@ public class WorkspaceCollaborationTests
         client.EditJournalEntry(Guid.NewGuid(), "geht nicht");
         await shown.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.Contains("nicht gefunden", clientWs.CommandRejected!, StringComparison.Ordinal);
+        var shownReason = clientWs.CommandRejected;
+        Assert.NotNull(shownReason);
+        Assert.Contains("nicht gefunden", shownReason, StringComparison.Ordinal);
 
         clientWs.DismissCommandRejectedCommand.Execute(null);
         Assert.Null(clientWs.CommandRejected);

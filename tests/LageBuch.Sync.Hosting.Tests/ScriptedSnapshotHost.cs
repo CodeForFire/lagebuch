@@ -39,11 +39,12 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     private readonly IHubContext<IncidentHub> _hub;
     private int _commandsReceived;
 
-    private ScriptedSnapshotHost(WebApplication app, int port, IHubContext<IncidentHub> hub)
+    private ScriptedSnapshotHost(WebApplication app, int port, IHubContext<IncidentHub> hub, IncidentSnapshot initial)
     {
         _app = app;
         Port = port;
         _hub = hub;
+        Current = initial;
     }
 
     public int Port { get; }
@@ -53,13 +54,19 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     /// <see cref="IncidentSnapshot.Revision"/> by <c>GET /revision</c>. Set it to move the host
     /// forward (or, with a lower revision, to model a host that restarted sharing).
     /// </summary>
-    public IncidentSnapshot Current { get; set; } = null!;
+    public IncidentSnapshot Current { get; set; }
 
     /// <summary>
     /// When set, <c>POST /command</c> answers 400 with this reason instead of applying anything —
     /// the shape the real host produces from a domain guard.
     /// </summary>
     public string? RejectCommandsWith { get; set; }
+
+    /// <summary>
+    /// When set, <c>POST /command</c> answers with this status and no body instead of applying
+    /// anything — a host failing in some way other than a domain guard's 400.
+    /// </summary>
+    public HttpStatusCode? FailCommandsWith { get; set; }
 
     /// <summary>
     /// How many commands reached <c>POST /command</c>. Lets a test prove a command was actually sent
@@ -81,10 +88,7 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         var app = builder.Build();
-        var host = new ScriptedSnapshotHost(app, port, app.Services.GetRequiredService<IHubContext<IncidentHub>>())
-        {
-            Current = initial,
-        };
+        var host = new ScriptedSnapshotHost(app, port, app.Services.GetRequiredService<IHubContext<IncidentHub>>(), initial);
 
         app.MapHub<IncidentHub>(SyncProtocol.HubPath);
         app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(version), SyncJson.Options));
@@ -100,6 +104,11 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         app.MapPost(SyncProtocol.CommandPath, (SyncCommand _) =>
         {
             Interlocked.Increment(ref host._commandsReceived);
+            if (host.FailCommandsWith is { } status)
+            {
+                return Results.StatusCode((int)status);
+            }
+
             return host.RejectCommandsWith is { } reason
                 ? Results.BadRequest(reason)
                 : Results.Json(host.Current, SyncJson.Options);

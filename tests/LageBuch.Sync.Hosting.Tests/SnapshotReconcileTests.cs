@@ -13,6 +13,9 @@ public class SnapshotReconcileTests
 {
     private static readonly TimeSpan Never = TimeSpan.FromMinutes(10);
 
+    /// <summary>The poll interval under a <see cref="FakeTimeProvider"/>; only <c>Advance</c> makes it pass.</summary>
+    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
+
     /// <summary>Completes when <paramref name="subscribe"/>'s event fires, so no test sleeps.</summary>
     private static async Task WaitForEvent(
         Action<Action> subscribe, Action<Action> unsubscribe, string description, TimeSpan? timeout = null)
@@ -96,60 +99,70 @@ public class SnapshotReconcileTests
     public async Task The_timer_heals_a_missed_broadcast_without_being_driven()
     {
         var basis = SnapshotFixture.BaseSnapshot();
+        var time = new FakeTimeProvider();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
-        await using var client = await SnapshotFixture.ConnectAsync(host, TimeSpan.FromMilliseconds(50));
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
 
         host.Current = SnapshotFixture.Revised(basis, 3, "Drei");
 
-        // The one timing-dependent test here; everything else drives ReconcileAsync directly.
-        await SnapshotFixture.WaitForClient(
+        // Nothing calls ReconcileAsync here: one interval passing on the clock is all it takes.
+        var healed = SnapshotFixture.WaitForClient(
             client, () => SnapshotFixture.JournalOf(client).Contains("Drei"), "the poll timer to heal the gap");
+        time.Advance(Interval);
+        await healed;
     }
 
     [Fact]
     public async Task A_reconcile_pass_that_cannot_reach_the_host_reports_failure()
     {
         var basis = SnapshotFixture.BaseSnapshot();
+        var time = new FakeTimeProvider();
         var host = await ScriptedSnapshotHost.StartAsync(basis);
-        await using var client = await SnapshotFixture.ConnectAsync(host, TimeSpan.FromMilliseconds(50));
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
 
         // The host goes away while SignalR may still believe otherwise. The poll is the only thing that
         // can tell the operator "I cannot confirm this is current", so it must say so rather than
         // faulting the loop and going quiet.
         await host.DisposeAsync();
 
-        await WaitForEvent(
+        var failed = WaitForEvent(
             h => client.ReconcileFailed += h,
             h => client.ReconcileFailed -= h,
             "the failed reconcile pass to be reported",
             TimeSpan.FromSeconds(10));
+        time.Advance(Interval);
+        await failed;
     }
 
     [Fact]
     public async Task A_successful_reconcile_pass_is_reported_so_the_footer_can_confirm_currency()
     {
         var basis = SnapshotFixture.BaseSnapshot();
+        var time = new FakeTimeProvider();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
-        await using var client = await SnapshotFixture.ConnectAsync(host, TimeSpan.FromMilliseconds(50));
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
 
-        await WaitForEvent(
+        var reconciled = WaitForEvent(
             h => client.Reconciled += h,
             h => client.Reconciled -= h,
             "a successful reconcile pass to be reported",
             TimeSpan.FromSeconds(10));
+        time.Advance(Interval);
+        await reconciled;
     }
 
     [Fact]
     public async Task Disposing_the_session_stops_the_poll_without_faulting_it()
     {
         var basis = SnapshotFixture.BaseSnapshot();
+        var time = new FakeTimeProvider();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
+        var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
 
-        // A 1 ms interval makes a GET very likely to be in flight at the moment of disposal. Disposal
-        // has to cancel the loop and wait for it before disposing the HttpClient it is using, or that
-        // GET lands on a disposed client inside a task nobody observes.
-        var client = await SnapshotFixture.ConnectAsync(host, TimeSpan.FromMilliseconds(1));
-        await SnapshotFixture.WaitForClient(client, () => true, "the client to settle");
+        // Fire a tick and dispose straight after, so the tick's GET is very likely still in flight.
+        // Disposal has to cancel the loop and wait for it before disposing the HttpClient it is using,
+        // or that GET lands on a disposed client inside a task nobody observes.
+        time.Advance(Interval);
 
         await client.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
     }
@@ -164,7 +177,7 @@ public class SnapshotReconcileTests
         // with it.
         var basis = SnapshotFixture.BaseSnapshot();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
-        var client = await SnapshotFixture.ConnectAsync(host, TimeSpan.FromMilliseconds(50));
+        var client = await SnapshotFixture.ConnectAsync(host, Interval, new FakeTimeProvider());
 
         await client.DisposeAsync();
         await client.DisposeAsync();
