@@ -8,6 +8,8 @@
       "src/LageBuch.Documents/LageBuch.Documents.csproj",
       "src/LageBuch.Domain/LageBuch.Domain.csproj",
       "src/LageBuch.Persistence/LageBuch.Persistence.csproj",
+      "src/LageBuch.Speech.Sherpa/LageBuch.Speech.Sherpa.csproj",
+      "src/LageBuch.Speech/LageBuch.Speech.csproj",
       "src/LageBuch.Sync.Hosting/LageBuch.Sync.Hosting.csproj",
       "src/LageBuch.Sync/LageBuch.Sync.csproj",
       "tests/LageBuch.Acceptance.Tests/LageBuch.Acceptance.Tests.csproj",
@@ -16,6 +18,8 @@
       "tests/LageBuch.Documents.Tests/LageBuch.Documents.Tests.csproj",
       "tests/LageBuch.Domain.Tests/LageBuch.Domain.Tests.csproj",
       "tests/LageBuch.Persistence.Tests/LageBuch.Persistence.Tests.csproj",
+      "tests/LageBuch.Speech.Sherpa.Tests/LageBuch.Speech.Sherpa.Tests.csproj",
+      "tests/LageBuch.Speech.Tests/LageBuch.Speech.Tests.csproj",
       "tests/LageBuch.Sync.Hosting.Tests/LageBuch.Sync.Hosting.Tests.csproj",
       "tests/LageBuch.Sync.Tests/LageBuch.Sync.Tests.csproj"
     ]

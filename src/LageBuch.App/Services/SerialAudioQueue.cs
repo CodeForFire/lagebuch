@@ -31,6 +31,22 @@ internal sealed class SerialAudioQueue
     /// <summary>Queues <paramref name="play"/> to run after everything already queued.</summary>
     public void Enqueue(Action play) => _queue.Add(play);
 
+    /// <summary>
+    /// Discards everything queued but not yet started.
+    /// </summary>
+    /// <remarks>
+    /// Best-effort, and deliberately does not touch the item already sounding: stopping that would
+    /// mean tracking and killing the OS player process, and a cue cut off mid-word is worse than
+    /// one that finishes. What this does prevent is a backlog continuing to speak after the user
+    /// has asked it to stop.
+    /// </remarks>
+    public void Drain()
+    {
+        while (_queue.TryTake(out _))
+        {
+        }
+    }
+
     [SuppressMessage(
         "Design",
         "CA1031",

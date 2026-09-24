@@ -228,6 +228,7 @@ public class TasksViewModelTests
         Assert.Equal("FÄLLIG", row.RemainingDisplay);
         Assert.Single(alarm.Played);                     // exactly once ...
         Assert.Equal(AlarmSound.TaskDue, alarm.Played[0]);
+        Assert.Equal(row.Text, alarm.Details[0]); // says which task, not just that one is due
 
         ticker.Fire();                                   // ... not again on subsequent ticks
         Assert.Single(alarm.Played);

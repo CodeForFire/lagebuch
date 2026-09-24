@@ -1,45 +1,57 @@
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.InteropServices;
 using Avalonia.Platform;
 using LageBuch.AppLogic.Services;
+using LageBuch.Speech;
 
 namespace LageBuch.App.Services;
 
 /// <summary>
-/// Audio for the desktop deployment. One-shot spoken cues (<see cref="Play"/>) work on Windows,
-/// macOS and Linux: winmm in-memory on Windows, and <c>afplay</c>/<c>aplay</c> on macOS/Linux fed
-/// a WAV extracted to a temp file. Every path degrades to a silent no-op when the asset or the
-/// player is missing, so a build with no voice clip yet — or a host without the CLI player —
-/// simply stays quiet rather than crashing.
+/// Audio for the desktop deployment: synthesized speech where a voice is installed, and the bundled
+/// clips where it is not.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>The clips stay.</b> They are what plays when speech is switched off, when the voice models
+/// are missing, and when synthesis throws. Today's guarantee is that a cue is never silently lost,
+/// and adding a voice must not weaken it.
+/// </para>
+/// <para>
+/// <b>The voice loads lazily, on the audio worker.</b> A Piper model takes around two seconds to
+/// load; doing that at startup would delay the window for a cue that may never fire. The first
+/// <see cref="Play(AlarmSound, string?)"/> pays it instead, on <see cref="SerialAudioQueue"/>'s
+/// thread, where blocking is already the norm.
+/// </para>
+/// </remarks>
 internal sealed class SystemAlarmService : IAlarmService, IDisposable
 {
-    private const uint SndNodefault = 0x0002; // no default beep if it fails
-    private const uint SndMemory = 0x0004;  // pszSound points to in-memory WAV
-
-    // No SND_ASYNC: playback must block the queue's worker thread until the clip finishes,
-    // so cues play one after another instead of overlapping (see SerialAudioQueue).
-
     // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent.
     private static readonly IReadOnlyDictionary<AlarmSound, string> VoiceAssets =
         new Dictionary<AlarmSound, string>
         {
             [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-ils.wav",
 
-            // Generic tone (already bundled) — a task falling due is frequent enough that a spoken
-            // sentence would be more noise than signal.
+            // A plain tone, and the only cue whose clip is not speech. It is the fallback for when
+            // there is no voice; with one, the cue says which task fell due, which is the point.
             [AlarmSound.TaskDue] = "alarm.wav",
             [AlarmSound.PressureCheckDue] = "voice-druckabfrage.wav",
             [AlarmSound.RetreatAlarm] = "voice-rueckzugsalarm.wav",
         };
 
     private readonly Dictionary<AlarmSound, byte[]> _voiceBytes = new();
-    private readonly Dictionary<AlarmSound, string> _voiceTempFiles = new();
     private readonly SerialAudioQueue _queue = new();
+    private readonly WavePlayer _player = new();
+    private readonly Lazy<ISpeechSynthesizer?> _speech;
 
-    public SystemAlarmService()
+    /// <param name="speechFactory">
+    /// Builds the synthesizer, or returns null when no voice is installed. Called at most once, on
+    /// the audio worker thread.
+    /// </param>
+    public SystemAlarmService(Func<ISpeechSynthesizer?>? speechFactory = null)
     {
+        _speech = new Lazy<ISpeechSynthesizer?>(
+            speechFactory ?? (static () => null),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
         // Preload the voice clips (all platforms). Absent files are simply skipped.
         foreach (var (sound, file) in VoiceAssets)
         {
@@ -50,77 +62,65 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
         }
     }
 
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "A missing player binary must stay silent (see comment); a failed alarm never crashes the app.")]
-    public void Play(AlarmSound sound)
-    {
-        if (!_voiceBytes.TryGetValue(sound, out var bytes))
-        {
-            return; // no clip bundled for this cue yet
-        }
+    /// <remarks>
+    /// Answers for the <em>configured</em> voice, not a loaded one: the model is loaded lazily, and
+    /// forcing it here -- from the UI thread, to draw a button -- is exactly what the laziness
+    /// exists to avoid.
+    /// </remarks>
+    public bool CanSpeak { get; init; }
 
-        _queue.Enqueue(() => PlayBlocking(sound, bytes));
+    /// <summary>
+    /// Why speech is off, when it is -- for the Stammdaten settings screen to show instead of
+    /// leaving the switch quietly ineffective.
+    /// </summary>
+    public string? SpeechUnavailableReason { get; init; }
+
+    public void Play(AlarmSound sound) => Play(sound, spokenDetail: null);
+
+    public void Play(AlarmSound sound, string? spokenDetail)
+    {
+        var sentence = AlarmAnnouncements.Sentence(sound);
+        var spoken = string.IsNullOrWhiteSpace(spokenDetail)
+            ? sentence
+            : $"{sentence}. {spokenDetail}";
+
+        _voiceBytes.TryGetValue(sound, out var clip);
+        _queue.Enqueue(() => SpeakOrPlay(sound.ToString(), spoken, clip));
     }
 
-    // Runs on the SerialAudioQueue's worker thread; blocks until the clip finishes playing.
+    public void Speak(string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        _queue.Enqueue(() => SpeakOrPlay("vorlesen", text, fallbackClip: null));
+    }
+
+    public void StopSpeaking() => _queue.Drain();
+
+    // Runs on the SerialAudioQueue's worker thread; blocks until the audio finishes playing.
     [SuppressMessage(
         "Design",
         "CA1031",
-        Justification = "Player binary missing (e.g. a headless Linux host without ALSA) — stay silent.")]
-    private void PlayBlocking(AlarmSound sound, byte[] bytes)
+        Justification = "Any synthesis failure falls back to the bundled clip, or to silence; a failed cue never crashes the app.")]
+    private void SpeakOrPlay(string name, string spoken, byte[]? fallbackClip)
     {
-        if (OperatingSystem.IsWindows())
-        {
-            PlaySound(bytes, IntPtr.Zero, SndMemory | SndNodefault);
-            return;
-        }
-
-        var path = TempFileFor(sound, bytes);
-        if (path is null)
-        {
-            return;
-        }
-
-        var player = OperatingSystem.IsMacOS() ? "afplay" : "aplay";
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(player, $"\"{path}\"")
+            if (_speech.Value is { } synthesizer && !string.IsNullOrWhiteSpace(spoken))
             {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            });
-            process?.WaitForExit();
+                var audio = synthesizer.Synthesize(SpeechText.Spoken(spoken));
+                _player.Play(name, audio.ToWav());
+                return;
+            }
         }
         catch
         {
-            // Player binary missing (e.g. a headless Linux host without ALSA) — stay silent.
-        }
-    }
-
-    // afplay/aplay need a file path, so materialize the embedded WAV to a temp file once and cache it.
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Best-effort temp cache: a failure falls back to silent alarm.")]
-    internal string? TempFileFor(AlarmSound sound, byte[] bytes)
-    {
-        if (_voiceTempFiles.TryGetValue(sound, out var cached))
-        {
-            return cached;
+            // A broken model, a missing file, a native fault: fall through to the bundled clip
+            // rather than losing the cue.
         }
 
-        try
+        if (fallbackClip is not null)
         {
-            var path = Path.Join(Path.GetTempPath(), $"lagebuch-{sound}.wav");
-            File.WriteAllBytes(path, bytes);
-            _voiceTempFiles[sound] = path;
-            return path;
-        }
-        catch
-        {
-            return null;
+            _player.Play(name, fallbackClip);
         }
     }
 
@@ -139,30 +139,28 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
         }
         catch
         {
-            return null; // asset not bundled — that cue stays silent
+            return null; // asset not bundled -- that cue stays silent
         }
     }
 
     [SuppressMessage(
         "Design",
         "CA1031",
-        Justification = "Best-effort temp cleanup on shutdown: a failed delete must not stop the app from exiting.")]
+        Justification = "Best-effort shutdown: a synthesizer that will not dispose must not stop the app from exiting.")]
     public void Dispose()
     {
-        foreach (var path in _voiceTempFiles.Values)
+        _player.Dispose();
+
+        try
         {
-            try
+            if (_speech.IsValueCreated)
             {
-                File.Delete(path);
-            }
-            catch
-            {
-                // Best-effort: the OS reclaims the temp directory eventually regardless.
+                _speech.Value?.Dispose();
             }
         }
+        catch
+        {
+            // The process is going away regardless.
+        }
     }
-
-    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-    [DllImport("winmm.dll", CharSet = CharSet.Auto)]
-    private static extern bool PlaySound(byte[]? data, IntPtr hModule, uint flags);
 }

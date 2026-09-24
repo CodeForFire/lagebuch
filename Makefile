@@ -19,6 +19,7 @@ APP          := src/LageBuch.App/LageBuch.App.csproj
 ANDROID_PROJ := src/LageBuch.App.Android/LageBuch.App.Android.csproj
 APP_ID       := de.codeforfire.lagebuch
 FILTER       ?=
+VOICE        ?=
 PROJECT      ?=
 VERSION      ?= 0.1.0
 
@@ -54,7 +55,8 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
         android-image android-image-rebuild apk emulator install run-android \
-        logcat uninstall package-linux logo-assets samples screenshots demo-gif
+        logcat uninstall package-linux logo-assets samples screenshots demo-gif \
+        voices audition
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -187,6 +189,16 @@ package-linux: ## Build a local .deb (VERSION=x.y.z)
 
 logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
 	packaging/logo/build-logo-assets.sh
+
+## Sprachausgabe (voice models, audition)
+
+voices: ## Fetch the TTS voice models into speech-models/ (VOICES="all" for every candidate)
+	packaging/speech/fetch-voices.sh speech-models $(VOICES)
+
+audition: ## Render the voice audition to dist/audition/index.html (VOICE=thorsten-medium for a fast loop)
+	AUDITION_OUT=$(CURDIR)/dist/audition AUDITION_VOICES=$(VOICE) $(DOTNET) test \
+	  tests/LageBuch.Speech.Sherpa.Tests -c $(CONFIG) --filter FullyQualifiedName~VoiceAuditionTests
+	@echo "open file://$(CURDIR)/dist/audition/index.html"
 
 ## Docs (README samples, screenshots, demo GIF)
 

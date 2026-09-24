@@ -1,0 +1,353 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+
+namespace LageBuch.Speech;
+
+/// <summary>
+/// Turns Lagebuch's written German into German a speech engine reads correctly.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Two levels, and the difference matters. The typed helpers -- <see cref="CallSign"/>,
+/// <see cref="Strength"/>, <see cref="Floor"/> -- are used where the caller still holds structured
+/// data, and they are always right. <see cref="Normalize"/> is the best-effort pass for text that
+/// only exists rendered (an ETB entry, a banner), where the structure that would have said what a
+/// number means is already gone.
+/// </para>
+/// <para>
+/// Ordinary numerals are left to the engine: espeak-ng and Supertonic both say "240" and "45"
+/// correctly in German, so spelling them out would only add ways to be wrong. A grouped number is
+/// split into its parts and each part left as a numeral, but the two kinds are joined differently:
+/// a Funkrufname is one identifier and runs together ("40/1" is "vierzig eins"), while a Stärke is
+/// four separate counts that want the pauses ("0/1/8/9" is "null, eins, acht, neun").
+/// </para>
+/// </remarks>
+public static class SpeechText
+{
+    // The one surviving piece of Funk convention: a group that is exactly "2" is said "zwo", so it
+    // cannot be heard as "drei". It cannot apply inside a larger number -- 42 is "zweiundvierzig",
+    // whose "zwei" is a syllable, not a digit -- so this is a whole-group rule, not a digit rule.
+    private const string Zwo = "zwo";
+
+    private static readonly char[] GroupSeparators = ['/', '-'];
+
+    // German ordinals decline. Standing alone or in apposition the neuter nominative is right
+    // ("..., zweites Obergeschoss, Wohnung 1"); after a dative article it is not ("im zweiten
+    // Obergeschoss"). Both forms appear in the corpus, so both are kept and the article picks.
+    // Index 0 is unused so the number indexes the table directly.
+    private static readonly string[] OrdinalNominative =
+    [
+        string.Empty, "erstes", "zweites", "drittes", "viertes", "fünftes", "sechstes", "siebtes",
+        "achtes", "neuntes", "zehntes", "elftes", "zwölftes", "dreizehntes", "vierzehntes",
+        "fünfzehntes", "sechzehntes", "siebzehntes", "achtzehntes", "neunzehntes", "zwanzigstes",
+    ];
+
+    private static readonly string[] OrdinalDative =
+    [
+        string.Empty, "ersten", "zweiten", "dritten", "vierten", "fünften", "sechsten", "siebten",
+        "achten", "neunten", "zehnten", "elften", "zwölften", "dreizehnten", "vierzehnten",
+        "fünfzehnten", "sechzehnten", "siebzehnten", "achtzehnten", "neunzehnten", "zwanzigsten",
+    ];
+
+    private static readonly string[] MonthWords =
+    [
+        string.Empty, "Januar", "Februar", "März", "April", "Mai", "Juni",
+        "Juli", "August", "September", "Oktober", "November", "Dezember",
+    ];
+
+    // "40/1", "1/40/1", "06/34-01" -- a Funkrufname groups its numbers with either separator, and
+    // a bare hyphen is spoken "Strich" if it survives. Only a hyphen *between digits* counts, so
+    // "AS-Überwachung" and "CSA-Trupp" are untouched.
+    private static readonly Regex DigitGroup = new(@"\d+(?:[/-]\d+)+", RegexOptions.Compiled);
+
+    private static readonly Regex StrengthGroups =
+        new(@"\bStärke\s+(\d+(?:/\d+){3})\b", RegexOptions.Compiled);
+
+    private static readonly Regex Timestamp =
+        new(@"\b(\d{2})\.(\d{2})\.(\d{4})[ ,]+(\d{1,2}):(\d{2})\b", RegexOptions.Compiled);
+
+    private static readonly Regex DateOnly = new(@"\b(\d{2})\.(\d{2})\.(\d{4})\b", RegexOptions.Compiled);
+
+    private static readonly Regex ClockTime = new(@"\b(\d{1,2}):(\d{2})\b", RegexOptions.Compiled);
+
+    // The optional leading article is what decides the ordinal's ending, so it is captured with the
+    // floor rather than left behind: "im 2. OG" is dative, a bare "2. OG" is not.
+    private static readonly Regex FloorLabel =
+        new(@"((?i:im|vom|zum|beim|dem|der|den)\s+)?\b(\d{1,2})\.\s?([OU])G\b", RegexOptions.Compiled);
+
+    private static readonly Regex FloorRange =
+        new(@"(EG|\d{1,2}\.\s?[OU]G)\s*[–—-]\s*(EG|\d{1,2}\.\s?[OU]G)", RegexOptions.Compiled);
+
+    private static readonly Regex ListSeparator = new(@"\s*/\s*", RegexOptions.Compiled);
+
+    // "FF Musterstadt (Florian Musterstadt 40/1)" -- a label followed by a parenthesised Funkrufname.
+    private static readonly Regex LabelledCallSign =
+        new(@"([^\s,;:()][^,;:()]*?)\s*\(([^)]*\d+/\d+[^)]*)\)", RegexOptions.Compiled);
+
+    // ", Stärke 0/1/8/9," -- ZF/GF/Mann/Gesamt; the last group is the total.
+    private static readonly Regex StrengthPhrase =
+        new(@",?\s*Stärke\s+\d+/\d+/\d+/(\d+)\s*,?", RegexOptions.Compiled);
+
+    private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+
+    private static readonly Regex SpaceBeforePunctuation = new(@"\s+([,.:;])", RegexOptions.Compiled);
+
+    private static readonly Regex RepeatedComma = new(@",(\s*,)+", RegexOptions.Compiled);
+
+    private static readonly Regex RedundantStop = new(@"[,;.]?\s*\.(\s*\.)*", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Speaks a Funkrufname: the name part unchanged, the number groups run together as one
+    /// identifier. "Florian Musterstadt 40/1" becomes "Florian Musterstadt 40 1", and
+    /// "Florian München 06/34-01" becomes "Florian München 6 34 1".
+    /// </summary>
+    public static string CallSign(string? callSign)
+    {
+        if (string.IsNullOrWhiteSpace(callSign))
+        {
+            return string.Empty;
+        }
+
+        var spoken = callSign
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(token => IsDigitGroup(token) ? SpeakGroups(token) : Normalize(token));
+
+        return Tidy(string.Join(' ', spoken));
+    }
+
+    /// <summary>
+    /// Speaks a Stärke such as "0/1/8/9" -- "null, eins, acht, neun". Each part is a head count, so
+    /// it stays a numeral the engine reads as a number: "0/1/10/11" is "zehn, elf", never "eins
+    /// null". Unlike <see cref="CallSign"/> the groups are comma-separated, because four counts
+    /// want the pauses that one identifier does not.
+    /// </summary>
+    public static string Strength(string? strengthText) =>
+        string.IsNullOrWhiteSpace(strengthText) ? string.Empty : Tidy(SpeakGroups(strengthText, ", "));
+
+    /// <summary>
+    /// Speaks a floor label: "EG" becomes "Erdgeschoss", "2. OG" becomes "zweites Obergeschoss",
+    /// and "im 2. OG" becomes "im zweiten Obergeschoss".
+    /// </summary>
+    public static string Floor(string? label) =>
+        string.IsNullOrWhiteSpace(label) ? string.Empty : Tidy(ExpandFloors(label));
+
+    /// <summary>
+    /// What a caller should use to speak an ETB line: <see cref="Condense"/> then
+    /// <see cref="Normalize"/>.
+    /// </summary>
+    public static string Spoken(string? text) => Normalize(Condense(text));
+
+    /// <summary>
+    /// Shortens a written line for the ear. <b>Lossy on purpose</b>, and deliberately not part of
+    /// <see cref="Normalize"/> so that a caller choosing to lose detail has to say so.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The ETB text itself never changes -- it is the record, and the PDF keeps every field. But
+    /// listening has a constraint reading does not: you cannot go back over a sentence you just
+    /// heard. Detail that helps on the page is noise in the ear, so the spoken rendering is allowed
+    /// to be shorter than the written one.
+    /// </para>
+    /// <para>
+    /// It works on the rendered string rather than on structured data, which means it also applies
+    /// to entries written long before this existed -- by the time an ETB line is read back, the
+    /// ForceUnit it came from is long gone.
+    /// </para>
+    /// </remarks>
+    public static string Condense(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        // "FF Musterstadt (Florian Musterstadt 40/1)" says Musterstadt twice. When the label's words
+        // already appear inside the Funkrufname, the label is redundant and only the call sign is
+        // spoken -- it is the identifier that tells two crews apart anyway. A label that shares
+        // nothing with the call sign is kept, because then it is carrying information.
+        var s = LabelledCallSign.Replace(
+            text,
+            m => SharesAWord(m.Groups[1].Value, m.Groups[2].Value) ? m.Groups[2].Value : m.Value);
+
+        // "Stärke 0/1/8/9" is four numbers where one will do aloud: the last group is the total.
+        // The comma before it becomes "mit" and the one after is dropped, so the clause reads
+        // "... 40/1 mit 9 Mann davon 4 AGT" rather than a list of bare numerals.
+        s = StrengthPhrase.Replace(s, m => $" mit {m.Groups[1].Value} Mann ");
+
+        return Tidy(s);
+    }
+
+    /// <summary>
+    /// Best-effort pass over already-rendered German, preserving every fact. Prefer the typed
+    /// helpers wherever the structured data is still to hand.
+    /// </summary>
+    public static string Normalize(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var s = text;
+
+        // Ranges first: the en-dash in "EG–2. OG" means "bis", and would otherwise be eaten by the
+        // generic separator rule below.
+        s = FloorRange.Replace(s, "$1 bis $2");
+        s = ExpandFloors(s);
+
+        s = Timestamp.Replace(s, m => $"{SpeakDate(m, 1, 2, 3)}, {SpeakClock(m, 4, 5)}");
+        s = DateOnly.Replace(s, m => SpeakDate(m, 1, 2, 3));
+        s = ClockTime.Replace(s, m => SpeakClock(m, 1, 2));
+
+        // A Stärke is four separate counts and wants the pauses between them; a Funkrufname is one
+        // identifier spoken as a unit, so its groups run together. Ordered Stärke first, because the
+        // general rule would otherwise swallow it.
+        s = StrengthGroups.Replace(s, m => "Stärke " + SpeakGroups(m.Groups[1].Value, ", "));
+        s = DigitGroup.Replace(s, m => SpeakGroups(m.Value));
+
+        s = s.Replace("z. B.", "zum Beispiel", StringComparison.Ordinal);
+        s = s.Replace("Whg.", "Wohnung", StringComparison.Ordinal);
+
+        // "Atemschutztrupp(s)" -- the written plural marker is noise when spoken.
+        s = s.Replace("(s)", string.Empty, StringComparison.Ordinal);
+
+        // Before the abbreviations, so a respelling cannot land inside a letter sequence.
+        s = SpeechPronunciation.Apply(s);
+
+        s = ReplaceAbbreviations(s);
+
+        s = s.Replace("→", " an ", StringComparison.Ordinal);
+        s = s.Replace("„", string.Empty, StringComparison.Ordinal)
+             .Replace("“", string.Empty, StringComparison.Ordinal);
+
+        // Pauses, measured with espeak-ng on identical words (bytes of 22050 Hz audio, ~44100/s):
+        //   none 81622 | "/" 81622 | "," 94154 | ":" 97916 | "." 101224
+        //
+        // A slash adds *nothing* -- "Müller / Schmidt / Huber" runs together exactly as if it were
+        // written without any separator at all. Every digit group has already been consumed by
+        // SpeakGroups above, so a slash surviving to here is always a list separator.
+        s = ListSeparator.Replace(s, ", ");
+
+        // A colon becomes a full stop. The extra 75 ms is not the point: a sentence boundary also
+        // resets the intonation contour, and that reset is what "grouping" actually sounds like.
+        // Ordered after ClockTime on purpose, or 09:17 would be split here.
+        s = s.Replace(":", ".", StringComparison.Ordinal);
+
+        // The em-dash separates whole clauses ("... 4 AGT — Status: Im Einsatz"), so it earns a full
+        // stop too. The middle dot only ever joins a Funkrufname to its Trupp, where a full stop
+        // would cut a single thought in half.
+        s = s.Replace("—", ".", StringComparison.Ordinal)
+             .Replace("–", ",", StringComparison.Ordinal)
+             .Replace("·", ",", StringComparison.Ordinal);
+
+        return Tidy(s);
+    }
+
+    // Case-insensitive because a label is written "FF Musterstadt" and the call sign
+    // "Florian Musterstadt"; only words of real length count, or "an"/"in" would match anything.
+    private static bool SharesAWord(string label, string callSign)
+    {
+        var words = callSign.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return label
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(w => w.Length > 3)
+            .Any(w => words.Contains(w, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static bool IsDigitGroup(string token) =>
+        token.Length > 0 && token.All(c => char.IsAsciiDigit(c) || c == '/' || c == '-');
+
+    // "40/1" -> "vierzig eins", spoken as one identifier. A comma here costs about 210 ms per gap
+    // (measured), which is far too much: a Funkrufname is said briskly on the radio, not dictated.
+    // A space costs nothing at all.
+    private static string SpeakGroups(string groups, string separator = " ") =>
+        string.Join(
+            separator,
+            groups.Split(
+                      GroupSeparators,
+                      StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                  .Select(SpeakGroup));
+
+    // A zero-padded group is written "06" and said "sechs": the padding is a column width in the
+    // Funkrufname scheme, not something anyone pronounces. Stripping runs before the "zwo" check,
+    // so "02" is "zwo" exactly like a bare "2".
+    //
+    // The guard keeps a group that *is* zero. "0" must stay "null" -- it is the leading position of
+    // a Stärke more often than not, where it is a real count rather than padding.
+    private static string SpeakGroup(string part)
+    {
+        var trimmed = part.TrimStart('0');
+        if (trimmed.Length == 0)
+        {
+            trimmed = "0";
+        }
+
+        return trimmed == "2" ? Zwo : trimmed;
+    }
+
+    private static string SpeakDate(Match m, int day, int month, int year)
+    {
+        var d = int.Parse(m.Groups[day].Value, CultureInfo.InvariantCulture);
+        var mo = int.Parse(m.Groups[month].Value, CultureInfo.InvariantCulture);
+        var name = mo is >= 1 and <= 12 ? MonthWords[mo] : m.Groups[month].Value;
+        return $"{d}. {name} {m.Groups[year].Value}";
+    }
+
+    // The hour loses its leading zero ("09" -> "9"); the minute keeps it, because "9 Uhr 5" and
+    // "9 Uhr 05" are read differently and the written form is the one the operator saw.
+    private static string SpeakClock(Match m, int hour, int minute) =>
+        $"{int.Parse(m.Groups[hour].Value, CultureInfo.InvariantCulture)} Uhr {m.Groups[minute].Value}";
+
+    private static string ExpandFloors(string text)
+    {
+        // "zweites Obergeschoss", with the ending chosen by what precedes it. A German ordinal is
+        // declined, and the corpus contains both cases: "Rauch aus dem 2. OG" needs the dative
+        // "zweiten", while the apposition in "Hauptstraße 12, 2. OG, Whg. 1" needs "zweites".
+        // Picking one ending would be wrong half the time, so the preceding article decides.
+        var s = FloorLabel.Replace(
+            text,
+            m =>
+            {
+                var storey = m.Groups[3].Value == "O" ? "Obergeschoss" : "Untergeschoss";
+                var n = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+                var article = m.Groups[1].Value;
+
+                if (n >= OrdinalNominative.Length)
+                {
+                    // Past the table a numeral reads better than a wrong word, and no Einsatzstelle
+                    // in this corpus has a twenty-first floor.
+                    return $"{article}{storey} {n}";
+                }
+
+                var ordinal = article.Length > 0 ? OrdinalDative[n] : OrdinalNominative[n];
+                return $"{article}{ordinal} {storey}";
+            });
+
+        return Regex.Replace(s, @"\bEG\b", "Erdgeschoss");
+    }
+
+    private static string ReplaceAbbreviations(string text)
+    {
+        var s = text;
+        foreach (var (abbreviation, spoken) in SpeechAbbreviations.Spelled
+                     .Concat(SpeechAbbreviations.Expanded)
+                     .OrderByDescending(pair => pair.Key.Length))
+        {
+            s = Regex.Replace(s, $@"(?<![\w-]){Regex.Escape(abbreviation)}(?![\w])", spoken);
+        }
+
+        return s;
+    }
+
+    private static string Tidy(string text)
+    {
+        var s = Whitespace.Replace(text, " ");
+        s = SpaceBeforePunctuation.Replace(s, "$1");
+        s = RepeatedComma.Replace(s, ",");
+
+        // Turning separators into full stops can leave a comma butting against one, or two stops in
+        // a row where a clause ended in punctuation already.
+        s = RedundantStop.Replace(s, ".");
+        return s.Trim().Trim(',').Trim();
+    }
+}

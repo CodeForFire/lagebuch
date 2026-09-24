@@ -586,6 +586,18 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         IsAlarmAcknowledged = true;
     }
 
+    // The first alarming Trupp and why it is alarming. Only the first: a spoken cue that listed
+    // every one would still be talking when the next repeat came round.
+    //
+    // DisplayNameWithCallSign is the same string the banner shows (#441), deliberately: the
+    // Funkrufname leads because two vehicles each send a "Trupp 1", and what is announced should
+    // not drift from what is displayed. Its "·" becomes a comma in the spoken form.
+    private string AlarmDetail()
+    {
+        var trupp = AlarmingTrupps.FirstOrDefault();
+        return trupp is null ? string.Empty : $"{trupp.DisplayNameWithCallSign}. {AlarmReason(trupp)}";
+    }
+
     private string AlarmReason(AtemschutzTrupp trupp) => trupp.IsTimeAlarm(_clock.Now)
         ? "Einsatzzeit erreicht"
         : $"Rückzugsdruck erreicht ({trupp.LatestPressure} bar)";
@@ -603,7 +615,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         if (IsAnyAlarm && !IsAlarmAcknowledged &&
             (_lastAlarmAnnouncedAt is null || _clock.Now - _lastAlarmAnnouncedAt >= RetreatRepeatInterval))
         {
-            _alarm.Play(AlarmSound.RetreatAlarm);
+            _alarm.Play(AlarmSound.RetreatAlarm, AlarmDetail());
             _lastAlarmAnnouncedAt = _clock.Now;
         }
         else if (!IsAnyAlarm)
@@ -1045,7 +1057,7 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
             {
                 if (_controlDueAnnounced.Add(trupp.Id))
                 {
-                    _alarm.Play(AlarmSound.PressureCheckDue);
+                    _alarm.Play(AlarmSound.PressureCheckDue, trupp.DisplayNameWithCallSign);
                 }
             }
             else

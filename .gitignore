@@ -43,3 +43,6 @@ seed-source/
 docs/samples/*.fwincident-wal
 docs/samples/*.fwincident-shm
 docs/samples/*.files/
+
+# Voice models fetched by packaging/speech/fetch-voices.sh -- never committed (no LFS here).
+speech-models/
