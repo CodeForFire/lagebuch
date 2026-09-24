@@ -720,11 +720,18 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [NotifyPropertyChangedFor(nameof(ShareButtonText))]
     private bool _isSharing;
 
-    // The one-line status under the toggle: the address to share, or "Tailscale nicht verbunden".
+    // Why sharing failed to start, shown inline on the status line; null while all is well. Only a
+    // failure earns header space — the address of a running share lives in ShareAddress instead.
     [ObservableProperty]
     private string? _shareStatus;
 
-    // The 4-digit PIN a joining device must enter; shown next to the address while sharing (§ #64).
+    // Where joining devices dial in, while sharing. Kept off the header line and shown only on demand
+    // behind the PIN: the ELW sets the address up once and rarely needs it again, while the header
+    // is shared with the Lagebuchführer readout and ran out of width with the URLs in it.
+    [ObservableProperty]
+    private string? _shareAddress;
+
+    // The 4-digit PIN a joining device must enter; the one thing read out per joining device (§ #64).
     [ObservableProperty]
     private string? _sharePin;
 
@@ -749,6 +756,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             await _hostController.StopAsync();
             IsSharing = false;
             ShareStatus = null;
+            ShareAddress = null;
             SharePin = null;
             return;
         }
@@ -769,7 +777,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
 
         IsSharing = true;
-        ShareStatus = _hostController.ShareHint;
+        ShareStatus = null; // clears a previous attempt's failure
+        ShareAddress = _hostController.ShareHint;
         SharePin = _hostController.SharePin;
     }
 }

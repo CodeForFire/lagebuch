@@ -55,8 +55,9 @@ internal sealed class IncidentHostController : IIncidentHostController
         SharePin = pin;
 
         // Bound on every interface; show the nicest address to dial plus the same-machine shortcut.
-        ShareHint = $"Erreichbar unter https://{LocalNetwork.DisplayAddress()}:{SyncProtocol.Port} · "
-            + $"auf diesem Gerät: https://localhost:{SyncProtocol.Port}";
+        // One per line: the flyout that shows it supplies the "Erreichbar unter" heading.
+        ShareHint = $"Im Netzwerk: https://{LocalNetwork.DisplayAddress()}:{SyncProtocol.Port}\n"
+            + $"Auf diesem Gerät: https://localhost:{SyncProtocol.Port}";
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)

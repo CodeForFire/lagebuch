@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.IncidentWorkspaceView"
              x:DataType="vm:IncidentWorkspaceViewModel">
   <Panel>
@@ -18,12 +19,18 @@
                "+ Einsatzdaten ergänzen" takes its place while nothing is known yet, #250). Status
                shares the hero's line on the right as a bare dot + word, no chrome. The app name lives
                once, up in the command bar. Sharing (#52) is a compact icon button on that same status
-               line rather than a labelled button on its own row — once active, the address/PIN it
-               reveals sit immediately left of the status pill, so the whole identity block never
-               grows past one line. -->
-          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-              <TextBlock x:Name="EinsatznummerValue" Classes="metric" Text="{Binding HeroText}" />
+               line rather than a labelled button on its own row — once active, only the PIN it
+               reveals sits left of the status pill; the address hides behind it (a click on the PIN).
+               LeadTrailPanel keeps the identity and the status group on one line while they fit and
+               wraps the status group, right-aligned, onto a second line when they don't — a *,Auto
+               Grid here used to draw them on top of each other on a narrower window. -->
+          <ctrl:LeadTrailPanel x:Name="HeaderIdentityLine" ItemSpacing="24" LineSpacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+              <!-- Trimmed rather than unbounded: a long Stichwort would otherwise push the status
+                   group onto its own line and still run past the window edge. -->
+              <TextBlock x:Name="EinsatznummerValue" Classes="metric" Text="{Binding HeroText}"
+                         MaxWidth="560" TextTrimming="CharacterEllipsis"
+                         ToolTip.Tip="{Binding HeroText}" />
 
               <!-- The chip, the address line and the two affordances are independent siblings (not
                    nested inside a shared collapsing wrapper): a data-bound text element stranded
@@ -34,6 +41,7 @@
                          Text="{Binding IncidentNumberInput}" IsVisible="{Binding ShowEinsatznummerChip}" />
 
               <TextBlock x:Name="AddressLine" Classes="secondary" VerticalAlignment="Center"
+                         MaxWidth="360" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding AddressDisplay}"
                          Text="{Binding AddressDisplay}" IsVisible="{Binding ShowAddressLine}" />
 
               <Button x:Name="EditIncidentDataButton" Classes="ghost" ToolTip.Tip="Einsatzdaten bearbeiten"
@@ -49,7 +57,7 @@
                       Command="{Binding EditIncidentDataCommand}" />
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <StackPanel x:Name="HeaderStatusGroup" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
               <!-- Who documents on this device, and the handover to the next Lagebuchführer (#469).
                    Each element gates its own IsVisible, for the same zero-width reason as the
                    sharing row below: OperatorDisplay arrives in the same update that shows it. -->
@@ -58,6 +66,7 @@
                            IsVisible="{Binding OperatorDisplay, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 <TextBlock x:Name="OperatorValue" Classes="body" VerticalAlignment="Center"
                            Foreground="{StaticResource TextPrimaryBrush}"
+                           MaxWidth="320" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding OperatorDisplay}"
                            Text="{Binding OperatorDisplay}"
                            IsVisible="{Binding OperatorDisplay, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 <Button x:Name="ChangeOperatorButton" Classes="ghost" ToolTip.Tip="Lagebuchführer wechseln"
@@ -91,27 +100,48 @@
                               Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
                   </Panel>
                 </Button>
-                <TextBlock Classes="body" VerticalAlignment="Center"
+                <!-- Only a failure to start sharing takes room here; trimmed, full text on hover. -->
+                <TextBlock x:Name="ShareError" Classes="body" VerticalAlignment="Center"
                            Foreground="{StaticResource TextSecondaryBrush}"
+                           MaxWidth="320" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ShareStatus}"
                            Text="{Binding ShareStatus}"
                            IsVisible="{Binding ShareStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 <!-- The PIN a joining device must enter; read it out to whoever is connecting (#64).
-                     The label and value gate their OWN IsVisible and hang off the always-visible
-                     sharing group — they are NOT wrapped in a Border that collapses on SharePin. A
-                     data-bound text element stranded inside an IsVisible-collapsed container is
-                     measured to zero width the first time the container un-collapses (the text
-                     arrives in the same notification) and caches it, so on the first share the number
-                     showed blank until a later relayout. The ShareStatus line above renders on first
-                     share for exactly this reason. -->
-                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                  <TextBlock Text="PIN" Classes="overline" FontSize="10" VerticalAlignment="Center"
-                             Foreground="{StaticResource AmberBrush}"
-                             IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  <TextBlock x:Name="PinValue" Text="{Binding SharePin}" VerticalAlignment="Center"
-                             FontWeight="Medium" FontFamily="{StaticResource MonoFont}"
-                             Foreground="{StaticResource AmberBrush}"
-                             IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                </StackPanel>
+                     It is also the way to the address other devices dial: that is set up once in the
+                     ELW and then rarely needed, so it sits in a flyout behind the PIN instead of on
+                     the header line, where it crowded out the Lagebuchführer readout.
+                     The label and value gate their OWN IsVisible besides the button's. A data-bound
+                     text element stranded inside an IsVisible-collapsed container is measured to zero
+                     width the first time the container un-collapses (the text arrives in the same
+                     notification) and caches it, so on the first share the number once showed blank
+                     until a later relayout; First_share_lays_out_the_pin_value_with_a_visible_width
+                     guards that. -->
+                <Button x:Name="ShareInfoButton" Classes="ghost" Padding="6,2"
+                        ToolTip.Tip="Adresse für andere Geräte anzeigen"
+                        AutomationProperties.Name="Adresse für andere Geräte anzeigen"
+                        IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="PIN" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                               Foreground="{StaticResource AmberBrush}"
+                               IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock x:Name="PinValue" Text="{Binding SharePin}" VerticalAlignment="Center"
+                               FontWeight="Medium" FontFamily="{StaticResource MonoFont}"
+                               Foreground="{StaticResource AmberBrush}"
+                               IsVisible="{Binding SharePin, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </StackPanel>
+                  <Button.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedRight">
+                      <StackPanel x:Name="ShareAddressPanel" Spacing="8" MinWidth="220">
+                        <TextBlock Text="ERREICHBAR UNTER" Classes="overline" />
+                        <SelectableTextBlock x:Name="ShareAddressValue" Classes="body"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             Text="{Binding ShareAddress}" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" MaxWidth="320" HorizontalAlignment="Left"
+                                   Text="{Binding SharePin, StringFormat='Beim Verbinden die PIN {0} eingeben.'}" />
+                      </StackPanel>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
               </StackPanel>
 
               <Border Width="1" Height="18" Background="{StaticResource HairlineBrush}"
@@ -124,7 +154,7 @@
                            Text="{Binding StatusDisplay}" />
               </StackPanel>
             </StackPanel>
-          </Grid>
+          </ctrl:LeadTrailPanel>
 
           <!-- Persistence failure banner (issue #167 review follow-up): IncidentStore's background
                writer can silently fail a queued write (disk full, read-only, locked/corrupt DB),

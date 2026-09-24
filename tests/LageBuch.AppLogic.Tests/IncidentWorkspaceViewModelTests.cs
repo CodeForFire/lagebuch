@@ -39,16 +39,31 @@ public class IncidentWorkspaceViewModelTests
 
     // --- Network sharing (no Tailscale required) --------------------------------------------
     [Fact]
-    public async Task Toggling_sharing_on_starts_the_host_and_shows_its_hint()
+    public async Task Toggling_sharing_on_starts_the_host_and_offers_its_address_without_a_status_line()
     {
-        var host = new FakeHostController(shareHint: "Erreichbar unter https://192.168.0.5:5859 · auf diesem Gerät: https://localhost:5859");
+        var host = new FakeHostController(shareHint: "Im Netzwerk: https://192.168.0.5:5859\nAuf diesem Gerät: https://localhost:5859");
         var vm = EditableWorkspace(host);
 
         await vm.ToggleSharingCommand.ExecuteAsync(null);
 
         Assert.True(host.StartCalled);
         Assert.True(vm.IsSharing);
-        Assert.Equal(host.ShareHint, vm.ShareStatus);
+        Assert.Equal(host.ShareHint, vm.ShareAddress);
+        Assert.Null(vm.ShareStatus); // the header line only carries a failure
+    }
+
+    [Fact]
+    public async Task Stopping_sharing_clears_the_address_and_the_pin()
+    {
+        var host = new FakeHostController(shareHint: "Im Netzwerk: https://192.168.0.5:5859");
+        var vm = EditableWorkspace(host);
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsSharing);
+        Assert.Null(vm.ShareAddress);
+        Assert.Null(vm.SharePin);
     }
 
     [Fact]
@@ -61,6 +76,7 @@ public class IncidentWorkspaceViewModelTests
 
         Assert.False(vm.IsSharing);
         Assert.Contains("Port 5859 belegt", vm.ShareStatus, StringComparison.Ordinal);
+        Assert.Null(vm.ShareAddress);
     }
 
     [Fact]

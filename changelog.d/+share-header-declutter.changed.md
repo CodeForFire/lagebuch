@@ -1,0 +1,1 @@
+While an incident is shared, the header shows only the PIN, and the address other devices dial now opens with a click on it; on a narrower window the header moves the Lagebuchführer, sharing and status onto a second line instead of drawing them on top of the Stichwort.
