@@ -67,7 +67,7 @@ Markdown.
 | **Funktionen** | EL, Abschnittsleiter und weitere Rollen mit von/bis, Übergabe und Handynummer |
 | **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene; Sicherheitstrupp je Trupp zugeordnet und im ETB protokolliert |
 | **Rückmeldung an ILS** | Erinnerung nach konfigurierbarer Zeit, danach im Intervall, mit ERLEDIGT-Quittierung; überlebt Neustart und Absturz |
-| **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), ppm-Wert mit Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort |
+| **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), Messreihe je Wohnung mit Uhrzeit und ppm-Wert in Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort; der Verlauf steht im ETB und im PDF |
 | **Checklisten** | Beliebig viele eigene Checklisten aus den Stammdaten – benannt, in frei wählbarer Reihenfolge in der Seitenleiste, Pflichtpunkte markiert, Abschluss im ETB protokolliert |
 | **Dateien & Links** | Fotos und PDFs an den Einsatz hängen (landen im Bericht); Schnellzugriff auf Wetter, Karten, Hydrantenplan |
 | **PDF-Bericht** | Ein Klick, Abschnitte wählbar, Anhänge eingebettet – fertig für Akte und Kreisbrandinspektion |
@@ -83,8 +83,8 @@ Alle Angaben laut Herstellerseiten, Stand September 2026. Fehler oder
 | Ohne Internet voll nutzbar | ja | ja | Desktop-Suite ja; Stammdaten und Ticker über das Cloud-Portal ([Quelle](https://fireboard.net/)) | ja, Abgleich sobald wieder online ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | ja, als Browser-App ([Quelle](https://www.fireplan.de/elw)) |
 | Daten bleiben im ELW, kein Cloud-Konto | ja, eine Datei pro Einsatz | ja | nein, „cloudbasierte Lösung“ mit Portal-Benutzerkonto ([Quelle](https://fireboard.net/)) | nein, Cloud mit Servern in Deutschland ([Quelle](https://www.missionbuddies.de/faq/)) | k. A. |
 | Mehrere Geräte im Einsatz | ja, LAN/Tailscale, TLS-gepinnt, ohne Server | nein | ja, über Portal ([Quelle](https://fireboard.net/produkte/module/grundsystem/)) | ja; gratis auf 2 Geräten, Premium unbegrenzt ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | ja, live nur mit Internet ([Quelle](https://www.fireplan.de/elw)) |
-| Atemschutzüberwachung | ja, mit Sprachansage und Rückzugsalarm | Überwachungstafel | ja, laut Produktseite ([Quelle](https://fireboard.net/)) | ja, Gratis-Stufe ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | k. A. |
-| CO-Messprotokoll | ja | Zettel | k. A. | k. A. | k. A. |
+| Atemschutzüberwachung | ja, mit Sprachansage, Rückzugsalarm und Sicherheitstrupp | Überwachungstafel | ja, laut Produktseite ([Quelle](https://fireboard.net/)) | ja, Gratis-Stufe ([Quelle](https://www.missionbuddies.de/atemschutzueberwachung/)) | k. A. |
+| CO-Messprotokoll | ja, Messreihe je Wohnung | Zettel | k. A. | k. A. | k. A. |
 | PDF-Einsatzbericht | ja, Abschnitte wählbar | nein | ja ([Quelle](https://fireboard.net/produkte/module/grundsystem/)) | ja, modulweise Export ([Quelle](https://www.missionbuddies.de/faq/)) | k. A. |
 | Kosten | 0 €, MIT-Lizenz | Papier | Grundsystem kostenfrei; Module wie Einsatzführung einmalig 600 € zzgl. 90 €/Jahr Wartung ([Preisliste 02/2026](https://fireboard.net/wp-content/uploads/2026/02/Fireboard-Preisliste-gesamt-Feb2026.pdf)) | Gratis-Stufe, sonst Abo ([Quelle](https://www.missionbuddies.de/faq/)) | auf Anfrage |
 | Quellcode einsehbar | ja | – | nein | nein | nein |
@@ -106,11 +106,13 @@ Alle Beispieldaten sind frei erfunden.
    [`uebung.fwincident`](docs/samples/uebung.fwincident) herunterladen
    ([Direktlink](https://github.com/CodeForFire/lagebuch/raw/main/docs/samples/uebung.fwincident)),
    in Lagebuch **ÖFFNEN** wählen. Der Einsatz „B 3 – Zimmerbrand“ hat schon
-   ETB-Einträge, vier Fahrzeuge, zwei Atemschutztrupps, Aufgaben und ein
-   CO-Messprotokoll. Über **WEITER BEARBEITEN** kannst du selbst eingreifen.
+   ETB-Einträge, vier Fahrzeuge, einen Angriffstrupp unter Atemschutz mit
+   zugeordnetem Sicherheitstrupp, Aufgaben und ein CO-Messprotokoll, in dem
+   eine Wohnung schon dreimal gemessen wurde. Über **WEITER BEARBEITEN** kannst du selbst eingreifen.
 4. **Ausprobieren** – einen ETB-Eintrag schreiben, im Tab **ATEMSCHUTZ** einen
-   Trupp bereitstellen und starten, eine Aufgabe mit Timer anlegen, in der
-   **CO-MESSUNG** eine Wohnung markieren.
+   Trupp bereitstellen, einen Sicherheitstrupp zuordnen und starten, eine
+   Aufgabe mit Timer anlegen, in der **CO-MESSUNG** eine Wohnung markieren oder
+   einen weiteren Messwert eintragen.
 5. **PDF EXPORTIEREN** – der fertige Einsatzbericht liegt nach ein paar
    Sekunden auf der Platte.
 
