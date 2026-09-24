@@ -81,7 +81,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // buttons (unlike the workspace's own "ZUR STARTSEITE", which already routes through
     // GoHomeRequested -> LeaveAsync) would drop the old workspace from CurrentView while it stayed
     // subscribed forever.
-    private async Task NavigateAwayAsync(Action proceed, bool toMasterData = false)
+    private async Task NavigateAwayAsync(Action proceed)
     {
         if (ReferenceEquals(CurrentView, _editor))
         {
@@ -105,7 +105,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 // Fire-and-forget like GoHomeRequested: a failed final save surfaces through the
                 // store's SaveFailed, not through this task.
-                ws.ConfirmLeaveThen(toMasterData, () => _ = LeaveThenAsync(ws, proceed));
+                ws.ConfirmLeaveThen(() => _ = LeaveThenAsync(ws, proceed));
                 return;
             }
 
@@ -150,7 +150,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     });
 
     [RelayCommand]
-    private Task ShowMasterData() => NavigateAwayAsync(() => CurrentView = _editor, toMasterData: true);
+    private Task ShowMasterData() => NavigateAwayAsync(() => CurrentView = _editor);
 
     [RelayCommand]
     private async Task ConfirmOperatorAsync()

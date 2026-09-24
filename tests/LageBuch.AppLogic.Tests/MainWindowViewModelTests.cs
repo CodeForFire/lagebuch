@@ -459,7 +459,7 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task Show_master_data_while_sharing_does_not_leave_the_incident()
+    public async Task Show_master_data_while_sharing_asks_like_any_exit_and_ends_sharing()
     {
         var host = new FakeHostController();
         var vm = NewWithHost(host);
@@ -467,10 +467,11 @@ public class MainWindowViewModelTests
         await workspace.ToggleSharingCommand.ExecuteAsync(null);
 
         await vm.ShowMasterDataCommand.ExecuteAsync(null);
-        Assert.Equal("FREIGABE BEENDEN", workspace.PendingConfirm!.ConfirmLabel);
+        Assert.Equal("Freigabe beenden?", workspace.PendingConfirm!.Title);
         workspace.PendingConfirm.ConfirmCommand.Execute(null);
 
-        Assert.Same(workspace, vm.CurrentView); // blocked: the confirm only ends the sharing
+        // No Stammdaten lock needed: the editor only opens once the clients are cut off.
+        Assert.IsType<MasterDataEditorViewModel>(vm.CurrentView);
         Assert.False(workspace.IsSharing);
         Assert.True(host.StopCalled);
     }

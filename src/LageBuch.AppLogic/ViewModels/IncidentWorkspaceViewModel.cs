@@ -299,33 +299,21 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     /// <summary>
     /// Asks before the shell leaves this workspace (#463), and runs <paramref name="leave"/> on
-    /// confirm; the wording is the same for every exit and only says whether leaving also cuts off
-    /// other devices. Stammdaten are not
-    /// reachable at all while the incident is shared or joined: the host serves its set to the
-    /// clients and a client runs on the host's, so the dialog then offers to end the sharing or the
-    /// connection instead, and never runs <paramref name="leave"/>.
+    /// confirm. The dialog is the same whatever the destination; its wording only says whether
+    /// leaving also cuts off other devices -- which is also why Stammdaten need no lock of their
+    /// own: <see cref="LeaveAsync"/> ends the sharing or the connection before the editor opens.
     /// </summary>
-    public void ConfirmLeaveThen(bool toMasterData, Action leave)
+    public void ConfirmLeaveThen(Action leave)
     {
         ArgumentNullException.ThrowIfNull(leave);
-        var dialog = (toMasterData, IsSharing, _session.IsRemote) switch
+        var dialog = (IsSharing, _session.IsRemote) switch
         {
-            (true, true, _) => new ConfirmDialogViewModel(
-                "Stammdaten gesperrt",
-                "Solange der Einsatz im Netzwerk freigegeben ist, bleiben die Stammdaten gesperrt. Zuerst die Freigabe beenden.",
-                "FREIGABE BEENDEN",
-                () => ToggleSharingCommand.Execute(null)),
-            (true, _, true) => new ConfirmDialogViewModel(
-                "Stammdaten gesperrt",
-                "Solange dieses Gerät mit einem Einsatz verbunden ist, bleiben die Stammdaten gesperrt. Zuerst die Verbindung trennen.",
-                "VERBINDUNG TRENNEN",
-                () => GoHomeRequested?.Invoke()),
-            (_, true, _) => new ConfirmDialogViewModel(
+            (true, _) => new ConfirmDialogViewModel(
                 "Freigabe beenden?",
                 "Beim Verlassen wird die Freigabe beendet — verbundene Geräte werden getrennt.",
                 "VERLASSEN",
                 leave),
-            (_, _, true) => new ConfirmDialogViewModel(
+            (_, true) => new ConfirmDialogViewModel(
                 "Verbindung trennen?",
                 "Beim Verlassen wird die Verbindung zum Einsatz getrennt.",
                 "TRENNEN",

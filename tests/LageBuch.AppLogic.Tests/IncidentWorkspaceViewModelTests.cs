@@ -111,23 +111,7 @@ public class IncidentWorkspaceViewModelTests
     }
 
     [Fact]
-    public async Task Leaving_for_master_data_while_sharing_offers_to_stop_sharing_and_stays()
-    {
-        var host = new FakeHostController();
-        var vm = EditableWorkspace(host);
-        await vm.ToggleSharingCommand.ExecuteAsync(null);
-        var left = false;
-
-        vm.ConfirmLeaveThen(toMasterData: true, () => left = true);
-        vm.PendingConfirm!.ConfirmCommand.Execute(null);
-
-        Assert.False(left);
-        Assert.False(vm.IsSharing);
-        Assert.True(host.StopCalled);
-    }
-
-    [Fact]
-    public void Leaving_for_master_data_on_a_joined_client_offers_to_disconnect()
+    public void Leaving_a_joined_incident_says_the_connection_is_dropped()
     {
         var clock = new FixedClock(T0);
         var local = TestSession.StartNew(
@@ -145,16 +129,14 @@ public class IncidentWorkspaceViewModelTests
             new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController());
-        var wentHome = false;
         var left = false;
-        vm.GoHomeRequested = () => wentHome = true;
 
-        vm.ConfirmLeaveThen(toMasterData: true, () => left = true);
-        Assert.Equal("VERBINDUNG TRENNEN", vm.PendingConfirm!.ConfirmLabel);
+        vm.ConfirmLeaveThen(() => left = true);
+        Assert.Equal("Verbindung trennen?", vm.PendingConfirm!.Title);
+        Assert.Equal("TRENNEN", vm.PendingConfirm.ConfirmLabel);
         vm.PendingConfirm.ConfirmCommand.Execute(null);
 
-        Assert.True(wentHome); // the ordinary disconnect path, not the way to Stammdaten
-        Assert.False(left);
+        Assert.True(left);
     }
 
     private static IncidentWorkspaceViewModel NewWorkspace(out FakeStore store, out FixedClock clock, FakeDialogs? dialogs = null)
