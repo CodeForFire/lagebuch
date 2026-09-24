@@ -161,6 +161,16 @@ public sealed class IncidentHost : IAsyncDisposable
         // carries metadata only (issue #167 P1 #2) — the attachment's bytes arrive separately via
         // HandleUploadFile — and a RemoveFileCommand's byte cleanup below runs the same way, off the
         // UI thread, once the metadata mutation and the broadcasted snapshot have already landed.
+        //
+        // Every command reaching this endpoint comes from a peer — the host's own UI edits go
+        // straight through its local session, never over HTTP. Closing the incident is the host's
+        // call alone (#465): a joined device, or an older client that still offers the button,
+        // must not be able to end the Einsatz for everyone.
+        if (command is CloseIncidentCommand)
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
         try
         {
             var removedFile = await _ui.InvokeAsync(() => CommandApplier.Apply(command, _session.Incident, _clock));

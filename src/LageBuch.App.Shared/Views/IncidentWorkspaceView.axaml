@@ -363,8 +363,11 @@
                        IsVisible="{Binding ExportStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" IsEnabled="{Binding IsInputEnabled}">
-            <Button x:Name="CloseButton" Content="EINSATZ ABSCHLIESSEN" Command="{Binding CloseIncidentCommand}" />
-            <!-- PDF export renders from the local file, so it's host-only (hidden on a joined client). -->
+            <!-- Only the host closes the incident (#465); a joined client doesn't see the button. -->
+            <Button x:Name="CloseButton" Content="EINSATZ ABSCHLIESSEN" Command="{Binding CloseIncidentCommand}"
+                    IsVisible="{Binding !IsClient}" />
+            <!-- The host exports from its file, a joined client from the synced state (#465). Hidden
+                 only where the platform can't render a PDF. -->
             <Button x:Name="ExportButton" Classes="signal" Content="PDF EXPORTIEREN" Command="{Binding ExportPdfCommand}"
                     IsVisible="{Binding CanExport}" />
           </StackPanel>

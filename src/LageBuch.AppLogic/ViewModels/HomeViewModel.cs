@@ -384,8 +384,9 @@ public sealed partial class HomeViewModel : ObservableObject
         return (trimmed, SyncProtocol.Port);
     }
 
-    // The remote workspace can't host (a client isn't hostable) and has no local file, so it gets a
-    // no-op host controller — the "Im Netzwerk freigeben" toggle and PDF export stay hidden.
+    // The remote workspace can't host (a client isn't hostable), so it gets a no-op host controller
+    // and the "Im Netzwerk freigeben" toggle stays hidden. It does get the PDF exporter: a client
+    // renders the synced state itself (#465). It gets no store, since it writes nothing locally.
     [SuppressMessage(
         "Reliability",
         "CA2000",
@@ -393,7 +394,7 @@ public sealed partial class HomeViewModel : ObservableObject
     private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md)
     {
         var workspace = new IncidentWorkspaceViewModel(
-            session, _clock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController());
+            session, _clock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController(), _pdfExporter, _lastPdfExport);
         WorkspaceOpened?.Invoke(workspace);
     }
 }

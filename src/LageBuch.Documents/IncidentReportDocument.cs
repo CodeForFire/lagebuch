@@ -25,8 +25,9 @@ public sealed class IncidentReportDocument : IDocument
     /// footer are always rendered regardless of this selection.
     /// </param>
     /// <param name="asOf">
-    /// The moment the export was taken. Only <see cref="Sections.TasksSection"/> uses it (to decide
-    /// which Aufgaben are overdue); every other section is a pure function of the incident.
+    /// The moment the export was taken. <see cref="Sections.TasksSection"/> uses it to decide which
+    /// Aufgaben are overdue, and the footer of a still-open incident prints it as the Zwischenstand
+    /// time (see <see cref="InterimMarker"/>); every other section is a pure function of the incident.
     /// </param>
     public IncidentReportDocument(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null, IncidentPdfSections sections = IncidentPdfSections.All)
     {
@@ -104,13 +105,36 @@ public sealed class IncidentReportDocument : IDocument
                 }
             });
 
-            page.Footer().AlignCenter().Text(t =>
+            var interimMarker = InterimMarker(_incident, _asOf);
+            page.Footer().Layers(layers =>
             {
-                t.Span("Seite ");
-                t.CurrentPageNumber();
-                t.Span(" / ");
-                t.TotalPages();
+                // Layered rather than split into columns, so the page count stays centred and the
+                // marker still gets the full width to the left of it instead of wrapping.
+                layers.PrimaryLayer().AlignCenter().Text(t =>
+                {
+                    t.Span("Seite ");
+                    t.CurrentPageNumber();
+                    t.Span(" / ");
+                    t.TotalPages();
+                });
+                if (interimMarker is not null)
+                {
+                    layers.Layer().AlignLeft().Text(interimMarker);
+                }
             });
         });
+    }
+
+    /// <summary>
+    /// The footer line on every page of a still-open incident's report (#465), or <c>null</c> once
+    /// it is closed. A PDF taken mid-Einsatz — on the host or on a joined client — is a snapshot
+    /// that will be overtaken, and has to say so on paper where "Status: Offen" is easy to miss.
+    /// </summary>
+    public static string? InterimMarker(Incident incident, DateTimeOffset asOf)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        return incident.State == IncidentState.Open
+            ? $"Zwischenstand – Stand {Formatting.Timestamp(asOf)}"
+            : null;
     }
 }

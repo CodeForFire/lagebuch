@@ -109,8 +109,8 @@ public sealed class LocalIncidentSession : IIncidentSession
         Changed?.Invoke();
     }
 
-    // Export is host-only (IncidentWorkspaceViewModel.CanExport gates on _local being non-null), and
-    // every attached file's bytes land in this device's own sibling folder the moment it's added —
+    // The host's export (a joined client uses SessionPdfExport instead, #465). Every attached
+    // file's bytes land in this device's own sibling folder the moment it's added —
     // whether typed here or uploaded by a joined client via AddFileCommand — so this never needs a
     // network pull, only IIncidentStore.
     public async Task<byte[]> ExportPdfAsync(IIncidentPdfExporter exporter, IncidentPdfSections sections = IncidentPdfSections.All)

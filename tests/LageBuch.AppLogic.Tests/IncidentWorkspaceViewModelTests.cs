@@ -829,6 +829,75 @@ public class IncidentWorkspaceViewModelTests
         Assert.True(vm.CanExport);
     }
 
+    // A joined client's workspace: the snapshot double stands in for RemoteIncidentSession
+    // (IsRemote, not a LocalIncidentSession), without a network.
+    private static IncidentWorkspaceViewModel ClientWorkspace(FakeDialogs? dialogs = null)
+    {
+        var clock = new FixedClock(T0);
+        var host = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        return new IncidentWorkspaceViewModel(
+            new SnapshotRoundTrippingSession(host),
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs ?? new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter());
+    }
+
+    [Fact]
+    public void Close_is_unavailable_on_a_client_workspace()
+    {
+        var vm = ClientWorkspace();
+
+        Assert.True(vm.IsClient);
+        Assert.False(vm.CloseIncidentCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Close_stays_available_on_the_host()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.False(vm.IsClient);
+        Assert.True(vm.CloseIncidentCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void CanExport_is_true_on_a_client_when_the_platform_can_render_pdfs()
+    {
+        var vm = ClientWorkspace();
+
+        Assert.True(vm.CanExport);
+        Assert.True(vm.ExportPdfCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ExportPdf_on_a_client_writes_a_pdf_from_the_synced_state_named_after_the_incidents_start()
+    {
+        var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var dialogs = new FakeDialogs { ExportPath = exportPath };
+        var vm = ClientWorkspace(dialogs);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        // No .fwincident on a client, so the name comes from the start time, formatted the way
+        // HomeViewModel names a new incident's file.
+        Assert.Equal("20260622-0900.pdf", dialogs.LastSuggestedExportName);
+        var bytes = await File.ReadAllBytesAsync(exportPath);
+        Assert.Equal(0x25, bytes[0]); // %PDF
+        Assert.Equal($"PDF exportiert: {Path.GetFileName(exportPath)}", vm.ExportStatus);
+        File.Delete(exportPath);
+    }
+
     [Fact]
     public void Header_shows_who_documents_and_offers_the_handover()
     {

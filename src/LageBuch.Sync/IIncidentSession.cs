@@ -132,6 +132,11 @@ public interface IIncidentSession
     /// </summary>
     void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning);
 
+    /// <summary>
+    /// Closes the incident for good. Only the authoritative device may: a joined client
+    /// (<see cref="IsRemote"/>) throws <see cref="InvalidOperationException"/>, and the host refuses
+    /// a peer's close command (#465).
+    /// </summary>
     void Close();
 
     /// <summary>

@@ -1,0 +1,1 @@
+A joined device can now export the PDF from the synced Einsatzdaten but can no longer close the host's incident, which the host now refuses, and a PDF of a still-open incident is marked as Zwischenstand (#465).
