@@ -149,7 +149,6 @@ public class IncidentWorkspaceViewModelTests
         var left = false;
         vm.GoHomeRequested = () => wentHome = true;
 
-        Assert.True(vm.IsNetworked);
         vm.ConfirmLeaveThen(toMasterData: true, () => left = true);
         Assert.Equal("VERBINDUNG TRENNEN", vm.PendingConfirm!.ConfirmLabel);
         vm.PendingConfirm.ConfirmCommand.Execute(null);

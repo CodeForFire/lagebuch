@@ -298,16 +298,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private void LeaveToHome() => GoHomeRequested?.Invoke();
 
     /// <summary>
-    /// Whether leaving this workspace cuts off other devices: it is shared from here, or this
-    /// device is a joined client.
-    /// </summary>
-    public bool IsNetworked => IsSharing || _session.IsRemote;
-
-    /// <summary>
     /// Asks before the shell leaves this workspace (#463), and runs <paramref name="leave"/> on
-    /// confirm. Stammdaten are not reachable at all while <see cref="IsNetworked"/>: the host
-    /// serves its set to the clients and a client runs on the host's, so the dialog then offers to
-    /// end the sharing or the connection instead, and never runs <paramref name="leave"/>.
+    /// confirm; the wording says whether leaving also cuts off other devices. Stammdaten are not
+    /// reachable at all while the incident is shared or joined: the host serves its set to the
+    /// clients and a client runs on the host's, so the dialog then offers to end the sharing or the
+    /// connection instead, and never runs <paramref name="leave"/>.
     /// </summary>
     public void ConfirmLeaveThen(bool toMasterData, Action leave)
     {
@@ -334,10 +329,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 "Beim Verlassen wird die Freigabe beendet — verbundene Geräte werden getrennt.",
                 "VERLASSEN",
                 leave),
-            _ => new ConfirmDialogViewModel(
+            (_, _, true) => new ConfirmDialogViewModel(
                 "Verbindung trennen?",
                 "Beim Verlassen wird die Verbindung zum Einsatz getrennt.",
                 "TRENNEN",
+                leave),
+            _ => new ConfirmDialogViewModel(
+                "Einsatz verlassen?",
+                "Der Einsatz wird verlassen. Er ist gespeichert und lässt sich über die Übersicht wieder öffnen.",
+                "VERLASSEN",
                 leave),
         };
         dialog.Closed += (_, _) => PendingConfirm = null;
@@ -773,7 +773,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShareButtonText))]
-    [NotifyPropertyChangedFor(nameof(IsNetworked))]
     private bool _isSharing;
 
     // Why sharing failed to start, shown inline on the status line; null while all is well. Only a

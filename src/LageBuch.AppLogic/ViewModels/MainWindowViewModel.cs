@@ -72,45 +72,41 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private AboutViewModel? _pendingAbout;
 
     // Every path that leaves the editor or an open workspace goes through here. Unsaved Stammdaten
-    // edits prompt first; leaving an open IncidentWorkspaceViewModel drains and unsubscribes it from
-    // the app-lifetime IIncidentStore singleton first (review follow-up to #280) -- otherwise the top
-    // command bar's ÜBERSICHT/STAMMDATEN/ÖFFNEN/NEUER EINSATZ/VERBINDEN buttons (unlike the
-    // workspace's own "ZUR STARTSEITE", which already routes through GoHomeRequested -> LeaveAsync)
-    // would drop the old workspace from CurrentView while it stayed subscribed forever.
-    // Leaving an open workspace asks first (#463) when it is headed for Stammdaten, or when leaving
-    // cuts off other devices; the workspace owns that prompt, since only it knows which case it is.
-    private async Task NavigateAwayAsync(Action proceed, bool toMasterData = false)
+    // edits prompt first. Leaving an open incident always asks first (#463) -- a stray tap on the
+    // command bar mid-Einsatz must not throw the Lagebuchführer out of it; the workspace owns that
+    // prompt, since only it knows whether it is shared or joined. On confirm, LeaveThenAsync drains
+    // and unsubscribes the workspace from the app-lifetime IIncidentStore singleton (review follow-up
+    // to #280) -- otherwise the command bar's ÜBERSICHT/STAMMDATEN/ÖFFNEN/NEUER EINSATZ/VERBINDEN
+    // buttons (unlike the workspace's own "ZUR STARTSEITE", which already routes through
+    // GoHomeRequested -> LeaveAsync) would drop the old workspace from CurrentView while it stayed
+    // subscribed forever.
+    private Task NavigateAwayAsync(Action proceed, bool toMasterData = false)
     {
         if (ReferenceEquals(CurrentView, _editor))
         {
             if (_editor.PendingConfirm is not null)
             {
-                return; // a discard prompt is already up — don't stack a second one
+                return Task.CompletedTask; // a discard prompt is already up — don't stack a second one
             }
 
             _editor.ConfirmDiscardThen(proceed);
-            return;
+            return Task.CompletedTask;
         }
 
         if (CurrentView is IncidentWorkspaceViewModel ws)
         {
-            if (ws.PendingConfirm is not null)
-            {
-                return; // a prompt is already up — don't stack a second one
-            }
-
-            if (toMasterData || ws.IsNetworked)
+            if (ws.PendingConfirm is null)
             {
                 // Fire-and-forget like GoHomeRequested: a failed final save surfaces through the
                 // store's SaveFailed, not through this task.
                 ws.ConfirmLeaveThen(toMasterData, () => _ = LeaveThenAsync(ws, proceed));
-                return;
             }
 
-            await ws.LeaveAsync();
+            return Task.CompletedTask; // a prompt already up is not stacked a second time
         }
 
         proceed();
+        return Task.CompletedTask;
     }
 
     private static async Task LeaveThenAsync(IncidentWorkspaceViewModel ws, Action proceed)

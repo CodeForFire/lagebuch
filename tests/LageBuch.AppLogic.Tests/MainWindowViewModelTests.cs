@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -154,6 +155,7 @@ public class MainWindowViewModelTests
         var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
 
         await vm.GoHomeCommand.ExecuteAsync(null);
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving asks first
 
         Assert.IsType<HomeViewModel>(vm.CurrentView);
         store.RaiseSaveFailed(new InvalidOperationException("zu spät"));
@@ -197,6 +199,7 @@ public class MainWindowViewModelTests
         var firstWorkspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
 
         await vm.RequestOpenFileCommand.ExecuteAsync(null);
+        firstWorkspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving asks first
         var secondWorkspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
         Assert.NotSame(firstWorkspace, secondWorkspace);
 
@@ -265,6 +268,7 @@ public class MainWindowViewModelTests
         var entriesBefore = etb.Entries.Count;
 
         vm.GoHomeCommand.Execute(null);
+        workspace.PendingConfirm!.ConfirmCommand.Execute(null); // #463: leaving asks first
 
         Assert.IsType<HomeViewModel>(vm.CurrentView);
         Assert.Equal(0, ticker.SubscriberCount); // Scba/Tasks/Reminder unsubscribed
@@ -392,14 +396,69 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task Going_home_from_an_unshared_incident_does_not_ask()
+    public async Task Going_home_from_an_open_incident_asks_first()
     {
         var vm = New();
-        OpenNewIncident(vm);
+        var workspace = OpenNewIncident(vm);
+
+        await vm.GoHomeCommand.ExecuteAsync(null);
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.Equal("VERLASSEN", workspace.PendingConfirm!.ConfirmLabel);
+
+        workspace.PendingConfirm.ConfirmCommand.Execute(null);
+
+        Assert.IsType<HomeViewModel>(vm.CurrentView);
+    }
+
+    public static TheoryData<string> CommandBarExits => new()
+    {
+        nameof(MainWindowViewModel.GoHomeCommand),
+        nameof(MainWindowViewModel.ShowMasterDataCommand),
+        nameof(MainWindowViewModel.RequestOpenFileCommand),
+        nameof(MainWindowViewModel.RequestNewIncidentCommand),
+        nameof(MainWindowViewModel.RequestJoinDeviceCommand),
+    };
+
+    private static IAsyncRelayCommand CommandBarExit(MainWindowViewModel vm, string name) => name switch
+    {
+        nameof(MainWindowViewModel.GoHomeCommand) => vm.GoHomeCommand,
+        nameof(MainWindowViewModel.ShowMasterDataCommand) => vm.ShowMasterDataCommand,
+        nameof(MainWindowViewModel.RequestOpenFileCommand) => vm.RequestOpenFileCommand,
+        nameof(MainWindowViewModel.RequestNewIncidentCommand) => vm.RequestNewIncidentCommand,
+        nameof(MainWindowViewModel.RequestJoinDeviceCommand) => vm.RequestJoinDeviceCommand,
+        _ => throw new ArgumentOutOfRangeException(nameof(name), name, null),
+    };
+
+    [Theory]
+    [MemberData(nameof(CommandBarExits))]
+    public async Task Every_exit_from_an_open_incident_asks_first(string exit)
+    {
+        var vm = New();
+        var workspace = OpenNewIncident(vm);
+
+        await CommandBarExit(vm, exit).ExecuteAsync(null);
+
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.NotNull(workspace.PendingConfirm);
+        Assert.Null(vm.PendingPrompt); // neither the operator nor the join prompt is up yet
+    }
+
+    [Fact]
+    public async Task A_read_only_incident_asks_before_leaving_too()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        TestSession.StartNew(store, clock, new SessionOperator("Müller"), "/x.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var home = new HomeViewModel(store, new MvFakeMasterData(), new FakeRecent(), new FakeDialogs(), clock, new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+        var vm = new MainWindowViewModel(home, new MasterDataEditorViewModel(new MvFakeMasterData(), new FakeDialogs(), new NoFiles()), new FakeDialogs(), "0.1.0");
+        await vm.OpenRecent("/x.fwincident");
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        Assert.True(workspace.IsReadOnly);
 
         await vm.GoHomeCommand.ExecuteAsync(null);
 
-        Assert.IsType<HomeViewModel>(vm.CurrentView);
+        Assert.Same(workspace, vm.CurrentView);
+        Assert.NotNull(workspace.PendingConfirm);
     }
 
     [Fact]
