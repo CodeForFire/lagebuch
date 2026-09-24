@@ -124,6 +124,22 @@ open a PR. Absolute rule, no exceptions.
 - Every repo needs `.github/dependabot.yml` covering the `github-actions`
   ecosystem; add it if missing.
 
+## Avalonia docs MCP
+
+`.mcp.json` configures Avalonia's free, hosted
+[Build MCP](https://docs.avaloniaui.net/tools/ai-tools/build-mcp) as
+`avalonia-docs`. Claude Code asks once to approve it, as it does for every
+project-scoped server. Use it — `lookup_avalonia_api`,
+`search_avalonia_docs`, `get_avalonia_expert_rules` — before writing XAML or
+reaching for a control API: this app is on Avalonia 12, much of what a model
+remembers is Avalonia 11, and a deprecated member only fails a full rebuild
+(see [Static analysis](#static-analysis)).
+
+Avalonia's DevTools and Parcel MCP servers are deliberately not configured:
+they need a paid Avalonia Plus licence, which a contributor cannot be expected
+to have. For looking at a rendered view, the headless harness under
+[Pull requests](#pull-requests) does the job.
+
 ## Static analysis
 
 Two tools police this code and they overlap: the build runs the .NET analyzers
