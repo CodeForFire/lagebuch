@@ -15,7 +15,10 @@ public interface IIncidentHostController
 
     bool IsHosting { get; }
 
-    /// <summary>A short line to show while hosting — e.g. the address other devices dial.</summary>
+    /// <summary>
+    /// The address(es) other devices dial while hosting, one per line; shown on demand behind the
+    /// PIN rather than on the header line. Null when not hosting.
+    /// </summary>
     string? ShareHint { get; }
 
     /// <summary>The PIN a joining device must enter while hosting; null when not hosting.</summary>

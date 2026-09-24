@@ -11,9 +11,11 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// Hosting no longer requires Tailscale (#59 follow-up): the share panel binds a status line that
-// tells the user which address to dial (LAN + localhost). This pins that the toggle flips the
-// button label and surfaces the hint in the view — and doubles as the PR screenshot capture.
+// Hosting no longer requires Tailscale (#59 follow-up). While sharing, the header line shows only
+// the PIN; the address to dial (LAN + localhost) sits in a flyout behind it, because it is set up
+// once in the ELW and the header line has no room for it next to the Lagebuchführer readout. This
+// pins that the toggle flips the button label, keeps the URLs off the header line and puts them
+// behind the PIN — and doubles as the PR screenshot capture.
 public class SharePanelRenderTests
 {
     private sealed class FakeHost : IIncidentHostController
@@ -22,7 +24,7 @@ public class SharePanelRenderTests
 
         public bool IsHosting { get; private set; }
 
-        public string? ShareHint => "Erreichbar unter https://192.168.0.5:5859 · auf diesem Gerät: https://localhost:5859";
+        public string? ShareHint => "Im Netzwerk: https://192.168.0.5:5859\nAuf diesem Gerät: https://localhost:5859";
 
         public string? SharePin => IsHosting ? "1234" : null;
 
@@ -61,8 +63,12 @@ public class SharePanelRenderTests
         frame.SavePng(Path.Join(dir, name));
     }
 
-    private static TextBlock ShareStatus(Window window) =>
-        window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text != null && t.Text.StartsWith("Erreichbar unter", StringComparison.Ordinal));
+    private static bool ShowsAnAddress(Window window) =>
+        window.GetVisualDescendants().OfType<TextBlock>()
+            .Any(t => t.IsEffectivelyVisible && t.Text != null && t.Text.Contains("https://", StringComparison.Ordinal));
+
+    private static Button ShareInfoButton(Window window) =>
+        window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "ShareInfoButton");
 
     [AvaloniaFact]
     public void Before_sharing_the_button_invites_sharing_and_no_status_is_shown()
@@ -71,14 +77,13 @@ public class SharePanelRenderTests
 
         Assert.Equal("IM NETZWERK FREIGEBEN", vm.ShareButtonText);
         Assert.Null(vm.ShareStatus);
-        Assert.DoesNotContain(
-            window.GetVisualDescendants().OfType<TextBlock>(),
-            t => t.Text != null && t.Text.StartsWith("Erreichbar unter", StringComparison.Ordinal));
+        Assert.False(ShowsAnAddress(window));
+        Assert.False(ShareInfoButton(window).IsVisible);
         Capture(window, "share-before.png");
     }
 
     [AvaloniaFact]
-    public async Task Toggling_on_flips_the_label_and_shows_the_reachable_at_hint()
+    public async Task Toggling_on_flips_the_label_and_shows_only_the_pin_on_the_header_line()
     {
         var (window, vm) = ShowWorkspace();
 
@@ -86,10 +91,31 @@ public class SharePanelRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("FREIGABE BEENDEN", vm.ShareButtonText);
-        Assert.Contains("localhost:5859", ShareStatus(window).Text!, StringComparison.Ordinal);
         Assert.Equal("1234", vm.SharePin);
+        Assert.True(ShareInfoButton(window).IsEffectivelyVisible);
         Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text != null && t.Text.Contains("1234", StringComparison.Ordinal));
+        Assert.False(ShowsAnAddress(window)); // the URLs no longer crowd the header line
         Capture(window, "share-after.png");
+    }
+
+    [AvaloniaFact]
+    public async Task Clicking_the_pin_reveals_the_address_to_dial()
+    {
+        var (window, vm) = ShowWorkspace();
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var button = ShareInfoButton(window);
+        button.Flyout!.ShowAt(button);
+        Dispatcher.UIThread.RunJobs();
+
+        var content = (Control)((Flyout)button.Flyout).Content!;
+        var address = content.GetVisualDescendants().Prepend(content).OfType<SelectableTextBlock>()
+            .Single(t => t.Name == "ShareAddressValue");
+        Assert.Contains("https://192.168.0.5:5859", address.Text, StringComparison.Ordinal);
+        Assert.Contains("https://localhost:5859", address.Text, StringComparison.Ordinal);
+        Capture(window, "share-flyout.png");
+        button.Flyout.Hide();
     }
 
     // Regression (#66 follow-up): the first time an incident is shared the PIN pill appeared but its
