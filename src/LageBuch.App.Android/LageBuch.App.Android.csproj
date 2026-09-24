@@ -6,14 +6,34 @@
          must be Exe so publish packages a launchable .apk. -->
     <OutputType>Exe</OutputType>
     <ApplicationId>de.codeforfire.lagebuch</ApplicationId>
+    <!-- Placeholders for local builds only. The tag is the source of truth: release.yml passes
+         -p:ApplicationVersion (versionCode), -p:ApplicationDisplayVersion (versionName) and
+         -p:Version (assembly version, shown on the About screen). Never bump these by hand. -->
     <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>0.0.0</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
-    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!-- Both formats out of one build. Google Play has not accepted an APK for a new app since
+         2021, so the upload is the .aab; the GitHub release keeps its .apk. The SDK builds the
+         bundle, then runs bundletool `build-apks` in universal mode over that same signed bundle
+         and extracts the .apk from it (_CreateUniversalApkFromBundle) — so the sideload APK is a
+         render of the exact bytes Play receives, not a separately built artefact. Note the
+         SINGULAR AndroidPackageFormat wins over this when set, which is what used to suppress
+         the bundle entirely. -->
+    <AndroidPackageFormats>aab;apk</AndroidPackageFormats>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <!-- Avalonia.Android's generated Resource designer code isn't documented and would otherwise
          trip CS1591 under this repo's TreatWarningsAsErrors + GenerateDocumentationFile default. -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Upload key for Google Play, opt-in. Without -p:AndroidSigningKeyStore the SDK falls back to
+       its debug key, which is what a contributor's `make apk` and every Debug build want. The
+       passwords are read from a file rather than passed literally: an -p:...Pass=<secret> on the
+       command line lands in the binlog and in `ps`, and the env: prefix is documented as
+       unsupported when the package format is aab. See docs/releasing.md, "Google Play". -->
+  <PropertyGroup Condition="'$(AndroidSigningKeyStore)' != ''">
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyAlias Condition="'$(AndroidSigningKeyAlias)' == ''">lagebuch-upload</AndroidSigningKeyAlias>
   </PropertyGroup>
 
   <ItemGroup>

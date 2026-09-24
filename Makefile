@@ -22,6 +22,13 @@ FILTER       ?=
 PROJECT      ?=
 VERSION      ?= 0.1.0
 
+# Google Play upload key. Outside the work tree on purpose — signing material is never
+# committed, and $(DOCKER_HOME) is a build cache that gets wiped. See docs/releasing.md.
+KEYSTORE      ?= $(HOME)/.config/lagebuch/lagebuch-upload.p12
+KEYSTORE_PASS ?= $(HOME)/.config/lagebuch/lagebuch-upload.pass
+KEY_ALIAS     ?= lagebuch-upload
+CODE          ?=
+
 ANDROID_HOME ?= $(HOME)/Android/Sdk
 ADB          := $(ANDROID_HOME)/platform-tools/adb
 EMULATOR_BIN := $(ANDROID_HOME)/emulator/emulator
@@ -32,6 +39,9 @@ AVD          ?= medium_tablet
 IMAGE        ?= lagebuch-android-build
 DOCKER_HOME  ?= $(HOME)/.cache/lagebuch-android-build
 APK          := src/LageBuch.App.Android/bin/$(CONFIG)/net10.0-android/$(APP_ID)-Signed.apk
+# `aab` always builds Release, whatever CONFIG says — a debug bundle is not uploadable.
+AAB          := src/LageBuch.App.Android/bin/Release/net10.0-android/$(APP_ID)-Signed.aab
+RELEASE_APK  := src/LageBuch.App.Android/bin/Release/net10.0-android/$(APP_ID)-Signed.apk
 
 # Matches .github/workflows/release.yml's PUBLISH_FLAGS.
 PUBLISH_FLAGS := -c Release --self-contained true -p:PublishSingleFile=true \
@@ -53,7 +63,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 .DEFAULT_GOAL := help
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
-        android-image android-image-rebuild apk emulator install run-android \
+        android-image android-image-rebuild apk aab emulator install run-android \
         logcat uninstall package-linux logo-assets samples screenshots demo-gif
 
 help: ## Show this help
@@ -133,6 +143,42 @@ apk: android-image ## Build an installable APK in Docker
 	  publish $(ANDROID_PROJ) -c $(CONFIG) -f net10.0-android \
 	  -p:AndroidPackageFormat=apk -p:EmbedAssembliesIntoApk=true
 	@echo "APK: $(APK)"
+
+# The release bundle for Google Play. Unlike `apk` this one is signed with the real upload key,
+# so it needs the keystore mounted in — read-only, and as its own mount, because it deliberately
+# lives outside both the work tree and $(DOCKER_HOME). The password is passed as file:, never as
+# a literal: an -p:AndroidSigningStorePass=<secret> would land in the MSBuild binlog and in `ps`,
+# and the env: form is documented as unsupported when the package format is aab.
+#
+# One publish emits both files: the .aab, and the universal .apk that bundletool extracts from
+# that same signed bundle. The .apk is therefore worth installing as a check on the bundle.
+aab: android-image ## Build the signed .aab for Google Play (VERSION=x.y.z CODE=<versionCode>)
+	@test -f "$(KEYSTORE)" \
+	  || { echo "No upload keystore at $(KEYSTORE) — see docs/releasing.md, 'Google Play'."; exit 1; }
+	@test -f "$(KEYSTORE_PASS)" \
+	  || { echo "No keystore password file at $(KEYSTORE_PASS) — see docs/releasing.md."; exit 1; }
+	@test -n "$(CODE)" \
+	  || { echo "CODE=<versionCode> is required — docs/releasing.md has the formula."; exit 1; }
+	@mkdir -p "$(DOCKER_HOME)"
+	docker run --rm \
+	  -u $$(id -u):$$(id -g) \
+	  -e HOME=/home/build -e DOTNET_CLI_HOME=/home/build \
+	  -e DOTNET_NOLOGO=1 -e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+	  -v "$(DOCKER_HOME)":/home/build \
+	  -v "$$HOME/.nuget":/home/build/.nuget \
+	  -v "$$PWD":/src \
+	  -v "$(dir $(KEYSTORE))":/keys:ro \
+	  $(IMAGE) \
+	  publish $(ANDROID_PROJ) -c Release -f net10.0-android \
+	  -p:EmbedAssembliesIntoApk=true \
+	  -p:ApplicationVersion=$(CODE) \
+	  -p:ApplicationDisplayVersion=$(VERSION) -p:Version=$(VERSION) \
+	  -p:AndroidSigningKeyStore=/keys/$(notdir $(KEYSTORE)) \
+	  -p:AndroidSigningKeyAlias=$(KEY_ALIAS) \
+	  -p:AndroidSigningStorePass=file:/keys/$(notdir $(KEYSTORE_PASS)) \
+	  -p:AndroidSigningKeyPass=file:/keys/$(notdir $(KEYSTORE_PASS))
+	@echo "AAB: $(AAB)"
+	@echo "APK: $(RELEASE_APK)   (universal, extracted from that bundle)"
 
 emulator: ## Boot the emulator (AVD=name) and wait for it
 	@test -x "$(EMULATOR_BIN)" \

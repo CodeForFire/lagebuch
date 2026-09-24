@@ -8,7 +8,7 @@ builds and attaches one package per platform:
 |----------|------|
 | Windows | `lagebuch-<version>-x64.msi` |
 | Linux (Debian/Ubuntu) | `lagebuch_<version>_amd64.deb` |
-| Android | `lagebuch-<version>.apk` |
+| Android | `lagebuch-<version>.apk` (plus a `.aab` build artefact, not a release asset) |
 | macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
 
 ## Cutting a release
@@ -102,6 +102,7 @@ the version the way each packaging format requires:
 | APK, assembly | `0.6.0-beta.1` | |
 | MSI `ProductVersion` | `0.6.0` | a ProductVersion must be numeric |
 | `.deb` control `Version:` | `0.6.0~beta.1` | `~` sorts *below* `0.6.0`, so `apt` treats the final release as an upgrade — a `-` would sort above it |
+| Android `versionCode` | `600201` | must be a single integer, and strictly greater than every build Google Play has already seen |
 
 The last two rows are the same version spelled two ways, and only the control
 field gets the tilde. It is deliberately kept out of the file name: GitHub
@@ -112,6 +113,31 @@ did not exist (#448). `apt` reads the control field, never the file name, so
 the sort order is unaffected. Both spellings are now derived inside
 [`build-deb.sh`](../packaging/linux/build-deb.sh) from the one version it is
 passed, so they cannot drift apart again.
+
+The Android `versionCode` faces the `.deb`'s ordering problem with none of its
+expressiveness: Play accepts one integer, and refuses any upload that does not
+raise it — to *any* track, permanently. So it is derived in the `version` job,
+never typed:
+
+```
+MAJOR*10000000 + MINOR*100000 + PATCH*1000 + offset
+offset:  alpha.N -> 100+N    beta.N -> 200+N    rc.N -> 300+N    final -> 999
+```
+
+| tag | `versionCode` |
+|---|---|
+| `v0.6.0-beta.1` | 600201 |
+| `v0.6.0-rc.1` | 600301 |
+| `v0.6.0` | 600999 |
+| `v0.6.1` | 601999 |
+| `v0.7.0` | 700999 |
+| `v1.0.0` | 10000999 |
+
+A prerelease sorts below its final release, exactly as the `.deb`'s `~` does.
+The ceiling — `209.99.99` — lands on `2099999999`, one below Play's limit of
+`2100000000`, and the job fails the build rather than silently wrapping past it.
+An unrecognised suffix fails the build too: a scheme nobody can order is worse
+than a rejected tag.
 
 The MSI carrying the numeric core means a beta and the eventual final share a
 ProductVersion; `AllowSameVersionUpgrades` in
@@ -176,6 +202,140 @@ validated without Windows against the published JSON schemas
 (`microsoft/winget-cli`, `schemas/JSON/manifests/v1.12.0/`); upstream's own
 pipeline is the authoritative check.
 
+## Google Play
+
+Google Play has not accepted an APK for a new app since 2021, so the upload is an
+**Android App Bundle**. The build produces one: `AndroidPackageFormats` is
+`aab;apk` in
+[`LageBuch.App.Android.csproj`](../src/LageBuch.App.Android/LageBuch.App.Android.csproj),
+and the SDK then runs bundletool over that same signed bundle to extract the
+universal `.apk` the GitHub release carries. The sideload APK is therefore a
+render of the exact bytes Play receives, not a second, independently built
+artefact — which is why there is no separate "verify the bundle" step below.
+
+Like winget, **submitting is a manual step at release time, and deliberately
+so.** Automating it would mean keeping the upload keystore and its password in
+this repository's secrets; a credential that can publish to every installed
+device is a larger concession than the winget token this project already
+declined, and releases here are tagged deliberately, a handful of times a year.
+The repository holds exactly one secret today and this is not the change that
+should make it six.
+
+### One-time setup
+
+The upload key is generated once, on a laptop, and never committed
+(`.gitignore` carries `*.p12`, `*.jks`, `*.keystore`, `*.pass` as defence in
+depth — the mechanism is that it lives outside the tree):
+
+```bash
+mkdir -p ~/.config/lagebuch && chmod 700 ~/.config/lagebuch
+keytool -genkeypair -v \
+  -keystore ~/.config/lagebuch/lagebuch-upload.p12 -storetype PKCS12 \
+  -alias lagebuch-upload -keyalg RSA -keysize 4096 -validity 10000 \
+  -dname "CN=CodeForFire, O=CodeForFire, C=DE"
+printf '%s' '<password>' > ~/.config/lagebuch/lagebuch-upload.pass
+chmod 600 ~/.config/lagebuch/lagebuch-upload.pass
+```
+
+`-validity 10000` is about 27 years, past Play's 2033 minimum. Use one password
+for store and key so a single file serves both properties. **Back the keystore
+up off the laptop, encrypted.**
+
+Under Play App Signing, Google holds the key that actually signs what users
+install; this one only authorises uploads. Losing it is recoverable through Play
+support, which is precisely why Play App Signing is the right choice for a
+project with one maintainer — but recovery is a support round-trip, not a
+convenience.
+
+Three things can never be changed after the first upload: the package name
+(`de.codeforfire.lagebuch`), the app signing key, and the account type. The
+package name already matches the sideloaded APK; keep it.
+
+### Per release
+
+```bash
+make aab VERSION=0.7.0 CODE=700999      # CODE from the table above
+```
+
+The keystore path, password file and alias are overridable (`KEYSTORE=`,
+`KEYSTORE_PASS=`, `KEY_ALIAS=`) but default to the locations above. The target
+refuses to run without all three of a keystore, a password file and a `CODE`.
+
+Then, in the Play Console: *Production* (or *Internal testing* first) → *Create
+new release* → upload `de.codeforfire.lagebuch-Signed.aab` → German release
+notes → roll out.
+
+**Full releases only**, the same rule as winget: a prerelease belongs on the
+*Internal testing* track, if anywhere. And note the ratchet — a build uploaded
+to *any* track burns its `versionCode` forever, so use the real derived number
+even for a throwaway test upload.
+
+### The declarations, frozen
+
+These are answered once and must be answered the same way every time; re-deciding
+them per release is how a Data-safety section drifts away from what the app does.
+
+- **Privacy policy**: <https://codeforfire.github.io/datenschutz/>, built from
+  [`datenschutz-und-sicherheit.md`](datenschutz-und-sicherheit.md), so it stays
+  current on its own.
+- **Data safety — no data collected, no data shared.** The app has no account, no
+  server, no telemetry, no crash reporting, no update check and no ads or
+  analytics SDKs; the vendor receives nothing. The one thing that leaves the
+  device is the optional multi-device sync, and that is a user-initiated,
+  TLS-encrypted, PIN-gated transfer to a second device the same organisation
+  controls, reaching no developer or third-party endpoint. *Encrypted in transit:
+  yes. Data deletion: everything is app-private and removed on uninstall.*
+  If Play ever queries the sync, that is the answer — it is written here so the
+  next release does not improvise a different one.
+- **Content rating** (IARC): Utility/Productivity; no violence, sexual content,
+  language, substances, gambling or horror; does **not** let users interact or
+  exchange content with strangers (the sync pairs the operator's own devices by
+  typed address and PIN, with no directory and no discovery); does not share
+  location. Expected outcome USK 0 / PEGI 3.
+- **Target audience**: 18 and over. Do not tick a younger bracket — it pulls the
+  app into Families policy and an SDK audit for no benefit.
+- **Ads**: none. **Account deletion URL**: not applicable, there are no accounts.
+  **News / health / financial / government app**: no to all.
+- **Category**: Productivity.
+
+### What the listing must not say
+
+Play restricts apps that imply official or governmental status, and apps that
+present themselves as emergency services. Lagebuch is a volunteer project that
+documents an Einsatz; it does not alert, dispatch or replace anything.
+
+- No coat of arms, Feuerwehr emblem or BOS insignia in the icon or graphics.
+- Not *amtlich*, *offiziell*, *behördlich*, *ILS*, *Leitstelle*, *112* or
+  *Notruf* in the name or descriptions, and no named Wehr or Kreisbrandinspektion.
+- No safety claims. The Rückzugsalarm is a timer with an acoustic reminder —
+  describe it as one, not as something that keeps anybody safe.
+- Do not advertise desktop-only capabilities. The Android app cannot host an
+  Einsatz for other devices and cannot export the PDF report; a listing that
+  implies otherwise is a metadata violation as well as a broken promise.
+
+Keep the disclaimer in the description: Lagebuch ist keine amtliche Anwendung und
+steht in keiner Verbindung zu einer Behörde oder einer Integrierten Leitstelle.
+
+### After the upload
+
+- The bundle's manifest carries the expected build number:
+  `java -jar bundletool.jar dump manifest --bundle <file>.aab | head -1`
+  (bundletool ships with the workload, under
+  `~/.dotnet/packs/Microsoft.Android.Sdk.Linux/*/tools/`).
+- The native libraries are still 16 KB-aligned, which Play requires of anything
+  targeting Android 15+. Today every one of them is, and the app ships only
+  64-bit ABIs:
+  ```bash
+  unzip -q -o -d /tmp/lb lagebuch-<version>.apk 'lib/*'
+  for f in /tmp/lb/lib/*/*.so; do
+    readelf -lW "$f" | awk -v f="$f" '$1=="LOAD" && $NF!="0x4000" { print "NOT 16K:", f }'
+  done
+  ```
+  If that ever prints something, the offender is a native library shipped by a
+  NuGet package and the fix is a package bump — no MSBuild switch realigns
+  someone else's `.so`.
+- Play's pre-launch report has no crashes on the tested devices.
+
 ## macOS
 
 The macOS `.dmg` is built on demand rather than on every tag: run the
@@ -200,5 +360,10 @@ that release's `SHA256SUMS.txt`; it carries a `.dmg.sha256` next to it instead.
 
 ```bash
 make package-linux VERSION=0.6.0   # builds a local .deb into dist/
-make apk                           # builds an installable APK in Docker
+make apk                           # builds an installable APK in Docker (debug key)
+make aab VERSION=0.7.0 CODE=700999 # builds the signed Play bundle (needs the upload key)
 ```
+
+`make apk` is the fast loop — Debug, debug key, `make install` puts it on the
+emulator. `make aab` is the release path and is described under
+[Google Play](#google-play) above.
