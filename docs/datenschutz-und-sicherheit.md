@@ -115,7 +115,7 @@ Anwendungsdaten.
 | `recent.json` | die zuletzt geöffneten Einsatzdateien mit vollständigem Pfad |
 | `last-save-folder.json` | der zuletzt zum Speichern verwendete Ordner |
 | `last-pdf-export.json` | der zuletzt für den PDF-Export verwendete Ordner |
-| `last-join-host.json` | die zuletzt erfolgreich verbundene Gegenstelle |
+| `last-connection.json` | die zuletzt erfolgreich verbundene Gegenstelle, mit **Stichwort** des Einsatzes und Zeitpunkt (ältere Versionen: `last-join-host.json`, nur die Gegenstelle) |
 | `trust.json` | die gespeicherten Zertifikats-Fingerabdrücke der Gegenstellen |
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
 
@@ -310,7 +310,8 @@ abgearbeitet sind.
 3. Aus dem Programmordner (`%AppData%\Lagebuch\` beziehungsweise
    `~/.config/Lagebuch/`):
    `masterdata.db`, `recent.json`, `last-save-folder.json`,
-   `last-pdf-export.json`, `last-join-host.json`, `trust.json` und den Ordner
+   `last-pdf-export.json`, `last-connection.json`, `last-join-host.json` (von
+   älteren Versionen), `trust.json` und den Ordner
    `attachment-cache/`.
 4. Exportierte PDF-Berichte an ihren Ablageorten (den zuletzt verwendeten nennt
    `last-pdf-export.json`).

@@ -5,7 +5,7 @@ namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// The read/deserialise/write scaffolding every one of the app's small JSON preference files shares
-/// (recent incidents, last save folder, last PDF export, last join host). Each of those stores owns
+/// (recent incidents, last save folder, last PDF export, last connection). Each of those stores owns
 /// its own semantics — what "empty" means, how a value is folded into the previous one — and leaves
 /// the file handling here.
 /// <para>

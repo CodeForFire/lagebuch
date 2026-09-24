@@ -318,6 +318,67 @@ public class HomeViewModelTests
 
         Assert.Equal(1, store.LoadCount);
     }
+
+    private static HomeViewModel HomeWithLastConnection(LastConnection? last) =>
+        new(
+            new FakeStore(),
+            new FakeMasterData(),
+            new FakeRecent(),
+            new FakeDialogs(),
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0",
+            lastConnection: new FakeLastConnectionStore { Saved = last });
+
+    [Fact]
+    public void Home_shows_the_last_connection_with_its_stichwort_and_time()
+    {
+        var vm = HomeWithLastConnection(new LastConnection("elw-1", "B3 Wohnung", T0));
+
+        Assert.True(vm.HasLastConnection);
+        Assert.Equal("elw-1", vm.LastConnection?.Host);
+        Assert.Equal("B3 Wohnung · 22.06.2026 09:00", vm.LastConnectionDetail);
+    }
+
+    [Fact]
+    public void Home_leaves_the_stichwort_out_while_the_host_has_none()
+    {
+        var vm = HomeWithLastConnection(new LastConnection("elw-1", null, T0));
+
+        Assert.Equal("22.06.2026 09:00", vm.LastConnectionDetail);
+    }
+
+    [Fact]
+    public void Home_shows_no_last_connection_when_this_device_never_joined()
+    {
+        var vm = HomeWithLastConnection(null);
+
+        Assert.False(vm.HasLastConnection);
+        Assert.Null(vm.LastConnectionDetail);
+    }
+
+    [Fact]
+    public void Neu_verbinden_asks_the_shell_to_open_the_join_dialog()
+    {
+        var vm = HomeWithLastConnection(new LastConnection("elw-1", null, T0));
+        var requested = false;
+        vm.ReconnectRequested = () => requested = true;
+
+        vm.ReconnectCommand.Execute(null);
+
+        Assert.True(requested);
+    }
+}
+
+internal sealed class FakeLastConnectionStore : ILastConnectionStore
+{
+    public LastConnection? Saved { get; set; }
+
+    public LastConnection? GetLast() => Saved;
+
+    public void SetLast(LastConnection connection) => Saved = connection;
 }
 
 internal sealed class FakeMasterData : IMasterDataProvider

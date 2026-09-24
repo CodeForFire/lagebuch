@@ -32,6 +32,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _dialogs = dialogs;
         _appVersion = appVersion;
         _home.WorkspaceOpened = ShowWorkspace;
+        _home.ReconnectRequested = () => RequestJoinDeviceCommand.Execute(null);
         _currentView = home;
     }
 
@@ -145,7 +146,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             // The host address rarely changes once set up (a station's ELW, a fixed Tailscale
             // node) -- prefill last time's so the operator doesn't retype it every join.
-            Host = _home.LastJoinHost ?? string.Empty,
+            Host = _home.LastConnection?.Host ?? string.Empty,
         };
     });
 

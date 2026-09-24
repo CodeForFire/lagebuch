@@ -831,7 +831,7 @@ public class IncidentWorkspaceViewModelTests
 
     // A joined client's workspace: the snapshot double stands in for RemoteIncidentSession
     // (IsRemote, not a LocalIncidentSession), without a network.
-    private static IncidentWorkspaceViewModel ClientWorkspace(FakeDialogs? dialogs = null)
+    private static IncidentWorkspaceViewModel ClientWorkspace(FakeDialogs? dialogs = null, string? remoteHost = null)
     {
         var clock = new FixedClock(T0);
         var host = TestSession.StartNew(
@@ -849,7 +849,33 @@ public class IncidentWorkspaceViewModelTests
             dialogs ?? new FakeDialogs(),
             new FakeAlarmService(),
             new NoopIncidentHostController(),
-            new TestPdfExporter());
+            new TestPdfExporter(),
+            remoteHost: remoteHost);
+    }
+
+    [Fact]
+    public void A_joined_client_shows_which_host_it_is_connected_to_until_the_link_drops()
+    {
+        var vm = ClientWorkspace(remoteHost: "elw-1:5859");
+
+        Assert.Equal("verbunden mit elw-1:5859", vm.ConnectedHostText);
+        Assert.True(vm.ShowConnectedHost);
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.IsConnected = false;
+
+        Assert.False(vm.ShowConnectedHost);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.ShowConnectedHost), raised);
+    }
+
+    [Fact]
+    public void A_local_incident_shows_no_connected_host()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.Null(vm.ConnectedHostText);
+        Assert.False(vm.ShowConnectedHost);
     }
 
     [Fact]

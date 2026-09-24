@@ -35,6 +35,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IIncidentStore? _store;
     private readonly IUiDispatcher _uiDispatcher;
 
+    // The address a joined client dialled, as typed; null on a local incident. The session itself
+    // does not keep it.
+    private readonly string? _remoteHost;
+
     // The checklist view models currently in the rail. Held separately from NavItems because each
     // one owns a session.Changed subscription that has to be released on rebuild.
     private readonly List<ChecklistViewModel> _checklists = new();
@@ -56,7 +60,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Links] = "LINKS",
         };
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -71,6 +75,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _lastPdfExportStore = lastPdfExport;
         _store = store;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
+        _remoteHost = remoteHost;
         IsReadOnly = session.IsReadOnly;
 
         // SaveFailed/SaveSucceeded fire on the store's background writer thread -- marshal onto
@@ -286,8 +291,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // it tracks the SignalR link so the view can grey out input while reconnecting. =====
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsInputEnabled))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectedHost))]
     [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
     private bool _isConnected = true;
+
+    /// <summary>"verbunden mit ‹host›" in a joined client's header (#464); null on a local incident.</summary>
+    public string? ConnectedHostText => _remoteHost is null ? null : $"verbunden mit {_remoteHost}";
+
+    /// <summary>Hidden while reconnecting: the "Verbindung getrennt" banner speaks then.</summary>
+    public bool ShowConnectedHost => _remoteHost is not null && IsConnected;
 
     /// <summary>Modules are interactive only while connected — a reconnecting client can't send commands.</summary>
     public bool IsInputEnabled => IsConnected;
