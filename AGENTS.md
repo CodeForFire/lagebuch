@@ -76,6 +76,36 @@ Any migration that adds a column must also declare it in
 (`src/LageBuch.Persistence/Sqlite/SchemaGuard.cs`);
 `SchemaReconciliationTests` fails the build otherwise.
 
+## Sync protocol version
+
+Two devices are allowed to sync when their **wire contracts** overlap, never
+when their app versions match. `SyncProtocol.ProtocolVersion` and
+`SyncProtocol.MinimumProtocolVersion` in `src/LageBuch.Sync/SyncProtocol.cs` are
+that contract's own version and the oldest one this build still speaks; the app
+version travels alongside them only so a refusal can name the build a human has
+to update. Never gate on it — a fleet whose Android half waits on Play review is
+the normal case, not a fault.
+
+Any change to what crosses the wire — the `SyncCommand` `[JsonDerivedType]`
+allowlist, `IncidentSnapshot`, the `/masterdata` payload — falls into one of two
+cases, and picking the right one is the whole mechanism. There is deliberately
+no per-feature capability negotiation:
+
+- **A peer at the floor can ignore it.** A new optional command field with a
+  defaulted constructor parameter (as `AddForceUnitCommand`'s `OfficerCount = 0`
+  does), a new snapshot property an older client drops. Raise
+  `ProtocolVersion` alone; old peers keep connecting.
+- **A peer at the floor cannot handle it.** A new command a client may send, a
+  renamed or removed field, a changed enum contract. Raise
+  `MinimumProtocolVersion` to match — and check
+  `LegacyProtocolVersion`, which encodes the claim that the pre-handshake v0.6.1
+  contract is protocol 1.
+
+The client does the two-sided overlap test, because it is the end that sees both
+ranges. The host's own gate is one-sided on purpose: it refuses a peer below its
+floor and lets a peer claiming something newer through, since that peer has
+already read `/version` and chosen to speak down.
+
 ## Git commits
 
 All commits must be:

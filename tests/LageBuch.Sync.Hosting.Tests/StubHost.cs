@@ -12,21 +12,29 @@ using Microsoft.Extensions.Logging;
 namespace LageBuch.Sync.Hosting.Tests;
 
 /// <summary>
-/// A stand-in host that clears the version handshake, the snapshot fetch and the hub connect but
-/// serves a configurable bad Stammdaten payload at <c>/masterdata</c> (#183) — either malformed JSON
-/// (the default, "{ not json") or well-formed JSON of a shape <c>MasterDataJson.ParseRoot</c> can't
-/// make a <c>MasterDataSet</c> out of. The real <see cref="IncidentHost"/> serializes an actual
-/// MasterDataSet and so cannot emit either without a test-only hook in production code.
-/// Used to prove a joining client rejects the host and tears its connection down rather than
-/// leaking an open hub connection, for every one of those failure shapes. No PIN middleware — the
-/// client's header is simply ignored.
+/// A stand-in host serving whatever the real <see cref="IncidentHost"/> cannot be made to serve
+/// without a test-only hook in production code. Two things need that:
+/// <list type="bullet">
+/// <item>
+/// A bad Stammdaten payload at <c>/masterdata</c> (#183) — either malformed JSON (the default,
+/// "{ not json") or well-formed JSON of a shape <c>MasterDataJson.ParseRoot</c> can't make a
+/// <c>MasterDataSet</c> out of. Proves a joining client rejects the host and tears its connection
+/// down rather than leaking an open hub connection, for every one of those failure shapes.
+/// </item>
+/// <item>
+/// A <c>/version</c> payload carrying no protocol numbers at all, which is what every host up to
+/// and including v0.6.1 answers with. The real host cannot emit that shape any more, and it is the
+/// forward-compatibility case that matters most: those builds are already in the field.
+/// </item>
+/// </list>
+/// No PIN middleware and no protocol gate — the client's headers are simply ignored.
 /// </summary>
-internal sealed class BadMasterDataHost : IAsyncDisposable
+internal sealed class StubHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly ConnectionTracker _tracker;
 
-    private BadMasterDataHost(WebApplication app, int port, ConnectionTracker tracker)
+    private StubHost(WebApplication app, int port, ConnectionTracker tracker)
     {
         _app = app;
         Port = port;
@@ -35,7 +43,7 @@ internal sealed class BadMasterDataHost : IAsyncDisposable
 
     public int Port { get; }
 
-    public static async Task<BadMasterDataHost> StartAsync(
+    public static async Task<StubHost> StartAsync(
         Incident incident, string version = "1.0.0", string masterDataBody = "{ not json")
     {
         var builder = WebApplication.CreateSlimBuilder();
@@ -55,6 +63,10 @@ internal sealed class BadMasterDataHost : IAsyncDisposable
 
         var app = builder.Build();
         app.MapHub<TrackingHub>(SyncProtocol.HubPath);
+
+        // The one-argument VersionInfo on purpose: no "protocol"/"minProtocol" members reach the wire,
+        // which is exactly what a v0.6.1 host answers. A client must read that as
+        // SyncProtocol.LegacyProtocolVersion and join anyway.
         app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(version), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(incident), SyncJson.Options));
 
@@ -64,7 +76,7 @@ internal sealed class BadMasterDataHost : IAsyncDisposable
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(masterDataBody, "application/json"));
 
         await app.StartAsync();
-        return new BadMasterDataHost(app, port, tracker);
+        return new StubHost(app, port, tracker);
     }
 
     /// <summary>
