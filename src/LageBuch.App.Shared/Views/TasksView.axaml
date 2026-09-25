@@ -99,7 +99,8 @@
 
     <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="TasksGrid" ItemsSource="{Binding Rows}" IsReadOnly="{Binding IsReadOnly}" CanUserSortColumns="False">
+      <DataGrid x:Name="TasksGrid" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
+                IsReadOnly="{Binding IsReadOnly}" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridCheckBoxColumn Header="" Width="44"
               Binding="{Binding IsDone, Mode=TwoWay}" />

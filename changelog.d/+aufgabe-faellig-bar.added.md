@@ -1,0 +1,1 @@
+When an Aufgabe falls due, the app now says "Aufgabe, fällig" instead of playing a plain tone, and a header bar visible from every tab names the task and who it is assigned to, opens it in the Aufgaben tab on a tap, and marks it done with ERLEDIGT (#460).

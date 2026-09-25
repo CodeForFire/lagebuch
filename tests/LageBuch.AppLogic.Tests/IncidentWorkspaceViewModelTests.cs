@@ -1505,6 +1505,77 @@ public class IncidentWorkspaceViewModelTests
         // The Trupp is still selected, so switching the module back on lands on the right row.
         Assert.Same(vm.Scba.Trupps[0], vm.Scba.SelectedTrupp);
     }
+
+    // --- #460: the Aufgabe-fällig bar leads to the Aufgaben tab -------------------------------
+
+    /// <summary>A workspace holding one task whose five-minute timer ran out a minute ago.</summary>
+    private static IncidentWorkspaceViewModel WorkspaceWithAnOverdueTask(MasterDataSet masterData)
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            masterData,
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new FakeHostController());
+        vm.Tasks.NewText = "Wasserversorgung prüfen";
+        vm.Tasks.NewTimerMinutes = 5;
+        vm.Tasks.AddTaskCommand.Execute(null);
+        clock.Now = T0.AddMinutes(6);
+        return vm;
+    }
+
+    [Fact]
+    public void Showing_a_task_moves_the_rail_to_the_aufgaben_tab()
+    {
+        var vm = WorkspaceWithAnOverdueTask(Md());
+        vm.SelectedNavItem = NavItemFor(vm, vm.Etb);
+
+        vm.Tasks.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Same(NavItemFor(vm, vm.Tasks), vm.SelectedNavItem);
+        Assert.Equal("Wasserversorgung prüfen", vm.Tasks.SelectedTask?.Text);
+    }
+
+    [Fact]
+    public void A_rebuilt_workspace_stops_listening_to_the_tasks_view_model_it_replaced()
+    {
+        var vm = WorkspaceWithAnOverdueTask(Md());
+        var replaced = vm.Tasks;
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        Assert.NotSame(replaced, vm.Tasks);
+
+        var etb = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = etb;
+        replaced.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Same(etb, vm.SelectedNavItem);
+    }
+
+    [Fact]
+    public void Showing_a_task_leaves_the_rail_alone_when_aufgaben_is_switched_off()
+    {
+        var vm = WorkspaceWithAnOverdueTask(
+            Md() with { Navigation = new[] { new NavEntry(NavModules.Tasks, null, false) } });
+        var etb = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = etb;
+
+        vm.Tasks.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Null(NavItemFor(vm, vm.Tasks));
+        Assert.Same(etb, vm.SelectedNavItem);
+    }
 }
 
 // Controls exactly when FlushAsync's task completes, and records call order, so
