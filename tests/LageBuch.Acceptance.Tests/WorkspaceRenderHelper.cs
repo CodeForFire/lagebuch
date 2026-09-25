@@ -8,6 +8,7 @@ using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Tasks;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Persistence.MasterData;
 
@@ -43,7 +44,8 @@ internal static class WorkspaceRenderHelper
     };
 
     public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars(
-        IIncidentHostController? host = null)
+        IIncidentHostController? host = null,
+        bool withOverdueTask = false)
     {
         var clock = new FixedClock();
         var checklistAufbau = new[]
@@ -90,6 +92,22 @@ internal static class WorkspaceRenderHelper
         vm.Scba.AddTruppCommand.Execute(null);
         var row = vm.Scba.Trupps[^1];
         row.StartCommand.Execute(null);
+
+        // Opt-in, so the renders that predate it keep their header (#460): a task on a 5-min timer,
+        // overdue once the clock advances below, and a later one listed above it, so a jump to the
+        // overdue task has a wrong row to land on.
+        if (withOverdueTask)
+        {
+            vm.Tasks.NewText = "Wasserversorgung aus Hydrant sicherstellen";
+            vm.Tasks.NewAssignee = "EL";
+            vm.Tasks.NewTimerMinutes = 5;
+            vm.Tasks.AddTaskCommand.Execute(null);
+            vm.Tasks.NewText = "Nachalarmierung prüfen";
+            vm.Tasks.NewAssignee = null;
+            vm.Tasks.NewUrgency = TaskUrgency.High;
+            vm.Tasks.NewTimerMinutes = 60;
+            vm.Tasks.AddTaskCommand.Execute(null);
+        }
 
         // Advance past the 30-min max duration so the trupp is in Rückzugsalarm.
         clock.Now = clock.Now.AddMinutes(31);

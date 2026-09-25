@@ -322,6 +322,227 @@ public class TasksViewModelTests
         Assert.Equal(TaskFilterKind.Done, vm.Filter); // ... that must not flip the filter
     }
 
+    // ----- #460: the Aufgabe-fällig bar names the task and leads to it -----
+    [Fact]
+    public void Task_rows_carry_their_task_id()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 5);
+
+        var vm = NewVm(session, clock);
+
+        Assert.Equal(session.Incident.Tasks[0].Id, vm.Rows.Single().Id);
+    }
+
+    [Fact]
+    public void Due_bar_is_hidden_while_no_task_is_overdue()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("mit Timer", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        session.AddTask("ohne Timer", null, TaskImportance.Low, TaskUrgency.Low, 0);
+        var vm = NewVm(session, clock, ticker);
+
+        clock.Now = T0.AddMinutes(4);
+        ticker.Fire();
+
+        Assert.False(vm.HasDueTask);
+        Assert.Equal("—", vm.DueTaskDisplay);
+    }
+
+    [Fact]
+    public void Due_bar_names_the_most_overdue_task_and_its_assignee()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("Später fällig", "EL", TaskImportance.High, TaskUrgency.High, 10);
+        session.AddTask("Wasserversorgung prüfen", "FFB 1/44/1", TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock, ticker);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+
+        Assert.True(vm.HasDueTask);
+        Assert.Equal("Aufgabe fällig: Wasserversorgung prüfen (zugeteilt an FFB 1/44/1)", vm.DueTaskDisplay);
+        Assert.Contains(nameof(TasksViewModel.HasDueTask), changed);
+        Assert.Contains(nameof(TasksViewModel.DueTaskDisplay), changed);
+    }
+
+    [Fact]
+    public void Due_bar_leaves_out_zugeteilt_when_nobody_is_assigned()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("Lage melden", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock, ticker);
+
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+
+        Assert.Equal("Aufgabe fällig: Lage melden", vm.DueTaskDisplay);
+    }
+
+    [Fact]
+    public void Due_bar_counts_the_other_overdue_tasks()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("Erste", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        session.AddTask("Zweite", null, TaskImportance.Low, TaskUrgency.Low, 6);
+        session.AddTask("Dritte", null, TaskImportance.Low, TaskUrgency.Low, 7);
+        var vm = NewVm(session, clock, ticker);
+
+        clock.Now = T0.AddMinutes(8);
+        ticker.Fire();
+
+        Assert.Equal("Aufgabe fällig: Erste · +2 weitere", vm.DueTaskDisplay);
+    }
+
+    [Fact]
+    public void Due_bar_clears_when_the_task_is_marked_done()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock, ticker);
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+        Assert.True(vm.HasDueTask);
+
+        vm.Rows.Single().IsDone = true;
+
+        Assert.False(vm.HasDueTask);
+    }
+
+    [Fact]
+    public void Completing_from_the_bar_marks_the_most_overdue_task_done()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("Erste", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        session.AddTask("Zweite", null, TaskImportance.Low, TaskUrgency.Low, 6);
+        var vm = NewVm(session, clock, ticker);
+        clock.Now = T0.AddMinutes(8);
+        ticker.Fire();
+
+        vm.CompleteMostOverdueTaskCommand.Execute(null);
+
+        Assert.True(session.Incident.Tasks.Single(t => t.Text == "Erste").IsCompleted);
+        Assert.False(session.Incident.Tasks.Single(t => t.Text == "Zweite").IsCompleted);
+        Assert.Equal("Aufgabe fällig: Zweite", vm.DueTaskDisplay);
+    }
+
+    [Fact]
+    public void ShowMostOverdueTask_selects_the_task_and_asks_to_reveal_it()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("Später fällig", null, TaskImportance.High, TaskUrgency.High, 10);
+        session.AddTask("Überfällig", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock, ticker);
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+        var reveals = 0;
+        vm.RevealRequested += (_, _) => reveals++;
+
+        vm.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Equal("Überfällig", vm.SelectedTask?.Text);
+        Assert.Contains(vm.SelectedTask, vm.Rows);
+        Assert.Equal(1, reveals);
+    }
+
+    [Fact]
+    public void Showing_the_same_task_twice_asks_to_reveal_it_again()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock, ticker);
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+        var reveals = 0;
+        vm.RevealRequested += (_, _) => reveals++;
+
+        vm.ShowMostOverdueTaskCommand.Execute(null);
+        vm.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Equal(2, reveals);
+    }
+
+    [Fact]
+    public void Showing_a_task_when_none_is_due_selects_nothing_and_reveals_nothing()
+    {
+        var (session, clock, _) = NewSession();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock);
+        var reveals = 0;
+        vm.RevealRequested += (_, _) => reveals++;
+
+        vm.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Null(vm.SelectedTask);
+        Assert.Equal(0, reveals);
+    }
+
+    [Fact]
+    public void Showing_a_task_hidden_by_the_done_filter_switches_back_to_open()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock, ticker);
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+        vm.Filter = TaskFilterKind.Done;
+
+        vm.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Equal(TaskFilterKind.Open, vm.Filter);
+        Assert.Equal("X", vm.SelectedTask?.Text);
+        Assert.Contains(vm.SelectedTask, vm.Rows);
+    }
+
+    [Fact]
+    public void The_selected_task_survives_an_incident_wide_change()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        session.AddTask("X", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        var vm = NewVm(session, clock, ticker);
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+        vm.ShowMostOverdueTaskCommand.Execute(null);
+
+        session.AddTask("Neu", null, TaskImportance.Low, TaskUrgency.Low, 30); // Sync() rebuilds rows
+
+        Assert.Equal("X", vm.SelectedTask?.Text);
+        Assert.Contains(vm.SelectedTask, vm.Rows);
+    }
+
+    [Fact]
+    public void Due_bar_is_hidden_in_a_read_only_workspace()
+    {
+        var store = new FakeStore();
+        var clock = new FixedClock(T0);
+        var live = TestSession.StartNew(
+            store,
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        live.AddTask("Liegengeblieben", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        clock.Now = T0.AddHours(3);
+        var ro = LocalIncidentSession.OpenReadOnly(store, clock, "/x.fwincident");
+
+        var vm = new TasksViewModel(ro, clock, new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
+
+        Assert.False(vm.HasDueTask);
+    }
+
     private static TasksViewModel NewVm(
         LocalIncidentSession session,
         FixedClock clock,

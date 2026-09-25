@@ -487,6 +487,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Scba?.Dispose();
         Files?.Dispose();
         CoMessprotokoll?.Dispose();
+        if (Tasks is not null)
+        {
+            // Same reason as Atemschutz above (#460).
+            Tasks.RevealRequested -= OnTasksRevealRequested;
+        }
+
         Tasks?.Dispose();
         Reminder?.Dispose();
     }
@@ -516,6 +522,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
 
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
+        Tasks.RevealRequested += OnTasksRevealRequested;
 
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.
@@ -595,9 +602,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// while the header bars, driven by the view model rather than the rail, still appear; then
     /// there is no tab to open and the selected Trupp is all this leaves behind.
     /// </remarks>
-    private void OnScbaRevealRequested(object? sender, EventArgs e)
+    private void OnScbaRevealRequested(object? sender, EventArgs e) => ShowModule(Scba);
+
+    /// <summary>
+    /// The Aufgabe-fällig bar asked for a task (#460): bring the Aufgaben tab forward, exactly as
+    /// <see cref="OnScbaRevealRequested"/> does for Atemschutz.
+    /// </summary>
+    private void OnTasksRevealRequested(object? sender, EventArgs e) => ShowModule(Tasks);
+
+    private void ShowModule(object module)
     {
-        if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, Scba)) is { } navItem)
+        if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, module)) is { } navItem)
         {
             SelectedNavItem = navItem;
         }
