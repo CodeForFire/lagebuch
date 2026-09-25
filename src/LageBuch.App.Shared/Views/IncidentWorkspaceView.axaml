@@ -147,6 +147,18 @@
               <Border Width="1" Height="18" Background="{StaticResource HairlineBrush}"
                       VerticalAlignment="Center" IsVisible="{Binding CanHost}" />
 
+              <!-- A joined client's counterpart to the sharing row (#464): which host it is
+                   connected to. Hidden while reconnecting, when the banner below speaks instead.
+                   Narrower than the operator readout so both still fit one line at 800px. -->
+              <TextBlock x:Name="ConnectedHostReadout" Classes="body" VerticalAlignment="Center"
+                         Foreground="{StaticResource TextSecondaryBrush}"
+                         MaxWidth="240" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ConnectedHostText}"
+                         Text="{Binding ConnectedHostText}"
+                         IsVisible="{Binding ShowConnectedHost}" />
+
+              <Border Width="1" Height="18" Background="{StaticResource HairlineBrush}"
+                      VerticalAlignment="Center" IsVisible="{Binding ShowConnectedHost}" />
+
               <StackPanel x:Name="StatusReadout" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
                 <Ellipse Width="10" Height="10" VerticalAlignment="Center" Fill="{StaticResource ActiveBrush}" />
                 <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Medium" FontSize="16"

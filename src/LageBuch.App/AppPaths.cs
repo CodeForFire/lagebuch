@@ -13,7 +13,7 @@ internal static class AppPaths
 
     public static string LastPdfExportJsonPath => Path.Join(Root, "last-pdf-export.json");
 
-    public static string LastJoinHostJsonPath => Path.Join(Root, "last-join-host.json");
+    public static string LastConnectionJsonPath => Path.Join(Root, "last-connection.json");
 
     public static string AttachmentCacheDir => Path.Join(Root, "attachment-cache");
 

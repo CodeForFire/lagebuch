@@ -36,10 +36,10 @@ public sealed partial class HomeViewModel : ObservableObject
     // is null-guarded, so the feature is simply inert rather than required.
     private readonly ILastSaveFolderStore? _lastSaveFolder;
 
-    // The host address last used for a successful join, so the join dialog can prefill it next
-    // time instead of starting empty (it rarely changes once set up). Null when not supplied
-    // (e.g. most tests) -- every use site is null-guarded, so the feature is simply inert.
-    private readonly ILastJoinHostStore? _lastJoinHost;
+    // The last successful join (#464): prefills the join dialog's host and drives the Home screen's
+    // "Zuletzt verbunden" card. Null when not supplied (e.g. most tests) -- every use site is
+    // null-guarded, so the feature is simply inert.
+    private readonly ILastConnectionStore? _lastConnectionStore;
 
     // Threaded straight into every IncidentWorkspaceViewModel this opens (#262); null (most tests
     // and every remote/joined workspace) just means "no last-export status to seed or persist".
@@ -56,7 +56,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastJoinHostStore? lastJoinHost = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -74,7 +74,8 @@ public sealed partial class HomeViewModel : ObservableObject
         _attachmentCacheRoot = attachmentCacheRoot;
         _trustStore = trustStore;
         _lastPdfExport = lastPdfExport;
-        _lastJoinHost = lastJoinHost;
+        _lastConnectionStore = lastConnection;
+        _lastConnection = lastConnection?.GetLast();
         RecentFiles = new ObservableCollection<RecentFileItem>(
             SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
     }
@@ -93,8 +94,62 @@ public sealed partial class HomeViewModel : ObservableObject
     /// <summary>Own personnel offered as name suggestions in the operator prompt (#469).</summary>
     public IReadOnlyList<Person> Personnel => _masterData.Get().Personnel;
 
-    /// <summary>The host address last used for a successful join, to prefill the join dialog with.</summary>
-    public string? LastJoinHost => _lastJoinHost?.GetLastHost();
+    /// <summary>The last successful join, or null if this device never joined one (#464).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLastConnection))]
+    [NotifyPropertyChangedFor(nameof(LastConnectionHost))]
+    [NotifyPropertyChangedFor(nameof(LastConnectionDetail))]
+    private LastConnection? _lastConnection;
+
+    public bool HasLastConnection => LastConnection is not null;
+
+    public string? LastConnectionHost => LastConnection?.Host;
+
+    /// <summary>
+    /// Why the last connection could not be written to disk, or null. The join itself has already
+    /// succeeded by then, so this only says the card will be gone after a restart.
+    /// </summary>
+    [ObservableProperty]
+    private string? _lastConnectionError;
+
+    /// <summary>
+    /// "‹Stichwort› · ‹time›" under the host on the Home card; the Stichwort is left out while unset.
+    /// A line of its own, so a long tailnet name is trimmed rather than broken mid-word on a phone.
+    /// </summary>
+    public string? LastConnectionDetail => LastConnection is not { } last
+        ? null
+        : last.Keyword is { Length: > 0 } keyword
+            ? $"{keyword} · {Formatting.Timestamp(last.ConnectedAt)}"
+            : Formatting.Timestamp(last.ConnectedAt);
+
+    /// <summary>
+    /// Raised by the Home card's "Neu verbinden". Home cannot reach the shell's join command, so the
+    /// shell subscribes and opens the join dialog through its own navigation path.
+    /// </summary>
+    public Action? ReconnectRequested { get; set; }
+
+    [RelayCommand]
+    private void Reconnect() => ReconnectRequested?.Invoke();
+
+    // The card holds a PIN, so the Lagebuchführer must be able to take it off this device. A
+    // still-open session cannot bring it back: its broadcast handler only updates the connection it
+    // recorded (see RememberConnection), and there is none left to match.
+    [RelayCommand]
+    private void ForgetLastConnection()
+    {
+        try
+        {
+            _lastConnectionStore?.Clear();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LastConnectionError = $"Nicht gelöscht: {ex.Message}";
+            return;
+        }
+
+        LastConnectionError = null;
+        LastConnection = null;
+    }
 
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
@@ -290,8 +345,8 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = null;
             _certificateChangedHost = null;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
-            _lastJoinHost?.SetLastHost(request.Host);
-            OpenRemoteWorkspace(session, hostMasterData);
+            RememberConnection(session, request.Host, request.Pin);
+            OpenRemoteWorkspace(session, hostMasterData, request.Host);
         }
         catch (PinRejectedException ex)
         {
@@ -338,6 +393,47 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = $"Verbindung zu {request.Host} nicht möglich. Teilt dieses Gerät gerade einen Einsatz? ({ex.Message})";
             ClearCertificateChangedHost();
         }
+    }
+
+    // The Stichwort is often typed on the host only after this client joined, so the record follows
+    // the session's broadcasts. The session is disposed when the workspace is left, which ends
+    // them; the ConnectedAt guard keeps a late broadcast from an earlier session from overwriting a
+    // newer join.
+    private void RememberConnection(RemoteIncidentSession session, string host, string? pin)
+    {
+        if (_lastConnectionStore is null)
+        {
+            return;
+        }
+
+        var connectedAt = _clock.Now;
+        SaveLastConnection(new LastConnection(host, session.Incident.Keyword, connectedAt, pin));
+        session.Changed += () =>
+        {
+            if (LastConnection is { } last && last.ConnectedAt == connectedAt
+                && !string.Equals(last.Keyword, session.Incident.Keyword, StringComparison.Ordinal))
+            {
+                SaveLastConnection(last with { Keyword = session.Incident.Keyword });
+            }
+        };
+    }
+
+    // A convenience file must not undo a join that already succeeded: an exception here would
+    // escape JoinDeviceAsync with the session open, or a host broadcast on the UI thread.
+    private void SaveLastConnection(LastConnection connection)
+    {
+        try
+        {
+            _lastConnectionStore?.SetLast(connection);
+            LastConnectionError = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LastConnectionError = $"Nicht gespeichert: {ex.Message}";
+        }
+
+        // Shown either way: after a failed write the card still holds for the rest of this run.
+        LastConnection = connection;
     }
 
     private void ClearCertificateChangedHost()
@@ -391,10 +487,10 @@ public sealed partial class HomeViewModel : ObservableObject
         "Reliability",
         "CA2000",
         Justification = "Ownership transfers to WorkspaceOpened's subscriber (MainWindowViewModel.ShowWorkspace), which disposes the outgoing workspace itself once CurrentView moves away from it.")]
-    private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md)
+    private void OpenRemoteWorkspace(RemoteIncidentSession session, MasterDataSet md, string host)
     {
         var workspace = new IncidentWorkspaceViewModel(
-            session, _clock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController(), _pdfExporter, _lastPdfExport);
+            session, _clock, _ticker, md, _dialogs, _alarm, new NoopIncidentHostController(), _pdfExporter, _lastPdfExport, remoteHost: host);
         WorkspaceOpened?.Invoke(workspace);
     }
 }

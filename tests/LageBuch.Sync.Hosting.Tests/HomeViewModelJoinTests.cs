@@ -17,19 +17,19 @@ public class HomeViewModelJoinTests
     // trust defaults to a fresh InMemoryTrustStore rather than null: RemoteIncidentSession.ConnectAsync
     // requires a trust store (there is no accept-any fallback any more), so every join test needs a
     // real one -- passing an explicit instance is only necessary for tests asserting on its contents.
-    private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null, ILastJoinHostStore? lastJoinHost = null) =>
+    private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null, ILastConnectionStore? lastConnection = null, FixedClock? clock = null) =>
         new(
             new InMemoryStore(),
             masterData ?? new EmptyMasterData(),
             new NoRecentFiles(),
             new NoDialogs(),
-            new FixedClock(),
+            clock ?? new FixedClock(),
             new NoTicker(),
             new NoAlarm(),
             new NoopIncidentHostController(),
             "1.0.0",
             trustStore: trust ?? new InMemoryTrustStore(),
-            lastJoinHost: lastJoinHost);
+            lastConnection: lastConnection);
 
     private static LocalIncidentSession HostSession(FixedClock clock) =>
         TestSession.StartNew(
@@ -226,14 +226,17 @@ public class HomeViewModelJoinTests
     }
 
     [Fact]
-    public async Task Successful_join_remembers_the_host_for_next_time()
+    public async Task Successful_join_remembers_the_host_the_stichwort_and_the_time()
     {
         var clock = new FixedClock();
-        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        var hostSession = HostSession(clock);
+        hostSession.SetKeyword("B3 Wohnung");
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
         await using var _ = host;
 
-        var lastJoinHost = new InMemoryLastJoinHostStore();
-        var vm = Home(lastJoinHost: lastJoinHost);
+        var lastConnection = new InMemoryLastConnectionStore();
+        var clientClock = new FixedClock { Now = new DateTimeOffset(2026, 9, 24, 14, 5, 0, TimeSpan.FromHours(2)) };
+        var vm = Home(lastConnection: lastConnection, clock: clientClock);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -241,9 +244,100 @@ public class HomeViewModelJoinTests
         await vm.JoinDeviceCommand.ExecuteAsync(request);
 
         Assert.Null(vm.JoinError);
-        Assert.Equal(request.Host, lastJoinHost.GetLastHost());
-        Assert.Equal(request.Host, vm.LastJoinHost);
+        var expected = new LastConnection(request.Host, "B3 Wohnung", clientClock.Now, TestHost.DefaultPin);
+        Assert.Equal(expected, lastConnection.GetLast());
+        Assert.Equal(expected, vm.LastConnection);
+        Assert.Equal("B3 Wohnung · 24.09.2026 14:05", vm.LastConnectionDetail);
+        Assert.Equal($"verbunden mit {request.Host}", opened!.ConnectedHostText);
+        Assert.True(opened.ShowConnectedHost);
+        await opened.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task A_join_still_opens_when_the_last_connection_cannot_be_saved()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var vm = Home(lastConnection: new FailingLastConnectionStore());
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        Assert.Null(vm.JoinError);
+        Assert.NotNull(opened);
+        Assert.True(vm.HasLastConnection); // still shown for the rest of this run
+        Assert.Equal("Nicht gespeichert: Kein Speicherplatz.", vm.LastConnectionError);
         await opened!.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task A_stichwort_set_on_the_host_after_joining_updates_the_last_connection()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        var lastConnection = new InMemoryLastConnectionStore();
+        var vm = Home(lastConnection: lastConnection);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        Assert.Null(vm.LastConnection?.Keyword);
+
+        var updated = new TaskCompletionSource();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(HomeViewModel.LastConnection) && vm.LastConnection?.Keyword is not null)
+            {
+                updated.TrySetResult();
+            }
+        };
+        hostSession.SetKeyword("TH Person eingeklemmt");
+        await updated.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("TH Person eingeklemmt", lastConnection.GetLast()?.Keyword);
+        await opened!.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task A_forgotten_connection_stays_forgotten_while_the_session_runs_on()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        var lastConnection = new InMemoryLastConnectionStore();
+        var vm = Home(lastConnection: lastConnection);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        vm.ForgetLastConnectionCommand.Execute(null);
+
+        // The workspace subscribed to the session after Home did, so once its header shows the
+        // new Stichwort, Home's handler has already seen the same broadcast.
+        var arrived = new TaskCompletionSource();
+        opened!.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IncidentWorkspaceViewModel.KeywordDisplay))
+            {
+                arrived.TrySetResult();
+            }
+        };
+        hostSession.SetKeyword("TH Person eingeklemmt");
+        await arrived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(vm.HasLastConnection);
+        Assert.Null(lastConnection.GetLast());
+        await opened.LeaveAsync();
     }
 
     [Fact]
@@ -265,20 +359,21 @@ public class HomeViewModelJoinTests
     }
 
     [Fact]
-    public async Task A_failed_join_does_not_remember_the_host()
+    public async Task A_failed_join_does_not_remember_the_connection()
     {
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
         await using var _ = host;
 
-        var lastJoinHost = new InMemoryLastJoinHostStore();
-        var vm = Home(lastJoinHost: lastJoinHost);
+        var lastConnection = new InMemoryLastConnectionStore();
+        var vm = Home(lastConnection: lastConnection);
 
         await vm.JoinDeviceCommand.ExecuteAsync(
             new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "9999"));
 
         Assert.NotNull(vm.JoinError);
-        Assert.Null(lastJoinHost.GetLastHost());
+        Assert.Null(lastConnection.GetLast());
+        Assert.False(vm.HasLastConnection);
     }
 
     [Fact]
@@ -369,21 +464,63 @@ public class HomeViewModelJoinTests
     }
 
     [Fact]
-    public void RequestJoinDevice_prefills_the_last_used_host()
+    public void RequestJoinDevice_prefills_the_last_used_host_and_pin()
     {
-        var lastJoinHost = new InMemoryLastJoinHostStore();
-        lastJoinHost.SetLastHost("elw-1:5859");
-        var vm = MainWindowVm(Home(lastJoinHost: lastJoinHost));
+        var lastConnection = new InMemoryLastConnectionStore();
+        lastConnection.SetLast(new LastConnection("elw-1:5859", "B3 Wohnung", new FixedClock().Now, "5393"));
+        var vm = MainWindowVm(Home(lastConnection: lastConnection));
 
         vm.RequestJoinDeviceCommand.Execute(null);
 
         Assert.Equal("elw-1:5859", vm.PendingPrompt!.Host);
+        Assert.Equal("5393", vm.PendingPrompt.Pin);
+    }
+
+    // The host started sharing anew since, with a new PIN: one rejected attempt, then the dialog
+    // asks for the PIN and keeps everything else.
+    [Fact]
+    public async Task A_stale_remembered_pin_is_rejected_once_and_cleared_from_the_dialog()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        var lastConnection = new InMemoryLastConnectionStore();
+        lastConnection.SetLast(new LastConnection($"127.0.0.1:{port}", "B3 Wohnung", clock.Now, "5393"));
+        var vm = MainWindowVm(Home(lastConnection: lastConnection));
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.OperatorName = "Client";
+        prompt.ConfirmCommand.Execute(null);
+
+        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+
+        Assert.Same(prompt, vm.PendingPrompt);
+        Assert.Equal("Falsche PIN.", prompt.ErrorMessage);
+        Assert.Equal(string.Empty, prompt.Pin);
+        Assert.Equal($"127.0.0.1:{port}", prompt.Host);
+    }
+
+    [Fact]
+    public void Neu_verbinden_on_home_opens_the_join_dialog_with_the_last_host_and_pin()
+    {
+        var lastConnection = new InMemoryLastConnectionStore();
+        lastConnection.SetLast(new LastConnection("elw-1:5859", "B3 Wohnung", new FixedClock().Now, "5393"));
+        var home = Home(lastConnection: lastConnection);
+        var vm = MainWindowVm(home);
+
+        home.ReconnectCommand.Execute(null);
+
+        Assert.NotNull(vm.PendingPrompt);
+        Assert.True(vm.PendingPrompt!.CollectsHost);
+        Assert.Equal("elw-1:5859", vm.PendingPrompt.Host);
+        Assert.Equal("5393", vm.PendingPrompt.Pin);
     }
 
     [Fact]
     public void RequestJoinDevice_starts_empty_when_nothing_was_ever_joined()
     {
-        var vm = MainWindowVm(Home(lastJoinHost: new InMemoryLastJoinHostStore()));
+        var vm = MainWindowVm(Home(lastConnection: new InMemoryLastConnectionStore()));
 
         vm.RequestJoinDeviceCommand.Execute(null);
 
