@@ -44,10 +44,10 @@ Markdown.
 ## Warum Lagebuch?
 
 - **Läuft offline – wirklich.** Kein Internet, kein Konto, kein Server. Jeder
-  Einsatz ist eine einzelne `.fwincident`-Datei, die dir gehört und die du
-  archivieren, kopieren oder weitergeben kannst.
+  Einsatz ist eine einzelne `.fwincident`-Datei, die euch gehört und die ihr
+  archivieren, kopieren oder weitergeben könnt.
 - **Keine Daten verlassen den ELW.** Stammdaten, Namen und Handynummern
-  liegen nur auf deinem Gerät. Die optionale Mehrgeräte-Verbindung läuft im
+  liegen nur auf euren Geräten. Die optionale Mehrgeräte-Verbindung läuft im
   LAN oder über Tailscale, TLS-gesichert mit PIN – ohne Cloud, ohne Telemetrie.
   Was genau wo gespeichert wird, steht in
   [Datenschutz und Sicherheit](docs/datenschutz-und-sicherheit.md) – die Seite
@@ -94,7 +94,7 @@ Alle Angaben laut Herstellerseiten, Stand September 2026. Fehler oder
 
 Alle Beispieldaten sind frei erfunden.
 
-1. **Installieren** – Paket für dein System aus den
+1. **Installieren** – Paket für euer System aus den
    [Releases](../../releases) laden, siehe [Installation](#installation).
 2. **Stammdaten importieren** –
    [`demo-stammdaten.json`](docs/samples/demo-stammdaten.json)
@@ -108,7 +108,7 @@ Alle Beispieldaten sind frei erfunden.
    in Lagebuch **ÖFFNEN** wählen. Der Einsatz „B 3 – Zimmerbrand“ hat schon
    ETB-Einträge, vier Fahrzeuge, einen Angriffstrupp unter Atemschutz mit
    zugeordnetem Sicherheitstrupp, Aufgaben und ein CO-Messprotokoll, in dem
-   eine Wohnung schon dreimal gemessen wurde. Über **WEITER BEARBEITEN** kannst du selbst eingreifen.
+   eine Wohnung schon dreimal gemessen wurde. Über **WEITER BEARBEITEN** könnt ihr selbst eingreifen.
 4. **Ausprobieren** – einen ETB-Eintrag schreiben, im Tab **ATEMSCHUTZ** einen
    Trupp bereitstellen, einen Sicherheitstrupp zuordnen und starten, eine
    Aufgabe mit Timer anlegen, in der **CO-MESSUNG** eine Wohnung markieren oder
@@ -116,7 +116,7 @@ Alle Beispieldaten sind frei erfunden.
 5. **PDF EXPORTIEREN** – der fertige Einsatzbericht liegt nach ein paar
    Sekunden auf der Platte.
 
-Wenn du danach mit deinen eigenen Daten weitermachen willst: Stammdaten
+Wenn ihr danach mit euren eigenen Daten weitermachen wollt: Stammdaten
 exportieren, `masterdata.db` löschen (Pfad siehe
 [docs/master-data.md](docs/master-data.md)), eigene Datei importieren.
 
