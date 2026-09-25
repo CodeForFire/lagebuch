@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.HomeView"
              x:DataType="vm:HomeViewModel">
   <Grid>
@@ -90,10 +91,11 @@
               <Border Grid.Column="1" Height="1" Background="{StaticResource HairlineBrush}"
                       VerticalAlignment="Center" Margin="14,0,0,0" />
             </Grid>
-            <!-- Grid, not a horizontal StackPanel, so on a phone the host trims and the Stichwort
-                 wraps instead of pushing the button off the card. -->
-            <Grid ColumnDefinitions="*,Auto">
-              <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+            <!-- LeadTrailPanel, as in the incident header: the buttons share the text's line while
+                 both fit and move onto their own line, right-aligned, on a phone. A *,Auto Grid
+                 squeezed the text into a sliver there and broke the time mid-number. -->
+            <ctrl:LeadTrailPanel x:Name="LastConnectionLine" ItemSpacing="16" LineSpacing="12">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
                 <TextBlock x:Name="LastConnectionHost" Foreground="{StaticResource TextPrimaryBrush}"
                            TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding LastConnectionHost}"
                            Text="{Binding LastConnectionHost}"
@@ -106,10 +108,19 @@
                            Text="{Binding LastConnectionError}"
                            IsVisible="{Binding LastConnectionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
               </StackPanel>
-              <Button Grid.Column="1" x:Name="ReconnectButton" Content="NEU VERBINDEN"
-                      Margin="10,0,0,0" VerticalAlignment="Center"
-                      Command="{Binding ReconnectCommand}" />
-            </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Button x:Name="ReconnectButton" Content="NEU VERBINDEN" VerticalAlignment="Center"
+                        Command="{Binding ReconnectCommand}" />
+                <!-- The card keeps the PIN on this device; this takes it off again. -->
+                <Button x:Name="ForgetLastConnectionButton" Classes="ghost" VerticalAlignment="Center"
+                        ToolTip.Tip="Letzte Verbindung vergessen"
+                        AutomationProperties.Name="Letzte Verbindung vergessen"
+                        Command="{Binding ForgetLastConnectionCommand}">
+                  <PathIcon Width="13" Height="13" VerticalAlignment="Center"
+                            Data="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                </Button>
+              </StackPanel>
+            </ctrl:LeadTrailPanel>
           </StackPanel>
         </Border>
 

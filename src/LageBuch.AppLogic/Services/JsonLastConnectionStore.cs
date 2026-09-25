@@ -12,4 +12,6 @@ public sealed class JsonLastConnectionStore : ILastConnectionStore
         _file.TryRead(out var connection) && !string.IsNullOrWhiteSpace(connection.Host) ? connection : null;
 
     public void SetLast(LastConnection connection) => _file.Write(connection);
+
+    public void Clear() => _file.Delete();
 }

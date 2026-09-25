@@ -244,7 +244,7 @@ public class HomeViewModelJoinTests
         await vm.JoinDeviceCommand.ExecuteAsync(request);
 
         Assert.Null(vm.JoinError);
-        var expected = new LastConnection(request.Host, "B3 Wohnung", clientClock.Now);
+        var expected = new LastConnection(request.Host, "B3 Wohnung", clientClock.Now, TestHost.DefaultPin);
         Assert.Equal(expected, lastConnection.GetLast());
         Assert.Equal(expected, vm.LastConnection);
         Assert.Equal("B3 Wohnung · 24.09.2026 14:05", vm.LastConnectionDetail);
@@ -303,6 +303,41 @@ public class HomeViewModelJoinTests
 
         Assert.Equal("TH Person eingeklemmt", lastConnection.GetLast()?.Keyword);
         await opened!.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task A_forgotten_connection_stays_forgotten_while_the_session_runs_on()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        var lastConnection = new InMemoryLastConnectionStore();
+        var vm = Home(lastConnection: lastConnection);
+        IncidentWorkspaceViewModel? opened = null;
+        vm.WorkspaceOpened = ws => opened = ws;
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        vm.ForgetLastConnectionCommand.Execute(null);
+
+        // The workspace subscribed to the session after Home did, so once its header shows the
+        // new Stichwort, Home's handler has already seen the same broadcast.
+        var arrived = new TaskCompletionSource();
+        opened!.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IncidentWorkspaceViewModel.KeywordDisplay))
+            {
+                arrived.TrySetResult();
+            }
+        };
+        hostSession.SetKeyword("TH Person eingeklemmt");
+        await arrived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(vm.HasLastConnection);
+        Assert.Null(lastConnection.GetLast());
+        await opened.LeaveAsync();
     }
 
     [Fact]
@@ -429,23 +464,48 @@ public class HomeViewModelJoinTests
     }
 
     [Fact]
-    public void RequestJoinDevice_prefills_the_last_used_host()
+    public void RequestJoinDevice_prefills_the_last_used_host_and_pin()
     {
         var lastConnection = new InMemoryLastConnectionStore();
-        lastConnection.SetLast(new LastConnection("elw-1:5859", "B3 Wohnung", new FixedClock().Now));
+        lastConnection.SetLast(new LastConnection("elw-1:5859", "B3 Wohnung", new FixedClock().Now, "5393"));
         var vm = MainWindowVm(Home(lastConnection: lastConnection));
 
         vm.RequestJoinDeviceCommand.Execute(null);
 
         Assert.Equal("elw-1:5859", vm.PendingPrompt!.Host);
-        Assert.Equal(string.Empty, vm.PendingPrompt.Pin); // the host makes a new PIN every time
+        Assert.Equal("5393", vm.PendingPrompt.Pin);
+    }
+
+    // The host started sharing anew since, with a new PIN: one rejected attempt, then the dialog
+    // asks for the PIN and keeps everything else.
+    [Fact]
+    public async Task A_stale_remembered_pin_is_rejected_once_and_cleared_from_the_dialog()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
+        await using var _ = host;
+
+        var lastConnection = new InMemoryLastConnectionStore();
+        lastConnection.SetLast(new LastConnection($"127.0.0.1:{port}", "B3 Wohnung", clock.Now, "5393"));
+        var vm = MainWindowVm(Home(lastConnection: lastConnection));
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.OperatorName = "Client";
+        prompt.ConfirmCommand.Execute(null);
+
+        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+
+        Assert.Same(prompt, vm.PendingPrompt);
+        Assert.Equal("Falsche PIN.", prompt.ErrorMessage);
+        Assert.Equal(string.Empty, prompt.Pin);
+        Assert.Equal($"127.0.0.1:{port}", prompt.Host);
     }
 
     [Fact]
-    public void Neu_verbinden_on_home_opens_the_join_dialog_with_the_last_host()
+    public void Neu_verbinden_on_home_opens_the_join_dialog_with_the_last_host_and_pin()
     {
         var lastConnection = new InMemoryLastConnectionStore();
-        lastConnection.SetLast(new LastConnection("elw-1:5859", "B3 Wohnung", new FixedClock().Now));
+        lastConnection.SetLast(new LastConnection("elw-1:5859", "B3 Wohnung", new FixedClock().Now, "5393"));
         var home = Home(lastConnection: lastConnection);
         var vm = MainWindowVm(home);
 
@@ -454,6 +514,7 @@ public class HomeViewModelJoinTests
         Assert.NotNull(vm.PendingPrompt);
         Assert.True(vm.PendingPrompt!.CollectsHost);
         Assert.Equal("elw-1:5859", vm.PendingPrompt.Host);
+        Assert.Equal("5393", vm.PendingPrompt.Pin);
     }
 
     [Fact]

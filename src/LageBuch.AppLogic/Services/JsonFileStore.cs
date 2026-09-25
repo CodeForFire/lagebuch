@@ -60,4 +60,14 @@ internal sealed class JsonFileStore<T>
         File.WriteAllText(tmpPath, JsonSerializer.Serialize(value));
         File.Move(tmpPath, _path, overwrite: true);
     }
+
+    /// <summary>
+    /// Removes the stored value, and any <c>*.tmp</c> a crashed <see cref="Write"/> left behind, so
+    /// nothing of it stays on disk. A missing file is not an error: there is nothing to remove.
+    /// </summary>
+    public void Delete()
+    {
+        File.Delete(_path);
+        File.Delete(_path + ".tmp");
+    }
 }

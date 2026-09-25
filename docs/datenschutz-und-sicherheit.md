@@ -115,7 +115,7 @@ Anwendungsdaten.
 | `recent.json` | die zuletzt geöffneten Einsatzdateien mit vollständigem Pfad |
 | `last-save-folder.json` | der zuletzt zum Speichern verwendete Ordner |
 | `last-pdf-export.json` | der zuletzt für den PDF-Export verwendete Ordner |
-| `last-connection.json` | die zuletzt erfolgreich verbundene Gegenstelle, mit **Stichwort** des Einsatzes und Zeitpunkt (ältere Versionen: `last-join-host.json`, nur die Gegenstelle) |
+| `last-connection.json` | die zuletzt erfolgreich verbundene Gegenstelle, mit **Stichwort** des Einsatzes, Zeitpunkt und **PIN**, damit ein Wiederverbinden im Einsatz ohne Nachfragen geht; auf der Startseite mit „Letzte Verbindung vergessen“ löschbar (ältere Versionen: `last-join-host.json`, nur die Gegenstelle) |
 | `trust.json` | die gespeicherten Zertifikats-Fingerabdrücke der Gegenstellen |
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
 

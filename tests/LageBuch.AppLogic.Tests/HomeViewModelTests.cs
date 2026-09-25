@@ -319,7 +319,7 @@ public class HomeViewModelTests
         Assert.Equal(1, store.LoadCount);
     }
 
-    private static HomeViewModel HomeWithLastConnection(LastConnection? last) =>
+    private static HomeViewModel HomeWithLastConnection(LastConnection? last, FakeLastConnectionStore? store = null) =>
         new(
             new FakeStore(),
             new FakeMasterData(),
@@ -330,7 +330,7 @@ public class HomeViewModelTests
             new FakeAlarmService(),
             new NoopIncidentHostController(),
             "1.0.0",
-            lastConnection: new FakeLastConnectionStore { Saved = last });
+            lastConnection: store ?? new FakeLastConnectionStore { Saved = last });
 
     [Fact]
     public void Home_shows_the_last_connection_with_its_stichwort_and_time()
@@ -370,15 +370,52 @@ public class HomeViewModelTests
 
         Assert.True(requested);
     }
+
+    [Fact]
+    public void Forgetting_the_last_connection_hides_the_card_and_clears_the_store()
+    {
+        var store = new FakeLastConnectionStore { Saved = new LastConnection("elw-1", null, T0, "5393") };
+        var vm = HomeWithLastConnection(null, store);
+
+        vm.ForgetLastConnectionCommand.Execute(null);
+
+        Assert.False(vm.HasLastConnection);
+        Assert.Null(store.Saved);
+        Assert.Null(vm.LastConnectionError);
+    }
+
+    [Fact]
+    public void A_connection_that_cannot_be_deleted_stays_on_the_card_with_the_reason()
+    {
+        var store = new FakeLastConnectionStore { Saved = new LastConnection("elw-1", null, T0, "5393"), FailClear = true };
+        var vm = HomeWithLastConnection(null, store);
+
+        vm.ForgetLastConnectionCommand.Execute(null);
+
+        Assert.True(vm.HasLastConnection);
+        Assert.Equal("Nicht gelöscht: Zugriff verweigert.", vm.LastConnectionError);
+    }
 }
 
 internal sealed class FakeLastConnectionStore : ILastConnectionStore
 {
     public LastConnection? Saved { get; set; }
 
+    public bool FailClear { get; init; }
+
     public LastConnection? GetLast() => Saved;
 
     public void SetLast(LastConnection connection) => Saved = connection;
+
+    public void Clear()
+    {
+        if (FailClear)
+        {
+            throw new UnauthorizedAccessException("Zugriff verweigert.");
+        }
+
+        Saved = null;
+    }
 }
 
 internal sealed class FakeMasterData : IMasterDataProvider

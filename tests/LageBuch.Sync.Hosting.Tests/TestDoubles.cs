@@ -102,6 +102,8 @@ internal sealed class InMemoryLastConnectionStore : ILastConnectionStore
     public LastConnection? GetLast() => _last;
 
     public void SetLast(LastConnection connection) => _last = connection;
+
+    public void Clear() => _last = null;
 }
 
 /// <summary>An <see cref="ILastConnectionStore"/> whose disk is full.</summary>
@@ -110,6 +112,10 @@ internal sealed class FailingLastConnectionStore : ILastConnectionStore
     public LastConnection? GetLast() => null;
 
     public void SetLast(LastConnection connection) => throw new IOException("Kein Speicherplatz.");
+
+    public void Clear()
+    {
+    }
 }
 
 // Minimal service doubles for constructing ViewModels (IncidentWorkspaceViewModel/HomeViewModel).

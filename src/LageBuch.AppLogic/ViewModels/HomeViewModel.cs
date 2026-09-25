@@ -131,6 +131,26 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private void Reconnect() => ReconnectRequested?.Invoke();
 
+    // The card holds a PIN, so the Lagebuchführer must be able to take it off this device. A
+    // still-open session cannot bring it back: its broadcast handler only updates the connection it
+    // recorded (see RememberConnection), and there is none left to match.
+    [RelayCommand]
+    private void ForgetLastConnection()
+    {
+        try
+        {
+            _lastConnectionStore?.Clear();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LastConnectionError = $"Nicht gelöscht: {ex.Message}";
+            return;
+        }
+
+        LastConnectionError = null;
+        LastConnection = null;
+    }
+
     /// <summary>
     /// Why the last open attempt failed, or null. Shown as a banner on the Home screen.
     /// </summary>
@@ -325,7 +345,7 @@ public sealed partial class HomeViewModel : ObservableObject
             JoinError = null;
             _certificateChangedHost = null;
             OnPropertyChanged(nameof(CanResetTrustedCertificate));
-            RememberConnection(session, request.Host);
+            RememberConnection(session, request.Host, request.Pin);
             OpenRemoteWorkspace(session, hostMasterData, request.Host);
         }
         catch (PinRejectedException ex)
@@ -379,7 +399,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // the session's broadcasts. The session is disposed when the workspace is left, which ends
     // them; the ConnectedAt guard keeps a late broadcast from an earlier session from overwriting a
     // newer join.
-    private void RememberConnection(RemoteIncidentSession session, string host)
+    private void RememberConnection(RemoteIncidentSession session, string host, string? pin)
     {
         if (_lastConnectionStore is null)
         {
@@ -387,7 +407,7 @@ public sealed partial class HomeViewModel : ObservableObject
         }
 
         var connectedAt = _clock.Now;
-        SaveLastConnection(new LastConnection(host, session.Incident.Keyword, connectedAt));
+        SaveLastConnection(new LastConnection(host, session.Incident.Keyword, connectedAt, pin));
         session.Changed += () =>
         {
             if (LastConnection is { } last && last.ConnectedAt == connectedAt

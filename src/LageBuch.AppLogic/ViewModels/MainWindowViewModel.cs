@@ -147,6 +147,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             // The host address rarely changes once set up (a station's ELW, a fixed Tailscale
             // node) -- prefill last time's so the operator doesn't retype it every join.
             Host = _home.LastConnection?.Host ?? string.Empty,
+
+            // The PIN too, valid for as long as the host keeps sharing: reconnecting mid-Einsatz
+            // must not mean asking around for it. A stale one is rejected once and then cleared.
+            Pin = _home.LastConnection?.Pin ?? string.Empty,
         };
     });
 

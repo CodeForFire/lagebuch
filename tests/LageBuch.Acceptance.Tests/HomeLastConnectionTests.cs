@@ -1,8 +1,10 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using LageBuch.App.Shared.Controls;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
@@ -42,6 +44,10 @@ public class HomeLastConnectionTests
         public LastConnection? GetLast() => _last;
 
         public void SetLast(LastConnection connection)
+        {
+        }
+
+        public void Clear()
         {
         }
     }
@@ -100,18 +106,46 @@ public class HomeLastConnectionTests
         Assert.True(requested);
     }
 
-    // On a phone a long host and Stichwort wrap; the button must stay on the card.
     [AvaloniaFact]
-    public void On_a_phone_the_button_stays_inside_the_card()
+    public void The_forget_button_is_named_and_hides_the_card()
+    {
+        var (window, _) = ShowHome(new LastConnection("elw-1", null, T0, "5393"));
+        var forget = ByName<Button>(window, "ForgetLastConnectionButton");
+
+        Assert.Equal("Letzte Verbindung vergessen", AutomationProperties.GetName(forget));
+
+        forget.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(ByName<Border>(window, "LastConnectionCard").IsVisible);
+    }
+
+    // On a phone a long host and Stichwort wrap; both buttons must stay on the card.
+    [AvaloniaFact]
+    public void On_a_phone_the_buttons_stay_inside_the_card()
     {
         var (window, _) = ShowHome(
             new LastConnection("elw-1.tail1234.ts.net:5859", "TH Person eingeklemmt nach Verkehrsunfall", T0),
             width: 360);
 
         var card = ByName<Border>(window, "LastConnectionCard");
-        var button = ByName<Button>(window, "ReconnectButton");
-        var right = button.TranslatePoint(new Point(button.Bounds.Width, 0), card)!.Value.X;
+        foreach (var name in new[] { "ReconnectButton", "ForgetLastConnectionButton" })
+        {
+            var button = ByName<Button>(window, name);
+            var right = button.TranslatePoint(new Point(button.Bounds.Width, 0), card)!.Value.X;
 
-        Assert.True(right <= card.Bounds.Width, $"button ends at x={right} on a {card.Bounds.Width}px card");
+            Assert.True(right <= card.Bounds.Width, $"{name} ends at x={right} on a {card.Bounds.Width}px card");
+        }
+
+        // The buttons take a line of their own rather than squeezing the text into a sliver.
+        Assert.True(ByName<LeadTrailPanel>(window, "LastConnectionLine").IsWrapped);
+    }
+
+    [AvaloniaFact]
+    public void On_a_desktop_text_and_buttons_share_one_line()
+    {
+        var (window, _) = ShowHome(new LastConnection("elw-1", "B3 Wohnung", T0));
+
+        Assert.False(ByName<LeadTrailPanel>(window, "LastConnectionLine").IsWrapped);
     }
 }
