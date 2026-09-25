@@ -31,6 +31,8 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly string _pin;
     private readonly IUiDispatcher _ui;
     private readonly string _masterDataJson;
+    private readonly int _protocolVersion;
+    private readonly int _minimumProtocolVersion;
     private readonly PinRateLimiter _rateLimiter = new();
     private X509Certificate2? _cert;
     private WebApplication? _app;
@@ -42,13 +44,23 @@ public sealed class IncidentHost : IAsyncDisposable
         string appVersion,
         IUiDispatcher ui,
         string pin,
-        MasterDataSet? masterData = null)
+        MasterDataSet? masterData = null,
+        int protocolVersion = SyncProtocol.ProtocolVersion,
+        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion)
     {
         _session = session;
         _clock = clock;
         _appVersion = appVersion;
         _pin = pin;
         _ui = ui;
+
+        // Overridable for tests only, the way ConnectAsync takes a reconnectPolicy. The app always
+        // takes the defaults: a host advertising anything other than what this build actually speaks
+        // is a lie. Tests need it because with MinimumProtocolVersion at its floor there is otherwise
+        // no way to construct a legitimately-too-old peer, which would leave the 426 path below
+        // shipping untested until the first release that raises the floor — during an Einsatz.
+        _protocolVersion = protocolVersion;
+        _minimumProtocolVersion = minimumProtocolVersion;
 
         // Serialized once, here, rather than per request: the Stammdaten editor is a top-level view
         // that an open workspace replaces, so the host's set provably cannot change while sharing.
@@ -133,8 +145,47 @@ public sealed class IncidentHost : IAsyncDisposable
             await next();
         });
 
+        // Wire-contract gate (§7): a peer announces the protocol revision it speaks in
+        // SyncProtocol.ProtocolHeader, and anything below the oldest revision this host still
+        // understands is refused here rather than later, on a command it cannot parse. Deliberately
+        // after the PIN gate — auth precedes content, so an uninvited peer never learns which
+        // revisions this host speaks.
+        //
+        // The test is one-sided: below the floor is refused, above the ceiling is not. A peer
+        // claiming something newer has already read /version, seen this host's range and chosen to
+        // speak down to it; refusing it here would reject a client its own handshake had just
+        // approved, and it would find out only on its second request. The host receives one number
+        // and cannot evaluate the overlap anyway — the client is the end that decides.
+        //
+        // SyncProtocol.VersionPath is exempt because it *is* the negotiation endpoint: a peer that
+        // cannot read it can never learn why it was refused, or which of the two devices to update.
+        // It sits behind the PIN gate already, and carries nothing but two constants and a version
+        // string, so exempting it discloses nothing. Note this means a peer with the right PIN but an
+        // unusable protocol can poll /version unthrottled — correct, a mismatch is not a brute-force
+        // attempt, and moving this block above the PIN check to "fix" that would break the rule above.
+        app.Use(async (context, next) =>
+        {
+            if (!context.Request.Path.Equals(new PathString(SyncProtocol.VersionPath), StringComparison.OrdinalIgnoreCase)
+                && !ProtocolAccepted(context.Request.Headers[SyncProtocol.ProtocolHeader], _minimumProtocolVersion))
+            {
+                context.Response.StatusCode = StatusCodes.Status426UpgradeRequired;
+
+                // The only failure in this pipeline with a body: 401 and 429 are answered by a client
+                // that knows what they mean, while this one can reach a human through a generic error
+                // banner. Charset spelled out because WriteAsync encodes UTF-8 but does not say so,
+                // and the message carries an umlaut.
+                context.Response.ContentType = "text/plain; charset=utf-8";
+                await context.Response.WriteAsync("Dieses Gerät ist zu alt für den Host. Bitte dieses Gerät aktualisieren.");
+                return;
+            }
+
+            await next();
+        });
+
         app.MapHub<IncidentHub>(SyncProtocol.HubPath);
-        app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(_appVersion), SyncJson.Options));
+        app.MapGet(
+            SyncProtocol.VersionPath,
+            () => Results.Json(new VersionInfo(_appVersion, _protocolVersion, _minimumProtocolVersion), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options));
 
         // Results.Content, not Results.Json: the payload is already serialized JSON text, and
@@ -261,6 +312,17 @@ public sealed class IncidentHost : IAsyncDisposable
     // against timing analysis over a LAN it is already carried over TLS.
     private bool PinMatches(Microsoft.Extensions.Primitives.StringValues header) =>
         header.Count == 1 && string.Equals(header[0], _pin, StringComparison.Ordinal);
+
+    // No header at all is a pre-negotiation peer (v0.6.1 or older), which by construction speaks
+    // SyncProtocol.LegacyProtocolVersion and is served. Anything present must be exactly one header
+    // and must parse: a duplicated or garbled one is refused rather than silently coalesced, the same
+    // rule PinMatches applies. Indexed after the count check because StringValues converts implicitly
+    // to both string and string[], which makes passing it to TryParse directly ambiguous.
+    private static bool ProtocolAccepted(Microsoft.Extensions.Primitives.StringValues header, int minimum) =>
+        header.Count == 0
+        || (header.Count == 1
+            && int.TryParse(header[0], System.Globalization.CultureInfo.InvariantCulture, out var claimed)
+            && claimed >= minimum);
 
     private void OnSessionChanged() => _ = Broadcast(SnapshotMapper.ToSnapshot(_session.Incident));
 

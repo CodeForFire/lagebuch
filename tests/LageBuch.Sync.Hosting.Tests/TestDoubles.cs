@@ -235,9 +235,19 @@ internal static class TestHost
         string version = "1.0.0",
         IUiDispatcher? ui = null,
         string pin = DefaultPin,
-        MasterDataSet? masterData = null)
+        MasterDataSet? masterData = null,
+        int protocolVersion = SyncProtocol.ProtocolVersion,
+        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion)
     {
-        var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher(), pin, masterData);
+        var host = new IncidentHost(
+            session,
+            clock,
+            version,
+            ui ?? new ImmediateUiDispatcher(),
+            pin,
+            masterData,
+            protocolVersion,
+            minimumProtocolVersion);
         var port = FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
         return (host, port);

@@ -180,6 +180,13 @@ Datei aus einer neueren Version wird mit klarer Meldung abgelehnt statt
 beschädigt, ältere Dateien werden beim Öffnen migriert. Alle Änderungen stehen
 im [CHANGELOG](CHANGELOG.md).
 
+Für die Mehrgeräte-Verbindung zählt nicht die App-Version, sondern das
+Übertragungsformat: Geräte verbinden sich auch dann, wenn auf ihnen
+unterschiedliche Versionen laufen – etwa weil das Android-Update noch in der
+Prüfung bei Google Play steckt. Passen die Formate wirklich nicht zusammen,
+lehnt die App die Verbindung mit einer klaren Meldung ab und nennt das Gerät,
+das aktualisiert werden muss.
+
 Woran wir als Nächstes arbeiten und was Version 1.0 bedeutet, stehen in der
 [Roadmap](ROADMAP.md) – kurz gesagt: ab 1.0 bleibt eine Einsatzdatei dauerhaft
 lesbar.

@@ -1,0 +1,1 @@
+Two devices now sync whenever their wire contracts are compatible instead of only when their app versions match exactly, so a phone still waiting on a Play Store update can join a newer desktop host, and a genuinely incompatible pair is refused with a message naming which device to update.

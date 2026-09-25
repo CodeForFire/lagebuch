@@ -8,7 +8,7 @@ namespace LageBuch.Sync.Hosting.Tests;
 
 /// <summary>
 /// The "Mit Gerät verbinden" join flow at the ViewModel layer (#52 §6/§7): a successful join opens a
-/// thin-client workspace, and the expected failures — a version mismatch, a wrong PIN, an
+/// thin-client workspace, and the expected failures — an incompatible wire contract, a wrong PIN, an
 /// unreachable / not-sharing host, and a changed TLS certificate — surface as a Home banner without
 /// throwing.
 /// </summary>
@@ -207,7 +207,7 @@ public class HomeViewModelJoinTests
     }
 
     [Fact]
-    public async Task Version_mismatch_shows_a_banner_and_opens_nothing()
+    public async Task A_newer_app_version_on_the_host_still_joins_when_the_protocol_matches()
     {
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "2.0.0"); // host newer
@@ -220,9 +220,34 @@ public class HomeViewModelJoinTests
         await vm.JoinDeviceCommand.ExecuteAsync(
             new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
 
+        // Two devices on different releases is the normal state of a volunteer fleet, not a fault.
+        Assert.True(opened);
+        Assert.Null(vm.JoinError);
+    }
+
+    [Fact]
+    public async Task Incompatible_protocol_shows_a_banner_naming_which_device_to_update()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock),
+            clock,
+            "2.0.0",
+            protocolVersion: SyncProtocol.ProtocolVersion + 5,
+            minimumProtocolVersion: SyncProtocol.ProtocolVersion + 5);
+        await using var _ = host;
+
+        var vm = Home(); // this device is "1.0.0"
+        var opened = false;
+        vm.WorkspaceOpened = _ => opened = true;
+
+        await vm.JoinDeviceCommand.ExecuteAsync(
+            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
-        Assert.Contains("2.0.0", vm.JoinError, StringComparison.Ordinal); // names the host version it refused
+        Assert.Contains("Bitte dieses Gerät aktualisieren", vm.JoinError, StringComparison.Ordinal);
+        Assert.Contains("2.0.0", vm.JoinError, StringComparison.Ordinal); // and still names the host build
     }
 
     [Fact]
@@ -399,7 +424,7 @@ public class HomeViewModelJoinTests
     public async Task A_corrupt_master_data_payload_aborts_the_join_without_opening_a_workspace(string masterDataBody)
     {
         var clock = new FixedClock();
-        await using var host = await BadMasterDataHost.StartAsync(HostSession(clock).Incident, masterDataBody: masterDataBody);
+        await using var host = await StubHost.StartAsync(HostSession(clock).Incident, masterDataBody: masterDataBody);
 
         var vm = Home();
         IncidentWorkspaceViewModel? opened = null;
@@ -408,7 +433,7 @@ public class HomeViewModelJoinTests
         await vm.JoinDeviceCommand.ExecuteAsync(
             new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{host.Port}", TestHost.DefaultPin));
 
-        // The version handshake guarantees an identical build on both ends, so an unreadable
+        // The handshake guarantees a compatible wire contract on both ends, so an unreadable
         // payload means corruption or something past the TOFU pin — abort, don't degrade into it.
         // This must hold for every shape above, not just truncated JSON: JsonDocument.Parse only
         // ever throws JsonException, but MasterDataJson.ParseRoot's TryGetProperty/GetProperty calls

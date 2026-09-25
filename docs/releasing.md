@@ -53,6 +53,14 @@ none of which towncrier does for you:
   `[Unreleased]` at `compare/v<new>...HEAD` and add a `[<new>]:
   compare/v<previous>...v<new>` line above the existing ones. A missing line
   renders the version heading as plain text instead of a diff link.
+- **The sync protocol numbers.** If anything in this release changed what
+  crosses the wire — a `SyncCommand` entry, `IncidentSnapshot`, the
+  `/masterdata` payload — `SyncProtocol.ProtocolVersion` has to have been raised
+  with it, and `SyncProtocol.MinimumProtocolVersion` too if an older peer cannot
+  cope. They are not tied to the release number and nothing in CI checks them;
+  see [AGENTS.md](../AGENTS.md#sync-protocol-version) for which of the two cases
+  applies. Getting this wrong is silent until two devices fail to talk during an
+  Einsatz.
 - **The milestone.** Close the milestone the release corresponds to, and move
   anything still open in it to the next one before closing — an issue that
   silently loses its milestone is an issue nobody plans again. Nothing in CI
