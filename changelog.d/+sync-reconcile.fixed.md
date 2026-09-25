@@ -1,0 +1,1 @@
+A joined device no longer sits unnoticed on a stale Stand: it discards out-of-order updates, checks itself against the host every ten seconds, shows in the footer whether its Stand is confirmed, and reports a change the host did not take with the host's reason (#295).

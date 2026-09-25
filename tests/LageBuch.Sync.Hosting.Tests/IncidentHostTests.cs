@@ -13,6 +13,16 @@ public class IncidentHostTests
     private static async Task<IncidentSnapshot> GetSnapshotAsync(HttpClient http) =>
         SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute)));
 
+    private static async Task<long> GetRevisionAsync(HttpClient http) =>
+        SyncJson.Deserialize<RevisionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute))).Revision;
+
+    private static async Task PostAsync(HttpClient http, SyncCommand command)
+    {
+        using var content = new StringContent(SyncJson.Serialize(command), Encoding.UTF8, "application/json");
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+        response.EnsureSuccessStatusCode();
+    }
+
     [Fact]
     public async Task Host_serves_version_and_snapshot_and_applies_a_posted_command()
     {
@@ -575,5 +585,152 @@ public class IncidentHostTests
         Assert.True(second.Headers.TryGetValues("Retry-After", out var retryValues));
         var retryAfterStr = Assert.Single(retryValues);
         Assert.True(int.TryParse(retryAfterStr, out var retryAfter) && retryAfter >= 1 && retryAfter <= 60);
+    }
+
+    [Fact]
+    public async Task Revision_starts_at_zero_and_advances_once_per_applied_change()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        Assert.Equal(0, await GetRevisionAsync(http));
+
+        await PostAsync(http, new AddJournalEntryCommand(
+            new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Erste Meldung", null, null));
+        Assert.Equal(1, await GetRevisionAsync(http));
+
+        await PostAsync(http, new AddJournalEntryCommand(
+            new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Zweite Meldung", null, null));
+        Assert.Equal(2, await GetRevisionAsync(http));
+
+        // A host-side edit travels the same Changed -> OnSessionChanged path, so it counts too.
+        session.SetKeyword("B3P");
+        Assert.Equal(3, await GetRevisionAsync(http));
+    }
+
+    [Fact]
+    public async Task GET_snapshot_carries_the_same_revision_as_GET_revision()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        await PostAsync(http, new AddJournalEntryCommand(
+            new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Meldung", null, null));
+
+        // The pair a joined client compares. If these two could disagree, a client would record a
+        // revision it does not hold the content for and then discard the broadcast that fixes it.
+        Assert.Equal(await GetRevisionAsync(http), (await GetSnapshotAsync(http)).Revision);
+    }
+
+    [Fact]
+    public async Task A_rejected_command_does_not_advance_the_revision()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        // An unknown entry id is a 400 (KeyNotFoundException), so nothing was applied.
+        using var content = new StringContent(
+            SyncJson.Serialize<SyncCommand>(new EditJournalEntryCommand(new OperatorDto("Client", "RUF 1"), Guid.NewGuid(), "x")),
+            Encoding.UTF8,
+            "application/json");
+        var rejected = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+
+        Assert.Equal(0, await GetRevisionAsync(http));
+    }
+
+    [Fact]
+    public async Task GET_revision_requires_the_pin()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+
+        var response = await http.GetAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_rejected_command_answers_with_the_hosts_reason_as_a_json_string()
+    {
+        // Pins the shape the client has to parse. Results.BadRequest(string) goes through
+        // TypedResults.BadRequest<T> and WriteResultAsJsonAsync, so the reason arrives as a JSON string
+        // *literal* -- quotes and all, application/json -- not as text/plain. The umlaut is part of the
+        // assertion so a later switch to Results.Content cannot silently mojibake a German message.
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+
+        session.Close();
+
+        using var content = new StringContent(
+            SyncJson.Serialize<SyncCommand>(new AddJournalEntryCommand(
+                new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Zu spät", null, null)),
+            Encoding.UTF8,
+            "application/json");
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            "\"Der Einsatz ist abgeschlossen und schreibgeschützt.\"",
+            await response.Content.ReadAsStringAsync());
     }
 }

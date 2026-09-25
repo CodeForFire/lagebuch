@@ -11,6 +11,14 @@ public static class SyncProtocol
     public const string VersionPath = "/version";
     public const string HubPath = "/hub";
 
+    /// <summary>
+    /// The host's current snapshot revision, and nothing else. A joined client polls this as an
+    /// anti-entropy net (#295): a broadcast that never arrived leaves the host's revision ahead of
+    /// the client's, and the next poll re-fetches <see cref="SnapshotPath"/> to catch up. Deliberately
+    /// tiny — it is requested every few seconds per client, unlike the whole-incident snapshot.
+    /// </summary>
+    public const string RevisionPath = "/revision";
+
     /// <summary>Route template for the on-demand attachment-bytes pull, keyed by <see cref="LageBuch.Domain.Files.IncidentFile.Id"/>.</summary>
     public const string FilesRouteTemplate = "/files/{id:guid}";
 
@@ -32,10 +40,24 @@ public static class SyncProtocol
     /// HTTP calls and the SignalR hub connection alike — so a single host middleware gates them all.
     /// </summary>
     public const string PinHeader = "X-Lagebuch-Pin";
+
+    /// <summary>
+    /// How often a joined client polls <see cref="RevisionPath"/>. This is the ceiling on how long a
+    /// device can sit on stale state after a lost broadcast, so it is chosen to be shorter than anyone
+    /// would spend reading a screen before acting on it — and the request is a few bytes over a LAN.
+    /// </summary>
+    public static readonly TimeSpan DefaultReconcileInterval = TimeSpan.FromSeconds(10);
 }
 
 /// <summary>Exchanged on connect; a client refuses a host whose <see cref="Version"/> differs (§7).</summary>
 public sealed record VersionInfo(string Version);
+
+/// <summary>
+/// The host's current <see cref="IncidentSnapshot.Revision"/>, served by
+/// <see cref="SyncProtocol.RevisionPath"/>. A joined client compares it against the revision it last
+/// applied; any difference means re-fetch the snapshot (#295).
+/// </summary>
+public sealed record RevisionInfo(long Revision);
 
 /// <summary>
 /// Thrown when the host rejects the join because the supplied share PIN is wrong or missing (§ #64).
@@ -54,6 +76,30 @@ public sealed class PinRejectedException : Exception
     }
 
     public PinRejectedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
+/// Thrown when the host refused a command with 400 — a domain guard, a closed incident, or an id it
+/// does not know. <see cref="Exception.Message"/> is the host's own German reason, verbatim, because
+/// that sentence is what the operator needs to read; the alternative they used to get was nothing at
+/// all (#295).
+/// </summary>
+public sealed class CommandRejectedException : Exception
+{
+    public CommandRejectedException()
+        : this("Die Änderung wurde vom Host abgelehnt.")
+    {
+    }
+
+    public CommandRejectedException(string message)
+        : base(message)
+    {
+    }
+
+    public CommandRejectedException(string message, Exception innerException)
         : base(message, innerException)
     {
     }

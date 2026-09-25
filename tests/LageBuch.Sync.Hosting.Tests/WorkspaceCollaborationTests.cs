@@ -331,6 +331,9 @@ public class WorkspaceCollaborationTests
         Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Disconnected)));
         Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Reconnected)));
         Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Ended)));
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.Reconciled)));
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.ReconcileFailed)));
+        Assert.Equal(0, RemoteEventSubscriberCount(client, nameof(RemoteIncidentSession.CommandRejected)));
     }
 
     private static int RemoteEventSubscriberCount(RemoteIncidentSession session, string eventName)
@@ -404,5 +407,128 @@ public class WorkspaceCollaborationTests
     {
         public TimeSpan? NextRetryDelay(RetryContext retryContext) =>
             retryContext.PreviousRetryCount == 0 ? TimeSpan.FromMilliseconds(50) : null;
+    }
+
+    [Fact]
+    public async Task A_joined_clients_workspace_reports_a_sync_state_where_the_host_reports_a_saved_one()
+    {
+        // A joined client writes nothing to disk, yet the footer used to read "gespeichert HH:mm:ss" on
+        // it, because OnChanged stamps LastSavedAt on every broadcast. What it can honestly state is the
+        // host's Stand, so the two devices report different things here.
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        var hostWs = Workspace(hostSession, clock);
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        Assert.Equal(WorkspaceSyncState.Local, hostWs.SyncState);
+        Assert.True(hostWs.ShowLocalSavedStatus);
+        Assert.False(hostWs.ShowSyncCurrentStatus);
+
+        Assert.Equal(WorkspaceSyncState.Current, clientWs.SyncState);
+        Assert.False(clientWs.ShowLocalSavedStatus);
+        Assert.True(clientWs.ShowSyncCurrentStatus);
+        Assert.False(clientWs.ShowSyncUnconfirmedStatus);
+    }
+
+    [Fact]
+    public async Task An_applied_broadcast_stamps_the_time_the_client_was_last_level_with_the_host()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        // Wait on the workspace's own notification, subscribed before anything is triggered. Waiting
+        // on the journal instead samples too early and fails roughly one run in six under load:
+        // ApplySnapshot swaps _incident inside its lock and only then raises Changed, and the
+        // workspace stamps the Stand partway down that handler chain — so the entry is visible to a
+        // poller a moment before LastSyncedAt is set.
+        var stamped = new TaskCompletionSource();
+        clientWs.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(clientWs.LastSyncedAt))
+            {
+                stamped.TrySetResult();
+            }
+        };
+
+        clock.Now = clock.Now.AddMinutes(7);
+        hostSession.AddJournalEntry(EtbDirection.Outgoing, "Vom Host");
+
+        await stamped.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(clock.Now, clientWs.LastSyncedAt);
+        Assert.Contains(client.Incident.Journal, e => e.Text == "Vom Host");
+    }
+
+    [Fact]
+    public async Task Losing_the_connection_leaves_the_clients_currency_unconfirmed()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
+        var clientWs = Workspace(client, clock);
+
+        Assert.Equal(WorkspaceSyncState.Current, clientWs.SyncState);
+
+        var disconnected = new TaskCompletionSource();
+        client.Disconnected += () => disconnected.TrySetResult();
+        clientWs.GoHomeRequested = () => { };
+
+        await host.DisposeAsync();
+        await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // Said straight away rather than one poll interval later: the footer must not keep claiming a
+        // Stand it can no longer confirm.
+        Assert.Equal(WorkspaceSyncState.Unconfirmed, clientWs.SyncState);
+        Assert.True(clientWs.ShowSyncUnconfirmedStatus);
+        Assert.False(clientWs.ShowSyncCurrentStatus);
+    }
+
+    [Fact]
+    public async Task A_rejected_command_shows_on_the_clients_workspace_and_can_be_dismissed()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+
+        Assert.Null(clientWs.CommandRejected);
+
+        var shown = new TaskCompletionSource();
+        clientWs.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(clientWs.CommandRejected) && clientWs.CommandRejected is not null)
+            {
+                shown.TrySetResult();
+            }
+        };
+
+        client.EditJournalEntry(Guid.NewGuid(), "geht nicht");
+        await shown.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var shownReason = clientWs.CommandRejected;
+        Assert.NotNull(shownReason);
+        Assert.Contains("nicht gefunden", shownReason, StringComparison.Ordinal);
+
+        clientWs.DismissCommandRejectedCommand.Execute(null);
+        Assert.Null(clientWs.CommandRejected);
     }
 }
