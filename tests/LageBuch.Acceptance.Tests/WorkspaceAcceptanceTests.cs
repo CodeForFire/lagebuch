@@ -598,6 +598,8 @@ public class WorkspaceAcceptanceTests
         Assert.False(vm.HasReminder);
     }
 
+    // A Trupp under air shows its next Druckabfrage as a quiet readout on the header strip; the
+    // full row (ScbaControlBar) is kept for when the check is actually due.
     [AvaloniaFact]
     public void Scba_control_reminder_appears_in_global_header_when_a_trupp_is_under_air()
     {
@@ -605,7 +607,8 @@ public class WorkspaceAcceptanceTests
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
-        var bar = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ScbaControlBar");
+        var bar = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ScbaControlReadout");
+        var dueRow = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ScbaControlBar");
         Assert.False(bar.IsVisible); // nothing under air yet
 
         vm.Scba.NewDesignation = "Angriffstrupp";
@@ -617,6 +620,7 @@ public class WorkspaceAcceptanceTests
 
         Assert.True(vm.Scba.HasControlReminder);
         Assert.True(bar.IsVisible);
+        Assert.False(dueRow.IsVisible); // not due yet
     }
 
     // Binding the bare EtbDirection enum made Avalonia fall back to Enum.ToString(), so the

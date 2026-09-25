@@ -76,6 +76,9 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 
     public bool IsDue => _timer.IsDue(_clock.Now);
 
+    /// <summary>Not yet due: the header shows the countdown as a quiet readout, not a row.</summary>
+    public bool IsCountingDown => !IsDue;
+
     public string RemainingDisplay
     {
         get
@@ -103,6 +106,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
 
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(IsDue));
+        OnPropertyChanged(nameof(IsCountingDown));
         AcknowledgeCommand.NotifyCanExecuteChanged();
         SnoozeFiveMinutesCommand.NotifyCanExecuteChanged();
     }
@@ -121,6 +125,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
             EtbDirection.Outgoing, "Rückmeldung an ILS", from: _session.Operator?.CallSign, to: "ILS");
         _onChanged();
         OnPropertyChanged(nameof(IsDue));
+        OnPropertyChanged(nameof(IsCountingDown));
         OnPropertyChanged(nameof(RemainingDisplay));
         AcknowledgeCommand.NotifyCanExecuteChanged();
         SnoozeFiveMinutesCommand.NotifyCanExecuteChanged();
@@ -141,6 +146,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         _lastAnnouncedAt = null;
         PersistTimer();
         OnPropertyChanged(nameof(IsDue));
+        OnPropertyChanged(nameof(IsCountingDown));
         OnPropertyChanged(nameof(RemainingDisplay));
         AcknowledgeCommand.NotifyCanExecuteChanged();
         SnoozeFiveMinutesCommand.NotifyCanExecuteChanged();

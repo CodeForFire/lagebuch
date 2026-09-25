@@ -164,6 +164,185 @@
     <Setter Property="RenderTransform" Value="none" />
   </Style>
 
+  <!-- ===================== Header Meldungen =====================
+       One anatomy for everything the header has to tell the Lagebuchführer, modelled on the
+       annunciator panel of a Leitstelle: every row leads with a tile that names its module, the
+       tiles line up in one column (SharedSizeGroup "MeldungTile"), and a tile LIGHTS UP when the
+       row needs someone. Colour says how urgent, never which module:
+         .info   unlit tile, quiet row          - a state (read-only)
+         .due    amber tile, amber-washed row   - due, act on it (ILS, Druckabfrage, Aufgabe)
+         .error  red tile, red-washed row       - data is being lost
+         .alarm  the whole row lit signal red   - Rückzugsalarm, the one loud thing
+       A countdown that is merely running is not a row at all: it is a readout on the quiet
+       strip (Border.meldung-strip) and becomes a row when it falls due. -->
+  <Style Selector="Border.meldung">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.due">
+    <Setter Property="Background" Value="{StaticResource AmberWashBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AmberDeepBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.error">
+    <Setter Property="Background" Value="{StaticResource ErrorWashBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ErrorDeepBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.alarm">
+    <Setter Property="MinHeight" Value="52" />
+    <Setter Property="Background" Value="{StaticResource SignalGradientBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource SignalHotBrush}" />
+    <Setter Property="BoxShadow" Value="0 0 22 -2 #CCFF3D2E" />
+  </Style>
+
+  <!-- A row's jump fills the row, so the tile inside it reaches top to bottom. -->
+  <Style Selector="Border.meldung Button.bar">
+    <Setter Property="VerticalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+  </Style>
+
+  <Style Selector="Border.meldung-tile">
+    <Setter Property="Padding" Value="12,0,14,0" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.meldung.due Border.meldung-tile">
+    <Setter Property="Background" Value="{StaticResource AmberBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AmberBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.error Border.meldung-tile">
+    <Setter Property="Background" Value="{StaticResource ErrorBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.alarm Border.meldung-tile">
+    <Setter Property="Background" Value="{StaticResource SignalDeepBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource SignalDeepBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.meldung-label">
+    <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LetterSpacing" Value="1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="PathIcon.meldung-icon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.due TextBlock.meldung-label">
+    <Setter Property="Foreground" Value="{StaticResource AmberInkBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.due PathIcon.meldung-icon">
+    <Setter Property="Foreground" Value="{StaticResource AmberInkBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.error TextBlock.meldung-label">
+    <Setter Property="Foreground" Value="{StaticResource ErrorInkBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.error PathIcon.meldung-icon">
+    <Setter Property="Foreground" Value="{StaticResource ErrorInkBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.alarm TextBlock.meldung-label">
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+  <Style Selector="Border.meldung.alarm PathIcon.meldung-icon">
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
+  <Style Selector="TextBlock.meldung-text">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="Margin" Value="14,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.info TextBlock.meldung-text">
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.alarm TextBlock.meldung-text">
+    <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="LetterSpacing" Value="0.5" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
+  <!-- The chevron at a jump row's end: the row is the way to the thing it names (#422). -->
+  <Style Selector="PathIcon.meldung-chevron">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="Margin" Value="0,0,12,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.alarm PathIcon.meldung-chevron">
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
+  <Style Selector="StackPanel.meldung-actions">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="6" />
+    <Setter Property="Margin" Value="0,0,6,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.meldung-actions > Button">
+    <Setter Property="Height" Value="32" />
+    <Setter Property="Padding" Value="12,0" />
+  </Style>
+  <Style Selector="Border.meldung.alarm StackPanel.meldung-actions > Button">
+    <Setter Property="Height" Value="38" />
+  </Style>
+
+  <!-- The quiet strip: countdowns that are running, not due. Readouts, not rows - no tile, no
+       tint; the time is the only thing set bright. -->
+  <Style Selector="Border.meldung-strip">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+  </Style>
+  <Style Selector="TextBlock.meldung-readout-label">
+    <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LetterSpacing" Value="1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <!-- The short form a narrow header swaps in for the label (IncidentWorkspaceView's query). -->
+  <Style Selector="TextBlock.meldung-readout-short">
+    <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LetterSpacing" Value="1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="TextBlock.meldung-readout-name">
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.meldung-readout-value">
+    <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+
   <!-- Icon-only button: compact square, ghost background. Used for row actions (e.g. the ETB
        grid) where a labelled button would not fit. Give each instance a ToolTip.Tip, since the
        icon alone carries no text. -->

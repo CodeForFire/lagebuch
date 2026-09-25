@@ -1,0 +1,1 @@
+The header notifications share one design: a countdown that is only running (ILS-Rückmeldung, next Druckabfrage) is a quiet readout on one strip, and anything due or alarming becomes a row whose tile lights up amber when it needs action and red only for the Rückzugsalarm and failed saves, with the tiles aligned in one column and reduced to icons on a phone.
