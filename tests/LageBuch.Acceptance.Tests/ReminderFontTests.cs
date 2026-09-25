@@ -48,7 +48,9 @@ public class ReminderFontTests
 
         var alarmBar = view.GetControl<Border>("ScbaAlarmBar");
         Assert.True(alarmBar.IsVisible);
-        var icon = Assert.Single(alarmBar.GetVisualDescendants().OfType<PathIcon>());
+
+        // The tile's icon, not the jump chevron at the row's end.
+        var icon = Assert.Single(alarmBar.GetVisualDescendants().OfType<PathIcon>(), p => p.Classes.Contains("meldung-icon"));
         Assert.True(icon.Bounds.Width > 0, "the SCBA alarm bar icon has zero width — nothing is drawn");
     }
 }

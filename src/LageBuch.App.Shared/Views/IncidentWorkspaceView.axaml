@@ -9,8 +9,30 @@
       <!-- ===================== Status header ===================== -->
       <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
-              Padding="24,10">
-        <StackPanel Spacing="10">
+              Padding="24,10" Container.Name="Header" Container.Sizing="Width">
+        <!-- On a phone the tile column would eat the message (an alarm row read "Fl…" at 412px):
+             below 640px a tile keeps only its icon, and the jump chevrons and readout labels go.
+             The icon still names the module, and every row stays the jump it was. -->
+        <Border.Styles>
+          <ContainerQuery Name="Header" Query="max-width:640">
+            <Style Selector="TextBlock.meldung-label">
+              <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="PathIcon.meldung-chevron">
+              <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="TextBlock.meldung-readout-label">
+              <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="TextBlock.meldung-readout-short">
+              <Setter Property="IsVisible" Value="True" />
+            </Style>
+            <Style Selector="Border.meldung-tile">
+              <Setter Property="Padding" Value="12,0" />
+            </Style>
+          </ContainerQuery>
+        </Border.Styles>
+        <StackPanel Spacing="8" Grid.IsSharedSizeScope="True">
           <!-- Incident identity. The Stichwort is what identifies THIS incident from the first minute
                (the Einsatznummer is usually unknown until ILS calls back, #69), so it is the hero —
                large tactical monospace — rather than the app's own name boxed off small to the side.
@@ -168,200 +190,247 @@
             </StackPanel>
           </ctrl:LeadTrailPanel>
 
-          <!-- Persistence failure banner (issue #167 review follow-up): IncidentStore's background
-               writer can silently fail a queued write (disk full, read-only, locked/corrupt DB),
-               and nothing used to surface that, so the screen kept saying "gespeichert" while
-               nothing reached disk. Stays up (unlike the export/share status lines) until a later
-               save actually succeeds. Red, not the amber used for the read-only/disconnect states
-               below, because unlike those this means data loss is actively happening right now. -->
-          <Border x:Name="PersistenceErrorBanner" Background="#2A1013"
-                  BorderBrush="#F87171" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
-                  IsVisible="{Binding PersistenceError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
-                        Foreground="#F87171"
-                        Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
-              <TextBlock x:Name="PersistenceErrorText" Text="{Binding PersistenceError}" FontWeight="SemiBold"
-                         TextWrapping="Wrap" Foreground="#F87171" VerticalAlignment="Center" />
-            </StackPanel>
-          </Border>
+          <!-- ===================== Meldungen =====================
+               Everything the header has to tell the Lagebuchführer, in one anatomy (Styles.axaml,
+               "Header Meldungen"): a tile naming the module, the message, then the actions. The
+               tiles share one column width (SharedSizeGroup on the StackPanel above), and colour
+               says how urgent, never which module. Rows run most urgent first; a countdown that is
+               only running sits on the quiet strip at the end and becomes a row when it falls due.
+               Every bar that names a thing is also the jump to it (#422); its actions keep their
+               own column, because a button inside a button is neither clickable nor honest. -->
 
-          <!-- Joined-client disconnect banner (#52 §7): auto-reconnect is running; input is greyed
-               out until it succeeds. "Zur Startseite" lets the user give up without waiting. -->
-          <Border x:Name="DisconnectedBanner" Background="#241608"
-                  BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
-                  IsVisible="{Binding !IsConnected}">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-              <PathIcon Grid.Column="0" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,12,0"
-                        Foreground="{StaticResource AmberBrush}"
-                        Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
-              <TextBlock Grid.Column="1" Text="Verbindung getrennt — verbinde neu…" FontWeight="SemiBold"
-                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-              <Button Grid.Column="2" x:Name="LeaveToHomeButton" Content="ZUR STARTSEITE"
-                      Command="{Binding LeaveToHomeCommand}" VerticalAlignment="Center" />
+          <!-- Rückzugsalarm: the one row lit end to end, with the audible alarm (life-safety).
+               The message sits in a star column so the ellipsis eats the reason, never the
+               Funkrufname that leads it (#417). -->
+          <Border x:Name="ScbaAlarmBar" Classes="meldung alarm" IsVisible="{Binding Scba.IsAnyAlarm}">
+            <Grid ColumnDefinitions="*,Auto" DataContext="{Binding Scba}">
+              <Button Grid.Column="0" x:Name="ScbaAlarmJumpButton" Classes="bar"
+                      Command="{Binding ShowAlarmingTruppCommand}"
+                      AutomationProperties.Name="Zum Trupp im Rückzugsalarm springen"
+                      ToolTip.Tip="Zum Trupp im Reiter ATEMSCHUTZ springen">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <Border Grid.Column="0" Classes="meldung-tile">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <PathIcon Classes="meldung-icon"
+                                Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                      <TextBlock Classes="meldung-label" Text="RÜCKZUGSALARM" />
+                    </StackPanel>
+                  </Border>
+                  <TextBlock Grid.Column="1" x:Name="ScbaAlarmText" Classes="meldung-text"
+                             Text="{Binding AlarmDisplay}" />
+                  <PathIcon Grid.Column="2" Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                </Grid>
+              </Button>
+              <StackPanel Grid.Column="1" Classes="meldung-actions">
+                <Button x:Name="ScbaAlarmAckButton" Content="ALARM QUITTIEREN"
+                        Command="{Binding AcknowledgeAlarmCommand}" />
+              </StackPanel>
             </Grid>
           </Border>
 
-          <!-- Read-only banner -->
-          <Border x:Name="ReadOnlyBanner" Background="#241608"
-                  BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,8"
-                  IsVisible="{Binding IsReadOnly}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
-                        Foreground="{StaticResource AmberBrush}"
-                        Data="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
-              <TextBlock Text="{Binding ReadOnlyReason}" FontWeight="SemiBold"
-                         Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-              <Button x:Name="ContinueEditingButton" Content="WEITER BEARBEITEN"
-                      Command="{Binding ContinueEditingCommand}"
-                      IsVisible="{Binding CanContinueEditing}" />
-            </StackPanel>
+          <!-- Persistence failure (#167 review follow-up): a queued write failed, so data is being
+               lost right now. Stays up until a later save succeeds. The text wraps rather than
+               trims: this is the one message that has to be read in full. -->
+          <Border x:Name="PersistenceErrorBanner" Classes="meldung error"
+                  IsVisible="{Binding PersistenceError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon" Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                  <TextBlock Classes="meldung-label" Text="SPEICHERN" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" x:Name="PersistenceErrorText" Classes="meldung-text"
+                         Margin="14,10" TextWrapping="Wrap" TextTrimming="None"
+                         Text="{Binding PersistenceError}" />
+            </Grid>
           </Border>
 
-          <!-- ILS reminder bar -->
-          <Border x:Name="ReminderBar" Background="#0B1A2A"
-                  BorderBrush="{StaticResource IncomingBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="14,6"
-                  IsVisible="{Binding HasReminder}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"
-                        DataContext="{Binding Reminder}">
-              <PathIcon Width="15" Height="15" VerticalAlignment="Center"
-                        Foreground="{StaticResource IncomingBrush}"
-                        Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
-              <TextBlock Text="RÜCKMELDUNG AN ILS" Classes="overline" FontSize="10"
-                         Foreground="{StaticResource IncomingBrush}" VerticalAlignment="Center" />
-
-              <!-- Running, not due: the countdown is the hero of the bar — large tactical monospace
-                   (stable digit width as it ticks every second) behind a quiet "NOCH" kicker and a
-                   hairline. The reminder is autonomous, so there is no start/stop control. -->
-              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
-                          IsVisible="{Binding !IsDue}">
-                <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}"
-                        VerticalAlignment="Center" />
-                <TextBlock Text="NOCH" Classes="overline" FontSize="9"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           VerticalAlignment="Center" />
-                <TextBlock x:Name="ReminderCountdownText" Classes="mono" FontSize="21" FontWeight="Medium"
-                           Foreground="{StaticResource IncomingBrush}"
-                           Text="{Binding RemainingDisplay}"
-                           VerticalAlignment="Center" />
+          <!-- Joined client lost its host (#52 §7): auto-reconnect is running and input is greyed
+               out until it succeeds. "Zur Startseite" gives up without waiting. -->
+          <Border x:Name="DisconnectedBanner" Classes="meldung due" IsVisible="{Binding !IsConnected}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon"
+                            Data="M22.99 9C19.15 5.16 13.8 3.76 8.84 4.78l2.52 2.52c3.47-.17 6.99 1.05 9.63 3.7l2-2zm-4 4c-1.29-1.29-2.84-2.13-4.49-2.56l3.53 3.53.96-.97zM2 3.05 5.07 6.1C3.6 6.82 2.22 7.78 1 9l1.99 2c1.24-1.24 2.67-2.16 4.2-2.77l2.24 2.24C7.81 10.89 6.27 11.73 5 13v.01L6.99 15c1.36-1.36 3.14-2.04 4.92-2.06L18.98 20l1.27-1.26L3.29 1.79 2 3.05zM9 17l3 3 3-3c-1.65-1.66-4.34-1.66-6 0z" />
+                  <TextBlock Classes="meldung-label" Text="VERBINDUNG" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" Classes="meldung-text" Text="Verbindung getrennt – verbinde neu …" />
+              <StackPanel Grid.Column="2" Classes="meldung-actions">
+                <Button x:Name="LeaveToHomeButton" Content="ZUR STARTSEITE" Command="{Binding LeaveToHomeCommand}" />
               </StackPanel>
-
-              <!-- Due: alert + acknowledge -->
-              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
-                          IsVisible="{Binding IsDue}">
-                <Border Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
-                        Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E">
-                  <TextBlock Text="FÄLLIG!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
-                             LetterSpacing="1.5" Foreground="#FFFFFF" VerticalAlignment="Center" />
-                </Border>
-                <Button x:Name="ReminderAckButton" Classes="signal" Content="ERLEDIGT" Command="{Binding AcknowledgeCommand}" />
-                <Button x:Name="ReminderSnoozeButton" Content="+5 MIN" Padding="8,4" FontSize="11"
-                        ToolTip.Tip="Noch nichts zu melden — in 5 Minuten erneut fällig, ohne Rückmeldung an ILS zu protokollieren"
-                        Command="{Binding SnoozeFiveMinutesCommand}" />
-              </StackPanel>
-            </StackPanel>
+            </Grid>
           </Border>
 
-          <!-- Atemschutz pressure-control reminder (soonest-due Trupp across all tabs).
-               #422: the whole bar is the button — it was read as one long before it was one, and
-               the tap now opens ATEMSCHUTZ on the very Trupp the bar names. The padding lives on
-               the Button, not the Border, so the hover wash covers the bar edge to edge. -->
-          <Border x:Name="ScbaControlBar" Background="#241608"
-                  BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}"
-                  IsVisible="{Binding Scba.HasControlReminder}">
-            <Button x:Name="ScbaControlJumpButton" Classes="bar" Padding="14,6"
-                    CornerRadius="{StaticResource RadiusSm}"
+          <!-- Druckabfrage due (#422): the row is the jump to the Trupp it names. While the check is
+               still ahead, the same Trupp is a readout on the quiet strip instead. -->
+          <Border x:Name="ScbaControlBar" Classes="meldung due">
+            <Border.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="Scba.HasControlReminder" />
+                <Binding Path="Scba.IsAnyControlDue" />
+              </MultiBinding>
+            </Border.IsVisible>
+            <Button x:Name="ScbaControlJumpButton" Classes="bar"
                     DataContext="{Binding Scba}"
                     Command="{Binding ShowMostUrgentControlCommand}"
+                    AutomationProperties.Name="Zum Trupp mit fälliger Druckabfrage springen"
                     ToolTip.Tip="Zum Trupp im Reiter ATEMSCHUTZ springen">
-              <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                <PathIcon Width="15" Height="15" VerticalAlignment="Center"
-                          Foreground="{StaticResource AmberBrush}"
-                          Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
-                <TextBlock Text="ATEMSCHUTZ" Classes="overline" FontSize="10"
-                           Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-                <TextBlock x:Name="ScbaControlText" Text="{Binding NextControlDisplay}" FontWeight="SemiBold"
-                           Foreground="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-                <Border x:Name="ScbaControlDuePill" Background="{StaticResource SignalGradientBrush}" CornerRadius="{StaticResource RadiusSm}"
-                        Padding="10,4" BoxShadow="0 0 16 -2 #99FF3D2E"
-                        IsVisible="{Binding IsAnyControlDue}">
-                  <TextBlock Text="DRUCKABFRAGE!" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold"
-                             LetterSpacing="1.5" Foreground="#FFFFFF" VerticalAlignment="Center" />
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Classes="meldung-tile">
+                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <PathIcon Classes="meldung-icon"
+                              Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                    <TextBlock Classes="meldung-label" Text="ATEMSCHUTZ" />
+                  </StackPanel>
                 </Border>
-              </StackPanel>
+                <TextBlock Grid.Column="1" x:Name="ScbaControlText" Classes="meldung-text"
+                           Text="{Binding NextControlDisplay}" />
+                <PathIcon Grid.Column="2" Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+              </Grid>
             </Button>
           </Border>
 
-          <!-- Atemschutz Rückzugsalarm: unmissable red banner + audible alarm (life-safety) -->
-          <Border x:Name="ScbaAlarmBar" Background="{StaticResource SignalGradientBrush}"
-                  BorderBrush="{StaticResource SignalHotBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}" Padding="16,10"
-                  BoxShadow="0 0 22 -2 #CCFF3D2E"
-                  IsVisible="{Binding Scba.IsAnyAlarm}">
-            <Grid ColumnDefinitions="*,Auto" DataContext="{Binding Scba}">
-              <!-- #422: the icon and the alarm text are the jump; ALARM QUITTIEREN keeps its own
-                   column, because a button inside a button is neither clickable nor honest. -->
-              <Button Grid.Column="0" x:Name="ScbaAlarmJumpButton" Classes="bar"
-                      VerticalAlignment="Center"
-                      Command="{Binding ShowAlarmingTruppCommand}"
-                      ToolTip.Tip="Zum Trupp im Reiter ATEMSCHUTZ springen">
-              <!-- A Grid, not a StackPanel: a StackPanel measures its children with infinite width,
-                   so since the banner gained the Funkrufname (#417) the text simply ran past the
-                   button and was cut off mid-word on a narrow window - at 900px it overshot by
-                   65px, losing the alarm reason without a mark to say so. The star column bounds
-                   it, and because the Funkrufname leads, what the ellipsis eats is the Trupp-Typ
-                   and the reason, never the name of the crew being called back. -->
-                <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
-                  <PathIcon Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"
-                            Foreground="#FFFFFF"
-                            Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                  <TextBlock Grid.Column="1" x:Name="ScbaAlarmText" Text="{Binding AlarmDisplay}"
-                             FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="SemiBold"
-                             LetterSpacing="1" Foreground="#FFFFFF" VerticalAlignment="Center"
-                             TextTrimming="CharacterEllipsis" />
-                </Grid>
-              </Button>
-              <Button Grid.Column="1" x:Name="ScbaAlarmAckButton" Content="ALARM QUITTIEREN"
-                      Command="{Binding AcknowledgeAlarmCommand}"
-                      VerticalAlignment="Center" />
-            </Grid>
-          </Border>
-
-          <!-- #460: an overdue Aufgabe, visible from every tab. Built like the Druckabfrage bar -
-               the bar is the jump to the task it names - but in the red of the grid's FÄLLIG chip,
-               and with ERLEDIGT in its own column, as ALARM QUITTIEREN is above. The text sits in
-               a star column so a long task text is trimmed rather than run past the bar (#417). -->
-          <Border x:Name="TaskDueBar" Background="#2A0E0B"
-                  BorderBrush="{StaticResource SignalBrush}" BorderThickness="1"
-                  CornerRadius="{StaticResource RadiusSm}"
-                  IsVisible="{Binding Tasks.HasDueTask}">
+          <!-- Aufgabe due (#460): the row is the jump to the task; ERLEDIGT ticks it off. -->
+          <Border x:Name="TaskDueBar" Classes="meldung due" IsVisible="{Binding Tasks.HasDueTask}">
             <Grid ColumnDefinitions="*,Auto" DataContext="{Binding Tasks}">
-              <Button Grid.Column="0" x:Name="TaskDueJumpButton" Classes="bar" Padding="14,6"
-                      CornerRadius="{StaticResource RadiusSm}"
+              <Button Grid.Column="0" x:Name="TaskDueJumpButton" Classes="bar"
                       Command="{Binding ShowMostOverdueTaskCommand}"
                       AutomationProperties.Name="Zur fälligen Aufgabe springen"
                       ToolTip.Tip="Zur Aufgabe im Reiter AUFGABEN springen">
-                <Grid ColumnDefinitions="Auto,Auto,*" VerticalAlignment="Center">
-                  <PathIcon Grid.Column="0" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,12,0"
-                            Foreground="{StaticResource SignalHotBrush}"
-                            Data="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 15h-2v-2h2v2zm0-4h-2V8h2v6zm-1-9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z" />
-                  <TextBlock Grid.Column="1" Text="AUFGABEN" Classes="overline" FontSize="10" Margin="0,0,12,0"
-                             Foreground="{StaticResource SignalHotBrush}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="2" x:Name="TaskDueText" Text="{Binding DueTaskDisplay}" FontWeight="SemiBold"
-                             Foreground="{StaticResource SignalHotBrush}" VerticalAlignment="Center"
-                             TextTrimming="CharacterEllipsis" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <Border Grid.Column="0" Classes="meldung-tile">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <PathIcon Classes="meldung-icon"
+                                Data="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-6 15h-2v-2h2v2zm0-4h-2V8h2v6zm-1-9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z" />
+                      <TextBlock Classes="meldung-label" Text="AUFGABEN" />
+                    </StackPanel>
+                  </Border>
+                  <TextBlock Grid.Column="1" x:Name="TaskDueText" Classes="meldung-text"
+                             Text="{Binding DueTaskDisplay}" />
+                  <PathIcon Grid.Column="2" Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
                 </Grid>
               </Button>
-              <Button Grid.Column="1" x:Name="TaskDueDoneButton" Content="ERLEDIGT"
-                      Command="{Binding CompleteMostOverdueTaskCommand}"
-                      AutomationProperties.Name="Fällige Aufgabe als erledigt markieren"
-                      VerticalAlignment="Center" Margin="0,4,4,4" />
+              <StackPanel Grid.Column="1" Classes="meldung-actions">
+                <Button x:Name="TaskDueDoneButton" Content="ERLEDIGT"
+                        Command="{Binding CompleteMostOverdueTaskCommand}"
+                        AutomationProperties.Name="Fällige Aufgabe als erledigt markieren" />
+              </StackPanel>
             </Grid>
+          </Border>
+
+          <!-- ILS Rückmeldung due. Nothing to jump to: the Rückmeldung is made by radio, and the
+               row is where it gets confirmed. +5 MIN puts it off without logging a report. -->
+          <Border x:Name="ReminderDueBar" Classes="meldung due"
+                  IsVisible="{Binding Reminder.IsDue, FallbackValue=False}">
+            <Grid DataContext="{Binding Reminder}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon"
+                            Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                  <TextBlock Classes="meldung-label" Text="ILS" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" Classes="meldung-text" Text="ILS-Rückmeldung fällig" />
+              <StackPanel Grid.Column="2" Classes="meldung-actions">
+                <Button x:Name="ReminderSnoozeButton" Content="+5 MIN"
+                        ToolTip.Tip="Noch nichts zu melden — in 5 Minuten erneut fällig, ohne Rückmeldung an ILS zu protokollieren"
+                        Command="{Binding SnoozeFiveMinutesCommand}" />
+                <Button x:Name="ReminderAckButton" Content="ERLEDIGT" Command="{Binding AcknowledgeCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Read-only: a state, not a demand, so its tile stays unlit. -->
+          <Border x:Name="ReadOnlyBanner" Classes="meldung info" IsVisible="{Binding IsReadOnly}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon"
+                            Data="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
+                  <TextBlock Classes="meldung-label" Text="NUR LESEN" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" Classes="meldung-text" Text="{Binding ReadOnlyReason}" />
+              <StackPanel Grid.Column="2" Classes="meldung-actions">
+                <Button x:Name="ContinueEditingButton" Content="WEITER BEARBEITEN"
+                        Command="{Binding ContinueEditingCommand}"
+                        IsVisible="{Binding CanContinueEditing}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- The quiet strip: countdowns that are running, not yet due. The time is the only
+               bright thing on it; each readout leaves for a row above when its time is up. -->
+          <Border x:Name="MeldungStrip" Classes="meldung-strip" IsVisible="{Binding ShowsCountdownStrip}">
+            <WrapPanel Orientation="Horizontal" ItemSpacing="36" VerticalAlignment="Center">
+              <Border x:Name="ReminderBar" MinHeight="42"
+                      IsVisible="{Binding Reminder.IsCountingDown, FallbackValue=False}">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"
+                            DataContext="{Binding Reminder}">
+                  <PathIcon Classes="meldung-icon"
+                            Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                  <TextBlock Classes="meldung-readout-label" Text="RÜCKMELDUNG AN ILS" />
+                  <TextBlock Classes="meldung-readout-short" Text="ILS" />
+                  <TextBlock x:Name="ReminderCountdownText" Classes="meldung-readout-value"
+                             Text="{Binding RemainingDisplay}" />
+                </StackPanel>
+              </Border>
+              <Border x:Name="ScbaControlReadout" MinHeight="42" IsVisible="{Binding Scba.IsControlCountingDown}">
+                <Button x:Name="ScbaControlReadoutButton" Classes="bar" Padding="8,0"
+                        DataContext="{Binding Scba}"
+                        Command="{Binding ShowMostUrgentControlCommand}"
+                        AutomationProperties.Name="Zum Trupp mit der nächsten Druckabfrage springen"
+                        ToolTip.Tip="Zum Trupp im Reiter ATEMSCHUTZ springen">
+                  <!-- A Grid, not a StackPanel, so a long Funkrufname trims on a phone instead of
+                       pushing the time off the strip. -->
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
+                    <PathIcon Grid.Column="0" Classes="meldung-icon" Margin="0,0,10,0"
+                              Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                    <TextBlock Grid.Column="1" Classes="meldung-readout-label" Margin="0,0,10,0" Text="DRUCKABFRAGE" />
+                    <TextBlock Grid.Column="2" x:Name="ScbaControlReadoutName" Classes="meldung-readout-name"
+                               Margin="0,0,10,0" Text="{Binding NextControlName}" />
+                    <TextBlock Grid.Column="3" Classes="meldung-readout-value" Text="{Binding NextControlRemaining}" />
+                  </Grid>
+                </Button>
+              </Border>
+            </WrapPanel>
           </Border>
         </StackPanel>
       </Border>

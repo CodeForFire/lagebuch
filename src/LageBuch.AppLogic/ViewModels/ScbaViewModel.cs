@@ -499,6 +499,18 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     public bool IsAnyControlDue => MostUrgentActive?.IsControlDue ?? false;
 
+    /// <summary>
+    /// A Trupp is under air and its next Druckabfrage is still ahead: the header shows it as a
+    /// quiet readout. Once it falls due it leaves the readout for a full row instead.
+    /// </summary>
+    public bool IsControlCountingDown => HasControlReminder && !IsAnyControlDue;
+
+    /// <summary>The Trupp the quiet readout names, Funkrufname first (#417); "—" when none.</summary>
+    public string NextControlName => MostUrgentActive?.DisplayNameWithCallSign ?? "—";
+
+    /// <summary>Time left until that Trupp's Druckabfrage, for the readout's monospace value.</summary>
+    public string NextControlRemaining => MostUrgentActive?.ControlRemainingDisplay ?? "—";
+
     public string NextControlDisplay
     {
         get
@@ -568,7 +580,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
                 return "—";
             }
 
-            var first = $"RÜCKZUGSALARM {trupps[0].DisplayNameWithCallSign}: {AlarmReason(trupps[0])}";
+            // The row's tile already says RÜCKZUGSALARM, so the text starts with the crew.
+            var first = $"{trupps[0].DisplayNameWithCallSign}: {AlarmReason(trupps[0])}";
             return trupps.Count == 1 ? first : $"{first}  (+{trupps.Count - 1})";
         }
     }
@@ -1010,6 +1023,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasControlReminder));
         OnPropertyChanged(nameof(IsAnyControlDue));
         OnPropertyChanged(nameof(NextControlDisplay));
+        OnPropertyChanged(nameof(IsControlCountingDown));
+        OnPropertyChanged(nameof(NextControlName));
+        OnPropertyChanged(nameof(NextControlRemaining));
     }
 
     private void OnTick()

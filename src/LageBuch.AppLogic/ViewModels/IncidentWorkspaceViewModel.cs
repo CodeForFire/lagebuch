@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -287,6 +288,23 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public bool HasReminder => Reminder is not null;
 
+    /// <summary>
+    /// Whether the header's quiet strip has anything to show: the ILS countdown or the next
+    /// Druckabfrage, still running and not yet due. Each leaves the strip for a row of its own
+    /// when it falls due, and the strip goes with the last of them.
+    /// </summary>
+    public bool ShowsCountdownStrip =>
+        (Reminder?.IsCountingDown ?? false) || (Scba?.IsControlCountingDown ?? false);
+
+    private void OnCountdownChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ReminderViewModel.IsCountingDown)
+            or nameof(ScbaViewModel.IsControlCountingDown))
+        {
+            OnPropertyChanged(nameof(ShowsCountdownStrip));
+        }
+    }
+
     // ===== Joined-client connection state (#52 §7). Always "connected" locally; on a remote session
     // it tracks the SignalR link so the view can grey out input while reconnecting. =====
     [ObservableProperty]
@@ -482,6 +500,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             // Atemschutz view model must not go on steering the rail of the workspace that
             // replaced it.
             Scba.RevealRequested -= OnScbaRevealRequested;
+            Scba.PropertyChanged -= OnCountdownChanged;
         }
 
         Scba?.Dispose();
@@ -494,6 +513,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
 
         Tasks?.Dispose();
+        if (Reminder is not null)
+        {
+            Reminder.PropertyChanged -= OnCountdownChanged;
+        }
+
         Reminder?.Dispose();
     }
 
@@ -514,6 +538,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
+        Scba.PropertyChanged += OnCountdownChanged;
 
         Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
@@ -537,6 +562,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 _masterData.Settings.IlsReminderIntervalMinutes,
                 _masterData.Settings.IlsReminderFollowUpIntervalMinutes);
 
+        if (Reminder is not null)
+        {
+            Reminder.PropertyChanged += OnCountdownChanged;
+        }
+
         BuildNavItems();
 
         OnPropertyChanged(nameof(Etb));
@@ -549,6 +579,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Tasks));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
+        OnPropertyChanged(nameof(ShowsCountdownStrip));
     }
 
     /// <summary>

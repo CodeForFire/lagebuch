@@ -221,6 +221,39 @@ public class ScbaViewModelTests
             vm.NextControlDisplay);
     }
 
+    // The header's quiet readout shows the next Druckabfrage as name and time apart, so the time
+    // can be set in monospace; once due, the readout gives way to a full row.
+    [Fact]
+    public void Header_readout_counts_down_until_the_druckabfrage_falls_due()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker);
+        vm.NewControlIntervalMinutes = 5;
+        var row = Register(vm, callSign: "Florian Musterstadt 40/1");
+        row.StartCommand.Execute(null);
+
+        Assert.True(vm.IsControlCountingDown);
+        Assert.Equal("Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp)", vm.NextControlName);
+        Assert.Equal(row.ControlRemainingDisplay, vm.NextControlRemaining);
+
+        clock.Now = T0.AddMinutes(6);
+        ticker.Fire();
+
+        Assert.False(vm.IsControlCountingDown);
+        Assert.True(vm.IsAnyControlDue);
+    }
+
+    [Fact]
+    public void Header_readout_is_off_while_nobody_is_under_air()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+
+        Assert.False(vm.IsControlCountingDown);
+        Assert.Equal("—", vm.NextControlName);
+    }
+
     [Fact]
     public void Tick_when_control_is_due_marks_due_in_header()
     {
@@ -344,8 +377,7 @@ public class ScbaViewModelTests
 
         Assert.True(vm.IsAnyAlarm);
         Assert.Contains(AlarmSound.RetreatAlarm, alarm.Played);
-        Assert.Contains("RÜCKZUGSALARM", vm.AlarmDisplay, StringComparison.Ordinal);
-        Assert.Contains("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay, StringComparison.Ordinal);
+        Assert.StartsWith("Trupp 1 (Angriffstrupp)", vm.AlarmDisplay, StringComparison.Ordinal);
         Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
     }
 
@@ -365,13 +397,10 @@ public class ScbaViewModelTests
         clock.Now = T0.AddMinutes(31);
         ticker.Fire();
 
+        // The header row's tile carries the word RÜCKZUGSALARM, so the text leads with the crew.
         Assert.Equal(
-            "RÜCKZUGSALARM Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp): Einsatzzeit erreicht",
+            "Florian Musterstadt 40/1 · Trupp 1 (Angriffstrupp): Einsatzzeit erreicht",
             vm.AlarmDisplay);
-        Assert.StartsWith(
-            "RÜCKZUGSALARM Florian Musterstadt 40/1",
-            vm.AlarmDisplay,
-            StringComparison.Ordinal);
     }
 
     [Fact]

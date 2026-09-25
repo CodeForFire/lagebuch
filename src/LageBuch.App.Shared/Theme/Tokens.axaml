@@ -40,6 +40,15 @@
 
   <Color x:Key="AmberColor">#FFB23E</Color>
   <Color x:Key="AmberDeepColor">#7A4A07</Color>
+
+  <!-- Header Meldungen: the dark "ink" set on a lit tile, and the row fills behind it. A lit
+       tile is a solid patch of its hue, so its label needs the hue's own near-black rather than
+       white, which on amber falls below 2:1. -->
+  <Color x:Key="AmberInkColor">#1F1404</Color>
+  <Color x:Key="AmberWashColor">#241608</Color>
+  <Color x:Key="ErrorInkColor">#260A0D</Color>
+  <Color x:Key="ErrorDeepColor">#7A2B31</Color>
+  <Color x:Key="ErrorWashColor">#2A1013</Color>
   <Color x:Key="ActiveColor">#37D17C</Color>
   <Color x:Key="IncomingColor">#52ABFF</Color>
 
@@ -59,6 +68,13 @@
   <SolidColorBrush x:Key="SignalHotBrush" Color="{StaticResource SignalHotColor}" />
   <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
   <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
+  <SolidColorBrush x:Key="AmberDeepBrush" Color="{StaticResource AmberDeepColor}" />
+  <SolidColorBrush x:Key="AmberInkBrush" Color="{StaticResource AmberInkColor}" />
+  <SolidColorBrush x:Key="AmberWashBrush" Color="{StaticResource AmberWashColor}" />
+  <SolidColorBrush x:Key="ErrorInkBrush" Color="{StaticResource ErrorInkColor}" />
+  <SolidColorBrush x:Key="ErrorDeepBrush" Color="{StaticResource ErrorDeepColor}" />
+  <SolidColorBrush x:Key="ErrorWashBrush" Color="{StaticResource ErrorWashColor}" />
+  <SolidColorBrush x:Key="SignalDeepBrush" Color="{StaticResource SignalDeepColor}" />
   <SolidColorBrush x:Key="ActiveBrush" Color="{StaticResource ActiveColor}" />
   <SolidColorBrush x:Key="IncomingBrush" Color="{StaticResource IncomingColor}" />
 

@@ -83,7 +83,9 @@ public class LayoutAlignmentTests
         double Left(string name) => LeftInWindow(
             window.GetVisualDescendants().OfType<Control>().First(c => c.Name == name), window);
 
-        var reminderBarLeft = Left("ReminderBar");
+        // The header's Meldungen: a row and the quiet strip of countdowns below the rows.
+        var alarmRowLeft = Left("ScbaAlarmBar");
+        var stripLeft = Left("MeldungStrip");
         var tabStripLeft = LeftInWindow(TabStrip(window), window);
 
         // #221: Close/Export moved to the footer's right side so each tab's own "add entry"
@@ -91,7 +93,8 @@ public class LayoutAlignmentTests
         // the footer's left edge.
         var footerLeft = Left("SavedStatusPanel");
 
-        Assert.Equal(Gutter, reminderBarLeft, precision: 0);
+        Assert.Equal(Gutter, alarmRowLeft, precision: 0);
+        Assert.Equal(Gutter, stripLeft, precision: 0);
         Assert.Equal(Gutter, tabStripLeft, precision: 0);
         Assert.Equal(Gutter, footerLeft, precision: 0);
     }
@@ -237,8 +240,9 @@ public class LayoutAlignmentTests
 
     // #417 lengthened both Atemschutz banners by a Funkrufname. They sat in horizontal StackPanels,
     // which measure their children with infinite width -- so a longer text does not ellipsise, it
-    // pushes DRUCKABFRAGE! and ALARM QUITTIEREN out of the bar. Those two are the urgency signal
-    // and the only way to silence the alarm, so losing them is worse than losing a few characters.
+    // pushes the row's end out of the bar. ALARM QUITTIEREN is the only way to silence the alarm
+    // and the chevron is what says the Druckabfrage row is a jump, so losing either is worse than
+    // losing a few characters.
     [AvaloniaTheory]
     [InlineData(900)]
     [InlineData(1100)]
@@ -249,7 +253,8 @@ public class LayoutAlignmentTests
         var window = ShowWorkspace(width);
         var view = (IncidentWorkspaceView)window.Content!;
 
-        AssertInside(view.GetControl<Border>("ScbaControlDuePill"), view.GetControl<Border>("ScbaControlBar"));
+        var controlBar = view.GetControl<Border>("ScbaControlBar");
+        AssertInside(controlBar.GetVisualDescendants().OfType<PathIcon>().Single(p => p.Classes.Contains("meldung-chevron")), controlBar);
         AssertInside(view.GetControl<Button>("ScbaAlarmAckButton"), view.GetControl<Border>("ScbaAlarmBar"));
 
         static void AssertInside(Visual child, Border bar)

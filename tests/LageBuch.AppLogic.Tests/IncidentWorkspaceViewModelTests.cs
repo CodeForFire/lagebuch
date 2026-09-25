@@ -1506,6 +1506,51 @@ public class IncidentWorkspaceViewModelTests
         Assert.Same(vm.Scba.Trupps[0], vm.Scba.SelectedTrupp);
     }
 
+    // --- Header Meldungen: the quiet strip holds running countdowns only ----------------------
+    [Fact]
+    public void Countdown_strip_shows_the_running_ils_reminder_and_leaves_when_it_falls_due()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService(), new FakeHostController());
+        var raised = 0;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IncidentWorkspaceViewModel.ShowsCountdownStrip))
+            {
+                raised++;
+            }
+        };
+        Assert.True(vm.ShowsCountdownStrip); // the ILS reminder starts with the incident
+
+        clock.Now = T0.AddHours(1);
+        ticker.Fire();
+
+        Assert.True(vm.Reminder!.IsDue);
+        Assert.False(vm.ShowsCountdownStrip);
+        Assert.True(raised > 0);
+    }
+
+    [Fact]
+    public void Countdown_strip_stays_off_in_a_read_only_workspace()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.Null(vm.Reminder);
+        Assert.False(vm.ShowsCountdownStrip);
+    }
+
     // --- #460: the Aufgabe-fällig bar leads to the Aufgaben tab -------------------------------
 
     /// <summary>A workspace holding one task whose five-minute timer ran out a minute ago.</summary>
