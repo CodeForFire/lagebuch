@@ -4,12 +4,63 @@
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.MasterDataEditorView"
              x:DataType="vm:MasterDataEditorViewModel">
-  <Panel>
-    <DockPanel Margin="28,24">
+  <!-- Its own container rather than the shell's: this view is hosted directly by the render
+       tests as well as by MainView, and a rail that only collapses when MainView happens to be
+       its parent is a rail whose phone layout nothing can check. A 220px rail beside the detail
+       leaves ~150px of editor on a 412dp phone, so below the breakpoint the two become a
+       drill-down — the rail is the screen until a category is picked, and ← KATEGORIEN comes back
+       to it. Wide windows keep both side by side exactly as before. -->
+  <UserControl.Styles>
+    <Style Selector="DockPanel#EditorBody">
+      <Setter Property="Margin" Value="28,24" />
+    </Style>
+    <Style Selector="Border#CategoryRail">
+      <Setter Property="Width" Value="220" />
+      <Setter Property="Margin" Value="0,0,16,0" />
+    </Style>
+    <!-- Grid.Column as a Style, not an attribute: a local value outranks a Style setter, so with
+         Grid.Column="1" on the panel the narrow query could move it down a row but never out of
+         the Auto column that was squeezing the title to nothing. -->
+    <Style Selector="WrapPanel#EditorActions">
+      <Setter Property="Grid.Row" Value="0" />
+      <Setter Property="Grid.Column" Value="1" />
+      <Setter Property="Grid.ColumnSpan" Value="1" />
+    </Style>
+
+    <ContainerQuery Name="Editor" Query="max-width:640">
+      <Style Selector="DockPanel#EditorBody">
+        <Setter Property="Margin" Value="12,16" />
+      </Style>
+      <!-- Whichever of the two is on screen gets the whole width: the rail by spanning both
+           columns, the detail because the hidden rail's Auto column measures zero. -->
+      <Style Selector="Border#CategoryRail">
+        <Setter Property="Width" Value="NaN" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Grid.ColumnSpan" Value="2" />
+      </Style>
+      <Style Selector="Button#BackToCategoriesButton">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="TextBlock#EditorTitle">
+        <Setter Property="FontSize" Value="20" />
+      </Style>
+      <!-- An Auto column never shrinks, so the four actions ran off the right edge rather than
+           wrapping. On a phone they take a row of their own under the title. -->
+      <Style Selector="WrapPanel#EditorActions">
+        <Setter Property="Grid.Row" Value="1" />
+        <Setter Property="Grid.Column" Value="0" />
+        <Setter Property="Grid.ColumnSpan" Value="2" />
+        <Setter Property="Margin" Value="0,10,0,0" />
+      </Style>
+    </ContainerQuery>
+  </UserControl.Styles>
+  <Panel Container.Name="Editor" Container.Sizing="Width">
+    <DockPanel x:Name="EditorBody">
       <!-- Header -->
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-          <TextBlock Text="STAMMDATEN" Classes="display" FontSize="26" />
+      <Grid x:Name="EditorHeader" DockPanel.Dock="Top" ColumnDefinitions="*,Auto"
+            RowDefinitions="Auto,Auto" Margin="0,0,0,18">
+        <WrapPanel Grid.Column="0" Orientation="Horizontal" ItemSpacing="12" LineSpacing="6" VerticalAlignment="Center">
+          <TextBlock x:Name="EditorTitle" Text="STAMMDATEN" Classes="display" FontSize="26" />
           <Border x:Name="DirtyDot" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
                   Background="#241608" BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
                   Padding="8,3" IsVisible="{Binding IsDirty}">
@@ -36,20 +87,22 @@
                   IsVisible="{Binding VehicleConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding VehicleConflicts}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
           </Border>
-        </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        </WrapPanel>
+        <WrapPanel x:Name="EditorActions" Orientation="Horizontal" ItemSpacing="8" LineSpacing="6">
           <Button x:Name="ImportButton" Content="IMPORTIEREN" Command="{Binding ImportCommand}" />
           <Button x:Name="ExportButton" Content="EXPORTIEREN" Command="{Binding ExportCommand}" />
           <Button x:Name="DiscardButton" Content="VERWERFEN" Command="{Binding DiscardCommand}" />
           <Button x:Name="SaveButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveCommand}" />
-        </StackPanel>
+        </WrapPanel>
       </Grid>
 
-      <!-- Master-detail -->
-      <Grid ColumnDefinitions="220,*">
-        <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}"
+      <!-- Master-detail. Auto, not a literal 220: the rail's own width is a Style now, so a
+           phone can widen it to the whole screen, and a hidden rail leaves an empty column. -->
+      <Grid ColumnDefinitions="Auto,*">
+        <Border x:Name="CategoryRail" Grid.Column="0" Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-                CornerRadius="{StaticResource RadiusMd}" Padding="6" Margin="0,0,16,0">
+                CornerRadius="{StaticResource RadiusMd}" Padding="6"
+                IsVisible="{Binding ShowCategories}">
           <DockPanel>
             <!-- Docked outside the scroll region below. The Checklisten are the one part of this
                  rail a brigade can grow without bound, so an "add" button living at the end of
@@ -160,7 +213,17 @@
 
         <Border Grid.Column="1" Background="#0C1119"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-                CornerRadius="{StaticResource RadiusMd}" Padding="16" ClipToBounds="True">
+                CornerRadius="{StaticResource RadiusMd}" Padding="16" ClipToBounds="True"
+                IsVisible="{Binding ShowDetail}">
+          <DockPanel>
+          <!-- The way back out of a category on a phone. Hidden by default through the Style at
+               the top of this file, never IsVisible="False" here: a local value would outrank the
+               query that has to bring it back. -->
+          <Button DockPanel.Dock="Top" x:Name="BackToCategoriesButton" Classes="ghost narrow-only"
+                  HorizontalAlignment="Left" Margin="0,0,0,12"
+                  Content="&#x2190; KATEGORIEN"
+                  AutomationProperties.Name="Zurück zu den Kategorien"
+                  Command="{Binding BackToCategoriesCommand}" />
           <ContentControl Content="{Binding SelectedSection}">
             <ContentControl.DataTemplates>
 
@@ -580,6 +643,7 @@
 
             </ContentControl.DataTemplates>
           </ContentControl>
+          </DockPanel>
         </Border>
       </Grid>
     </DockPanel>

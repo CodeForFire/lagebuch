@@ -14,7 +14,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// only while the data is empty) fills the editor from a JSON file for review; Export writes the
 /// current set back out.
 /// </summary>
-public sealed partial class MasterDataEditorViewModel : ObservableObject
+public sealed partial class MasterDataEditorViewModel : ObservableObject, INarrowAware
 {
     private readonly IMasterDataProvider _provider;
     private readonly IFileDialogService _dialogs;
@@ -83,10 +83,42 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject
             }
 
             SetProperty(ref _selectedSection, value);
+
+            // On a phone the rail and the detail cannot share 412dp, so picking a category is a
+            // step into it rather than a change beside it.
+            if (IsNarrow)
+            {
+                IsDetailOpen = true;
+            }
         }
     }
 
     private EditorSection? _selectedSection;
+
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCategories))]
+    [NotifyPropertyChangedFor(nameof(ShowDetail))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether a phone is showing the picked category rather than the list of them. The wide
+    /// layout ignores it: a 220px rail beside the detail costs nothing on an ELW monitor.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCategories))]
+    [NotifyPropertyChangedFor(nameof(ShowDetail))]
+    private bool _isDetailOpen;
+
+    /// <summary>The category rail: always on a wide window, only before drilling in on a phone.</summary>
+    public bool ShowCategories => !IsNarrow || !IsDetailOpen;
+
+    /// <summary>The picked category's editor, the counterpart of <see cref="ShowCategories"/>.</summary>
+    public bool ShowDetail => !IsNarrow || IsDetailOpen;
+
+    /// <summary>Back out of a category on a phone, to the list of them.</summary>
+    [RelayCommand]
+    private void BackToCategories() => IsDetailOpen = false;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]

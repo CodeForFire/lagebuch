@@ -522,7 +522,11 @@
                   <Panel>
                     <Border Classes="navcell-rule" />
                     <StackPanel Spacing="2" VerticalAlignment="Center">
-                      <Panel>
+                      <!-- Centre, not stretch: the cell's content is stretched to its full width,
+                           so a dot hung off the right edge of a stretched panel lands outside the
+                           button — and outside the screen on the last cell. Sized to the icon, the
+                           dot's overhang stays inside the cell. -->
+                      <Panel HorizontalAlignment="Center">
                         <PathIcon Classes="navcell-icon"
                                   Data="{Binding ModuleKey, Converter={x:Static conv:ModuleIconConverter.Instance}}" />
                         <!-- The status dot rides the icon's top-right corner rather than sitting
@@ -550,7 +554,7 @@
                   ToolTip.Tip="Weitere Bereiche und Aktionen">
             <Panel>
               <StackPanel Spacing="2" VerticalAlignment="Center">
-                <Panel>
+                <Panel HorizontalAlignment="Center">
                   <PathIcon Classes="navcell-icon"
                             Data="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
                   <Ellipse Width="7" Height="7" Margin="0,-2,-8,0"

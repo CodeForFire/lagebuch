@@ -39,6 +39,11 @@ EMULATOR_BIN := $(ANDROID_HOME)/emulator/emulator
 # this is both the AVD instance name and the device profile to create it
 # with (`android emulator create --list-profiles` shows the full set).
 AVD          ?= medium_tablet
+# The phone profile the layout contract is written against: Medium_Phone_API_35 is 1080px @
+# 420dpi = 411dp, the width CommandBarReachabilityTests and PhoneLayoutTests pin. `make
+# emulator-phone` boots this one instead, because AVD defaults to the tablet and a tablet never
+# shows the phone layout.
+PHONE_AVD    ?= medium_phone
 IMAGE        ?= lagebuch-android-build
 DOCKER_HOME  ?= $(HOME)/.cache/lagebuch-android-build
 APK          := src/LageBuch.App.Android/bin/$(CONFIG)/net10.0-android/$(APP_ID)-Signed.apk
@@ -68,7 +73,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
         android-image android-image-rebuild apk aab emulator install run-android \
         logcat uninstall package-linux logo-assets samples screenshots demo-gif \
-        play-listing-check play-screenshots
+        play-listing-check play-screenshots phone-screenshots emulator-phone
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -185,6 +190,9 @@ aab: android-image ## Build the signed .aab for Google Play (VERSION=x.y.z)
 	@echo "AAB: $(AAB)"
 	@echo "APK: $(RELEASE_APK)   (universal, extracted from that bundle)"
 
+emulator-phone: ## Boot the phone emulator (PHONE_AVD=name) — the layout AVD defaults to a tablet
+	$(MAKE) emulator AVD=$(PHONE_AVD)
+
 emulator: ## Boot the emulator (AVD=name) and wait for it
 	@test -x "$(EMULATOR_BIN)" \
 	  || { echo "No emulator at $(EMULATOR_BIN) — set ANDROID_HOME=/path/to/sdk"; exit 1; }
@@ -244,6 +252,13 @@ play-listing-check: ## Check the Play Store listing text against the Console's l
 # Einsatz, 1080 rows instead of 1032.
 play-screenshots: ## Regenerate docs/play/screenshots/*.png at 16:9 for the Play listing
 	RENDER_OUT=$(CURDIR)/docs/play/screenshots RENDER_WIDTH=1920 RENDER_HEIGHT=1080 \
+	  $(DOTNET) test tests/LageBuch.Acceptance.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoFlowRenderTests
+
+# Writes outside docs/ on purpose: these are for a pull request's before/after pair, not for the
+# repository. docs/screenshots is the desktop set the README shows and must stay at 1920x1032.
+phone-screenshots: ## Render the phone layout to out/phone-screenshots (412x915, for a PR)
+	RENDER_OUT=$(CURDIR)/out/phone-screenshots RENDER_WIDTH=412 RENDER_HEIGHT=915 \
 	  $(DOTNET) test tests/LageBuch.Acceptance.Tests -c $(CONFIG) \
 	  --filter FullyQualifiedName~DemoFlowRenderTests
 
