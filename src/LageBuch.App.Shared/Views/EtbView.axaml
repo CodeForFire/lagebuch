@@ -16,6 +16,17 @@
        one dock serves both layouts: the query turns its row of fixed-width fields into a stack of
        full-width ones. -->
   <UserControl.Styles>
+    <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
+         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
+         a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
+         and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Style Selector="StackPanel#EditFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
     <Style Selector="ComboBox#DirectionBox">
       <Setter Property="Width" Value="130" />
     </Style>
@@ -33,6 +44,12 @@
     </Style>
 
     <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <Style Selector="StackPanel#EditFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
       <!-- The bottom bar already says ETB; the heading would only cost the checkbox its width. -->
       <Style Selector="TextBlock#EtbTitle">
         <Setter Property="IsVisible" Value="False" />
@@ -48,14 +65,10 @@
       </Style>
 
       <!-- The dock stacks. -->
-      <Style Selector="WrapPanel#DockFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <Style Selector="WrapPanel#EditFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
+      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
+           leaves it the width of its longest entry. -->
       <Style Selector="ComboBox#DirectionBox">
-        <Setter Property="Width" Value="NaN" />
+        <Setter Property="Width" Value="356" />
       </Style>
       <Style Selector="AutoCompleteBox#FromBox">
         <Setter Property="Width" Value="NaN" />
@@ -118,7 +131,7 @@
                         Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
             </Button>
           </Grid>
-          <WrapPanel x:Name="DockFields" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+          <StackPanel x:Name="DockFields" Spacing="8">
             <HeaderedContentControl Classes="field" Header="RICHTUNG">
               <ComboBox x:Name="DirectionBox"
                         ItemsSource="{Binding DirectionOptions}"
@@ -160,7 +173,7 @@
             <Button x:Name="EtbAddAndTaskButton" Classes="ghost dock-action" Content="HINZUFÜGEN &amp; AUFGABE"
                     Command="{Binding AddEntryAndCreateTaskCommand}"
                     VerticalAlignment="Bottom" Margin="0,0,0,1" />
-          </WrapPanel>
+          </StackPanel>
           <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
                selbst dieses so breit machen wuerde wie ihren Text und den Knopf aus dem
                Fenster schoebe. Die Felder sagen welche, diese Zeile sagt was. -->
@@ -178,7 +191,7 @@
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}">
       <StackPanel Spacing="6">
-        <WrapPanel x:Name="EditFields" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+        <StackPanel x:Name="EditFields" Spacing="8">
           <HeaderedContentControl Classes="field" Header="EINTRAG"
                                     Classes.invalid="{Binding EditTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
@@ -192,7 +205,7 @@
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
           <Button x:Name="CancelEditButton" Classes="dock-action" Content="ABBRECHEN" Command="{Binding CancelEditCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        </WrapPanel>
+        </StackPanel>
         <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
              selbst dieses so breit machen wuerde wie ihren Text und den Knopf aus dem
              Fenster schoebe. Die Felder sagen welche, diese Zeile sagt was. -->

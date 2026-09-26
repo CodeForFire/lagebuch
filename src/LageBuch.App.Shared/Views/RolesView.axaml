@@ -10,6 +10,17 @@
        controls: a local value in XAML outranks a Style setter, so the narrow query could never
        widen them. One dock serves both layouts. -->
   <UserControl.Styles>
+    <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
+         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
+         a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
+         and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Style Selector="StackPanel#TransferFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
     <Style Selector="AutoCompleteBox#RoleBox">
       <Setter Property="Width" Value="120" />
     </Style>
@@ -36,6 +47,12 @@
     </Style>
 
     <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <Style Selector="StackPanel#TransferFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
       <!-- The bottom bar already says FUNKTIONEN; dropping the heading gives the checkbox room. -->
       <Style Selector="TextBlock#RolesTitle">
         <Setter Property="IsVisible" Value="False" />
@@ -45,12 +62,6 @@
       </Style>
       <Style Selector="Border#RolesCardPanel">
         <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <Style Selector="WrapPanel#DockFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <Style Selector="WrapPanel#TransferFields">
-        <Setter Property="Orientation" Value="Vertical" />
       </Style>
       <Style Selector="AutoCompleteBox#RoleBox">
         <Setter Property="Width" Value="NaN" />
@@ -123,7 +134,7 @@
                       Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
           </Button>
         </Grid>
-        <WrapPanel x:Name="DockFields" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+        <StackPanel x:Name="DockFields" Spacing="8">
           <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
                make editable) — mirrors PersonNameBox below. -->
@@ -168,7 +179,7 @@
           </HeaderedContentControl>
           <Button x:Name="AddRoleButton" Classes="signal dock-action" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        </WrapPanel>
+        </StackPanel>
         <!-- Was noch fehlt (#412): eigene Zeile, damit keine Meldung ihr Feld verbreitert. -->
         <TextBlock x:Name="DockErrorSummary" Classes="field-error"
                    Text="{Binding ErrorSummary}"
@@ -211,7 +222,7 @@
                     Foreground="{StaticResource TextSecondaryBrush}"
                     Data="M16.01 11H4v2h12.01v3L20 12l-3.99-4z" />
         </StackPanel>
-        <WrapPanel x:Name="TransferFields" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+        <StackPanel x:Name="TransferFields" Spacing="8">
           <HeaderedContentControl Classes="field suggest" Header="NAME"
                                   Classes.invalid="{Binding TransferPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="TransferPersonNameBox"
@@ -239,7 +250,7 @@
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
           <Button x:Name="CancelTransferButton" Classes="dock-action" Content="ABBRECHEN" Command="{Binding CancelTransferCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        </WrapPanel>
+        </StackPanel>
         <!-- Was noch fehlt (#412): eigene Zeile, damit keine Meldung ihr Feld verbreitert. -->
         <TextBlock x:Name="TransferErrorSummary" Classes="field-error"
                    Text="{Binding TransferErrorSummary}"

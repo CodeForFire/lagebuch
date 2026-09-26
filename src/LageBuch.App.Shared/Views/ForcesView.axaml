@@ -11,6 +11,14 @@
        on the control, because a local value in XAML outranks a Style setter and the query could
        never widen it — one dock serves both layouts. -->
   <UserControl.Styles>
+    <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
+         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
+         a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
+         and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
     <!-- The readout's size is a Style, not FontSize= on the TextBlocks, so the narrow query can
          shrink it; a local attribute would outrank the setter and silently win. -->
     <Style Selector="TextBlock#TotalStrengthPrefixText">
@@ -42,6 +50,9 @@
     </Style>
 
     <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
       <!-- The bottom bar already says KRÄFTE; dropping the heading gives the Gesamtstärke tile
            the whole line, which it needs at 388px. -->
       <Style Selector="TextBlock#ForcesTitle">
@@ -62,11 +73,11 @@
       <Style Selector="Border#ForcesCardPanel">
         <Setter Property="IsVisible" Value="True" />
       </Style>
-      <Style Selector="WrapPanel#DockFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
+      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, and this one
+           shares an inner row with the clear-selection button, so NaN leaves it the width of its
+           longest Funkrufname. 300 fills the line and leaves the button its place. -->
       <Style Selector="ComboBox#VehicleBox">
-        <Setter Property="Width" Value="NaN" />
+        <Setter Property="Width" Value="300" />
       </Style>
       <Style Selector="TextBox#BrigadeBox">
         <Setter Property="Width" Value="NaN" />
@@ -78,7 +89,7 @@
         <Setter Property="Width" Value="NaN" />
       </Style>
       <Style Selector="ComboBox#StatusBox">
-        <Setter Property="Width" Value="NaN" />
+        <Setter Property="Width" Value="356" />
       </Style>
       <Style Selector="TextBox#NotesBox">
         <Setter Property="Width" Value="NaN" />
@@ -154,7 +165,7 @@
                       Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
           </Button>
         </Grid>
-        <WrapPanel x:Name="DockFields" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+        <StackPanel x:Name="DockFields" Spacing="8">
           <!-- Fahrzeuge aller Wachen (#215): wählt man eines, werden Feuerwehr, Funkrufname und
                Stärke vorbelegt und die beiden ersten Felder gesperrt (readonly), damit die Zeile
                nicht vom Stammdaten-Fahrzeug abweicht. Der X-Button hebt die Auswahl wieder auf. -->
@@ -238,7 +249,7 @@
           </HeaderedContentControl>
           <Button x:Name="AddForceButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        </WrapPanel>
+        </StackPanel>
         <!-- Was noch fehlt (#412), auf einer eigenen Zeile wie der Hinweis darunter: unter den
              Feldern selbst würde jede Meldung ihr Feld so breit machen wie ihren Text und
              HINZUFÜGEN aus dem Fenster schieben. Die Felder sagen welche, diese Zeile sagt was.

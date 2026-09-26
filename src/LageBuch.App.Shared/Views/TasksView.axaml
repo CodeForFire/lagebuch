@@ -7,6 +7,14 @@
              x:Class="LageBuch.App.Shared.Views.TasksView"
              x:DataType="vm:TasksViewModel">
   <UserControl.Styles>
+    <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
+         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
+         a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
+         and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
     <Style Selector="TextBlock.prio-high">
       <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -42,6 +50,9 @@
 
     <!-- The narrow layout, keyed off the workspace's container. -->
     <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
       <!-- The bottom bar already says AUFGABEN; the heading would only cost the filters room. -->
       <Style Selector="TextBlock#TasksTitle">
         <Setter Property="IsVisible" Value="False" />
@@ -52,14 +63,13 @@
       <Style Selector="Border#TasksCardPanel">
         <Setter Property="IsVisible" Value="True" />
       </Style>
-      <Style Selector="WrapPanel#DockFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
+      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
+           leaves it the width of its longest entry. -->
       <Style Selector="ComboBox#ImportanceBox">
-        <Setter Property="Width" Value="NaN" />
+        <Setter Property="Width" Value="356" />
       </Style>
       <Style Selector="ComboBox#UrgencyBox">
-        <Setter Property="Width" Value="NaN" />
+        <Setter Property="Width" Value="356" />
       </Style>
       <Style Selector="AutoCompleteBox#AssigneeBox">
         <Setter Property="Width" Value="NaN" />
@@ -121,7 +131,7 @@
                       Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
           </Button>
         </Grid>
-        <WrapPanel x:Name="DockFields" Orientation="Horizontal" ItemSpacing="12" LineSpacing="8">
+        <StackPanel x:Name="DockFields" Spacing="12">
           <HeaderedContentControl Classes="field" Header="WICHTIGKEIT">
             <ComboBox x:Name="ImportanceBox" ItemsSource="{Binding ImportanceOptions}"
                       SelectedValue="{Binding NewImportance}" SelectedValueBinding="{Binding Value}">
@@ -168,7 +178,7 @@
           </HeaderedContentControl>
           <Button x:Name="TaskAddButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        </WrapPanel>
+        </StackPanel>
         <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
              selbst dieses so breit machen wuerde wie ihren Text und den Knopf aus dem
              Fenster schoebe. Die Felder sagen welche, diese Zeile sagt was. -->
