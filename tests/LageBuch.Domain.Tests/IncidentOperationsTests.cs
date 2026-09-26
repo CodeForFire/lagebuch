@@ -774,4 +774,51 @@ public class IncidentOperationsTests
 
         Assert.Equal("Müller", incident.FindRunningRoleHolder("EL", null)!.PersonName);
     }
+
+    // A Funktion unique once per Einsatz does not care which Abschnitt either holder is typed into,
+    // so it needs the any-section form -- the section-scoped one would not see the incumbent at all.
+    [Fact]
+    public void Find_running_role_holder_in_any_section_finds_a_holder_in_another_abschnitt()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord");
+
+        var holder = incident.FindRunningRoleHolderInAnySection("EL");
+
+        Assert.NotNull(holder);
+        Assert.Equal("Müller", holder!.PersonName);
+    }
+
+    // The other half of that pair: the same holder stays invisible to the section-scoped form for a
+    // different Abschnitt, so a per-Abschnitt Funktion is not blocked by the Einsatzleiter.
+    [Fact]
+    public void Find_running_role_holder_does_not_see_a_holder_from_another_abschnitt()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord");
+
+        Assert.Null(incident.FindRunningRoleHolder("EL", "Abschnitt Süd"));
+    }
+
+    // Liveness is the same rule in both forms: a role whose assignment has ended is held by nobody,
+    // in any Abschnitt.
+    [Fact]
+    public void Find_running_role_holder_in_any_section_ignores_an_ended_assignment()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord", from: clock.Now);
+        incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(30));
+
+        Assert.Null(incident.FindRunningRoleHolderInAnySection("EL"));
+    }
+
+    [Fact]
+    public void Find_running_role_holder_in_any_section_returns_null_for_a_blank_funktion()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord");
+
+        Assert.Null(incident.FindRunningRoleHolderInAnySection(string.Empty));
+        Assert.Null(incident.FindRunningRoleHolderInAnySection("   "));
+    }
 }
