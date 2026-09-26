@@ -13,6 +13,23 @@ public partial class IncidentWorkspaceView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+
+        // The one size forwarder in the workspace. The container query in the .axaml handles
+        // everything presentational; this is for the decisions a Style setter cannot make, and the
+        // workspace view model hands the flag down to every module it owns, so no module view
+        // needs a forwarder of its own. Forwarding an event is what AGENTS.md leaves to
+        // code-behind — no state is kept here.
+        SizeChanged += OnSizeChanged;
+    }
+
+    private void OnSizeChanged(object? sender, SizeChangedEventArgs e) => ApplyNarrow(e.NewSize.Width);
+
+    private void ApplyNarrow(double width)
+    {
+        if (_vm is not null && width > 0)
+        {
+            _vm.IsNarrow = width <= LayoutBreakpoints.Narrow;
+        }
     }
 
     private void OnDataContextChanged(object? sender, System.EventArgs e)
@@ -31,6 +48,10 @@ public partial class IncidentWorkspaceView : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnViewModelPropertyChanged;
+
+            // The view is already laid out by the time a workspace is attached, and SizeChanged
+            // will not fire again for a size that has not changed.
+            ApplyNarrow(Bounds.Width);
             AttachPrompt();
         }
     }

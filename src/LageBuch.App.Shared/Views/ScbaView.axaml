@@ -7,6 +7,24 @@
              x:Class="LageBuch.App.Shared.Views.ScbaView"
              x:DataType="vm:ScbaViewModel">
   <UserControl.Styles>
+    <!-- Field widths as Styles, not Width= on the controls: a local value in XAML outranks a
+         Style setter, so the narrow query below could never widen them. -->
+    <Style Selector="AutoCompleteBox#CallSignBox">
+      <Setter Property="Width" Value="140" />
+    </Style>
+    <Style Selector="ComboBox#TruppTypeBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <Style Selector="AutoCompleteBox#TruppfuehrerBox">
+      <Setter Property="Width" Value="170" />
+    </Style>
+    <Style Selector="AutoCompleteBox#TruppmannBox">
+      <Setter Property="Width" Value="170" />
+    </Style>
+    <Style Selector="AutoCompleteBox#ZweiterTruppmannBox">
+      <Setter Property="Width" Value="170" />
+    </Style>
+
     <Style Selector="TextBlock.scbaStatus">
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     </Style>
@@ -27,24 +45,88 @@
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Margin" Value="0,0,6,0" />
     </Style>
+
+    <!-- The narrow layout, keyed off the workspace's container. This grid is the widest in the
+         app — its fixed columns alone total 1025px and it wants 1205px — so there is nothing to
+         squeeze: a phone reads the same Trupps as cards. -->
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <!-- Wide enough that only one fits a phone's content column, which is how a horizontal
+           WrapPanel is told "one field per line". -->
+      <Style Selector="AutoCompleteBox#CallSignBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="ComboBox#TruppTypeBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="AutoCompleteBox#TruppfuehrerBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="AutoCompleteBox#TruppmannBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="AutoCompleteBox#ZweiterTruppmannBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="TextBlock#ScbaTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#ScbaGridPanel">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#ScbaCardPanel">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="WrapPanel#RegistrationDock > :is(Control)">
+        <Setter Property="Margin" Value="0,0,0,8" />
+      </Style>
+      <Style Selector="Button.dock-action">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      </Style>
+    </ContainerQuery>
   </UserControl.Styles>
   <DockPanel>
-    <TextBlock DockPanel.Dock="Top" Text="ATEMSCHUTZÜBERWACHUNG" Classes="overline"
+    <TextBlock DockPanel.Dock="Top" x:Name="ScbaTitle" Text="ATEMSCHUTZÜBERWACHUNG" Classes="overline"
                Margin="0,0,0,14" VerticalAlignment="Center" />
 
     <!-- Registration dock: announce a Trupp on standby. The air clock starts later, via "UNTER PA".
          The next-pressure-control reminder lives in the global incident header so it's visible
          from every tab. -->
+    <!-- The phone's way in to the dock. A Trupp under air is what must stay in sight, so the
+         eight-field Bereitstellen form only appears when it is actually being filled in. -->
+    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="+ TRUPP BEREITSTELLEN"
+            IsVisible="{Binding ShowComposerButton}"
+            Command="{Binding OpenComposerCommand}" />
+
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            IsVisible="{Binding ShowComposer}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
+           bottom of the window to the soft keyboard. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="6">
+        <!-- Only the phone's form needs a way back out; the wide dock is never in the way. -->
+        <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,4"
+              IsVisible="{Binding IsNarrow}">
+          <TextBlock Grid.Column="0" Text="TRUPP BEREITSTELLEN" Classes="overline" VerticalAlignment="Center" />
+          <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                  AutomationProperties.Name="Eingabe schließen"
+                  ToolTip.Tip="Eingabe schließen"
+                  Command="{Binding CloseComposerCommand}">
+            <PathIcon Width="13" Height="13"
+                      Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+          </Button>
+        </Grid>
         <WrapPanel x:Name="RegistrationDock" Orientation="Horizontal">
           <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). This is the
                vehicle/unit the Trupp rides with, hence leading the form (#78). -->
           <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
-            <AutoCompleteBox x:Name="CallSignBox" Width="140"
+            <AutoCompleteBox x:Name="CallSignBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                              ItemsSource="{Binding CallSignOptions}"
                              FilterMode="ContainsOrdinal"
@@ -53,7 +135,7 @@
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="TRUPP-ART"
                                     Classes.invalid="{Binding NewDesignationError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <ComboBox x:Name="TruppTypeBox" Width="150" ItemsSource="{Binding TruppTypeOptions}"
+            <ComboBox x:Name="TruppTypeBox" ItemsSource="{Binding TruppTypeOptions}"
                       SelectedItem="{Binding NewDesignation}" />
           </HeaderedContentControl>
           <!-- One box per position rather than a single free-text field: a Trupp is two people,
@@ -63,7 +145,7 @@
                persona (#137). -->
           <HeaderedContentControl Classes="field suggest" Header="TRUPPFÜHRER"
                                     Classes.invalid="{Binding NewTruppfuehrerError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <AutoCompleteBox x:Name="TruppfuehrerBox" Width="170"
+            <AutoCompleteBox x:Name="TruppfuehrerBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
@@ -72,7 +154,7 @@
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest" Header="TRUPPMANN"
                                     Classes.invalid="{Binding NewTruppmannError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <AutoCompleteBox x:Name="TruppmannBox" Width="170"
+            <AutoCompleteBox x:Name="TruppmannBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderAlt}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
@@ -81,7 +163,7 @@
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest" Header="2. TRUPPMANN" IsVisible="{Binding RequiresThirdMember}"
                                     Classes.invalid="{Binding NewZweiterTruppmannError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <AutoCompleteBox x:Name="ZweiterTruppmannBox" Width="170"
+            <AutoCompleteBox x:Name="ZweiterTruppmannBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderThird}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
@@ -113,7 +195,7 @@
               <TextBlock Text="Min. Abfrage" Classes="secondary" VerticalAlignment="Center" />
             </StackPanel>
           </HeaderedContentControl>
-          <Button x:Name="AddTruppButton" Classes="signal" Content="BEREITSTELLEN" Command="{Binding AddTruppCommand}"
+          <Button x:Name="AddTruppButton" Classes="signal dock-action" Content="BEREITSTELLEN" Command="{Binding AddTruppCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </WrapPanel>
         <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
@@ -123,9 +205,11 @@
                    Text="{Binding ErrorSummary}"
                    IsVisible="{Binding ErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
+      </ScrollViewer>
     </Border>
 
-    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+    <Panel>
+    <Border x:Name="ScbaGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <!-- Rows size to their content here, unlike the other grids. A Trupp is two people, or three
            where its Trupp-Typ calls for it, each on its own line, so the shared 40px RowHeight from
@@ -297,5 +381,129 @@
         </DataGrid.Columns>
       </DataGrid>
     </Border>
+
+    <!-- The narrow layout: one card per Trupp. Restzeit is the hero — it is the number that says
+         whether the crew has to turn around now — and keeps the alarm colouring it has in the
+         grid. Everything else follows in the order it gets read out over the radio. -->
+    <Border x:Name="ScbaCardPanel" Classes="narrow-only"
+            Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="ScbaCards" ItemsSource="{Binding Trupps}" Margin="8">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ScbaTruppRow">
+              <Border Classes="row-card">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center"
+                               FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                               Foreground="{StaticResource TextPrimaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="{Binding StatusDisplay}" VerticalAlignment="Center"
+                               FontWeight="SemiBold" Classes="scbaStatus"
+                               Classes.alarm="{Binding IsAlarm}" Classes.control="{Binding IsControlDue}" />
+                  </Grid>
+                  <TextBlock Text="{Binding CallSign}" Classes="mono" FontSize="11.5"
+                             IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}"
+                             TextTrimming="CharacterEllipsis" />
+
+                  <!-- The one value a Lagebuchführer looks for first. -->
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Column="0" Text="RESTZEIT" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding RemainingDisplay}" VerticalAlignment="Center"
+                               FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Medium"
+                               Classes="scbaStatus" Classes.alarm="{Binding IsAlarm}" />
+                  </Grid>
+
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="14" LineSpacing="2">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="Start" Classes="cellLabel" />
+                      <TextBlock Text="{Binding StartTimeDisplay}" Classes="mono" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="Einsatz" Classes="cellLabel" />
+                      <TextBlock Text="{Binding ElapsedDisplay}" Classes="mono" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="akt." Classes="cellLabel" />
+                      <TextBlock Text="{Binding PressureDisplay}" Classes="mono" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="Abfrage" Classes="cellLabel" />
+                      <TextBlock Text="{Binding ControlRemainingDisplay}" Classes="mono"
+                                 Classes.control="{Binding IsControlDue}" />
+                    </StackPanel>
+                  </WrapPanel>
+
+                  <ItemsControl ItemsSource="{Binding MemberLines}" ToolTip.Tip="{Binding MembersDetail}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <!-- FwDV 7's Sicherheitstrupp. Same command-driven flyout as the grid; no x:Name
+                       here, because the grid's SafetyTruppButton is found by name in tests and a
+                       second control answering to it would make that search ambiguous. -->
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Column="0" Text="Si." Classes="cellLabel" />
+                    <Button Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Padding="8,4" FontSize="12"
+                            Content="{Binding SafetyTruppButtonText}"
+                            IsEnabled="{Binding CanAssignSafetyTrupp}"
+                            AutomationProperties.Name="Sicherheitstrupp wählen">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                          <ItemsControl ItemsSource="{Binding SafetyTruppChoices}" MinWidth="170">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:SafetyTruppChoice">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left" Padding="8,5"
+                                        Command="{Binding SelectCommand}"
+                                        ToolTip.Tip="{Binding Detail}">
+                                  <Grid ColumnDefinitions="14,Auto,*" ColumnSpacing="6">
+                                    <TextBlock Grid.Column="0" Text="✓" FontWeight="Bold"
+                                               IsVisible="{Binding IsCurrent}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Display}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Detail}"
+                                               Classes="cellLabel" TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                  </Grid>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                  </Grid>
+                  <TextBlock Text="{Binding SafetyTruppHint}"
+                             FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                             TextWrapping="Wrap" IsVisible="{Binding HasSafetyTruppHint}" />
+
+                  <!-- The Druckkontrolle input and whatever the Trupp's state allows next. -->
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
+                    <NumericUpDown Width="120" Minimum="0" Maximum="400" Value="{Binding PressureInput}"
+                                   FormatString="0" IsEnabled="{Binding !IsReturned}" />
+                    <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}"
+                            IsVisible="{Binding IsWaiting}" />
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                            IsVisible="{Binding IsActive}" />
+                    <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}"
+                            IsVisible="{Binding IsActive}" />
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                            IsVisible="{Binding IsWithdrawing}" />
+                    <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}"
+                            IsVisible="{Binding IsWithdrawing}" />
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+    </Panel>
   </DockPanel>
 </UserControl>

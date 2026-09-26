@@ -4,26 +4,65 @@
              x:Class="LageBuch.App.Shared.Views.MainView"
              x:DataType="vm:MainWindowViewModel"
              Background="{StaticResource AppBackgroundBrush}">
-  <Panel>
+  <!-- The shell is the container every narrow-layout query in this view is measured against.
+       It sits on the root Panel rather than on the command bar, because a container query styles
+       its container's DESCENDANTS and not the container element itself — a query declared on the
+       bar could hide things inside the bar but never shorten the bar. The root also covers the
+       prompt and About overlays at the bottom of this file. -->
+  <Panel Container.Name="Shell" Container.Sizing="Width">
+    <Panel.Styles>
+      <!-- The wide defaults. Each has to be a Style rather than an attribute on the control: a
+           local value in XAML outranks every Style setter, so the query below could never win. -->
+      <Style Selector="Border#CommandBar">
+        <Setter Property="Height" Value="60" />
+      </Style>
+      <ContainerQuery Name="Shell" Query="max-width:640">
+        <Style Selector="Border#CommandBar">
+          <Setter Property="Height" Value="56" />
+        </Style>
+        <Style Selector="TextBlock#BrandDescriptor">
+          <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Border#BrandDivider">
+          <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="StackPanel#WideActions">
+          <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="StackPanel#WideTrailingActions">
+          <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Button#MoreActionsButton">
+          <Setter Property="IsVisible" Value="True" />
+        </Style>
+      </ContainerQuery>
+    </Panel.Styles>
     <DockPanel>
       <!-- ===== Command bar ===== -->
+      <!-- Six actions in one Auto column is wider than a phone: NEUER EINSATZ used to render at
+           x=527..638 on a 411dp viewport, 227px past the edge and untappable
+           (CommandBarReachabilityTests). Below 640 the bar keeps the one action that starts work
+           and folds the rest into an overflow, the descriptor beside the wordmark goes, and the
+           bar loses 4px of height. -->
       <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBarBrush}"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
-              Height="60">
-        <Grid Margin="0,0,24,0" ColumnDefinitions="Auto,*,Auto">
+              x:Name="CommandBar">
+        <Grid Margin="0,0,16,0" ColumnDefinitions="Auto,*,Auto">
           <!-- Brand mark: signal bar + wordmark. One baseline, one voice: LAGEBUCH is the single
                tracked-caps wordmark; the descriptor rides beside it in sentence-case body type
                (past a hairline) so the strip isn't two competing caps labels stacked with a nudge. -->
           <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Stretch">
             <Border Width="4" Background="{StaticResource SignalGradientBrush}" />
-            <StackPanel Orientation="Horizontal" Spacing="14" Margin="20,0,0,0" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="14" Margin="16,0,0,0" VerticalAlignment="Center">
               <Image Source="avares://LageBuch.App.Shared/Assets/icon-1024.png"
                      Width="32" Height="32" Stretch="Uniform" VerticalAlignment="Center" />
               <TextBlock Text="LAGEBUCH" FontFamily="{StaticResource DisplayFont}"
                          FontSize="19" FontWeight="SemiBold" LetterSpacing="3" VerticalAlignment="Center"
                          Foreground="{StaticResource TextPrimaryBrush}" />
-              <Border Width="1" Height="18" Background="{StaticResource HairlineBrush}" VerticalAlignment="Center" />
-              <TextBlock Text="Einsatzdokumentation" FontFamily="{StaticResource BodyFont}"
+              <Border x:Name="BrandDivider" Width="1" Height="18"
+                      Background="{StaticResource HairlineBrush}" VerticalAlignment="Center" />
+              <TextBlock x:Name="BrandDescriptor" Text="Einsatzdokumentation"
+                         FontFamily="{StaticResource BodyFont}"
                          FontSize="13" VerticalAlignment="Center"
                          Foreground="{StaticResource TextSecondaryBrush}" />
             </StackPanel>
@@ -31,16 +70,50 @@
 
           <!-- Actions -->
           <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <Button x:Name="HomeButton" Classes="ghost" Content="ÜBERSICHT" Command="{Binding GoHomeCommand}" />
-            <Button x:Name="MasterDataButton" Classes="ghost" Content="STAMMDATEN" Command="{Binding ShowMasterDataCommand}" />
-            <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}" Margin="4,0" />
-            <Button x:Name="JoinDeviceButton" Classes="ghost" Content="VERBINDEN" Command="{Binding RequestJoinDeviceCommand}"
-                    ToolTip.Tip="Mit einem Gerät verbinden, das einen Einsatz im Netzwerk freigegeben hat" />
-            <Button x:Name="OpenFileButton" Content="ÖFFNEN" Command="{Binding RequestOpenFileCommand}" />
+            <StackPanel x:Name="WideActions" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button x:Name="HomeButton" Classes="ghost" Content="ÜBERSICHT" Command="{Binding GoHomeCommand}" />
+              <Button x:Name="MasterDataButton" Classes="ghost" Content="STAMMDATEN" Command="{Binding ShowMasterDataCommand}" />
+              <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}" Margin="4,0" />
+              <Button x:Name="JoinDeviceButton" Classes="ghost" Content="VERBINDEN" Command="{Binding RequestJoinDeviceCommand}"
+                      ToolTip.Tip="Mit einem Gerät verbinden, das einen Einsatz im Netzwerk freigegeben hat" />
+              <Button x:Name="OpenFileButton" Content="ÖFFNEN" Command="{Binding RequestOpenFileCommand}" />
+            </StackPanel>
+
+            <!-- The one action that starts work stays on the bar at every width. -->
             <Button x:Name="NewIncidentButton" Classes="signal" Content="NEUER EINSATZ" Command="{Binding RequestNewIncidentCommand}" />
-            <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}" Margin="4,0" />
-            <Button x:Name="AboutButton" Classes="ghost" Content="ÜBER" Command="{Binding ShowAboutCommand}"
-                    ToolTip.Tip="Über Lagebuch — Version, Lizenz und Quellcode" />
+
+            <StackPanel x:Name="WideTrailingActions" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Border Width="1" Height="22" Background="{StaticResource HairlineBrush}" Margin="4,0" />
+              <Button x:Name="AboutButton" Classes="ghost" Content="ÜBER" Command="{Binding ShowAboutCommand}"
+                      ToolTip.Tip="Über Lagebuch — Version, Lizenz und Quellcode" />
+            </StackPanel>
+
+            <!-- Everything the narrow bar could not keep. A Flyout of real Buttons rather than a
+                 MenuFlyout, matching the share panel in IncidentWorkspaceView: they pick up the
+                 app's own button styling, and MenuItem has none here. -->
+            <Button x:Name="MoreActionsButton" Classes="ghost narrow-only"
+                    ToolTip.Tip="Weitere Aktionen"
+                    AutomationProperties.Name="Weitere Aktionen">
+              <PathIcon Width="16" Height="16"
+                        Data="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+              <Button.Flyout>
+                <Flyout Placement="BottomEdgeAlignedRight">
+                  <StackPanel x:Name="MoreActionsPanel" Spacing="6" MinWidth="200">
+                    <Button x:Name="MoreHomeButton" Classes="ghost" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left" Content="ÜBERSICHT" Command="{Binding GoHomeCommand}" />
+                    <Button x:Name="MoreOpenFileButton" Classes="ghost" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left" Content="ÖFFNEN" Command="{Binding RequestOpenFileCommand}" />
+                    <Button x:Name="MoreJoinDeviceButton" Classes="ghost" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left" Content="VERBINDEN" Command="{Binding RequestJoinDeviceCommand}" />
+                    <Border Height="1" Background="{StaticResource HairlineBrush}" Margin="0,2" />
+                    <Button x:Name="MoreMasterDataButton" Classes="ghost" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left" Content="STAMMDATEN" Command="{Binding ShowMasterDataCommand}" />
+                    <Button x:Name="MoreAboutButton" Classes="ghost" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left" Content="ÜBER" Command="{Binding ShowAboutCommand}" />
+                  </StackPanel>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
           </StackPanel>
         </Grid>
       </Border>

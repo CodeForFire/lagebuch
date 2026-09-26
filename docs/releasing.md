@@ -342,12 +342,20 @@ README's 1920x1032 because Play insists on exactly 16:9 and rejects 1.86:1. They
 are honest for the 7-inch and 10-inch tablet slots, which is the form factor an
 ELW actually uses.
 
-They are **not** a substitute for phone captures. The phone layout has a known
-limitation — see the skipped `CommandBarReachabilityTests` — and a landscape
-tablet render in the phone slot would promise a phone experience nobody has
-checked. Capture those from a real device or an accelerated emulator before
-filling the phone slot. (An emulator needs `/dev/kvm`; without it an x86_64
-system image is too slow to drive.)
+They are **not** a substitute for phone captures — but no longer because the
+phone layout is unfinished. It has one now: below 640px the command bar folds its
+actions into an overflow, the module rail becomes a bottom nav bar, and the grids
+read as cards (`PhoneLayoutTests` pins it, and `CommandBarReachabilityTests` is
+no longer skipped). `make phone-screenshots` renders that layout at 412x915 into
+`out/phone-screenshots`.
+
+What those renders still cannot show is the one thing only a device has: the soft
+keyboard. The composers exist to be typed into, and `AdjustResize` plus their
+own scrolling is what keeps the focused field above it. So capture the phone slot
+from a real device or an accelerated emulator — `make emulator-phone` boots the
+phone profile rather than the tablet one `AVD` defaults to — and check a composer
+with the keyboard up while you are there. (An emulator needs `/dev/kvm`; without
+it an x86_64 system image is too slow to drive.)
 
 ### The declarations, frozen
 

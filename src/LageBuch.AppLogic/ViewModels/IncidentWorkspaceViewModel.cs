@@ -14,6 +14,12 @@ namespace LageBuch.AppLogic.ViewModels;
 
 public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisposable
 {
+    /// <summary>
+    /// How many rail entries the narrow layout's bottom bar shows before the rest go behind MEHR.
+    /// Five cells across a 412dp phone leave ~82dp each, which fits an icon over a short label.
+    /// </summary>
+    private const int PhoneNavSlots = 4;
+
     private readonly IIncidentSession _session;
 
     // The concrete local session, or null on a joined client. Guards what only exists on the device
@@ -186,6 +192,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // "Straße, Ortsteil" -- the same join the PDF header prints, so the two never disagree.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowAddressLine))]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLineInHeader))]
     [NotifyPropertyChangedFor(nameof(HasIncidentData))]
     private string? _addressDisplay;
 
@@ -205,6 +212,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public bool ShowEinsatznummerChip => HasEinsatznummer && !IsEinsatznummerShownAsHero;
 
     public bool ShowAddressLine => !string.IsNullOrWhiteSpace(AddressDisplay);
+
+    /// <summary>
+    /// Whether the header itself shows the address. Separate from <see cref="ShowAddressLine"/>,
+    /// which says whether there <em>is</em> one and feeds <see cref="HasIncidentData"/>: folding
+    /// the phone into that would take the edit pencil away from an Einsatz that only has an
+    /// address. At 412dp the address is what pushes the Einsatznummer chip off the line, and it is
+    /// the one part of the identity already a tap away behind that pencil.
+    /// </summary>
+    public bool ShowAddressLineInHeader => ShowAddressLine && !IsNarrow;
 
     // Drives which affordance the header shows: a quiet pencil once anything is known, an explicit
     // "+ Einsatzdaten ergänzen" while nothing is -- so an incident started without any head data
@@ -263,6 +279,125 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     [ObservableProperty]
     private WorkspaceNavItemViewModel? _selectedNavItem;
+
+    /// <summary>
+    /// The rail entries the narrow bottom bar shows directly, and the ones behind its MEHR button.
+    /// The split is by position, because the order is the Kommandant's own: Stammdaten's
+    /// Navigation list is what decides which modules are one tap away on a phone.
+    /// </summary>
+    /// <remarks>
+    /// Atemschutz falls into the overflow under the shipped order. That is survivable rather than
+    /// an oversight: a Rückzugsalarm is a lit header bar that jumps straight to the tab (#422), and
+    /// <see cref="OverflowHasStatusDot"/> carries the quieter states out to the MEHR button.
+    /// </remarks>
+    public ObservableCollection<WorkspaceNavItemViewModel> PrimaryNavItems { get; } = new();
+
+    /// <inheritdoc cref="PrimaryNavItems" />
+    public ObservableCollection<WorkspaceNavItemViewModel> OverflowNavItems { get; } = new();
+
+    /// <summary>Whether MEHR has anything behind it — false on a rail of four or fewer.</summary>
+    [ObservableProperty]
+    private bool _hasOverflowNavItems;
+
+    /// <summary>
+    /// A Checkliste behind MEHR still has to report. Without this its dot would be invisible until
+    /// the operator opened the overflow, which is the one moment it is no longer news.
+    /// </summary>
+    [ObservableProperty]
+    private bool _overflowHasStatusDot;
+
+    /// <summary>
+    /// Whether the workspace is laid out for a phone. Set by the shell from the actual width; the
+    /// container queries in the views handle everything that is purely presentational, and this
+    /// carries only the decisions a style setter cannot make — chiefly that an add-entry dock is a
+    /// sheet that starts closed rather than a strip that is always there.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLineInHeader))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Hands the flag down to every module that lays out differently on a phone. Called again on
+    /// each rebuild, because <see cref="BuildNavItems"/> replaces the module view models wholesale
+    /// and a fresh one would otherwise come up in the desktop layout on a phone.
+    /// </summary>
+    partial void OnIsNarrowChanged(bool value) => PushNarrowToModules(value);
+
+    private void PushNarrowToModules(bool value)
+    {
+        foreach (var module in NarrowAwareModules())
+        {
+            module.IsNarrow = value;
+        }
+    }
+
+    private IEnumerable<INarrowAware> NarrowAwareModules()
+    {
+        // Every module the workspace owns, not only the ones that implement INarrowAware today:
+        // OfType does the filtering, and a module that gains the interface later is picked up
+        // without anyone having to remember this list. Null while the workspace is between
+        // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
+        // also drops.
+        object?[] modules = [Etb, Tasks, Roles, Forces, Scba, CoMessprotokoll, Files, Links];
+        return modules.OfType<INarrowAware>();
+    }
+
+    /// <summary>Opens a rail entry from the narrow bottom bar or its MEHR flyout.</summary>
+    [RelayCommand]
+    private void SelectNavItem(WorkspaceNavItemViewModel? item)
+    {
+        if (item is not null)
+        {
+            SelectedNavItem = item;
+        }
+    }
+
+    partial void OnSelectedNavItemChanged(WorkspaceNavItemViewModel? value)
+    {
+        foreach (var item in NavItems)
+        {
+            item.IsSelected = ReferenceEquals(item, value);
+        }
+    }
+
+    private void RebuildNavSplit()
+    {
+        foreach (var item in OverflowNavItems)
+        {
+            item.PropertyChanged -= OnOverflowNavItemChanged;
+        }
+
+        PrimaryNavItems.Clear();
+        OverflowNavItems.Clear();
+
+        for (var i = 0; i < NavItems.Count; i++)
+        {
+            if (i < PhoneNavSlots)
+            {
+                PrimaryNavItems.Add(NavItems[i]);
+                continue;
+            }
+
+            OverflowNavItems.Add(NavItems[i]);
+            NavItems[i].PropertyChanged += OnOverflowNavItemChanged;
+        }
+
+        HasOverflowNavItems = OverflowNavItems.Count > 0;
+        UpdateOverflowStatusDot();
+    }
+
+    private void OnOverflowNavItemChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is null
+            or nameof(WorkspaceNavItemViewModel.IsComplete)
+            or nameof(WorkspaceNavItemViewModel.IsIncomplete))
+        {
+            UpdateOverflowStatusDot();
+        }
+    }
+
+    private void UpdateOverflowStatusDot() =>
+        OverflowHasStatusDot = OverflowNavItems.Any(item => item.IsComplete || item.IsIncomplete);
 
     public EtbViewModel Etb { get; private set; } = null!;
 
@@ -480,6 +615,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         NavItems.Clear();
 
+        // The split holds the same instances and, for the overflow, a subscription on each.
+        foreach (var item in OverflowNavItems)
+        {
+            item.PropertyChanged -= OnOverflowNavItemChanged;
+        }
+
+        PrimaryNavItems.Clear();
+        OverflowNavItems.Clear();
+        HasOverflowNavItems = false;
+        OverflowHasStatusDot = false;
+
         foreach (var checklist in _checklists)
         {
             checklist.Dispose();
@@ -617,9 +763,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
             if (modules.TryGetValue(spec.ModuleKey, out var content))
             {
-                NavItems.Add(new WorkspaceNavItemViewModel(ModuleHeaders[spec.ModuleKey], content));
+                NavItems.Add(new WorkspaceNavItemViewModel(
+                    ModuleHeaders[spec.ModuleKey], content, moduleKey: spec.ModuleKey));
             }
         }
+
+        RebuildNavSplit();
+
+        // The modules above are freshly constructed, so they start in the desktop layout.
+        PushNarrowToModules(IsNarrow);
     }
 
     /// <summary>

@@ -9,7 +9,25 @@ public partial class MainView : UserControl
     private MainWindowViewModel? _viewModel;
     private OperatorPromptViewModel? _prompt;
 
-    public MainView() => InitializeComponent();
+    public MainView()
+    {
+        InitializeComponent();
+
+        // The shell's own width decides whether the command bar is a row of six actions or one
+        // action plus an overflow. The container query in the .axaml does the showing and hiding;
+        // this exists because the view model has decisions of its own to make at the same
+        // breakpoint, and a Style setter cannot reach a view model. Forwarding a size to a
+        // command is the one thing AGENTS.md leaves to code-behind — no state is kept here.
+        SizeChanged += OnSizeChanged;
+    }
+
+    private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (_viewModel is not null)
+        {
+            _viewModel.IsNarrow = e.NewSize.Width <= LayoutBreakpoints.Narrow;
+        }
+    }
 
     /// <summary>
     /// Wires the view model in and hooks the operator-prompt confirm/cancel events. Called by
@@ -34,6 +52,13 @@ public partial class MainView : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+        // The view is usually sized before a head attaches its view model, and SizeChanged will
+        // not fire again for a size that did not change — so seed the flag from what we have.
+        if (Bounds.Width > 0)
+        {
+            _viewModel.IsNarrow = Bounds.Width <= LayoutBreakpoints.Narrow;
+        }
 
         // A prompt may already be pending if the caller primed the view model before attaching.
         AttachPrompt();

@@ -109,6 +109,12 @@
   <CornerRadius x:Key="RadiusLg">12</CornerRadius>
   <x:Double x:Key="ControlHeight">36</x:Double>
 
+  <!-- A mouse pointer is a pixel; a gloved thumb in a command vehicle is not. Every control a
+       narrow layout swaps in grows to Android's 48dp touch-target minimum — the phone counterpart
+       of ControlHeight above. The container queries in the views are the only things that reach
+       for it. -->
+  <x:Double x:Key="ControlHeightTouch">48</x:Double>
+
   <BoxShadows x:Key="PanelShadow">0 8 28 -8 #99000000</BoxShadows>
   <BoxShadows x:Key="OverlayShadow">0 24 60 -12 #CC000000</BoxShadows>
 

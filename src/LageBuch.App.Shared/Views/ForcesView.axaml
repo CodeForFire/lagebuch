@@ -6,47 +6,172 @@
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.ForcesView"
              x:DataType="vm:ForcesViewModel">
+  <!-- Keyed off the workspace's container (IncidentWorkspaceView's root Panel); a query resolves
+       its container by name anywhere below it. Field widths live in Styles rather than as Width=
+       on the control, because a local value in XAML outranks a Style setter and the query could
+       never widen it — one dock serves both layouts. -->
+  <UserControl.Styles>
+    <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
+         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
+         a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
+         and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <!-- The readout's size is a Style, not FontSize= on the TextBlocks, so the narrow query can
+         shrink it; a local attribute would outrank the setter and silently win. -->
+    <Style Selector="TextBlock#TotalStrengthPrefixText">
+      <Setter Property="FontSize" Value="26" />
+    </Style>
+    <Style Selector="TextBlock#TotalStrengthGesamtText">
+      <Setter Property="FontSize" Value="26" />
+    </Style>
+    <Style Selector="TextBlock#TotalScbaText">
+      <Setter Property="FontSize" Value="26" />
+    </Style>
+    <Style Selector="ComboBox#VehicleBox">
+      <Setter Property="Width" Value="190" />
+    </Style>
+    <Style Selector="TextBox#BrigadeBox">
+      <Setter Property="Width" Value="160" />
+    </Style>
+    <Style Selector="TextBox#CallSignBox">
+      <Setter Property="Width" Value="140" />
+    </Style>
+    <Style Selector="TextBox#ScbaBox">
+      <Setter Property="Width" Value="90" />
+    </Style>
+    <Style Selector="ComboBox#StatusBox">
+      <Setter Property="Width" Value="140" />
+    </Style>
+    <Style Selector="TextBox#NotesBox">
+      <Setter Property="Width" Value="170" />
+    </Style>
+
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <!-- The bottom bar already says KRÄFTE; dropping the heading gives the Gesamtstärke tile
+           the whole line, which it needs at 388px. -->
+      <Style Selector="TextBlock#ForcesTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="TextBlock#TotalStrengthPrefixText">
+        <Setter Property="FontSize" Value="19" />
+      </Style>
+      <Style Selector="TextBlock#TotalStrengthGesamtText">
+        <Setter Property="FontSize" Value="19" />
+      </Style>
+      <Style Selector="TextBlock#TotalScbaText">
+        <Setter Property="FontSize" Value="19" />
+      </Style>
+      <Style Selector="Border#ForcesGridPanel">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#ForcesCardPanel">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, and this one
+           shares an inner row with the clear-selection button, so NaN leaves it the width of its
+           longest Funkrufname. 300 fills the line and leaves the button its place. -->
+      <Style Selector="ComboBox#VehicleBox">
+        <Setter Property="Width" Value="300" />
+      </Style>
+      <Style Selector="TextBox#BrigadeBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#CallSignBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#ScbaBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="ComboBox#StatusBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="TextBox#NotesBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="HeaderedContentControl.field">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+      </Style>
+      <Style Selector="Button.dock-action">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      </Style>
+    </ContainerQuery>
+  </UserControl.Styles>
+
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Top" />
+      <TextBlock Grid.Column="0" x:Name="ForcesTitle" Text="EINGESETZTE KRÄFTE" Classes="overline" VerticalAlignment="Top" />
       <!-- Total strength readout im ZF/GF/Mannschaft/Gesamt-Format (#76, #216), AGT-Anteil daneben.
            Gesamt is bold+underlined by binding it as a separate TextBlock after the plain prefix
            (see ForcesViewModel.TotalStrengthPrefixText); no Run/Inlines idiom exists here to bold
            part of one TextBlock's text. -->
       <Border Grid.Column="1" Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" Padding="18,8">
-        <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+        <!-- A WrapPanel, not a StackPanel: the readout is ~380px wide and a phone's content column
+             is 388, so on any smaller Stichwort or a landscape split it has to fall onto a second
+             line rather than run off the edge. -->
+        <WrapPanel Orientation="Horizontal" ItemSpacing="14" LineSpacing="4" VerticalAlignment="Center">
           <TextBlock Text="GESAMTSTÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
           <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
-            <TextBlock x:Name="TotalStrengthPrefixText" Classes="metric" FontSize="26"
+            <TextBlock x:Name="TotalStrengthPrefixText" Classes="metric"
                        Foreground="{StaticResource SignalBrush}" Text="{Binding TotalStrengthPrefixText}" />
-            <TextBlock x:Name="TotalStrengthGesamtText" Classes="metric" FontSize="26" FontWeight="Bold"
+            <TextBlock x:Name="TotalStrengthGesamtText" Classes="metric" FontWeight="Bold"
                        TextDecorations="Underline"
                        Foreground="{StaticResource SignalBrush}" Text="{Binding TotalPersonnel}" />
           </StackPanel>
           <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
           <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
-          <TextBlock x:Name="TotalScbaText" Classes="metric" FontSize="26"
+          <TextBlock x:Name="TotalScbaText" Classes="metric"
                      Foreground="{StaticResource SignalBrush}" Text="{Binding TotalScba}" />
-        </StackPanel>
+        </WrapPanel>
       </Border>
     </Grid>
 
+    <!-- The phone's way in to the dock, at the bottom edge where the thumb already is. -->
+    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="+ EINHEIT AUFNEHMEN"
+            IsVisible="{Binding ShowComposerButton}"
+            Command="{Binding OpenComposerCommand}" />
+
     <!-- Input dock -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            IsVisible="{Binding ShowComposer}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- The duplicate-callsign hint used to sit at the end of the horizontal fields row below,
            where a narrower-than-test-harness window would clip it; it now gets its own full-width
            line so it always has room to wrap instead. -->
+      <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
+           bottom of the window to the soft keyboard. Never scrolls on a wide window. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="6">
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <!-- Only the phone's form needs a way back out; the wide dock is never in the way. -->
+        <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,4"
+              IsVisible="{Binding IsNarrow}">
+          <TextBlock Grid.Column="0" Text="EINHEIT AUFNEHMEN" Classes="overline" VerticalAlignment="Center" />
+          <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                  AutomationProperties.Name="Eingabe schließen"
+                  ToolTip.Tip="Eingabe schließen"
+                  Command="{Binding CloseComposerCommand}">
+            <PathIcon Width="13" Height="13"
+                      Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+          </Button>
+        </Grid>
+        <StackPanel x:Name="DockFields" Spacing="8">
           <!-- Fahrzeuge aller Wachen (#215): wählt man eines, werden Feuerwehr, Funkrufname und
                Stärke vorbelegt und die beiden ersten Felder gesperrt (readonly), damit die Zeile
                nicht vom Stammdaten-Fahrzeug abweicht. Der X-Button hebt die Auswahl wieder auf. -->
           <HeaderedContentControl Classes="field" Header="FAHRZEUG">
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <ComboBox x:Name="VehicleBox" Width="190"
+              <ComboBox x:Name="VehicleBox"
                         ItemsSource="{Binding VehicleOptions}"
                         SelectedItem="{Binding SelectedVehicle}">
                 <ComboBox.ItemTemplate>
@@ -72,7 +197,7 @@
                derived this field (#215). -->
           <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE"
                                   Classes.invalid="{Binding NewBrigadeError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBox x:Name="BrigadeBox" Width="160"
+            <TextBox x:Name="BrigadeBox"
                      IsEnabled="{Binding !IsVehicleSelected}"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
                      Text="{Binding NewBrigade}">
@@ -86,7 +211,7 @@
                Kraft is a Fahrzeug from den Stammdaten oder eine Wache samt Funkrufname. -->
           <HeaderedContentControl Classes="field" Header="FUNKRUFNAME"
                                   Classes.invalid="{Binding NewCallSignError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBox x:Name="CallSignBox" Width="140"
+            <TextBox x:Name="CallSignBox"
                      IsEnabled="{Binding !IsVehicleSelected}"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                      Text="{Binding NewCallSign}">
@@ -111,18 +236,18 @@
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="DAVON AGT"
                                   Classes.invalid="{Binding NewScbaCountError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBox x:Name="ScbaBox" Width="90"
+            <TextBox x:Name="ScbaBox"
                      Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="STATUS">
-            <ComboBox x:Name="StatusBox" Width="140"
+            <ComboBox x:Name="StatusBox"
                       ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding NewStatus}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="BEMERKUNG">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="NotesBox" Width="170" Text="{Binding NewNotes}" />
+            <TextBox x:Name="NotesBox" Text="{Binding NewNotes}" />
           </HeaderedContentControl>
-          <Button x:Name="AddForceButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
+          <Button x:Name="AddForceButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddForceCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </StackPanel>
         <!-- Was noch fehlt (#412), auf einer eigenen Zeile wie der Hinweis darunter: unter den
@@ -140,9 +265,11 @@
                    TextWrapping="Wrap"
                    IsVisible="{Binding IsDuplicateCallSign}" />
       </StackPanel>
+      </ScrollViewer>
     </Border>
 
-    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+    <Panel>
+    <Border x:Name="ForcesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <DataGrid x:Name="ForcesGrid" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
@@ -267,5 +394,57 @@
         </DataGrid.Columns>
       </DataGrid>
     </Border>
+
+    <!-- The narrow layout: the same units, read as cards. The Funkrufname leads because that is
+         what a Kommandant calls over the radio; Status and Bemerkung stay live controls, because
+         both move while the Einsatz runs. -->
+    <Border x:Name="ForcesCardPanel" Classes="narrow-only"
+            Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="ForcesCards" ItemsSource="{Binding Forces}" Margin="8">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ForceRow">
+              <Border Classes="row-card">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Classes="mono" FontSize="14" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Text="{Binding CallSign}" />
+                    <Button Grid.Column="1" Classes="icon-btn card-action"
+                            IsVisible="{Binding !IsReadOnly}"
+                            Command="{Binding RemoveCommand}"
+                            ToolTip.Tip="Einheit entfernen" AutomationProperties.Name="Einheit entfernen">
+                      <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </Button>
+                  </Grid>
+                  <TextBlock Classes="secondary" FontSize="13" TextWrapping="Wrap" Text="{Binding Brigade}" />
+                  <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock Text="STÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding StrengthPrefixText}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" TextDecorations="Underline"
+                                 VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding ScbaCount}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <ComboBox HorizontalAlignment="Stretch"
+                            ItemsSource="{Binding StatusOptions}"
+                            SelectedItem="{Binding Status}"
+                            IsEnabled="{Binding !IsReadOnly}" />
+                  <!-- Freitext: kein Platzhalter, siehe #137; LostFocus for the same reason as the
+                       grid's column — a commit per keystroke rewrites the Einsatzdatei (#33). -->
+                  <TextBox Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                           IsEnabled="{Binding !IsReadOnly}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+    </Panel>
   </DockPanel>
 </UserControl>

@@ -7,69 +7,181 @@
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.EtbView"
              x:DataType="vm:EtbViewModel">
+  <!-- The narrow layout, keyed off the workspace's container (declared on IncidentWorkspaceView's
+       root Panel — a query resolves its container by name anywhere below it, so a module view
+       states its own phone rules without the shell knowing anything about them).
+
+       Every field width lives in a Style here rather than as Width="…" on the control, because a
+       local value in XAML outranks a Style setter and the query below could never widen it. The
+       one dock serves both layouts: the query turns its row of fixed-width fields into a stack of
+       full-width ones. -->
+  <UserControl.Styles>
+    <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
+         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
+         a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
+         and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Style Selector="StackPanel#EditFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Style Selector="ComboBox#DirectionBox">
+      <Setter Property="Width" Value="130" />
+    </Style>
+    <Style Selector="AutoCompleteBox#FromBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <Style Selector="AutoCompleteBox#ToBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <Style Selector="TextBox#EtbTextBox">
+      <Setter Property="Width" Value="320" />
+    </Style>
+    <Style Selector="TextBox#EditTextBox">
+      <Setter Property="Width" Value="420" />
+    </Style>
+
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <Style Selector="StackPanel#EditFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <!-- The bottom bar already says ETB; the heading would only cost the checkbox its width. -->
+      <Style Selector="TextBlock#EtbTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+
+      <!-- Seven columns budgeted for an ELW monitor cannot be made to fit 412dp, so the phone
+           reads the same rows as cards instead. -->
+      <Style Selector="Border#EtbGridPanel">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#EtbCardPanel">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+
+      <!-- The dock stacks. -->
+      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
+           leaves it the width of its longest entry. -->
+      <Style Selector="ComboBox#DirectionBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="AutoCompleteBox#FromBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="AutoCompleteBox#ToBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#EtbTextBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#EditTextBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="HeaderedContentControl.field">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+      </Style>
+      <Style Selector="Button.dock-action">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      </Style>
+    </ContainerQuery>
+  </UserControl.Styles>
+
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" Text="EINSATZTAGEBUCH" Classes="overline" VerticalAlignment="Top" />
+      <TextBlock Grid.Column="0" x:Name="EtbTitle" Text="EINSATZTAGEBUCH" Classes="overline" VerticalAlignment="Top" />
       <CheckBox Grid.Column="1" x:Name="HideSystemCheckBox"
                 Content="Systemmeldungen ausblenden"
                 IsChecked="{Binding HideSystemEntries}" />
     </Grid>
 
+    <!-- The phone's way in to the dock. Full width and at the bottom edge of the list, where the
+         thumb already is; on a wide window the dock is simply always open and this never shows. -->
+    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="+ NEUER EINTRAG"
+            IsVisible="{Binding ShowComposerButton}"
+            Command="{Binding OpenComposerCommand}" />
+
     <!-- Input dock -->
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            IsVisible="{Binding ShowComposer}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
-      <StackPanel Spacing="6">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <HeaderedContentControl Classes="field" Header="RICHTUNG">
-            <ComboBox x:Name="DirectionBox" Width="130"
-                      ItemsSource="{Binding DirectionOptions}"
-                      SelectedValue="{Binding NewDirection}"
-                      SelectedValueBinding="{Binding Value}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:EtbDirectionOption">
-                  <TextBlock Text="{Binding Label}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-          </HeaderedContentControl>
-          <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
-               a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
-               ComboBox, mirroring ForcesView's Brigade field. -->
-          <HeaderedContentControl Classes="field suggest" Header="VON">
-            <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                             ItemsSource="{Binding CallSignOptions}"
-                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
-          </HeaderedContentControl>
-          <HeaderedContentControl Classes="field suggest" Header="AN">
-            <AutoCompleteBox Width="150" PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
-                             ItemsSource="{Binding CallSignOptions}"
-                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
-          </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="EINTRAG"
-                                    Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="EtbTextBox" Width="320" Text="{Binding NewText}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
-          </HeaderedContentControl>
-          <Button x:Name="EtbAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}"
-                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
-          <Button x:Name="EtbAddAndTaskButton" Classes="ghost" Content="HINZUFÜGEN &amp; AUFGABE"
-                  Command="{Binding AddEntryAndCreateTaskCommand}"
-                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+      <!-- Scrolls so a focused field can still be reached once Android's AdjustResize has taken
+           the bottom half of the window for the soft keyboard. On a wide window the dock is one
+           row tall and the scrollbar never appears. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="6">
+          <!-- Only the phone's sheet needs a way back out; the wide dock is never in the way. -->
+          <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,4"
+                IsVisible="{Binding IsNarrow}">
+            <TextBlock Grid.Column="0" Text="NEUER EINTRAG" Classes="overline" VerticalAlignment="Center" />
+            <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                    AutomationProperties.Name="Eingabe schließen"
+                    ToolTip.Tip="Eingabe schließen"
+                    Command="{Binding CloseComposerCommand}">
+              <PathIcon Width="13" Height="13"
+                        Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+            </Button>
+          </Grid>
+          <StackPanel x:Name="DockFields" Spacing="8">
+            <HeaderedContentControl Classes="field" Header="RICHTUNG">
+              <ComboBox x:Name="DirectionBox"
+                        ItemsSource="{Binding DirectionOptions}"
+                        SelectedValue="{Binding NewDirection}"
+                        SelectedValueBinding="{Binding Value}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EtbDirectionOption">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </HeaderedContentControl>
+            <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
+                 a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
+                 ComboBox, mirroring ForcesView's Brigade field. -->
+            <HeaderedContentControl Classes="field suggest" Header="VON">
+              <AutoCompleteBox x:Name="FromBox" PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                               ItemsSource="{Binding CallSignOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field suggest" Header="AN">
+              <AutoCompleteBox x:Name="ToBox" PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
+                               ItemsSource="{Binding CallSignOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="EINTRAG"
+                                      Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <!-- Freitext: kein Platzhalter, siehe #137 -->
+              <TextBox x:Name="EtbTextBox" Text="{Binding NewText}">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </HeaderedContentControl>
+            <Button x:Name="EtbAddButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}"
+                    VerticalAlignment="Bottom" Margin="0,0,0,1" />
+            <Button x:Name="EtbAddAndTaskButton" Classes="ghost dock-action" Content="HINZUFÜGEN &amp; AUFGABE"
+                    Command="{Binding AddEntryAndCreateTaskCommand}"
+                    VerticalAlignment="Bottom" Margin="0,0,0,1" />
+          </StackPanel>
+          <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
+               selbst dieses so breit machen wuerde wie ihren Text und den Knopf aus dem
+               Fenster schoebe. Die Felder sagen welche, diese Zeile sagt was. -->
+          <TextBlock x:Name="DockErrorSummary" Classes="field-error"
+                     Text="{Binding ErrorSummary}"
+                     IsVisible="{Binding ErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
-        <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
-             selbst dieses so breit machen wuerde wie ihren Text und den Knopf aus dem
-             Fenster schoebe. Die Felder sagen welche, diese Zeile sagt was. -->
-        <TextBlock x:Name="DockErrorSummary" Classes="field-error"
-                   Text="{Binding ErrorSummary}"
-                   IsVisible="{Binding ErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
-      </StackPanel>
+      </ScrollViewer>
     </Border>
 
     <!-- Edit panel: a small form below the grid, mirroring the input dock's visual language, shown
@@ -79,19 +191,19 @@
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}">
       <StackPanel Spacing="6">
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <StackPanel x:Name="EditFields" Spacing="8">
           <HeaderedContentControl Classes="field" Header="EINTRAG"
                                     Classes.invalid="{Binding EditTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="EditTextBox" Width="420" Text="{Binding EditText}">
+            <TextBox x:Name="EditTextBox" Text="{Binding EditText}">
               <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
               </TextBox.KeyBindings>
             </TextBox>
           </HeaderedContentControl>
-          <Button x:Name="SaveEditButton" Classes="signal" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
+          <Button x:Name="SaveEditButton" Classes="signal dock-action" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-          <Button x:Name="CancelEditButton" Content="ABBRECHEN" Command="{Binding CancelEditCommand}"
+          <Button x:Name="CancelEditButton" Classes="dock-action" Content="ABBRECHEN" Command="{Binding CancelEditCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </StackPanel>
         <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
@@ -124,7 +236,7 @@
                    over the panel's #0F141D lands at roughly 1,9:1 against WCAG AA's 4,5:1. These
                    rows are the audit trail this panel exists for: the previous wording, who
                    rewrote it and when. Same fix as the Übergabe heading in #436. -->
-              <TextBlock Classes="mono" Margin="0,2">
+              <TextBlock Classes="mono" Margin="0,2" TextWrapping="Wrap">
                 <TextBlock.Text>
                   <MultiBinding StringFormat="{}{0}: „{1}“ ({2})">
                     <Binding Path="EditedAt" />
@@ -139,55 +251,117 @@
       </StackPanel>
     </Border>
 
-    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
-            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="EtbGrid" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
-        <DataGrid.Columns>
-          <DataGridTextColumn Header="ZEIT" Binding="{Binding Time}" />
-          <DataGridTextColumn Header="RICHTUNG" Binding="{Binding Direction}" />
-          <DataGridTextColumn Header="VON" Binding="{Binding From}" />
-          <DataGridTextColumn Header="AN" Binding="{Binding To}" />
-          <DataGridTemplateColumn Header="EINTRAG" Width="*">
-            <DataGridTemplateColumn.CellTemplate>
+    <!-- The wide layout: one row per entry, every column at once. -->
+    <Panel>
+      <Border x:Name="EtbGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+        <DataGrid x:Name="EtbGrid" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="ZEIT" Binding="{Binding Time}" />
+            <DataGridTextColumn Header="RICHTUNG" Binding="{Binding Direction}" />
+            <DataGridTextColumn Header="VON" Binding="{Binding From}" />
+            <DataGridTextColumn Header="AN" Binding="{Binding To}" />
+            <DataGridTemplateColumn Header="EINTRAG" Width="*">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="vm:EtbEntryRow">
+                  <TextBlock Text="{Binding Text}" VerticalAlignment="Center" Margin="6,4" />
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="ERFASST VON" Binding="{Binding EnteredBy}" />
+            <DataGridTemplateColumn Header="">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="vm:EtbEntryRow">
+                  <StackPanel Orientation="Horizontal" Spacing="2" Margin="6,4">
+                    <Button Classes="icon-btn" Command="{Binding BeginEditCommand}"
+                            IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten"
+                            AutomationProperties.Name="Bearbeiten">
+                      <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                    </Button>
+                    <!-- Not gated on IsEditable/IsReadOnly like the edit button: history must stay
+                         readable even for a System entry's neighbours or a closed incident. Its
+                         amber tint is the row's only "was edited" marker: it only shows up here,
+                         so a separate badge in the EINTRAG column would just repeat the same fact. -->
+                    <Button Classes="icon-btn" Command="{Binding ShowHistoryCommand}"
+                            IsVisible="{Binding WasEdited}" ToolTip.Tip="Verlauf (bearbeitet)"
+                            AutomationProperties.Name="Verlauf (bearbeitet)">
+                      <PathIcon Foreground="{StaticResource AmberBrush}"
+                                Data="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.92 6.92 0 0 1-4.95-2.05l-1.41 1.41A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z" />
+                    </Button>
+                    <!-- Reopens the same overlay #88 wired to the input dock's "HINZUFÜGEN & AUFGABE"
+                         button, the one thing that flow left no way back to once an entry was saved
+                         (#247). Hidden entirely (not just disabled), like the host feature gate. -->
+                    <Button Classes="icon-btn" Command="{Binding CreateTaskCommand}"
+                            IsVisible="{Binding CanCreateTask}" ToolTip.Tip="Aufgabe erstellen"
+                            AutomationProperties.Name="Aufgabe erstellen">
+                      <PathIcon Data="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                    </Button>
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Border>
+
+      <!-- The narrow layout: the same rows, read as cards. The time leads because it is what the
+           Lagebuchführer scans for; the Eintrag is the body and wraps in full, because an entry
+           trimmed to an ellipsis is an entry nobody can check against what was reported. -->
+      <Border x:Name="EtbCardPanel" Classes="narrow-only"
+              Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+              CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsControl x:Name="EtbCards" ItemsSource="{Binding Entries}" Margin="8">
+            <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:EtbEntryRow">
-                <TextBlock Text="{Binding Text}" VerticalAlignment="Center" Margin="6,4" />
+                <Border Classes="row-card">
+                  <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Classes="mono" FontSize="13"
+                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                 Text="{Binding Time}" />
+                      <TextBlock Grid.Column="1" Classes="overline" VerticalAlignment="Center"
+                                 Text="{Binding Direction}" />
+                    </Grid>
+                    <TextBlock Classes="secondary" FontSize="13" TextWrapping="Wrap">
+                      <TextBlock.Text>
+                        <MultiBinding StringFormat="{}{0} → {1}">
+                          <Binding Path="From" />
+                          <Binding Path="To" />
+                        </MultiBinding>
+                      </TextBlock.Text>
+                    </TextBlock>
+                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextPrimaryBrush}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Classes="mono" FontSize="11" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" Text="{Binding EnteredBy}" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                        <Button Classes="icon-btn card-action" Command="{Binding BeginEditCommand}"
+                                IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten"
+                                AutomationProperties.Name="Bearbeiten">
+                          <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                        </Button>
+                        <Button Classes="icon-btn card-action" Command="{Binding ShowHistoryCommand}"
+                                IsVisible="{Binding WasEdited}" ToolTip.Tip="Verlauf (bearbeitet)"
+                                AutomationProperties.Name="Verlauf (bearbeitet)">
+                          <PathIcon Foreground="{StaticResource AmberBrush}"
+                                    Data="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.92 6.92 0 0 1-4.95-2.05l-1.41 1.41A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z" />
+                        </Button>
+                        <Button Classes="icon-btn card-action" Command="{Binding CreateTaskCommand}"
+                                IsVisible="{Binding CanCreateTask}" ToolTip.Tip="Aufgabe erstellen"
+                                AutomationProperties.Name="Aufgabe erstellen">
+                          <PathIcon Data="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                        </Button>
+                      </StackPanel>
+                    </Grid>
+                  </StackPanel>
+                </Border>
               </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTextColumn Header="ERFASST VON" Binding="{Binding EnteredBy}" />
-          <DataGridTemplateColumn Header="">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate x:DataType="vm:EtbEntryRow">
-                <StackPanel Orientation="Horizontal" Spacing="2" Margin="6,4">
-                  <Button Classes="icon-btn" Command="{Binding BeginEditCommand}"
-                          IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten"
-                          AutomationProperties.Name="Bearbeiten">
-                    <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                  </Button>
-                  <!-- Not gated on IsEditable/IsReadOnly like the edit button: history must stay
-                       readable even for a System entry's neighbours or a closed incident. Its
-                       amber tint is the row's only "was edited" marker: it only shows up here,
-                       so a separate badge in the EINTRAG column would just repeat the same fact. -->
-                  <Button Classes="icon-btn" Command="{Binding ShowHistoryCommand}"
-                          IsVisible="{Binding WasEdited}" ToolTip.Tip="Verlauf (bearbeitet)"
-                          AutomationProperties.Name="Verlauf (bearbeitet)">
-                    <PathIcon Foreground="{StaticResource AmberBrush}"
-                              Data="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7 6.92 6.92 0 0 1-4.95-2.05l-1.41 1.41A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z" />
-                  </Button>
-                  <!-- Reopens the same overlay #88 wired to the input dock's "HINZUFÜGEN & AUFGABE"
-                       button, the one thing that flow left no way back to once an entry was saved
-                       (#247). Hidden entirely (not just disabled), like the host feature gate. -->
-                  <Button Classes="icon-btn" Command="{Binding CreateTaskCommand}"
-                          IsVisible="{Binding CanCreateTask}" ToolTip.Tip="Aufgabe erstellen"
-                          AutomationProperties.Name="Aufgabe erstellen">
-                    <PathIcon Data="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-                  </Button>
-                </StackPanel>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-        </DataGrid.Columns>
-      </DataGrid>
-    </Border>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Border>
+    </Panel>
   </DockPanel>
 </UserControl>

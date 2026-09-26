@@ -52,6 +52,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private object? _currentView;
 
+    /// <summary>
+    /// Whether the shell is laid out for a phone. The command bar is a single fixed row of six
+    /// actions, which overflows a 411dp viewport by 227px and puts NEUER EINSATZ off the right edge
+    /// (CommandBarReachabilityTests); below the breakpoint it keeps one action and folds the rest
+    /// into an overflow flyout. The shell's code-behind sets this from the actual width — the
+    /// workspace has its own copy, because the two are separate view models.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isNarrow;
+
     // #304 P0 finding: every navigate-away path funnels through this setter, so disposing the
     // outgoing workspace here (rather than duplicating a Dispose() call at each call site) is what
     // guarantees it happens exactly once, wherever CurrentView moves on to next -- Home via GoHome

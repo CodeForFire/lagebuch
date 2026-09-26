@@ -7,6 +7,14 @@
              x:Class="LageBuch.App.Shared.Views.TasksView"
              x:DataType="vm:TasksViewModel">
   <UserControl.Styles>
+    <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
+         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
+         a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
+         and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
     <Style Selector="TextBlock.prio-high">
       <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -21,10 +29,69 @@
       <Setter Property="Foreground" Value="{StaticResource SignalBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+
+    <!-- Wide defaults as Styles, not Width= on the controls: a local value in XAML outranks a
+         Style setter, so the narrow query below could never widen them. -->
+    <Style Selector="ComboBox#ImportanceBox">
+      <Setter Property="Width" Value="110" />
+    </Style>
+    <Style Selector="ComboBox#UrgencyBox">
+      <Setter Property="Width" Value="130" />
+    </Style>
+    <Style Selector="AutoCompleteBox#AssigneeBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <Style Selector="TextBox#TimerBox">
+      <Setter Property="Width" Value="70" />
+    </Style>
+    <Style Selector="TextBox#TaskNewTextBox">
+      <Setter Property="Width" Value="320" />
+    </Style>
+
+    <!-- The narrow layout, keyed off the workspace's container. -->
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <!-- The bottom bar already says AUFGABEN; the heading would only cost the filters room. -->
+      <Style Selector="TextBlock#TasksTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#TasksGridPanel">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#TasksCardPanel">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
+           leaves it the width of its longest entry. -->
+      <Style Selector="ComboBox#ImportanceBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="ComboBox#UrgencyBox">
+        <Setter Property="Width" Value="356" />
+      </Style>
+      <Style Selector="AutoCompleteBox#AssigneeBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#TimerBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#TaskNewTextBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="HeaderedContentControl.field">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+      </Style>
+      <Style Selector="Button.dock-action">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      </Style>
+    </ContainerQuery>
   </UserControl.Styles>
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" Text="AUFGABEN" Classes="overline" VerticalAlignment="Top" />
+      <TextBlock Grid.Column="0" x:Name="TasksTitle" Text="AUFGABEN" Classes="overline" VerticalAlignment="Top" />
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
         <RadioButton x:Name="TaskFilterOpen" GroupName="taskFilter" Content="OFFEN"
                      IsChecked="{Binding IsOpenFilter, Mode=TwoWay}" Margin="0,0,4,0" />
@@ -35,14 +102,38 @@
       </StackPanel>
     </Grid>
 
+    <!-- The phone's way in to the dock, at the bottom edge where the thumb already is. -->
+    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="+ NEUE AUFGABE"
+            IsVisible="{Binding ShowComposerButton}"
+            Command="{Binding OpenComposerCommand}" />
+
     <!-- Input dock -->
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            IsVisible="{Binding ShowComposer}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
+           bottom of the window to the soft keyboard. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="6">
-        <StackPanel Orientation="Horizontal" Spacing="12">
+        <!-- Only the phone's form needs a way back out; the wide dock is never in the way. -->
+        <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,4"
+              IsVisible="{Binding IsNarrow}">
+          <TextBlock Grid.Column="0" Text="NEUE AUFGABE" Classes="overline" VerticalAlignment="Center" />
+          <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                  AutomationProperties.Name="Eingabe schließen"
+                  ToolTip.Tip="Eingabe schließen"
+                  Command="{Binding CloseComposerCommand}">
+            <PathIcon Width="13" Height="13"
+                      Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+          </Button>
+        </Grid>
+        <StackPanel x:Name="DockFields" Spacing="12">
           <HeaderedContentControl Classes="field" Header="WICHTIGKEIT">
-            <ComboBox Width="110" ItemsSource="{Binding ImportanceOptions}"
+            <ComboBox x:Name="ImportanceBox" ItemsSource="{Binding ImportanceOptions}"
                       SelectedValue="{Binding NewImportance}" SelectedValueBinding="{Binding Value}">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:ImportanceOption">
@@ -52,7 +143,7 @@
             </ComboBox>
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="DRINGLICHKEIT">
-            <ComboBox Width="130" ItemsSource="{Binding UrgencyOptions}"
+            <ComboBox x:Name="UrgencyBox" ItemsSource="{Binding UrgencyOptions}"
                       SelectedValue="{Binding NewUrgency}" SelectedValueBinding="{Binding Value}">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:UrgencyOption">
@@ -62,14 +153,14 @@
             </ComboBox>
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest" Header="ZUGETEILT">
-            <AutoCompleteBox Width="150" ItemsSource="{Binding AssigneeOptions}"
+            <AutoCompleteBox x:Name="AssigneeBox" ItemsSource="{Binding AssigneeOptions}"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                              Text="{Binding NewAssignee}" b:EnterSubmit.Command="{Binding AddTaskCommand}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="TIMER (MIN)"
                                     Classes.invalid="{Binding NewTimerMinutesError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBox Width="70" Text="{Binding NewTimerMinutes}" b:IntegerOnly.IsEnabled="True"
+            <TextBox x:Name="TimerBox" Text="{Binding NewTimerMinutes}" b:IntegerOnly.IsEnabled="True"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}">
               <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
@@ -79,13 +170,13 @@
           <HeaderedContentControl Classes="field" Header="AUFGABE"
                                     Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="TaskNewTextBox" Width="320" Text="{Binding NewText}">
+            <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}">
               <TextBox.KeyBindings>
                 <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
               </TextBox.KeyBindings>
             </TextBox>
           </HeaderedContentControl>
-          <Button x:Name="TaskAddButton" Classes="signal" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}"
+          <Button x:Name="TaskAddButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
         </StackPanel>
         <!-- Was noch fehlt (#412): eine eigene Zeile, weil eine Meldung unter dem Feld
@@ -95,9 +186,11 @@
                    Text="{Binding ErrorSummary}"
                    IsVisible="{Binding ErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
+      </ScrollViewer>
     </Border>
 
-    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+    <Panel>
+    <Border x:Name="TasksGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <DataGrid x:Name="TasksGrid" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
                 IsReadOnly="{Binding IsReadOnly}" CanUserSortColumns="False">
@@ -147,5 +240,49 @@
         </DataGrid.Columns>
       </DataGrid>
     </Border>
+
+    <!-- The narrow layout: one card per task. The tick is a real touch target on the left, the
+         task text is the body, and Wichtigkeit/Dringlichkeit/Timer keep the colours they carry in
+         the grid — an overdue timer has to stay signal red wherever it is read. -->
+    <Border x:Name="TasksCardPanel" Classes="narrow-only"
+            Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="TasksCards" ItemsSource="{Binding Rows}" Margin="8">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TaskRow">
+              <Border Classes="row-card">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                  <CheckBox Grid.Column="0" VerticalAlignment="Top" MinWidth="0"
+                            IsChecked="{Binding IsDone, Mode=TwoWay}"
+                            AutomationProperties.Name="Aufgabe erledigt" />
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextPrimaryBrush}" />
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2">
+                      <TextBlock Text="{Binding ImportanceLabel}"
+                                 Classes.prio-high="{Binding IsImportanceHigh}"
+                                 Classes.prio-medium="{Binding IsImportanceMedium}"
+                                 Classes.prio-low="{Binding IsImportanceLow}" />
+                      <TextBlock Text="{Binding UrgencyLabel}"
+                                 Classes.prio-high="{Binding IsUrgencyHigh}"
+                                 Classes.prio-medium="{Binding IsUrgencyMedium}"
+                                 Classes.prio-low="{Binding IsUrgencyLow}" />
+                      <TextBlock Text="{Binding RemainingDisplay}" Classes.due="{Binding IsOverdue}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding Assignee}" Classes="secondary" FontSize="13"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding CreatedDisplay}" Classes="overline" FontSize="9"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+    </Panel>
   </DockPanel>
 </UserControl>
