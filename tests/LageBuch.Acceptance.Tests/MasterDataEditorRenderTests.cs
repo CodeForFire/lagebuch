@@ -18,7 +18,7 @@ public class MasterDataEditorRenderTests
     {
         public MasterDataSet Get() => MasterDataSet.Empty with
         {
-            Roles = new[] { "EL", "EAL", "ZF", "GF" },
+            Roles = new[] { new Role("EL"), new Role("EAL"), new Role("ZF"), new Role("GF") },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
             TruppTypes = new[]
             {

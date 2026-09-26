@@ -38,7 +38,7 @@ public class MasterDataStoreTests : IDisposable
     {
         var set = MasterDataSet.Empty with
         {
-            Roles = new[] { "EL", "ZF" },
+            Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert" },
             ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
                 new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
@@ -61,7 +61,7 @@ public class MasterDataStoreTests : IDisposable
         MasterDataStore.Save(_path, set);
 
         var reopened = MasterDataStore.GetOrCreate(_path);
-        Assert.Equal(new[] { "EL", "ZF" }, reopened.Roles);
+        Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, reopened.Roles);
         Assert.Equal(
             new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
             reopened.ChecklistTemplates[0].Items);
@@ -133,7 +133,7 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
     }
 
-    // Unlike md_personnel's other optional columns, these two really are absent from every store a
+// Unlike md_personnel's other optional columns, these two really are absent from every store a
     // released build wrote: without the AddColumnIfMissing lines, opening one fails with
     // "no such column: email" and takes the whole roster with it.
     [Fact]
@@ -158,6 +158,44 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal("0171", person.Phone);
         Assert.Null(person.Email);
         Assert.Null(person.Note);
+    }
+
+    // A brigade upgrading has an md_roles that predates #470: one column, no uniqueness. It must
+    // open, keep every row, and report them all as Multiple -- this is the path that must never
+    // refuse to open, so it is worth a hand-built pre-change database rather than a save/round trip.
+    [Fact]
+    public void A_store_predating_the_uniqueness_column_opens_with_every_funktion_as_multiple()
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_roles (value TEXT NOT NULL);
+                INSERT INTO md_roles (value) VALUES ('EL'), ('ZF');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, set.Roles);
+    }
+
+    [Fact]
+    public void Every_uniqueness_mode_survives_the_sqlite_round_trip()
+    {
+        var roles = new[]
+        {
+            new Role("EL", RoleUniqueness.UniquePerIncident),
+            new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection),
+            new Role("ZF"),
+        };
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = roles });
+
+        Assert.Equal(roles, MasterDataStore.GetOrCreate(_path).Roles);
     }
 
     [Fact]
@@ -354,11 +392,11 @@ public class MasterDataStoreTests : IDisposable
     [Fact]
     public void A_value_deleted_through_Save_stays_deleted()
     {
-        MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { "EL", "ZF" } });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { new Role("EL"), new Role("ZF") } });
 
-        MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { "ZF" } });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Roles = new[] { new Role("ZF") } });
 
-        Assert.DoesNotContain("EL", MasterDataStore.GetOrCreate(_path).Roles);
+        Assert.DoesNotContain(MasterDataStore.GetOrCreate(_path).Roles, r => r.Name == "EL");
     }
 
     [Fact]

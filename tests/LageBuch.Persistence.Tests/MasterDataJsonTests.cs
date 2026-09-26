@@ -24,7 +24,7 @@ public class MasterDataJsonTests
             }
             """);
 
-        Assert.Equal(new[] { "EL", "ZF" }, set.Roles);
+        Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
         Assert.Equal(new TruppType("Angriffstrupp", 2, 30), Assert.Single(set.TruppTypes));
         Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplates[0].Items));
@@ -62,7 +62,7 @@ public class MasterDataJsonTests
     public void Parse_treats_missing_keys_as_empty_categories()
     {
         var set = Parse("""{ "roles": ["EL"] }""");
-        Assert.Equal(new[] { "EL" }, set.Roles);
+        Assert.Equal(new[] { new Role("EL") }, set.Roles);
         Assert.Empty(set.UnitStatus);
         Assert.Empty(set.Links);
         Assert.Empty(set.Personnel);
@@ -95,7 +95,7 @@ public class MasterDataJsonTests
     {
         var original = MasterDataSet.Empty with
         {
-            Roles = new[] { "EL", "ZF" },
+            Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
             Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä") },
 
@@ -485,7 +485,7 @@ public class MasterDataJsonTests
 
         // Settings always carry values, so they must not count toward emptiness (else Import hides).
         Assert.True((MasterDataSet.Empty with { Settings = new IncidentSettings(1, 2, 3) }).IsEmpty);
-        Assert.False((MasterDataSet.Empty with { Roles = new[] { "EL" } }).IsEmpty);
+        Assert.False((MasterDataSet.Empty with { Roles = new[] { new Role("EL") } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Links = new[] { new Link("N", "U") } }).IsEmpty);
     }
@@ -548,5 +548,100 @@ public class MasterDataJsonTests
         Assert.Null(person.Note);
         Assert.False(person.HasEmail);
         Assert.False(person.HasNote);
+    }
+
+    // #470: a Funktion carries how often it may be held. The object form is what a current file
+    // holds; the bare string is what every file written before #470 holds, and must keep working.
+    [Fact]
+    public void Parse_reads_a_bare_funktions_name_as_multiple()
+    {
+        var set = Parse("""{ "roles": ["EL", "ZF"] }""");
+
+        Assert.Equal(new Role("EL"), Assert.Single(set.Roles, r => r.Name == "EL"));
+        Assert.Equal(RoleUniqueness.Multiple, set.Roles[0].Uniqueness);
+    }
+
+    [Fact]
+    public void Parse_reads_the_uniqueness_mode_off_a_funktions_object()
+    {
+        var set = Parse("""
+            {
+              "roles": [
+                { "name": "EL", "uniqueness": "uniquePerIncident" },
+                { "name": "Abschnittsleiter", "uniqueness": "uniquePerSection" },
+                { "name": "ZF" }
+              ]
+            }
+            """);
+
+        Assert.Equal(
+            new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection),
+                new Role("ZF", RoleUniqueness.Multiple),
+            },
+            set.Roles);
+    }
+
+    // A file crosses a trust boundary and HomeViewModel catches only the JSON exception types
+    // around this parse, so an unrecognised mode must degrade rather than throw -- the same
+    // reasoning as TruppType.ClampMemberCount.
+    [Theory]
+    [InlineData("nonsense")]
+    [InlineData("")]
+    [InlineData("1")]
+    public void Parse_falls_back_to_multiple_for_an_unusable_uniqueness_mode(string mode)
+    {
+        var set = Parse($$"""{ "roles": [{ "name": "EL", "uniqueness": "{{mode}}" }] }""");
+
+        Assert.Equal(RoleUniqueness.Multiple, Assert.Single(set.Roles).Uniqueness);
+    }
+
+    [Fact]
+    public void Parse_defaults_a_missing_uniqueness_mode_to_multiple()
+    {
+        var set = Parse("""{ "roles": [{ "name": "EL" }] }""");
+
+        Assert.Equal(new Role("EL"), Assert.Single(set.Roles));
+    }
+
+    // The positive shape assertion no test made before: the exporter always writes the object,
+    // so a current file never carries a bare string -- which is what makes the bare-string branch
+    // above a legacy path rather than a second live format.
+    [Fact]
+    public void Serialize_writes_every_funktion_as_an_object()
+    {
+        var json = MasterDataJson.Serialize(MasterDataSet.Empty with
+        {
+            Roles = new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("ZF"),
+            },
+        });
+
+        using var doc = JsonDocument.Parse(json);
+        var roles = doc.RootElement.GetProperty("roles");
+        Assert.Equal(JsonValueKind.Object, roles[0].ValueKind);
+        Assert.Equal("EL", roles[0].GetProperty("name").GetString());
+        Assert.Equal("uniquePerIncident", roles[0].GetProperty("uniqueness").GetString());
+        Assert.Equal("multiple", roles[1].GetProperty("uniqueness").GetString());
+    }
+
+    [Fact]
+    public void Round_trip_preserves_every_uniqueness_mode()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            Roles = new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection),
+                new Role("ZF"),
+            },
+        };
+
+        Assert.Equal(original.Roles, Parse(MasterDataJson.Serialize(original)).Roles);
     }
 }

@@ -39,7 +39,7 @@ public class RolesTabRenderTests
 
     private static MasterDataSet MasterData() => MasterDataSet.Empty with
     {
-        Roles = new[] { AnonymizedExampleData.RoleExample, "ZF" },
+        Roles = new[] { new Role(AnonymizedExampleData.RoleExample), new Role("ZF") },
         Vehicles = AnonymizedExampleData.Vehicles,
     };
 

@@ -17,7 +17,7 @@ public class RolesPhoneFocusTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        Roles = new[] { "EL" },
+        Roles = new[] { new Role("EL") },
     };
 
     private static RolesViewModel BuildRolesVm(out LocalIncidentSession session)

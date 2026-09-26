@@ -201,7 +201,7 @@ public class WorkspaceAcceptanceTests
 
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        Roles = new[] { "EL" },
+        Roles = new[] { new Role("EL") },
         ChecklistTemplates = ChecklistTemplate.AufbauAbbau(new[] { new ChecklistTemplateItem("Blaulicht aus?", false) }, null),
         TruppTypes = new[] { new TruppType("Angriffstrupp") },
         Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), new Vehicle("Aich", "Aich 42/1", 6) },

@@ -17,7 +17,7 @@ public class OpenDropDownOnFocusTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        Roles = new[] { "EL", "GF" },
+        Roles = new[] { new Role("EL"), new Role("GF") },
     };
 
     private static RolesViewModel BuildRolesVm()

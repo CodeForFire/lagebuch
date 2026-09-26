@@ -10,7 +10,7 @@ public class RolesViewModelTests
 
     private static MasterDataSet Md(params Person[] personnel) => MasterDataSet.Empty with
     {
-        Roles = new[] { "EL", "ZF" },
+        Roles = new[] { new Role("EL"), new Role("ZF") },
         Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 12/1", 4) },
         Personnel = personnel,
     };

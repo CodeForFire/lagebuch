@@ -113,7 +113,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
         _onChanged = onChanged;
         _personnel = masterData.Personnel;
         IsReadOnly = session.IsReadOnly;
-        RoleOptions = masterData.Roles;
+        RoleOptions = masterData.Roles.Select(r => r.Name).ToArray();
         CallSignOptions = masterData.RadioCallSigns;
         PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
         Roles = new ObservableCollection<RoleAssignmentRow>();

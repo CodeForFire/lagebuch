@@ -10,7 +10,7 @@ public class MasterDataEditorViewModelTests
     {
         private static readonly MasterDataSet DefaultSet = MasterDataSet.Empty with
         {
-            Roles = new[] { "EL", "ZF" },
+            Roles = new[] { new Role("EL"), new Role("ZF") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67") },
         };
 
@@ -210,7 +210,7 @@ public class MasterDataEditorViewModelTests
 
         Assert.False(vm.IsDirty);
         Assert.Equal(1, provider.SaveCount);
-        Assert.DoesNotContain("EL", provider.Get().Roles);
+        Assert.DoesNotContain(provider.Get().Roles, r => r.Name == "EL");
     }
 
     [Fact]
@@ -324,7 +324,7 @@ public class MasterDataEditorViewModelTests
         vm.SaveCommand.Execute(null);
 
         var set = provider.Get();
-        Assert.Contains("MARK-Rollen", set.Roles);
+        Assert.Contains(set.Roles, r => r.Name == "MARK-Rollen");
         Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
         Assert.Contains(set.TruppTypes, t => t.Name == "MARK-Trupp-Typen" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
         Assert.Contains(set.Vehicles, v => v.Wache == "MARK-Wache" && v.CallSign == "MARK-Funkrufname");
@@ -440,7 +440,7 @@ public class MasterDataEditorViewModelTests
     public async Task Import_populates_the_sections_and_marks_dirty_without_saving()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty);
-        var imported = MasterDataSet.Empty with { Roles = new[] { "EL", "ZF" } };
+        var imported = MasterDataSet.Empty with { Roles = new[] { new Role("EL"), new Role("ZF") } };
         var vm = Vm(
             provider,
             new FakeDialogs { ImportPath = "/import.json" },
@@ -460,7 +460,7 @@ public class MasterDataEditorViewModelTests
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var imported = MasterDataSet.Empty with
         {
-            Roles = new[] { "EL" },
+            Roles = new[] { new Role("EL") },
         };
         var vm = Vm(
             provider,
@@ -471,7 +471,7 @@ public class MasterDataEditorViewModelTests
         vm.SaveCommand.Execute(null);
 
         Assert.Equal(1, provider.SaveCount);
-        Assert.Equal(new[] { "EL" }, provider.Get().Roles);
+        Assert.Equal(new[] { new Role("EL") }, provider.Get().Roles);
     }
 
     [Fact]
@@ -503,7 +503,7 @@ public class MasterDataEditorViewModelTests
         var vm = Vm(
             new InMemoryProvider(MasterDataSet.Empty),
             new FakeDialogs { ImportPath = "/neu.json" },
-            new FakeFileService(read: MasterDataSet.Empty with { Roles = new[] { "EL" } }));
+            new FakeFileService(read: MasterDataSet.Empty with { Roles = new[] { new Role("EL") } }));
 
         await vm.ImportCommand.ExecuteAsync(null);
 
@@ -552,8 +552,8 @@ public class MasterDataEditorViewModelTests
 
         Assert.Equal("/out.json", files.WrittenPath);
         Assert.NotNull(files.Written);
-        Assert.Contains("NEU", files.Written!.Roles);
-        Assert.Contains("EL", files.Written.Roles);
+        Assert.Contains(files.Written!.Roles, r => r.Name == "NEU");
+        Assert.Contains(files.Written.Roles, r => r.Name == "EL");
     }
 
     [Fact]

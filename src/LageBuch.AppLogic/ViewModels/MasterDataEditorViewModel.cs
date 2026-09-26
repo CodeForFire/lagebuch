@@ -199,7 +199,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
         EditorSection[] categories =
         {
-            _roles = new EditableListSection("Rollen", "ROLLE", set.Roles, MarkDirty),
+            _roles = new EditableListSection("Rollen", "ROLLE", set.Roles.Select(r => r.Name).ToArray(), MarkDirty),
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),
@@ -284,7 +284,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     private MasterDataSet BuildSet() => _original with
     {
-        Roles = _roles.ToValues(),
+        Roles = _roles.ToValues().Select(n => new Role(n)).ToArray(),
         UnitStatus = _unitStatus.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),

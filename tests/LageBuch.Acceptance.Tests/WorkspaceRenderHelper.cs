@@ -20,7 +20,7 @@ internal static class WorkspaceRenderHelper
 
     private static MasterDataSet Md() => MasterDataSet.Empty with
     {
-        Roles = new[] { "EL" },
+        Roles = new[] { new Role("EL") },
         ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
             new[]
             {
