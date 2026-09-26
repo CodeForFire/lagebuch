@@ -12,6 +12,11 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>0.0.0</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+    <!-- .NET 9+ defaults to android-arm64;android-x64 only. Many Android tablets (the Galaxy Tab A
+         line among them) run a 32-bit armeabi-v7a userland, and Play lists the app as incompatible
+         for them. Play splits the .aab per ABI, so arm64 devices download no extra bytes; only the
+         universal sideload .apk grows. release.yml fails if one of these ABIs goes missing. -->
+    <RuntimeIdentifiers>android-arm;android-arm64;android-x64</RuntimeIdentifiers>
     <!-- Both formats out of one build. Google Play has not accepted an APK for a new app since
          2021, so the upload is the .aab; the GitHub release keeps its .apk. The SDK builds the
          bundle, then runs bundletool `build-apks` in universal mode over that same signed bundle
