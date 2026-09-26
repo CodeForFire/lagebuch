@@ -79,21 +79,47 @@ public static class StammdatenCatalogue
     {
         ArgumentNullException.ThrowIfNull(catalogue);
 
-        var trimmed = designation?.Trim();
+        return FindByName(designation, catalogue, entry => entry?.Name);
+    }
+
+    /// <summary>
+    /// The Stammdaten row for the Funktion <paramref name="name"/>, or null when the catalogue has
+    /// no such row. Matched the same way as every other lookup here -- trimmed, ignoring case -- so
+    /// "el" finds the row the Stammdaten spell "EL".
+    /// <para>
+    /// It returns the whole row rather than the name because #470 put the Funktion's uniqueness on
+    /// it, and the caller needs the mode to know whether a second holder may be refused. A null is
+    /// not an error: an unlisted Funktion is one the Stammdaten do not describe, it carries no mode,
+    /// so nothing is refused for it -- the tolerance this whole class exists for.
+    /// </para>
+    /// </summary>
+    public static Role? Find(string? name, IReadOnlyList<Role> catalogue)
+    {
+        ArgumentNullException.ThrowIfNull(catalogue);
+
+        return FindByName(name, catalogue, entry => entry?.Name);
+    }
+
+    // One loop for both row lookups, so the trimming, the case-insensitive comparison and the
+    // first-match rule cannot drift apart between them; only the row type differs. A null row or a
+    // null name is tolerated as it always was, which costs nothing next to a mid-Einsatz crash.
+    private static T? FindByName<T>(string? name, IReadOnlyList<T> catalogue, Func<T, string?> nameOf)
+    {
+        var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))
         {
-            return null;
+            return default;
         }
 
         foreach (var entry in catalogue)
         {
-            if (string.Equals(entry?.Name?.Trim(), trimmed, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(nameOf(entry)?.Trim(), trimmed, StringComparison.OrdinalIgnoreCase))
             {
                 return entry;
             }
         }
 
-        return null;
+        return default;
     }
 
     /// <summary>The catalogue's own spelling of <paramref name="trimmed"/>, or null if it has none.</summary>
