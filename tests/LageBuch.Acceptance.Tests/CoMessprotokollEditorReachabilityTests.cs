@@ -20,7 +20,7 @@ namespace LageBuch.Acceptance.Tests;
 //
 // These render deliberately short, which is what the other CO test files do not do
 // (1200x700 and 1920x1032) and why this went unnoticed for so long. 600 is the app's own
-// MinWidth/MinHeight floor (MainWindow.axaml), so it is a size a user can actually produce;
+// MinHeight floor (MainWindow.axaml), so it is a size a user can actually produce;
 // Android, where MinHeight does not apply at all, is worse still.
 public class CoMessprotokollEditorReachabilityTests
 {
