@@ -463,19 +463,21 @@
                        icon-btn buttons (28px, plus each subsequent button's 4px left margin) —
                        "Auto" would size to this Grid's own (empty) content instead of the row
                        template's buttons, leaving the header and row Grids to disagree on width
-                       and dragging SITZPLÄTZE/ZF out of alignment with their columns. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,28,32,32" Margin="0,0,0,6">
+                       and dragging SITZPLÄTZE/ZF/EIGEN out of alignment with their columns. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,70,28,32,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="3" Text="ZF" Classes="overline" FontSize="10"
                                ToolTip.Tip="Zugführerfahrzeug" />
+                    <TextBlock Grid.Column="4" Text="EIGEN" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Eigenes Fahrzeug" />
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
-                          <Grid ColumnDefinitions="*,*,150,70,28,32,32" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,*,150,70,70,28,32,32" Margin="0,0,0,6">
                             <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                  aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
                             <Grid Grid.Column="0" Margin="0,0,6,0">
@@ -505,22 +507,26 @@
                                  Officer/Mannschaft this is not seat-derived, so it needs its own flag. -->
                             <CheckBox Grid.Column="3" IsChecked="{Binding HasZugfuehrer}"
                                       VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Zugführerfahrzeug" />
+                            <!-- Own vehicle or a neighbouring brigade's (#458). -->
+                            <CheckBox Grid.Column="4" IsChecked="{Binding IsOwn}"
+                                      VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Eigenes Fahrzeug"
+                                      AutomationProperties.Name="Eigenes Fahrzeug" />
                             <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
-                            <Button Grid.Column="4" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
+                            <Button Grid.Column="5" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
                                     AutomationProperties.Name="Nach oben"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
                             </Button>
-                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                            <Button Grid.Column="6" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
                                     AutomationProperties.Name="Nach unten"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
                                     CommandParameter="{Binding}">
                               <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
                             </Button>
-                            <Button Grid.Column="6" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="7" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
@@ -599,19 +605,22 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
-                  <!-- Column headers (#137): each row is unlabeled otherwise. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
+                  <!-- Column headers (#137): each row is unlabeled otherwise. The trailing column is
+                       the remove button's fixed 28px, not "Auto" (see the Fahrzeuge headers above). -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,110,120,150,70,28" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="NACHNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="VORNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="ROLLE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="3" Text="RUFNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="4" Text="TELEFON" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="5" Text="EIGEN" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Eigenes Personal" />
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PersonRow">
-                          <Grid ColumnDefinitions="*,*,110,120,150,Auto" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,*,110,120,150,70,28" Margin="0,0,0,6">
                             <TextBox Grid.Column="0"
                                      PlaceholderText="{x:Static md:AnonymizedExampleData.PersonLastNamePlaceholder}"
                                      Text="{Binding LastName}" Margin="0,0,6,0" />
@@ -627,7 +636,11 @@
                             <TextBox Grid.Column="4"
                                      PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                                      Text="{Binding Phone}" Margin="0,0,6,0" />
-                            <Button Grid.Column="5" Classes="icon-btn" ToolTip.Tip="Entfernen"
+                            <!-- Only own personnel are offered as Lagebuchführer (#458). -->
+                            <CheckBox Grid.Column="5" IsChecked="{Binding IsOwn}"
+                                      VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Eigenes Personal"
+                                      AutomationProperties.Name="Eigenes Personal" />
+                            <Button Grid.Column="6" Classes="icon-btn" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">

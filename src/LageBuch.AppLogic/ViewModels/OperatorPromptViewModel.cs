@@ -16,14 +16,16 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
         CollectsHost = collectHost;
         CallSignOptions = callSignOptions ?? Array.Empty<string>();
         _personnel = personnel ?? Array.Empty<Person>();
-        PersonOptions = _personnel.Select(p => p.DisplayName).ToArray();
+        PersonOptions = _personnel.Where(p => p.IsOwn).Select(p => p.DisplayName).ToArray();
         PreviousOperatorDisplay = previous?.Display;
     }
 
     private readonly IReadOnlyList<Person> _personnel;
 
-    // Own personnel offered as suggestions for the NAME field (#469, a first step of #459). Free
-    // text stays allowed: whoever documents need not be in the roster, which is empty until imported.
+    // Own personnel offered as suggestions for the NAME field (#469, a first step of #459); a
+    // neighbouring brigade's people are left out (#458). Free text stays allowed: whoever documents
+    // need not be in the roster, which is empty until imported. The call-sign prefill still searches
+    // the whole roster, so a foreign name typed by hand gets its Funkrufname too.
     public IReadOnlyList<string> PersonOptions { get; }
 
     // Set only when a Lagebuchführer hands over mid-incident (#469): the prompt then asks for the

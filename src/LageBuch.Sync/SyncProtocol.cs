@@ -21,8 +21,12 @@ public static class SyncProtocol
     /// enum contract — raises <see cref="MinimumProtocolVersion"/> to match. There is no per-feature
     /// capability negotiation: choosing between those two cases is the whole mechanism.
     /// </para>
+    /// <para>
+    /// 2: the Stammdaten payload carries <c>isOwn</c> on vehicles and personnel (#458). A peer at 1
+    /// skips the key, and a payload without it reads as all own, so the floor stays at 1.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 1;
+    public const int ProtocolVersion = 2;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

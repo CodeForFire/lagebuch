@@ -368,6 +368,26 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
+    public void Unticking_own_marks_dirty_and_Save_persists_the_foreign_flag()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9) },
+            Personnel = new[] { new Person("Nachbar", "Nora", null, null, null) },
+        });
+        var vm = Vm(provider);
+
+        Vehicles(vm).Rows[0].IsOwn = false;
+        Personnel(vm).Rows[0].IsOwn = false;
+        Assert.True(vm.IsDirty);
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.False(Assert.Single(provider.Get().Vehicles).IsOwn);
+        Assert.False(Assert.Single(provider.Get().Personnel).IsOwn);
+    }
+
+    [Fact]
     public void Editing_a_setting_marks_dirty_and_Save_persists_it()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty);
