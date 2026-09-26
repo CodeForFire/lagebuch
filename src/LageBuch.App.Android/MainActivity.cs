@@ -20,6 +20,7 @@ namespace LageBuch.App.Android;
     Theme = "@style/MyTheme.NoActionBar",
     Icon = "@drawable/icon",
     MainLauncher = true,
+
     // AdjustResize shrinks the window when the soft keyboard opens instead of drawing the keyboard
     // over it. Without it the phone's add-entry sheet — the one place the app asks for typing — is
     // exactly what the keyboard covers, and the field being filled is the field nobody can see

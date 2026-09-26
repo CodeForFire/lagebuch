@@ -244,6 +244,29 @@ public class PhoneLayoutTests
     }
 
     [AvaloniaFact]
+    public void Every_module_that_lays_out_for_a_phone_is_told_that_it_is_on_one()
+    {
+        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
+        _ = PhoneWindow(new IncidentWorkspaceView { DataContext = vm });
+
+        // The propagation list is written by hand, so a module can implement INarrowAware and be
+        // forgotten — CO-Messung was, and its Wohnung editor would silently never take the width
+        // it needs. Ask the modules themselves instead of trusting the list.
+        object?[] modules =
+        [
+            vm.Etb, vm.Tasks, vm.Roles, vm.Forces, vm.Scba, vm.CoMessprotokoll, vm.Files, vm.Links,
+        ];
+
+        var aware = modules.OfType<INarrowAware>().ToArray();
+        Assert.NotEmpty(aware);
+        Assert.All(
+            aware,
+            m => Assert.True(
+                m.IsNarrow,
+                $"{m.GetType().Name} implements INarrowAware but never hears that it is on a phone"));
+    }
+
+    [AvaloniaFact]
     public void The_etb_reads_as_cards_and_the_grid_stands_down()
     {
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();

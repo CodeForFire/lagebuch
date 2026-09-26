@@ -333,9 +333,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private IEnumerable<INarrowAware> NarrowAwareModules()
     {
-        // Null while the workspace is between sessions: DisposeChildren clears them and
-        // BuildNavItems has not run yet.
-        object?[] modules = [Etb, Tasks, Roles, Forces, Scba, Files];
+        // Every module the workspace owns, not only the ones that implement INarrowAware today:
+        // OfType does the filtering, and a module that gains the interface later is picked up
+        // without anyone having to remember this list. Null while the workspace is between
+        // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
+        // also drops.
+        object?[] modules = [Etb, Tasks, Roles, Forces, Scba, CoMessprotokoll, Files, Links];
         return modules.OfType<INarrowAware>();
     }
 
