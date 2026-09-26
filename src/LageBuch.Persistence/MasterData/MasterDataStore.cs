@@ -76,13 +76,14 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_vehicles (wache, call_sign, seats, has_zugfuehrer) VALUES ($w,$c,$s,$z);",
+                "INSERT INTO md_vehicles (wache, call_sign, seats, has_zugfuehrer, is_own) VALUES ($w,$c,$s,$z,$o);",
                 p =>
                 {
                     p("$w", v.Wache);
                     p("$c", v.CallSign);
                     p("$s", v.Seats);
                     p("$z", v.HasZugfuehrer ? 1 : 0);
+                    p("$o", v.IsOwn ? 1 : 0);
                 });
         }
 
@@ -95,7 +96,7 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone) VALUES ($l,$f,$r,$c,$p);",
+                "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone, is_own) VALUES ($l,$f,$r,$c,$p,$o);",
                 p =>
                 {
                     p("$l", person.LastName);
@@ -103,6 +104,7 @@ public sealed class MasterDataStore
                     p("$r", (object?)person.Role ?? DBNull.Value);
                     p("$c", (object?)person.CallSign ?? DBNull.Value);
                     p("$p", (object?)person.Phone ?? DBNull.Value);
+                    p("$o", person.IsOwn ? 1 : 0);
                 });
         }
 
@@ -205,7 +207,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -234,7 +236,8 @@ public sealed class MasterDataStore
                 first_name TEXT NOT NULL,
                 role TEXT,
                 call_sign TEXT,
-                phone TEXT
+                phone TEXT,
+                is_own INTEGER NOT NULL DEFAULT 1
             );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             """;
@@ -262,6 +265,11 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "role", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "call_sign", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "phone", "TEXT");
+
+        // Widen both tables where they predate the own/foreign flag (#458). DEFAULT 1: every row
+        // already there was entered as the brigade's own.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "is_own", "INTEGER NOT NULL DEFAULT 1");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "is_own", "INTEGER NOT NULL DEFAULT 1");
 
         // Widen a pre-existing md_trupp_types that predates #398, when a Trupp-Typ was a bare name
         // and the crew size and Einsatzzeit were decided by comparing that name against a literal.
@@ -599,12 +607,12 @@ public sealed class MasterDataStore
     private static List<Vehicle> ReadVehicles(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT wache, call_sign, seats, has_zugfuehrer FROM md_vehicles;";
+        cmd.CommandText = "SELECT wache, call_sign, seats, has_zugfuehrer, is_own FROM md_vehicles;";
         using var r = cmd.ExecuteReader();
         var list = new List<Vehicle>();
         while (r.Read())
         {
-            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0));
+            list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0, r.GetInt32(4) != 0));
         }
 
         return list;
@@ -613,12 +621,12 @@ public sealed class MasterDataStore
     private static List<Person> ReadPersonnel(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT last_name, first_name, role, call_sign, phone FROM md_personnel ORDER BY last_name, first_name;";
+        cmd.CommandText = "SELECT last_name, first_name, role, call_sign, phone, is_own FROM md_personnel ORDER BY last_name, first_name;";
         using var r = cmd.ExecuteReader();
         var list = new List<Person>();
         while (r.Read())
         {
-            list.Add(new Person(r.GetString(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4)));
+            list.Add(new Person(r.GetString(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4), r.GetInt32(5) != 0));
         }
 
         return list;

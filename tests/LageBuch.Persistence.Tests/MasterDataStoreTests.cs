@@ -121,6 +121,56 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Vehicles_and_personnel_round_trip_the_own_flag()
+    {
+        var set = MasterDataSet.Empty with
+        {
+            Vehicles = new[]
+            {
+                new Vehicle("FFB Wache 1", "FFB 1/40/1", 9),
+                new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9, IsOwn: false),
+            },
+            Personnel = new[]
+            {
+                new Person("Mustermann", "Max", null, null, null),
+                new Person("Nachbar", "Nora", null, null, null, IsOwn: false),
+            },
+        };
+        MasterDataStore.Save(_path, set);
+
+        var reopened = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(set.Vehicles, reopened.Vehicles);
+        Assert.Equal(set.Personnel, reopened.Personnel);
+    }
+
+    [Fact]
+    public void A_pre_own_flag_database_widens_in_place_and_reads_existing_rows_as_own()
+    {
+        // Simulate a database written before #458: both tables exist but without is_own. Every
+        // row already in them was entered as the brigade's own, so the column must default to 1.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0);
+                INSERT INTO md_vehicles (wache, call_sign, seats) VALUES ('FFB Wache 1', 'FFB 1/40/1', 9);
+                CREATE TABLE md_personnel (last_name TEXT NOT NULL, first_name TEXT NOT NULL, role TEXT, call_sign TEXT, phone TEXT);
+                INSERT INTO md_personnel (last_name, first_name) VALUES ('Mustermann', 'Max');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.True(Assert.Single(set.Vehicles).IsOwn);
+        Assert.True(Assert.Single(set.Personnel).IsOwn);
+    }
+
+    [Fact]
     public void A_database_with_the_old_wachen_and_funkrufnamen_tables_opens_and_derives_from_vehicles()
     {
         // Simulate a database written while Wachen/Funkrufnamen were still their own lists. The

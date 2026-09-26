@@ -53,6 +53,26 @@ public class MasterDataSyncTests
     }
 
     [Fact]
+    public async Task Host_serves_the_own_flag_of_vehicles_and_personnel()
+    {
+        var clock = new FixedClock();
+        var hostSet = MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9, IsOwn: false) },
+            Personnel = new[] { new Person("Nachbar", "Nora", null, null, null, IsOwn: false) },
+        };
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
+        await using var _ = host;
+
+        using var http = Client(port, TestHost.DefaultPin);
+        var set = MasterDataJson.Parse(
+            await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
+
+        Assert.False(Assert.Single(set.Vehicles).IsOwn);
+        Assert.False(Assert.Single(set.Personnel).IsOwn);
+    }
+
+    [Fact]
     public async Task Master_data_endpoint_rejects_a_wrong_pin()
     {
         var clock = new FixedClock();

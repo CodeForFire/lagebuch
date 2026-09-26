@@ -91,7 +91,7 @@ public class MasterDataSectionTests
     public void PersonRow_Role_change_flags_a_change()
     {
         var changes = 0;
-        var row = new PersonRow("Mustermann", "Max", null, null, null, () => changes++);
+        var row = new PersonRow("Mustermann", "Max", null, null, null, true, () => changes++);
 
         row.Role = "GF";
 
@@ -103,7 +103,7 @@ public class MasterDataSectionTests
     public void PersonRow_CallSign_change_flags_a_change()
     {
         var changes = 0;
-        var row = new PersonRow("Mustermann", "Max", null, null, null, () => changes++);
+        var row = new PersonRow("Mustermann", "Max", null, null, null, true, () => changes++);
 
         row.CallSign = "Land 1";
 
@@ -115,12 +115,62 @@ public class MasterDataSectionTests
     public void VehicleRow_HasZugfuehrer_change_flags_a_change()
     {
         var changes = 0;
-        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
         row.HasZugfuehrer = true;
 
         Assert.Equal(1, changes);
         Assert.True(row.HasZugfuehrer);
+    }
+
+    [Fact]
+    public void VehicleRow_IsOwn_change_flags_a_change()
+    {
+        var changes = 0;
+        var row = new VehicleRow("Wache 1", "ELW 1", 4, false, true, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
+
+        row.IsOwn = false;
+
+        Assert.Equal(1, changes);
+        Assert.False(row.IsOwn);
+    }
+
+    [Fact]
+    public void PersonRow_IsOwn_change_flags_a_change()
+    {
+        var changes = 0;
+        var row = new PersonRow("Mustermann", "Max", null, null, null, true, () => changes++);
+
+        row.IsOwn = false;
+
+        Assert.Equal(1, changes);
+        Assert.False(row.IsOwn);
+    }
+
+    [Fact]
+    public void Vehicles_and_personnel_round_trip_the_own_flag()
+    {
+        var vehicles = new[] { new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9, IsOwn: false) };
+        var people = new[] { new Person("Nachbar", "Nora", null, null, null, IsOwn: false) };
+
+        var v = new VehiclesSection("Fahrzeuge", vehicles, Array.Empty<string>(), Array.Empty<string>(), () => { });
+        var p = new PersonnelSection("Personal", people, () => { });
+
+        Assert.Equal(vehicles, v.ToValues());
+        Assert.Equal(people, p.ToPeople());
+    }
+
+    [Fact]
+    public void Added_vehicle_and_person_rows_start_as_own()
+    {
+        var v = new VehiclesSection("Fahrzeuge", Array.Empty<Vehicle>(), Array.Empty<string>(), Array.Empty<string>(), () => { });
+        var p = new PersonnelSection("Personal", Array.Empty<Person>(), () => { });
+
+        v.AddCommand.Execute(null);
+        p.AddCommand.Execute(null);
+
+        Assert.True(Assert.Single(v.Rows).IsOwn);
+        Assert.True(Assert.Single(p.Rows).IsOwn);
     }
 
     [Fact]

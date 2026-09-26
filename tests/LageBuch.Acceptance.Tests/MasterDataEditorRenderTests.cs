@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -277,10 +278,57 @@ public class MasterDataEditorRenderTests
         var zfHeader = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "ZF");
         Assert.Equal(zfHeader.Bounds.X, zfCheckBox.Bounds.X, 1);
 
+        // Own or a neighbouring brigade's vehicle (#458): one checkbox per row, all ticked by
+        // default, under its own header.
+        var ownCheckBoxes = view.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Eigenes Fahrzeug").ToList();
+        Assert.Equal(3, ownCheckBoxes.Count);
+        Assert.All(ownCheckBoxes, c => Assert.True(c.IsChecked));
+        var ownHeader = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "EIGEN");
+        Assert.Equal(ownHeader.Bounds.X, ownCheckBoxes[0].Bounds.X, 1);
+
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-fahrzeuge-after.png"));
+    }
+
+    [AvaloniaFact]
+    public void Personal_section_marks_each_person_as_own_under_its_own_header()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = (PersonnelSection)vm.Sections.Single(s => s.Title == "Personal");
+        vm.SelectedSection = section;
+
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var ownCheckBoxes = view.GetVisualDescendants().OfType<CheckBox>()
+            .Where(c => AutomationProperties.GetName(c) == "Eigenes Personal").ToList();
+        Assert.Equal(2, ownCheckBoxes.Count);
+
+        // Unticking the box is what takes a neighbouring brigade's person out of the
+        // Lagebuchführer suggestions (#458), so it has to reach the saved record.
+        ownCheckBoxes[1].IsChecked = false;
+        Assert.False(section.ToPeople().Single(p => p.LastName == "Musterfrau").IsOwn);
+
+        // The header's trailing column used to be "Auto", which sized to the header's own empty
+        // cell and pushed every header after NACHNAME right of its field.
+        var headers = view.GetVisualDescendants().OfType<TextBlock>().ToList();
+        var ownHeader = Assert.Single(headers, t => t.Text == "EIGEN");
+        Assert.Equal(ownHeader.Bounds.X, ownCheckBoxes[0].Bounds.X, 1);
+        var phoneHeader = Assert.Single(headers, t => t.Text == "TELEFON");
+        var phoneBox = Assert.Single(
+            view.GetVisualDescendants().OfType<TextBox>(),
+            b => b.Text == "01 71 / 1 23 45 67");
+        Assert.Equal(phoneHeader.Bounds.X, phoneBox.Bounds.X, 1);
+
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "master-data-editor-personal-after.png"));
     }
 
     // The rail is two ListBoxes over one SelectedSection, which only works because that property

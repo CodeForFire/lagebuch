@@ -7,7 +7,7 @@ public sealed partial class PersonRow : ObservableObject
 {
     private readonly Action _onChanged;
 
-    public PersonRow(string lastName, string firstName, string? role, string? callSign, string? phone, Action onChanged)
+    public PersonRow(string lastName, string firstName, string? role, string? callSign, string? phone, bool isOwn, Action onChanged)
     {
         _onChanged = onChanged;
         _lastName = lastName;
@@ -15,6 +15,7 @@ public sealed partial class PersonRow : ObservableObject
         _role = role;
         _callSign = callSign;
         _phone = phone;
+        _isOwn = isOwn;
     }
 
     [ObservableProperty]
@@ -27,6 +28,8 @@ public sealed partial class PersonRow : ObservableObject
     private string? _callSign;
     [ObservableProperty]
     private string? _phone;
+    [ObservableProperty]
+    private bool _isOwn;
 
     partial void OnLastNameChanged(string value) => _onChanged();
 
@@ -37,4 +40,6 @@ public sealed partial class PersonRow : ObservableObject
     partial void OnCallSignChanged(string? value) => _onChanged();
 
     partial void OnPhoneChanged(string? value) => _onChanged();
+
+    partial void OnIsOwnChanged(bool value) => _onChanged();
 }

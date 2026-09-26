@@ -170,8 +170,11 @@ public sealed record IncidentSettings(
 /// compiled into the app, so it only ever reaches a running install through an explicit import.
 /// The roster is empty until then — every consumer must treat that as normal rather than as a
 /// configuration error, and must still accept a freely typed name.
+/// IsOwn tells the brigade's own people from those of a neighbouring one (#458); only own
+/// personnel are offered as Lagebuchführer. Defaulted to own, because everything entered before
+/// the flag existed was entered as the brigade's own.
 /// </summary>
-public sealed record Person(string LastName, string FirstName, string? Role, string? CallSign, string? Phone)
+public sealed record Person(string LastName, string FirstName, string? Role, string? CallSign, string? Phone, bool IsOwn = true)
 {
     /// <summary>How the person is offered in pickers and stored on an assignment.</summary>
     public string DisplayName => string.IsNullOrWhiteSpace(FirstName) ? LastName : $"{LastName}, {FirstName}";
@@ -184,9 +187,11 @@ public sealed record Person(string LastName, string FirstName, string? Role, str
 /// seat count feeds the Stärke preset when the vehicle is picked in the Kräfte entry. HasZugfuehrer marks a
 /// command vehicle (ELW/KdoW) that carries the Zugführer -- unlike Officer/Mannschaft, ZF is
 /// not seat-derived, since only specific vehicles carry one. Defaulted so existing call sites
-/// and older Stammdaten payloads keep working unchanged.
+/// and older Stammdaten payloads keep working unchanged. IsOwn tells the brigade's own vehicles
+/// from those of a neighbouring one (#458); defaulted to own for the same reason, which is the
+/// opposite of HasZugfuehrer's default -- a missing flag must not turn a whole fleet foreign.
 /// </summary>
-public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false);
+public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false, bool IsOwn = true);
 
 /// <summary>
 /// One Trupp-Typ: its name, how many people it is crewed by, and the Einsatzzeit it defaults to.
@@ -495,7 +500,8 @@ public static class MasterDataJson
                         x.GetProperty("wache").GetString()!,
                         x.GetProperty("callSign").GetString()!,
                         x.TryGetProperty("seats", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0,
-                        x.TryGetProperty("hasZugfuehrer", out var hz) && hz.ValueKind == JsonValueKind.True))
+                        x.TryGetProperty("hasZugfuehrer", out var hz) && hz.ValueKind == JsonValueKind.True,
+                        IsOwn(x)))
                     .ToList()
                 : Array.Empty<Vehicle>();
 
@@ -713,12 +719,20 @@ public static class MasterDataJson
                 p.TryGetProperty("firstName", out var f) ? f.GetString() ?? string.Empty : string.Empty,
                 Opt(p, "role"),
                 Opt(p, "callSign"),
-                Opt(p, "phone")))
+                Opt(p, "phone"),
+                IsOwn(p)))
             .ToList();
 
         static string? Opt(JsonElement e, string prop) =>
             e.TryGetProperty(prop, out var v) && v.ValueKind is not JsonValueKind.Null ? v.GetString() : null;
     }
+
+    /// <summary>
+    /// Only an explicit <c>false</c> marks an entry foreign (#458): a file or a sync host from before
+    /// the flag existed carries no isOwn at all, and everything in it is the brigade's own.
+    /// </summary>
+    private static bool IsOwn(JsonElement e) =>
+        !(e.TryGetProperty("isOwn", out var o) && o.ValueKind == JsonValueKind.False);
 
     /// <summary>
     /// Serializes the whole set in the superset schema, so a file written here re-parses identically.
@@ -740,7 +754,7 @@ public static class MasterDataJson
             checklists = ChecklistsForExport(set),
             navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
-            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer }),
+            vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn }),
             personnel = set.Personnel.Select(p => new
             {
                 lastName = p.LastName,
@@ -748,6 +762,7 @@ public static class MasterDataJson
                 role = p.Role,
                 callSign = p.CallSign,
                 phone = p.Phone,
+                isOwn = p.IsOwn,
             }),
             settings = new
             {
