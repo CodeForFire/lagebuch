@@ -210,6 +210,11 @@ jobs:
           apk=$(find publish-android -name "*-Signed.apk" -o -name "*.apk" | head -n1)
           aab=$(find publish-android -name "*.aab" | head -n1)
           test -n "$aab" || { echo "::error::No .aab was produced - check AndroidPackageFormats"; exit 1; }
+          # An SDK default once dropped armeabi-v7a without a word, and Play then hid the app from
+          # every 32-bit tablet. Refuse to release a package missing any ABI the csproj lists.
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            unzip -l "$apk" "lib/$abi/*" > /dev/null || { echo "::error::The APK has no lib/$abi - check RuntimeIdentifiers"; exit 1; }
+          done
           mkdir -p dist play
           cp "$apk" "dist/lagebuch-${VERSION}.apk"
           cp "$aab" "play/lagebuch-${VERSION}.aab"
