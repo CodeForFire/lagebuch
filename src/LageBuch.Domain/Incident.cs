@@ -728,6 +728,56 @@ public sealed class Incident
     public int NextFreeScbaTruppNumber() =>
         Enumerable.Range(1, _scbaTrupps.Count + 1).First(n => _scbaTrupps.All(t => t.TruppNumber != n));
 
+    /// <summary>
+    /// The running assignment holding <paramref name="role"/> in <paramref name="section"/>, or null
+    /// when that slot is free. A pure query — it decides nothing and writes nothing, the same stance
+    /// <see cref="NextFreeScbaTruppNumber"/> takes.
+    /// <para>
+    /// It exists so the Funktionen tab can refuse a second holder of a Funktion the Stammdaten marked
+    /// unique (#470). The aggregate does not enforce that itself: the catalogue carrying the setting
+    /// lives in <c>LageBuch.Persistence</c>, and <c>Domain</c> references nothing, so the rule is
+    /// applied by <c>RolesViewModel</c> against what this returns. A blank <paramref name="role"/>
+    /// matches nothing rather than everything, and the first of several matches wins.
+    /// </para>
+    /// <para>
+    /// Only an assignment with no Bis stamp holds anything — the same liveness test
+    /// <see cref="Close"/> uses when it ends everything still running. Names are compared trimmed
+    /// and ignoring case, like every catalogue lookup in the app, so "el" finds "EL" and two
+    /// spellings of one Abschnittsleiter cannot sit side by side unnoticed. An empty
+    /// <paramref name="section"/> is a bucket of its own: a per-Abschnitt Funktion allows exactly
+    /// one holder that is in no Abschnitt at all.
+    /// </para>
+    /// </summary>
+    public RoleAssignment? FindRunningRoleHolder(string role, string? section)
+    {
+        var wanted = role?.Trim();
+        if (string.IsNullOrEmpty(wanted))
+        {
+            return null;
+        }
+
+        var wantedSection = NormalizeSection(section);
+        foreach (var assignment in _roles)
+        {
+            if (assignment.To is not null
+                || !string.Equals(assignment.Role?.Trim(), wanted, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(NormalizeSection(assignment.Section), wantedSection, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return assignment;
+        }
+
+        return null;
+
+        // Both blanks collapse to one spelling so a null and a whitespace-only Abschnitt are the
+        // same bucket; anything else is compared as typed. Ordinal-ignore-case rather than
+        // InvariantCulture: these are operator-typed labels, not identifiers, and the app compares
+        // every other such value this way.
+        static string NormalizeSection(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,
         string designation,

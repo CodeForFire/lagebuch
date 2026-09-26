@@ -676,4 +676,102 @@ public class IncidentOperationsTests
 
         Assert.Equal(before, incident.Journal.Count);
     }
+
+    // #470: RolesViewModel asks the aggregate who currently holds a Funktion, so a unique one can be
+    // refused at the moment of entry. The aggregate does not itself enforce anything -- the
+    // catalogue it would need lives in LageBuch.Persistence, and Domain references nothing.
+    [Fact]
+    public void Find_running_role_holder_returns_the_running_assignment_for_a_funktion()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord");
+
+        var holder = incident.FindRunningRoleHolder("EL", "Abschnitt Nord");
+
+        Assert.NotNull(holder);
+        Assert.Equal("Müller", holder!.PersonName);
+    }
+
+    [Fact]
+    public void Find_running_role_holder_returns_null_when_the_funktion_is_free()
+    {
+        var incident = NewIncident(out _, out _);
+
+        Assert.Null(incident.FindRunningRoleHolder("EL", "Abschnitt Nord"));
+    }
+
+    // Ended without a successor: an EL who is gone holds the Funktion nobody, so the slot is free
+    // again -- which is the whole point of a Übergabe being possible.
+    [Fact]
+    public void Find_running_role_holder_returns_null_when_the_only_assignment_has_ended()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var assigned = incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord", from: clock.Now);
+        incident.EndRoleAssignment(assigned.Id, clock.Now.AddMinutes(30));
+
+        Assert.Null(incident.FindRunningRoleHolder("EL", "Abschnitt Nord"));
+    }
+
+    [Fact]
+    public void Find_running_role_holder_returns_the_successor_after_a_handover()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        var original = incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord", from: clock.Now);
+
+        incident.TransferRole(clock, op, original.Id, "Schmidt", null, null);
+
+        Assert.Equal("Schmidt", incident.FindRunningRoleHolder("EL", "Abschnitt Nord")!.PersonName);
+    }
+
+    [Fact]
+    public void Find_running_role_holder_matches_the_funktion_and_abschnitt_ignoring_case_and_spacing()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller", section: "Abschnitt Nord");
+
+        Assert.NotNull(incident.FindRunningRoleHolder("  el ", " abschnitt nord "));
+    }
+
+    [Fact]
+    public void Find_running_role_holder_treats_two_blank_abschnitte_as_the_same_bucket()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "Abschnittsleiter", "Müller");
+
+        Assert.NotNull(incident.FindRunningRoleHolder("Abschnittsleiter", "   "));
+        Assert.NotNull(incident.FindRunningRoleHolder("Abschnittsleiter", null));
+    }
+
+    [Fact]
+    public void Find_running_role_holder_separates_a_blank_abschnitt_from_a_named_one()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "Abschnittsleiter", "Müller", section: "Abschnitt Nord");
+
+        Assert.Null(incident.FindRunningRoleHolder("Abschnittsleiter", null));
+    }
+
+    // Nothing a caller can type means "every Funktion", so a blank one finds nothing instead of
+    // reporting the first row as taken.
+    [Fact]
+    public void Find_running_role_holder_returns_null_for_a_blank_funktion()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller");
+
+        Assert.Null(incident.FindRunningRoleHolder(string.Empty, null));
+        Assert.Null(incident.FindRunningRoleHolder("   ", null));
+    }
+
+    // A peer that bypasses its own UI can leave two running holders behind, so the query has to say
+    // which one it means: the first, deterministically, rather than an arbitrary one.
+    [Fact]
+    public void Find_running_role_holder_returns_the_first_of_two_running_holders()
+    {
+        var incident = NewIncident(out var clock, out var op);
+        incident.AssignRole(clock, op, "EL", "Müller");
+        incident.AssignRole(clock, op, "EL", "Schmidt");
+
+        Assert.Equal("Müller", incident.FindRunningRoleHolder("EL", null)!.PersonName);
+    }
 }
