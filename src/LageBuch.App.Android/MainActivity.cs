@@ -1,4 +1,5 @@
 using Android.Content.PM;
+using Android.Views;
 using AndroidX.Activity.Result;
 using AndroidX.Activity.Result.Contract;
 using Avalonia.Android;
@@ -19,6 +20,12 @@ namespace LageBuch.App.Android;
     Theme = "@style/MyTheme.NoActionBar",
     Icon = "@drawable/icon",
     MainLauncher = true,
+    // AdjustResize shrinks the window when the soft keyboard opens instead of drawing the keyboard
+    // over it. Without it the phone's add-entry sheet — the one place the app asks for typing — is
+    // exactly what the keyboard covers, and the field being filled is the field nobody can see
+    // (#53 §4, "on-screen keyboard avoidance"). Each composer stacks inside a ScrollViewer so the
+    // focused field can still be scrolled into what is left of the window.
+    WindowSoftInputMode = SoftInput.AdjustResize,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity
 {

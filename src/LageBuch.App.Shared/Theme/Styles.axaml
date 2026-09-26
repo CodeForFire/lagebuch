@@ -319,6 +319,16 @@
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
   </Style>
+  <!-- Controls that only a narrow layout shows. The default has to live in a Style, not as
+       IsVisible="False" on the control: a local value in XAML outranks every Style setter, so a
+       container query could never turn them back on. Same reason as meldung-readout-short below. -->
+  <Style Selector="Button.narrow-only">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Border.narrow-only">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
   <!-- The short form a narrow header swaps in for the label (IncidentWorkspaceView's query). -->
   <Style Selector="TextBlock.meldung-readout-short">
     <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
@@ -650,6 +660,99 @@
   </Style>
   <Style Selector="TabItem:selected /template/ Border#Rail">
     <Setter Property="Background" Value="{StaticResource SignalBrush}" />
+  </Style>
+
+  <!-- =========================================================
+       ROW CARDS — one record per card, the narrow layout's DataGrid
+       =========================================================
+       A seven-column grid budgeted for a 1920px ELW monitor cannot be squeezed into 412dp, so the
+       phone reads the same rows stacked: the identifying fact first, the free text in full (never
+       trimmed — an entry nobody can read is an entry nobody can check), the quiet metadata and the
+       row's own actions last. -->
+  <Style Selector="Border.row-card">
+    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+
+  <!-- A row action on a card is a thumb target, not a pointer target. -->
+  <Style Selector="Button.card-action">
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+  </Style>
+  <Style Selector="Button.card-action PathIcon">
+    <Setter Property="Width" Value="17" />
+    <Setter Property="Height" Value="17" />
+  </Style>
+
+  <!-- =========================================================
+       BOTTOM NAV BAR — the narrow layout's replacement for the rail
+       =========================================================
+       The 172px left rail is 42% of a 411dp phone before any content, so below the breakpoint the
+       rail's TabItems are hidden and this takes over: the first four entries as thumb-reachable
+       cells, the rest behind MEHR. Same vocabulary as the rail — signal-red rule on the open
+       entry, the same status dots — turned through 90° and grown to a 56px touch target.
+       Deliberately NOT the .icon-btn class: AutomationPropertiesTests counts every icon-btn in
+       the workspace, and these exist in the visual tree at desktop widths too, merely hidden. -->
+  <Style Selector="Border.navbar">
+    <Setter Property="Background" Value="{StaticResource SidebarBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+  </Style>
+  <Style Selector="Button.navcell">
+    <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="Padding" Value="2,0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <!-- The default press shrinks the button 3%; on a bar cell that reads as the whole bar twitching. -->
+  <Style Selector="Button.navcell:pressed">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+  <Style Selector="Button.navcell:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#161E2A" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.navcell.selected">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="Button.navcell.selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#1B2532" />
+  </Style>
+
+  <!-- The open entry's marker. Mirrors the rail's 3px left rail, moved to the top edge. -->
+  <Style Selector="Border.navcell-rule">
+    <Setter Property="Height" Value="3" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.navcell.selected Border.navcell-rule">
+    <Setter Property="Background" Value="{StaticResource SignalBrush}" />
+  </Style>
+
+  <Style Selector="PathIcon.navcell-icon">
+    <Setter Property="Width" Value="19" />
+    <Setter Property="Height" Value="19" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.navcell-label">
+    <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="LetterSpacing" Value="0.4" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
   </Style>
 
   <!-- =========================================================

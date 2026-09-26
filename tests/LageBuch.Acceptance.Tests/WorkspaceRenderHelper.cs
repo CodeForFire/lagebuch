@@ -134,10 +134,11 @@ internal static class WorkspaceRenderHelper
     /// naming the tab it was written for, and a stale index fails as a wrong-tab assertion rather
     /// than as a missing tab. Matching on the header survives that.
     /// <para>
-    /// Reading the first TextBlock under the container is safe for either header shape (a bare
-    /// string, or the checklists' TextBlock-plus-status-dots panel): TabControl hoists the
-    /// selected tab's content into PART_SelectedContentHost, so a TabItem's own visual subtree
-    /// holds nothing but its header.
+    /// Matched against the bound item's own Header, not against rendered text. The narrow layout
+    /// hides the rail's TabItems and navigates from a bottom bar instead, so below the breakpoint
+    /// there is no realized header TextBlock to read and every tab would answer "?". The item is
+    /// the same at any width. Rendered text stays the fallback for a tab whose item is a bare
+    /// string rather than a nav view model.
     /// </para>
     /// </remarks>
     public static TabControl SelectTab(Window window, string header)
@@ -145,7 +146,7 @@ internal static class WorkspaceRenderHelper
         var tabs = Tabs(window);
         for (var i = 0; i < tabs.ItemCount; i++)
         {
-            if (HeaderTextOf(tabs.ContainerFromIndex(i)) == header)
+            if (HeaderOf(tabs, i) == header)
             {
                 tabs.SelectedIndex = i;
                 Dispatcher.UIThread.RunJobs();
@@ -156,7 +157,7 @@ internal static class WorkspaceRenderHelper
         var shown = string.Join(
             ", ",
             Enumerable.Range(0, tabs.ItemCount)
-                .Select(i => HeaderTextOf(tabs.ContainerFromIndex(i)) ?? "?"));
+                .Select(i => HeaderOf(tabs, i) ?? "?"));
         throw new InvalidOperationException(
             $"no rail tab headed \"{header}\" -- the rail shows: {shown}.");
     }
@@ -190,7 +191,7 @@ internal static class WorkspaceRenderHelper
         for (var i = 0; i < tabs.ItemCount; i++)
         {
             var container = tabs.ContainerFromIndex(i);
-            if (HeaderTextOf(container) != header)
+            if (HeaderOf(tabs, i) != header)
             {
                 continue;
             }
@@ -208,9 +209,20 @@ internal static class WorkspaceRenderHelper
     {
         var tabs = Tabs(window);
         return Enumerable.Range(0, tabs.ItemCount)
-            .Select(i => HeaderTextOf(tabs.ContainerFromIndex(i)) ?? "?")
+            .Select(i => HeaderOf(tabs, i) ?? "?")
             .ToArray();
     }
+
+    /// <summary>
+    /// A rail tab's header: the bound nav item's own label where there is one, otherwise whatever
+    /// the container renders. See <see cref="SelectTab" /> for why this cannot read the visual.
+    /// </summary>
+    private static string? HeaderOf(TabControl tabs, int index) =>
+        tabs.Items[index] switch
+        {
+            WorkspaceNavItemViewModel nav => nav.Header,
+            _ => HeaderTextOf(tabs.ContainerFromIndex(index)),
+        };
 
     private static string? HeaderTextOf(Control? container) =>
         container?.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault()?.Text;

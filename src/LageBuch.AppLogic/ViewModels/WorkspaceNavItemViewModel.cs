@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
 
@@ -22,10 +23,11 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
 {
     private readonly ChecklistViewModel? _checklist;
 
-    public WorkspaceNavItemViewModel(string header, object content, ChecklistViewModel? checklist = null)
+    public WorkspaceNavItemViewModel(string header, object content, ChecklistViewModel? checklist = null, string? moduleKey = null)
     {
         Header = header;
         Content = content;
+        ModuleKey = moduleKey ?? NavModules.Checklist;
         _checklist = checklist;
         if (_checklist is not null)
         {
@@ -39,6 +41,21 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
 
     /// <summary>The module view model; the ViewLocator resolves its view, exactly as before.</summary>
     public object Content { get; }
+
+    /// <summary>
+    /// Which built-in module this entry is, or <see cref="NavModules.Checklist"/> for a Checkliste.
+    /// The narrow layout's bottom bar keys its icon off this: a rail label alone is not legible in
+    /// a 82dp cell, and a Checkliste is user-named so it can only have the generic glyph.
+    /// </summary>
+    public string ModuleKey { get; }
+
+    /// <summary>
+    /// Whether this is the entry currently open. The wide rail gets this from
+    /// <c>TabItem:selected</c>, but the narrow bottom bar is an <c>ItemsControl</c> of buttons
+    /// rather than a selector, so it needs the flag on the item itself.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSelected;
 
     /// <summary>True for a Checkliste tab, false for a built-in module.</summary>
     public bool IsChecklist => _checklist is not null;

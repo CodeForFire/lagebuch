@@ -11,7 +11,7 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-public sealed partial class EtbViewModel : ObservableObject, IDisposable
+public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -174,6 +174,43 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     // Only the read-only rule gates the buttons; the empty field answers on the press (#412).
     private bool CanAddEntry => !IsReadOnly;
 
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the narrow layout's add-entry sheet is open. The dock is four fields and two
+    /// buttons across ~900px; a phone shows it stacked over the list instead, opened by one
+    /// button and closed again the moment an entry lands. Ignored by the wide layout, where the
+    /// dock is simply always there.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isComposerOpen;
+
+    /// <summary>
+    /// Whether the add-entry dock is on screen: always on a wide window, only while composing on
+    /// a phone. One property rather than two bindings, because a XAML binding is a local value and
+    /// would win over any container query trying to restore the dock on the desktop.
+    /// </summary>
+    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+
+    /// <summary>The phone's "add an entry" affordance, shown exactly when the dock is not.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+
+    [RelayCommand(CanExecute = nameof(CanAddEntry))]
+    private void OpenComposer() => IsComposerOpen = true;
+
+    [RelayCommand]
+    private void CloseComposer()
+    {
+        IsComposerOpen = false;
+        ShowAddErrors(false); // a dismissed sheet must not reopen still complaining
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntry()
     {
@@ -208,6 +245,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
         NewFrom = null;
         NewTo = null;
         ShowAddErrors(false); // the cleared field must not read as a fresh complaint
+
+        // Both add paths land here, and only on success — so this is where the phone's sheet
+        // closes and gives the list back. A failed validation returns before ever reaching it.
+        IsComposerOpen = false;
     }
 
     private bool ValidateAdd()

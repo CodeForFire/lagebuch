@@ -4,6 +4,19 @@
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.HomeView"
              x:DataType="vm:HomeViewModel">
+  <!-- 56px of gutter each side is 27% of a 412dp phone. The column and its MaxWidth already
+       degrade correctly, so the gutter is the only thing this view gets wrong on a phone.
+       Keyed off the shell's container, declared on MainView's root Panel. -->
+  <UserControl.Styles>
+    <Style Selector="StackPanel#ContentColumn">
+      <Setter Property="Margin" Value="56,48" />
+    </Style>
+    <ContainerQuery Name="Shell" Query="max-width:640">
+      <Style Selector="StackPanel#ContentColumn">
+        <Setter Property="Margin" Value="16,24" />
+      </Style>
+    </ContainerQuery>
+  </UserControl.Styles>
   <Grid>
     <!-- Faint hazard glow in the corner for atmosphere. Radial, anchored on the corner it
          decorates, and fading to a zero-alpha stop of its own hue. The linear version fading to
@@ -29,7 +42,7 @@
            (a long path in the recent list wanted the full 720, a short one only ~643), so the
            whole page jumped sideways on every scroll. Stretch pins it to min(viewport, 720);
            Avalonia still centres a Stretch element that MaxWidth has made narrower than its slot. -->
-      <StackPanel x:Name="ContentColumn" Margin="56,48" Spacing="28" MaxWidth="720"
+      <StackPanel x:Name="ContentColumn" Spacing="28" MaxWidth="720"
                   HorizontalAlignment="Stretch">
         <!-- Greeting -->
         <StackPanel Spacing="6">

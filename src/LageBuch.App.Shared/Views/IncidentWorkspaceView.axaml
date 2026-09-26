@@ -2,14 +2,77 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
+             xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
              x:Class="LageBuch.App.Shared.Views.IncidentWorkspaceView"
              x:DataType="vm:IncidentWorkspaceViewModel">
-  <Panel>
+  <!-- The workspace is its own container, measured on the root Panel: a container query styles
+       its container's descendants, not the container itself, so the element carrying the name has
+       to sit outside everything the query touches. The header keeps its own, narrower container
+       below — that one is about the width the Meldungen have, this one about the whole shell. -->
+  <Panel Container.Name="Workspace" Container.Sizing="Width">
+    <Panel.Styles>
+      <!-- The wide defaults. Every one of these has to be a Style and not an attribute on the
+           control: a local value in XAML outranks a Style setter, so the query could not win. -->
+      <Style Selector="Border#WorkspaceBody">
+        <Setter Property="Padding" Value="24,0,0,0" />
+      </Style>
+      <Style Selector="Border.tab-content">
+        <Setter Property="Padding" Value="24" />
+      </Style>
+      <Style Selector="Border#StatusHeader">
+        <Setter Property="Padding" Value="24,10" />
+      </Style>
+      <Style Selector="Border#ActionFooter">
+        <Setter Property="Padding" Value="24,12" />
+      </Style>
+      <!-- Trimmed rather than unbounded: a long Stichwort would otherwise push the status group
+           onto its own line and still run past the window edge. A Style, not MaxWidth on the
+           element, so the narrow query below can tighten it. -->
+      <Style Selector="TextBlock#EinsatznummerValue">
+        <Setter Property="MaxWidth" Value="560" />
+      </Style>
+      <ContainerQuery Name="Workspace" Query="max-width:640">
+        <!-- The rail is 172px of a 411dp screen. Its TabItems go; the TabControl stays, so it
+             still hosts the content and still owns SelectedItem — which is what keeps every
+             render test's WorkspaceRenderHelper.SelectTab working. PhoneNavBar drives it now. -->
+        <Style Selector="TabItem">
+          <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Border#PhoneNavBar">
+          <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="StackPanel#FooterActions">
+          <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Border#WorkspaceBody">
+          <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="Border.tab-content">
+          <Setter Property="Padding" Value="12" />
+        </Style>
+        <Style Selector="Border#StatusHeader">
+          <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style Selector="Border#ActionFooter">
+          <Setter Property="Padding" Value="12,6" />
+        </Style>
+        <!-- The Stichwort is the hero at 28px on an ELW monitor, but at 412dp it and the
+             Einsatznummer chip together want ~394px of a 388px line and the chip loses its tail.
+             Smaller type keeps both whole; it is still by far the largest thing on the screen. -->
+        <Style Selector="TextBlock#EinsatznummerValue">
+          <Setter Property="FontSize" Value="21" />
+          <Setter Property="MaxWidth" Value="240" />
+        </Style>
+        <Style Selector="TextBlock#IncidentNumberChip">
+          <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+      </ContainerQuery>
+    </Panel.Styles>
     <DockPanel>
       <!-- ===================== Status header ===================== -->
-      <Border DockPanel.Dock="Top" Background="{StaticResource SurfaceBrush}"
+      <Border DockPanel.Dock="Top" x:Name="StatusHeader" Background="{StaticResource SurfaceBrush}"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
-              Padding="24,10" Container.Name="Header" Container.Sizing="Width">
+              Container.Name="Header" Container.Sizing="Width">
         <!-- On a phone the tile column would eat the message (an alarm row read "Fl…" at 412px):
              below 640px a tile keeps only its icon, and the jump chevrons and readout labels go.
              The icon still names the module, and every row stays the jump it was. -->
@@ -51,7 +114,7 @@
               <!-- Trimmed rather than unbounded: a long Stichwort would otherwise push the status
                    group onto its own line and still run past the window edge. -->
               <TextBlock x:Name="EinsatznummerValue" Classes="metric" Text="{Binding HeroText}"
-                         MaxWidth="560" TextTrimming="CharacterEllipsis"
+                         TextTrimming="CharacterEllipsis"
                          ToolTip.Tip="{Binding HeroText}" />
 
               <!-- The chip, the address line and the two affordances are independent siblings (not
@@ -436,9 +499,112 @@
       </Border>
 
       <!-- ===================== Action footer ===================== -->
-      <Border DockPanel.Dock="Bottom" Background="{StaticResource HeaderBarBrush}"
-              BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0"
-              Padding="24,12">
+      <!-- ===================== Bottom nav bar (narrow only) =====================
+           Docked before the footer so it lands at the very bottom edge, under the thumb. The
+           rail's TabItems are hidden at this width; these cells drive the same SelectedNavItem,
+           so a jump from a header Meldung bar (#422) still lights the right cell. -->
+      <Border DockPanel.Dock="Bottom" x:Name="PhoneNavBar" Classes="narrow-only navbar"
+              IsEnabled="{Binding IsInputEnabled}">
+        <Grid ColumnDefinitions="*,Auto">
+          <ItemsControl Grid.Column="0" x:Name="PhoneNavCells" ItemsSource="{Binding PrimaryNavItems}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Rows="1" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
+                <Button Classes="navcell" Classes.selected="{Binding IsSelected}"
+                        AutomationProperties.Name="{Binding Header}"
+                        ToolTip.Tip="{Binding Header}"
+                        Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).SelectNavItemCommand}"
+                        CommandParameter="{Binding}">
+                  <Panel>
+                    <Border Classes="navcell-rule" />
+                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                      <Panel>
+                        <PathIcon Classes="navcell-icon"
+                                  Data="{Binding ModuleKey, Converter={x:Static conv:ModuleIconConverter.Instance}}" />
+                        <!-- The status dot rides the icon's top-right corner rather than sitting
+                             beside the label: at 82dp a dot on the text line pushes the word into
+                             an ellipsis, and a Checkliste's name is the part worth reading. -->
+                        <Ellipse Width="7" Height="7" Margin="0,-2,-8,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top"
+                                 Fill="{StaticResource ActiveBrush}" IsVisible="{Binding IsComplete}" />
+                        <Ellipse Width="7" Height="7" Margin="0,-2,-8,0"
+                                 HorizontalAlignment="Right" VerticalAlignment="Top"
+                                 Fill="{StaticResource SignalBrush}" IsVisible="{Binding IsIncomplete}" />
+                      </Panel>
+                      <TextBlock Classes="navcell-label" Text="{Binding Header}" />
+                    </StackPanel>
+                  </Panel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- Everything the four cells could not hold, plus the two Einsatz-level actions the
+               footer gives up at this width. -->
+          <Button Grid.Column="1" x:Name="MoreModulesButton" Classes="navcell" Width="72"
+                  AutomationProperties.Name="Weitere Bereiche und Aktionen"
+                  ToolTip.Tip="Weitere Bereiche und Aktionen">
+            <Panel>
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <Panel>
+                  <PathIcon Classes="navcell-icon"
+                            Data="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+                  <Ellipse Width="7" Height="7" Margin="0,-2,-8,0"
+                           HorizontalAlignment="Right" VerticalAlignment="Top"
+                           Fill="{StaticResource SignalBrush}" IsVisible="{Binding OverflowHasStatusDot}" />
+                </Panel>
+                <TextBlock Classes="navcell-label" Text="MEHR" />
+              </StackPanel>
+            </Panel>
+            <Button.Flyout>
+              <Flyout Placement="TopEdgeAlignedRight">
+                <StackPanel x:Name="MoreModulesPanel" Spacing="4" MinWidth="220">
+                  <ItemsControl ItemsSource="{Binding OverflowNavItems}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left" Margin="0,1"
+                                Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).SelectNavItemCommand}"
+                                CommandParameter="{Binding}">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Width="15" Height="15" VerticalAlignment="Center"
+                                      Data="{Binding ModuleKey, Converter={x:Static conv:ModuleIconConverter.Instance}}" />
+                            <TextBlock Text="{Binding Header}" VerticalAlignment="Center" />
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                     Fill="{StaticResource ActiveBrush}" IsVisible="{Binding IsComplete}" />
+                            <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                     Fill="{StaticResource SignalBrush}" IsVisible="{Binding IsIncomplete}" />
+                          </StackPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Border Height="1" Background="{StaticResource HairlineBrush}" Margin="0,4" />
+                  <!-- The footer's actions, under the same gates they carry there. -->
+                  <Button x:Name="MoreCloseButton" Classes="ghost" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left" Content="EINSATZ ABSCHLIESSEN"
+                          IsVisible="{Binding !IsClient}" IsEnabled="{Binding IsInputEnabled}"
+                          Command="{Binding CloseIncidentCommand}" />
+                  <Button x:Name="MoreExportButton" Classes="ghost" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left" Content="PDF EXPORTIEREN"
+                          IsVisible="{Binding CanExport}" IsEnabled="{Binding IsInputEnabled}"
+                          Command="{Binding ExportPdfCommand}" />
+                </StackPanel>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+        </Grid>
+      </Border>
+
+      <!-- On a phone the two actions move into the bottom bar's MEHR sheet and only the save and
+           export status stays here: a phone cannot afford an action footer AND a nav bar, and of
+           the two it is the save state that has to remain in sight during an Einsatz. -->
+      <Border DockPanel.Dock="Bottom" x:Name="ActionFooter" Background="{StaticResource HeaderBarBrush}"
+              BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0">
         <!-- #221: Close/Export moved from lower-left to lower-right, so lower-left is free for
              each tab's own "add entry" affordance without a stray click landing on either. -->
         <Grid ColumnDefinitions="Auto,*,Auto">
@@ -475,7 +641,7 @@
                        ToolTip.Tip="{Binding ExportStatusDetail}"
                        IsVisible="{Binding ExportStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" IsEnabled="{Binding IsInputEnabled}">
+          <StackPanel x:Name="FooterActions" Grid.Column="2" Orientation="Horizontal" Spacing="10" IsEnabled="{Binding IsInputEnabled}">
             <!-- Only the host closes the incident (#465); a joined client doesn't see the button. -->
             <Button x:Name="CloseButton" Content="EINSATZ ABSCHLIESSEN" Command="{Binding CloseIncidentCommand}"
                     IsVisible="{Binding !IsClient}" />
@@ -492,7 +658,7 @@
            and footer actions. The content area keeps its own inner padding, preserving
            the gap between rail and content. -->
       <!-- Greyed out while a joined client is reconnecting — it can't send commands until the link is back. -->
-      <Border Background="{StaticResource AppBackgroundBrush}" Padding="24,0,0,0" IsEnabled="{Binding IsInputEnabled}">
+      <Border x:Name="WorkspaceBody" Background="{StaticResource AppBackgroundBrush}" IsEnabled="{Binding IsInputEnabled}">
         <!-- The rail is Stammdaten now (0..n Checklisten, per-module visibility), so it binds a
              resolved collection instead of ten literal TabItems. One header template serves every
              tab: IsComplete/IsIncomplete are plain booleans on the nav item and are both false for
@@ -519,7 +685,7 @@
           </TabControl.ItemTemplate>
           <TabControl.ContentTemplate>
             <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
-              <Border Background="{StaticResource SurfaceBrush}" Padding="24" Margin="0">
+              <Border Classes="tab-content" Background="{StaticResource SurfaceBrush}" Margin="0">
                 <ContentControl Content="{Binding Content}" />
               </Border>
             </DataTemplate>
