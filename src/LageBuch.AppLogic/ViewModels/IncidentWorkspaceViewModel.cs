@@ -192,6 +192,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // "Straße, Ortsteil" -- the same join the PDF header prints, so the two never disagree.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowAddressLine))]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLineInHeader))]
     [NotifyPropertyChangedFor(nameof(HasIncidentData))]
     private string? _addressDisplay;
 
@@ -211,6 +212,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public bool ShowEinsatznummerChip => HasEinsatznummer && !IsEinsatznummerShownAsHero;
 
     public bool ShowAddressLine => !string.IsNullOrWhiteSpace(AddressDisplay);
+
+    /// <summary>
+    /// Whether the header itself shows the address. Separate from <see cref="ShowAddressLine"/>,
+    /// which says whether there <em>is</em> one and feeds <see cref="HasIncidentData"/>: folding
+    /// the phone into that would take the edit pencil away from an Einsatz that only has an
+    /// address. At 412dp the address is what pushes the Einsatznummer chip off the line, and it is
+    /// the one part of the identity already a tap away behind that pencil.
+    /// </summary>
+    public bool ShowAddressLineInHeader => ShowAddressLine && !IsNarrow;
 
     // Drives which affordance the header shows: a quiet pencil once anything is known, an explicit
     // "+ Einsatzdaten ergänzen" while nothing is -- so an incident started without any head data
@@ -303,6 +313,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// sheet that starts closed rather than a strip that is always there.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLineInHeader))]
     private bool _isNarrow;
 
     /// <summary>

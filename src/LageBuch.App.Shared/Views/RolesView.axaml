@@ -6,26 +6,130 @@
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.RolesView"
              x:DataType="vm:RolesViewModel">
+  <!-- Keyed off the workspace's container. Field widths are Styles rather than Width= on the
+       controls: a local value in XAML outranks a Style setter, so the narrow query could never
+       widen them. One dock serves both layouts. -->
+  <UserControl.Styles>
+    <Style Selector="AutoCompleteBox#RoleBox">
+      <Setter Property="Width" Value="120" />
+    </Style>
+    <Style Selector="AutoCompleteBox#PersonNameBox">
+      <Setter Property="Width" Value="200" />
+    </Style>
+    <Style Selector="TextBox#SectionBox">
+      <Setter Property="Width" Value="130" />
+    </Style>
+    <Style Selector="AutoCompleteBox#CallSignBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <Style Selector="TextBox#PhoneBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <Style Selector="AutoCompleteBox#TransferPersonNameBox">
+      <Setter Property="Width" Value="200" />
+    </Style>
+    <Style Selector="AutoCompleteBox#TransferCallSignBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+    <Style Selector="TextBox#TransferPhoneBox">
+      <Setter Property="Width" Value="150" />
+    </Style>
+
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <!-- The bottom bar already says FUNKTIONEN; dropping the heading gives the checkbox room. -->
+      <Style Selector="TextBlock#RolesTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#RolesGridPanel">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Border#RolesCardPanel">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="WrapPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <Style Selector="WrapPanel#TransferFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <Style Selector="AutoCompleteBox#RoleBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="AutoCompleteBox#PersonNameBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#SectionBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="AutoCompleteBox#CallSignBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#PhoneBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="AutoCompleteBox#TransferPersonNameBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="AutoCompleteBox#TransferCallSignBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#TransferPhoneBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="HeaderedContentControl.field">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+      </Style>
+      <Style Selector="Button.dock-action">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      </Style>
+    </ContainerQuery>
+  </UserControl.Styles>
+
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-      <TextBlock Grid.Column="0" Text="FÜHRUNG &amp; FUNKTIONEN" Classes="overline" VerticalAlignment="Top" />
+      <TextBlock Grid.Column="0" x:Name="RolesTitle" Text="FÜHRUNG &amp; FUNKTIONEN" Classes="overline" VerticalAlignment="Top" />
       <CheckBox Grid.Column="1" x:Name="ShowAllRolesCheckBox"
                 Content="Alle Funktionen (auch beendete)"
                 IsChecked="{Binding ShowAllRoles}" />
     </Grid>
 
+    <!-- The phone's way in to the dock, at the bottom edge where the thumb already is. -->
+    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="+ FUNKTION ZUWEISEN"
+            IsVisible="{Binding ShowComposerButton}"
+            Command="{Binding OpenComposerCommand}" />
+
     <!-- Input dock -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            IsVisible="{Binding ShowComposer}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
+           bottom of the window to the soft keyboard. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="10">
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <!-- Only the phone's form needs a way back out; the wide dock is never in the way. -->
+        <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto"
+              IsVisible="{Binding IsNarrow}">
+          <TextBlock Grid.Column="0" Text="FUNKTION ZUWEISEN" Classes="overline" VerticalAlignment="Center" />
+          <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                  AutomationProperties.Name="Eingabe schließen"
+                  ToolTip.Tip="Eingabe schließen"
+                  Command="{Binding CloseComposerCommand}">
+            <PathIcon Width="13" Height="13"
+                      Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+          </Button>
+        </Grid>
+        <WrapPanel x:Name="DockFields" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
           <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
                make editable) — mirrors PersonNameBox below. -->
           <HeaderedContentControl Classes="field suggest" Header="FUNKTION"
                                   Classes.invalid="{Binding NewRoleError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <AutoCompleteBox x:Name="RoleBox" Width="120"
+            <AutoCompleteBox x:Name="RoleBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
                              ItemsSource="{Binding RoleOptions}"
                              FilterMode="ContainsOrdinal"
@@ -34,7 +138,7 @@
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest" Header="NAME"
                                   Classes.invalid="{Binding NewPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <AutoCompleteBox x:Name="PersonNameBox" Width="200"
+            <AutoCompleteBox x:Name="PersonNameBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal"
@@ -43,14 +147,14 @@
                              b:EnterSubmit.Command="{Binding AddRoleCommand}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="ABSCHNITT">
-            <TextBox x:Name="SectionBox" Width="130"
+            <TextBox x:Name="SectionBox"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
                      Text="{Binding NewSection}" />
           </HeaderedContentControl>
           <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). -->
           <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
-            <AutoCompleteBox Width="150"
+            <AutoCompleteBox x:Name="CallSignBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                              ItemsSource="{Binding CallSignOptions}"
                              FilterMode="ContainsOrdinal"
@@ -58,13 +162,13 @@
                              Text="{Binding NewCallSign}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="HANDYNUMMER">
-            <TextBox x:Name="PhoneBox" Width="150"
+            <TextBox x:Name="PhoneBox"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                      Text="{Binding NewPhone}" />
           </HeaderedContentControl>
-          <Button x:Name="AddRoleButton" Classes="signal" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
+          <Button x:Name="AddRoleButton" Classes="signal dock-action" Content="ZUWEISEN" Command="{Binding AddRoleCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        </StackPanel>
+        </WrapPanel>
         <!-- Was noch fehlt (#412): eigene Zeile, damit keine Meldung ihr Feld verbreitert. -->
         <TextBlock x:Name="DockErrorSummary" Classes="field-error"
                    Text="{Binding ErrorSummary}"
@@ -77,6 +181,7 @@
                    TextWrapping="Wrap"
                    IsVisible="{Binding IsNewRoleUnknown}" />
       </StackPanel>
+      </ScrollViewer>
     </Border>
 
     <!-- Transfer panel: a small form below the grid, mirroring EtbView's edit panel, shown only
@@ -106,10 +211,10 @@
                     Foreground="{StaticResource TextSecondaryBrush}"
                     Data="M16.01 11H4v2h12.01v3L20 12l-3.99-4z" />
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="8">
+        <WrapPanel x:Name="TransferFields" Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
           <HeaderedContentControl Classes="field suggest" Header="NAME"
                                   Classes.invalid="{Binding TransferPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <AutoCompleteBox x:Name="TransferPersonNameBox" Width="200"
+            <AutoCompleteBox x:Name="TransferPersonNameBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal"
@@ -118,7 +223,7 @@
                              b:EnterSubmit.Command="{Binding ConfirmTransferCommand}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest" Header="FUNKRUFNAME">
-            <AutoCompleteBox x:Name="TransferCallSignBox" Width="150"
+            <AutoCompleteBox x:Name="TransferCallSignBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                              ItemsSource="{Binding CallSignOptions}"
                              FilterMode="ContainsOrdinal"
@@ -126,15 +231,15 @@
                              Text="{Binding TransferCallSign}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="HANDYNUMMER">
-            <TextBox x:Name="TransferPhoneBox" Width="150"
+            <TextBox x:Name="TransferPhoneBox"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
                      Text="{Binding TransferPhone}" />
           </HeaderedContentControl>
-          <Button x:Name="ConfirmTransferButton" Classes="signal" Content="ÜBERTRAGEN" Command="{Binding ConfirmTransferCommand}"
+          <Button x:Name="ConfirmTransferButton" Classes="signal dock-action" Content="ÜBERTRAGEN" Command="{Binding ConfirmTransferCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-          <Button x:Name="CancelTransferButton" Content="ABBRECHEN" Command="{Binding CancelTransferCommand}"
+          <Button x:Name="CancelTransferButton" Classes="dock-action" Content="ABBRECHEN" Command="{Binding CancelTransferCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
-        </StackPanel>
+        </WrapPanel>
         <!-- Was noch fehlt (#412): eigene Zeile, damit keine Meldung ihr Feld verbreitert. -->
         <TextBlock x:Name="TransferErrorSummary" Classes="field-error"
                    Text="{Binding TransferErrorSummary}"
@@ -142,7 +247,8 @@
       </StackPanel>
     </Border>
 
-    <Border Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+    <Panel>
+    <Border x:Name="RolesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <DataGrid x:Name="RolesGrid" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
@@ -181,5 +287,53 @@
         </DataGrid.Columns>
       </DataGrid>
     </Border>
+
+    <!-- The narrow layout: one card per assignment. The Funktion leads — it is what the position
+         is called on the radio — with the person under it; the Handynummer stays a live field for
+         the same reason it is one in the grid, and ÜBERTRAGEN stays with the row it hands over. -->
+    <Border x:Name="RolesCardPanel" Classes="narrow-only"
+            Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="RolesCards" ItemsSource="{Binding Roles}" Margin="8">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:RoleAssignmentRow">
+              <Border Classes="row-card">
+                <StackPanel Spacing="5">
+                  <TextBlock Text="{Binding Role}" FontWeight="SemiBold"
+                             Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding PersonName}" TextWrapping="Wrap" />
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2">
+                    <TextBlock Text="{Binding Section}" Classes="secondary" FontSize="13"
+                               IsVisible="{Binding Section, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock Text="{Binding CallSign}" Classes="mono" FontSize="12"
+                               IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </WrapPanel>
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="VON" Classes="overline" FontSize="9" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding FromDisplay}" Classes="mono" FontSize="12" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6"
+                                IsVisible="{Binding ToDisplay, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <TextBlock Text="BIS" Classes="overline" FontSize="9" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding ToDisplay}" Classes="mono" FontSize="12" />
+                    </StackPanel>
+                  </WrapPanel>
+                  <TextBox PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                           Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                           IsEnabled="{Binding !IsReadOnly}" />
+                  <Button Content="ÜBERTRAGEN" HorizontalAlignment="Stretch"
+                          Height="{StaticResource ControlHeightTouch}"
+                          IsVisible="{Binding IsRunning}"
+                          Command="{Binding BeginTransferCommand}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+    </Panel>
   </DockPanel>
 </UserControl>

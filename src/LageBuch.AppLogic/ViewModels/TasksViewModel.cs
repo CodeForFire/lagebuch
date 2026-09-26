@@ -16,7 +16,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// counts, and because the input dock's state lives here rather than on rows, a rebuild never
 /// eats half-finished input. The ticker drives the countdown displays and the one-shot due alarm.
 /// </summary>
-public sealed partial class TasksViewModel : ObservableObject, IDisposable
+public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -197,6 +197,37 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     // press instead, because a grey button names nothing (#412).
     private bool CanAddTask => !IsReadOnly;
 
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the narrow layout's add-task form is open. Five fields across ~810px; a phone
+    /// stacks them and only while a task is actually being written.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isComposerOpen;
+
+    /// <summary>Whether the dock is on screen: always when wide, only while composing on a phone.</summary>
+    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+
+    /// <summary>The phone's "add a task" affordance, shown exactly when the dock is not.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+
+    [RelayCommand(CanExecute = nameof(CanAddTask))]
+    private void OpenComposer() => IsComposerOpen = true;
+
+    [RelayCommand]
+    private void CloseComposer()
+    {
+        IsComposerOpen = false;
+        ShowErrors(false); // a dismissed form must not reopen still complaining
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddTask))]
     private void AddTask()
     {
@@ -208,6 +239,9 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         _session.AddTask(NewText, NewAssignee, NewImportance, NewUrgency, NewTimerMinutes!.Value);
         NewText = string.Empty; // priorities stay sticky for rapid follow-up entries
         ShowErrors(false); // ...and the cleared text must not read as a fresh complaint
+
+        // Reached only on success, so this is where the phone's form closes again.
+        IsComposerOpen = false;
         _onChanged();
     }
 

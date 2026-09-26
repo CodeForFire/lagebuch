@@ -127,7 +127,7 @@
 
               <TextBlock x:Name="AddressLine" Classes="secondary" VerticalAlignment="Center"
                          MaxWidth="360" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding AddressDisplay}"
-                         Text="{Binding AddressDisplay}" IsVisible="{Binding ShowAddressLine}" />
+                         Text="{Binding AddressDisplay}" IsVisible="{Binding ShowAddressLineInHeader}" />
 
               <Button x:Name="EditIncidentDataButton" Classes="ghost" ToolTip.Tip="Einsatzdaten bearbeiten"
                       AutomationProperties.Name="Einsatzdaten bearbeiten"

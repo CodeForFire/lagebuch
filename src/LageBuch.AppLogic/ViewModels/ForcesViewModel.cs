@@ -199,7 +199,7 @@ public sealed partial class ForceRow : ObservableObject
         }).ToArray();
 }
 
-public sealed partial class ForcesViewModel : ObservableObject, IDisposable
+public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -442,6 +442,37 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
     // instead, because a grey button names none of them (#412).
     private bool CanAddForce => !IsReadOnly;
 
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the narrow layout's add-unit form is open. Nine fields across ~1070px is the widest
+    /// dock in the app; a phone stacks them and only while an Einheit is actually being added.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isComposerOpen;
+
+    /// <summary>Whether the dock is on screen: always when wide, only while composing on a phone.</summary>
+    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+
+    /// <summary>The phone's "add a unit" affordance, shown exactly when the dock is not.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+
+    [RelayCommand(CanExecute = nameof(CanAddForce))]
+    private void OpenComposer() => IsComposerOpen = true;
+
+    [RelayCommand]
+    private void CloseComposer()
+    {
+        IsComposerOpen = false;
+        ShowErrors(false); // a dismissed form must not reopen still complaining
+    }
+
     // Lifted comparisons throughout: null >= 0 is false, so every operand coalesces first.
     private int Zugfuehrer => NewZugfuehrerCount ?? 0;
 
@@ -547,6 +578,10 @@ public sealed partial class ForcesViewModel : ObservableObject, IDisposable
         NewStatus = null;
         NewNotes = null;
         ShowErrors(false); // the cleared form must not read as a fresh complaint
+
+        // Reached only on success — Validate() returns early otherwise — so this is where the
+        // phone's form closes and gives the list back.
+        IsComposerOpen = false;
         _onChanged();
     }
 
