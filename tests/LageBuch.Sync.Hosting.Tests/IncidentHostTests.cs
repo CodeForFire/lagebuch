@@ -635,6 +635,17 @@ public class IncidentHostTests
         response.EnsureSuccessStatusCode();
     }
 
+    // SyncProtocol's doc comment claims the v0.6.1 contract *is* protocol 1, and nothing else states
+    // it. The refusal test above cannot hold it: that one only fails when the number rises to the
+    // floor, and 0 is what an absent member on the wire lands on -- a drift down to it would leave
+    // every other test green while making the doc comment false and the 0 -> Legacy mapping in
+    // RemoteIncidentSession a no-op.
+    [Fact]
+    public void Legacy_protocol_is_the_contract_a_pre_handshake_build_speaks()
+    {
+        Assert.Equal(1, SyncProtocol.LegacyProtocolVersion);
+    }
+
     [Fact]
     public async Task Host_refuses_a_request_with_no_protocol_header_once_its_floor_is_above_the_legacy_protocol()
     {
