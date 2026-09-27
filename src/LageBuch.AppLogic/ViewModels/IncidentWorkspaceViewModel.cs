@@ -33,6 +33,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly ILastPdfExportStore? _lastPdfExportStore;
+    private readonly IMailComposer _mailComposer;
 
     // The same app-lifetime store the session persists through (issue #167 review follow-up):
     // its background writer's SaveFailed/SaveSucceeded never reached the UI before this, so a
@@ -67,7 +68,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Links] = "LINKS",
         };
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -80,6 +81,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _hostController = hostController;
         _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         _lastPdfExportStore = lastPdfExport;
+        _mailComposer = mailComposer ?? new NoopMailComposer();
         _store = store;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
         _remoteHost = remoteHost;
@@ -831,8 +833,23 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             ? $"ACHTUNG: {activeTrupps} Atemschutztrupp(s) noch unter PA. " +
               "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?"
             : "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?";
-        var dialog = new ConfirmDialogViewModel(
-            "Einsatz abschließen?", message, "ABSCHLIESSEN", PerformClose);
+
+        // The final PDF is usually the next thing the Lagebuchführer makes, and it goes out by
+        // e-mail; offering it here saves the trip through PDF EXPORTIEREN and the mail program.
+        ConfirmDialogViewModel? dialog = null;
+        dialog = new ConfirmDialogViewModel(
+            "Einsatz abschließen?",
+            message,
+            "ABSCHLIESSEN",
+            () =>
+            {
+                PerformClose();
+                if (dialog?.IsOptionChecked == true)
+                {
+                    OpenPdfExportOptions(RunExportAndMailAsync, "PDF ERSTELLEN & MAILEN");
+                }
+            },
+            CanMailPdf ? "PDF erstellen und per E-Mail senden" : null);
 
         // Clear the overlay on either outcome; PerformClose has already run on confirm.
         dialog.Closed += (_, _) => PendingConfirm = null;
@@ -916,9 +933,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // Opens the section-selection overlay (#262); the actual generate/write/share work is the
     // overlay's own awaitable ExportCommand (RunExportAsync below), so this stays synchronous.
     [RelayCommand(CanExecute = nameof(CanExport))]
-    private void ExportPdf()
+    private void ExportPdf() => OpenPdfExportOptions(RunExportAsync);
+
+    // Mailing needs both halves: a PDF to attach and a mail program to hand it to. Neither exists
+    // on Android, which is why the close dialog there never offers it.
+    private bool CanMailPdf => CanExport && _mailComposer.CanCompose;
+
+    private void OpenPdfExportOptions(Func<IncidentPdfSections, Task> onExport, string exportLabel = "EXPORTIEREN")
     {
-        var dialog = new PdfExportOptionsViewModel(RunExportAsync);
+        var dialog = new PdfExportOptionsViewModel(onExport, exportLabel);
 
         // Guards against a stale dialog's Closed firing after a newer one has already replaced it
         // in PendingPdfExportOptions -- Export() awaits real async work while the dialog stays up,
@@ -934,11 +957,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         PendingPdfExportOptions = dialog;
     }
 
+    // Returns the written PDF's path, or null when the save dialog was cancelled or the export
+    // failed -- the status line already says which.
     [SuppressMessage(
         "Design",
         "CA1031",
         Justification = "Export can fail in several ways (disk full, exporter throwing, etc.); surfaces in the status line.")]
-    private async Task RunExportAsync(IncidentPdfSections sections)
+    private async Task<string?> RunExportAsync(IncidentPdfSections sections)
     {
         // Reuse the incident's own name -- its .fwincident file's base name (date+time, see
         // HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually still
@@ -951,7 +976,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
         {
-            return; // cancelled -- no status change, dialog still closes normally
+            return null; // cancelled -- no status change, dialog still closes normally
         }
 
         try
@@ -974,11 +999,47 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 : $"PDF exportiert: {Path.GetFileName(path)} ({missing} {(missing == 1 ? "Anhang" : "Anhänge")} nicht verfügbar)";
             ExportStatusDetail = path;
             _lastPdfExportStore?.SetLastExport(path, _clock.Now);
+            return path;
         }
         catch (Exception ex)
         {
             ExportStatus = $"Export fehlgeschlagen: {ex.Message}";
             ExportStatusDetail = null; // nothing to point a tooltip at -- the export failed
+            return null;
+        }
+    }
+
+    // The close dialog's "PDF erstellen und per E-Mail senden": the same export, then the PDF goes
+    // to the mail program with a subject built from the Einsatzdaten. ExportStatusDetail keeps the
+    // path, so whatever the mail program did, the file is still one tooltip away.
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A mail program that fails to start must not lose the exported PDF; surfaces in the status line.")]
+    private async Task RunExportAndMailAsync(IncidentPdfSections sections)
+    {
+        var path = await RunExportAsync(sections);
+        if (path is null)
+        {
+            return;
+        }
+
+        var name = Path.GetFileName(path);
+        var incident = _session.Incident;
+        try
+        {
+            var result = await _mailComposer.ComposeAsync(
+                new MailDraft(IncidentMail.Subject(incident), IncidentMail.Body(incident), path));
+            ExportStatus = result switch
+            {
+                MailComposeResult.Attached => $"PDF per E-Mail vorbereitet: {name}",
+                MailComposeResult.OpenedWithoutAttachment => $"E-Mail geöffnet – PDF bitte anhängen: {name}",
+                _ => $"PDF exportiert: {name} – E-Mail-Programm nicht gefunden",
+            };
+        }
+        catch (Exception ex)
+        {
+            ExportStatus = $"PDF exportiert: {name} – E-Mail fehlgeschlagen: {ex.Message}";
         }
     }
 

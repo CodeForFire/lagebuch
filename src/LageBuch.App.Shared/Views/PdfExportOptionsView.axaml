@@ -43,7 +43,7 @@
                      IsVisible="{Binding SelectionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
-            <Button x:Name="ExportButton" Classes="signal" Content="EXPORTIEREN" Command="{Binding ExportCommand}" />
+            <Button x:Name="ExportButton" Classes="signal" Content="{Binding ExportLabel}" Command="{Binding ExportCommand}" />
           </StackPanel>
         </StackPanel>
       </DockPanel>

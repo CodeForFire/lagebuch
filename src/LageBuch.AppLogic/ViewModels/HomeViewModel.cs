@@ -44,6 +44,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // Threaded straight into every IncidentWorkspaceViewModel this opens (#262); null (most tests
     // and every remote/joined workspace) just means "no last-export status to seed or persist".
     private readonly ILastPdfExportStore? _lastPdfExport;
+    private readonly IMailComposer? _mailComposer;
 
     // Where a joined client caches pulled attachment bytes (see RemoteIncidentSession.GetFileBytesAsync).
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
@@ -56,7 +57,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -74,6 +75,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _attachmentCacheRoot = attachmentCacheRoot;
         _trustStore = trustStore;
         _lastPdfExport = lastPdfExport;
+        _mailComposer = mailComposer;
         _lastConnectionStore = lastConnection;
         _lastConnection = lastConnection?.GetLast();
         RecentFiles = new ObservableCollection<RecentFileItem>(
@@ -270,7 +272,7 @@ public sealed partial class HomeViewModel : ObservableObject
         // The local workspace's own saves flow through this same _store singleton, so wiring it
         // through here (issue #167 review follow-up) lets it surface a failed background write
         // that would otherwise leave the operator believing the incident is safely persisted.
-        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport, _store, _uiDispatcher);
+        var workspace = new IncidentWorkspaceViewModel(session, _clock, _ticker, md, _dialogs, _alarm, _hostController, _pdfExporter, _lastPdfExport, _store, _uiDispatcher, mailComposer: _mailComposer);
         WorkspaceOpened?.Invoke(workspace);
     }
 
