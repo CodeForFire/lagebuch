@@ -80,7 +80,7 @@
             </Button>
           </Grid>
           <StackPanel x:Name="DockFields" Spacing="8">
-            <HeaderedContentControl Classes="field" Header="NAME"
+            <HeaderedContentControl Classes="field required" Header="NAME"
                                     Classes.invalid="{Binding NewNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
               <TextBox x:Name="NewNameBox"
                        MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNameLength}"

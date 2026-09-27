@@ -33,7 +33,7 @@
                requires Tailscale, #59 follow-up), entered alongside "who documents here" so a
                joining device provides both in one prompt. -->
           <StackPanel IsVisible="{Binding CollectsHost}" Spacing="3">
-            <HeaderedContentControl Classes="field" Header="GERÄT (NAME ODER IP-ADRESSE)"
+            <HeaderedContentControl Classes="field required" Header="GERÄT (NAME ODER IP-ADRESSE)"
                                     Margin="0,4,0,0" ctrl:Field.Error="{Binding HostError}">
               <TextBox x:Name="HostBox" PlaceholderText="z. B. elw-1 oder 192.168.1.10" Text="{Binding Host}">
                 <TextBox.KeyBindings>
@@ -42,7 +42,7 @@
               </TextBox>
             </HeaderedContentControl>
             <!-- The 4-digit PIN the hosting device shows; required to join (#64). -->
-            <HeaderedContentControl Classes="field" Header="PIN" Margin="0,8,0,0"
+            <HeaderedContentControl Classes="field required" Header="PIN" Margin="0,8,0,0"
                                     ctrl:Field.Error="{Binding PinError}">
               <TextBox x:Name="PinBox" PlaceholderText="4-stellig" MaxLength="4" Text="{Binding Pin}"
                        b:IntegerOnly.IsEnabled="True">
@@ -73,7 +73,7 @@
             </Border>
           </StackPanel>
           <!-- Suggests own personnel (#469) but stays free text, like CallSignBox below. -->
-          <HeaderedContentControl Classes="field suggest" Header="NAME" Margin="0,4,0,0"
+          <HeaderedContentControl Classes="field suggest required" Header="NAME" Margin="0,4,0,0"
                                   ctrl:Field.Error="{Binding OperatorNameError}">
             <AutoCompleteBox x:Name="OperatorNameBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorFullNamePlaceholder}"

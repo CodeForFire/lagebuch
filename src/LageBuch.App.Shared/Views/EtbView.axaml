@@ -139,7 +139,7 @@
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
                                Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
             </HeaderedContentControl>
-            <HeaderedContentControl Classes="field" Header="EINTRAG"
+            <HeaderedContentControl Classes="field required" Header="EINTRAG"
                                       Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
               <!-- Freitext: kein Platzhalter, siehe #137 -->
               <TextBox x:Name="EtbTextBox" Text="{Binding NewText}">
@@ -172,7 +172,7 @@
             IsVisible="{Binding IsEditing}">
       <StackPanel Spacing="6">
         <StackPanel x:Name="EditFields" Spacing="8">
-          <HeaderedContentControl Classes="field" Header="EINTRAG"
+          <HeaderedContentControl Classes="field required" Header="EINTRAG"
                                     Classes.invalid="{Binding EditTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
             <TextBox x:Name="EditTextBox" Text="{Binding EditText}">

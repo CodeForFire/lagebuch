@@ -195,7 +195,7 @@
                mutual aid from outside the Landkreis). A suggestion list here would just re-offer
                what the dropdown already has. Readonly while a Fahrzeug is selected, since its Wache
                derived this field (#215). -->
-          <HeaderedContentControl Classes="field" Header="FEUERWEHR / WACHE"
+          <HeaderedContentControl Classes="field required" Header="FEUERWEHR / WACHE"
                                   Classes.invalid="{Binding NewBrigadeError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBox x:Name="BrigadeBox"
                      IsEnabled="{Binding !IsVehicleSelected}"
@@ -209,7 +209,7 @@
           <!-- Same reasoning as Feuerwehr/Wache above: free text for vehicles outside the Stammdaten,
                readonly while a Fahrzeug is selected. Required together with the Wache (#220): a
                Kraft is a Fahrzeug from den Stammdaten oder eine Wache samt Funkrufname. -->
-          <HeaderedContentControl Classes="field" Header="FUNKRUFNAME"
+          <HeaderedContentControl Classes="field required" Header="FUNKRUFNAME"
                                   Classes.invalid="{Binding NewCallSignError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBox x:Name="CallSignBox"
                      IsEnabled="{Binding !IsVehicleSelected}"

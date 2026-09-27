@@ -503,7 +503,13 @@
     <Setter Property="Template">
       <ControlTemplate>
         <StackPanel Spacing="2">
-          <TextBlock Classes="overline" FontSize="10" Text="{TemplateBinding Header}" />
+          <StackPanel Orientation="Horizontal" Spacing="3">
+            <TextBlock Classes="overline" FontSize="10" Text="{TemplateBinding Header}" />
+            <!-- Mandatory marker (#414): shape and colour together, because a colour-only signal
+                 is lost to glare on an ELW screen. Opt in with Classes="field required". -->
+            <TextBlock x:Name="RequiredMarker" Classes="overline" FontSize="10" Text="*"
+                       IsVisible="False" />
+          </StackPanel>
           <Grid>
             <ContentPresenter Content="{TemplateBinding Content}" />
             <!-- Suggestion marker (#259): signals the input is backed by a suggestion list
@@ -530,6 +536,22 @@
 
   <Style Selector="HeaderedContentControl.field.suggest /template/ PathIcon#SuggestChevron">
     <Setter Property="IsVisible" Value="True" />
+  </Style>
+
+  <!-- The asterisk is only seen. A screen reader lands on the input, not on the caption, so the
+       input itself says it is required. TextBox also covers the one inside an AutoCompleteBox or a
+       NumericUpDown. -->
+  <!-- Foreground here rather than on the template part: a value set inside a template ranks
+       below any style, so TextBlock.overline would repaint the asterisk in caption grey. -->
+  <Style Selector="HeaderedContentControl.field.required /template/ TextBlock#RequiredMarker">
+    <Setter Property="IsVisible" Value="True" />
+    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+  </Style>
+  <Style Selector="HeaderedContentControl.field.required TextBox">
+    <Setter Property="AutomationProperties.IsRequiredForForm" Value="True" />
+  </Style>
+  <Style Selector="HeaderedContentControl.field.required ComboBox">
+    <Setter Property="AutomationProperties.IsRequiredForForm" Value="True" />
   </Style>
 
   <!-- A field the form is waiting on (#412). Set with Classes.invalid from the same error string

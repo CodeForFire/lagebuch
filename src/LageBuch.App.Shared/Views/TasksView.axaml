@@ -167,7 +167,7 @@
               </TextBox.KeyBindings>
             </TextBox>
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="AUFGABE"
+          <HeaderedContentControl Classes="field required" Header="AUFGABE"
                                     Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
             <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}">

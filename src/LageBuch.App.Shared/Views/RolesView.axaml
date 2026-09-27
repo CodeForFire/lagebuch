@@ -138,7 +138,7 @@
           <!-- Funktion is a suggestion list, not a closed set: an ad-hoc or mutual-aid role must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (which Avalonia cannot
                make editable) — mirrors PersonNameBox below. -->
-          <HeaderedContentControl Classes="field suggest" Header="FUNKTION"
+          <HeaderedContentControl Classes="field suggest required" Header="FUNKTION"
                                   Classes.invalid="{Binding NewRoleError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="RoleBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
@@ -147,7 +147,7 @@
                              MinimumPrefixLength="0"
                              Text="{Binding NewRole}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field suggest" Header="NAME"
+          <HeaderedContentControl Classes="field suggest required" Header="NAME"
                                   Classes.invalid="{Binding NewPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="PersonNameBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
@@ -223,7 +223,7 @@
                     Data="M16.01 11H4v2h12.01v3L20 12l-3.99-4z" />
         </StackPanel>
         <StackPanel x:Name="TransferFields" Spacing="8">
-          <HeaderedContentControl Classes="field suggest" Header="NAME"
+          <HeaderedContentControl Classes="field suggest required" Header="NAME"
                                   Classes.invalid="{Binding TransferPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="TransferPersonNameBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
