@@ -314,12 +314,14 @@ public sealed class IncidentHost : IAsyncDisposable
         header.Count == 1 && string.Equals(header[0], _pin, StringComparison.Ordinal);
 
     // No header at all is a pre-negotiation peer (v0.6.1 or older), which by construction speaks
-    // SyncProtocol.LegacyProtocolVersion and is served. Anything present must be exactly one header
+    // SyncProtocol.LegacyProtocolVersion and is gated like any other peer claiming that number —
+    // served while the floor still includes it, refused once the floor has risen above it (protocol
+    // 3, the Beteiligte commands). Anything present must be exactly one header
     // and must parse: a duplicated or garbled one is refused rather than silently coalesced, the same
     // rule PinMatches applies. Indexed after the count check because StringValues converts implicitly
     // to both string and string[], which makes passing it to TryParse directly ambiguous.
     private static bool ProtocolAccepted(Microsoft.Extensions.Primitives.StringValues header, int minimum) =>
-        header.Count == 0
+        (header.Count == 0 && minimum <= SyncProtocol.LegacyProtocolVersion)
         || (header.Count == 1
             && int.TryParse(header[0], System.Globalization.CultureInfo.InvariantCulture, out var claimed)
             && claimed >= minimum);

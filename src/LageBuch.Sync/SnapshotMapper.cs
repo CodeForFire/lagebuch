@@ -4,6 +4,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Involved;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -91,7 +92,8 @@ public static class SnapshotMapper
                 d.Status,
                 d.KeyAvailable,
                 d.CoValue,
-                d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList())).ToList());
+                d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList())).ToList(),
+            incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -167,7 +169,8 @@ public static class SnapshotMapper
                 d.Status,
                 d.KeyAvailable,
                 d.CoValue,
-                d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)))));
+                d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)))),
+            (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

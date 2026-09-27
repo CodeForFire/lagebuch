@@ -197,6 +197,15 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));
 
+    public void AddInvolvedParty(string name, string? phone, string? notes) =>
+        Mutate(() => Incident.AddInvolvedParty(_clock, RequireOperator(), name, phone, notes));
+
+    public void UpdateInvolvedParty(Guid partyId, string name, string? phone, string? notes) =>
+        Mutate(() => Incident.UpdateInvolvedParty(partyId, name, phone, notes));
+
+    public void RemoveInvolvedParty(Guid partyId) =>
+        Mutate(() => Incident.RemoveInvolvedParty(partyId));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

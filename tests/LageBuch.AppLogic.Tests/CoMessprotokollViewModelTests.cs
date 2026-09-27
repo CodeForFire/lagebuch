@@ -820,6 +820,13 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void SetTaskCompleted(Guid taskId, bool isDone) => _inner.SetTaskCompleted(taskId, isDone);
 
+    public void AddInvolvedParty(string name, string? phone, string? notes) => _inner.AddInvolvedParty(name, phone, notes);
+
+    public void UpdateInvolvedParty(Guid partyId, string name, string? phone, string? notes) =>
+        _inner.UpdateInvolvedParty(partyId, name, phone, notes);
+
+    public void RemoveInvolvedParty(Guid partyId) => _inner.RemoveInvolvedParty(partyId);
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

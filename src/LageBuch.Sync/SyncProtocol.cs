@@ -25,20 +25,27 @@ public static class SyncProtocol
     /// 2: the Stammdaten payload carries <c>isOwn</c> on vehicles and personnel (#458). A peer at 1
     /// skips the key, and a payload without it reads as all own, so the floor stays at 1.
     /// </para>
+    /// <para>
+    /// 3: the Beteiligte — <c>addInvolvedParty</c>, <c>updateInvolvedParty</c> and
+    /// <c>removeInvolvedParty</c> commands and the snapshot's <c>involvedParties</c>. A host at 2
+    /// would reject those commands, so the floor rises to 3 as well.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 2;
+    public const int ProtocolVersion = 3;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 1;
+    public const int MinimumProtocolVersion = 3;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,
     /// before this handshake existed. Builds up to and including that release send no protocol
-    /// number at all, and a host still running one must stay joinable.
+    /// number at all. Such a peer stayed joinable until protocol 3 raised
+    /// <see cref="MinimumProtocolVersion"/> above this value; it is now refused like any other
+    /// peer below the floor.
     /// <para>
     /// This equals 1 because the v0.6.1 contract *is* protocol 1 — true only as long as the release
     /// introducing the handshake changes nothing else on the wire (it adds two JSON members an old

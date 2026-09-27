@@ -421,4 +421,61 @@ public class CommandApplierTests
             d.BuildingId == buildingId && d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
         Assert.Equal(DwellingStatus.Searched, dwelling.Status);
     }
+
+    [Fact]
+    public void Involved_party_commands_add_update_and_remove_on_the_host_without_an_etb_line()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var journalBefore = incident.Journal.Count;
+
+        ApplyOverWire(new AddInvolvedPartyCommand(new OperatorDto("Client", "FFB 2"), "Erika Beispiel", null, null), incident, clock);
+        var party = Assert.Single(incident.InvolvedParties);
+        Assert.Equal("Client (FFB 2)", party.CreatedBy);
+        Assert.Equal(clock.Now, party.CreatedAt);
+
+        ApplyOverWire(new UpdateInvolvedPartyCommand(party.Id, "Erika Beispiel", "0171 0000001", "Hauseigentümerin"), incident, clock);
+        Assert.Equal("0171 0000001", Assert.Single(incident.InvolvedParties).Phone);
+
+        ApplyOverWire(new RemoveInvolvedPartyCommand(party.Id), incident, clock);
+        Assert.Empty(incident.InvolvedParties);
+
+        Assert.Equal(journalBefore, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void An_oversized_involved_party_name_from_a_peer_is_refused_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var oversized = new string('A', Domain.Involved.InvolvedParty.MaxNameLength + 1);
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(new AddInvolvedPartyCommand(new OperatorDto("Client", null), oversized, null, null), incident, clock));
+
+        Assert.Empty(incident.InvolvedParties);
+    }
+
+    [Fact]
+    public void An_oversized_involved_party_update_from_a_peer_leaves_the_entry_untouched()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var party = incident.AddInvolvedParty(clock, new SessionOperator("Host"), "Erika Beispiel", null, null);
+        var oversizedNotes = new string('x', Domain.Involved.InvolvedParty.MaxNotesLength + 1);
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(new UpdateInvolvedPartyCommand(party.Id, "Erika Beispiel", null, oversizedNotes), incident, clock));
+
+        Assert.Same(party, Assert.Single(incident.InvolvedParties));
+    }
+
+    [Fact]
+    public void Removing_an_involved_party_the_host_does_not_know_throws()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        Assert.Throws<KeyNotFoundException>(() => ApplyOverWire(new RemoveInvolvedPartyCommand(Guid.NewGuid()), incident, clock));
+    }
 }
