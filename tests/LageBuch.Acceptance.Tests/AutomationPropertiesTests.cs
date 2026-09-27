@@ -79,7 +79,7 @@ public class AutomationPropertiesTests
         // the Checklisten, so only «Neue Checkliste» and the delete button change the set.
         AssertNamed("Navigation", 2 * (NavModules.All.Count + 1));
         AssertNamed("Links", 3);
-        AssertNamed("Personal", 1); // only Entfernen
+        AssertNamed("Personal", 2); // only Entfernen, once in the wide row and once in its phone form
 
         var vehicles = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
         vehicles.AddCommand.Execute(null);
