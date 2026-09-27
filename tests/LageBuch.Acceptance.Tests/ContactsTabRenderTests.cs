@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -18,7 +20,8 @@ public class ContactsTabRenderTests
     // A fictional Kreisbrandinspektion, shaped like the real roster: a Funkrufname, a Dienstgrad,
     // and a Notiz that is either a Fachgebiet or the Feuerwehren somebody covers. Two entries
     // deliberately carry no address and no Notiz -- the roster's xltm-sourced people don't, and
-    // that is the path the per-field visibility has to survive.
+    // that is the path the per-field visibility has to survive. The SBI belongs to a neighbouring
+    // brigade (#458), which the list has to mark.
     private static Person[] Roster() => new[]
     {
         new Person("Mustermann", "Max", "KBR", "Land 1", "01 71 / 1 23 45 67", true, "max.mustermann@example.org", "Kreisbrandrat, KBI Vertretung"),
@@ -27,14 +30,15 @@ public class ContactsTabRenderTests
         new Person("Musterhuber", "Sepp", "KBM", "Land 3/1", "01 71 / 3 45 67 89", true, "sepp.musterhuber@example.org", "Musterdorf, Beispielried, Vorlagenhofen, Schemastetten"),
         new Person("Musterschmid", "Anna", "Fachberater", "Land 9/1", "01 71 / 4 56 78 90", true, "anna.musterschmid@example.org", "Fachberater EDV"),
         new Person("Beispielmeier", "Klara", "PSNV", "Land 9/4", "01 71 / 5 67 89 01", true, "klara.beispielmeier@example.org", "PSNV-E Team"),
-        new Person("Musterlechner", "Hans", "SBI", "Musterstadt 1", "01 71 / 6 78 90 12", true, null, "SBI Musterstadt; Musterstadt, Beispielbach"),
+        new Person("Musterlechner", "Hans", "SBI", "Musterstadt 1", "01 71 / 6 78 90 12", false, null, "SBI Musterstadt; Musterstadt, Beispielbach"),
         new Person("Vorlage", "Kim", "Jugend", null, "01 71 / 7 89 01 23", true, null, null),
     };
 
     private static MasterDataSet MasterData() =>
         WorkspaceRenderHelper.MasterData() with { Personnel = Roster() };
 
-    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace(MasterDataSet md)
+    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace(
+        MasterDataSet md, double width = 1920, double height = 1032)
     {
         var session = TestSession.StartNew(
             new FakeStore(),
@@ -51,11 +55,14 @@ public class ContactsTabRenderTests
             new FakeDialogs(),
             new NoopAlarmService(),
             new NoopIncidentHostController());
-        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = height };
         window.Show();
         Dispatcher.UIThread.RunJobs();
         return (window, vm);
     }
+
+    private static ContactsView ContactsView(Window window) =>
+        WorkspaceRenderHelper.SelectedTabContent(window).GetVisualDescendants().OfType<ContactsView>().Single();
 
     private static void Capture(Window window, string name)
     {
@@ -63,6 +70,16 @@ public class ContactsTabRenderTests
         if (string.IsNullOrWhiteSpace(dir))
         {
             return;
+        }
+
+        // Let the buttons' 150ms brush transitions finish. They run on the wall clock, not on render
+        // ticks, so a frame captured at once shows a background still halfway out of Transparent
+        // (#00FFFFFF) as a grey it never settles on. Screenshot path only: no assertion waits.
+        var settle = Stopwatch.StartNew();
+        while (settle.ElapsedMilliseconds < 250)
+        {
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
         }
 
         Directory.CreateDirectory(dir);
@@ -90,8 +107,50 @@ public class ContactsTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Single(vm.Contacts.VisibleContacts);
-        Assert.Equal("Beispiel, Bernd", vm.Contacts.VisibleContacts[0].DisplayName);
+        Assert.Equal("Beispiel, Bernd", vm.Contacts.VisibleContacts[0].Person.DisplayName);
+
+        // The hit is drawn, not just computed: the Notiz carries exactly one highlighted run.
+        var note = ContactsView(window).GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "ContactNote");
+        var hit = Assert.Single(note.Inlines!.OfType<Run>(), r => r.Background is not null);
+        Assert.Equal("Gefahrgut", hit.Text);
         Capture(window, "kontakte-suche.png");
+    }
+
+    [AvaloniaFact]
+    public void A_member_of_a_neighbouring_brigade_carries_the_fremd_tag()
+    {
+        var (window, _) = ShowWorkspace(MasterData());
+        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
+
+        var tags = ContactsView(window).GetVisualDescendants().OfType<Border>()
+            .Where(b => b.Name == "ForeignTag" && b.IsEffectivelyVisible);
+        Assert.Single(tags);
+    }
+
+    // Opening the tab means looking somebody up, so typing goes straight into the search.
+    [AvaloniaFact]
+    public void Opening_the_tab_puts_the_caret_in_the_search_box()
+    {
+        var (window, _) = ShowWorkspace(MasterData());
+        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(ContactsView(window).GetControl<TextBox>("ContactSearchBox").IsFocused);
+    }
+
+    // 412x915 is the phone PhoneLayoutTests renders at. The overflow check itself lives there;
+    // this is the screenshot.
+    [AvaloniaFact]
+    public void The_kontakte_tab_renders_on_a_phone()
+    {
+        var (window, vm) = ShowWorkspace(MasterData(), 412, 915);
+        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
+
+        vm.Contacts.FilterText = "kbm";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, vm.Contacts.VisibleContacts.Count);
+        Capture(window, "kontakte-phone.png");
     }
 
     [AvaloniaFact]
@@ -102,7 +161,7 @@ public class ContactsTabRenderTests
         vm.Contacts.FilterText = "Beispielried";
 
         Assert.Single(vm.Contacts.VisibleContacts);
-        Assert.Equal("Musterhuber, Sepp", vm.Contacts.VisibleContacts[0].DisplayName);
+        Assert.Equal("Musterhuber, Sepp", vm.Contacts.VisibleContacts[0].Person.DisplayName);
     }
 
     [AvaloniaFact]
@@ -161,8 +220,7 @@ public class ContactsTabRenderTests
             WorkspaceRenderHelper.MasterData() with { Personnel = Array.Empty<Person>() });
         WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
 
-        var view = WorkspaceRenderHelper.SelectedTabContent(window)
-            .GetVisualDescendants().OfType<ContactsView>().Single();
+        var view = ContactsView(window);
         Assert.True(view.GetControl<TextBlock>("EmptyText").IsEffectivelyVisible);
         Assert.False(view.GetControl<TextBox>("ContactSearchBox").IsEffectivelyVisible);
         Capture(window, "kontakte-leer.png");
@@ -223,6 +281,26 @@ public class ContactsTabRenderTests
         // die lokale Eigenschaft unberuehrt und graut den Knopf ueber den effektiven Zustand aus.
         Assert.False(view.GetControl<Button>("SaveButton").IsEffectivelyEnabled);
         Capture(window, "stammdaten-email-ungueltig.png");
+    }
+
+    [AvaloniaFact]
+    public void The_stammdaten_personnel_editor_renders_on_a_phone()
+    {
+        var vm = new MasterDataEditorViewModel(
+            new ContactsSampleProvider(), new FakeDialogs(), new ContactsNoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 412, Height = 915 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var categories = view.GetControl<ListBox>("CategoryList");
+        categories.SelectedIndex = Enumerable.Range(0, categories.ItemCount)
+            .First(i => vm.Sections[i].Title == "Personal");
+        Dispatcher.UIThread.RunJobs();
+
+        var boxes = view.GetVisualDescendants().OfType<TextBox>().Where(b => b.IsEffectivelyVisible).ToArray();
+        Assert.Contains(boxes, b => b.Text == "max.mustermann@ff-musterstadt.example");
+        Capture(window, "stammdaten-personal-phone.png");
     }
 
     private sealed class ContactsSampleProvider : IMasterDataProvider

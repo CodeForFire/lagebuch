@@ -33,7 +33,7 @@ public class ContactsViewModelTests
         vm.FilterText = "gefahrgut";
 
         Assert.Single(vm.VisibleContacts);
-        Assert.Equal("Beispiel, Bernd", vm.VisibleContacts[0].DisplayName);
+        Assert.Equal("Beispiel, Bernd", vm.VisibleContacts[0].Person.DisplayName);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class ContactsViewModelTests
         vm.FilterText = "Biburg";
 
         Assert.Single(vm.VisibleContacts);
-        Assert.Equal("Musterhuber, Sepp", vm.VisibleContacts[0].DisplayName);
+        Assert.Equal("Musterhuber, Sepp", vm.VisibleContacts[0].Person.DisplayName);
     }
 
     // Every term has to match, but each may land in a different field and in any order -- a plain
@@ -82,7 +82,7 @@ public class ContactsViewModelTests
         vm.FilterText = "01711234567";
 
         Assert.Single(vm.VisibleContacts);
-        Assert.Equal("Mustermann, Max", vm.VisibleContacts[0].DisplayName);
+        Assert.Equal("Mustermann, Max", vm.VisibleContacts[0].Person.DisplayName);
     }
 
     [Fact]
@@ -107,6 +107,124 @@ public class ContactsViewModelTests
 
         Assert.Equal(4, vm.VisibleContacts.Count);
         Assert.False(vm.IsFiltered);
+    }
+
+    // "8 von 35": the operator sees at once whether the search narrowed the roster to the one
+    // person or still left a page to read.
+    [Fact]
+    public void The_match_count_names_the_hits_and_the_roster_size()
+    {
+        var vm = Vm();
+        vm.FilterText = "kbm";
+
+        Assert.Equal("2 von 4", vm.MatchCountText);
+    }
+
+    [Fact]
+    public void A_neighbouring_brigade_member_is_marked_foreign()
+    {
+        var vm = new ContactsViewModel(
+            new[]
+            {
+                new Person("Eigen", "Eva", null, null, null),
+                new Person("Fremd", "Fritz", null, null, null, IsOwn: false),
+            },
+            new NoopContactDialogs());
+
+        Assert.False(vm.VisibleContacts[0].IsForeign);
+        Assert.True(vm.VisibleContacts[1].IsForeign);
+    }
+
+    // The Notiz is shown so the operator can see *why* somebody matched; the matched term is the
+    // part of it to light up.
+    [Fact]
+    public void A_match_in_the_notiz_is_marked_for_highlighting()
+    {
+        var vm = Vm();
+        vm.FilterText = "gefahrgut";
+
+        Assert.Equal(
+            new[]
+            {
+                new TextSegment("KBM ", false),
+                new TextSegment("Gefahrgut", true),
+                new TextSegment(", Fachberater Arbeits- und Gesundheitsschutz", false),
+            },
+            vm.VisibleContacts[0].NoteSegments);
+    }
+
+    [Fact]
+    public void A_match_in_the_name_is_marked_for_highlighting()
+    {
+        var vm = Vm();
+        vm.FilterText = "huber";
+
+        Assert.Equal(
+            new[] { new TextSegment("Muster", false), new TextSegment("huber", true), new TextSegment(", Sepp", false) },
+            vm.VisibleContacts[0].NameSegments);
+    }
+
+    [Fact]
+    public void Without_a_filter_nothing_is_highlighted()
+    {
+        var row = Vm().VisibleContacts[1];
+
+        Assert.Equal(new[] { new TextSegment("Beispiel, Bernd", false) }, row.NameSegments);
+        Assert.All(row.NoteSegments, s => Assert.False(s.IsMatch));
+    }
+
+    [Fact]
+    public void Clearing_the_filter_takes_the_highlight_away_again()
+    {
+        var vm = Vm();
+        vm.FilterText = "gefahrgut";
+        vm.ClearFilterCommand.Execute(null);
+
+        Assert.All(vm.VisibleContacts, r => Assert.DoesNotContain(r.NoteSegments, s => s.IsMatch));
+    }
+
+    // One term inside another, and two terms side by side, merge into one highlighted run rather
+    // than splitting it into fragments or marking a character twice.
+    [Theory]
+    [InlineData("gefahr gefahrgut")]
+    [InlineData("gefahr gut")]
+    public void Overlapping_and_adjacent_terms_merge_into_one_highlight(string query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var segments = TextSegment.Highlight("KBM Gefahrgut", query.Split(' '));
+
+        Assert.Equal(new[] { new TextSegment("KBM ", false), new TextSegment("Gefahrgut", true) }, segments);
+    }
+
+    [Fact]
+    public void Every_occurrence_of_a_term_is_highlighted_case_insensitively()
+    {
+        var segments = TextSegment.Highlight("Alling, alling-Nord", new[] { "ALLING" });
+
+        Assert.Equal(
+            new[]
+            {
+                new TextSegment("Alling", true),
+                new TextSegment(", ", false),
+                new TextSegment("alling", true),
+                new TextSegment("-Nord", false),
+            },
+            segments);
+    }
+
+    [Fact]
+    public void Umlauts_match_their_own_case()
+    {
+        var segments = TextSegment.Highlight("Übung Höhenrettung", new[] { "üBUNG" });
+
+        Assert.Equal(new TextSegment("Übung", true), segments[0]);
+    }
+
+    [Fact]
+    public void An_absent_text_yields_no_segments()
+    {
+        Assert.Empty(TextSegment.Highlight(null, new[] { "x" }));
+        Assert.Empty(TextSegment.Highlight("   ", new[] { "x" }));
     }
 
     [Fact]

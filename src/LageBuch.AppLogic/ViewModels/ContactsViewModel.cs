@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -13,7 +14,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// session and mutates nothing: the roster is global master data, not incident state, so phoning
 /// somebody off it is not an incident action and nothing is written to the ETB.
 /// </summary>
-public sealed partial class ContactsViewModel : ObservableObject
+public sealed partial class ContactsViewModel : ObservableObject, INarrowAware
 {
     // Person is a record, so two people with identical fields are equal by value. A dictionary
     // keyed on Person would collapse them; a parallel array cannot, and costs nothing at roster
@@ -26,8 +27,8 @@ public sealed partial class ContactsViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(people);
         _dialogs = dialogs;
         Contacts = people;
-        VisibleContacts = new ObservableCollection<Person>(people);
         _entries = people.Select(p => (p, HaystackFor(p))).ToArray();
+        VisibleContacts = new ObservableCollection<ContactRow>(people.Select(p => RowFor(p, Array.Empty<string>())));
     }
 
     public IReadOnlyList<Person> Contacts { get; }
@@ -38,7 +39,14 @@ public sealed partial class ContactsViewModel : ObservableObject
     /// in the Stammdaten) stays distinguishable from "nothing matched what you typed" — the same
     /// split <see cref="LinksViewModel"/> uses.
     /// </summary>
-    public ObservableCollection<Person> VisibleContacts { get; }
+    public ObservableCollection<ContactRow> VisibleContacts { get; }
+
+    /// <summary>
+    /// Whether the tab is laid out for a phone. The view reads it to leave the search box
+    /// unfocused there, where focusing it would push the soft keyboard over the list.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isNarrow;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -46,11 +54,16 @@ public sealed partial class ContactsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFiltered))]
     [NotifyPropertyChangedFor(nameof(NoMatchesMessage))]
+    [NotifyPropertyChangedFor(nameof(MatchCountText))]
     private string _filterText = string.Empty;
 
     public bool IsFiltered => !string.IsNullOrWhiteSpace(FilterText);
 
     public string NoMatchesMessage => $"Kein Kontakt passt zu „{FilterText.Trim()}“.";
+
+    /// <summary>"2 von 35": how far the search narrowed the roster, shown while one is typed.</summary>
+    public string MatchCountText =>
+        string.Create(CultureInfo.InvariantCulture, $"{VisibleContacts.Count} von {Contacts.Count}");
 
     partial void OnFilterTextChanged(string value) => ApplyFilter();
 
@@ -108,10 +121,17 @@ public sealed partial class ContactsViewModel : ObservableObject
         {
             if (terms.All(t => haystack.Contains(t, StringComparison.OrdinalIgnoreCase)))
             {
-                VisibleContacts.Add(person);
+                VisibleContacts.Add(RowFor(person, terms));
             }
         }
     }
+
+    /// <summary>
+    /// Only the name and the Notiz are split for highlighting: they are the two lines a hit has
+    /// to explain. A hit in the Rolle or the Funkrufname is already plain to see next to the name.
+    /// </summary>
+    private static ContactRow RowFor(Person person, IReadOnlyList<string> terms) =>
+        new(person, TextSegment.Highlight(person.DisplayName, terms), TextSegment.Highlight(person.Note, terms));
 
     [RelayCommand]
     private void ClearFilter() => FilterText = string.Empty;
