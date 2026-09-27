@@ -21,6 +21,8 @@
         <StackPanel Margin="26,22,26,24" Spacing="10">
           <TextBlock Text="{Binding Title}" Classes="display" FontSize="22" />
           <TextBlock Text="{Binding Message}" Classes="secondary" TextWrapping="Wrap" />
+          <CheckBox x:Name="OptionCheckBox" IsVisible="{Binding HasOption}"
+                    IsChecked="{Binding IsOptionChecked}" Content="{Binding OptionLabel}" />
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
             <Button x:Name="ConfirmButton" Classes="signal" Content="{Binding ConfirmLabel}"

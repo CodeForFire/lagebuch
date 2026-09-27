@@ -15,9 +15,10 @@ public sealed partial class PdfExportOptionsViewModel : ObservableObject
 {
     private readonly Func<IncidentPdfSections, Task> _onExport;
 
-    public PdfExportOptionsViewModel(Func<IncidentPdfSections, Task> onExport)
+    public PdfExportOptionsViewModel(Func<IncidentPdfSections, Task> onExport, string exportLabel = "EXPORTIEREN")
     {
         _onExport = onExport;
+        ExportLabel = exportLabel;
         Items = new[]
         {
             new PdfSectionOptionViewModel(IncidentPdfSections.Checklist, "Checkliste", NotifyCanExecuteChanged),
@@ -33,6 +34,9 @@ public sealed partial class PdfExportOptionsViewModel : ObservableObject
     }
 
     public IReadOnlyList<PdfSectionOptionViewModel> Items { get; }
+
+    /// <summary>The confirm button's text: what happens once the sections are chosen.</summary>
+    public string ExportLabel { get; }
 
     /// <summary>Raised after Export completes or Cancel, so the host removes the overlay.</summary>
     public event EventHandler? Closed;

@@ -61,7 +61,8 @@ internal static class Program
             trustStore: new JsonTrustStore(AppPaths.TrustJsonPath),
             pdfExporter: new QuestPdfIncidentExporter(),
             lastPdfExport: new JsonLastPdfExportStore(AppPaths.LastPdfExportJsonPath),
-            lastConnection: new JsonLastConnectionStore(AppPaths.LastConnectionJsonPath));
+            lastConnection: new JsonLastConnectionStore(AppPaths.LastConnectionJsonPath),
+            mailComposer: new OsMailComposer());
     }
 
     public static AppBuilder BuildAvaloniaApp() =>
