@@ -417,13 +417,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             hub.Reconnected += async _ =>
             {
                 // Reconcile rather than resync blindly: only a position that differs costs a snapshot
-                // fetch. Wrapped, and
-                // Reconnected raised regardless, because a throwing catch-up used to leave Reconnected
-                // un-raised — which left IsConnected false and the workspace's input disabled for good.
-                // A pass that fails here is exactly what the poll retries.
-                // A pass that succeeds re-confirms the Stand straight away: when nothing was missed it
-                // applies nothing, so without Reconciled here the footer would stay "nicht bestätigt"
-                // until the next tick although the device is demonstrably current.
+                // fetch. Wrapped, and Reconnected raised regardless, because a throwing catch-up used to
+                // leave Reconnected un-raised — which left IsConnected false and the workspace's input
+                // disabled for good. A pass that fails here is exactly what the poll retries; one that
+                // succeeds re-confirms the Stand straight away, because when nothing was missed it
+                // applies nothing, and without Reconciled the footer would stay "nicht bestätigt" until
+                // the next tick although the device is demonstrably current.
                 try
                 {
                     await session.ReconcileAsync(session._reconcileCts.Token);
