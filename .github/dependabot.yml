@@ -6,6 +6,15 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    # codeql-action/init writes a config that codeql-action/analyze refuses
+    # unless both run the same version ("Loaded a configuration file for
+    # version '4.38.2', but running version '4.38.0'"). Dependabot treats each
+    # sub-action as its own dependency, so ungrouped they arrive as separate
+    # pull requests that can never pass CodeQL on their own.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # Keep the digest-pinned base image in docker/android-build.Dockerfile
   # current. The pin is a digest rather than a tag, so without this entry it
