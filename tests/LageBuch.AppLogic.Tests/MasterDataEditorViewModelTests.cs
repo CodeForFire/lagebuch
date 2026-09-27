@@ -646,8 +646,8 @@ public class MasterDataEditorViewModelTests
         Personnel = people,
     };
 
-    // Eine Adresse, die Lagebuch nicht oeffnen wuerde, waere im Kontakte-Modul ein Knopf, der
-    // nichts tut -- und zwar erst dort, wo sie niemand mehr korrigieren kann.
+    // An address Lagebuch would refuse to open would be a dead button in the Kontakte tab -- and
+    // found dead only there, where nobody can fix it any more.
     [Fact]
     public void An_unusable_email_address_blocks_saving_and_names_the_person()
     {
@@ -661,7 +661,7 @@ public class MasterDataEditorViewModelTests
         Assert.Contains("Mustermann, Max", vm.PersonnelConflicts, StringComparison.Ordinal);
     }
 
-    // Die Meldung steht in einer schmalen Leiste; der Name findet die Zeile, die Adresse nicht.
+    // The message sits in a narrow strip; the name finds the row, the address does not.
     [Fact]
     public void The_message_names_the_person_rather_than_the_address()
     {
@@ -686,7 +686,7 @@ public class MasterDataEditorViewModelTests
         Assert.False(vm.SaveCommand.CanExecute(null));
     }
 
-    // Keine Adresse ist der Normalfall, kein Fehler.
+    // No address is the normal case, not an error.
     [Fact]
     public void A_blank_address_never_counts_as_a_conflict()
     {
@@ -701,8 +701,8 @@ public class MasterDataEditorViewModelTests
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
 
-    // ToPeople verwirft Zeilen ohne Nachnamen; ueber einen Wert, der nie in der Datei landet,
-    // darf sich der Editor nicht beschweren.
+    // ToPeople drops rows without a last name; the editor must not complain about a value that
+    // never reaches the file.
     [Fact]
     public void A_row_without_a_last_name_is_dropped_and_its_address_raises_nothing()
     {
@@ -743,10 +743,10 @@ public class MasterDataEditorViewModelTests
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
 
-    // Ein Import ist der wahrscheinlichste Weg, wie eine unbrauchbare Adresse in die Stammdaten
-    // kommt -- und der Editor muss das sagen, bevor irgendetwas angefasst wurde. Beide Regeln
-    // liefen frueher erst nach einer Zeilenaenderung, weil Import zwar PopulateSections aufrief,
-    // die Konfliktpruefung aber nur in Load stand.
+    // An import is the likeliest way for an unusable address to enter the Stammdaten -- and the
+    // editor has to say so before anything is touched. Both rules used to run only after a row
+    // changed, because Import called PopulateSections while the conflict check lived only in
+    // Load.
     [Fact]
     public async Task An_imported_unusable_address_blocks_saving_before_anything_is_edited()
     {

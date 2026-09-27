@@ -251,9 +251,9 @@ public class ContactsTabRenderTests
         Capture(window, "stammdaten-personal.png");
     }
 
-    // Eine Adresse, die Lagebuch nicht oeffnen wuerde, waere im Kontakte-Modul ein Knopf, der
-    // nichts tut. Der Editor sagt es deshalb an der Stelle, an der sie eingegeben wird, und
-    // laesst sich bis dahin nicht speichern -- genau wie bei doppelten Funkrufnamen.
+    // An address Lagebuch would refuse to open would be a dead button in the Kontakte tab. So the
+    // editor says so where it is typed in and refuses to save until then -- exactly as it does
+    // for duplicate Funkrufnamen.
     [AvaloniaFact]
     public void An_unusable_address_names_the_person_and_blocks_saving()
     {
@@ -277,8 +277,8 @@ public class ContactsTabRenderTests
 
         Assert.True(banner.IsEffectivelyVisible);
 
-        // IsEffectivelyEnabled, nicht IsEnabled: ein Command, dessen CanExecute false ist, laesst
-        // die lokale Eigenschaft unberuehrt und graut den Knopf ueber den effektiven Zustand aus.
+        // IsEffectivelyEnabled, not IsEnabled: a command whose CanExecute is false leaves the local
+        // property alone and greys the button out through the effective state.
         Assert.False(view.GetControl<Button>("SaveButton").IsEffectivelyEnabled);
         Capture(window, "stammdaten-email-ungueltig.png");
     }

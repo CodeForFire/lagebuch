@@ -149,12 +149,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private string? _vehicleConflicts;
 
     /// <summary>
-    /// E-Mail-Adressen, die Lagebuch nicht öffnen würde. Eine Adresse aus den Stammdaten landet
-    /// im Kontakte-Modul hinter einem Knopf, der sie an die Mail-App des Geräts übergibt, und
-    /// <see cref="MailAddressValidator"/> lehnt dort ab, was in einer mailto:-URI etwas bedeutet.
-    /// Das hier ist dieselbe Prüfung an der Stelle, an der die Adresse eingegeben wird -- sonst
-    /// merkt es erst, wer an der Einsatzstelle jemanden erreichen will, und dort ist sie nicht
-    /// mehr zu korrigieren.
+    /// E-mail addresses Lagebuch would refuse to open. A Stammdaten address ends up behind a
+    /// button in the Kontakte tab that hands it to the device's mail app, and
+    /// <see cref="MailAddressValidator"/> rejects there whatever means something in a mailto: URI.
+    /// This is the same check where the address is typed in -- otherwise the first to notice is
+    /// whoever tries to reach somebody at the Einsatzstelle, where it can no longer be fixed.
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
@@ -266,11 +265,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     /// <summary>Recomputes the list of people whose address Lagebuch could not open.</summary>
     /// <remarks>
-    /// Über <see cref="PersonnelSection.ToPeople"/> statt über die Zeilen: das ist, was SPEICHERN
-    /// wirklich schreibt. Zeilen ohne Nachnamen fallen dort weg und eine nur aus Leerzeichen
-    /// bestehende Adresse wird zu null -- beides darf keine Meldung über einen Wert auslösen, der
-    /// nie in der Datei landet. Genannt wird die Person, nie die Adresse: die Meldung steht in
-    /// einer schmalen Leiste, und der Name ist es, der die Zeile findet.
+    /// Through <see cref="PersonnelSection.ToPeople"/> rather than the rows: that is what SPEICHERN
+    /// actually writes. Rows without a last name drop out there and a whitespace-only address
+    /// becomes null -- neither may raise a complaint about a value that never reaches the file.
+    /// The message names the person, never the address: it sits in a narrow strip, and the name
+    /// is what finds the row.
     /// </remarks>
     private void RefreshPersonnelConflicts()
     {
