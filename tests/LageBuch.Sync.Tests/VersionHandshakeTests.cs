@@ -42,13 +42,14 @@ public class VersionHandshakeTests
     }
 
     [Fact]
-    public void The_beteiligte_commands_raise_the_floor_to_protocol_three()
+    public void The_snapshot_position_raises_the_floor_to_protocol_four()
     {
-        // addInvolvedParty/updateInvolvedParty/removeInvolvedParty are commands a client may send,
-        // which a host at protocol 2 cannot parse — so both ends of the range move to 3, and a
-        // pre-handshake peer (LegacyProtocolVersion) is now below the floor.
-        Assert.Equal(3, SyncProtocol.ProtocolVersion);
-        Assert.Equal(3, SyncProtocol.MinimumProtocolVersion);
+        // Protocol 3 raised the floor for the Beteiligte commands; 4 raises it again for the epoch and
+        // revision (#295). A 4 client discards snapshots that do not supersede the one it holds, and a
+        // 3 host stamps revision 0 on every one, so that pair must not connect. A pre-handshake peer
+        // (LegacyProtocolVersion) stays below the floor.
+        Assert.Equal(4, SyncProtocol.ProtocolVersion);
+        Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
         Assert.InRange(SyncProtocol.LegacyProtocolVersion, int.MinValue, SyncProtocol.MinimumProtocolVersion - 1);
     }
 }

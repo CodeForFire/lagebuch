@@ -46,6 +46,10 @@ public sealed class IncidentHost : IAsyncDisposable
     // design; a client that rejoins re-seeds from GET /snapshot.
     private long _revision;
 
+    // Which counter _revision is (#295): minted fresh by every StartAsync, so no client can mistake a
+    // revision from one sharing session for one from another. Not a secret — it only has to differ.
+    private Guid _epoch;
+
     public IncidentHost(
         LocalIncidentSession session,
         IClock clock,
@@ -93,6 +97,7 @@ public sealed class IncidentHost : IAsyncDisposable
         // Serve TLS with a fresh self-signed cert minted per share session; the client pins it via
         // Trust-on-First-Use (§ P0 #2) rather than the OS trust store.
         (_cert, _) = SyncCertificate.Generate();
+        _epoch = Guid.NewGuid();
         builder.WebHost.UseKestrel(o =>
         {
             // "Bind everything" is requested as either wildcard depending on caller history/tests;
@@ -206,7 +211,7 @@ public sealed class IncidentHost : IAsyncDisposable
         // The poll endpoint (#295). Takes the same UI hop so _revision stays single-threaded; it reads
         // one long, so the hop costs nothing worth saving.
         app.MapGet(SyncProtocol.RevisionPath, async () =>
-            await _ui.InvokeAsync(() => Results.Json(new RevisionInfo(_revision), SyncJson.Options)));
+            await _ui.InvokeAsync(() => Results.Json(new RevisionInfo(_revision, _epoch), SyncJson.Options)));
 
         // Results.Content, not Results.Json: the payload is already serialized JSON text, and
         // Results.Json would re-encode it into a JSON string literal. MasterDataJson.Serialize uses
@@ -356,11 +361,11 @@ public sealed class IncidentHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// The aggregate and its revision as one value. Callers must already be on the UI thread, which is
+    /// The aggregate and its position as one value. Callers must already be on the UI thread, which is
     /// what makes the pair consistent — see <see cref="_revision"/>.
     /// </summary>
     private IncidentSnapshot CurrentSnapshot() =>
-        SnapshotMapper.ToSnapshot(_session.Incident) with { Revision = _revision };
+        SnapshotMapper.ToSnapshot(_session.Incident) with { Revision = _revision, Epoch = _epoch };
 
     private Task Broadcast(IncidentSnapshot snapshot) =>
         _hub is null ? Task.CompletedTask : _hub.Clients.All.SendAsync(SyncProtocol.SnapshotMethod, snapshot);

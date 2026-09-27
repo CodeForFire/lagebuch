@@ -26,7 +26,7 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// </para>
 /// <para>
 /// <see cref="Current"/> models the host's true state: <c>/snapshot</c> serves it and
-/// <c>/revision</c> serves its <see cref="IncidentSnapshot.Revision"/>, so the two can never
+/// <c>/revision</c> serves its epoch and revision, so the two can never
 /// disagree — exactly the invariant the real host maintains by reading both on its UI thread.
 /// <see cref="PushAsync"/> deliberately does <em>not</em> touch it, which is what lets a test model a
 /// stale broadcast still in flight while the host has already moved on.
@@ -96,7 +96,9 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
             () => Results.Json(
                 new VersionInfo(version, SyncProtocol.ProtocolVersion, SyncProtocol.MinimumProtocolVersion), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(host.Current, SyncJson.Options));
-        app.MapGet(SyncProtocol.RevisionPath, () => Results.Json(new RevisionInfo(host.Current.Revision), SyncJson.Options));
+        app.MapGet(
+            SyncProtocol.RevisionPath,
+            () => Results.Json(new RevisionInfo(host.Current.Revision, host.Current.Epoch), SyncJson.Options));
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(
             MasterDataJson.Serialize(MasterDataSet.Empty), "application/json"));
 

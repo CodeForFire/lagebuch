@@ -13,16 +13,15 @@ namespace LageBuch.Sync;
 /// sibling of the SQL mapping in <c>LageBuch.Persistence.IncidentRepository</c>.
 /// </summary>
 /// <remarks>
-/// <c>Revision</c> is the host's change counter, and the one member here a client compares rather
-/// than displays: it discards any pushed snapshot whose revision it has already applied, which is
-/// what makes two broadcasts racing each other harmless (#295). Monotonic within one host
-/// <em>process</em> only — a host that stops and restarts sharing counts from zero again, which is
-/// why a client that finds the host <em>behind</em> re-baselines instead of ignoring it.
+/// <c>Epoch</c> and <c>Revision</c> are the two members a client compares rather than displays
+/// (#295). <c>Revision</c> is the host's change counter; <c>Epoch</c> names the counter it belongs to,
+/// a fresh random value every time the host starts sharing. See <see cref="SyncPosition"/> for how a
+/// client orders two snapshots by them.
 /// <para>
-/// <c>0</c> means nobody attached one. <see cref="SnapshotMapper.ToSnapshot"/> leaves it at the
-/// default and only <c>IncidentHost</c> fills it in, so the persistence path (<c>IncidentStore</c>,
-/// which round-trips this type in memory and never reads it) is untouched. Appending a defaulted
-/// trailing parameter is this type's documented compat convention.
+/// Their defaults mean nobody attached them. <see cref="SnapshotMapper.ToSnapshot"/> leaves both
+/// alone and only <c>IncidentHost</c> fills them in, so the persistence path (<c>IncidentStore</c>,
+/// which round-trips this type in memory and never reads them) is untouched. Appending defaulted
+/// trailing parameters is this type's documented compat convention.
 /// </para>
 /// </remarks>
 public sealed record IncidentSnapshot(
@@ -50,7 +49,8 @@ public sealed record IncidentSnapshot(
 
     // Defaulted like DwellingDto.Readings: a snapshot without the key reads as "no Beteiligte".
     IReadOnlyList<InvolvedPartyDto>? InvolvedParties = null,
-    long Revision = 0);
+    long Revision = 0,
+    Guid Epoch = default);
 
 public sealed record TimerDto(
     string Key,

@@ -14,9 +14,11 @@
 
   <!-- The reconcile pass (RemoteIncidentSession.ReconcileAsync) is internal so the tests can drive one
        deterministically instead of racing the poll timer. The client's tests live in the Hosting test
-       project, because they need a real Kestrel host to talk to. -->
+       project, because they need a real Kestrel host to talk to. SyncPosition, the client's ordering
+       rule, is internal too and is tested exhaustively, without a host, in LageBuch.Sync.Tests. -->
   <ItemGroup>
     <InternalsVisibleTo Include="LageBuch.Sync.Hosting.Tests" />
+    <InternalsVisibleTo Include="LageBuch.Sync.Tests" />
   </ItemGroup>
 
 </Project>

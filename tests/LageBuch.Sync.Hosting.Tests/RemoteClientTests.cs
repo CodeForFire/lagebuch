@@ -469,6 +469,29 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task Connect_refuses_a_protocol_3_host()
+    {
+        // A protocol-3 host sends revision 0 on every snapshot and has no /revision. A client that
+        // joined it anyway would drop every update after the first as "already applied" and fail
+        // every reconcile pass: frozen on the Lage it joined with, which is the one outcome #295 is
+        // about. The floor rising to 4 is what refuses it up front, naming the host as the device to
+        // update.
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock),
+            clock,
+            "1.0.0",
+            protocolVersion: 3,
+            minimumProtocolVersion: 3);
+        await using var _ = host;
+
+        var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port));
+
+        Assert.Contains("Der Host ist zu alt", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Connect_treats_a_host_without_protocol_fields_as_the_legacy_protocol_and_refuses_it()
     {
         var clock = new FixedClock();

@@ -30,15 +30,21 @@ public static class SyncProtocol
     /// <c>removeInvolvedParty</c> commands and the snapshot's <c>involvedParties</c>. A host at 2
     /// would reject those commands, so the floor rises to 3 as well.
     /// </para>
+    /// <para>
+    /// 4: the snapshot carries <c>epoch</c> and <c>revision</c>, and the host serves them at
+    /// <see cref="RevisionPath"/> (#295). A client at 4 discards any snapshot that does not supersede
+    /// the one it holds, and a host at 3 sends revision 0 on every one — so such a client would drop
+    /// every update after the first and sit on the Lage it joined with. The floor rises to 4.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 3;
+    public const int ProtocolVersion = 4;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 3;
+    public const int MinimumProtocolVersion = 4;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,
@@ -62,10 +68,11 @@ public static class SyncProtocol
     public const string HubPath = "/hub";
 
     /// <summary>
-    /// The host's current snapshot revision, and nothing else. A joined client polls this as an
-    /// anti-entropy net (#295): a broadcast that never arrived leaves the host's revision ahead of
-    /// the client's, and the next poll re-fetches <see cref="SnapshotPath"/> to catch up. Deliberately
-    /// tiny — it is requested every few seconds per client, unlike the whole-incident snapshot.
+    /// The host's current snapshot position — epoch and revision — and nothing else. A joined client
+    /// polls this as an anti-entropy net (#295): a broadcast that never arrived leaves the host's
+    /// position different from the client's, and the next poll re-fetches <see cref="SnapshotPath"/>
+    /// to catch up. Deliberately tiny — it is requested every few seconds per client, unlike the
+    /// whole-incident snapshot.
     /// </summary>
     public const string RevisionPath = "/revision";
 
@@ -124,11 +131,11 @@ public static class SyncProtocol
 public sealed record VersionInfo(string Version, int Protocol = 0, int MinProtocol = 0);
 
 /// <summary>
-/// The host's current <see cref="IncidentSnapshot.Revision"/>, served by
-/// <see cref="SyncProtocol.RevisionPath"/>. A joined client compares it against the revision it last
-/// applied; any difference means re-fetch the snapshot (#295).
+/// The host's current <see cref="IncidentSnapshot.Epoch"/> and <see cref="IncidentSnapshot.Revision"/>,
+/// served by <see cref="SyncProtocol.RevisionPath"/>. A joined client compares the pair against the
+/// one it last applied; any difference means re-fetch the snapshot (#295).
 /// </summary>
-public sealed record RevisionInfo(long Revision);
+public sealed record RevisionInfo(long Revision, Guid Epoch = default);
 
 /// <summary>
 /// Thrown when the host rejects the join because the supplied share PIN is wrong or missing (§ #64).

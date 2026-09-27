@@ -75,8 +75,10 @@ public class SnapshotReconcileTests
         Assert.Equal(new[] { "Vier" }, SnapshotFixture.JournalOf(client));
     }
 
-    [Fact]
-    public async Task A_host_that_restarted_sharing_at_a_lower_revision_is_adopted()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    public async Task A_host_in_a_new_epoch_is_adopted_whatever_its_revision(long restartedAt)
     {
         var basis = SnapshotFixture.BaseSnapshot();
         await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.Revised(basis, 7, "Sieben"));
@@ -84,15 +86,41 @@ public class SnapshotReconcileTests
 
         Assert.Equal(new[] { "Sieben" }, SnapshotFixture.JournalOf(client));
 
-        // A host whose counter went back to zero. Comparing with != rather than > is what notices this;
-        // newer-only would leave the client showing revision 7 forever.
-        host.Current = SnapshotFixture.Revised(basis, 1, "Eins");
+        // A host that started sharing again, counting in a new epoch. Below the client's revision a
+        // newer-only rule would ignore it forever; at the *same* revision a bare counter would even
+        // call it current. The epoch is what tells both apart from a stale copy.
+        host.Current = SnapshotFixture.Revised(basis, restartedAt, "Neu") with { Epoch = Guid.NewGuid() };
 
         await client.ReconcileAsync();
         await SnapshotFixture.WaitForClient(
-            client, () => SnapshotFixture.JournalOf(client).Contains("Eins"), "the restarted host to be adopted");
+            client, () => SnapshotFixture.JournalOf(client).Contains("Neu"), "the new epoch to be adopted");
 
-        Assert.Equal(new[] { "Eins" }, SnapshotFixture.JournalOf(client));
+        Assert.Equal(new[] { "Neu" }, SnapshotFixture.JournalOf(client));
+    }
+
+    [Fact]
+    public async Task A_resync_that_lands_after_a_newer_push_does_not_regress_the_client()
+    {
+        // The reconcile fetch and the hub push are two channels with nothing ordering them: the fetch
+        // may be answered with revision 3 while a push of revision 4 overtakes it on the way in.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var host = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var client = await SnapshotFixture.ConnectAsync(host, Never);
+
+        var four = SnapshotFixture.Revised(basis, 4, "Vier");
+        await host.PushAsync(four);
+        await SnapshotFixture.WaitForClient(client, () => SnapshotFixture.JournalOf(client).Contains("Vier"), "revision 4");
+
+        // The host still serves the older state the fetch was answered with.
+        host.Current = SnapshotFixture.Revised(basis, 3, "Drei");
+        await client.ReconcileAsync();
+
+        // Ordered behind the resync rather than asserted after a sleep: once 5 lands, 3 has been and gone.
+        var five = SnapshotFixture.Revised(basis, 5, "Fünf");
+        await host.PushAsync(five);
+        await SnapshotFixture.WaitForClient(client, () => SnapshotFixture.JournalOf(client).Contains("Fünf"), "revision 5");
+
+        Assert.Equal(new[] { "Fünf" }, SnapshotFixture.JournalOf(client));
     }
 
     [Fact]

@@ -15,7 +15,10 @@ public class IncidentHostTests
         SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute)));
 
     private static async Task<long> GetRevisionAsync(HttpClient http) =>
-        SyncJson.Deserialize<RevisionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute))).Revision;
+        (await GetRevisionInfoAsync(http)).Revision;
+
+    private static async Task<RevisionInfo> GetRevisionInfoAsync(HttpClient http) =>
+        SyncJson.Deserialize<RevisionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute)));
 
     private static async Task PostAsync(HttpClient http, SyncCommand command)
     {
@@ -568,6 +571,7 @@ public class IncidentHostTests
 
     [Theory]
     [InlineData(SyncProtocol.SnapshotPath)]
+    [InlineData(SyncProtocol.RevisionPath)]
     [InlineData(SyncProtocol.MasterDataPath)]
     [InlineData(SyncProtocol.CommandPath)]
     public async Task Host_refuses_every_endpoint_below_its_minimum_protocol(string path)
@@ -835,8 +839,58 @@ public class IncidentHostTests
             new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Meldung", null, null));
 
         // The pair a joined client compares. If these two could disagree, a client would record a
-        // revision it does not hold the content for and then discard the broadcast that fixes it.
-        Assert.Equal(await GetRevisionAsync(http), (await GetSnapshotAsync(http)).Revision);
+        // position it does not hold the content for and then discard the broadcast that fixes it.
+        var position = await GetRevisionInfoAsync(http);
+        var snapshot = await GetSnapshotAsync(http);
+        Assert.Equal(position.Revision, snapshot.Revision);
+        Assert.Equal(position.Epoch, snapshot.Epoch);
+        Assert.NotEqual(Guid.Empty, snapshot.Epoch);
+    }
+
+    [Fact]
+    public async Task Sharing_again_starts_a_new_epoch()
+    {
+        // What lets a client tell a restarted host's revision 3 from the revision 3 it already holds.
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+
+        async Task<Guid> ShareAndReadEpochAsync()
+        {
+            var port = TestHost.FreeTcpPort();
+            await host.StartAsync(IPAddress.Loopback, port);
+            using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+            http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+            http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var epoch = (await GetRevisionInfoAsync(http)).Epoch;
+            await host.StopAsync();
+            return epoch;
+        }
+
+        var first = await ShareAndReadEpochAsync();
+        var second = await ShareAndReadEpochAsync();
+
+        Assert.NotEqual(Guid.Empty, first);
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
+    public async Task Host_refuses_a_protocol_3_client()
+    {
+        // Protocol 4 raised the floor (#295). A protocol-3 client would not break against this host
+        // itself, but the floor is one number for both directions, and a 4 client cannot use a 3 host.
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: SyncProtocol.MinimumProtocolVersion);
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, "3");
+
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute));
+
+        Assert.Equal(HttpStatusCode.UpgradeRequired, response.StatusCode);
     }
 
     [Fact]
