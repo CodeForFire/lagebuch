@@ -510,6 +510,14 @@ public class RolesViewModelTests
         var conflict = vm.ConflictingRow;
         Assert.NotNull(conflict);
         Assert.Equal("Müller", conflict.PersonName);
+
+        // The holder's Abschnitt, not the one on screen: the operator typed "Abschnitt Süd" and the
+        // holder is in "Abschnitt Nord", so this sentence must not name the wrong person's
+        // Abschnitt. Re-keying the branch on NewSection instead of the matched row would leave every
+        // other test in this file green and fail here.
+        Assert.Equal(
+            string.Format(CultureInfo.InvariantCulture, HeldInSection, "EL", "Abschnitt Nord", "Müller"),
+            vm.ConflictHint);
     }
 
     [Fact]
@@ -533,12 +541,13 @@ public class RolesViewModelTests
         Assert.NotNull(conflict);
         Assert.Equal("Müller", conflict.PersonName);
 
-        // The rendered sentence, composed from the spec's template with the arguments the view model
-        // passes: Funktion, Abschnitt and holder all named, and no "in Abschnitt  " gap. Composed
-        // here from the constant rather than written out, so the wording of the one sentence a
-        // person reads exists in ValidationMessages alone -- a literal would be a second copy to
-        // drift. The earlier half of this test is not the place for it: there the typed Abschnitt is
-        // blank, the short form is the correct rendering, and it would prove nothing about this one.
+        // The rendered sentence, composed from the constant with the arguments the view model
+        // passes: the Funktion, the Abschnitt as the app spells it, and its holder. Composed here
+        // rather than written out, so the wording of the one sentence a person reads lives in
+        // ValidationMessages alone -- a literal would be a second copy to drift. The earlier half of
+        // this test is not the place for it: there the typed Abschnitt is "Abschnitt Süd" while the
+        // holder is in "Abschnitt Nord", so ConflictingRow is null and no sentence is rendered at
+        // all.
         Assert.Equal(
             string.Format(CultureInfo.InvariantCulture, HeldInSection, "EL", "Abschnitt Nord", "Müller"),
             vm.ConflictHint);
