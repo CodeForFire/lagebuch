@@ -2,6 +2,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Involved;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -21,6 +22,7 @@ public sealed class Incident
     private readonly List<IncidentTask> _tasks = new();
     private readonly List<Building> _buildings = new();
     private readonly List<Dwelling> _dwellings = new();
+    private readonly List<InvolvedParty> _involvedParties = new();
 
     private Incident()
     {
@@ -71,6 +73,9 @@ public sealed class Incident
     public IReadOnlyList<Building> Buildings => _buildings;
 
     public IReadOnlyList<Dwelling> Dwellings => _dwellings;
+
+    /// <summary>The Beteiligte — people involved who are not forces — in creation order.</summary>
+    public IReadOnlyList<InvolvedParty> InvolvedParties => _involvedParties;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -138,7 +143,8 @@ public sealed class Incident
         IEnumerable<IncidentFile> files,
         IEnumerable<IncidentTask> tasks,
         IEnumerable<Building> buildings,
-        IEnumerable<Dwelling> dwellings)
+        IEnumerable<Dwelling> dwellings,
+        IEnumerable<InvolvedParty> involvedParties)
     {
         var incident = new Incident
         {
@@ -164,6 +170,7 @@ public sealed class Incident
         incident._tasks.AddRange(tasks);
         incident._buildings.AddRange(buildings);
         incident._dwellings.AddRange(dwellings);
+        incident._involvedParties.AddRange(involvedParties);
         return incident;
     }
 
@@ -942,6 +949,47 @@ public sealed class Incident
         var updated = _tasks[index].WithCompletion(isDone, op, clock.Now);
         _tasks[index] = updated;
         return updated;
+    }
+
+    /// <summary>
+    /// Records a Beteiligte/n — a house owner, a vehicle owner, a police contact. Deliberately
+    /// silent, like <see cref="AddTask"/>: no ETB line, so the name and phone number of a third
+    /// party stay in this one list instead of being copied into the operational log. The PDF
+    /// export reports them in their own section.
+    /// </summary>
+    public InvolvedParty AddInvolvedParty(IClock clock, SessionOperator op, string name, string? phone, string? notes)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var party = InvolvedParty.Create(clock.Now, name, phone, notes, op);
+        _involvedParties.Add(party);
+        return party;
+    }
+
+    /// <summary>Corrects a Beteiligte/n in place, keeping identity and position. Silent, like
+    /// <see cref="AddInvolvedParty"/>; an unknown id throws so a replayed command fails loudly.</summary>
+    public InvolvedParty UpdateInvolvedParty(Guid partyId, string name, string? phone, string? notes)
+    {
+        EnsureOpen();
+        var index = FindInvolvedPartyIndex(partyId);
+        var updated = _involvedParties[index].WithDetails(name, phone, notes);
+        _involvedParties[index] = updated;
+        return updated;
+    }
+
+    /// <summary>Takes a Beteiligte/n back completely. Silent, like <see cref="AddInvolvedParty"/>.</summary>
+    public void RemoveInvolvedParty(Guid partyId)
+    {
+        EnsureOpen();
+        _involvedParties.RemoveAt(FindInvolvedPartyIndex(partyId));
+    }
+
+    private int FindInvolvedPartyIndex(Guid partyId)
+    {
+        var index = _involvedParties.FindIndex(p => p.Id == partyId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Beteiligte/r {partyId} nicht gefunden.");
     }
 
     private AtemschutzTrupp FindScbaTrupp(Guid truppId) =>

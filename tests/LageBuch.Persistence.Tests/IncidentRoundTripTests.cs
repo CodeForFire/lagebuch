@@ -537,4 +537,38 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal("Müller", Domain.CoMeasurement.CoMeasurementLabels.ApartmentLabel(building, 0, 2));
         Assert.Equal("Müller", Domain.CoMeasurement.CoMeasurementLabels.ApartmentLabel(building, 1, 2));
     }
+
+    [Fact]
+    public void Involved_parties_survive_a_round_trip_in_order_with_blank_fields_as_null()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster", "FFB 12/1");
+        var incident = Incident.Start(clock, op, "Brand");
+        incident.AddInvolvedParty(clock, op, "Erika Beispiel", "0171 0000001", "Hauseigentümerin, Schlüssel vorhanden");
+        clock.Now = clock.Now.AddMinutes(4);
+        incident.AddInvolvedParty(clock, op, "POK Mustermann", null, null);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(incident.InvolvedParties, loaded.InvolvedParties);
+        Assert.Null(loaded.InvolvedParties[1].Phone);
+        Assert.Null(loaded.InvolvedParties[1].Notes);
+        Assert.Equal(clock.Now, loaded.InvolvedParties[1].CreatedAt);
+    }
+
+    [Fact]
+    public void A_removed_involved_party_is_gone_after_the_next_save()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op);
+        var party = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        IncidentRepository.Save(_path, incident);
+
+        incident.RemoveInvolvedParty(party.Id);
+        IncidentRepository.Save(_path, incident);
+
+        Assert.Empty(IncidentRepository.Load(_path).InvolvedParties);
+    }
 }

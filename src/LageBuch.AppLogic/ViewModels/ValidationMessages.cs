@@ -21,6 +21,9 @@ public static class ValidationMessages
     /// <summary>A timer box emptied, or holding something that is not a count of minutes.</summary>
     public const string TimerMinutes = "Minuten eintragen (0 oder mehr)";
 
+    /// <summary>A Beteiligte/r without a name, which nobody could look up again.</summary>
+    public const string NameRequired = "Name eingeben";
+
     /// <summary>The Wache a Kräfte row belongs to, without which the row reports nobody.</summary>
     public const string BrigadeRequired = "Wache eingeben";
 

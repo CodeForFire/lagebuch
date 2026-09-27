@@ -40,4 +40,15 @@ public class VersionHandshakeTests
         Assert.Equal(4, info.Protocol);
         Assert.Equal(2, info.MinProtocol);
     }
+
+    [Fact]
+    public void The_beteiligte_commands_raise_the_floor_to_protocol_three()
+    {
+        // addInvolvedParty/updateInvolvedParty/removeInvolvedParty are commands a client may send,
+        // which a host at protocol 2 cannot parse — so both ends of the range move to 3, and a
+        // pre-handshake peer (LegacyProtocolVersion) is now below the floor.
+        Assert.Equal(3, SyncProtocol.ProtocolVersion);
+        Assert.Equal(3, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.LegacyProtocolVersion, int.MinValue, SyncProtocol.MinimumProtocolVersion - 1);
+    }
 }

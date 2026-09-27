@@ -33,7 +33,10 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<IncidentFileDto> Files,
     IReadOnlyList<TaskDto> Tasks,
     IReadOnlyList<BuildingDto> Buildings,
-    IReadOnlyList<DwellingDto> Dwellings);
+    IReadOnlyList<DwellingDto> Dwellings,
+
+    // Defaulted like DwellingDto.Readings: a snapshot without the key reads as "no Beteiligte".
+    IReadOnlyList<InvolvedPartyDto>? InvolvedParties = null);
 
 public sealed record TimerDto(
     string Key,
@@ -139,6 +142,10 @@ public sealed record TaskDto(
     DateTimeOffset DueAt,
     DateTimeOffset? CompletedAt,
     string? CompletedBy);
+
+/// <summary>One Beteiligte/r on the wire; mirrors <see cref="LageBuch.Domain.Involved.InvolvedParty"/>.</summary>
+public sealed record InvolvedPartyDto(
+    Guid Id, string Name, string? Phone, string? Notes, string CreatedBy, DateTimeOffset CreatedAt);
 
 public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,

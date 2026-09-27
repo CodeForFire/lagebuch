@@ -156,6 +156,7 @@ public class PhoneLayoutTests
     [InlineData("DATEIEN")]
     [InlineData("CO-MESSUNG")]
     [InlineData("LINKS")]
+    [InlineData("BETEILIGTE")]
     [InlineData("AUFBAU")]
     public void No_module_runs_past_the_phone_viewport(string header)
     {
@@ -175,6 +176,7 @@ public class PhoneLayoutTests
     [InlineData("ATEMSCHUTZ")]
     [InlineData("AUFGABEN")]
     [InlineData("FUNKTIONEN")]
+    [InlineData("BETEILIGTE")]
     public void A_dock_becomes_a_sheet_that_opens_and_closes(string header)
     {
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
@@ -254,7 +256,7 @@ public class PhoneLayoutTests
         // it needs. Ask the modules themselves instead of trusting the list.
         object?[] modules =
         [
-            vm.Etb, vm.Tasks, vm.Roles, vm.Forces, vm.Scba, vm.CoMessprotokoll, vm.Files, vm.Links,
+            vm.Etb, vm.Tasks, vm.Roles, vm.Forces, vm.InvolvedParties, vm.Scba, vm.CoMessprotokoll, vm.Files, vm.Links,
         ];
 
         var aware = modules.OfType<INarrowAware>().ToArray();

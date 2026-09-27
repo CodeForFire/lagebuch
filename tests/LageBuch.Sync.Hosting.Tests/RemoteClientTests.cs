@@ -467,21 +467,24 @@ public class RemoteClientTests
     }
 
     [Fact]
-    public async Task Connect_treats_a_host_without_protocol_fields_as_the_legacy_protocol()
+    public async Task Connect_treats_a_host_without_protocol_fields_as_the_legacy_protocol_and_refuses_it()
     {
         var clock = new FixedClock();
 
         // A v0.6.1 host answers /version with nothing but "version" — no protocol numbers exist yet
-        // in that build. Those hosts are already installed in the field and must stay joinable, so
-        // the absent members have to read as SyncProtocol.LegacyProtocolVersion rather than as 0.
+        // in that build. The absent members read as SyncProtocol.LegacyProtocolVersion rather than
+        // as 0, and since protocol 3 (the Beteiligte commands) that is below this build's floor: the
+        // refusal names the host as the device to update.
         await using var host = await StubHost.StartAsync(
             HostSession(clock).Incident,
-            masterDataBody: MasterDataJson.Serialize(MasterDataSet.Empty));
+            masterDataBody: MasterDataJson.Serialize(MasterDataSet.Empty),
+            legacyVersion: true);
 
-        await using var session = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "9.9.9", new ImmediateUiDispatcher(), new InMemoryTrustStore(), port: host.Port);
+        var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "9.9.9", new ImmediateUiDispatcher(), new InMemoryTrustStore(), port: host.Port));
 
-        Assert.NotNull(session.Incident);
+        Assert.Contains("Der Host ist zu alt", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

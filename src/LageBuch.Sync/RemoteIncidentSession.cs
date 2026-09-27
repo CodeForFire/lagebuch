@@ -407,6 +407,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));
 
+    public void AddInvolvedParty(string name, string? phone, string? notes) =>
+        Send(new AddInvolvedPartyCommand(Op(), name, phone, notes));
+
+    public void UpdateInvolvedParty(Guid partyId, string name, string? phone, string? notes) =>
+        Send(new UpdateInvolvedPartyCommand(partyId, name, phone, notes));
+
+    public void RemoveInvolvedParty(Guid partyId) =>
+        Send(new RemoveInvolvedPartyCommand(partyId));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

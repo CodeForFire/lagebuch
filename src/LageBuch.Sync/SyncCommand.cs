@@ -50,6 +50,9 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(SetApartmentLabelCommand), "setApartmentLabel")]
 [JsonDerivedType(typeof(SetApartmentCountCommand), "setApartmentCount")]
 [JsonDerivedType(typeof(RemoveDwellingsCommand), "removeDwellings")]
+[JsonDerivedType(typeof(AddInvolvedPartyCommand), "addInvolvedParty")]
+[JsonDerivedType(typeof(UpdateInvolvedPartyCommand), "updateInvolvedParty")]
+[JsonDerivedType(typeof(RemoveInvolvedPartyCommand), "removeInvolvedParty")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -147,6 +150,15 @@ public sealed record AddTaskCommand(
     TaskImportance Importance, TaskUrgency Urgency, int TimerMinutes) : SyncCommand;
 
 public sealed record SetTaskCompletedCommand(OperatorDto Operator, Guid TaskId, bool IsDone) : SyncCommand;
+
+// The Beteiligte. Only the add carries an operator, for the entry's CreatedBy stamp; a correction
+// or removal writes no ETB line and records no author, like RenameFileCommand. The domain caps
+// every field, so an oversized value from a peer is refused on the host.
+public sealed record AddInvolvedPartyCommand(OperatorDto Operator, string Name, string? Phone, string? Notes) : SyncCommand;
+
+public sealed record UpdateInvolvedPartyCommand(Guid PartyId, string Name, string? Phone, string? Notes) : SyncCommand;
+
+public sealed record RemoveInvolvedPartyCommand(Guid PartyId) : SyncCommand;
 
 // UndergroundFloorCount defaults to 0 so a pre-#218 payload deserializes as "keine
 // Untergeschosse" instead of failing the contract (same convention as #76's OfficerCount).

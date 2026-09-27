@@ -71,7 +71,8 @@ public class IncidentTimerTests
             Array.Empty<Files.IncidentFile>(),
             Array.Empty<Tasks.IncidentTask>(),
             Array.Empty<CoMeasurement.Building>(),
-            Array.Empty<CoMeasurement.Dwelling>());
+            Array.Empty<CoMeasurement.Dwelling>(),
+            Array.Empty<Involved.InvolvedParty>());
 
         Assert.Equal("ils-reminder", Assert.Single(incident.Timers).Key);
     }

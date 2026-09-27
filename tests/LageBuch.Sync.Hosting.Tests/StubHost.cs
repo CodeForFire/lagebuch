@@ -22,9 +22,10 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// down rather than leaking an open hub connection, for every one of those failure shapes.
 /// </item>
 /// <item>
-/// A <c>/version</c> payload carrying no protocol numbers at all, which is what every host up to
-/// and including v0.6.1 answers with. The real host cannot emit that shape any more, and it is the
-/// forward-compatibility case that matters most: those builds are already in the field.
+/// A <c>/version</c> payload carrying no protocol numbers at all (<c>legacyVersion: true</c>), which
+/// is what every host up to and including v0.6.1 answers with. The real host cannot emit that shape
+/// any more, and those builds are already in the field. Otherwise the stub advertises this build's
+/// own protocol range, so a test aimed at the Stammdaten path gets past the handshake.
 /// </item>
 /// </list>
 /// No PIN middleware and no protocol gate — the client's headers are simply ignored.
@@ -44,7 +45,7 @@ internal sealed class StubHost : IAsyncDisposable
     public int Port { get; }
 
     public static async Task<StubHost> StartAsync(
-        Incident incident, string version = "1.0.0", string masterDataBody = "{ not json")
+        Incident incident, string version = "1.0.0", string masterDataBody = "{ not json", bool legacyVersion = false)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -64,10 +65,13 @@ internal sealed class StubHost : IAsyncDisposable
         var app = builder.Build();
         app.MapHub<TrackingHub>(SyncProtocol.HubPath);
 
-        // The one-argument VersionInfo on purpose: no "protocol"/"minProtocol" members reach the wire,
-        // which is exactly what a v0.6.1 host answers. A client must read that as
-        // SyncProtocol.LegacyProtocolVersion and join anyway.
-        app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(version), SyncJson.Options));
+        // For legacyVersion the one-argument VersionInfo on purpose: no "protocol"/"minProtocol"
+        // members reach the wire, which is exactly what a v0.6.1 host answers. A client must read
+        // that as SyncProtocol.LegacyProtocolVersion.
+        var versionInfo = legacyVersion
+            ? new VersionInfo(version)
+            : new VersionInfo(version, SyncProtocol.ProtocolVersion, SyncProtocol.MinimumProtocolVersion);
+        app.MapGet(SyncProtocol.VersionPath, () => Results.Json(versionInfo, SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(incident), SyncJson.Options));
 
         // The whole point: well-formed HTTP, bad Stammdaten -- either malformed JSON (the default)

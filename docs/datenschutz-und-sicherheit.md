@@ -45,10 +45,11 @@ einzelne Datei gespeichert wird.
 | CO-Messprotokoll | **Name der Bewohnerin oder des Bewohners je Wohnung**, ppm-Wert, Status, Schlüssel vorhanden | Einsatzdatei |
 | Kräfte | Wache, Funkrufname, Stärke als Zahlen (ZF/GF/Mann, AGT), Status, Bemerkung – **keine Namen** | Einsatzdatei |
 | Aufgaben | Auftrag, Zuständiger (Freitext), „angelegt von“, „erledigt von“, Zeiten | Einsatzdatei |
+| Beteiligte | **Name, Telefonnummer und Notiz** von Personen außerhalb der Feuerwehr (z. B. Eigentümer, Fahrzeughalter, Polizei), „angelegt von“ | Einsatzdatei |
 | Dateien und Anhänge | Fotos und PDFs, deren Originaldateiname und „hinzugefügt von“ | Ordner neben der Einsatzdatei |
 | Änderungsprotokoll | wer wann welche Aktion ausgeführt hat | Einsatzdatei |
 
-Zwei Punkte verdienen besondere Aufmerksamkeit:
+Drei Punkte verdienen besondere Aufmerksamkeit:
 
 **Das CO-Messprotokoll enthält Daten Dritter.** Erfasst werden hier Namen von
 Personen, die nicht der Feuerwehr angehören und die der Erfassung nicht
@@ -57,6 +58,13 @@ dieser Teil der Einsatzdatei sollte bei der Festlegung von Löschfristen zuerst
 betrachtet werden. Der Name ist ein Freitextfeld und kann leer bleiben –
 die Wohnung lässt sich auch ohne ihn eindeutig über Haus, Stockwerk und Lage
 kennzeichnen.
+
+**Auch die Beteiligten sind Daten Dritter.** Hauseigentümer, Fahrzeughalter
+oder die Ansprechperson der Polizei werden mit Name, Telefonnummer und Notiz
+erfasst. Diese Angaben stehen bewusst nur in dieser Liste und im PDF-Bericht –
+das ETB erhält beim Anlegen, Ändern oder Entfernen keinen Eintrag. Ein
+entfernter Eintrag ist damit aus der Einsatzdatei verschwunden; für
+Löschfristen gilt dasselbe wie für das CO-Messprotokoll.
 
 **Fotos enthalten mehr als das Bild.** Lagebuch entfernt keine
 EXIF-Metadaten aus angehängten Bildern. Ein mit dem Diensthandy aufgenommenes
@@ -182,7 +190,8 @@ exponentiell, bis zu einer Minute.
 vollständigen Stand des Einsatzes: Einsatzdaten, das gesamte ETB einschließlich
 der aufbewahrten Korrekturfassungen, Funktionen **mit Namen und
 Telefonnummern**, Kräfte, Atemschutztrupps mit den Namen der Truppmitglieder,
-Aufgaben, CO-Messprotokoll, Änderungsprotokoll und die Liste der Anhänge.
+Aufgaben, Beteiligte **mit Namen und Telefonnummern**, CO-Messprotokoll,
+Änderungsprotokoll und die Liste der Anhänge.
 Anhänge selbst werden nur auf Anforderung übertragen (höchstens 25 MB je Datei).
 
 **Der Gastgeber gibt seine Stammdaten weiter.** Damit beide Geräte dieselben

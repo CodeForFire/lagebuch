@@ -283,6 +283,48 @@ public class WorkspaceCollaborationTests
     }
 
     [Fact]
+    public async Task Involved_parties_converge_between_host_and_client()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
+            TestHost.DefaultPin,
+            port);
+        var journalBefore = hostSession.Incident.Journal.Count;
+
+        // Client adds -> the host's aggregate holds it, credited to the client device.
+        var added = NextChange(client);
+        client.AddInvolvedParty("Erika Beispiel", null, "Hauseigentümerin");
+        await added;
+
+        var party = Assert.Single(hostSession.Incident.InvolvedParties);
+        Assert.Equal("Client (RUF 1)", party.CreatedBy);
+
+        // Client corrects -> host sees the phone number.
+        var updated = NextChange(client);
+        client.UpdateInvolvedParty(party.Id, "Erika Beispiel", "0171 0000001", "Hauseigentümerin");
+        await updated;
+        Assert.Equal("0171 0000001", Assert.Single(hostSession.Incident.InvolvedParties).Phone);
+        Assert.Equal("0171 0000001", Assert.Single(client.Incident.InvolvedParties).Phone);
+
+        // Client removes -> gone on both ends, and no ETB line was written along the way.
+        var removed = NextChange(client);
+        client.RemoveInvolvedParty(party.Id);
+        await removed;
+        Assert.Empty(hostSession.Incident.InvolvedParties);
+        Assert.Empty(client.Incident.InvolvedParties);
+        Assert.Equal(journalBefore, hostSession.Incident.Journal.Count);
+    }
+
+    [Fact]
     public async Task Losing_the_host_disconnects_then_returns_the_client_home()
     {
         var clock = new FixedClock();
