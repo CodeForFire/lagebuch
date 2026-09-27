@@ -18,6 +18,20 @@ public static class ValidationMessages
     /// <summary>A field that means nothing when empty -- the plain case behind most forms.</summary>
     public const string Required = "Pflichtfeld — bitte ausfüllen";
 
+    /// <summary>
+    /// A Funktion the Stammdaten marked unique is already held, so the press hands over instead of
+    /// adding a second holder (#470). {0} is the Funktion, {1} the person holding it.
+    /// </summary>
+    public const string FunctionAlreadyHeld = "{0} ist bereits besetzt: {1}";
+
+    /// <summary>
+    /// The same for a Funktion unique per Abschnitt, where the Abschnitt is what makes two
+    /// assignments collide. {0} is the Funktion, {1} the Abschnitt, {2} its holder. A holder with no
+    /// Abschnitt names none, and RolesViewModel then uses <see cref="FunctionAlreadyHeld"/> rather
+    /// than let this read as "in Abschnitt  bereits besetzt".
+    /// </summary>
+    public const string FunctionAlreadyHeldInSection = "{0} ist in Abschnitt {1} bereits besetzt: {2}";
+
     /// <summary>A timer box emptied, or holding something that is not a count of minutes.</summary>
     public const string TimerMinutes = "Minuten eintragen (0 oder mehr)";
 

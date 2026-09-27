@@ -15,6 +15,11 @@ public class RolesViewModelTests
         Personnel = personnel,
     };
 
+    // #470: the same catalogue, with the one Funktion under test marked. The rest stays Multiple so
+    // an unrelated row can never be what a test trips over.
+    private static MasterDataSet MdWithRoles(RoleUniqueness uniqueness, params Person[] personnel) =>
+        Md(personnel) with { Roles = new[] { new Role("EL", uniqueness), new Role("ZF") } };
+
     private static readonly Person Max = new("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67");
 
     private static RolesViewModel NewVm(FixedClock clock, MasterDataSet md, Action? onChanged = null)
@@ -429,5 +434,226 @@ public class RolesViewModelTests
         vm.NewRole = "Fachberater THW";
 
         Assert.False(vm.IsNewRoleUnknown);
+    }
+
+    // --- Funktionen, die nur einmal besetzt werden dürfen (issue #470) ---
+    // #470: the default must stay inert, or marking one Funktion unique would change how every
+    // other one behaves.
+    [Fact]
+    public void A_funktion_the_stammdaten_leave_multiple_is_never_flagged()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.Multiple));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Schmidt";
+        Assert.Null(vm.ConflictingRow); // while it is typed, so the press below cannot empty the form first
+
+        vm.AddRoleCommand.Execute(null);
+
+        Assert.Equal(2, vm.Roles.Count);
+        Assert.Null(vm.ConflictingRow);
+    }
+
+    [Fact]
+    public void A_funktion_unique_per_einsatz_is_flagged_while_a_holder_runs()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerIncident));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Schmidt";
+
+        var conflict = vm.ConflictingRow;
+        Assert.NotNull(conflict);
+        Assert.Equal("Müller", conflict.PersonName);
+        Assert.NotNull(vm.ConflictHint);
+    }
+
+    // One Einsatzleiter for the whole Einsatz, whichever Abschnitt either of them is typed into --
+    // so the Abschnitt the operator picked must not hide a holder sitting in another one.
+    [Fact]
+    public void A_funktion_unique_per_einsatz_is_flagged_across_abschnitte()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerIncident));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.NewSection = "Abschnitt Nord";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Schmidt";
+        vm.NewSection = "Abschnitt Süd";
+
+        var conflict = vm.ConflictingRow;
+        Assert.NotNull(conflict);
+        Assert.Equal("Müller", conflict.PersonName);
+    }
+
+    [Fact]
+    public void A_funktion_unique_per_abschnitt_is_only_flagged_inside_the_same_abschnitt()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerSection));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.NewSection = "Abschnitt Nord";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Schmidt";
+        vm.NewSection = "Abschnitt Süd";
+        Assert.Null(vm.ConflictingRow);
+
+        vm.NewSection = "Abschnitt Nord";
+        var conflict = vm.ConflictingRow;
+        Assert.NotNull(conflict);
+        Assert.Equal("Müller", conflict.PersonName);
+    }
+
+    // A handover ends the old row and starts a successor for the same Funktion, so the slot is
+    // never free afterwards: the conflict clears for Müller and follows Schmidt.
+    [Fact]
+    public void A_completed_handover_points_the_conflict_at_the_new_holder()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerIncident));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Schmidt";
+        vm.AddRoleCommand.Execute(null); // refused into a hand-off
+        vm.ConfirmTransferCommand.Execute(null);
+
+        var conflict = vm.ConflictingRow;
+        Assert.NotNull(conflict);
+        Assert.Equal("Schmidt", conflict.PersonName);
+
+        var hint = vm.ConflictHint;
+        Assert.NotNull(hint);
+        Assert.Contains("Schmidt", hint, StringComparison.Ordinal);
+        Assert.DoesNotContain("Müller", hint, StringComparison.Ordinal);
+    }
+
+    // An unlisted Funktion has no mode, so nothing is refused for it -- the tolerance
+    // StammdatenCatalogue exists for.
+    [Fact]
+    public void A_funktion_absent_from_the_stammdaten_is_never_flagged()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerIncident));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "Fachberater THW";
+        vm.NewPersonName = "Schmidt";
+
+        Assert.Null(vm.ConflictingRow);
+    }
+
+    [Fact]
+    public void A_conflict_is_found_even_when_the_funktion_is_typed_in_another_spelling()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerIncident));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "  el  ";
+        vm.NewPersonName = "Schmidt";
+
+        Assert.NotNull(vm.ConflictingRow);
+    }
+
+    // A computed property nobody re-raises keeps showing what it was last computed from, so the
+    // binding over the add form would show no conflict at all — a property that lies. Both inputs
+    // are covered: the typed Abschnitt, and a handover that changes the holder without the form
+    // changing by a keystroke.
+    [Fact]
+    public void The_conflict_is_re_raised_when_the_form_or_the_incident_changes()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerSection));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.NewSection = "Abschnitt Nord";
+        vm.AddRoleCommand.Execute(null);
+
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Huber";
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.NewSection = "Abschnitt Nord";
+        Assert.NotNull(vm.ConflictHint);
+        raised.Clear();
+
+        vm.NewSection = "Abschnitt Süd";
+        Assert.Null(vm.ConflictHint);
+        Assert.Contains(nameof(RolesViewModel.ConflictHint), raised);
+        Assert.Contains(nameof(RolesViewModel.ConflictingRow), raised);
+
+        vm.NewSection = "Abschnitt Nord";
+        raised.Clear();
+        Assert.Single(vm.Roles).BeginTransferCommand.Execute(null);
+        vm.TransferPersonName = "Schmidt";
+        vm.ConfirmTransferCommand.Execute(null);
+
+        var conflict = vm.ConflictingRow;
+        Assert.NotNull(conflict);
+        Assert.Equal("Schmidt", conflict.PersonName);
+        Assert.Contains(nameof(RolesViewModel.ConflictHint), raised);
+        Assert.Contains(nameof(RolesViewModel.ConflictingRow), raised);
+    }
+
+    // The refusal is a hand-off, not an error message: the press opens the existing Übergabe panel
+    // on the holder, carrying what was already typed, and the add form keeps its values so
+    // ABBRECHEN returns to it.
+    [Fact]
+    public void ZUWEISEN_on_a_held_funktion_opens_the_handover_on_its_holder()
+    {
+        var clock = new FixedClock(T0);
+        var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerIncident));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Schmidt";
+        vm.NewCallSign = "Florian 2";
+        vm.NewPhone = "0171 2";
+
+        vm.AddRoleCommand.Execute(null);
+
+        Assert.Single(vm.Roles);                                     // no second holder was created
+        Assert.True(vm.IsTransferring);
+        var holder = vm.TransferringRow;
+        Assert.NotNull(holder);
+        Assert.Equal("EL", holder.Role);
+        Assert.Equal("Müller", holder.PersonName);
+        Assert.Equal("Schmidt", vm.TransferPersonName);
+        Assert.Equal("Florian 2", vm.TransferCallSign);
+        Assert.Equal("0171 2", vm.TransferPhone);
+        Assert.Equal("EL", vm.NewRole);                            // the add form is left as typed
+        Assert.Equal("Schmidt", vm.NewPersonName);
     }
 }
