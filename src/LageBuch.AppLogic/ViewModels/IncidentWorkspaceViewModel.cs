@@ -61,6 +61,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Tasks] = "AUFGABEN",
             [NavModules.Roles] = "FUNKTIONEN",
             [NavModules.Forces] = "KRÄFTE",
+            [NavModules.InvolvedParties] = "BETEILIGTE",
             [NavModules.Scba] = "ATEMSCHUTZ",
             [NavModules.Co] = "CO-MESSUNG",
             [NavModules.Files] = "DATEIEN",
@@ -338,7 +339,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [Etb, Tasks, Roles, Forces, Scba, CoMessprotokoll, Files, Links];
+        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links];
         return modules.OfType<INarrowAware>();
     }
 
@@ -404,6 +405,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public RolesViewModel Roles { get; private set; } = null!;
 
     public ForcesViewModel Forces { get; private set; } = null!;
+
+    public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
 
     public ScbaViewModel Scba { get; private set; } = null!;
 
@@ -640,6 +643,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Etb?.Dispose();
         Roles?.Dispose();
         Forces?.Dispose();
+        InvolvedParties?.Dispose();
         if (Scba is not null)
         {
             // Not covered by Dispose: the workspace owns this subscription, and an outgoing
@@ -682,6 +686,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
+        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirm);
+
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
         Scba.PropertyChanged += OnCountdownChanged;
@@ -718,6 +724,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Etb));
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
+        OnPropertyChanged(nameof(InvolvedParties));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
@@ -744,6 +751,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Tasks] = Tasks,
             [NavModules.Roles] = Roles,
             [NavModules.Forces] = Forces,
+            [NavModules.InvolvedParties] = InvolvedParties,
             [NavModules.Scba] = Scba,
             [NavModules.Co] = CoMessprotokoll,
             [NavModules.Files] = Files,

@@ -26,6 +26,9 @@ public static class NavModules
     /// <summary>Kräfte.</summary>
     public const string Forces = "forces";
 
+    /// <summary>Beteiligte: the Einsatz's own address book of people who are not forces.</summary>
+    public const string InvolvedParties = "involved";
+
     /// <summary>Atemschutz.</summary>
     public const string Scba = "scba";
 
@@ -46,7 +49,7 @@ public static class NavModules
 
     /// <summary>Every built-in module, in the order the rail shipped with.</summary>
     public static IReadOnlyList<string> All { get; } =
-        new[] { Etb, Tasks, Roles, Forces, Scba, Co, Files, Links };
+        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links };
 
     /// <summary>
     /// Whether this build knows the key. A layout written by a newer build may name a module that
@@ -77,8 +80,8 @@ public sealed record NavEntry(string ModuleKey, Guid? ChecklistId, bool IsVisibl
 public static class NavLayout
 {
     /// <summary>
-    /// The rail exactly as it shipped before it was configurable: Aufbau, the eight modules in
-    /// their original order, then Abbau.
+    /// The rail as it shipped before it was configurable — Aufbau, the modules in their original
+    /// order, then Abbau — plus Beteiligte, placed beside Kräfte.
     /// </summary>
     /// <remarks>
     /// Stored as "no layout" rather than written into a fresh Stammdaten set on purpose. An empty
@@ -93,6 +96,7 @@ public static class NavLayout
         new NavEntry(NavModules.Tasks, null, true),
         new NavEntry(NavModules.Roles, null, true),
         new NavEntry(NavModules.Forces, null, true),
+        new NavEntry(NavModules.InvolvedParties, null, true),
         new NavEntry(NavModules.Scba, null, true),
         new NavEntry(NavModules.Co, null, true),
         new NavEntry(NavModules.Files, null, true),

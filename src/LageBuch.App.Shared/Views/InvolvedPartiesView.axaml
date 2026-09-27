@@ -1,0 +1,192 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             x:Class="LageBuch.App.Shared.Views.InvolvedPartiesView"
+             x:DataType="vm:InvolvedPartiesViewModel">
+  <!-- Same dock idiom as ForcesView: the fields run side by side on a wide window and stack on a
+       phone. Orientation and widths are Style setters rather than attributes, because a local value
+       in XAML outranks a Style setter and the container query could never change them. -->
+  <UserControl.Styles>
+    <Style Selector="StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Style Selector="TextBox#NewNameBox">
+      <Setter Property="Width" Value="220" />
+    </Style>
+    <Style Selector="TextBox#NewPhoneBox">
+      <Setter Property="Width" Value="170" />
+    </Style>
+    <Style Selector="TextBox#NewNotesBox">
+      <Setter Property="Width" Value="320" />
+    </Style>
+
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="StackPanel#DockFields">
+        <Setter Property="Orientation" Value="Vertical" />
+      </Style>
+      <Style Selector="TextBlock#InvolvedPartiesTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="TextBox#NewNameBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#NewPhoneBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="TextBox#NewNotesBox">
+        <Setter Property="Width" Value="NaN" />
+      </Style>
+      <Style Selector="HeaderedContentControl.field">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+      </Style>
+      <Style Selector="Button.dock-action">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      </Style>
+    </ContainerQuery>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" x:Name="InvolvedPartiesTitle" Text="BETEILIGTE" Classes="overline"
+               Margin="0,0,0,14" />
+
+    <!-- The phone's way in to the form, at the bottom edge where the thumb already is. -->
+    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="+ BETEILIGTE/N AUFNEHMEN"
+            IsVisible="{Binding ShowComposerButton}"
+            Command="{Binding OpenComposerCommand}" />
+
+    <!-- Input dock -->
+    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
+            IsVisible="{Binding ShowComposer}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
+           bottom of the window to the soft keyboard. Never scrolls on a wide window. -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="6">
+          <Grid x:Name="ComposerHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,4"
+                IsVisible="{Binding IsNarrow}">
+            <TextBlock Grid.Column="0" Text="BETEILIGTE/N AUFNEHMEN" Classes="overline" VerticalAlignment="Center" />
+            <Button Grid.Column="1" x:Name="CloseComposerButton" Classes="ghost"
+                    AutomationProperties.Name="Eingabe schließen"
+                    ToolTip.Tip="Eingabe schließen"
+                    Command="{Binding CloseComposerCommand}">
+              <PathIcon Width="13" Height="13"
+                        Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+            </Button>
+          </Grid>
+          <StackPanel x:Name="DockFields" Spacing="8">
+            <HeaderedContentControl Classes="field" Header="NAME"
+                                    Classes.invalid="{Binding NewNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBox x:Name="NewNameBox"
+                       MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNameLength}"
+                       PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
+                       Text="{Binding NewName}">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </HeaderedContentControl>
+            <!-- Plain text: a number is read out over the radio or typed into a phone, never
+                 dialled from here (tel: launch is out of scope). -->
+            <HeaderedContentControl Classes="field" Header="TELEFON">
+              <TextBox x:Name="NewPhoneBox"
+                       MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxPhoneLength}"
+                       PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                       Text="{Binding NewPhone}">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="NOTIZ">
+              <!-- Freitext: kein Platzhalter, siehe #137 -->
+              <TextBox x:Name="NewNotesBox"
+                       MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNotesLength}"
+                       Text="{Binding NewNotes}">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </HeaderedContentControl>
+            <Button x:Name="AddInvolvedPartyButton" Classes="signal dock-action" Content="HINZUFÜGEN"
+                    Command="{Binding AddCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+          </StackPanel>
+          <TextBlock x:Name="DockErrorSummary" Classes="field-error"
+                     Text="{Binding NewNameError}"
+                     IsVisible="{Binding NewNameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock DockPanel.Dock="Top" x:Name="EmptyText" Text="Noch keine Beteiligten erfasst."
+               Foreground="{StaticResource TextMutedBrush}"
+               IsVisible="{Binding !Parties.Count}" />
+
+    <!-- One card per person on every width: an address book is read entry by entry, and the same
+         stacked card works on a 412dp phone. Stretch, never a centred MaxWidth column, so the
+         list cannot change width while it scrolls. -->
+    <Border x:Name="InvolvedPartiesPanel"
+            Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True"
+            IsVisible="{Binding Parties.Count}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="InvolvedPartiesList" ItemsSource="{Binding Parties}" Margin="8"
+                      Grid.IsSharedSizeScope="True">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:InvolvedPartyRow">
+              <Border Classes="row-card">
+                <Grid ColumnDefinitions="*,Auto">
+                  <!-- Each field pushes on LostFocus: the row rebuilds after every accepted write,
+                       so a per-keystroke push would rewrite the Einsatzdatei on every character
+                       and throw focus out of the box (#33, same as ForcesView's Bemerkung). -->
+                  <Grid Grid.Column="0" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="Label" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="NAME" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox Grid.Row="0" Grid.Column="1" FontWeight="SemiBold"
+                             AutomationProperties.Name="Name"
+                             MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNameLength}"
+                             Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="TELEFON" Classes="overline" FontSize="10"
+                               VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Classes="mono"
+                             AutomationProperties.Name="Telefon"
+                             MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxPhoneLength}"
+                             Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="NOTIZ" Classes="overline" FontSize="10"
+                               VerticalAlignment="Top" Margin="0,8,12,0" />
+                    <TextBox Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" AcceptsReturn="True"
+                             AutomationProperties.Name="Notiz"
+                             MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNotesLength}"
+                             Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding !IsReadOnly}" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Classes="field-error"
+                               Text="{Binding Error}"
+                               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </Grid>
+                  <Button Grid.Column="1" Classes="icon-btn card-action" VerticalAlignment="Top"
+                          Margin="8,0,0,0"
+                          IsVisible="{Binding !IsReadOnly}"
+                          Command="{Binding RemoveCommand}"
+                          ToolTip.Tip="Beteiligte/n entfernen" AutomationProperties.Name="Beteiligte/n entfernen">
+                    <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</UserControl>

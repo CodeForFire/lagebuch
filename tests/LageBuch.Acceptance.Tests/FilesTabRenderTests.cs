@@ -54,11 +54,11 @@ public class FilesTabRenderTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_eight_tabs_before_dateien_is_opened()
+    public void Workspace_renders_nine_modules_and_two_checklists_before_dateien_is_opened()
     {
         var (window, _, _) = ShowWorkspace();
 
-        Assert.Equal(10, WorkspaceRenderHelper.RailHeaders(window).Count);
+        Assert.Equal(11, WorkspaceRenderHelper.RailHeaders(window).Count);
         Capture(window, "files-before.png");
     }
 

@@ -223,14 +223,14 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_with_eight_tabs()
+    public void Workspace_renders_with_nine_modules_and_two_checklists()
     {
         var vm = BuildWorkspace(out _);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1000, Height = 700 };
         window.Show();
 
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
-        Assert.Equal(10, tabs.Items.Count);
+        Assert.Equal(11, tabs.Items.Count);
     }
 
     [AvaloniaFact]

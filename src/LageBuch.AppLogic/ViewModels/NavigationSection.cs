@@ -173,6 +173,7 @@ public sealed partial class NavRow : ObservableObject
             [NavModules.Tasks] = "Aufgaben",
             [NavModules.Roles] = "Funktionen",
             [NavModules.Forces] = "Kräfte",
+            [NavModules.InvolvedParties] = "Beteiligte",
             [NavModules.Scba] = "Atemschutz",
             [NavModules.Co] = "CO-Messung",
             [NavModules.Files] = "Dateien",
