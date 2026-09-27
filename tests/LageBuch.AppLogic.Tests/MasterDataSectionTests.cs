@@ -356,4 +356,60 @@ public class MasterDataSectionTests
 
         Assert.Equal(new[] { "Erster", "Zweiter" }, s.Rows.Select(r => r.Name));
     }
+
+    // #470: the Funktionen editor became a typed section when the uniqueness moved onto the row,
+    // the way #398 did for Trupp-Typen. It carries that section's normalization.
+    [Fact]
+    public void Roles_section_keeps_the_name_the_mode_and_the_order()
+    {
+        var s = new RolesSection(
+            "Rollen",
+            new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("EAL", RoleUniqueness.UniquePerSection),
+                new Role("ZF"),
+            },
+            () => { });
+
+        Assert.Equal(
+            new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("EAL", RoleUniqueness.UniquePerSection),
+                new Role("ZF", RoleUniqueness.Multiple),
+            },
+            s.ToValues());
+    }
+
+    // The plain name list this replaced de-duplicated ordinally, so "EL" and "el" survived as two
+    // Funktionen -- yet StammdatenCatalogue has always matched them as one. Case-insensitive,
+    // first spelling and its mode winning, as for the Trupp-Typen.
+    [Fact]
+    public void Roles_section_drops_a_funktion_repeated_differing_only_in_case()
+    {
+        var s = new RolesSection(
+            "Rollen",
+            new[]
+            {
+                new Role("  EL  ", RoleUniqueness.UniquePerIncident),
+                new Role("el", RoleUniqueness.Multiple),
+                new Role("   ", RoleUniqueness.Multiple),
+            },
+            () => { });
+
+        Assert.Equal(new[] { new Role("EL", RoleUniqueness.UniquePerIncident) }, s.ToValues());
+    }
+
+    [Fact]
+    public void Roles_section_adds_a_row_defaulting_to_multiple()
+    {
+        var changes = 0;
+        var s = new RolesSection("Rollen", Array.Empty<Role>(), () => changes++);
+
+        s.AddCommand.Execute(null);
+
+        Assert.Equal(RoleUniqueness.Multiple, Assert.Single(s.Rows).Uniqueness);
+        Assert.Equal(1, changes);
+    }
 }

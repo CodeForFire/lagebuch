@@ -18,7 +18,15 @@ public class MasterDataEditorRenderTests
     {
         public MasterDataSet Get() => MasterDataSet.Empty with
         {
-            Roles = new[] { new Role("EL"), new Role("EAL"), new Role("ZF"), new Role("GF") },
+            // Two of the four carry a non-default mode (#470), so the render proves the mode
+            // reaches the picker rather than only that a ComboBox exists.
+            Roles = new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("EAL", RoleUniqueness.UniquePerSection),
+                new Role("ZF"),
+                new Role("GF"),
+            },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
             TruppTypes = new[]
             {
@@ -178,6 +186,83 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-trupp-typen.png"));
+    }
+
+    // #470: a Funktion carries how often it may be held, so the Rollen editor is a typed section
+    // with a picker per row rather than the single-string EditableListSection the simple
+    // categories use -- the same move #398 made for Trupp-Typen.
+    [AvaloniaFact]
+    public void Funktionen_section_renders_a_uniqueness_picker_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Rollen");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        // Captured before the assertions: the picker assertion below is the one that fails on a
+        // build without the template, and a PNG from a run that never got there proves nothing.
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-funktionen.png"));
+        }
+
+        // Pinned row order, so pairing the pickers with the names by index below is a claim the
+        // test makes and not an accident of traversal. A ComboBox carries a TextBox of its own in
+        // its template, so the name fields are the ones no picker is an ancestor of.
+        var rowNames = view.GetVisualDescendants()
+            .OfType<TextBox>()
+            .Where(t => t.GetVisualAncestors().All(a => a is not ComboBox))
+            .Select(t => t.Text);
+        Assert.Equal(new[] { "EL", "EAL", "ZF", "GF" }, rowNames);
+
+        // One picker per row, each carrying that row's own mode. Asserted as a value, not as
+        // presence: the mode used to be dropped on load and defaulted on save, so a ComboBox that
+        // merely exists would have passed.
+        var pickers = view.GetVisualDescendants().OfType<ComboBox>().ToList();
+        Assert.Equal(4, pickers.Count);
+        Assert.Equal(
+            new object?[]
+            {
+                RoleUniqueness.UniquePerIncident,
+                RoleUniqueness.UniquePerSection,
+                RoleUniqueness.Multiple,
+                RoleUniqueness.Multiple,
+            },
+            pickers.Select(c => c.SelectedValue));
+
+        // The item template renders the German label, so the selection is readable and not a bare
+        // enum.
+        var labels = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.Contains("einmal je Einsatz", labels);
+        Assert.Contains("einmal je Abschnitt", labels);
+        Assert.Contains("mehrfach", labels);
+    }
+
+    // The other half of the same binding: choosing a mode in the view has to reach the row the
+    // save reads. A one-way SelectedValue would render every mode correctly and drop the
+    // operator's choice, which is the bug this section exists to fix.
+    [AvaloniaFact]
+    public void Choosing_a_uniqueness_in_the_view_reaches_the_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = (RolesSection)vm.Sections.Single(s => s.Title == "Rollen");
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var pickers = view.GetVisualDescendants().OfType<ComboBox>().ToList();
+        Assert.Equal(4, pickers.Count);
+
+        pickers[0].SelectedValue = RoleUniqueness.UniquePerSection;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(RoleUniqueness.UniquePerSection, section.Rows[0].Uniqueness);
     }
 
     [AvaloniaFact]

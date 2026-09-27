@@ -106,8 +106,8 @@ public class MasterDataEditorViewModelTests
         IMasterDataProvider provider, IFileDialogService? dialogs = null, IMasterDataFileService? files = null) =>
         new(provider, dialogs ?? new FakeDialogs(), files ?? new FakeFileService());
 
-    private static EditableListSection Roles(MasterDataEditorViewModel vm) =>
-        vm.Sections.OfType<EditableListSection>().First(s => s.Title == "Rollen");
+    private static RolesSection Roles(MasterDataEditorViewModel vm) =>
+        vm.Sections.OfType<RolesSection>().Single();
 
     private static EditableListSection Section(MasterDataEditorViewModel vm, string title) =>
         vm.Sections.OfType<EditableListSection>().First(s => s.Title == title);
@@ -204,13 +204,44 @@ public class MasterDataEditorViewModelTests
         var provider = new InMemoryProvider();
         var vm = Vm(provider);
         var roles = Roles(vm);
-        roles.RemoveCommand.Execute(roles.Items.First(i => i.Value == "EL"));
+        roles.RemoveCommand.Execute(roles.Rows.First(r => r.Name == "EL"));
 
         vm.SaveCommand.Execute(null);
 
         Assert.False(vm.IsDirty);
         Assert.Equal(1, provider.SaveCount);
         Assert.DoesNotContain(provider.Get().Roles, r => r.Name == "EL");
+    }
+
+    // #470: a brigade imports Stammdaten marking EL as einmal je Einsatz, then opens the editor to
+    // change something else and saves. The mode used to be dropped on load and rebuilt as the
+    // default on save, so the setting was silently gone after one Save -- and nothing in the view
+    // said so, because there was no field to show it.
+    [Fact]
+    public void A_save_round_trip_keeps_the_uniqueness_a_funktion_carries()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Roles = new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("EAL", RoleUniqueness.UniquePerSection),
+                new Role("ZF"),
+            },
+        });
+        var vm = Vm(provider);
+
+        Settings(vm).ReturnPressureBar = 45;   // any edit at all makes the editor dirty
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("EAL", RoleUniqueness.UniquePerSection),
+                new Role("ZF", RoleUniqueness.Multiple),
+            },
+            provider.Get().Roles);
     }
 
     [Fact]
@@ -222,7 +253,7 @@ public class MasterDataEditorViewModelTests
         vm.DiscardCommand.Execute(null);
 
         Assert.False(vm.IsDirty);
-        Assert.Equal(new[] { "EL", "ZF" }, Roles(vm).ToValues());
+        Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, Roles(vm).ToValues());
     }
 
     [Fact]
@@ -276,10 +307,17 @@ public class MasterDataEditorViewModelTests
     [Fact]
     public void Save_maps_every_category_to_its_own_list_in_BuildSet()
     {
-        var listTitles = new[] { "Rollen", "Einheiten-Status" };
+        var listTitles = new[] { "Einheiten-Status" };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var vm = Vm(provider);
+
+        // #470: Rollen carries a uniqueness mode since it became a typed section, so the marker
+        // carries one too -- BuildSet has to write both, not just the name.
+        var roles = Roles(vm);
+        roles.AddCommand.Execute(null);
+        roles.Rows[^1].Name = "MARK-Rollen";
+        roles.Rows[^1].Uniqueness = RoleUniqueness.UniquePerSection;
 
         foreach (var title in listTitles)
         {
@@ -324,7 +362,7 @@ public class MasterDataEditorViewModelTests
         vm.SaveCommand.Execute(null);
 
         var set = provider.Get();
-        Assert.Contains(set.Roles, r => r.Name == "MARK-Rollen");
+        Assert.Contains(set.Roles, r => r.Name == "MARK-Rollen" && r.Uniqueness == RoleUniqueness.UniquePerSection);
         Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
         Assert.Contains(set.TruppTypes, t => t.Name == "MARK-Trupp-Typen" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
         Assert.Contains(set.Vehicles, v => v.Wache == "MARK-Wache" && v.CallSign == "MARK-Funkrufname");
@@ -448,7 +486,7 @@ public class MasterDataEditorViewModelTests
 
         await vm.ImportCommand.ExecuteAsync(null);
 
-        Assert.Equal(new[] { "EL", "ZF" }, Roles(vm).ToValues());
+        Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, Roles(vm).ToValues());
         Assert.True(vm.IsDirty);
         Assert.Equal(0, provider.SaveCount);          // nothing written until Save
         Assert.False(vm.ImportCommand.CanExecute(null)); // no second import while dirty
@@ -545,8 +583,8 @@ public class MasterDataEditorViewModelTests
         var provider = new InMemoryProvider(); // DefaultSet: EL, ZF + a person
         var files = new FakeFileService();
         var vm = Vm(provider, new FakeDialogs { ExportPath = "/out.json" }, files);
-        Section(vm, "Rollen").AddCommand.Execute(null);
-        Section(vm, "Rollen").Items[^1].Value = "NEU"; // an unsaved edit
+        Roles(vm).AddCommand.Execute(null);
+        Roles(vm).Rows[^1].Name = "NEU"; // an unsaved edit
 
         await vm.ExportCommand.ExecuteAsync(null);
 
