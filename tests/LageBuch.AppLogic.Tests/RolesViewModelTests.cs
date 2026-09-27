@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Persistence.MasterData;
@@ -7,6 +9,14 @@ namespace LageBuch.AppLogic.Tests;
 public class RolesViewModelTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 6, 22, 9, 0, 0, TimeSpan.FromHours(2));
+
+    // The two conflict sentences a person reads, parsed once each so the assertions below can state
+    // them without CA1863 re-parsing a template per call. The wording itself is not copied here.
+    private static readonly CompositeFormat Held =
+        CompositeFormat.Parse(ValidationMessages.FunctionAlreadyHeld);
+
+    private static readonly CompositeFormat HeldInSection =
+        CompositeFormat.Parse(ValidationMessages.FunctionAlreadyHeldInSection);
 
     private static MasterDataSet Md(params Person[] personnel) => MasterDataSet.Empty with
     {
@@ -475,7 +485,9 @@ public class RolesViewModelTests
         var conflict = vm.ConflictingRow;
         Assert.NotNull(conflict);
         Assert.Equal("Müller", conflict.PersonName);
-        Assert.NotNull(vm.ConflictHint);
+        Assert.Equal(
+            string.Format(CultureInfo.InvariantCulture, Held, "EL", "Müller"),
+            vm.ConflictHint);
     }
 
     // One Einsatzleiter for the whole Einsatz, whichever Abschnitt either of them is typed into --
@@ -520,6 +532,16 @@ public class RolesViewModelTests
         var conflict = vm.ConflictingRow;
         Assert.NotNull(conflict);
         Assert.Equal("Müller", conflict.PersonName);
+
+        // The rendered sentence, composed from the spec's template with the arguments the view model
+        // passes: Funktion, Abschnitt and holder all named, and no "in Abschnitt  " gap. Composed
+        // here from the constant rather than written out, so the wording of the one sentence a
+        // person reads exists in ValidationMessages alone -- a literal would be a second copy to
+        // drift. The earlier half of this test is not the place for it: there the typed Abschnitt is
+        // blank, the short form is the correct rendering, and it would prove nothing about this one.
+        Assert.Equal(
+            string.Format(CultureInfo.InvariantCulture, HeldInSection, "EL", "Abschnitt Nord", "Müller"),
+            vm.ConflictHint);
     }
 
     // A handover ends the old row and starts a successor for the same Funktion, so the slot is
