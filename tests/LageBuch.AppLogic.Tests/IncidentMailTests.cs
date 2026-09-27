@@ -11,16 +11,30 @@ public class IncidentMailTests
     private static Incident NewIncident() => Incident.Start(new FixedClock(T0), new SessionOperator("Müller"));
 
     [Fact]
-    public void Subject_lists_number_keyword_address_and_start()
+    public void Subject_lists_number_keyword_and_start()
     {
         var incident = NewIncident();
         incident.SetIncidentNumber(new IncidentNumber("2026-0815"));
         incident.SetKeyword("B3 Wohnungsbrand");
-        incident.SetAddress("Hauptstr. 5", "Nord");
 
         Assert.Equal(
-            "Einsatzbericht 2026-0815 · B3 Wohnungsbrand · Hauptstr. 5, Nord · 19.09.2026 22:17",
+            "Einsatzbericht 2026-0815 · B3 Wohnungsbrand · 19.09.2026 22:17",
             IncidentMail.Subject(incident));
+    }
+
+    // A subject is never encrypted, sits in every mail server's log and shows on lock screens; the
+    // Einsatzort -- often someone's home -- stays in the PDF.
+    [Fact]
+    public void Subject_leaves_out_the_address()
+    {
+        var incident = NewIncident();
+        incident.SetKeyword("B3 Wohnungsbrand");
+        incident.SetAddress("Hauptstr. 5", "Nord");
+
+        var subject = IncidentMail.Subject(incident);
+
+        Assert.DoesNotContain("Hauptstr", subject, StringComparison.Ordinal);
+        Assert.DoesNotContain("Nord", subject, StringComparison.Ordinal);
     }
 
     [Fact]

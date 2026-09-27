@@ -6,13 +6,13 @@ namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// The prefilled subject and body of the e-mail that carries an incident's PDF. Both stay free of
-/// person names: the PDF already carries what the recipient needs, and a subject line is shown in
-/// every inbox listing it passes through.
+/// personal data -- no names, no Einsatzort: the PDF already carries what the recipient needs, and
+/// a subject line is never encrypted, lands in mail server logs and shows on lock screens.
 /// </summary>
 public static class IncidentMail
 {
-    // "Einsatzbericht 2026-0815 · B3 Wohnungsbrand · Hauptstr. 5, Nord · 19.09.2026 22:17", blank
-    // parts dropped, so even an unnamed incident gets a subject that sorts and reads sensibly.
+    // "Einsatzbericht 2026-0815 · B3 Wohnungsbrand · 19.09.2026 22:17", blank parts dropped, so
+    // even an unnamed incident gets a subject that sorts and reads sensibly.
     public static string Subject(Incident incident)
     {
         ArgumentNullException.ThrowIfNull(incident);
@@ -20,7 +20,6 @@ public static class IncidentMail
             {
                 incident.IncidentNumber?.Value,
                 incident.Keyword,
-                Formatting.Address(incident.Street, incident.District),
                 Formatting.Timestamp(incident.StartedAt),
             }
             .Select(SingleLine)
