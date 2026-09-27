@@ -623,39 +623,24 @@ public class WorkspaceAcceptanceTests
         Assert.False(dueRow.IsVisible); // not due yet
     }
 
-    // Binding the bare EtbDirection enum made Avalonia fall back to Enum.ToString(), so the
-    // picker read "Incoming" while the grid beside it read "Eingang". A ViewModel-level
-    // assertion cannot catch that regression — it only shows up once the control renders.
+    // A real Einsatz showed nobody used the RICHTUNG picker, so it went from the dock, the grid
+    // and the phone's cards alike. A ViewModel test cannot see a leftover column or field.
     [AvaloniaFact]
-    public void Etb_direction_picker_renders_german_labels()
+    public void Etb_asks_for_no_direction()
     {
         var vm = BuildWorkspace(out _);
         var view = new EtbView { DataContext = vm.Etb };
-        var window = new Window { Content = view, Width = 800, Height = 600 };
+        var window = new Window { Content = view, Width = 1280, Height = 800 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var box = view.GetControl<ComboBox>("DirectionBox");
-
-        // Closed: the selection box shows the label, not the enum identifier.
-        Assert.Equal("Eingang", Text(box).Single());
-
-        box.IsDropDownOpen = true;
-        Dispatcher.UIThread.RunJobs();
-
-        // Open: the list itself is realized into an OverlayPopupHost, which is a sibling of the
-        // ComboBox rather than a descendant — so the options have to be read through the popup.
-        var popupHost = Assert.IsAssignableFrom<Control>(
-            window.GetVisualDescendants().OfType<OverlayPopupHost>().Single());
-        var options = Text(popupHost);
-
-        Assert.Equal(new[] { "Eingang", "Ausgang", "Intern" }, options);
-
-        static string[] Text(Control c) => c.GetVisualDescendants()
-            .OfType<TextBlock>()
-            .Select(t => t.Text)
-            .Where(t => !string.IsNullOrWhiteSpace(t))
-            .ToArray()!;
+        Assert.Null(view.FindControl<ComboBox>("DirectionBox"));
+        Assert.DoesNotContain(
+            view.GetControl<DataGrid>("EtbGrid").Columns,
+            c => string.Equals(c.Header as string, "RICHTUNG", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            view.GetVisualDescendants().OfType<HeaderedContentControl>(),
+            f => string.Equals(f.Header as string, "RICHTUNG", StringComparison.Ordinal));
     }
 
     // The Funktionen tab had no UI-level coverage at all before issue #17 widened it.

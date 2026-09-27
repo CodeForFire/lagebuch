@@ -1,5 +1,4 @@
 using System.Globalization;
-using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Domain;
@@ -13,16 +12,6 @@ public static class Formatting
     /// <summary>Clock time alone, for series read within one Einsatz (a CO-Messreihe), where the
     /// date is the same on every line and only the minute carries information.</summary>
     public static string TimeOfDay(DateTimeOffset t) => t.ToString("HH:mm", De);
-
-    public static string Direction(EtbDirection direction) => direction switch
-    {
-        EtbDirection.Incoming => "Eingang",
-        EtbDirection.Outgoing => "Ausgang",
-        EtbDirection.Internal => "Intern",
-        EtbDirection.System => "System",
-        EtbDirection.Measurement => "Messung",
-        _ => direction.ToString(),
-    };
 
     public static string State(IncidentState state) => state switch
     {

@@ -7,7 +7,7 @@ namespace LageBuch.Documents.Sections;
 
 public static class EtbSection
 {
-    private static readonly string[] HeaderTitles = ["Zeit", "Richtung", "Von", "An", "Eintrag", "Erfasst von"];
+    private static readonly string[] HeaderTitles = ["Zeit", "Von", "An", "Eintrag", "Erfasst von"];
 
     public static void Compose(IContainer container, Incident incident)
     {
@@ -27,10 +27,9 @@ public static class EtbSection
                 table.ColumnsDefinition(columns =>
                 {
                     columns.ConstantColumn(95);  // Zeit
-                    columns.ConstantColumn(60);  // Richtung
                     columns.RelativeColumn(1);   // Von
                     columns.RelativeColumn(1);   // An
-                    columns.RelativeColumn(3);   // Eintrag
+                    columns.RelativeColumn(4);   // Eintrag, which took over Richtung's room
                     columns.RelativeColumn(1);   // Erfasst von
                 });
 
@@ -45,7 +44,6 @@ public static class EtbSection
                 foreach (var entry in incident.Journal)
                 {
                     table.Cell().Element(BodyCell).Text(Formatting.Timestamp(entry.Timestamp));
-                    table.Cell().Element(BodyCell).Text(Formatting.Direction(entry.Direction));
                     table.Cell().Element(BodyCell).Text(Formatting.OrDash(entry.From));
                     table.Cell().Element(BodyCell).Text(Formatting.OrDash(entry.To));
 

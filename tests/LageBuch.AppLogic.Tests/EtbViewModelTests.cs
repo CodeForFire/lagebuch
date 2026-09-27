@@ -24,7 +24,6 @@ public class EtbViewModelTests
         var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => changes++)
         {
             NewText = "Lagemeldung",
-            NewDirection = EtbDirection.Incoming,
             NewFrom = "ILS",
         };
 
@@ -94,17 +93,33 @@ public class EtbViewModelTests
         Assert.False(vm.AddEntryCommand.CanExecute(null));
     }
 
+    // A real Einsatz showed the RICHTUNG picker was never worth the keystroke, so the dock no
+    // longer asks. The domain still wants a direction, and Internal is the neutral one: it is
+    // never shown, and it keeps the entry editable and visible under the hide-system filter.
     [Fact]
-    public void DirectionOptions_offers_the_human_directions_only()
+    public void Manually_added_entries_are_stored_as_internal()
     {
-        var vm = NewVm();
-        Assert.Contains(EtbDirection.Incoming, vm.DirectionOptions.Select(o => o.Value));
-        Assert.Contains(EtbDirection.Outgoing, vm.DirectionOptions.Select(o => o.Value));
-        Assert.Contains(EtbDirection.Internal, vm.DirectionOptions.Select(o => o.Value));
+        var created = new List<string>();
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }, created.Add);
 
-        // App-written directions are never picked by a human.
-        Assert.DoesNotContain(EtbDirection.System, vm.DirectionOptions.Select(o => o.Value));
-        Assert.DoesNotContain(EtbDirection.Measurement, vm.DirectionOptions.Select(o => o.Value));
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        vm.NewText = "Wasserversorgung prüfen";
+        vm.AddEntryAndCreateTaskCommand.Execute(null);
+
+        Assert.Equal(
+            new[] { EtbDirection.Internal, EtbDirection.Internal },
+            session.Incident.Journal.Skip(1).Select(e => e.Direction));
+        Assert.All(vm.Entries, e => Assert.True(e.IsEditable));
+        Assert.Equal(new[] { "Wasserversorgung prüfen" }, created);
     }
 
     // #424, the user-visible half: a CO reading must survive the default filter. Practitioners
@@ -180,7 +195,7 @@ public class EtbViewModelTests
         // Hidden by default (#223): only the human entry shows until toggled off.
         var only = Assert.Single(vm.Entries);
         Assert.Equal("Lagemeldung", only.Text);
-        Assert.Equal(EtbDirection.Incoming, only.DirectionValue);
+        Assert.Equal(EtbDirection.Internal, only.DirectionValue);
 
         vm.HideSystemEntries = false;
         Assert.Equal(2, vm.Entries.Count);
@@ -216,31 +231,6 @@ public class EtbViewModelTests
         vm.AddEntryCommand.Execute(null);
         var only = Assert.Single(vm.Entries);
         Assert.Equal("Lagemeldung", only.Text);
-    }
-
-    // The picker used to bind the bare enum, so Avalonia rendered "Incoming"/"Outgoing"/
-    // "Internal" right next to a grid saying "Eingang"/"Ausgang"/"Intern". The old version of
-    // this test asserted membership only, which is exactly why that slipped through.
-    [Theory]
-    [InlineData(EtbDirection.Incoming, "Eingang")]
-    [InlineData(EtbDirection.Outgoing, "Ausgang")]
-    [InlineData(EtbDirection.Internal, "Intern")]
-    public void DirectionOptions_are_labelled_in_german(EtbDirection direction, string expected)
-    {
-        var option = Assert.Single(NewVm().DirectionOptions, o => o.Value == direction);
-        Assert.Equal(expected, option.Label);
-    }
-
-    [Fact]
-    public void DirectionOption_labels_match_the_grid_and_the_pdf()
-    {
-        var vm = NewVm();
-        vm.NewText = "Lagemeldung";
-        vm.NewDirection = EtbDirection.Outgoing;
-        vm.AddEntryCommand.Execute(null);
-
-        var selected = Assert.Single(vm.DirectionOptions, o => o.Value == vm.NewDirection);
-        Assert.Equal(vm.Entries[0].Direction, selected.Label);
     }
 
     [Fact]

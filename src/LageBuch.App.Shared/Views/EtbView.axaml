@@ -27,9 +27,6 @@
     <Style Selector="StackPanel#EditFields">
       <Setter Property="Orientation" Value="Horizontal" />
     </Style>
-    <Style Selector="ComboBox#DirectionBox">
-      <Setter Property="Width" Value="130" />
-    </Style>
     <Style Selector="AutoCompleteBox#FromBox">
       <Setter Property="Width" Value="150" />
     </Style>
@@ -55,7 +52,7 @@
         <Setter Property="IsVisible" Value="False" />
       </Style>
 
-      <!-- Seven columns budgeted for an ELW monitor cannot be made to fit 412dp, so the phone
+      <!-- Six columns budgeted for an ELW monitor cannot be made to fit 412dp, so the phone
            reads the same rows as cards instead. -->
       <Style Selector="Border#EtbGridPanel">
         <Setter Property="IsVisible" Value="False" />
@@ -65,11 +62,6 @@
       </Style>
 
       <!-- The dock stacks. -->
-      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
-           leaves it the width of its longest entry. -->
-      <Style Selector="ComboBox#DirectionBox">
-        <Setter Property="Width" Value="356" />
-      </Style>
       <Style Selector="AutoCompleteBox#FromBox">
         <Setter Property="Width" Value="NaN" />
       </Style>
@@ -132,18 +124,6 @@
             </Button>
           </Grid>
           <StackPanel x:Name="DockFields" Spacing="8">
-            <HeaderedContentControl Classes="field" Header="RICHTUNG">
-              <ComboBox x:Name="DirectionBox"
-                        ItemsSource="{Binding DirectionOptions}"
-                        SelectedValue="{Binding NewDirection}"
-                        SelectedValueBinding="{Binding Value}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EtbDirectionOption">
-                    <TextBlock Text="{Binding Label}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </HeaderedContentControl>
             <!-- Suggestion list, not a closed set: a sender/recipient outside Stammdaten (e.g. "ELW 1",
                  a person's name) must stay enterable, so this is an AutoCompleteBox rather than a
                  ComboBox, mirroring ForcesView's Brigade field. -->
@@ -258,7 +238,6 @@
         <DataGrid x:Name="EtbGrid" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
           <DataGrid.Columns>
             <DataGridTextColumn Header="ZEIT" Binding="{Binding Time}" />
-            <DataGridTextColumn Header="RICHTUNG" Binding="{Binding Direction}" />
             <DataGridTextColumn Header="VON" Binding="{Binding From}" />
             <DataGridTextColumn Header="AN" Binding="{Binding To}" />
             <DataGridTemplateColumn Header="EINTRAG" Width="*">
@@ -316,13 +295,9 @@
               <DataTemplate x:DataType="vm:EtbEntryRow">
                 <Border Classes="row-card">
                   <StackPanel Spacing="4">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Grid.Column="0" Classes="mono" FontSize="13"
-                                 Foreground="{StaticResource TextPrimaryBrush}"
-                                 Text="{Binding Time}" />
-                      <TextBlock Grid.Column="1" Classes="overline" VerticalAlignment="Center"
-                                 Text="{Binding Direction}" />
-                    </Grid>
+                    <TextBlock Classes="mono" FontSize="13"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               Text="{Binding Time}" />
                     <TextBlock Classes="secondary" FontSize="13" TextWrapping="Wrap">
                       <TextBlock.Text>
                         <MultiBinding StringFormat="{}{0} → {1}">
