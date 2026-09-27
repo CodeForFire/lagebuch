@@ -18,5 +18,6 @@ public enum IncidentPdfSections
     Atemschutz = 1 << 5,
     CoMessprotokoll = 1 << 6,
     Files = 1 << 7,
-    All = Checklist | Etb | Roles | Forces | Tasks | Atemschutz | CoMessprotokoll | Files,
+    InvolvedParties = 1 << 8,
+    All = Checklist | Etb | Roles | Forces | Tasks | Atemschutz | CoMessprotokoll | Files | InvolvedParties,
 }

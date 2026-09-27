@@ -96,7 +96,8 @@ public class IncidentTaskAggregateTests
             seed.Files,
             seed.Tasks,
             seed.Buildings,
-            seed.Dwellings);
+            seed.Dwellings,
+            seed.InvolvedParties);
 
         Assert.Equal(2, restored.Tasks.Count);
         Assert.Equal("Offen", restored.Tasks[0].Text);
