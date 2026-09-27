@@ -129,7 +129,7 @@
             Padding="14">
       <StackPanel Spacing="8">
         <TextBlock Text="NEUES HAUS HINZUFÜGEN" Classes="overline" />
-        <HeaderedContentControl Classes="field" Header="BEZEICHNUNG"
+        <HeaderedContentControl Classes="field required" Header="BEZEICHNUNG"
                                 ctrl:Field.Error="{Binding NewBuildingNameError}">
           <TextBox x:Name="NewBuildingNameBox" Text="{Binding NewBuildingName}"
                    PlaceholderText="{x:Static md:AnonymizedExampleData.BuildingNamePlaceholder}" />

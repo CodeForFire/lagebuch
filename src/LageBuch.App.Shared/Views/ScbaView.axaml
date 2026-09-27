@@ -133,7 +133,7 @@
                              MinimumPrefixLength="0"
                              Text="{Binding NewCallSign}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="TRUPP-ART"
+          <HeaderedContentControl Classes="field required" Header="TRUPP-ART"
                                     Classes.invalid="{Binding NewDesignationError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <ComboBox x:Name="TruppTypeBox" ItemsSource="{Binding TruppTypeOptions}"
                       SelectedItem="{Binding NewDesignation}" />
@@ -143,7 +143,7 @@
                selected Trupp-Typ calls for it (#398). Crew names
                use the ad-hoc "whoever is entering data right now" persona, not the Stammdaten roster
                persona (#137). -->
-          <HeaderedContentControl Classes="field suggest" Header="TRUPPFÜHRER"
+          <HeaderedContentControl Classes="field suggest required" Header="TRUPPFÜHRER"
                                     Classes.invalid="{Binding NewTruppfuehrerError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="TruppfuehrerBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
@@ -152,7 +152,7 @@
                              Text="{Binding NewTruppfuehrer}"
                              b:EnterSubmit.Command="{Binding AddTruppCommand}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field suggest" Header="TRUPPMANN"
+          <HeaderedContentControl Classes="field suggest required" Header="TRUPPMANN"
                                     Classes.invalid="{Binding NewTruppmannError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="TruppmannBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderAlt}"
@@ -161,7 +161,7 @@
                              Text="{Binding NewTruppmann}"
                              b:EnterSubmit.Command="{Binding AddTruppCommand}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field suggest" Header="2. TRUPPMANN" IsVisible="{Binding RequiresThirdMember}"
+          <HeaderedContentControl Classes="field suggest required" Header="2. TRUPPMANN" IsVisible="{Binding RequiresThirdMember}"
                                     Classes.invalid="{Binding NewZweiterTruppmannError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="ZweiterTruppmannBox"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderThird}"
@@ -170,7 +170,7 @@
                              Text="{Binding NewZweiterTruppmann}"
                              b:EnterSubmit.Command="{Binding AddTruppCommand}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="EINSTIEGSDRUCK"
+          <HeaderedContentControl Classes="field required" Header="EINSTIEGSDRUCK"
                                     Classes.invalid="{Binding NewEntryPressureError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <NumericUpDown Width="100" Minimum="1" Maximum="400" Value="{Binding NewEntryPressure}"
