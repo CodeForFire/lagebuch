@@ -37,7 +37,9 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly IHubContext<IncidentHub> _hub;
+    private readonly SemaphoreSlim _revisionRequests = new(0);
     private int _commandsReceived;
+    private TaskCompletionSource? _revisionGate;
 
     private ScriptedSnapshotHost(WebApplication app, int port, IHubContext<IncidentHub> hub, IncidentSnapshot initial)
     {
@@ -51,8 +53,8 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
 
     /// <summary>
     /// What the host would say if asked right now: served by <c>GET /snapshot</c>, and its
-    /// <see cref="IncidentSnapshot.Revision"/> by <c>GET /revision</c>. Set it to move the host
-    /// forward (or, with a lower revision, to model a host that restarted sharing).
+    /// epoch and revision by <c>GET /revision</c>. Set it to move the host forward (or, with a new
+    /// epoch, to model a host that started sharing again).
     /// </summary>
     public IncidentSnapshot Current { get; set; }
 
@@ -73,6 +75,18 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     /// rather than inferring it from state that something else might have produced.
     /// </summary>
     public int CommandsReceived => _commandsReceived;
+
+    /// <summary>
+    /// When set, <c>GET /revision</c> answers with this status and no body — a reconcile pass that
+    /// reaches the host but cannot learn its position.
+    /// </summary>
+    public HttpStatusCode? FailRevisionWith { get; set; }
+
+    /// <summary>
+    /// When set, <c>GET /snapshot</c> answers with a body one byte over
+    /// <see cref="SyncProtocol.MaxResponseBytes"/>, streamed so the test host never holds it.
+    /// </summary>
+    public bool ServeOversizedSnapshot { get; set; }
 
     public static async Task<ScriptedSnapshotHost> StartAsync(IncidentSnapshot initial, string version = "1.0.0")
     {
@@ -95,10 +109,21 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
             SyncProtocol.VersionPath,
             () => Results.Json(
                 new VersionInfo(version, SyncProtocol.ProtocolVersion, SyncProtocol.MinimumProtocolVersion), SyncJson.Options));
-        app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(host.Current, SyncJson.Options));
-        app.MapGet(
-            SyncProtocol.RevisionPath,
-            () => Results.Json(new RevisionInfo(host.Current.Revision, host.Current.Epoch), SyncJson.Options));
+        app.MapGet(SyncProtocol.SnapshotPath, () => host.ServeOversizedSnapshot
+            ? Results.Stream(OversizedBodyAsync, "application/json")
+            : Results.Json(host.Current, SyncJson.Options));
+        app.MapGet(SyncProtocol.RevisionPath, async (CancellationToken aborted) =>
+        {
+            host._revisionRequests.Release();
+            if (host._revisionGate is { } gate)
+            {
+                await gate.Task.WaitAsync(aborted);
+            }
+
+            return host.FailRevisionWith is { } status
+                ? Results.StatusCode((int)status)
+                : Results.Json(new RevisionInfo(host.Current.Revision, host.Current.Epoch), SyncJson.Options);
+        });
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(
             MasterDataJson.Serialize(MasterDataSet.Empty), "application/json"));
 
@@ -130,5 +155,48 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     public Task PushAsync(IncidentSnapshot snapshot) =>
         _hub.Clients.All.SendAsync(SyncProtocol.SnapshotMethod, snapshot);
 
-    public async ValueTask DisposeAsync() => await _app.DisposeAsync();
+    /// <summary>
+    /// From now on, every <c>GET /revision</c> is held open until <see cref="ReleaseRevisionRequests"/>
+    /// — a host that accepted the request and then went silent, which is what a half-open link looks
+    /// like from the client's side.
+    /// </summary>
+    public void HoldRevisionRequests() =>
+        _revisionGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Lets every held <c>GET /revision</c> answer, and stops holding new ones.</summary>
+    public void ReleaseRevisionRequests()
+    {
+        var gate = _revisionGate;
+        _revisionGate = null;
+        gate?.TrySetResult();
+    }
+
+    /// <summary>
+    /// Completes once one more <c>GET /revision</c> has reached the host — proof that a reconcile pass
+    /// is in flight, so a test never has to guess that it "very likely" is.
+    /// </summary>
+    public async Task WaitForRevisionRequestAsync(TimeSpan? timeout = null)
+    {
+        if (!await _revisionRequests.WaitAsync(timeout ?? TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException("No GET /revision reached the scripted host.");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        ReleaseRevisionRequests();
+        await _app.DisposeAsync();
+        _revisionRequests.Dispose();
+    }
+
+    private static async Task OversizedBodyAsync(Stream body)
+    {
+        var chunk = new byte[64 * 1024];
+        Array.Fill(chunk, (byte)' ');
+        for (var remaining = SyncProtocol.MaxResponseBytes + 1; remaining > 0; remaining -= chunk.Length)
+        {
+            await body.WriteAsync(chunk.AsMemory(0, (int)Math.Min(chunk.Length, remaining)));
+        }
+    }
 }

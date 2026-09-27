@@ -1,5 +1,6 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace LageBuch.Sync.Hosting.Tests;
 
@@ -49,14 +50,20 @@ internal static class SnapshotFixture
         client.Incident.Journal.Select(e => e.Text).ToArray();
 
     public static Task<RemoteIncidentSession> ConnectAsync(
-        ScriptedSnapshotHost host, TimeSpan? reconcileInterval = null, TimeProvider? timeProvider = null) =>
+        ScriptedSnapshotHost host,
+        TimeSpan? reconcileInterval = null,
+        TimeProvider? timeProvider = null,
+        IRetryPolicy? reconnectPolicy = null,
+        IUiDispatcher? ui = null,
+        FaultyRelay? via = null) =>
         RemoteIncidentSession.ConnectAsync(
             "127.0.0.1",
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
-            new ImmediateUiDispatcher(),
+            ui ?? new ImmediateUiDispatcher(),
             new InMemoryTrustStore(),
-            port: host.Port,
+            port: via?.Port ?? host.Port,
+            reconnectPolicy: reconnectPolicy,
             reconcileInterval: reconcileInterval,
             timeProvider: timeProvider);
 

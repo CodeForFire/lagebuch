@@ -54,6 +54,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     // a tick that comes due before Task.Run has scheduled the loop is then held by the timer rather than
     // lost, which is what lets a test advance a fake clock straight away.
     private readonly PeriodicTimer _reconcileTimer;
+    private readonly TimeProvider _time;
     private Incident _incident;
     private SyncPosition _applied;
     private Task? _reconcileLoop;
@@ -141,6 +142,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         TimeProvider time)
     {
         _reconcileTimer = new PeriodicTimer(reconcileInterval, time);
+        _time = time;
         _http = http;
         _handler = handler;
         _hub = hub;
@@ -201,8 +203,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// of the test and drive <see cref="ReconcileAsync"/> directly.
     /// </param>
     /// <param name="timeProvider">
-    /// Drives the reconcile timer. Defaults to <see cref="TimeProvider.System"/>; tests pass a fake and
-    /// advance it instead of waiting on the wall clock.
+    /// Drives the reconcile timer and each pass's <see cref="SyncProtocol.ReconcileTimeout"/>. Defaults
+    /// to <see cref="TimeProvider.System"/>; tests pass a fake and advance it instead of waiting on the
+    /// wall clock.
     /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
     [SuppressMessage(
@@ -260,7 +263,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         // after the hub, since the hub's long-lived transport also uses it via HttpMessageHandlerFactory
         // below) rather than relying on HttpClient's default cascade, so ownership is one clear line
         // instead of implicit via a constructor flag.
-        var http = new HttpClient(handler, disposeHandler: false) { BaseAddress = baseUri };
+        // MaxResponseContentBufferSize: every response here is read into memory, and each one comes
+        // from a sync peer, so none may be larger than SyncProtocol.MaxResponseBytes.
+        var http = new HttpClient(handler, disposeHandler: false)
+        {
+            BaseAddress = baseUri,
+            MaxResponseContentBufferSize = SyncProtocol.MaxResponseBytes,
+        };
         if (!string.IsNullOrEmpty(pin))
         {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
@@ -412,9 +421,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 // Reconnected raised regardless, because a throwing catch-up used to leave Reconnected
                 // un-raised — which left IsConnected false and the workspace's input disabled for good.
                 // A pass that fails here is exactly what the poll retries.
+                // A pass that succeeds re-confirms the Stand straight away: when nothing was missed it
+                // applies nothing, so without Reconciled here the footer would stay "nicht bestätigt"
+                // until the next tick although the device is demonstrably current.
                 try
                 {
                     await session.ReconcileAsync(session._reconcileCts.Token);
+                    session._ui.Post(() => session.Reconciled?.Invoke());
                 }
                 catch (Exception)
                 {
@@ -950,12 +963,16 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     await ReconcileAsync(ct);
                     _ui.Post(() => Reconciled?.Invoke());
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
                     return;
                 }
                 catch (Exception)
                 {
+                    // Including an OperationCanceledException that is *not* our shutdown: the pass's
+                    // own deadline, or an HTTP client timeout. Treating those as shutdown would end the
+                    // loop for good after one slow request, silently, which is the failure it exists
+                    // to catch.
                     _ui.Post(() => ReconcileFailed?.Invoke());
                 }
             }
@@ -975,13 +992,21 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// session, whose revisions say nothing about ours. Whether the fetched snapshot is then adopted is
     /// <see cref="ApplySnapshot"/>'s decision, so a broadcast that overtakes the fetch still wins.
     /// <para>
+    /// The whole pass runs against <see cref="SyncProtocol.ReconcileTimeout"/>, measured on the injected
+    /// <see cref="TimeProvider"/>, and throws <see cref="OperationCanceledException"/> when it runs
+    /// out while <paramref name="ct"/> is still live.
+    /// </para>
+    /// <para>
     /// Internal so tests can drive exactly one pass instead of racing the timer.
     /// </para>
     /// </remarks>
     internal async Task ReconcileAsync(CancellationToken ct = default)
     {
+        using var deadline = new CancellationTokenSource(SyncProtocol.ReconcileTimeout, _time);
+        using var pass = CancellationTokenSource.CreateLinkedTokenSource(ct, deadline.Token);
+
         var host = SyncPosition.Of(SyncJson.Deserialize<RevisionInfo>(
-            await _http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute), ct)));
+            await _http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute), pass.Token)));
 
         SyncPosition applied;
         lock (_applyGate)
@@ -995,7 +1020,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         }
 
         ApplySnapshot(SyncJson.Deserialize<IncidentSnapshot>(
-            await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct)));
+            await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), pass.Token)));
     }
 
     // .NET wraps an exception thrown inside ServerCertificateCustomValidationCallback in an

@@ -107,11 +107,28 @@ public static class SyncProtocol
     public const string ProtocolHeader = "X-Lagebuch-Protocol";
 
     /// <summary>
+    /// The most a joined client buffers from any one response of the host's: a snapshot, a command's
+    /// answer, an attachment. The host is outside the client's trust boundary, so a response that
+    /// would not fit is refused rather than read. Sized to hold the largest attachment
+    /// (<see cref="LageBuch.Domain.Files.IncidentFile.MaxSizeBytes"/>) with room to spare; a snapshot
+    /// is text and runs to megabytes at the very most.
+    /// </summary>
+    public const long MaxResponseBytes = LageBuch.Domain.Files.IncidentFile.MaxSizeBytes + (8 * 1024 * 1024);
+
+    /// <summary>
     /// How often a joined client polls <see cref="RevisionPath"/>. This is the ceiling on how long a
     /// device can sit on stale state after a lost broadcast, so it is chosen to be shorter than anyone
     /// would spend reading a screen before acting on it — and the request is a few bytes over a LAN.
     /// </summary>
     public static readonly TimeSpan DefaultReconcileInterval = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// How long one reconcile pass may take before it counts as failed. Without it a pass on a link
+    /// that went silent without closing — a roaming WLAN, an access point asleep — would wait out the
+    /// HTTP client's 100 s default, and the footer would keep claiming a confirmed Stand for all of it.
+    /// With it, a device learns it cannot confirm its Stand within one interval plus this.
+    /// </summary>
+    public static readonly TimeSpan ReconcileTimeout = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>

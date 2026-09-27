@@ -180,19 +180,104 @@ public class SnapshotReconcileTests
     }
 
     [Fact]
-    public async Task Disposing_the_session_stops_the_poll_without_faulting_it()
+    public async Task Disposing_the_session_while_a_pass_is_in_flight_stops_the_poll_without_faulting_it()
     {
         var basis = SnapshotFixture.BaseSnapshot();
         var time = new FakeTimeProvider();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
         var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
 
-        // Fire a tick and dispose straight after, so the tick's GET is very likely still in flight.
-        // Disposal has to cancel the loop and wait for it before disposing the HttpClient it is using,
-        // or that GET lands on a disposed client inside a task nobody observes.
+        // Held at the host, so the tick's GET is certainly in flight when disposal starts. Disposal has
+        // to cancel the loop and wait for it before disposing the HttpClient that GET is using, or it
+        // lands on a disposed client inside a task nobody observes.
+        host.HoldRevisionRequests();
         time.Advance(Interval);
+        await host.WaitForRevisionRequestAsync();
 
         await client.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task A_pass_the_host_never_answers_fails_at_its_deadline_and_the_poll_carries_on()
+    {
+        // A link that went silent without closing: the request is accepted and then nothing comes
+        // back. The pass must give up at SyncProtocol.ReconcileTimeout rather than the HTTP client's
+        // 100 s, and — the part that used to go wrong — the loop must survive that cancellation,
+        // because a timeout is not the shutdown token.
+        var basis = SnapshotFixture.BaseSnapshot();
+        var time = new FakeTimeProvider();
+        await using var host = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
+
+        host.HoldRevisionRequests();
+        var failed = WaitForEvent(
+            h => client.ReconcileFailed += h, h => client.ReconcileFailed -= h, "the silent pass to fail");
+        time.Advance(Interval);
+        await host.WaitForRevisionRequestAsync();
+        time.Advance(SyncProtocol.ReconcileTimeout);
+        await failed;
+
+        host.ReleaseRevisionRequests();
+        var reconciled = WaitForEvent(
+            h => client.Reconciled += h, h => client.Reconciled -= h, "the next tick to reconcile");
+        time.Advance(Interval);
+        await reconciled;
+    }
+
+    [Fact]
+    public async Task An_oversized_snapshot_is_refused_and_the_client_keeps_what_it_had()
+    {
+        // The host is outside the trust boundary: a response beyond SyncProtocol.MaxResponseBytes is
+        // not buffered, the pass fails, and the Stand on screen stays the last one that was sound.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.Revised(basis, 1, "Eins"));
+        await using var client = await SnapshotFixture.ConnectAsync(host, Never);
+
+        host.Current = SnapshotFixture.Revised(basis, 2, "Zwei");
+        host.ServeOversizedSnapshot = true;
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.ReconcileAsync());
+        Assert.Equal(new[] { "Eins" }, SnapshotFixture.JournalOf(client));
+    }
+
+    [Fact]
+    public async Task A_reconnect_that_finds_nothing_missed_confirms_the_stand_at_once()
+    {
+        // Nothing to fetch means nothing applied and no Changed — so unless the reconnect's own pass
+        // reports itself, the footer stays "nicht bestätigt" until the next tick despite being current.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var host = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var relay = FaultyRelay.Start(host.Port);
+        await using var client = await SnapshotFixture.ConnectAsync(
+            host, Never, reconnectPolicy: new ReconnectImmediately(), via: relay);
+
+        var reconciled = WaitForEvent(
+            h => client.Reconciled += h, h => client.Reconciled -= h, "the reconnect to confirm the Stand", TimeSpan.FromSeconds(10));
+        relay.Reset();
+        await reconciled;
+    }
+
+    [Fact]
+    public async Task A_reconnect_whose_catch_up_fails_still_reports_the_reconnect()
+    {
+        // Regression: the catch-up used to run unguarded inside SignalR's Reconnected handler, so when
+        // it threw, Reconnected was never raised — the workspace kept its input disabled for good.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var host = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var relay = FaultyRelay.Start(host.Port);
+        await using var client = await SnapshotFixture.ConnectAsync(
+            host, Never, reconnectPolicy: new ReconnectImmediately(), via: relay);
+
+        host.FailRevisionWith = System.Net.HttpStatusCode.InternalServerError;
+        var failed = WaitForEvent(
+            h => client.ReconcileFailed += h, h => client.ReconcileFailed -= h, "the catch-up to fail", TimeSpan.FromSeconds(10));
+        var reconnected = WaitForEvent(
+            h => client.Reconnected += h, h => client.Reconnected -= h, "Reconnected despite the failed catch-up", TimeSpan.FromSeconds(10));
+
+        relay.Reset();
+
+        await failed;
+        await reconnected;
     }
 
     [Fact]
