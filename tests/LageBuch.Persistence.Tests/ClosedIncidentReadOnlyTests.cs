@@ -51,4 +51,21 @@ public class ClosedIncidentReadOnlyTests : IDisposable
         Assert.Throws<IncidentClosedException>(
             () => loaded.AddForceUnit(new Clock(), new Domain.SessionOperator("Müller"), "FFB", 1));
     }
+
+    [Fact]
+    public void A_closed_incident_keeps_its_involved_parties_and_rejects_new_ones()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op);
+        incident.AddInvolvedParty(clock, op, "Erika Beispiel", "0171 0000001", null);
+        incident.Close(clock, op);
+        IncidentRepository.Save(_path, incident);
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal("Erika Beispiel", Assert.Single(loaded.InvolvedParties).Name);
+        Assert.Throws<IncidentClosedException>(
+            () => loaded.AddInvolvedParty(clock, op, "Max Beispiel", null, null));
+    }
 }

@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 24;
+    public const int CurrentVersion = 25;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -158,6 +158,11 @@ public static class Migrations
         if (version < 24)
         {
             ApplyV24(cn, tx);
+        }
+
+        if (version < 25)
+        {
+            ApplyV25(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -768,6 +773,24 @@ public static class Migrations
             );
             """;
         Exec(cn, tx, sql24);
+    }
+
+    // The Beteiligte: people involved in the Einsatz who are not forces (house owner, vehicle
+    // owner, police contact). Ordinal keeps the creation order, as incident_tasks does.
+    private static void ApplyV25(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql25 = """
+            CREATE TABLE IF NOT EXISTS involved_parties (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                phone TEXT,
+                notes TEXT,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            """;
+        Exec(cn, tx, sql25);
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
