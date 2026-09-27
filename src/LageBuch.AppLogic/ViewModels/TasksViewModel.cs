@@ -548,8 +548,9 @@ public enum TaskFilterKind
     All,
 }
 
-/// <summary>An enum value paired with its German label (EtbDirectionOption precedent). Two
-/// closed records instead of a generic one, so Avalonia compiled-bind templates stay simple.</summary>
+/// <summary>An enum value paired with its German label, so a picker never falls back to the enum
+/// identifier. Two closed records instead of a generic one, so Avalonia compiled-bind templates
+/// stay simple.</summary>
 public readonly record struct ImportanceOption(TaskImportance Value, string Label);
 
 public readonly record struct UrgencyOption(TaskUrgency Value, string Label);

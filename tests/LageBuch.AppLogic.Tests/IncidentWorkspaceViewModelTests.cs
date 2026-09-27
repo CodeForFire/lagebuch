@@ -1,7 +1,6 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
-using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -293,7 +292,6 @@ public class IncidentWorkspaceViewModelTests
         var vm = NewWorkspace(out var store, out _);
         var before = store.SaveCount;
         vm.Etb.NewText = "Meldung";
-        vm.Etb.NewDirection = EtbDirection.Internal;
         vm.Etb.AddEntryCommand.Execute(null);
 
         Assert.True(store.SaveCount > before);
@@ -1095,7 +1093,6 @@ public class IncidentWorkspaceViewModelTests
         vm.ConfirmPendingPrompt();
 
         vm.Etb.NewText = "Lagemeldung";
-        vm.Etb.NewDirection = EtbDirection.Internal;
         vm.Etb.AddEntryCommand.Execute(null);
 
         Assert.Equal("Schmidt (FFB 1)", vm.Etb.Entries[0].EnteredBy);
