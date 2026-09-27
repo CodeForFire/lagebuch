@@ -793,8 +793,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             // The host answered, but not with a domain guard's 400: a server error, a PIN the rate
             // limiter now refuses, an oversized body. The connection stays up and the revision does
             // not move, so nothing else would ever notice that this input was lost.
-            _ui.Post(() => CommandRejected?.Invoke(
-                $"Der Host hat die Änderung nicht angenommen (Fehler {(int)status})."));
+            _ui.Post(() => CommandRejected?.Invoke(DescribeRefusal(status)));
         }
         catch (Exception)
         {
@@ -832,6 +831,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     }
 
     /// <summary>
+    /// What to tell the Lagebuchführer when the host refused a command with something other than a
+    /// domain guard's 400. The statuses the host's own middleware produces get a sentence that says
+    /// what to do; anything else names its code, because it is the host's fault and not the input's.
+    /// </summary>
+    private static string DescribeRefusal(HttpStatusCode status) => status switch
+    {
+        HttpStatusCode.Unauthorized => "Der Host hat die PIN nicht angenommen.",
+        HttpStatusCode.TooManyRequests => "Der Host nimmt nach zu vielen Fehlversuchen gerade nichts an.",
+        HttpStatusCode.UpgradeRequired => "Dieses Gerät ist zu alt für den Host. Bitte dieses Gerät aktualisieren.",
+        HttpStatusCode.RequestEntityTooLarge => "Die Änderung ist zu groß für den Host.",
+        _ => $"Der Host hat die Änderung nicht angenommen (Fehler {(int)status}).",
+    };
+
+    /// <summary>
     /// Pulls the host's reason out of a 400 body.
     /// </summary>
     /// <remarks>
@@ -840,7 +853,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// rather than as plain text. Both shapes are accepted anyway, so a later change at the host cannot
     /// put quotation marks on an operator's screen. Length-capped because this ends up in a banner, not
     /// a log viewer, and read-capped because the body comes from a sync peer: however much it sends,
-    /// only <c>maxBodyBytes</c> of it is ever buffered.
+    /// only <c>maxBodyBytes</c> of it is ever buffered. For the same reason control and formatting
+    /// characters are dropped: a peer's text must not be able to reorder itself with a bidi override
+    /// or break the banner's layout.
     /// </remarks>
     [SuppressMessage(
         "Design",
@@ -890,12 +905,33 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             body = body[1..];
         }
 
+        body = Displayable(body);
         if (string.IsNullOrWhiteSpace(body))
         {
             return "Die Änderung wurde vom Host abgelehnt.";
         }
 
         return body.Length > maxLength ? body[..maxLength] : body;
+    }
+
+    // Line breaks and tabs become spaces so words stay apart; every other control or format character
+    // (bidi overrides, zero-width joiners, BEL) is dropped.
+    private static string Displayable(string text)
+    {
+        var builder = new StringBuilder(text.Length);
+        foreach (var c in text)
+        {
+            if (char.IsWhiteSpace(c))
+            {
+                builder.Append(char.IsControl(c) ? ' ' : c);
+            }
+            else if (!char.IsControl(c) && CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.Format)
+            {
+                builder.Append(c);
+            }
+        }
+
+        return builder.ToString().Trim();
     }
 
     // Arrives on SignalR's receive loop. Swap the cached incident and raise Changed on the UI thread:

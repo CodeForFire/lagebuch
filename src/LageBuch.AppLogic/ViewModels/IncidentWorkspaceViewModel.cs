@@ -208,7 +208,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     /// <summary>
     /// Null = nothing was refused. The host's own reason for turning down the last change, shown as a
-    /// banner until the operator dismisses it or a later change lands (#295).
+    /// banner until the Lagebuchführer dismisses it (#295).
     /// </summary>
     [ObservableProperty]
     private string? _commandRejected;

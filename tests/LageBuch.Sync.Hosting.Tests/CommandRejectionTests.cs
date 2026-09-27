@@ -168,6 +168,44 @@ public class CommandRejectionTests
         Assert.DoesNotContain("Geht verloren", SnapshotFixture.JournalOf(client));
     }
 
+    [Theory]
+    [InlineData(System.Net.HttpStatusCode.Unauthorized, "Der Host hat die PIN nicht angenommen.")]
+    [InlineData(System.Net.HttpStatusCode.TooManyRequests, "Der Host nimmt nach zu vielen Fehlversuchen gerade nichts an.")]
+    [InlineData(System.Net.HttpStatusCode.UpgradeRequired, "Dieses Gerät ist zu alt für den Host. Bitte dieses Gerät aktualisieren.")]
+    [InlineData(System.Net.HttpStatusCode.RequestEntityTooLarge, "Die Änderung ist zu groß für den Host.")]
+    public async Task A_refusal_from_the_hosts_own_middleware_says_what_it_means(System.Net.HttpStatusCode status, string expected)
+    {
+        // These are the statuses the host's PIN gate, rate limiter, protocol gate and Kestrel produce.
+        // "Fehler 426" tells a Lagebuchführer nothing; the sentence tells them which device to update.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var scripted = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var client = await SnapshotFixture.ConnectAsync(scripted, Never);
+
+        scripted.FailCommandsWith = status;
+
+        var rejection = NextRejection(client);
+        client.AddJournalEntry(EtbDirection.Incoming, "Abgewiesen");
+
+        Assert.Equal(expected, await rejection);
+    }
+
+    [Fact]
+    public async Task A_rejection_reason_cannot_reorder_or_break_the_banner()
+    {
+        // The reason is a sync peer's text on the Lagebuchführer's screen: a right-to-left override
+        // would make it read backwards, and control characters would break the line.
+        var basis = SnapshotFixture.BaseSnapshot();
+        await using var scripted = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var client = await SnapshotFixture.ConnectAsync(scripted, Never);
+
+        scripted.RejectCommandsWith = "Punkt\u202E A\u200B ist\u0007\r\nunbekannt.";
+
+        var rejection = NextRejection(client);
+        client.AddJournalEntry(EtbDirection.Incoming, "Wird abgelehnt");
+
+        Assert.Equal("Punkt A ist  unbekannt.", await rejection);
+    }
+
     [Fact]
     public async Task An_oversized_rejection_reason_is_cut_to_banner_length()
     {
