@@ -459,3 +459,78 @@ internal sealed class ReconnectImmediately : Microsoft.AspNetCore.SignalR.Client
     public TimeSpan? NextRetryDelay(Microsoft.AspNetCore.SignalR.Client.RetryContext retryContext) =>
         retryContext.PreviousRetryCount < 50 ? TimeSpan.FromMilliseconds(20) : null;
 }
+
+/// <summary>
+/// An <see cref="IUiDispatcher"/> with production's threading model: one dedicated thread that runs
+/// everything posted to it in order, and runs a call inline when it is already on that thread — which
+/// is what <c>AvaloniaUiDispatcher</c> does over <c>Dispatcher.UIThread</c>.
+/// <see cref="ImmediateUiDispatcher"/> instead runs every call on whichever thread made it, so under it
+/// SignalR's receive loop, an HTTP response and the reconcile poll all execute concurrently; this one
+/// serializes them, the way a device does.
+/// </summary>
+internal sealed class SerialUiDispatcher : IUiDispatcher, IDisposable
+{
+    private readonly System.Collections.Concurrent.BlockingCollection<Action> _queue = new();
+    private readonly Thread _thread;
+    private int _invocations;
+
+    public SerialUiDispatcher()
+    {
+        _thread = new Thread(Run) { IsBackground = true, Name = "SerialUiDispatcher" };
+        _thread.Start();
+    }
+
+    /// <summary>How many <see cref="InvokeAsync{T}"/> calls reached this dispatcher.</summary>
+    public int Invocations => Volatile.Read(ref _invocations);
+
+    public void Post(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (Thread.CurrentThread == _thread)
+        {
+            action();
+        }
+        else
+        {
+            _queue.Add(action);
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Not swallowed: the exception faults the returned task, which is where the caller awaits it — as Dispatcher.UIThread.InvokeAsync does.")]
+    public Task<T> InvokeAsync<T>(Func<T> func)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        Interlocked.Increment(ref _invocations);
+        var result = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Post(() =>
+        {
+            try
+            {
+                result.SetResult(func());
+            }
+            catch (Exception ex)
+            {
+                result.SetException(ex);
+            }
+        });
+        return result.Task;
+    }
+
+    public void Dispose()
+    {
+        _queue.CompleteAdding();
+        _thread.Join();
+        _queue.Dispose();
+    }
+
+    private void Run()
+    {
+        foreach (var action in _queue.GetConsumingEnumerable())
+        {
+            action();
+        }
+    }
+}

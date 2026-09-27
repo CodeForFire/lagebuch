@@ -22,6 +22,7 @@ internal sealed class FaultyRelay : IAsyncDisposable
     private readonly int _targetPort;
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentDictionary<Guid, (TcpClient Downstream, TcpClient Upstream)> _links = new();
+    private readonly SemaphoreSlim _held = new(0);
     private readonly Task _acceptLoop;
     private TaskCompletionSource _flowing = Completed();
 
@@ -45,6 +46,18 @@ internal sealed class FaultyRelay : IAsyncDisposable
         if (_flowing.Task.IsCompleted)
         {
             _flowing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+    }
+
+    /// <summary>
+    /// Completes once bytes have arrived at the relay while it was paused and were held there — proof
+    /// that a request is on its way into the silence, so a test never has to guess that it is.
+    /// </summary>
+    public async Task WaitForHeldTrafficAsync(TimeSpan? timeout = null)
+    {
+        if (!await _held.WaitAsync(timeout ?? TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException("No traffic reached the paused relay.");
         }
     }
 
@@ -80,6 +93,7 @@ internal sealed class FaultyRelay : IAsyncDisposable
         }
 
         _stop.Dispose();
+        _held.Dispose();
     }
 
     private static TaskCompletionSource Completed()
@@ -157,7 +171,13 @@ internal sealed class FaultyRelay : IAsyncDisposable
         {
             // Held here while paused: the bytes were accepted from one side and are not passed on,
             // which is exactly what a half-open link does to both peers.
-            await _flowing.Task.WaitAsync(_stop.Token);
+            var flowing = _flowing.Task;
+            if (!flowing.IsCompleted)
+            {
+                _held.Release();
+            }
+
+            await flowing.WaitAsync(_stop.Token);
             await to.WriteAsync(buffer.AsMemory(0, read), _stop.Token);
         }
     }

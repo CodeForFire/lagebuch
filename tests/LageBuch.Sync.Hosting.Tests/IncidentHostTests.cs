@@ -847,6 +847,37 @@ public class IncidentHostTests
         Assert.NotEqual(Guid.Empty, snapshot.Epoch);
     }
 
+    [Theory]
+    [InlineData(SyncProtocol.SnapshotPath)]
+    [InlineData(SyncProtocol.RevisionPath)]
+    public async Task A_read_of_the_incident_goes_through_the_ui_dispatcher(string path)
+    {
+        // Regression: GET /snapshot used to read _session.Incident straight from a Kestrel thread
+        // while the UI thread mutated it. Both reads now hop onto the UI thread, as /command does —
+        // which is also what keeps the served position and content one consistent pair.
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        using var ui = new SerialUiDispatcher();
+        await using var host = new IncidentHost(session, clock, "1.0.0", ui, "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        var before = ui.Invocations;
+        (await http.GetAsync(new Uri(path, UriKind.RelativeOrAbsolute))).EnsureSuccessStatusCode();
+
+        Assert.Equal(before + 1, ui.Invocations);
+    }
+
     [Fact]
     public async Task Sharing_again_starts_a_new_epoch()
     {

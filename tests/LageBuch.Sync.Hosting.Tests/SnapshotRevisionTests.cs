@@ -5,15 +5,27 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// moved past is dropped instead of overwriting newer state. Driven through
 /// <see cref="ScriptedSnapshotHost"/> because the real host cannot deliver one — see that type's
 /// remarks for why, and for the alternatives that were rejected.
+/// <para>
+/// Each runs twice: under <see cref="ImmediateUiDispatcher"/>, where the channels race on their own
+/// threads, and under <see cref="SerialUiDispatcher"/>, which queues them onto one thread the way a
+/// device's UI dispatcher does.
+/// </para>
 /// </summary>
 public class SnapshotRevisionTests
 {
-    [Fact]
-    public async Task A_pushed_snapshot_below_the_applied_revision_is_discarded()
+    public static TheoryData<bool> Dispatchers => new() { false, true };
+
+    private static IUiDispatcher Dispatcher(bool serial, SerialUiDispatcher queue) =>
+        serial ? queue : new ImmediateUiDispatcher();
+
+    [Theory]
+    [MemberData(nameof(Dispatchers))]
+    public async Task A_pushed_snapshot_below_the_applied_revision_is_discarded(bool serial)
     {
+        using var queue = new SerialUiDispatcher();
         var basis = SnapshotFixture.BaseSnapshot();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
-        await using var client = await SnapshotFixture.ConnectAsync(host);
+        await using var client = await SnapshotFixture.ConnectAsync(host, ui: Dispatcher(serial, queue));
 
         var applied = 0;
         client.Changed += () => Interlocked.Increment(ref applied);
@@ -38,12 +50,14 @@ public class SnapshotRevisionTests
         Assert.Equal(2, Volatile.Read(ref applied)); // 5 and 6 — the stale 4 raised no Changed at all
     }
 
-    [Fact]
-    public async Task A_pushed_snapshot_repeating_the_applied_revision_is_discarded()
+    [Theory]
+    [MemberData(nameof(Dispatchers))]
+    public async Task A_pushed_snapshot_repeating_the_applied_revision_is_discarded(bool serial)
     {
+        using var queue = new SerialUiDispatcher();
         var basis = SnapshotFixture.BaseSnapshot();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
-        await using var client = await SnapshotFixture.ConnectAsync(host);
+        await using var client = await SnapshotFixture.ConnectAsync(host, ui: Dispatcher(serial, queue));
 
         var seven = SnapshotFixture.Revised(basis, 7, "Sieben");
         host.Current = seven;
@@ -66,14 +80,17 @@ public class SnapshotRevisionTests
         Assert.Equal(1, Volatile.Read(ref applied)); // 8 only
     }
 
-    [Fact]
-    public async Task The_initial_snapshots_revision_is_adopted_so_a_replay_of_it_is_discarded()
+    [Theory]
+    [MemberData(nameof(Dispatchers))]
+    public async Task The_initial_snapshots_revision_is_adopted_so_a_replay_of_it_is_discarded(bool serial)
     {
-        // Seeding _lastRevision from GET /snapshot is what stops the client treating everything up to
-        // the joined-at revision as new; without it the first poll would also force a pointless resync.
+        // Seeding the applied position from GET /snapshot is what stops the client treating everything
+        // up to the joined-at revision as new; without it the first poll would also force a pointless
+        // resync.
+        using var queue = new SerialUiDispatcher();
         var basis = SnapshotFixture.BaseSnapshot();
         await using var host = await ScriptedSnapshotHost.StartAsync(SnapshotFixture.Revised(basis, 12, "Zwölf"));
-        await using var client = await SnapshotFixture.ConnectAsync(host);
+        await using var client = await SnapshotFixture.ConnectAsync(host, ui: Dispatcher(serial, queue));
 
         Assert.Equal(new[] { "Zwölf" }, SnapshotFixture.JournalOf(client));
 

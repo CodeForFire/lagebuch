@@ -469,6 +469,34 @@ public class RemoteClientTests
     }
 
     [Fact]
+    public async Task A_commands_own_response_and_its_broadcast_are_applied_once()
+    {
+        // The sender gets the same state twice, over two channels in no fixed order: the HTTP response
+        // to its command and the hub broadcast. Whichever comes second carries the position already
+        // held and must not raise Changed again — a second rebuild of every list on the device.
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        var changes = 0;
+        client.Changed += () => Interlocked.Increment(ref changes);
+
+        await client.SendAsync(new AddJournalEntryCommand(
+            new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Eins", null, null));
+
+        // Ordered behind the first broadcast on the same hub connection rather than asserted after a
+        // sleep: once "Zwei" has landed, the broadcast of "Eins" has been and gone.
+        hostSession.AddJournalEntry(EtbDirection.Outgoing, "Zwei");
+        await SnapshotFixture.WaitForClient(
+            client, () => client.Incident.Journal.Any(e => e.Text == "Zwei"), "the second change");
+
+        Assert.Equal(2, Volatile.Read(ref changes));
+    }
+
+    [Fact]
     public async Task Connect_refuses_a_protocol_3_host()
     {
         // A protocol-3 host sends revision 0 on every snapshot and has no /revision. A client that

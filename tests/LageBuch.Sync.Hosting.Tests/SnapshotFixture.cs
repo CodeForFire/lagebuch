@@ -11,7 +11,10 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// </summary>
 internal static class SnapshotFixture
 {
-    /// <summary>A snapshot of an incident with no journal, revision 0 — what a client joins onto.</summary>
+    /// <summary>
+    /// A snapshot of an incident with no journal, at revision 0 of a fresh epoch — what a client joins
+    /// onto. The epoch is set, as the real host always sets it.
+    /// </summary>
     public static IncidentSnapshot BaseSnapshot()
     {
         var session = TestSession.StartNew(
@@ -21,7 +24,7 @@ internal static class SnapshotFixture
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        return SnapshotMapper.ToSnapshot(session.Incident);
+        return SnapshotMapper.ToSnapshot(session.Incident) with { Epoch = Guid.NewGuid() };
     }
 
     /// <summary>
