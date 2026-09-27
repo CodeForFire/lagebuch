@@ -1708,6 +1708,10 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public string? LastOpenedUrl { get; private set; }
 
+    public string? LastMailAddress { get; private set; }
+
+    public string? LastPhoneNumber { get; private set; }
+
     public string? LastSuggestedExportName { get; private set; }
 
     public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>("/x.fwincident");
@@ -1738,6 +1742,18 @@ internal sealed class FakeDialogs : IFileDialogService
     public Task OpenUrlAsync(string url)
     {
         LastOpenedUrl = url;
+        return Task.CompletedTask;
+    }
+
+    public Task OpenMailAsync(string address)
+    {
+        LastMailAddress = address;
+        return Task.CompletedTask;
+    }
+
+    public Task OpenPhoneAsync(string number)
+    {
+        LastPhoneNumber = number;
         return Task.CompletedTask;
     }
 

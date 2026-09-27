@@ -54,11 +54,11 @@ public class LinksTabRenderTests
     }
 
     [AvaloniaFact]
-    public void Workspace_renders_nine_modules_and_two_checklists_before_links_is_opened()
+    public void Workspace_renders_the_rail_before_links_is_opened()
     {
         var (window, _) = ShowWorkspace();
 
-        Assert.Equal(11, WorkspaceRenderHelper.RailHeaders(window).Count);
+        Assert.Equal(12, WorkspaceRenderHelper.RailHeaders(window).Count);
         Capture(window, "links-before.png");
     }
 

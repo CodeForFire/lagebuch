@@ -178,6 +178,7 @@ public sealed partial class NavRow : ObservableObject
             [NavModules.Co] = "CO-Messung",
             [NavModules.Files] = "Dateien",
             [NavModules.Links] = "Links",
+            [NavModules.Contacts] = "Kontakte",
         };
 
     partial void OnIsVisibleChanged(bool value) => _onChanged();

@@ -41,6 +41,9 @@ public static class NavModules
     /// <summary>Links.</summary>
     public const string Links = "links";
 
+    /// <summary>Kontakte.</summary>
+    public const string Contacts = "contacts";
+
     /// <summary>
     /// Not a module of its own: the marker for an entry that names one of the Einsatz's
     /// Checklisten through <see cref="NavEntry.ChecklistId"/>.
@@ -49,7 +52,7 @@ public static class NavModules
 
     /// <summary>Every built-in module, in the order the rail shipped with.</summary>
     public static IReadOnlyList<string> All { get; } =
-        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links };
+        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links, Contacts };
 
     /// <summary>
     /// Whether this build knows the key. A layout written by a newer build may name a module that
@@ -81,7 +84,8 @@ public static class NavLayout
 {
     /// <summary>
     /// The rail as it shipped before it was configurable — Aufbau, the modules in their original
-    /// order, then Abbau — plus Beteiligte, placed beside Kräfte.
+    /// order, then Abbau — plus the modules added since: Beteiligte beside Kräfte, Kontakte after
+    /// Links.
     /// </summary>
     /// <remarks>
     /// Stored as "no layout" rather than written into a fresh Stammdaten set on purpose. An empty
@@ -101,6 +105,7 @@ public static class NavLayout
         new NavEntry(NavModules.Co, null, true),
         new NavEntry(NavModules.Files, null, true),
         new NavEntry(NavModules.Links, null, true),
+        new NavEntry(NavModules.Contacts, null, true),
         new NavEntry(NavModules.Checklist, ChecklistDefaults.AbbauListId, true),
     };
 }

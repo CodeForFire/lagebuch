@@ -24,6 +24,36 @@ person's call sign) becomes a call-sign suggestion. Maintaining the vehicle
 list is all that is needed; every field still accepts free text for anything
 not in it (a Leitstelle, a mutual-aid unit).
 
+## Kontakte: die Notiz ist das Suchfeld
+
+A personnel row carries an optional `email` and an optional `note` besides the
+name, role, call sign and phone number. The **Kontakte** tab in the Einsatz rail
+lists the roster and searches all of them at once.
+
+`note` is free text the brigade maintains, and in practice it holds one of two
+things: a Fachgebiet (`KBM Gefahrgut, Fachberater Arbeits- und
+Gesundheitsschutz`, `Fachberater EDV`, `PSNV-E Team`) or the Feuerwehren someone
+covers (`Alling, Biburg, Eichenau, Emmering`). That is what makes the tab able
+to answer "wer ist zuständig für ABC?" — the search splits the query on spaces
+and keeps a person when every term matches somewhere, so `gefahrgut`,
+`kbm gefahrgut` and `gefahrgut kbm` all find the same person.
+
+Telefonnummer and E-Mail-Adresse open the device's dialer and mail app.
+Lagebuch never places a call itself: the dialer comes up prefilled and the
+operator still presses call. Both values are validated before they reach the
+platform, because they arrive from an imported file rather than from the
+operator's keyboard — an address carrying a line break or a `?bcc=`, or a number
+carrying a USSD code, is refused rather than launched.
+
+Both fields are optional everywhere. A roster that has neither still works, and
+a person without an address simply shows no mail button.
+
+The Stammdaten editor checks an address against the same rules the launcher
+applies, and names anyone whose address could not be opened instead of letting
+SPEICHERN write it — the operator who typed it is the one who can still fix it.
+The same check runs right after an import, which is where an unusable address
+most often comes from.
+
 ## Sample data
 
 [`samples/demo-stammdaten.json`](samples/demo-stammdaten.json) is a complete,
@@ -119,7 +149,8 @@ can now correct itself.
 ## PII
 
 Any real master-data or personnel JSON — street lists, station and call-sign
-names, and above all names and mobile numbers — is personal/identifying data and
+names, and above all names, mobile numbers and e-mail addresses — is
+personal/identifying data and
 must be kept **out of the repository**. `seed-source/` and `*.masterdata.json`
 are gitignored for exactly this reason; only the anonymised example and demo
 files under `docs/` are tracked. An empty roster is a fully supported state:

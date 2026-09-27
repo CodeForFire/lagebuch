@@ -4,7 +4,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-/// <summary>Editor for the personnel roster (five fields and the own/foreign flag per row).</summary>
+/// <summary>Editor for the personnel roster (seven fields and the own/foreign flag, on two lines per row).</summary>
 public sealed partial class PersonnelSection : EditorSection
 {
     private readonly Action _onChanged;
@@ -14,7 +14,8 @@ public sealed partial class PersonnelSection : EditorSection
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<PersonRow>(
-            people.Select(p => new PersonRow(p.LastName, p.FirstName, p.Role, p.CallSign, p.Phone, p.IsOwn, onChanged)));
+            people.Select(p => new PersonRow(
+                p.LastName, p.FirstName, p.Role, p.CallSign, p.Phone, p.IsOwn, p.Email, p.Note, onChanged)));
     }
 
     public ObservableCollection<PersonRow> Rows { get; }
@@ -22,7 +23,7 @@ public sealed partial class PersonnelSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(new PersonRow(string.Empty, string.Empty, null, null, null, isOwn: true, _onChanged));
+        Rows.Add(new PersonRow(string.Empty, string.Empty, null, null, null, isOwn: true, null, null, _onChanged));
         _onChanged();
     }
 
@@ -47,7 +48,15 @@ public sealed partial class PersonnelSection : EditorSection
                 continue;
             }
 
-            result.Add(new Person(last, r.FirstName?.Trim() ?? string.Empty, Nz(r.Role), Nz(r.CallSign), Nz(r.Phone), r.IsOwn));
+            result.Add(new Person(
+                last,
+                r.FirstName?.Trim() ?? string.Empty,
+                Nz(r.Role),
+                Nz(r.CallSign),
+                Nz(r.Phone),
+                r.IsOwn,
+                Nz(r.Email),
+                Nz(r.Note)));
         }
 
         return result;
