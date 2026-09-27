@@ -1,7 +1,6 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
-using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -293,7 +292,6 @@ public class IncidentWorkspaceViewModelTests
         var vm = NewWorkspace(out var store, out _);
         var before = store.SaveCount;
         vm.Etb.NewText = "Meldung";
-        vm.Etb.NewDirection = EtbDirection.Internal;
         vm.Etb.AddEntryCommand.Execute(null);
 
         Assert.True(store.SaveCount > before);
@@ -829,6 +827,101 @@ public class IncidentWorkspaceViewModelTests
         Assert.True(vm.CanExport);
     }
 
+    // A joined client's workspace: the snapshot double stands in for RemoteIncidentSession
+    // (IsRemote, not a LocalIncidentSession), without a network.
+    private static IncidentWorkspaceViewModel ClientWorkspace(FakeDialogs? dialogs = null, string? remoteHost = null)
+    {
+        var clock = new FixedClock(T0);
+        var host = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        return new IncidentWorkspaceViewModel(
+            new SnapshotRoundTrippingSession(host),
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs ?? new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter(),
+            remoteHost: remoteHost);
+    }
+
+    [Fact]
+    public void A_joined_client_shows_which_host_it_is_connected_to_until_the_link_drops()
+    {
+        var vm = ClientWorkspace(remoteHost: "elw-1:5859");
+
+        Assert.Equal("verbunden mit elw-1:5859", vm.ConnectedHostText);
+        Assert.True(vm.ShowConnectedHost);
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        vm.IsConnected = false;
+
+        Assert.False(vm.ShowConnectedHost);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.ShowConnectedHost), raised);
+    }
+
+    [Fact]
+    public void A_local_incident_shows_no_connected_host()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.Null(vm.ConnectedHostText);
+        Assert.False(vm.ShowConnectedHost);
+    }
+
+    [Fact]
+    public void Close_is_unavailable_on_a_client_workspace()
+    {
+        var vm = ClientWorkspace();
+
+        Assert.True(vm.IsClient);
+        Assert.False(vm.CloseIncidentCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Close_stays_available_on_the_host()
+    {
+        var vm = NewWorkspace(out _, out _);
+
+        Assert.False(vm.IsClient);
+        Assert.True(vm.CloseIncidentCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void CanExport_is_true_on_a_client_when_the_platform_can_render_pdfs()
+    {
+        var vm = ClientWorkspace();
+
+        Assert.True(vm.CanExport);
+        Assert.True(vm.ExportPdfCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task ExportPdf_on_a_client_writes_a_pdf_from_the_synced_state_named_after_the_incidents_start()
+    {
+        var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var dialogs = new FakeDialogs { ExportPath = exportPath };
+        var vm = ClientWorkspace(dialogs);
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        // No .fwincident on a client, so the name comes from the start time, formatted the way
+        // HomeViewModel names a new incident's file.
+        Assert.Equal("20260622-0900.pdf", dialogs.LastSuggestedExportName);
+        var bytes = await File.ReadAllBytesAsync(exportPath);
+        Assert.Equal(0x25, bytes[0]); // %PDF
+        Assert.Equal($"PDF exportiert: {Path.GetFileName(exportPath)}", vm.ExportStatus);
+        File.Delete(exportPath);
+    }
+
     [Fact]
     public void Header_shows_who_documents_and_offers_the_handover()
     {
@@ -1000,7 +1093,6 @@ public class IncidentWorkspaceViewModelTests
         vm.ConfirmPendingPrompt();
 
         vm.Etb.NewText = "Lagemeldung";
-        vm.Etb.NewDirection = EtbDirection.Internal;
         vm.Etb.AddEntryCommand.Execute(null);
 
         Assert.Equal("Schmidt (FFB 1)", vm.Etb.Entries[0].EnteredBy);
@@ -1409,6 +1501,122 @@ public class IncidentWorkspaceViewModelTests
 
         // The Trupp is still selected, so switching the module back on lands on the right row.
         Assert.Same(vm.Scba.Trupps[0], vm.Scba.SelectedTrupp);
+    }
+
+    // --- Header Meldungen: the quiet strip holds running countdowns only ----------------------
+    [Fact]
+    public void Countdown_strip_shows_the_running_ils_reminder_and_leaves_when_it_falls_due()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService(), new FakeHostController());
+        var raised = 0;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IncidentWorkspaceViewModel.ShowsCountdownStrip))
+            {
+                raised++;
+            }
+        };
+        Assert.True(vm.ShowsCountdownStrip); // the ILS reminder starts with the incident
+
+        clock.Now = T0.AddHours(1);
+        ticker.Fire();
+
+        Assert.True(vm.Reminder!.IsDue);
+        Assert.False(vm.ShowsCountdownStrip);
+        Assert.True(raised > 0);
+    }
+
+    [Fact]
+    public void Countdown_strip_stays_off_in_a_read_only_workspace()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.Null(vm.Reminder);
+        Assert.False(vm.ShowsCountdownStrip);
+    }
+
+    // --- #460: the Aufgabe-fällig bar leads to the Aufgaben tab -------------------------------
+
+    /// <summary>A workspace holding one task whose five-minute timer ran out a minute ago.</summary>
+    private static IncidentWorkspaceViewModel WorkspaceWithAnOverdueTask(MasterDataSet masterData)
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            masterData,
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new FakeHostController());
+        vm.Tasks.NewText = "Wasserversorgung prüfen";
+        vm.Tasks.NewTimerMinutes = 5;
+        vm.Tasks.AddTaskCommand.Execute(null);
+        clock.Now = T0.AddMinutes(6);
+        return vm;
+    }
+
+    [Fact]
+    public void Showing_a_task_moves_the_rail_to_the_aufgaben_tab()
+    {
+        var vm = WorkspaceWithAnOverdueTask(Md());
+        vm.SelectedNavItem = NavItemFor(vm, vm.Etb);
+
+        vm.Tasks.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Same(NavItemFor(vm, vm.Tasks), vm.SelectedNavItem);
+        Assert.Equal("Wasserversorgung prüfen", vm.Tasks.SelectedTask?.Text);
+    }
+
+    [Fact]
+    public void A_rebuilt_workspace_stops_listening_to_the_tasks_view_model_it_replaced()
+    {
+        var vm = WorkspaceWithAnOverdueTask(Md());
+        var replaced = vm.Tasks;
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        Assert.NotSame(replaced, vm.Tasks);
+
+        var etb = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = etb;
+        replaced.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Same(etb, vm.SelectedNavItem);
+    }
+
+    [Fact]
+    public void Showing_a_task_leaves_the_rail_alone_when_aufgaben_is_switched_off()
+    {
+        var vm = WorkspaceWithAnOverdueTask(
+            Md() with { Navigation = new[] { new NavEntry(NavModules.Tasks, null, false) } });
+        var etb = NavItemFor(vm, vm.Etb);
+        vm.SelectedNavItem = etb;
+
+        vm.Tasks.ShowMostOverdueTaskCommand.Execute(null);
+
+        Assert.Null(NavItemFor(vm, vm.Tasks));
+        Assert.Same(etb, vm.SelectedNavItem);
     }
 }
 

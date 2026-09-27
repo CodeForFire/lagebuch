@@ -171,4 +171,28 @@ public class MigrationsTests : IDisposable
         check.CommandText = "SELECT count(*) FROM pragma_table_info('checklist_items') WHERE name IN ('is_mandatory','kind');";
         Assert.Equal(2L, (long)check.ExecuteScalar()!);
     }
+
+    [Fact]
+    public void V24_database_upgrades_to_v25_and_gains_the_involved_parties_table()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (24);";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(25, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText =
+            "SELECT count(*) FROM pragma_table_info('involved_parties') " +
+            "WHERE name IN ('id','ordinal','name','phone','notes','created_by','created_at');";
+        Assert.Equal(7L, (long)check.ExecuteScalar()!);
+    }
 }

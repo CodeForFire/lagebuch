@@ -23,7 +23,7 @@ public sealed class IncidentRepository
                     "role_assignments", "force_units", "force_unit_edits", "scba_trupps",
                     "scba_trupp_members", "scba_pressure_readings", "audit_events",
                     "incident_timers", "incident_files", "incident_tasks",
-                    "co_buildings", "co_dwellings", "co_readings",
+                    "co_buildings", "co_dwellings", "co_readings", "involved_parties",
                  })
         {
             Exec(cn, tx, $"DELETE FROM {table};");
@@ -352,6 +352,25 @@ public sealed class IncidentRepository
                     p("$due", t.DueAt.ToString(Iso));
                     p("$coat", (object?)t.CompletedAt?.ToString(Iso) ?? DBNull.Value);
                     p("$coby", (object?)t.CompletedBy ?? DBNull.Value);
+                });
+        }
+
+        for (var i = 0; i < incident.InvolvedParties.Count; i++)
+        {
+            var party = incident.InvolvedParties[i];
+            Run(
+                cn,
+                tx,
+                "INSERT INTO involved_parties (id, ordinal, name, phone, notes, created_by, created_at) " + "VALUES ($id,$o,$name,$phone,$notes,$by,$cat);",
+                p =>
+                {
+                    p("$id", party.Id.ToString());
+                    p("$o", i);
+                    p("$name", party.Name);
+                    p("$phone", (object?)party.Phone ?? DBNull.Value);
+                    p("$notes", (object?)party.Notes ?? DBNull.Value);
+                    p("$by", party.CreatedBy);
+                    p("$cat", party.CreatedAt.ToString(Iso));
                 });
         }
 
@@ -702,6 +721,17 @@ public sealed class IncidentRepository
                 NullableDate(r, 8),
                 Str(r, 9)));
 
+        var involvedParties = ReadAll(
+            cn,
+            "SELECT id, name, phone, notes, created_by, created_at FROM involved_parties ORDER BY ordinal;",
+            r => Domain.Involved.InvolvedParty.Rehydrate(
+                Guid.Parse(r.GetString(0)),
+                r.GetString(1),
+                Str(r, 2),
+                Str(r, 3),
+                r.GetString(4),
+                ParseDate(r.GetString(5))));
+
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the
         // Einsatznummer so pre-existing incidents keep their number.
@@ -731,7 +761,8 @@ public sealed class IncidentRepository
             files,
             tasks,
             buildings,
-            dwellings);
+            dwellings,
+            involvedParties);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

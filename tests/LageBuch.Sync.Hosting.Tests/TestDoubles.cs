@@ -172,14 +172,28 @@ internal sealed class InMemoryTrustStore : ITrustStore
     public void RemoveThumbprint(string hostAddress) => _map.Remove(hostAddress);
 }
 
-/// <summary>In-memory <see cref="ILastJoinHostStore"/> for asserting whether/what a join persisted.</summary>
-internal sealed class InMemoryLastJoinHostStore : ILastJoinHostStore
+/// <summary>In-memory <see cref="ILastConnectionStore"/> for asserting whether/what a join persisted.</summary>
+internal sealed class InMemoryLastConnectionStore : ILastConnectionStore
 {
-    private string? _host;
+    private LastConnection? _last;
 
-    public string? GetLastHost() => _host;
+    public LastConnection? GetLast() => _last;
 
-    public void SetLastHost(string host) => _host = host;
+    public void SetLast(LastConnection connection) => _last = connection;
+
+    public void Clear() => _last = null;
+}
+
+/// <summary>An <see cref="ILastConnectionStore"/> whose disk is full.</summary>
+internal sealed class FailingLastConnectionStore : ILastConnectionStore
+{
+    public LastConnection? GetLast() => null;
+
+    public void SetLast(LastConnection connection) => throw new IOException("Kein Speicherplatz.");
+
+    public void Clear()
+    {
+    }
 }
 
 // Minimal service doubles for constructing ViewModels (IncidentWorkspaceViewModel/HomeViewModel).
@@ -299,9 +313,19 @@ internal static class TestHost
         string version = "1.0.0",
         IUiDispatcher? ui = null,
         string pin = DefaultPin,
-        MasterDataSet? masterData = null)
+        MasterDataSet? masterData = null,
+        int protocolVersion = SyncProtocol.ProtocolVersion,
+        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion)
     {
-        var host = new IncidentHost(session, clock, version, ui ?? new ImmediateUiDispatcher(), pin, masterData);
+        var host = new IncidentHost(
+            session,
+            clock,
+            version,
+            ui ?? new ImmediateUiDispatcher(),
+            pin,
+            masterData,
+            protocolVersion,
+            minimumProtocolVersion);
         var port = FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
         return (host, port);

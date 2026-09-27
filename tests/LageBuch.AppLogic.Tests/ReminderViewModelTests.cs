@@ -35,6 +35,25 @@ public class ReminderViewModelTests
         Assert.False(vm.AcknowledgeCommand.CanExecute(null));
     }
 
+    // The header shows a running countdown as a quiet readout and a due one as a row; the two
+    // flags must flip together on the same tick, or both (or neither) would show.
+    [Fact]
+    public void Countdown_readout_gives_way_when_the_reminder_falls_due()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        Assert.True(vm.IsCountingDown);
+
+        clock.Now = T0.AddMinutes(15);
+        ticker.Fire();
+
+        Assert.False(vm.IsCountingDown);
+        Assert.Contains(nameof(ReminderViewModel.IsCountingDown), changed);
+    }
+
     [Fact]
     public void Tick_past_interval_makes_it_due()
     {

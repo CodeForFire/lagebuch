@@ -1,0 +1,1 @@
+A joined device's home screen shows where it was last connected — host, Stichwort and time — with a Neu verbinden button that reopens the connect dialog with host and PIN pre-filled and a button that forgets the connection again, and while connected the incident header names the host (#464).

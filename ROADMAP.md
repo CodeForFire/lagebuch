@@ -87,8 +87,17 @@ The plan, in order of what is actually achievable:
 - **SHA-256 checksums and Sigstore-backed build attestations** on every release.
   Not recognised by the operating system, but verifiable, and they are the
   artefacts a Datenschutzbeauftragter can actually check. These ship as of 0.6.
-- **A published Android signing-key fingerprint**, and distribution through
-  Obtainium so updates do not mean re-downloading an APK by hand.
+- **Google Play** on Android. A bundle signed by Google installs without the
+  unknown-sources prompt and updates itself — for a public-sector organisation
+  the only Android path with no warning to click past, and a far shorter road
+  than a Windows certificate. The build already produces the bundle; what is
+  missing is the developer account and the listing. The APK on the GitHub
+  release stays alongside it.
+- **A published Android signing-key fingerprint** for that APK, and distribution
+  through Obtainium so updates do not mean re-downloading it by hand — the path
+  for anyone who does not want Play. This needs the release APK to be signed with
+  a stable key of its own first; today it carries the CI runner's throwaway debug
+  key, which is why a sideloaded install cannot be upgraded in place at all.
 
 On code signing, plainly: the SignPath Foundation reviewed this project and
 declined. OSSign requires six months of activity on the account, the

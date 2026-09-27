@@ -52,13 +52,14 @@
     { "name": "Kartendienst", "url": "https://example.org/karte" }
   ],
   "vehicles": [
-    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false },
-    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true },
-    { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false }
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false, "isOwn": true },
+    { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true },
+    { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false }
   ],
   "personnel": [
-    { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000" },
-    { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null }
+    { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000", "isOwn": true },
+    { "lastName": "Musterfrau", "firstName": "Erika", "role": "GF", "callSign": null, "phone": null, "isOwn": true },
+    { "lastName": "Beispiel", "firstName": "Bernd", "role": "GF", "callSign": "Florian Musterdorf 40/1", "phone": null, "isOwn": false }
   ],
   "settings": {
     "ilsReminderIntervalMinutes": 15,

@@ -84,9 +84,11 @@ public class RehydrationTests
             Array.Empty<Files.IncidentFile>(),
             Array.Empty<Tasks.IncidentTask>(),
             Array.Empty<CoMeasurement.Building>(),
-            Array.Empty<CoMeasurement.Dwelling>());
+            Array.Empty<CoMeasurement.Dwelling>(),
+            new[] { Involved.InvolvedParty.Rehydrate(Guid.NewGuid(), "Erika Beispiel", "0171 0000001", "Hauseigentümerin", "Müller", T0) });
 
         Assert.Equal(id, incident.Id);
+        Assert.Equal("Erika Beispiel", Assert.Single(incident.InvolvedParties).Name);
         Assert.Equal(IncidentState.Closed, incident.State);
         Assert.Equal("B 1.2 260715 4242", incident.IncidentNumber!.Value);
         Assert.Equal(T0.AddHours(2), incident.ClosedAt);
@@ -130,7 +132,8 @@ public class RehydrationTests
             new[] { Files.IncidentFile.Rehydrate(fileId, "bericht.pdf", "bericht.pdf", "application/pdf", 4096, T0, "Müller") },
             Array.Empty<Tasks.IncidentTask>(),
             Array.Empty<CoMeasurement.Building>(),
-            Array.Empty<CoMeasurement.Dwelling>());
+            Array.Empty<CoMeasurement.Dwelling>(),
+            Array.Empty<Involved.InvolvedParty>());
 
         var file = Assert.Single(incident.Files);
         Assert.Equal(fileId, file.Id);
@@ -161,7 +164,8 @@ public class RehydrationTests
             Array.Empty<Files.IncidentFile>(),
             Array.Empty<Tasks.IncidentTask>(),
             Array.Empty<CoMeasurement.Building>(),
-            Array.Empty<CoMeasurement.Dwelling>());
+            Array.Empty<CoMeasurement.Dwelling>(),
+            Array.Empty<Involved.InvolvedParty>());
         Assert.Throws<IncidentClosedException>(() => incident.SetStatus("x"));
     }
 }

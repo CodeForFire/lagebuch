@@ -33,6 +33,7 @@ public class MasterDataSyncTests
     {
         var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
         return http;
     }
 
@@ -50,6 +51,26 @@ public class MasterDataSyncTests
         Assert.Equal(new[] { "Löschzug Fürstenfeldbruck" }, set.Brigades);
         Assert.Equal(new Vehicle("Löschzug Fürstenfeldbruck", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
         Assert.Equal(60, set.Settings.ReturnPressureBar);
+    }
+
+    [Fact]
+    public async Task Host_serves_the_own_flag_of_vehicles_and_personnel()
+    {
+        var clock = new FixedClock();
+        var hostSet = MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("FF Nachbarort", "Florian Nachbarort 40/1", 9, IsOwn: false) },
+            Personnel = new[] { new Person("Nachbar", "Nora", null, null, null, IsOwn: false) },
+        };
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
+        await using var _ = host;
+
+        using var http = Client(port, TestHost.DefaultPin);
+        var set = MasterDataJson.Parse(
+            await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
+
+        Assert.False(Assert.Single(set.Vehicles).IsOwn);
+        Assert.False(Assert.Single(set.Personnel).IsOwn);
     }
 
     [Fact]

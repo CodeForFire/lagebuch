@@ -525,7 +525,8 @@ public class FilesViewModelTests
         new[] { file },
         Array.Empty<Domain.Tasks.IncidentTask>(),
         Array.Empty<Domain.CoMeasurement.Building>(),
-        Array.Empty<Domain.CoMeasurement.Dwelling>());
+        Array.Empty<Domain.CoMeasurement.Dwelling>(),
+        Array.Empty<Domain.Involved.InvolvedParty>());
 
     // Any per-open copy of this name anywhere under the temp root. Tolerates another test's
     // directory disappearing mid-scan — the suite runs classes in parallel.

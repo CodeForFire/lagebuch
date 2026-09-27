@@ -48,7 +48,7 @@ public class ModuleTabsScrollingTests
         var tabItems = tabs.GetVisualDescendants().OfType<TabItem>().ToArray();
 
         // Nothing lost: every declared rail tab is still realized.
-        Assert.Equal(10, tabItems.Length);
+        Assert.Equal(11, tabItems.Length);
 
         // One column, not side-by-side columns: every tab shares the same horizontal origin.
         var columns = tabItems

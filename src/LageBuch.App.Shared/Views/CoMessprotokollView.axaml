@@ -8,6 +8,44 @@
              x:Class="LageBuch.App.Shared.Views.CoMessprotokollView"
              x:DataType="vm:CoMessprotokollViewModel">
   <UserControl.Styles>
+    <!-- Wide defaults for everything the narrow query below re-sizes. Each has to be a Style and
+         not an attribute on the control: a local value in XAML outranks a Style setter. -->
+    <Style Selector="Border#DwellingEditor">
+      <Setter Property="Width" Value="320" />
+    </Style>
+    <Style Selector="StackPanel.floor-gutter">
+      <Setter Property="Width" Value="104" />
+    </Style>
+    <Style Selector="ComboBox#BuildingBox">
+      <Setter Property="Width" Value="200" />
+    </Style>
+
+    <!-- The narrow layout, keyed off the workspace's container. -->
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="TextBlock#CoTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <!-- The editor takes the whole width; ShowMatrix gets the matrix out of its way. -->
+      <Style Selector="Border#DwellingEditor">
+        <Setter Property="Width" Value="NaN" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0,8" />
+      </Style>
+      <!-- 104px of gutter against a 388px column left nothing for the tiles, whose own floor is
+           96px; 56 still fits "1.UG" and its Nutzung on one left edge. -->
+      <Style Selector="StackPanel.floor-gutter">
+        <Setter Property="Width" Value="56" />
+      </Style>
+      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
+           leaves it the width of its longest entry. -->
+      <Style Selector="ComboBox#BuildingBox">
+        <Setter Property="Width" Value="300" />
+      </Style>
+      <Style Selector="HeaderedContentControl.field">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+      </Style>
+    </ContainerQuery>
+
     <!-- Active filter chip. Deliberately NOT Button.signal: that class is the red accent, and red
          already means "Person(en) betroffen" on every tile below. Reusing it here would put the
          most alarming color in the app on a chip that only says "this list is filtered". A raised
@@ -43,7 +81,7 @@
   <DockPanel>
     <!-- Title: every other tab leads with one at this same position (DockPanel.Dock="Top",
          Margin bottom 14) — this view was missing it (#137). -->
-    <TextBlock DockPanel.Dock="Top" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
+    <TextBlock DockPanel.Dock="Top" x:Name="CoTitle" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
 
     <!-- Building management: which Haus, and add/remove a Haus (bottom gutter, matching every
          other tab's entry point, #221). HAUS auswählen/ENTFERNEN act on the selected Haus and sit
@@ -54,9 +92,9 @@
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
-      <StackPanel Orientation="Horizontal" Spacing="8">
+      <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
         <HeaderedContentControl Classes="field" Header="HAUS">
-          <ComboBox Width="200" ItemsSource="{Binding BuildingOptions}"
+          <ComboBox x:Name="BuildingBox" ItemsSource="{Binding BuildingOptions}"
                     SelectedItem="{Binding SelectedBuilding}"
                     PlaceholderText="Haus auswählen..."
                     IsEnabled="{Binding CanModify}">
@@ -76,7 +114,7 @@
                 Command="{Binding AddBuildingCommand}"
                 IsEnabled="{Binding !IsReadOnly}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
-      </StackPanel>
+      </WrapPanel>
     </Border>
 
     <!-- Add Building Dialog: opened by the HAUS HINZUFÜGEN button in the bottom dock, so it
@@ -206,7 +244,6 @@
             Background="#0F141D"
             BorderBrush="{StaticResource HairlineBrush}"
             BorderThickness="1,0,0,0"
-            Width="320"
             Padding="16"
             IsEnabled="{Binding !IsReadOnly}">
       <DockPanel>
@@ -417,9 +454,11 @@
          without reserving layout space for it (viewport width stays equal to the ScrollViewer's),
          so once the tiles started filling the line edge to edge the bar sat on top of the
          rightmost unit of every floor. Reserving the 16px keeps the tiles clear of it. -->
+    <!-- ShowMatrix, not just HasBuildings: on a phone the Wohnung editor takes the whole width,
+         so the matrix stands aside while it is open rather than being squeezed to nothing. -->
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                   AllowAutoHide="False"
-                  IsVisible="{Binding HasBuildings}">
+                  IsVisible="{Binding ShowMatrix}">
       <ItemsControl ItemsSource="{Binding MatrixRows}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
@@ -430,10 +469,11 @@
           <DataTemplate x:DataType="vm:FloorRowViewModel">
             <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
                     Padding="0,8,0,10">
-              <Grid ColumnDefinitions="104,*">
+              <Grid ColumnDefinitions="Auto,*">
                 <!-- Floor gutter: label, its Nutzung (FloorDescriptions) and this floor's own
-                     progress. Fixed width so every floor label sits on one left edge. -->
-                <StackPanel Grid.Column="0" Spacing="1" Margin="0,0,10,0">
+                     progress. Fixed width so every floor label sits on one left edge — as a Style
+                     (see the top of this file), so a phone can narrow it. -->
+                <StackPanel Grid.Column="0" Classes="floor-gutter" Spacing="1" Margin="0,0,10,0">
                   <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13"
                              Foreground="{StaticResource TextPrimaryBrush}" />
                   <!-- TextSecondary, not TextMuted: muted is a semi-transparent token meant for

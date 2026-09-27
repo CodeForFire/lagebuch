@@ -17,21 +17,50 @@
       <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
       <Setter Property="BorderThickness" Value="2" />
     </Style>
+
+    <!-- Hidden by default through a Style, never IsVisible="False" on the panel: a local value
+         in XAML outranks a Style setter, so the query below could never bring it back. -->
+    <Style Selector="WrapPanel.file-meta-line">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <!-- The narrow layout, keyed off the workspace's container. Six columns of metadata squeeze
+         the name — the one column that matters — to nothing on a phone, so below the breakpoint
+         the three metadata columns collapse (an Auto column with a hidden child is zero wide) and
+         reappear as one quiet line under the name. -->
+    <ContainerQuery Name="Workspace" Query="max-width:640">
+      <Style Selector="TextBlock#FilesTitle">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Grid#FilesHeaderRow">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="TextBlock.file-meta-column">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="WrapPanel.file-meta-line">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="Button#AddFileButton">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      </Style>
+    </ContainerQuery>
   </UserControl.Styles>
   <DockPanel>
-    <TextBlock DockPanel.Dock="Top" Text="DATEIEN" Classes="overline" Margin="0,0,0,14" />
+    <TextBlock DockPanel.Dock="Top" x:Name="FilesTitle" Text="DATEIEN" Classes="overline" Margin="0,0,0,14" />
 
     <!-- #221: the add-entry affordance lives at the lower-left on every tab, matching Kräfte/
          Atemschutz/Funktionen's input docks; this was the odd one out at the upper-right. -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsVisible="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
-      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+      <WrapPanel Orientation="Horizontal" ItemSpacing="10" LineSpacing="6" VerticalAlignment="Center">
         <Button x:Name="AddFileButton" Classes="signal" Content="DATEI HINZUFÜGEN"
                 Command="{Binding AddFileCommand}" />
         <TextBlock x:Name="MaxFileSizeHint" Classes="secondary mono" FontSize="11" Opacity="0.7"
                    VerticalAlignment="Center" Text="{Binding MaxFileSizeHint}" />
-      </StackPanel>
+      </WrapPanel>
     </Border>
 
     <!-- Upload/open failure banner: same shape as Home's OpenErrorBanner -->
@@ -57,7 +86,7 @@
         <!-- Column headers: the rename box below has no other visible label (#137). Columns share
              a SharedSizeGroup with the row template below so headers line up with their data even
              though each row sizes its Auto columns to its own content. -->
-        <Grid Margin="0,0,0,8">
+        <Grid x:Name="FilesHeaderRow" Margin="0,0,0,8">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
@@ -75,7 +104,7 @@
         <ItemsControl x:Name="FilesList" ItemsSource="{Binding Files}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:IncidentFileRow">
-              <Grid Margin="0,0,0,10">
+              <Grid Margin="0,0,0,10" RowDefinitions="Auto,Auto">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" SharedSizeGroup="FilesSize" />
@@ -91,11 +120,20 @@
                          PlaceholderText="{x:Static md:AnonymizedExampleData.FileNamePlaceholder}"
                          BorderThickness="0" Background="Transparent" Padding="0"
                          VerticalAlignment="Center" IsEnabled="{Binding !IsReadOnly}" />
-                <TextBlock Grid.Column="1" Classes="mono" Text="{Binding SizeDisplay}" Margin="10,0"
+                <TextBlock Grid.Column="1" Classes="mono file-meta-column" Text="{Binding SizeDisplay}" Margin="10,0"
                            VerticalAlignment="Center" />
-                <TextBlock Grid.Column="2" Classes="mono" Text="{Binding AddedAtDisplay}" Margin="10,0"
+                <TextBlock Grid.Column="2" Classes="mono file-meta-column" Text="{Binding AddedAtDisplay}" Margin="10,0"
                            VerticalAlignment="Center" />
-                <TextBlock Grid.Column="3" Text="{Binding AddedBy}" Margin="10,0" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="3" Classes="file-meta-column" Text="{Binding AddedBy}" Margin="10,0"
+                           VerticalAlignment="Center" />
+                <!-- The same three values, on their own line, for the width where they have no
+                     columns to live in. Default hidden; the container query above shows it. -->
+                <WrapPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6" Classes="file-meta-line"
+                           Orientation="Horizontal" ItemSpacing="12" LineSpacing="2" Margin="0,2,0,0">
+                  <TextBlock Classes="mono" FontSize="11" Text="{Binding SizeDisplay}" />
+                  <TextBlock Classes="mono" FontSize="11" Text="{Binding AddedAtDisplay}" />
+                  <TextBlock Classes="secondary" FontSize="11" Text="{Binding AddedBy}" />
+                </WrapPanel>
                 <!-- ReflectionBinding: OpenFileCommand lives on the parent ItemsControl's
                      DataContext (FilesViewModel), whose static type is object under compiled
                      bindings, so a compiled $parent cast path won't resolve. -->

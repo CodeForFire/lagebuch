@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -40,10 +41,13 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         // Version handshake.
         var version = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute)));
         Assert.Equal("1.2.3", version.Version);
+        Assert.Equal(SyncProtocol.ProtocolVersion, version.Protocol);
+        Assert.Equal(SyncProtocol.MinimumProtocolVersion, version.MinProtocol);
 
         // Initial snapshot reflects the hosted incident.
         var before = await GetSnapshotAsync(http);
@@ -86,6 +90,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var version = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute)));
         Assert.Equal("1.2.3", version.Version);
@@ -108,6 +113,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var entry = session.Incident.AddJournalEntry(
             clock,
@@ -148,6 +154,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var command = new EditJournalEntryCommand(new OperatorDto("Client", null), Guid.NewGuid(), "Text");
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
@@ -174,6 +181,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
         var command = new AddJournalEntryCommand(
             new OperatorDto("Client", null),
             EtbDirection.Internal,
@@ -184,6 +192,35 @@ public class IncidentHostTests
 
         var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Host_refuses_a_close_command_from_a_client_with_403_and_the_incident_stays_open()
+    {
+        // #465: any joined device could permanently close the host's incident. An older client
+        // still sends CloseIncidentCommand, so the host has to refuse it, not just the new UI.
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var command = new CloseIncidentCommand(new OperatorDto("Client", null));
+        var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
+
+        var response = await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(IncidentState.Open, session.Incident.State);
     }
 
     [Theory]
@@ -207,6 +244,7 @@ public class IncidentHostTests
         if (pin is not null)
         {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
+            http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         // The PIN gate refuses the first request with 401 — the documented auth response.
@@ -249,6 +287,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var bytes = new byte[] { 1, 2, 3, 4, 5 };
         var fileId = Guid.NewGuid();
@@ -302,6 +341,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var bytes = new byte[] { 1, 2, 3, 4, 5 };
         var fileId = Guid.NewGuid();
@@ -346,6 +386,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         using var uploadContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
         var response = await http.PutAsync(new Uri(SyncProtocol.FilesPath(Guid.NewGuid()), UriKind.RelativeOrAbsolute), uploadContent);
@@ -375,6 +416,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var fileId = Guid.NewGuid();
         var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", 3);
@@ -411,6 +453,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var fileId = Guid.NewGuid();
         var command = new AddFileCommand(new OperatorDto("Client", "RUF 1"), fileId, "brand.jpg", "image/jpeg", 3);
@@ -456,6 +499,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var response = await http.GetAsync(new Uri(SyncProtocol.FilesPath(Guid.NewGuid()), UriKind.RelativeOrAbsolute));
 
@@ -501,9 +545,182 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var negotiate = await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null);
         negotiate.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Host_still_serves_the_version_endpoint_to_a_peer_it_would_otherwise_refuse()
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: 5);
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, "1");
+
+        // The exemption: a refused peer has to be able to read the range it failed, or it can never
+        // tell the Lagebuchführer which of the two devices to update.
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
+
+        response.EnsureSuccessStatusCode();
+        var version = SyncJson.Deserialize<VersionInfo>(await response.Content.ReadAsStringAsync());
+        Assert.Equal(5, version.MinProtocol);
+    }
+
+    [Theory]
+    [InlineData(SyncProtocol.SnapshotPath)]
+    [InlineData(SyncProtocol.MasterDataPath)]
+    [InlineData(SyncProtocol.CommandPath)]
+    public async Task Host_refuses_every_endpoint_below_its_minimum_protocol(string path)
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: 5);
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, "4");
+
+        var response = await gated.Http.GetAsync(new Uri(path, UriKind.RelativeOrAbsolute));
+
+        Assert.Equal(HttpStatusCode.UpgradeRequired, response.StatusCode);
+        Assert.Contains("aktualisieren", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Host_refuses_the_hub_negotiate_below_its_minimum_protocol()
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: 5);
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, "4");
+
+        var negotiate = await gated.Http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null);
+
+        Assert.Equal(HttpStatusCode.UpgradeRequired, negotiate.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("1.0")]
+    [InlineData("-1")]
+    public async Task Host_refuses_a_protocol_header_it_cannot_read(string claimed)
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: SyncProtocol.MinimumProtocolVersion);
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, claimed);
+
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute));
+
+        Assert.Equal(HttpStatusCode.UpgradeRequired, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Host_refuses_a_duplicated_protocol_header()
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: SyncProtocol.MinimumProtocolVersion);
+
+        // Two values coalesce into one header; refused rather than silently picking one, the same
+        // rule PinMatches applies.
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, "99");
+
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute));
+
+        Assert.Equal(HttpStatusCode.UpgradeRequired, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Host_accepts_a_request_with_no_protocol_header_while_its_floor_includes_the_legacy_protocol()
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: SyncProtocol.LegacyProtocolVersion);
+
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute));
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Host_refuses_a_request_with_no_protocol_header_once_its_floor_is_above_the_legacy_protocol()
+    {
+        // A v0.6.1 client sends no header and cannot speak the Beteiligte commands (protocol 3); it
+        // is gated as the legacy number it is, not waved through for having said nothing.
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: SyncProtocol.MinimumProtocolVersion);
+
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute));
+
+        Assert.Equal(HttpStatusCode.UpgradeRequired, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Host_accepts_a_peer_claiming_a_newer_protocol_than_it_speaks()
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: SyncProtocol.MinimumProtocolVersion);
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, "99");
+
+        // The host's gate is one-sided on purpose. A peer claiming something newer has read /version,
+        // seen this host's ceiling and chosen to speak down to it; refusing it here would 426 a client
+        // its own handshake had just approved, one request after approving it.
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute));
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task A_protocol_mismatch_is_refused_after_the_pin_not_before()
+    {
+        await using var gated = await ProtocolGatedHostAsync(minimumProtocolVersion: 5, pin: "1234");
+        gated.Http.DefaultRequestHeaders.Remove(SyncProtocol.PinHeader);
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "9999");
+        gated.Http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, "1");
+
+        var response = await gated.Http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute));
+
+        // Auth precedes content: a peer that cannot get in never learns which protocols this host speaks.
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // A started host whose protocol floor the test chooses, plus a PIN-carrying client onto it. The
+    // floor is overridable for tests only: at its real value of SyncProtocol.MinimumProtocolVersion
+    // no legitimately-too-old peer can be constructed, which would leave the 426 path shipping
+    // untested until the first release that raises it.
+    private static async Task<ProtocolGatedHost> ProtocolGatedHostAsync(int minimumProtocolVersion, string pin = "1234")
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var host = new IncidentHost(
+            session,
+            clock,
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            pin,
+            null,
+            Math.Max(minimumProtocolVersion, SyncProtocol.ProtocolVersion),
+            minimumProtocolVersion);
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+
+        var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
+        return new ProtocolGatedHost(host, http);
+    }
+
+    // Owns both the Kestrel host and the client dialling it, so one `await using` in each test above
+    // shuts the listener down rather than leaving one per test for the run's duration.
+    private sealed class ProtocolGatedHost : IAsyncDisposable
+    {
+        private readonly IncidentHost _host;
+
+        public ProtocolGatedHost(IncidentHost host, HttpClient http)
+        {
+            _host = host;
+            Http = http;
+        }
+
+        public HttpClient Http { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            Http.Dispose();
+            await _host.DisposeAsync();
+        }
     }
 
     [Fact]
@@ -523,6 +740,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         var response = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
         response.EnsureSuccessStatusCode();
@@ -545,6 +763,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "9999");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         // First wrong PIN: 401 (no backoff yet).
         var first = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
@@ -576,6 +795,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         Assert.Equal(0, await GetRevisionAsync(http));
 
@@ -609,6 +829,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         await PostAsync(http, new AddJournalEntryCommand(
             new OperatorDto("Client", "RUF 1"), EtbDirection.Incoming, "Meldung", null, null));
@@ -635,6 +856,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         // An unknown entry id is a 400 (KeyNotFoundException), so nothing was applied.
         using var content = new StringContent(
@@ -689,6 +911,7 @@ public class IncidentHostTests
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         session.Close();
 

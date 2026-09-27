@@ -22,6 +22,16 @@ FILTER       ?=
 PROJECT      ?=
 VERSION      ?= 0.1.0
 
+# Google Play upload key. Outside the work tree on purpose — signing material is never
+# committed, and $(DOCKER_HOME) is a build cache that gets wiped. See docs/releasing.md.
+KEYSTORE      ?= $(HOME)/.config/lagebuch/lagebuch-upload.p12
+KEYSTORE_PASS ?= $(HOME)/.config/lagebuch/lagebuch-upload.pass
+KEY_ALIAS     ?= lagebuch-upload
+# Derived from VERSION by scripts/android-version-code.sh, which the release workflow uses too.
+# Set it only to override that; Google Play burns a versionCode permanently on first upload, so
+# a number typed by hand is a mistake that cannot be taken back.
+CODE          ?=
+
 ANDROID_HOME ?= $(HOME)/Android/Sdk
 ADB          := $(ANDROID_HOME)/platform-tools/adb
 EMULATOR_BIN := $(ANDROID_HOME)/emulator/emulator
@@ -29,9 +39,17 @@ EMULATOR_BIN := $(ANDROID_HOME)/emulator/emulator
 # this is both the AVD instance name and the device profile to create it
 # with (`android emulator create --list-profiles` shows the full set).
 AVD          ?= medium_tablet
+# The phone profile the layout contract is written against: Medium_Phone_API_35 is 1080px @
+# 420dpi = 411dp, the width CommandBarReachabilityTests and PhoneLayoutTests pin. `make
+# emulator-phone` boots this one instead, because AVD defaults to the tablet and a tablet never
+# shows the phone layout.
+PHONE_AVD    ?= medium_phone
 IMAGE        ?= lagebuch-android-build
 DOCKER_HOME  ?= $(HOME)/.cache/lagebuch-android-build
 APK          := src/LageBuch.App.Android/bin/$(CONFIG)/net10.0-android/$(APP_ID)-Signed.apk
+# `aab` always builds Release, whatever CONFIG says — a debug bundle is not uploadable.
+AAB          := src/LageBuch.App.Android/bin/Release/net10.0-android/$(APP_ID)-Signed.aab
+RELEASE_APK  := src/LageBuch.App.Android/bin/Release/net10.0-android/$(APP_ID)-Signed.apk
 
 # Matches .github/workflows/release.yml's PUBLISH_FLAGS.
 PUBLISH_FLAGS := -c Release --self-contained true -p:PublishSingleFile=true \
@@ -53,8 +71,9 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 .DEFAULT_GOAL := help
 
 .PHONY: help restore build build-all test test-all run format format-check ci clean \
-        android-image android-image-rebuild apk emulator install run-android \
-        logcat uninstall package-linux logo-assets samples screenshots demo-gif
+        android-image android-image-rebuild apk aab emulator install run-android \
+        logcat uninstall package-linux logo-assets samples screenshots demo-gif \
+        play-listing-check play-screenshots phone-screenshots emulator-phone
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -134,6 +153,46 @@ apk: android-image ## Build an installable APK in Docker
 	  -p:AndroidPackageFormat=apk -p:EmbedAssembliesIntoApk=true
 	@echo "APK: $(APK)"
 
+# The release bundle for Google Play. Unlike `apk` this one is signed with the real upload key,
+# so it needs the keystore mounted in — read-only, and as its own mount, because it deliberately
+# lives outside both the work tree and $(DOCKER_HOME). The password is passed as file:, never as
+# a literal: an -p:AndroidSigningStorePass=<secret> would land in the MSBuild binlog and in `ps`,
+# and the env: form is documented as unsupported when the package format is aab.
+#
+# One publish emits both files: the .aab, and the universal .apk that bundletool extracts from
+# that same signed bundle. The .apk is therefore worth installing as a check on the bundle.
+aab: android-image ## Build the signed .aab for Google Play (VERSION=x.y.z)
+	@test -f "$(KEYSTORE)" \
+	  || { echo "No upload keystore at $(KEYSTORE) — see docs/releasing.md, 'Google Play'."; exit 1; }
+	@test -f "$(KEYSTORE_PASS)" \
+	  || { echo "No keystore password file at $(KEYSTORE_PASS) — see docs/releasing.md."; exit 1; }
+	@mkdir -p "$(DOCKER_HOME)"
+	@code="$(CODE)"; \
+	  if [ -z "$$code" ]; then code=$$(scripts/android-version-code.sh "$(VERSION)") || exit 1; fi; \
+	  echo "versionCode $$code   ($(VERSION))"; \
+	  docker run --rm \
+	    -u $$(id -u):$$(id -g) \
+	    -e HOME=/home/build -e DOTNET_CLI_HOME=/home/build \
+	    -e DOTNET_NOLOGO=1 -e DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+	    -v "$(DOCKER_HOME)":/home/build \
+	    -v "$$HOME/.nuget":/home/build/.nuget \
+	    -v "$$PWD":/src \
+	    -v "$(dir $(KEYSTORE))":/keys:ro \
+	    $(IMAGE) \
+	    publish $(ANDROID_PROJ) -c Release -f net10.0-android \
+	    -p:EmbedAssembliesIntoApk=true \
+	    -p:ApplicationVersion=$$code \
+	    -p:ApplicationDisplayVersion=$(VERSION) -p:Version=$(VERSION) \
+	    -p:AndroidSigningKeyStore=/keys/$(notdir $(KEYSTORE)) \
+	    -p:AndroidSigningKeyAlias=$(KEY_ALIAS) \
+	    -p:AndroidSigningStorePass=file:/keys/$(notdir $(KEYSTORE_PASS)) \
+	    -p:AndroidSigningKeyPass=file:/keys/$(notdir $(KEYSTORE_PASS))
+	@echo "AAB: $(AAB)"
+	@echo "APK: $(RELEASE_APK)   (universal, extracted from that bundle)"
+
+emulator-phone: ## Boot the phone emulator (PHONE_AVD=name) — the layout AVD defaults to a tablet
+	$(MAKE) emulator AVD=$(PHONE_AVD)
+
 emulator: ## Boot the emulator (AVD=name) and wait for it
 	@test -x "$(EMULATOR_BIN)" \
 	  || { echo "No emulator at $(EMULATOR_BIN) — set ANDROID_HOME=/path/to/sdk"; exit 1; }
@@ -184,6 +243,24 @@ package-linux: ## Build a local .deb (VERSION=x.y.z)
 	packaging/linux/build-deb.sh "$(VERSION)" publish \
 	  src/LageBuch.App.Shared/Assets/icon-1024.png \
 	  src/LageBuch.App/Assets/icon.svg dist
+
+play-listing-check: ## Check the Play Store listing text against the Console's limits
+	packaging/play/check-listing.sh
+
+# Google Play rejects a store screenshot that is not exactly 16:9 or 9:16, which is why these
+# are not the README's 1920x1032 images reused: those are 1.86:1. Same harness, same fictional
+# Einsatz, 1080 rows instead of 1032.
+play-screenshots: ## Regenerate docs/play/screenshots/*.png at 16:9 for the Play listing
+	RENDER_OUT=$(CURDIR)/docs/play/screenshots RENDER_WIDTH=1920 RENDER_HEIGHT=1080 \
+	  $(DOTNET) test tests/LageBuch.Acceptance.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoFlowRenderTests
+
+# Writes outside docs/ on purpose: these are for a pull request's before/after pair, not for the
+# repository. docs/screenshots is the desktop set the README shows and must stay at 1920x1032.
+phone-screenshots: ## Render the phone layout to out/phone-screenshots (412x915, for a PR)
+	RENDER_OUT=$(CURDIR)/out/phone-screenshots RENDER_WIDTH=412 RENDER_HEIGHT=915 \
+	  $(DOTNET) test tests/LageBuch.Acceptance.Tests -c $(CONFIG) \
+	  --filter FullyQualifiedName~DemoFlowRenderTests
 
 logo-assets: ## Regenerate the logo derivatives from docs/logo/source (needs ImageMagick)
 	packaging/logo/build-logo-assets.sh

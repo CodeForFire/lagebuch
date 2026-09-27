@@ -94,6 +94,15 @@ public interface IIncidentSession
     /// <summary>Stamps/clears a task's completion (#88).</summary>
     void SetTaskCompleted(Guid taskId, bool isDone);
 
+    /// <summary>Records a Beteiligte/n (house owner, vehicle owner, police contact). No ETB line.</summary>
+    void AddInvolvedParty(string name, string? phone, string? notes);
+
+    /// <summary>Corrects a Beteiligte/n in place. No ETB line.</summary>
+    void UpdateInvolvedParty(Guid partyId, string name, string? phone, string? notes);
+
+    /// <summary>Takes a Beteiligte/n back completely. No ETB line.</summary>
+    void RemoveInvolvedParty(Guid partyId);
+
     void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,
@@ -132,6 +141,11 @@ public interface IIncidentSession
     /// </summary>
     void UpsertTimer(string key, DateTimeOffset cycleAnchor, int intervalMinutes, int recurringIntervalMinutes, bool isRunning);
 
+    /// <summary>
+    /// Closes the incident for good. Only the authoritative device may: a joined client
+    /// (<see cref="IsRemote"/>) throws <see cref="InvalidOperationException"/>, and the host refuses
+    /// a peer's close command (#465).
+    /// </summary>
     void Close();
 
     /// <summary>

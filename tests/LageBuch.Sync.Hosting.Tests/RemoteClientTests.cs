@@ -1,6 +1,7 @@
 using LageBuch.AppLogic;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Sync.Hosting.Tests;
 
@@ -29,6 +30,28 @@ public class RemoteClientTests
                     t.GetAwaiter().GetResult();
                 },
                 TaskContinuationOptions.ExecuteSynchronously);
+    }
+
+    [Fact]
+    public async Task Close_on_a_remote_session_throws_and_the_host_incident_stays_open()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0");
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
+            TestHost.DefaultPin,
+            port);
+
+        Assert.Throws<InvalidOperationException>(client.Close);
+        Assert.Equal(IncidentState.Open, hostSession.Incident.State);
+        Assert.False(client.IsReadOnly);
     }
 
     [Fact]
@@ -387,14 +410,106 @@ public class RemoteClientTests
     }
 
     [Fact]
-    public async Task Connect_refuses_a_version_mismatch()
+    public async Task Connect_accepts_a_host_whose_app_version_differs_when_the_protocol_overlaps()
     {
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "2.0.0");
         await using var _ = host;
 
-        await Assert.ThrowsAsync<VersionMismatchException>(() =>
+        // The whole point of the protocol handshake: a fleet whose devices update at different times
+        // — an Android release waits on Play review — still connects as long as the wire contract is
+        // the same. This pair used to be refused purely for disagreeing about a number on the About screen.
+        await using var session = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        Assert.NotNull(session.Incident);
+    }
+
+    [Fact]
+    public async Task Connect_refuses_a_host_that_requires_a_newer_protocol_than_this_device_speaks()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock),
+            clock,
+            "1.0.0",
+            protocolVersion: SyncProtocol.ProtocolVersion + 5,
+            minimumProtocolVersion: SyncProtocol.ProtocolVersion + 5);
+        await using var _ = host;
+
+        var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
             RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port));
+
+        // Names this device as the one to update, not the host.
+        Assert.Contains("Dieses Gerät ist zu alt", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Connect_refuses_a_host_advertising_a_protocol_below_this_devices_floor()
+    {
+        var clock = new FixedClock();
+
+        // -1 rather than the natural MinimumProtocolVersion - 1, which is 0 and therefore the
+        // "pre-negotiation host" sentinel a client is required to read as LegacyProtocolVersion. While
+        // the floor sits at the lowest legal revision the only way to land under it is an
+        // advertisement no honest host would make — which is itself worth refusing, and this branch
+        // becomes the ordinary too-old-host case the moment MinimumProtocolVersion is raised.
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock),
+            clock,
+            "1.0.0",
+            protocolVersion: -1,
+            minimumProtocolVersion: -1);
+        await using var _ = host;
+
+        var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port));
+
+        Assert.Contains("Der Host ist zu alt", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Connect_treats_a_host_without_protocol_fields_as_the_legacy_protocol_and_refuses_it()
+    {
+        var clock = new FixedClock();
+
+        // A v0.6.1 host answers /version with nothing but "version" — no protocol numbers exist yet
+        // in that build. The absent members read as SyncProtocol.LegacyProtocolVersion rather than
+        // as 0, and since protocol 3 (the Beteiligte commands) that is below this build's floor: the
+        // refusal names the host as the device to update.
+        await using var host = await StubHost.StartAsync(
+            HostSession(clock).Incident,
+            masterDataBody: MasterDataJson.Serialize(MasterDataSet.Empty),
+            legacyVersion: true);
+
+        var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "9.9.9", new ImmediateUiDispatcher(), new InMemoryTrustStore(), port: host.Port));
+
+        Assert.Contains("Der Host ist zu alt", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Connect_sends_the_protocol_header_on_every_request_and_on_the_hub_negotiate()
+    {
+        var clock = new FixedClock();
+
+        // A floor above the legacy default means an absent header is refused, so this only passes if
+        // the header reaches *both* header bags. Forgetting the hub's one lets /version, /masterdata
+        // and /snapshot all succeed and fails only at StartAsync — the worst failure shape available,
+        // which is exactly why it is worth a test of its own.
+        var (host, port) = await TestHost.StartAsync(
+            HostSession(clock),
+            clock,
+            "1.0.0",
+            protocolVersion: SyncProtocol.ProtocolVersion,
+            minimumProtocolVersion: SyncProtocol.ProtocolVersion);
+        await using var _ = host;
+
+        await using var session = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+
+        Assert.NotNull(session.Incident);
     }
 
     [Fact]

@@ -63,6 +63,10 @@ public class CommandSerializationTests
         new SetApartmentCountCommand(Op, Guid.NewGuid(), -1, 14),
         new RemoveDwellingsCommand(Op, Guid.NewGuid(), 0, new[] { 2, 4 }),
         new RemoveDwellingsCommand(Op, Guid.NewGuid(), -1, new[] { 7 }),
+        new AddInvolvedPartyCommand(Op, "Erika Beispiel", "0171 0000001", "Hauseigentümerin"),
+        new AddInvolvedPartyCommand(Op, "POK Mustermann", null, null),
+        new UpdateInvolvedPartyCommand(Guid.NewGuid(), "Erika Beispiel", null, "Schlüssel übergeben"),
+        new RemoveInvolvedPartyCommand(Guid.NewGuid()),
     }.Select(c => new object[] { c });
 
     [Theory]
@@ -184,5 +188,27 @@ public class CommandSerializationTests
 
         var command = Assert.IsType<RemoveForceUnitCommand>(SyncJson.Deserialize<SyncCommand>(json));
         Assert.Equal(unitId, command.UnitId);
+    }
+
+    // The Beteiligte discriminators are a wire contract between joined devices: renaming one
+    // silently breaks a peer on the same protocol.
+    [Theory]
+    [InlineData("addInvolvedParty")]
+    [InlineData("updateInvolvedParty")]
+    [InlineData("removeInvolvedParty")]
+    public void Involved_party_commands_use_their_discriminators(string discriminator)
+    {
+        var id = Guid.NewGuid();
+        SyncCommand command = discriminator switch
+        {
+            "addInvolvedParty" => new AddInvolvedPartyCommand(Op, "Erika Beispiel", null, null),
+            "updateInvolvedParty" => new UpdateInvolvedPartyCommand(id, "Erika Beispiel", "110", null),
+            _ => new RemoveInvolvedPartyCommand(id),
+        };
+
+        var json = SyncJson.Serialize(command);
+
+        Assert.Contains($"\"$type\":\"{discriminator}\"", json, StringComparison.Ordinal);
+        Assert.Equal(command.GetType(), SyncJson.Deserialize<SyncCommand>(json).GetType());
     }
 }

@@ -32,6 +32,7 @@ public class ConfigurableRailRenderTests
             new NavEntry(NavModules.Tasks, null, true),
             new NavEntry(NavModules.Forces, null, true),
             new NavEntry(NavModules.Roles, null, false),
+            new NavEntry(NavModules.InvolvedParties, null, false),
             new NavEntry(NavModules.Scba, null, false),
             new NavEntry(NavModules.Co, null, false),
             new NavEntry(NavModules.Files, null, true),
@@ -149,7 +150,7 @@ public class ConfigurableRailRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(
-            new[] { "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE", "ATEMSCHUTZ", "CO-MESSUNG", "DATEIEN", "LINKS" },
+            new[] { "ETB", "AUFGABEN", "FUNKTIONEN", "KRÄFTE", "BETEILIGTE", "ATEMSCHUTZ", "CO-MESSUNG", "DATEIEN", "LINKS" },
             WorkspaceRenderHelper.RailHeaders(window));
     }
 }

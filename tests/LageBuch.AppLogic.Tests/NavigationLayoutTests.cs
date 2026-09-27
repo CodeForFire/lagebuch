@@ -34,10 +34,23 @@ public class NavigationLayoutTests
         Assert.Equal(
             new[]
             {
-                "checklist:Aufbau", "etb", "tasks", "roles", "forces",
+                "checklist:Aufbau", "etb", "tasks", "roles", "forces", "involved",
                 "scba", "co", "files", "links", "checklist:Abbau",
             },
             Keys(specs));
+    }
+
+    [Fact]
+    public void A_layout_saved_before_beteiligte_existed_still_shows_it_at_the_end()
+    {
+        var saved = NavModules.All
+            .Where(k => !string.Equals(k, NavModules.InvolvedParties, StringComparison.Ordinal))
+            .Select(k => Module(k))
+            .ToArray();
+
+        var specs = NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>());
+
+        Assert.Equal(NavModules.InvolvedParties, Keys(specs)[^1]);
     }
 
     [Fact]

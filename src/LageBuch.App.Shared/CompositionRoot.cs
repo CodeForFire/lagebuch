@@ -30,9 +30,9 @@ public static class CompositionRoot
         ITrustStore? trustStore = null,
         IIncidentPdfExporter? pdfExporter = null,
         ILastPdfExportStore? lastPdfExport = null,
-        ILastJoinHostStore? lastJoinHost = null)
+        ILastConnectionStore? lastConnection = null)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastJoinHost: lastJoinHost);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
         return new MainWindowViewModel(home, editor, dialogs, appVersion);
     }

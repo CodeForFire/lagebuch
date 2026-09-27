@@ -102,17 +102,50 @@ public class HeaderLayoutTests
         var window = await ShowSharedUnnamedIncident(width);
         Capture(window, $"header-{width}.png");
 
-        string[] names =
-        [
-            "EinsatznummerValue", "AddIncidentDataButton", "OperatorReadout", "ShareInfoButton", "StatusReadout",
-        ];
+        AssertNoOverlap(window, width, "EinsatznummerValue", "AddIncidentDataButton", "OperatorReadout", "ShareInfoButton", "StatusReadout");
+    }
+
+    // A joined client (#464): "verbunden mit ‹host›" takes the sharing row's place.
+    [AvaloniaTheory]
+    [InlineData(1920)]
+    [InlineData(1340)]
+    [InlineData(1024)]
+    [InlineData(800)]
+    public void No_two_header_elements_overlap_on_a_joined_client(double width)
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Maximilian Mustermann-Beispiel", "FFB 1/12/1"),
+            "/x.fwincident",
+            [("Aufstellort ELW weit genug weg um nicht zu behindern?", true)],
+            [("Fahrzeug abgerüstet und einsatzbereit?", true)]);
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new ManualTicker(),
+            WorkspaceRenderHelper.MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController(),
+            remoteHost: "elw-1.tail1234.ts.net:5859");
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = 900 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, $"header-client-{width}.png");
+
+        AssertNoOverlap(window, width, "EinsatznummerValue", "AddIncidentDataButton", "OperatorReadout", "ConnectedHostReadout", "StatusReadout");
+    }
+
+    private static void AssertNoOverlap(Window window, double width, params string[] names)
+    {
         var rects = names
             .Select(n => (Name: n, Control: window.GetVisualDescendants().OfType<Control>().Single(c => c.Name == n)))
             .Where(x => x.Control.IsEffectivelyVisible)
             .Select(x => (x.Name, Rect: BoundsInWindow(window, x.Control)))
             .ToList();
 
-        // Every one of them is on screen in this scenario (unnamed incident, operator set, shared).
+        // Every one of them is on screen in each scenario (unnamed incident, operator set, shared or joined).
         Assert.Equal(names.Length, rects.Count);
 
         for (var i = 0; i < rects.Count; i++)

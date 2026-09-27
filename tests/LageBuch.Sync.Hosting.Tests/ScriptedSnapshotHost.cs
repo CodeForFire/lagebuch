@@ -91,7 +91,10 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         var host = new ScriptedSnapshotHost(app, port, app.Services.GetRequiredService<IHubContext<IncidentHub>>(), initial);
 
         app.MapHub<IncidentHub>(SyncProtocol.HubPath);
-        app.MapGet(SyncProtocol.VersionPath, () => Results.Json(new VersionInfo(version), SyncJson.Options));
+        app.MapGet(
+            SyncProtocol.VersionPath,
+            () => Results.Json(
+                new VersionInfo(version, SyncProtocol.ProtocolVersion, SyncProtocol.MinimumProtocolVersion), SyncJson.Options));
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(host.Current, SyncJson.Options));
         app.MapGet(SyncProtocol.RevisionPath, () => Results.Json(new RevisionInfo(host.Current.Revision), SyncJson.Options));
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(

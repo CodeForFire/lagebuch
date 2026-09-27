@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          android:versionCode="1" android:versionName="0.1.0"
-          package="de.codeforfire.lagebuch">
+<!-- versionCode, versionName and package are deliberately absent. The .NET Android SDK fills
+     those attributes only when they are missing, so declaring one here silently overrides
+     -p:ApplicationVersion, -p:ApplicationDisplayVersion and $(ApplicationId) from the csproj and
+     the release workflow. That is exactly what happened: every published APK up to and including
+     lagebuch-0.6.0.apk reported versionName 0.1.0 / versionCode 1, whatever its tag said. The
+     csproj is the only source of truth; the tag feeds it through release.yml. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="36" />
     <!-- Required to join a hosted Einsatz. The Android SDK adds INTERNET to Debug builds by
          itself so the debugger can attach, which is why every development device had it and no
@@ -10,6 +14,8 @@
          connection is TLS, so usesCleartextTraffic stays false. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application android:label="Lagebuch" android:icon="@drawable/icon" android:usesCleartextTraffic="false">
+        <!-- Spelled out rather than built from ${applicationId}: AndroidFileDialogService derives
+             the same authority as $"{PackageName}.fileprovider", and the two must agree. -->
         <provider android:name="androidx.core.content.FileProvider"
                   android:authorities="de.codeforfire.lagebuch.fileprovider"
                   android:exported="false"

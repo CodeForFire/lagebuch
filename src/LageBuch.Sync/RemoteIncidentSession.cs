@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -156,7 +157,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// Version-handshakes, fetches the initial snapshot, and opens the push channel. Throws
     /// <see cref="PinRejectedException"/> when the host refuses the share PIN (either a wrong/missing
     /// PIN, i.e. a 401, or a rate-limited one, i.e. a 429 after too many failed attempts),
-    /// <see cref="VersionMismatchException"/> on a version mismatch,
+    /// <see cref="VersionMismatchException"/> when the two devices' wire contracts do not overlap
+    /// (differing app versions on their own are fine — see <see cref="SyncProtocol.ProtocolVersion"/>),
     /// <see cref="CertificateChangedException"/> when the host presents a certificate that differs
     /// from the one previously trusted for that address, and
     /// <see cref="HttpRequestException"/> when the host isn't sharing / is unreachable — including
@@ -164,7 +166,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// </summary>
     /// <param name="host">The host's Tailscale/LAN address to dial.</param>
     /// <param name="op">This device's operator, attributed on every command it sends.</param>
-    /// <param name="localVersion">This device's app version, compared against the host's.</param>
+    /// <param name="localVersion">
+    /// This device's app version. Display only — it names this device in a refusal message and is
+    /// never what the refusal is decided on; that is <see cref="SyncProtocol.ProtocolVersion"/>.
+    /// </param>
     /// <param name="ui">Dispatcher used to marshal SignalR callbacks onto the UI thread.</param>
     /// <param name="trustStore">
     /// Store of trusted TLS thumbprints, keyed by host address, driving Trust-on-First-Use: on first
@@ -261,6 +266,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
         }
 
+        // Announced on every request, not just the handshake, so the host can refuse a contract it no
+        // longer serves at whichever endpoint the client reaches for. Unconditional — unlike the PIN
+        // there is nothing optional about which contract this build speaks. The hub needs the same
+        // header set on its own options bag below: sharing the handler does not share these.
+        http.DefaultRequestHeaders.Add(
+            SyncProtocol.ProtocolHeader,
+            SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
+
         try
         {
             // The PIN gates every endpoint, so the first request already reflects it: a 401 means the
@@ -289,12 +302,37 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 throw new PinRejectedException($"Zu viele Fehlversuche. Bitte {retryAfter:F0}s warten.");
             }
 
+            // A host that refuses this build's contract outright. It cannot happen while /version is
+            // exempt from the host's own protocol gate — which it is, precisely so the payload below
+            // can name the versions — but a future host may stop exempting it, and a bare
+            // HttpRequestException would then reach the user as "Teilt dieses Gerät gerade einen
+            // Einsatz?", which sends them looking in the wrong place entirely.
+            if (versionResponse.StatusCode == HttpStatusCode.UpgradeRequired)
+            {
+                throw VersionMismatchException.ThisDeviceIsTooOld(localVersion, "unbekannt");
+            }
+
             versionResponse.EnsureSuccessStatusCode();
 
-            var hostVersion = SyncJson.Deserialize<VersionInfo>(await versionResponse.Content.ReadAsStringAsync(ct)).Version;
-            if (hostVersion != localVersion)
+            // Compatibility is decided on the wire contract, never on the app version (§7): the two
+            // ends of a volunteer-run fleet are routinely on different releases while speaking an
+            // identical protocol, and an Android update additionally waits on Play review. A host
+            // that predates this handshake sends neither number, so 0 means LegacyProtocolVersion.
+            var hostInfo = SyncJson.Deserialize<VersionInfo>(await versionResponse.Content.ReadAsStringAsync(ct));
+            var hostProtocol = hostInfo.Protocol == 0 ? SyncProtocol.LegacyProtocolVersion : hostInfo.Protocol;
+            var hostMinProtocol = hostInfo.MinProtocol == 0 ? SyncProtocol.LegacyProtocolVersion : hostInfo.MinProtocol;
+
+            // The client is the end that sees both ranges, so it is the end that decides; the host's
+            // own gate is a one-sided backstop against a peer below its floor. The app version goes
+            // into the message so a human is told which of the two devices to update.
+            if (hostMinProtocol > SyncProtocol.ProtocolVersion)
             {
-                throw new VersionMismatchException(localVersion, hostVersion);
+                throw VersionMismatchException.ThisDeviceIsTooOld(localVersion, hostInfo.Version);
+            }
+
+            if (hostProtocol < SyncProtocol.MinimumProtocolVersion)
+            {
+                throw VersionMismatchException.HostIsTooOld(localVersion, hostInfo.Version);
             }
 
             // The host is the Stammdaten master (#183). Pulled on the same HttpClient as everything
@@ -321,6 +359,14 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                     {
                         o.Headers.Add(SyncProtocol.PinHeader, pin);
                     }
+
+                    // A second, independent header bag: HttpMessageHandlerFactory below shares the
+                    // handler, not the HttpClient, so nothing set on DefaultRequestHeaders reaches the
+                    // negotiate and transport requests. Omitting it here would let /version,
+                    // /masterdata and /snapshot all succeed and fail only at StartAsync.
+                    o.Headers.Add(
+                        SyncProtocol.ProtocolHeader,
+                        SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
 
                     o.HttpMessageHandlerFactory = _ => handler;
                 })
@@ -465,6 +511,15 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));
 
+    public void AddInvolvedParty(string name, string? phone, string? notes) =>
+        Send(new AddInvolvedPartyCommand(Op(), name, phone, notes));
+
+    public void UpdateInvolvedParty(Guid partyId, string name, string? phone, string? notes) =>
+        Send(new UpdateInvolvedPartyCommand(partyId, name, phone, notes));
+
+    public void RemoveInvolvedParty(Guid partyId) =>
+        Send(new RemoveInvolvedPartyCommand(partyId));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,
@@ -512,7 +567,10 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     {
     }
 
-    public void Close() => Send(new CloseIncidentCommand(Op()));
+    // Closing the incident is the host's call alone (#465). The workspace hides the button on a
+    // joined client and the host refuses the command with 403 anyway; throwing here keeps a
+    // future caller from firing one off and losing the refusal in the fire-and-forget Send.
+    public void Close() => throw new InvalidOperationException("Nur das Host-Gerät kann den Einsatz abschließen.");
 
     // Unlike every other mutation, this is a real upload — genuinely awaited (per IIncidentSession's
     // doc comment) rather than fire-and-forget, so the caller can show a spinner and catch a

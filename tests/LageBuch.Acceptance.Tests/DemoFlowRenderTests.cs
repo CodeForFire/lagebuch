@@ -80,6 +80,23 @@ public class DemoFlowRenderTests
     private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
         (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
 
+    // The README grid renders at 1920x1032, the shape of the desktop window it documents.
+    // Google Play insists on exactly 16:9 for a store screenshot, so `make play-screenshots`
+    // overrides the height to 1080. Defaults keep `make screenshots` and `make demo-gif`
+    // byte-identical; nothing else reads these.
+    private static double RenderWidth => Size("RENDER_WIDTH", 1920);
+
+    private static double RenderHeight => Size("RENDER_HEIGHT", 1032);
+
+    private static double Size(string variable, double fallback) =>
+        double.TryParse(
+            Environment.GetEnvironmentVariable(variable),
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var value) && value > 0
+            ? value
+            : fallback;
+
     private static void Capture(Window window, string name)
     {
         var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
@@ -109,7 +126,7 @@ public class DemoFlowRenderTests
             new NoopAlarmService(),
             new NoopIncidentHostController(),
             "0.5.0");
-        var window = new Window { Content = new HomeView { DataContext = vm }, Width = 1920, Height = 1032 };
+        var window = new Window { Content = new HomeView { DataContext = vm }, Width = RenderWidth, Height = RenderHeight };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -123,7 +140,7 @@ public class DemoFlowRenderTests
     {
         var vm = new MasterDataEditorViewModel(new DemoMasterData(), new FakeDialogs(), new NoFiles());
         vm.SelectedSection = vm.Sections.Single(s => s.Title == "Fahrzeuge");
-        var window = new Window { Content = new MasterDataEditorView { DataContext = vm }, Width = 1920, Height = 1032 };
+        var window = new Window { Content = new MasterDataEditorView { DataContext = vm }, Width = RenderWidth, Height = RenderHeight };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -157,7 +174,7 @@ public class DemoFlowRenderTests
             new FakeDialogs(),
             new NoopAlarmService(),
             new NoopIncidentHostController());
-        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = RenderWidth, Height = RenderHeight };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 

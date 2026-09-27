@@ -9,11 +9,11 @@ public class PdfExportOptionsViewModelTests
         new(onExport ?? (_ => Task.CompletedTask));
 
     [Fact]
-    public void All_eight_sections_are_selected_by_default()
+    public void All_nine_sections_are_selected_by_default()
     {
         var vm = NewVm();
 
-        Assert.Equal(8, vm.Items.Count);
+        Assert.Equal(9, vm.Items.Count);
         Assert.All(vm.Items, i => Assert.True(i.IsSelected));
     }
 

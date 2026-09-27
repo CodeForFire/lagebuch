@@ -289,6 +289,33 @@ public class SnapshotRoundTripTests
         Assert.Empty(dwelling.Readings);
         Assert.Equal(45, dwelling.CoValue);
     }
+
+    [Fact]
+    public void Involved_parties_round_trip_through_the_snapshot_over_the_wire()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Muster", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        incident.AddInvolvedParty(clock, op, "Erika Beispiel", "0171 0000001", "Hauseigentümerin");
+        incident.AddInvolvedParty(clock, op, "POK Mustermann", null, null);
+
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(incident.InvolvedParties, restored.InvolvedParties);
+    }
+
+    [Fact]
+    public void A_snapshot_without_involved_parties_reads_as_none()
+    {
+        var clock = new FixedClock();
+        var incident = Incident.Start(clock, new SessionOperator("Muster"));
+        var snapshot = SnapshotMapper.ToSnapshot(incident) with { InvolvedParties = null };
+
+        var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(snapshot)));
+
+        Assert.Empty(restored.InvolvedParties);
+    }
 }
 
 internal sealed class FixedClock : IClock

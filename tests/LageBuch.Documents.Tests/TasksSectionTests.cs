@@ -59,6 +59,10 @@ public class TasksSectionTests
         incident.AddTask(clock, op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
         incident.SetTaskCompleted(incident.Tasks[0].Id, true, clock, op);
 
+        // Closed, so the footer's Zwischenstand line (which prints the export time) stays out of
+        // the comparison -- only the task's overdue marking may depend on asOf here.
+        incident.Close(clock, op);
+
         var shortlyAfter = IncidentPdf.Generate(incident, Started.AddMinutes(10), new Dictionary<Guid, byte[]>());
         var daysLater = IncidentPdf.Generate(incident, Started.AddDays(3), new Dictionary<Guid, byte[]>());
 

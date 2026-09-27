@@ -3,8 +3,13 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              x:Class="LageBuch.App.Shared.Views.AboutView"
              x:DataType="vm:AboutViewModel">
-  <Border Background="#B3070A10" Padding="40" Focusable="True" KeyDown="OnKeyDown">
-    <Border Width="420" VerticalAlignment="Center" HorizontalAlignment="Center"
+  <!-- MaxWidth, not Width, and Stretch rather than Center: a hard Width clips on a phone
+       instead of shrinking — the card wanted its Width plus 80px of scrim against a 412dp
+       screen. Avalonia centres a Stretch element that MaxWidth has made narrower than its
+       slot, so a wide window looks exactly as it did. The scrim inset drops 40 -> 16 for the
+       same reason; on a desktop the card never comes near either. -->
+  <Border Background="#B3070A10" Padding="16" Focusable="True" KeyDown="OnKeyDown">
+    <Border MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Stretch"
             Background="{StaticResource SurfaceRaisedBrush}"
             BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusLg}"

@@ -318,6 +318,104 @@ public class HomeViewModelTests
 
         Assert.Equal(1, store.LoadCount);
     }
+
+    private static HomeViewModel HomeWithLastConnection(LastConnection? last, FakeLastConnectionStore? store = null) =>
+        new(
+            new FakeStore(),
+            new FakeMasterData(),
+            new FakeRecent(),
+            new FakeDialogs(),
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0",
+            lastConnection: store ?? new FakeLastConnectionStore { Saved = last });
+
+    [Fact]
+    public void Home_shows_the_last_connection_with_its_stichwort_and_time()
+    {
+        var vm = HomeWithLastConnection(new LastConnection("elw-1", "B3 Wohnung", T0));
+
+        Assert.True(vm.HasLastConnection);
+        Assert.Equal("elw-1", vm.LastConnection?.Host);
+        Assert.Equal("B3 Wohnung · 22.06.2026 09:00", vm.LastConnectionDetail);
+    }
+
+    [Fact]
+    public void Home_leaves_the_stichwort_out_while_the_host_has_none()
+    {
+        var vm = HomeWithLastConnection(new LastConnection("elw-1", null, T0));
+
+        Assert.Equal("22.06.2026 09:00", vm.LastConnectionDetail);
+    }
+
+    [Fact]
+    public void Home_shows_no_last_connection_when_this_device_never_joined()
+    {
+        var vm = HomeWithLastConnection(null);
+
+        Assert.False(vm.HasLastConnection);
+        Assert.Null(vm.LastConnectionDetail);
+    }
+
+    [Fact]
+    public void Neu_verbinden_asks_the_shell_to_open_the_join_dialog()
+    {
+        var vm = HomeWithLastConnection(new LastConnection("elw-1", null, T0));
+        var requested = false;
+        vm.ReconnectRequested = () => requested = true;
+
+        vm.ReconnectCommand.Execute(null);
+
+        Assert.True(requested);
+    }
+
+    [Fact]
+    public void Forgetting_the_last_connection_hides_the_card_and_clears_the_store()
+    {
+        var store = new FakeLastConnectionStore { Saved = new LastConnection("elw-1", null, T0, "5393") };
+        var vm = HomeWithLastConnection(null, store);
+
+        vm.ForgetLastConnectionCommand.Execute(null);
+
+        Assert.False(vm.HasLastConnection);
+        Assert.Null(store.Saved);
+        Assert.Null(vm.LastConnectionError);
+    }
+
+    [Fact]
+    public void A_connection_that_cannot_be_deleted_stays_on_the_card_with_the_reason()
+    {
+        var store = new FakeLastConnectionStore { Saved = new LastConnection("elw-1", null, T0, "5393"), FailClear = true };
+        var vm = HomeWithLastConnection(null, store);
+
+        vm.ForgetLastConnectionCommand.Execute(null);
+
+        Assert.True(vm.HasLastConnection);
+        Assert.Equal("Nicht gelöscht: Zugriff verweigert.", vm.LastConnectionError);
+    }
+}
+
+internal sealed class FakeLastConnectionStore : ILastConnectionStore
+{
+    public LastConnection? Saved { get; set; }
+
+    public bool FailClear { get; init; }
+
+    public LastConnection? GetLast() => Saved;
+
+    public void SetLast(LastConnection connection) => Saved = connection;
+
+    public void Clear()
+    {
+        if (FailClear)
+        {
+            throw new UnauthorizedAccessException("Zugriff verweigert.");
+        }
+
+        Saved = null;
+    }
 }
 
 internal sealed class FakeMasterData : IMasterDataProvider

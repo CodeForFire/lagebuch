@@ -241,7 +241,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
     private static string Clock(TimeSpan span) => $"{(int)span.TotalMinutes:00}:{span.Seconds:00}";
 }
 
-public sealed partial class ScbaViewModel : ObservableObject, IDisposable
+public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -499,6 +499,18 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
     public bool IsAnyControlDue => MostUrgentActive?.IsControlDue ?? false;
 
+    /// <summary>
+    /// A Trupp is under air and its next Druckabfrage is still ahead: the header shows it as a
+    /// quiet readout. Once it falls due it leaves the readout for a full row instead.
+    /// </summary>
+    public bool IsControlCountingDown => HasControlReminder && !IsAnyControlDue;
+
+    /// <summary>The Trupp the quiet readout names, Funkrufname first (#417); "—" when none.</summary>
+    public string NextControlName => MostUrgentActive?.DisplayNameWithCallSign ?? "—";
+
+    /// <summary>Time left until that Trupp's Druckabfrage, for the readout's monospace value.</summary>
+    public string NextControlRemaining => MostUrgentActive?.ControlRemainingDisplay ?? "—";
+
     public string NextControlDisplay
     {
         get
@@ -568,7 +580,8 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
                 return "—";
             }
 
-            var first = $"RÜCKZUGSALARM {trupps[0].DisplayNameWithCallSign}: {AlarmReason(trupps[0])}";
+            // The row's tile already says RÜCKZUGSALARM, so the text starts with the crew.
+            var first = $"{trupps[0].DisplayNameWithCallSign}: {AlarmReason(trupps[0])}";
             return trupps.Count == 1 ? first : $"{first}  (+{trupps.Count - 1})";
         }
     }
@@ -658,6 +671,37 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
     /// number is checked without a message: it is assigned internally and never user-edited
     /// (#217), so there is no field for an operator to correct.
     /// </summary>
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the narrow layout's Bereitstellen form is open. Eight fields is more than a phone
+    /// screen holds alongside the Trupps already under air, and those are what must stay in sight.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isComposerOpen;
+
+    /// <summary>Whether the dock is on screen: always when wide, only while composing on a phone.</summary>
+    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+
+    /// <summary>The phone's "announce a Trupp" affordance, shown exactly when the dock is not.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+
+    [RelayCommand(CanExecute = nameof(CanAddTrupp))]
+    private void OpenComposer() => IsComposerOpen = true;
+
+    [RelayCommand]
+    private void CloseComposer()
+    {
+        IsComposerOpen = false;
+        ShowErrors(false); // a dismissed form must not reopen still complaining
+    }
+
     private bool Validate()
     {
         ShowErrors(true);
@@ -729,6 +773,10 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
 
         NewTruppNumber = _session.Incident.NextFreeScbaTruppNumber(); // sets up the *next* Trupp's number
         ShowErrors(false); // the cleared form must not read as a fresh complaint
+
+        // Reached only once a Trupp is actually bereitgestellt, so this is where the phone's form
+        // closes and hands the screen back to the Trupps under air.
+        IsComposerOpen = false;
         ApplyDefaultMaxDuration(); // empty designation => AGT default; also re-derives the interval
         RefreshHeader();
         _onChanged();
@@ -1010,6 +1058,9 @@ public sealed partial class ScbaViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasControlReminder));
         OnPropertyChanged(nameof(IsAnyControlDue));
         OnPropertyChanged(nameof(NextControlDisplay));
+        OnPropertyChanged(nameof(IsControlCountingDown));
+        OnPropertyChanged(nameof(NextControlName));
+        OnPropertyChanged(nameof(NextControlRemaining));
     }
 
     private void OnTick()

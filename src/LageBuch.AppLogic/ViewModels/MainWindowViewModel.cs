@@ -32,6 +32,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _dialogs = dialogs;
         _appVersion = appVersion;
         _home.WorkspaceOpened = ShowWorkspace;
+        _home.ReconnectRequested = () => RequestJoinDeviceCommand.Execute(null);
         _currentView = home;
     }
 
@@ -50,6 +51,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private object? _currentView;
+
+    /// <summary>
+    /// Whether the shell is laid out for a phone. The command bar is a single fixed row of six
+    /// actions, which overflows a 411dp viewport by 227px and puts NEUER EINSATZ off the right edge
+    /// (CommandBarReachabilityTests); below the breakpoint it keeps one action and folds the rest
+    /// into an overflow flyout. The shell's code-behind sets this from the actual width — the
+    /// workspace has its own copy, because the two are separate view models.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isNarrow;
 
     // #304 P0 finding: every navigate-away path funnels through this setter, so disposing the
     // outgoing workspace here (rather than duplicating a Dispose() call at each call site) is what
@@ -145,7 +156,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             // The host address rarely changes once set up (a station's ELW, a fixed Tailscale
             // node) -- prefill last time's so the operator doesn't retype it every join.
-            Host = _home.LastJoinHost ?? string.Empty,
+            Host = _home.LastConnection?.Host ?? string.Empty,
+
+            // The PIN too, valid for as long as the host keeps sharing: reconnecting mid-Einsatz
+            // must not mean asking around for it. A stale one is rejected once and then cleared.
+            Pin = _home.LastConnection?.Pin ?? string.Empty,
         };
     });
 

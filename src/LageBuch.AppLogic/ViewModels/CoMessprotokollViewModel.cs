@@ -492,7 +492,7 @@ public sealed partial class FloorRowViewModel : ObservableObject
     }
 }
 
-public sealed partial class CoMessprotokollViewModel : ObservableObject, IDisposable
+public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrowAware, IDisposable
 {
     /// <summary>Pixel width of the summary progress track (see SearchedBarWidth).</summary>
     private const double ProgressTrackWidth = 420;
@@ -532,9 +532,23 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
     /// holds has reached the session yet (#242).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEditorOpen))]
+    [NotifyPropertyChangedFor(nameof(ShowMatrix))]
     private DwellingEditorViewModel? _editor;
 
     public bool IsEditorOpen => Editor is not null;
+
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMatrix))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the building matrix is on screen. The Wohnung editor is a 320px pane docked beside
+    /// it, which at 412dp leaves ~91px for a matrix whose floor gutter alone used to be 104 — so
+    /// on a phone the editor takes the screen while it is open and the matrix comes back when it
+    /// closes. On a wide window both are visible at once, as before.
+    /// </summary>
+    public bool ShowMatrix => HasBuildings && !(IsNarrow && IsEditorOpen);
 
     /// <summary>The open "which Wohnungen go?" question, or null when none is pending (#419).
     /// Like <see cref="Editor"/>, nothing it holds has reached the session.</summary>
@@ -655,6 +669,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, IDispos
         BuildMatrix();
         OnPropertyChanged(nameof(IsReadOnly));
         OnPropertyChanged(nameof(HasBuildings));
+        OnPropertyChanged(nameof(ShowMatrix));
         OnPropertyChanged(nameof(CanModify));
     }
 

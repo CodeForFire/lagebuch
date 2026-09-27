@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -12,10 +14,16 @@ namespace LageBuch.AppLogic.ViewModels;
 
 public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisposable
 {
+    /// <summary>
+    /// How many rail entries the narrow layout's bottom bar shows before the rest go behind MEHR.
+    /// Five cells across a 412dp phone leave ~82dp each, which fits an icon over a short label.
+    /// </summary>
+    private const int PhoneNavSlots = 4;
+
     private readonly IIncidentSession _session;
 
-    // The concrete local session, or null on a joined client. Guards the two capabilities that only
-    // exist on the device that owns the .fwincident file: PDF export and resuming a read-only file.
+    // The concrete local session, or null on a joined client. Guards what only exists on the device
+    // that owns the .fwincident file: resuming a read-only file, and exporting straight from its disk.
     private readonly LocalIncidentSession? _local;
     private readonly IClock _clock;
     private readonly ITicker _ticker;
@@ -34,6 +42,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly IIncidentStore? _store;
     private readonly IUiDispatcher _uiDispatcher;
 
+    // The address a joined client dialled, as typed; null on a local incident. The session itself
+    // does not keep it.
+    private readonly string? _remoteHost;
+
     // The checklist view models currently in the rail. Held separately from NavItems because each
     // one owns a session.Changed subscription that has to be released on rebuild.
     private readonly List<ChecklistViewModel> _checklists = new();
@@ -49,13 +61,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Tasks] = "AUFGABEN",
             [NavModules.Roles] = "FUNKTIONEN",
             [NavModules.Forces] = "KRÄFTE",
+            [NavModules.InvolvedParties] = "BETEILIGTE",
             [NavModules.Scba] = "ATEMSCHUTZ",
             [NavModules.Co] = "CO-MESSUNG",
             [NavModules.Files] = "DATEIEN",
             [NavModules.Links] = "LINKS",
         };
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -70,6 +83,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _lastPdfExportStore = lastPdfExport;
         _store = store;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
+        _remoteHost = remoteHost;
         IsReadOnly = session.IsReadOnly;
 
         // SaveFailed/SaveSucceeded fire on the store's background writer thread -- marshal onto
@@ -250,6 +264,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     // "Straße, Ortsteil" -- the same join the PDF header prints, so the two never disagree.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowAddressLine))]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLineInHeader))]
     [NotifyPropertyChangedFor(nameof(HasIncidentData))]
     private string? _addressDisplay;
 
@@ -269,6 +284,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public bool ShowEinsatznummerChip => HasEinsatznummer && !IsEinsatznummerShownAsHero;
 
     public bool ShowAddressLine => !string.IsNullOrWhiteSpace(AddressDisplay);
+
+    /// <summary>
+    /// Whether the header itself shows the address. Separate from <see cref="ShowAddressLine"/>,
+    /// which says whether there <em>is</em> one and feeds <see cref="HasIncidentData"/>: folding
+    /// the phone into that would take the edit pencil away from an Einsatz that only has an
+    /// address. At 412dp the address is what pushes the Einsatznummer chip off the line, and it is
+    /// the one part of the identity already a tap away behind that pencil.
+    /// </summary>
+    public bool ShowAddressLineInHeader => ShowAddressLine && !IsNarrow;
 
     // Drives which affordance the header shows: a quiet pencil once anything is known, an explicit
     // "+ Einsatzdaten ergänzen" while nothing is -- so an incident started without any head data
@@ -328,11 +352,132 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private WorkspaceNavItemViewModel? _selectedNavItem;
 
+    /// <summary>
+    /// The rail entries the narrow bottom bar shows directly, and the ones behind its MEHR button.
+    /// The split is by position, because the order is the Kommandant's own: Stammdaten's
+    /// Navigation list is what decides which modules are one tap away on a phone.
+    /// </summary>
+    /// <remarks>
+    /// Atemschutz falls into the overflow under the shipped order. That is survivable rather than
+    /// an oversight: a Rückzugsalarm is a lit header bar that jumps straight to the tab (#422), and
+    /// <see cref="OverflowHasStatusDot"/> carries the quieter states out to the MEHR button.
+    /// </remarks>
+    public ObservableCollection<WorkspaceNavItemViewModel> PrimaryNavItems { get; } = new();
+
+    /// <inheritdoc cref="PrimaryNavItems" />
+    public ObservableCollection<WorkspaceNavItemViewModel> OverflowNavItems { get; } = new();
+
+    /// <summary>Whether MEHR has anything behind it — false on a rail of four or fewer.</summary>
+    [ObservableProperty]
+    private bool _hasOverflowNavItems;
+
+    /// <summary>
+    /// A Checkliste behind MEHR still has to report. Without this its dot would be invisible until
+    /// the operator opened the overflow, which is the one moment it is no longer news.
+    /// </summary>
+    [ObservableProperty]
+    private bool _overflowHasStatusDot;
+
+    /// <summary>
+    /// Whether the workspace is laid out for a phone. Set by the shell from the actual width; the
+    /// container queries in the views handle everything that is purely presentational, and this
+    /// carries only the decisions a style setter cannot make — chiefly that an add-entry dock is a
+    /// sheet that starts closed rather than a strip that is always there.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAddressLineInHeader))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Hands the flag down to every module that lays out differently on a phone. Called again on
+    /// each rebuild, because <see cref="BuildNavItems"/> replaces the module view models wholesale
+    /// and a fresh one would otherwise come up in the desktop layout on a phone.
+    /// </summary>
+    partial void OnIsNarrowChanged(bool value) => PushNarrowToModules(value);
+
+    private void PushNarrowToModules(bool value)
+    {
+        foreach (var module in NarrowAwareModules())
+        {
+            module.IsNarrow = value;
+        }
+    }
+
+    private IEnumerable<INarrowAware> NarrowAwareModules()
+    {
+        // Every module the workspace owns, not only the ones that implement INarrowAware today:
+        // OfType does the filtering, and a module that gains the interface later is picked up
+        // without anyone having to remember this list. Null while the workspace is between
+        // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
+        // also drops.
+        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links];
+        return modules.OfType<INarrowAware>();
+    }
+
+    /// <summary>Opens a rail entry from the narrow bottom bar or its MEHR flyout.</summary>
+    [RelayCommand]
+    private void SelectNavItem(WorkspaceNavItemViewModel? item)
+    {
+        if (item is not null)
+        {
+            SelectedNavItem = item;
+        }
+    }
+
+    partial void OnSelectedNavItemChanged(WorkspaceNavItemViewModel? value)
+    {
+        foreach (var item in NavItems)
+        {
+            item.IsSelected = ReferenceEquals(item, value);
+        }
+    }
+
+    private void RebuildNavSplit()
+    {
+        foreach (var item in OverflowNavItems)
+        {
+            item.PropertyChanged -= OnOverflowNavItemChanged;
+        }
+
+        PrimaryNavItems.Clear();
+        OverflowNavItems.Clear();
+
+        for (var i = 0; i < NavItems.Count; i++)
+        {
+            if (i < PhoneNavSlots)
+            {
+                PrimaryNavItems.Add(NavItems[i]);
+                continue;
+            }
+
+            OverflowNavItems.Add(NavItems[i]);
+            NavItems[i].PropertyChanged += OnOverflowNavItemChanged;
+        }
+
+        HasOverflowNavItems = OverflowNavItems.Count > 0;
+        UpdateOverflowStatusDot();
+    }
+
+    private void OnOverflowNavItemChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is null
+            or nameof(WorkspaceNavItemViewModel.IsComplete)
+            or nameof(WorkspaceNavItemViewModel.IsIncomplete))
+        {
+            UpdateOverflowStatusDot();
+        }
+    }
+
+    private void UpdateOverflowStatusDot() =>
+        OverflowHasStatusDot = OverflowNavItems.Any(item => item.IsComplete || item.IsIncomplete);
+
     public EtbViewModel Etb { get; private set; } = null!;
 
     public RolesViewModel Roles { get; private set; } = null!;
 
     public ForcesViewModel Forces { get; private set; } = null!;
+
+    public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
 
     public ScbaViewModel Scba { get; private set; } = null!;
 
@@ -352,12 +497,36 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public bool HasReminder => Reminder is not null;
 
+    /// <summary>
+    /// Whether the header's quiet strip has anything to show: the ILS countdown or the next
+    /// Druckabfrage, still running and not yet due. Each leaves the strip for a row of its own
+    /// when it falls due, and the strip goes with the last of them.
+    /// </summary>
+    public bool ShowsCountdownStrip =>
+        (Reminder?.IsCountingDown ?? false) || (Scba?.IsControlCountingDown ?? false);
+
+    private void OnCountdownChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ReminderViewModel.IsCountingDown)
+            or nameof(ScbaViewModel.IsControlCountingDown))
+        {
+            OnPropertyChanged(nameof(ShowsCountdownStrip));
+        }
+    }
+
     // ===== Joined-client connection state (#52 §7). Always "connected" locally; on a remote session
     // it tracks the SignalR link so the view can grey out input while reconnecting. =====
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsInputEnabled))]
+    [NotifyPropertyChangedFor(nameof(ShowConnectedHost))]
     [NotifyCanExecuteChangedFor(nameof(ChangeOperatorCommand))]
     private bool _isConnected = true;
+
+    /// <summary>"verbunden mit ‹host›" in a joined client's header (#464); null on a local incident.</summary>
+    public string? ConnectedHostText => _remoteHost is null ? null : $"verbunden mit {_remoteHost}";
+
+    /// <summary>Hidden while reconnecting: the "Verbindung getrennt" banner speaks then.</summary>
+    public bool ShowConnectedHost => _remoteHost is not null && IsConnected;
 
     /// <summary>Modules are interactive only while connected — a reconnecting client can't send commands.</summary>
     public bool IsInputEnabled => IsConnected;
@@ -526,6 +695,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         NavItems.Clear();
 
+        // The split holds the same instances and, for the overflow, a subscription on each.
+        foreach (var item in OverflowNavItems)
+        {
+            item.PropertyChanged -= OnOverflowNavItemChanged;
+        }
+
+        PrimaryNavItems.Clear();
+        OverflowNavItems.Clear();
+        HasOverflowNavItems = false;
+        OverflowHasStatusDot = false;
+
         foreach (var checklist in _checklists)
         {
             checklist.Dispose();
@@ -540,18 +720,31 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Etb?.Dispose();
         Roles?.Dispose();
         Forces?.Dispose();
+        InvolvedParties?.Dispose();
         if (Scba is not null)
         {
             // Not covered by Dispose: the workspace owns this subscription, and an outgoing
             // Atemschutz view model must not go on steering the rail of the workspace that
             // replaced it.
             Scba.RevealRequested -= OnScbaRevealRequested;
+            Scba.PropertyChanged -= OnCountdownChanged;
         }
 
         Scba?.Dispose();
         Files?.Dispose();
         CoMessprotokoll?.Dispose();
+        if (Tasks is not null)
+        {
+            // Same reason as Atemschutz above (#460).
+            Tasks.RevealRequested -= OnTasksRevealRequested;
+        }
+
         Tasks?.Dispose();
+        if (Reminder is not null)
+        {
+            Reminder.PropertyChanged -= OnCountdownChanged;
+        }
+
         Reminder?.Dispose();
     }
 
@@ -570,8 +763,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Forces = new ForcesViewModel(_session, _clock, _masterData, OnChanged, RequestConfirm);
 
+        InvolvedParties = new InvolvedPartiesViewModel(_session, OnChanged, RequestConfirm);
+
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
+        Scba.PropertyChanged += OnCountdownChanged;
 
         Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
@@ -580,6 +776,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
 
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
+        Tasks.RevealRequested += OnTasksRevealRequested;
 
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.
@@ -594,11 +791,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 _masterData.Settings.IlsReminderIntervalMinutes,
                 _masterData.Settings.IlsReminderFollowUpIntervalMinutes);
 
+        if (Reminder is not null)
+        {
+            Reminder.PropertyChanged += OnCountdownChanged;
+        }
+
         BuildNavItems();
 
         OnPropertyChanged(nameof(Etb));
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
+        OnPropertyChanged(nameof(InvolvedParties));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
@@ -606,6 +809,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Tasks));
         OnPropertyChanged(nameof(Reminder));
         OnPropertyChanged(nameof(HasReminder));
+        OnPropertyChanged(nameof(ShowsCountdownStrip));
     }
 
     /// <summary>
@@ -624,6 +828,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Tasks] = Tasks,
             [NavModules.Roles] = Roles,
             [NavModules.Forces] = Forces,
+            [NavModules.InvolvedParties] = InvolvedParties,
             [NavModules.Scba] = Scba,
             [NavModules.Co] = CoMessprotokoll,
             [NavModules.Files] = Files,
@@ -643,9 +848,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
             if (modules.TryGetValue(spec.ModuleKey, out var content))
             {
-                NavItems.Add(new WorkspaceNavItemViewModel(ModuleHeaders[spec.ModuleKey], content));
+                NavItems.Add(new WorkspaceNavItemViewModel(
+                    ModuleHeaders[spec.ModuleKey], content, moduleKey: spec.ModuleKey));
             }
         }
+
+        RebuildNavSplit();
+
+        // The modules above are freshly constructed, so they start in the desktop layout.
+        PushNarrowToModules(IsNarrow);
     }
 
     /// <summary>
@@ -659,9 +870,17 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// while the header bars, driven by the view model rather than the rail, still appear; then
     /// there is no tab to open and the selected Trupp is all this leaves behind.
     /// </remarks>
-    private void OnScbaRevealRequested(object? sender, EventArgs e)
+    private void OnScbaRevealRequested(object? sender, EventArgs e) => ShowModule(Scba);
+
+    /// <summary>
+    /// The Aufgabe-fällig bar asked for a task (#460): bring the Aufgaben tab forward, exactly as
+    /// <see cref="OnScbaRevealRequested"/> does for Atemschutz.
+    /// </summary>
+    private void OnTasksRevealRequested(object? sender, EventArgs e) => ShowModule(Tasks);
+
+    private void ShowModule(object module)
     {
-        if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, Scba)) is { } navItem)
+        if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, module)) is { } navItem)
         {
             SelectedNavItem = navItem;
         }
@@ -679,7 +898,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         PendingConfirm = dialog;
     }
 
-    private bool CanClose => !IsReadOnly;
+    /// <summary>
+    /// True on a joined client. Closing the incident is the host's call alone (#465), so the
+    /// EINSATZ ABSCHLIESSEN button is hidden here — and the host refuses a client's close anyway.
+    /// </summary>
+    public bool IsClient => _session.IsRemote;
+
+    private bool CanClose => !IsReadOnly && !IsClient;
 
     // Closing is permanent (the incident becomes read-only), so confirm first. If a Trupp is
     // still under air, call that out — closing mid-Atemschutz is a serious mistake.
@@ -757,11 +982,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public void CancelPendingPrompt() => PendingPrompt = null;
 
-    // PDF export renders from the local .fwincident, so it belongs to the host that owns the file;
-    // a joined client (_local is null) hides the button and lets the host export instead. It also
-    // needs a platform that can actually render one -- QuestPDF doesn't support Android
-    // (QuestPDF/QuestPDF#1432), so that head supplies NoopIncidentPdfExporter and hides the button too.
-    public bool CanExport => _local is not null && _pdfExporter.CanExport;
+    // The host renders from its own .fwincident; a joined client renders the synced state with
+    // attachments from its cache (#465, SessionPdfExport). Either way it needs a platform that can
+    // actually render one -- QuestPDF doesn't support Android (QuestPDF/QuestPDF#1432), so that head
+    // supplies NoopIncidentPdfExporter and hides the button.
+    public bool CanExport => _pdfExporter.CanExport;
 
     // The one-line export outcome: a fresh success/failure message, or (before any export this
     // session) seeded from ILastPdfExportStore in the constructor. Shows only the file name --
@@ -800,10 +1025,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Justification = "Export can fail in several ways (disk full, exporter throwing, etc.); surfaces in the status line.")]
     private async Task RunExportAsync(IncidentPdfSections sections)
     {
-        // Reuse the incident's own name -- its .fwincident file's base name (date+time+Stichwort,
-        // see HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually
-        // still unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf".
-        var suggested = Path.GetFileNameWithoutExtension(_local!.Path) + ".pdf";
+        // Reuse the incident's own name -- its .fwincident file's base name (date+time, see
+        // HomeViewModel.NewIncidentAsync) -- rather than the Einsatznummer, which is usually still
+        // unknown at export time (#69) and previously fell back to the literal "Einsatz.pdf". A
+        // joined client has no file, so it names the PDF the same way from the incident's start.
+        var baseName = _local is not null
+            ? Path.GetFileNameWithoutExtension(_local.Path)
+            : _session.Incident.StartedAt.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+        var suggested = baseName + ".pdf";
         var path = await _dialogs.PickExportPdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -812,10 +1041,22 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         try
         {
-            var bytes = await _local!.ExportPdfAsync(_pdfExporter, sections);
+            byte[] bytes;
+            var missing = 0;
+            if (_local is not null)
+            {
+                bytes = await _local.ExportPdfAsync(_pdfExporter, sections);
+            }
+            else
+            {
+                (bytes, missing) = await SessionPdfExport.ExportAsync(_session, _pdfExporter, _clock, sections);
+            }
+
             await File.WriteAllBytesAsync(path, bytes);
             await _dialogs.ShareFileAsync(path, "application/pdf");
-            ExportStatus = $"PDF exportiert: {Path.GetFileName(path)}";
+            ExportStatus = missing == 0
+                ? $"PDF exportiert: {Path.GetFileName(path)}"
+                : $"PDF exportiert: {Path.GetFileName(path)} ({missing} {(missing == 1 ? "Anhang" : "Anhänge")} nicht verfügbar)";
             ExportStatusDetail = path;
             _lastPdfExportStore?.SetLastExport(path, _clock.Now);
         }

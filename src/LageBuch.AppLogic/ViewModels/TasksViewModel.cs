@@ -16,7 +16,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// counts, and because the input dock's state lives here rather than on rows, a rebuild never
 /// eats half-finished input. The ticker drives the countdown displays and the one-shot due alarm.
 /// </summary>
-public sealed partial class TasksViewModel : ObservableObject, IDisposable
+public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -197,6 +197,37 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
     // press instead, because a grey button names nothing (#412).
     private bool CanAddTask => !IsReadOnly;
 
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the narrow layout's add-task form is open. Five fields across ~810px; a phone
+    /// stacks them and only while a task is actually being written.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isComposerOpen;
+
+    /// <summary>Whether the dock is on screen: always when wide, only while composing on a phone.</summary>
+    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+
+    /// <summary>The phone's "add a task" affordance, shown exactly when the dock is not.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+
+    [RelayCommand(CanExecute = nameof(CanAddTask))]
+    private void OpenComposer() => IsComposerOpen = true;
+
+    [RelayCommand]
+    private void CloseComposer()
+    {
+        IsComposerOpen = false;
+        ShowErrors(false); // a dismissed form must not reopen still complaining
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddTask))]
     private void AddTask()
     {
@@ -208,6 +239,9 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         _session.AddTask(NewText, NewAssignee, NewImportance, NewUrgency, NewTimerMinutes!.Value);
         NewText = string.Empty; // priorities stay sticky for rapid follow-up entries
         ShowErrors(false); // ...and the cleared text must not read as a fresh complaint
+
+        // Reached only on success, so this is where the phone's form closes again.
+        IsComposerOpen = false;
         _onChanged();
     }
 
@@ -243,12 +277,107 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
         {
             foreach (var task in _session.Incident.Tasks)
             {
-                if (!task.IsCompleted && task.DueAt <= now && _dueAnnounced.Add(task.Id))
+                if (TaskRow.IsOverdueAt(task, now) && _dueAnnounced.Add(task.Id))
                 {
                     _alarm.Play(AlarmSound.TaskDue);
                 }
             }
         }
+
+        RefreshHeader();
+    }
+
+    // --- #460: the Aufgabe-fällig bar names the task and leads to it ---
+
+    /// <summary>
+    /// The open tasks past their due time, the longest overdue first. The bar names the first and
+    /// counts the rest; the chip in the grid uses the same rule, so the two can never disagree.
+    /// </summary>
+    private List<IncidentTask> OverdueTasks()
+    {
+        var now = _clock.Now;
+        return _session.Incident.Tasks
+            .Where(t => TaskRow.IsOverdueAt(t, now))
+            .OrderBy(t => t.DueAt)
+            .ThenBy(t => t.CreatedAt)
+            .ToList();
+    }
+
+    /// <summary>Whether the header shows the Aufgabe-fällig bar. Never on a read-only workspace.</summary>
+    public bool HasDueTask => !IsReadOnly && OverdueTasks().Count > 0;
+
+    /// <summary>"Aufgabe fällig: ‹Text› (zugeteilt an ‹Assignee›) · +N weitere", or "—".</summary>
+    public string DueTaskDisplay
+    {
+        get
+        {
+            var overdue = OverdueTasks();
+            if (overdue.Count == 0)
+            {
+                return "—";
+            }
+
+            var task = overdue[0];
+            var text = string.IsNullOrWhiteSpace(task.Assignee)
+                ? $"Aufgabe fällig: {task.Text}"
+                : $"Aufgabe fällig: {task.Text} (zugeteilt an {task.Assignee})";
+            return overdue.Count > 1 ? $"{text} · +{overdue.Count - 1} weitere" : text;
+        }
+    }
+
+    /// <summary>The row the grid has selected; the bar points it at the task it names.</summary>
+    [ObservableProperty]
+    private TaskRow? _selectedTask;
+
+    /// <summary>
+    /// Raised after <see cref="SelectedTask"/> has been pointed at the task the bar names, so the
+    /// workspace can bring the Aufgaben tab forward and the view can scroll the row into sight.
+    /// Raised on every request, not only when the selection changes: tapping the bar again after
+    /// scrolling away has to scroll back (#422 precedent).
+    /// </summary>
+    public event EventHandler? RevealRequested;
+
+    /// <summary>The bar was tapped: go to the longest-overdue task, the one the bar names.</summary>
+    [RelayCommand]
+    private void ShowMostOverdueTask()
+    {
+        if (OverdueTasks().FirstOrDefault() is not { } task)
+        {
+            return;
+        }
+
+        // An overdue task is open by definition, so ERLEDIGT would hide the very row asked for.
+        if (Filter == TaskFilterKind.Done)
+        {
+            Filter = TaskFilterKind.Open;
+        }
+
+        if (Rows.FirstOrDefault(r => r.Id == task.Id) is not { } row)
+        {
+            return;
+        }
+
+        SelectedTask = row;
+        RevealRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The bar's ERLEDIGT: ticks off the task the bar names, as the grid's checkbox would.</summary>
+    [RelayCommand]
+    private void CompleteMostOverdueTask()
+    {
+        if (IsReadOnly || OverdueTasks().FirstOrDefault() is not { } task)
+        {
+            return;
+        }
+
+        _session.SetTaskCompleted(task.Id, true);
+        _onChanged();
+    }
+
+    private void RefreshHeader()
+    {
+        OnPropertyChanged(nameof(HasDueTask));
+        OnPropertyChanged(nameof(DueTaskDisplay));
     }
 
     // --- Sync ---
@@ -266,11 +395,16 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
             .Select(t => new TaskRow(_session, t, IsReadOnly, now, _onChanged))
             .ToList();
 
+        // Rows are recreated, so the selection is carried over by task id rather than by row.
+        var selectedId = SelectedTask?.Id;
         Rows.Clear();
         foreach (var row in visible)
         {
             Rows.Add(row);
         }
+
+        SelectedTask = visible.FirstOrDefault(r => r.Id == selectedId);
+        RefreshHeader();
     }
 
     public void Dispose()
@@ -288,14 +422,13 @@ public sealed partial class TasksViewModel : ObservableObject, IDisposable
 public sealed partial class TaskRow : ObservableObject
 {
     private readonly IIncidentSession _session;
-    private readonly Guid _id;
     private readonly Action _onChanged;
 
     public TaskRow(IIncidentSession session, IncidentTask task, bool isReadOnly, DateTimeOffset now, Action onChanged)
     {
         ArgumentNullException.ThrowIfNull(task);
         _session = session;
-        _id = task.Id;
+        Id = task.Id;
         _onChanged = onChanged;
         IsReadOnly = isReadOnly;
         Text = task.Text;
@@ -317,7 +450,7 @@ public sealed partial class TaskRow : ObservableObject
             ? $"ERLEDIGT · {completedAt:HH:mm}"
             : string.Empty;
         RemainingDisplay = ComputeRemaining(task, now);
-        IsOverdue = ComputeIsOverdue(task, now);
+        IsOverdue = IsOverdueAt(task, now);
     }
 
     public Guid Id { get; }
@@ -356,9 +489,9 @@ public sealed partial class TaskRow : ObservableObject
     {
         if (IsReadOnly)
             return;
-        var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == _id);
+        var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == Id);
         if (task is { } current && current.IsCompleted != value)
-            _session.SetTaskCompleted(_id, value);
+            _session.SetTaskCompleted(Id, value);
         _onChanged();
     }
 
@@ -371,18 +504,19 @@ public sealed partial class TaskRow : ObservableObject
     /// <summary>Called by the owning VM on every ticker tick — recomputes countdown + overdue.</summary>
     public void RefreshClock(DateTimeOffset now)
     {
-        var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == _id);
+        var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == Id);
         if (task is null)
         {
             return;
         }
 
-        IsOverdue = ComputeIsOverdue(task, now);
+        IsOverdue = IsOverdueAt(task, now);
         RemainingDisplay = ComputeRemaining(task, now);
         OnPropertyChanged(nameof(IsOverdue));
     }
 
-    private static bool ComputeIsOverdue(IncidentTask task, DateTimeOffset now) =>
+    /// <summary>Open, on a timer, and past its due time — the one overdue rule (chip, bar and alarm).</summary>
+    internal static bool IsOverdueAt(IncidentTask task, DateTimeOffset now) =>
         !task.IsCompleted && task.DueAt != DateTimeOffset.MaxValue && task.DueAt <= now;
 
     private static string ComputeRemaining(IncidentTask task, DateTimeOffset now)
@@ -414,8 +548,9 @@ public enum TaskFilterKind
     All,
 }
 
-/// <summary>An enum value paired with its German label (EtbDirectionOption precedent). Two
-/// closed records instead of a generic one, so Avalonia compiled-bind templates stay simple.</summary>
+/// <summary>An enum value paired with its German label, so a picker never falls back to the enum
+/// identifier. Two closed records instead of a generic one, so Avalonia compiled-bind templates
+/// stay simple.</summary>
 public readonly record struct ImportanceOption(TaskImportance Value, string Label);
 
 public readonly record struct UrgencyOption(TaskUrgency Value, string Label);

@@ -5,7 +5,7 @@ namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// The read/deserialise/write scaffolding every one of the app's small JSON preference files shares
-/// (recent incidents, last save folder, last PDF export, last join host). Each of those stores owns
+/// (recent incidents, last save folder, last PDF export, last connection). Each of those stores owns
 /// its own semantics — what "empty" means, how a value is folded into the previous one — and leaves
 /// the file handling here.
 /// <para>
@@ -59,5 +59,15 @@ internal sealed class JsonFileStore<T>
         var tmpPath = _path + ".tmp";
         File.WriteAllText(tmpPath, JsonSerializer.Serialize(value));
         File.Move(tmpPath, _path, overwrite: true);
+    }
+
+    /// <summary>
+    /// Removes the stored value, and any <c>*.tmp</c> a crashed <see cref="Write"/> left behind, so
+    /// nothing of it stays on disk. A missing file is not an error: there is nothing to remove.
+    /// </summary>
+    public void Delete()
+    {
+        File.Delete(_path);
+        File.Delete(_path + ".tmp");
     }
 }

@@ -97,6 +97,25 @@ public class IncidentPdfTests
     }
 
     [Fact]
+    public void An_open_incidents_report_is_marked_as_a_Zwischenstand_with_the_export_time()
+    {
+        var incident = Incident.Start(new Clock(), new SessionOperator("Müller"));
+
+        Assert.Equal("Zwischenstand – Stand 22.06.2026 12:00", IncidentReportDocument.InterimMarker(incident, ExportedAt));
+    }
+
+    [Fact]
+    public void A_closed_incidents_report_carries_no_Zwischenstand_marker()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        incident.Close(clock, op);
+
+        Assert.Null(IncidentReportDocument.InterimMarker(incident, ExportedAt));
+    }
+
+    [Fact]
     public void Direct_document_generation_ensures_license_and_produces_a_valid_pdf()
     {
         var bytes = new IncidentReportDocument(BuildFullIncident(), ExportedAt).GeneratePdf();

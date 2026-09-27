@@ -24,6 +24,7 @@ public sealed partial class PdfExportOptionsViewModel : ObservableObject
             new PdfSectionOptionViewModel(IncidentPdfSections.Etb, "Einsatztagebuch (ETB)", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Roles, "Funktionszuweisung", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Forces, "Kräfteübersicht", NotifyCanExecuteChanged),
+            new PdfSectionOptionViewModel(IncidentPdfSections.InvolvedParties, "Beteiligte", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Tasks, "Aufgaben", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.Atemschutz, "Atemschutzüberwachung", NotifyCanExecuteChanged),
             new PdfSectionOptionViewModel(IncidentPdfSections.CoMessprotokoll, "CO-Messprotokoll", NotifyCanExecuteChanged),

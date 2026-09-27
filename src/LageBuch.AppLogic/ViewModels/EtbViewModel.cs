@@ -11,8 +11,15 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-public sealed partial class EtbViewModel : ObservableObject, IDisposable
+public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisposable
 {
+    // A real Einsatz showed the Lagebuchführer never gained anything from picking Eingang, Ausgang
+    // or Intern, so the dock no longer asks. The domain still records a direction on every entry,
+    // and Internal is the neutral one: never shown, editable, and untouched by the System filter.
+    // Incoming and Outgoing stay valid input -- an older peer still sends them over sync, and the
+    // ILS reminder still writes Outgoing.
+    private const EtbDirection ManualDirection = EtbDirection.Internal;
+
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
@@ -136,13 +143,6 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     private bool IsVisible(EtbEntryRow row) =>
         !HideSystemEntries || row.DirectionValue != EtbDirection.System;
 
-    // App-written directions are never chosen by a human, so they are omitted from the picker.
-    public IReadOnlyList<EtbDirectionOption> DirectionOptions { get; } =
-        Enum.GetValues<EtbDirection>()
-            .Where(d => !EtbDirections.IsAppWritten(d))
-            .Select(d => new EtbDirectionOption(d, Formatting.Direction(d)))
-            .ToArray();
-
     // The dock and the edit panel below the grid are two separate forms, so each keeps its own
     // "the operator has asked" state: pressing one must not light up a field in the other (#412).
     private bool _addErrorsShown;
@@ -160,9 +160,6 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _newTo;
 
-    [ObservableProperty]
-    private EtbDirection _newDirection = EtbDirection.Incoming;
-
     /// <summary>Whether the Eintrag is still missing, once the operator has asked (#412).</summary>
     /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
     public string? ErrorSummary => ValidationMessages.Summarize(
@@ -174,6 +171,43 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
     // Only the read-only rule gates the buttons; the empty field answers on the press (#412).
     private bool CanAddEntry => !IsReadOnly;
 
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the narrow layout's add-entry sheet is open. The dock is three fields and two
+    /// buttons across ~900px; a phone shows it stacked over the list instead, opened by one
+    /// button and closed again the moment an entry lands. Ignored by the wide layout, where the
+    /// dock is simply always there.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isComposerOpen;
+
+    /// <summary>
+    /// Whether the add-entry dock is on screen: always on a wide window, only while composing on
+    /// a phone. One property rather than two bindings, because a XAML binding is a local value and
+    /// would win over any container query trying to restore the dock on the desktop.
+    /// </summary>
+    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+
+    /// <summary>The phone's "add an entry" affordance, shown exactly when the dock is not.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+
+    [RelayCommand(CanExecute = nameof(CanAddEntry))]
+    private void OpenComposer() => IsComposerOpen = true;
+
+    [RelayCommand]
+    private void CloseComposer()
+    {
+        IsComposerOpen = false;
+        ShowAddErrors(false); // a dismissed sheet must not reopen still complaining
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntry()
     {
@@ -182,7 +216,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo); // Changed → Sync() renders it
+        _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo); // Changed → Sync() renders it
         ClearNewEntry();
         _onChanged();
     }
@@ -195,7 +229,7 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _session.AddJournalEntry(NewDirection, NewText, NewFrom, NewTo);
+        _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo);
         var text = NewText;
         ClearNewEntry();
         _onChanged();
@@ -208,6 +242,10 @@ public sealed partial class EtbViewModel : ObservableObject, IDisposable
         NewFrom = null;
         NewTo = null;
         ShowAddErrors(false); // the cleared field must not read as a fresh complaint
+
+        // Both add paths land here, and only on success — so this is where the phone's sheet
+        // closes and gives the list back. A failed validation returns before ever reaching it.
+        IsComposerOpen = false;
     }
 
     private bool ValidateAdd()
@@ -333,7 +371,6 @@ public sealed class EtbEntryRow
         ArgumentNullException.ThrowIfNull(canCreateTask);
         Id = entry.Id;
         Time = Formatting.Timestamp(entry.Timestamp);
-        Direction = Formatting.Direction(entry.Direction);
         From = entry.From;
         To = entry.To;
         Text = entry.Text;
@@ -360,8 +397,6 @@ public sealed class EtbEntryRow
 
     public string Time { get; }
 
-    public string Direction { get; }
-
     public string? From { get; }
 
     public string? To { get; }
@@ -386,10 +421,3 @@ public sealed class EtbEntryRow
 
     public ICommand CreateTaskCommand { get; }
 }
-
-/// <summary>
-/// An <see cref="EtbDirection"/> paired with its German label, so the picker shows the same
-/// wording as the grid and the PDF. Binding the raw enum makes Avalonia fall back to
-/// <see cref="Enum.ToString()"/>, which leaks the English identifiers into the UI.
-/// </summary>
-public sealed record EtbDirectionOption(EtbDirection Value, string Label);

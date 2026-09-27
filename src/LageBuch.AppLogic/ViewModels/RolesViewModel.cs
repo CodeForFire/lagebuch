@@ -92,7 +92,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     private void BeginTransfer() => _onTransfer(this);
 }
 
-public sealed partial class RolesViewModel : ObservableObject, IDisposable
+public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -217,6 +217,37 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
     // this is separate from IsNewRoleUnknown, which never blocked anything and still does not.
     private bool CanAddRole => !IsReadOnly;
 
+    /// <inheritdoc />
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isNarrow;
+
+    /// <summary>
+    /// Whether the narrow layout's assign form is open. Five fields across ~750px; a phone stacks
+    /// them and only while a Funktion is actually being assigned.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    private bool _isComposerOpen;
+
+    /// <summary>Whether the dock is on screen: always when wide, only while composing on a phone.</summary>
+    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+
+    /// <summary>The phone's "assign a Funktion" affordance, shown exactly when the dock is not.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+
+    [RelayCommand(CanExecute = nameof(CanAddRole))]
+    private void OpenComposer() => IsComposerOpen = true;
+
+    [RelayCommand]
+    private void CloseComposer()
+    {
+        IsComposerOpen = false;
+        ShowAddErrors(false); // a dismissed form must not reopen still complaining
+    }
+
     [RelayCommand(CanExecute = nameof(CanAddRole))]
     private void AddRole()
     {
@@ -245,6 +276,9 @@ public sealed partial class RolesViewModel : ObservableObject, IDisposable
         NewCallSign = null;
         NewPhone = null;
         ShowAddErrors(false); // the cleared fields must not read as a fresh complaint
+
+        // Reached only on success, so this is where the phone's form closes again.
+        IsComposerOpen = false;
         _onChanged();
     }
 

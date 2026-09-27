@@ -1,0 +1,1 @@
+The Android app now reports the version it was built from — `versionCode` and `versionName` were pinned in `AndroidManifest.xml`, which silently overrode the release workflow and left every published APK identifying itself as 0.1.0, build 1 — and the build now also produces the signed Android App Bundle that Google Play requires, with the APK extracted from that same bundle.

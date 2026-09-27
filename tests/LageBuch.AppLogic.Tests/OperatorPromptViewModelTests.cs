@@ -39,6 +39,27 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
+    public void Offers_only_own_personnel_as_name_suggestions()
+    {
+        var roster = Roster.Append(new Person("Nachbar", "Nora", null, "Florian Nachbarort 1", null, IsOwn: false)).ToArray();
+
+        var vm = new OperatorPromptViewModel(personnel: roster);
+
+        Assert.Equal(new[] { "Schmidt, Anna", "Huber, Max" }, vm.PersonOptions);
+    }
+
+    [Fact]
+    public void A_foreign_person_typed_by_hand_still_fills_the_call_sign()
+    {
+        var roster = Roster.Append(new Person("Nachbar", "Nora", null, "Florian Nachbarort 1", null, IsOwn: false)).ToArray();
+        var vm = new OperatorPromptViewModel(personnel: roster);
+
+        vm.OperatorName = "Nachbar, Nora";
+
+        Assert.Equal("Florian Nachbarort 1", vm.OperatorCallSign);
+    }
+
+    [Fact]
     public void Picking_a_person_fills_a_blank_call_sign()
     {
         var vm = new OperatorPromptViewModel(personnel: Roster);

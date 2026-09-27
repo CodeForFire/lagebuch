@@ -13,6 +13,13 @@ artifacts/
 publish/
 dist/
 
+# Signing material. The Google Play upload key lives in ~/.config/lagebuch/, never in the
+# tree — see docs/releasing.md. These patterns are defence in depth, not the mechanism.
+*.p12
+*.jks
+*.keystore
+*.pass
+
 # Project-specific: never commit the legacy template or planning artifacts
 *.xltm
 Einsatzdokumentation_Digital_*.xltm
@@ -43,3 +50,7 @@ seed-source/
 docs/samples/*.fwincident-wal
 docs/samples/*.fwincident-shm
 docs/samples/*.files/
+
+# Scratch renders for a pull request's before/after pair (`make phone-screenshots`).
+# The committed screenshot sets live in docs/screenshots and docs/play/screenshots.
+out/

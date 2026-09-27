@@ -1,8 +1,14 @@
+<!-- MinWidth 380, not the 900 this carried before: 900 was the width the desktop layout needed
+     to hold together, and there was nothing else to fall back to. There is now, below 640, so the
+     floor only has to stay under the 412dp the phone layout is written against. It is also the
+     one way to see that layout without an Android device — drag the window narrow.
+     MinHeight stays 600; see CoMessprotokollEditorReachabilityTests, which renders at exactly
+     that to prove the CO sidebar keeps its commit button. -->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:LageBuch.App.Shared.Views"
         x:Class="LageBuch.App.Shared.Views.MainWindow"
-        Width="1080" Height="740" MinWidth="900" MinHeight="600"
+        Width="1080" Height="740" MinWidth="380" MinHeight="600"
         Title="Lagebuch"
         TransparencyLevelHint="None">
   <views:MainView x:Name="Root" />

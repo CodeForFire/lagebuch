@@ -28,9 +28,9 @@ public class LayoutAlignmentTests
             .GetVisualDescendants().OfType<ItemsPresenter>()
             .First(p => p.Name == "PART_ItemsPresenter");
 
-    private static Window ShowWorkspace(double width = 1920)
+    private static Window ShowWorkspace(double width = 1920, bool withOverdueTask = false)
     {
-        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
+        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars(withOverdueTask: withOverdueTask);
         var window = new Window
         {
             Content = new IncidentWorkspaceView { DataContext = vm },
@@ -83,7 +83,9 @@ public class LayoutAlignmentTests
         double Left(string name) => LeftInWindow(
             window.GetVisualDescendants().OfType<Control>().First(c => c.Name == name), window);
 
-        var reminderBarLeft = Left("ReminderBar");
+        // The header's Meldungen: a row and the quiet strip of countdowns below the rows.
+        var alarmRowLeft = Left("ScbaAlarmBar");
+        var stripLeft = Left("MeldungStrip");
         var tabStripLeft = LeftInWindow(TabStrip(window), window);
 
         // #221: Close/Export moved to the footer's right side so each tab's own "add entry"
@@ -91,7 +93,8 @@ public class LayoutAlignmentTests
         // the footer's left edge.
         var footerLeft = Left("SavedStatusPanel");
 
-        Assert.Equal(Gutter, reminderBarLeft, precision: 0);
+        Assert.Equal(Gutter, alarmRowLeft, precision: 0);
+        Assert.Equal(Gutter, stripLeft, precision: 0);
         Assert.Equal(Gutter, tabStripLeft, precision: 0);
         Assert.Equal(Gutter, footerLeft, precision: 0);
     }
@@ -237,8 +240,9 @@ public class LayoutAlignmentTests
 
     // #417 lengthened both Atemschutz banners by a Funkrufname. They sat in horizontal StackPanels,
     // which measure their children with infinite width -- so a longer text does not ellipsise, it
-    // pushes DRUCKABFRAGE! and ALARM QUITTIEREN out of the bar. Those two are the urgency signal
-    // and the only way to silence the alarm, so losing them is worse than losing a few characters.
+    // pushes the row's end out of the bar. ALARM QUITTIEREN is the only way to silence the alarm
+    // and the chevron is what says the Druckabfrage row is a jump, so losing either is worse than
+    // losing a few characters.
     [AvaloniaTheory]
     [InlineData(900)]
     [InlineData(1100)]
@@ -249,7 +253,8 @@ public class LayoutAlignmentTests
         var window = ShowWorkspace(width);
         var view = (IncidentWorkspaceView)window.Content!;
 
-        AssertInside(view.GetControl<Border>("ScbaControlDuePill"), view.GetControl<Border>("ScbaControlBar"));
+        var controlBar = view.GetControl<Border>("ScbaControlBar");
+        AssertInside(controlBar.GetVisualDescendants().OfType<PathIcon>().Single(p => p.Classes.Contains("meldung-chevron")), controlBar);
         AssertInside(view.GetControl<Button>("ScbaAlarmAckButton"), view.GetControl<Border>("ScbaAlarmBar"));
 
         static void AssertInside(Visual child, Border bar)
@@ -277,5 +282,31 @@ public class LayoutAlignmentTests
         Assert.True(
             right <= jump.Bounds.Width + 1.0,
             $"the alarm text reaches {right:F0}px in a {jump.Bounds.Width:F0}px button — not trimmed.");
+    }
+
+    // #460: the task text is free text and can be as long as the Lagebuchführer typed it. It must
+    // trim inside the jump, and ERLEDIGT - the one-tap way to clear the bar - must stay on screen.
+    [AvaloniaTheory]
+    [InlineData(900)]
+    [InlineData(1920)]
+    public void Aufgabe_faellig_bar_trims_its_text_and_keeps_erledigt_inside(double width)
+    {
+        var window = ShowWorkspace(width, withOverdueTask: true);
+        var view = (IncidentWorkspaceView)window.Content!;
+        var bar = view.GetControl<Border>("TaskDueBar");
+        var done = view.GetControl<Button>("TaskDueDoneButton");
+        var text = view.GetControl<TextBlock>("TaskDueText");
+        var jump = view.GetControl<Button>("TaskDueJumpButton");
+
+        var doneLeft = done.TranslatePoint(new Point(0, 0), bar)!.Value.X;
+        Assert.True(
+            doneLeft >= -1.0 && doneLeft + done.Bounds.Width <= bar.Bounds.Width + 1.0,
+            $"ERLEDIGT spans {doneLeft:F0}..{doneLeft + done.Bounds.Width:F0}px in a {bar.Bounds.Width:F0}px bar — pushed out.");
+
+        Assert.Equal(TextTrimming.CharacterEllipsis, text.TextTrimming);
+        var right = text.TranslatePoint(new Point(0, 0), jump)!.Value.X + text.Bounds.Width;
+        Assert.True(
+            right <= jump.Bounds.Width + 1.0,
+            $"the task text reaches {right:F0}px in a {jump.Bounds.Width:F0}px button — not trimmed.");
     }
 }
