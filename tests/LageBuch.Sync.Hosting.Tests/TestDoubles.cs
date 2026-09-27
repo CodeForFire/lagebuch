@@ -449,3 +449,13 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
         remove { }
     }
 }
+
+/// <summary>
+/// Reconnects almost at once, for as long as a test needs; the production policy waits 3 s between
+/// attempts.
+/// </summary>
+internal sealed class ReconnectImmediately : Microsoft.AspNetCore.SignalR.Client.IRetryPolicy
+{
+    public TimeSpan? NextRetryDelay(Microsoft.AspNetCore.SignalR.Client.RetryContext retryContext) =>
+        retryContext.PreviousRetryCount < 50 ? TimeSpan.FromMilliseconds(20) : null;
+}

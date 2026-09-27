@@ -368,7 +368,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                         SyncProtocol.ProtocolHeader,
                         SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
 
-                    o.HttpMessageHandlerFactory = _ => handler;
+                    // Wrapped, never the handler itself: SignalR disposes what this factory returns
+                    // whenever a connection ends, and _http runs on the same handler. Handing it over
+                    // bare meant the first dropped link disposed both — every reconnect attempt then
+                    // failed with ObjectDisposedException, every command with it, until the policy
+                    // gave up and the session ended. The wrapper is SignalR's to dispose; the handler
+                    // stays this session's, released in DisposeAsync.
+                    o.HttpMessageHandlerFactory = _ => new BorrowedHandler(handler);
                 })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
@@ -1037,6 +1043,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         _handler.Dispose();
         _reconcileTimer.Dispose();
         _reconcileCts.Dispose();
+    }
+
+    /// <summary>
+    /// Lends the session's handler to a SignalR connection without handing over its lifetime.
+    /// </summary>
+    [SuppressMessage(
+        "Usage",
+        "CA2215",
+        Justification = "Deliberately does not call base.Dispose: DelegatingHandler.Dispose disposes the inner handler, which is exactly what must not happen here — the session owns it and disposes it in DisposeAsync.")]
+    private sealed class BorrowedHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        protected override void Dispose(bool disposing)
+        {
+        }
     }
 
     // SignalR's default policy gives up after ~30s; on a callout a device's mobile data can blip for
