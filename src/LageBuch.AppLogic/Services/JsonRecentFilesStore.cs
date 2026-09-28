@@ -22,4 +22,13 @@ public sealed class JsonRecentFilesStore : IRecentFilesStore
 
         _file.Write(list);
     }
+
+    public void Remove(string path)
+    {
+        var list = new List<string>(GetRecent());
+        if (list.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)) > 0)
+        {
+            _file.Write(list);
+        }
+    }
 }

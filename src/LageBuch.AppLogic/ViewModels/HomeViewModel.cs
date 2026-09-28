@@ -160,6 +160,18 @@ public sealed partial class HomeViewModel : ObservableObject
     private string? _openError;
 
     /// <summary>
+    /// The recent-list entry whose open just failed, or null. Lets the open-failure banner offer to
+    /// take that entry off the list (#481); a file picked through the dialog was never listed, so it
+    /// leaves this null.
+    /// </summary>
+    [ObservableProperty]
+    private string? _failedRecentPath;
+
+    /// <summary>Why an entry could not be taken off the recent list, or null.</summary>
+    [ObservableProperty]
+    private string? _recentFilesError;
+
+    /// <summary>
     /// Why the last join attempt failed, or null. Shown as a banner on the Home screen (§7): a
     /// version mismatch, or a host that isn't reachable / isn't currently sharing an incident.
     /// </summary>
@@ -215,6 +227,36 @@ public sealed partial class HomeViewModel : ObservableObject
     [RelayCommand]
     private void OpenRecent(string path) => TryOpen(path);
 
+    // Only the list entry goes; the .fwincident file is never touched, so nothing is lost and no
+    // confirmation is asked for -- the header's ÖFFNEN brings it back.
+    [RelayCommand]
+    private void RemoveRecent(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        try
+        {
+            _recent.Remove(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RecentFilesError = $"Nicht entfernt: {ex.Message}";
+            return;
+        }
+
+        RecentFilesError = null;
+        if (RecentFiles.FirstOrDefault(f => string.Equals(f.Path, path, StringComparison.Ordinal)) is { } item)
+        {
+            RecentFiles.Remove(item);
+        }
+
+        // The banner was about this entry; with it gone there is nothing left to report.
+        if (string.Equals(path, FailedRecentPath, StringComparison.Ordinal))
+        {
+            FailedRecentPath = null;
+            OpenError = null;
+        }
+    }
+
     [RelayCommand]
     private async Task OpenFileAsync()
     {
@@ -246,11 +288,13 @@ public sealed partial class HomeViewModel : ObservableObject
         {
             var session = LocalIncidentSession.OpenReadOnly(_store, _clock, path);
             OpenError = null;
+            FailedRecentPath = null;
             OpenWorkspace(session, path, _masterData.Get());
         }
         catch (Exception ex)
         {
             OpenError = $"{Path.GetFileName(path)} konnte nicht geöffnet werden. {ex.Message}";
+            FailedRecentPath = RecentFiles.Any(f => string.Equals(f.Path, path, StringComparison.Ordinal)) ? path : null;
         }
     }
 

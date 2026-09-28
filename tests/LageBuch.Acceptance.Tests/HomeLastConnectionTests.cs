@@ -33,6 +33,10 @@ public class HomeLastConnectionTests
         public void Add(string path)
         {
         }
+
+        public void Remove(string path)
+        {
+        }
     }
 
     private sealed class Last : ILastConnectionStore

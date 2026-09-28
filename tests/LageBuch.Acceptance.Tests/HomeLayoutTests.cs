@@ -61,6 +61,10 @@ public class HomeLayoutTests
         public void Add(string path)
         {
         }
+
+        public void Remove(string path)
+        {
+        }
     }
 
     private static Window ShowHome(params string[] recentPaths) => ShowHome(1100, recentPaths);

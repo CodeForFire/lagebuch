@@ -305,6 +305,114 @@ public class HomeViewModelTests
         Assert.Null(vm.OpenError);
     }
 
+    private static HomeViewModel HomeWithRecent(FakeRecent recent, IIncidentStore? store = null, IFileDialogService? dialogs = null) =>
+        new(
+            store ?? new FakeStore(),
+            new FakeMasterData(),
+            recent,
+            dialogs ?? new FakeDialogs(),
+            new FixedClock(T0),
+            new FakeTicker(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            "1.0.0");
+
+    [Fact]
+    public void Removing_a_recent_entry_drops_it_from_the_list_and_the_store()
+    {
+        var recent = new FakeRecent("/b.fwincident", "/a.fwincident");
+        var vm = HomeWithRecent(recent);
+
+        vm.RemoveRecentCommand.Execute("/a.fwincident");
+
+        Assert.Equal(new[] { "/b.fwincident" }, recent.GetRecent());
+        Assert.Equal(new[] { "/b.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+        Assert.Null(vm.RecentFilesError);
+    }
+
+    // The button says "Aus der Liste entfernen", not "Löschen": the Einsatz itself must survive.
+    [Fact]
+    public void Removing_a_recent_entry_leaves_the_incident_file_on_disk()
+    {
+        var path = Path.Join(Path.GetTempPath(), $"remove-{Guid.NewGuid():N}.fwincident");
+        File.WriteAllText(path, "Einsatz");
+        try
+        {
+            var vm = HomeWithRecent(new FakeRecent(path));
+
+            vm.RemoveRecentCommand.Execute(path);
+
+            Assert.Empty(vm.RecentFiles);
+            Assert.True(File.Exists(path));
+            Assert.Equal("Einsatz", File.ReadAllText(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void A_recent_entry_that_cannot_be_removed_stays_listed_with_the_reason()
+    {
+        var vm = HomeWithRecent(new FakeRecent("/a.fwincident") { FailRemove = true });
+
+        vm.RemoveRecentCommand.Execute("/a.fwincident");
+
+        Assert.Single(vm.RecentFiles);
+        Assert.Equal("Nicht entfernt: Zugriff verweigert.", vm.RecentFilesError);
+    }
+
+    [Fact]
+    public void A_listed_entry_that_fails_to_open_offers_removal_in_the_banner()
+    {
+        var vm = HomeWithRecent(new FakeRecent("/gone.fwincident"), new ThrowingStore("Datei kaputt."));
+
+        vm.OpenRecentCommand.Execute("/gone.fwincident");
+
+        Assert.NotNull(vm.OpenError);
+        Assert.Equal("/gone.fwincident", vm.FailedRecentPath);
+    }
+
+    // A file picked through the dialog was never on the list, so there is nothing to take off it.
+    [Fact]
+    public void A_picked_file_that_fails_to_open_offers_no_removal()
+    {
+        var vm = HomeWithRecent(new FakeRecent(), new ThrowingStore("Datei kaputt."), new OpenReturningDialogs());
+
+        vm.OpenFileCommand.Execute(null);
+
+        Assert.NotNull(vm.OpenError);
+        Assert.Null(vm.FailedRecentPath);
+    }
+
+    [Fact]
+    public void Removing_the_entry_that_failed_to_open_clears_the_banner()
+    {
+        var recent = new FakeRecent("/gone.fwincident", "/other.fwincident");
+        var vm = HomeWithRecent(recent, new ThrowingStore("Datei kaputt."));
+        vm.OpenRecentCommand.Execute("/gone.fwincident");
+
+        vm.RemoveRecentCommand.Execute(vm.FailedRecentPath);
+
+        Assert.Null(vm.OpenError);
+        Assert.Null(vm.FailedRecentPath);
+        Assert.Equal(new[] { "/other.fwincident" }, recent.GetRecent());
+    }
+
+    // The banner is about a different file, so taking some other row off leaves it standing.
+    [Fact]
+    public void Removing_another_entry_keeps_the_banner()
+    {
+        var vm = HomeWithRecent(new FakeRecent("/gone.fwincident", "/other.fwincident"), new ThrowingStore("Datei kaputt."));
+        vm.OpenRecentCommand.Execute("/gone.fwincident");
+
+        vm.RemoveRecentCommand.Execute("/other.fwincident");
+
+        Assert.NotNull(vm.OpenError);
+        Assert.Equal("/gone.fwincident", vm.FailedRecentPath);
+    }
+
     [Fact]
     public void OpenRecent_loads_store_once()
     {
@@ -434,7 +542,11 @@ internal sealed class FakeMasterData : IMasterDataProvider
 
 internal sealed class FakeRecent : IRecentFilesStore
 {
-    private readonly List<string> _list = new();
+    private readonly List<string> _list;
+
+    public FakeRecent(params string[] paths) => _list = new List<string>(paths);
+
+    public bool FailRemove { get; init; }
 
     public IReadOnlyList<string> GetRecent() => _list;
 
@@ -442,6 +554,16 @@ internal sealed class FakeRecent : IRecentFilesStore
     {
         _list.Remove(path);
         _list.Insert(0, path);
+    }
+
+    public void Remove(string path)
+    {
+        if (FailRemove)
+        {
+            throw new UnauthorizedAccessException("Zugriff verweigert.");
+        }
+
+        _list.Remove(path);
     }
 }
 

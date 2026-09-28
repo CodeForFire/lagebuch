@@ -1,7 +1,9 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -43,6 +45,8 @@ public class HomeOpenErrorTests
         public void Add(string path)
         {
         }
+
+        public void Remove(string path) => _list.Remove(path);
     }
 
     // Fails the way the real repository does for a file written by a newer build.
@@ -86,7 +90,7 @@ public class HomeOpenErrorTests
         }
     }
 
-    private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null)
+    private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null, double width = 1100)
     {
         var vm = new HomeViewModel(
             new BrokenStore(),
@@ -103,7 +107,11 @@ public class HomeOpenErrorTests
             vm.OpenRecentCommand.Execute("/home/operator/Einsaetze/Einsatz-1234.fwincident");
         }
 
-        var window = new Window { Content = new HomeView { DataContext = vm }, Width = 1100, Height = 820 };
+        // Hosted in a "Shell" container like MainView's root, so HomeView's phone query applies.
+        var shell = new Panel { Children = { new HomeView { DataContext = vm } } };
+        Container.SetName(shell, "Shell");
+        Container.SetSizing(shell, ContainerSizing.Width);
+        var window = new Window { Content = shell, Width = width, Height = 820 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
@@ -208,5 +216,77 @@ public class HomeOpenErrorTests
         Assert.True(
             message.Bounds.Height > 30,
             $"message is {message.Bounds.Height}px tall — it did not wrap onto a second line");
+    }
+
+    private static List<Button> RemoveButtons(Window window) =>
+        window.GetVisualDescendants().OfType<Button>().Where(b => b.Name == "RemoveRecentButton").ToList();
+
+    // #481: every row can be taken off the list, and the icon-only button says so to a screen reader.
+    [AvaloniaFact]
+    public void Each_recent_row_has_a_named_remove_button()
+    {
+        var (window, vm) = ShowHome(triggerError: false, renderTo: "home-remove-after.png");
+
+        var buttons = RemoveButtons(window);
+
+        Assert.Equal(vm.RecentFiles.Count, buttons.Count);
+        Assert.All(buttons, b =>
+        {
+            Assert.NotNull(b.Command);
+            Assert.Equal("Aus der Liste entfernen", AutomationProperties.GetName(b));
+        });
+    }
+
+    [AvaloniaFact]
+    public void Clicking_remove_takes_the_row_off_the_list()
+    {
+        var (window, vm) = ShowHome(triggerError: false);
+        var target = vm.RecentFiles[0].Path;
+        var button = Assert.Single(RemoveButtons(window), b => Equals(b.CommandParameter, target));
+
+        button.Command!.Execute(button.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.DoesNotContain(vm.RecentFiles, f => f.Path == target);
+        Assert.Equal(2, window.GetVisualDescendants().OfType<ListBox>().First().ItemCount);
+    }
+
+    // The rows are already tight on a phone: a second button must not push ÖFFNEN out of the row
+    // or squeeze the file name to nothing.
+    [AvaloniaFact]
+    public void At_phone_width_both_row_buttons_stay_inside_the_row()
+    {
+        var (window, _) = ShowHome(triggerError: false, renderTo: "home-remove-phone.png", width: 412);
+
+        foreach (var item in window.GetVisualDescendants().OfType<ListBoxItem>())
+        {
+            var right = item.TranslatePoint(new Point(item.Bounds.Width, 0), window)!.Value.X;
+            var buttons = item.GetVisualDescendants().OfType<Button>().ToList();
+            Assert.Equal(2, buttons.Count);
+            foreach (var button in buttons)
+            {
+                var buttonRight = button.TranslatePoint(new Point(button.Bounds.Width, 0), window)!.Value.X;
+                Assert.True(buttonRight <= right + 1.0, $"a row button ends at x={buttonRight} but the row at x={right}");
+            }
+
+            // The name's own column, not the TextBlock: a short name is legitimately narrow.
+            var nameColumn = item.GetVisualDescendants().OfType<TextBlock>().First().GetVisualParent<StackPanel>()!;
+            Assert.True(nameColumn.Bounds.Width > 200, $"the file name gets only {nameColumn.Bounds.Width}px");
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_failed_open_offers_removal_in_the_banner()
+    {
+        var (window, vm) = ShowHome(triggerError: true, renderTo: "home-remove-banner.png");
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "RemoveFailedRecentButton");
+
+        Assert.True(button.IsEffectivelyVisible);
+
+        button.Command!.Execute(button.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(Banner(window).IsVisible);
+        Assert.DoesNotContain(vm.RecentFiles, f => f.Path == "/home/operator/Einsaetze/Einsatz-1234.fwincident");
     }
 }
