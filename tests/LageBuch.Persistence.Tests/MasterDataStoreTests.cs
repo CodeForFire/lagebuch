@@ -133,7 +133,7 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new Vehicle("FFB Wache 1", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
     }
 
-// Unlike md_personnel's other optional columns, these two really are absent from every store a
+    // Unlike md_personnel's other optional columns, these two really are absent from every store a
     // released build wrote: without the AddColumnIfMissing lines, opening one fails with
     // "no such column: email" and takes the whole roster with it.
     [Fact]
