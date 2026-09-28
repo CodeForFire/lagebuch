@@ -121,9 +121,9 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     // The two conflict messages, parsed once each: CompositeFormat is the cached form of a composite
     // template, and this hint is rebuilt on every keystroke in the add form. De is the fixed culture
     // Formatting applies to everything a person reads, repeated here because that class formats
-    // timestamps and labels rather than a message template — CurrentCulture would spell the German
-    // text the way a device set to another language does. Every value substituted is a string, so
-    // the provider decides nothing either way; it is there so the culture is never the device's.
+    // timestamps and labels rather than a message template. Every value substituted is a string, so
+    // the provider decides nothing either way today; it is there so the culture is never the
+    // device's, whatever a future argument turns out to be.
     private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
 
     private static readonly CompositeFormat HeldFormat = CompositeFormat.Parse(ValidationMessages.FunctionAlreadyHeld);
@@ -292,7 +292,12 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     {
         get
         {
-            if (NewRoleUniqueness == RoleUniqueness.Multiple || string.IsNullOrWhiteSpace(NewRole))
+            // The blank NewRole needs no guard of its own: StammdatenCatalogue.Find already returns
+            // null for one, so NewRoleUniqueness reads Multiple and this half fires. Were that ever
+            // to change, FindRunningRoleHolder's own blank-role guard -- pinned by
+            // Find_running_role_holder_returns_null_for_a_blank_funktions_role -- still yields no
+            // holder below, so the property cannot report a conflict on an empty field either way.
+            if (NewRoleUniqueness == RoleUniqueness.Multiple)
             {
                 return null;
             }

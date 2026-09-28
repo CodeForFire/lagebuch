@@ -800,9 +800,9 @@ public sealed class Incident
     }
 
     // Both blanks collapse to one spelling so a null and a whitespace-only Abschnitt are the same
-    // bucket; anything else is compared as typed. Ordinal-ignore-case rather than InvariantCulture:
-    // these are operator-typed labels, not identifiers, and the app compares every other such value
-    // this way.
+    // bucket; anything else is compared trimmed, the same way names are. Ordinal-ignore-case rather
+    // than InvariantCulture: these are operator-typed labels, not identifiers, and the app compares
+    // every other such value this way.
     private static string NormalizeSection(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
     public AtemschutzTrupp AddScbaTrupp(

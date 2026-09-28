@@ -32,8 +32,9 @@ public sealed partial class RoleRow : ObservableObject
     private string _name;
 
     /// <summary>
-    /// How often this Funktion may be held. Everything but mehrfach is advisory at the moment of
-    /// entry: the Funktionen tab offers the Übergabe when the slot is already taken.
+    /// How often this Funktion may be held. Everything but mehrfach is enforced at the moment of
+    /// entry, not merely advised: the Funktionen tab turns the press into the Übergabe for the
+    /// running holder instead of letting a second one in, so a unique Funktion never gets one.
     /// </summary>
     [ObservableProperty]
     private RoleUniqueness _uniqueness;
