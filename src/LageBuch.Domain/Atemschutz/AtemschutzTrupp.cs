@@ -384,6 +384,21 @@ public sealed class AtemschutzTrupp
     public bool IsControlDue(DateTimeOffset now) =>
         (IsActive || IsWithdrawing) && NextControlDueAt is { } due && now >= due;
 
+    /// <summary>
+    /// The Trupp's state as one word at <paramref name="now"/>, as the grid and the PDF print it
+    /// (#426). Kept here so the two never word it differently. An alarm outranks Rückzug, and
+    /// Rückzug outranks a due Druckabfrage: a withdrawing crew is already on its way out.
+    /// </summary>
+    public string StatusLabel(DateTimeOffset now) => this switch
+    {
+        { IsReturned: true } => "Abgenommen",
+        { IsWaiting: true } => "Bereitgestellt",
+        _ when IsAlarm(now) => "ALARM",
+        { IsWithdrawing: true } => "Rückzug",
+        _ when IsControlDue(now) => "Druckabfrage",
+        _ => "Im Einsatz",
+    };
+
     private static void ValidatePressure(int bar, string paramName)
     {
         if (bar < 0 || bar > MaxPressureBar)
