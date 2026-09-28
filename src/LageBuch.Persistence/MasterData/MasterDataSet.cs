@@ -583,10 +583,30 @@ public static class MasterDataJson
             ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
             : Array.Empty<string>();
 
+    /// <summary>
+    /// The required name of a hand-edited object entry, trimmed.
+    /// </summary>
+    /// <remarks>
+    /// Absent (<c>GetProperty</c> throws <see cref="KeyNotFoundException"/>) and wrong-kind
+    /// (<c>InvalidOperationException</c>) both land inside the filter
+    /// <c>HomeViewModel.JoinDeviceAsync</c> applies around this parse, so the caller turns them
+    /// into a German banner and disposes the session. An *explicit* JSON null does not: there
+    /// <c>GetString()</c> returns null and the next <c>Trim()</c> raised a
+    /// <see cref="NullReferenceException"/> that escaped that filter, skipped the
+    /// <c>DisposeAsync</c> in its catch and killed the joining app mid-Einsatz. The property is
+    /// present and unusable, which is a malformed document -- so say so in the one exception type
+    /// the caller already handles, and in German, because the caller shows this message to the
+    /// Lagebuchführer.
+    /// </remarks>
+    private static string RequiredName(JsonElement entry, string what) =>
+        entry.GetProperty("name").GetString()
+        ?? throw new JsonException($"{what}: \"name\" darf nicht null sein.");
+
     // The per-item branch #398 wrote for Trupp-Typen: a bare string is what every file written
     // before #470 holds and must keep importing, an object is the current form. name is required
-    // (GetProperty throws KeyNotFoundException, which HomeViewModel catches); uniqueness is
-    // optional and degrades to Multiple, because a hand-edited file may carry anything.
+    // (GetProperty throws KeyNotFoundException, which HomeViewModel catches; RequiredName covers
+    // the null it would otherwise pass through); uniqueness is optional and degrades to Multiple,
+    // because a hand-edited file may carry anything.
     private static IReadOnlyList<Role> ParseRoles(JsonElement root)
     {
         if (!root.TryGetProperty("roles", out var arr) || arr.ValueKind != JsonValueKind.Array)
@@ -600,7 +620,7 @@ public static class MasterDataJson
             result.Add(x.ValueKind == JsonValueKind.String
                 ? new Role(x.GetString()!.Trim())
                 : new Role(
-                    x.GetProperty("name").GetString()!.Trim(),
+                    RequiredName(x, "Funktion"),
                     Role.UniquenessFrom(
                         x.TryGetProperty("uniqueness", out var u) && u.ValueKind == JsonValueKind.String
                             ? u.GetString()
@@ -746,7 +766,7 @@ public static class MasterDataJson
             }
 
             result.Add(new TruppType(
-                x.GetProperty("name").GetString()!.Trim(),
+                RequiredName(x, "Trupp-Typ"),
                 TruppType.ClampMemberCount(Int(x, "memberCount", AtemschutzTrupp.StandardMemberCount)),
                 TruppType.ClampMaxDurationMinutes(
                     Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes))));

@@ -644,4 +644,51 @@ public class MasterDataJsonTests
 
         Assert.Equal(original.Roles, Parse(MasterDataJson.Serialize(original)).Roles);
     }
+
+    // The trust boundary HomeViewModel.JoinDeviceAsync guards: it catches exactly these four types
+    // and nothing else, turns them into a German banner, and -- crucially -- disposes the session
+    // first. A Stammdaten file is host-controlled data that crossed a LAN and a PIN, so a
+    // well-formed document whose *shape* is wrong is a normal hostile input, not a programming
+    // error, and every shape must land inside that set. An explicit JSON null for a required name
+    // used to raise a NullReferenceException out of GetString()!.Trim(), which escaped the filter,
+    // skipped the DisposeAsync and killed the joining app mid-Einsatz with no handler to catch it.
+    // Two call sites trim that name and both were reachable: roles and truppTypes.
+    [Theory]
+    [InlineData("""{ "roles": [{ "name": null }] }""")]
+    [InlineData("""{ "truppTypes": [{ "name": null }] }""")]
+    [InlineData("""{ "roles": [{ "name": 7 }] }""")]
+    [InlineData("""{ "truppTypes": [{ "name": 7 }] }""")]
+    [InlineData("""{ "roles": [null] }""")]
+    [InlineData("""{ "roles": [7] }""")]
+    [InlineData("""{ "roles": [true] }""")]
+    [InlineData("""{ "roles": [{}] }""")]
+    [InlineData("""{ "truppTypes": [null] }""")]
+    [InlineData("""{ "truppTypes": [{}] }""")]
+    public void Parse_raises_nothing_a_join_does_not_already_catch_for_a_wrong_shaped_named_entry(string json)
+    {
+        var thrown = Record.Exception(() => Parse(json));
+
+        Assert.True(
+            thrown is null
+                or JsonException
+                or InvalidOperationException
+                or KeyNotFoundException
+                or FormatException,
+            thrown is null ? "expected this shape to be rejected" : $"escaped the filter as {thrown.GetType().Name}");
+    }
+
+    // The one shape that needs its own assertion, because it is the one a reader will change
+    // again: an explicit null for a property that *is* present is malformed, not absent, so
+    // KeyNotFoundException would be a lie and only the JSON exception tells the caller the truth.
+    // The message is German because JoinError shows it to the Lagebuchführer verbatim.
+    [Theory]
+    [InlineData("""{ "roles": [{ "name": null }] }""")]
+    [InlineData("""{ "truppTypes": [{ "name": null }] }""")]
+    public void Parse_rejects_an_explicitly_null_name_as_a_german_json_error(string json)
+    {
+        var ex = Assert.Throws<JsonException>(() => Parse(json));
+
+        Assert.Contains("name", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("null", ex.Message, StringComparison.Ordinal);
+    }
 }
