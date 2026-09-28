@@ -1,0 +1,1 @@
+After ten wrong share PINs across all devices the host stops accepting new joins until the Lagebuchführer draws a new PIN, which closes the way a peer with many addresses could guess the four-digit PIN, while devices already joined keep working (#288).

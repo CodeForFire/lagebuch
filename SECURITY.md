@@ -89,16 +89,21 @@ one note on why the trust model around the middle two is where it is.
   the LAN at that moment can get themselves pinned instead, and every later
   connection will then look correct.
   ([#288](../../issues/288))
-- **The share PIN is four digits.** It is drawn per share from
-  `RandomNumberGenerator`, held in memory only, never persisted, and a wrong
-  PIN puts the offending source IP into an exponential backoff
-  (2^(failures-1) seconds, capped at 60). But the space is 10,000 values, and
-  the backoff is keyed per source IP, is held in memory only for the host
-  process's lifetime, never locks an address out, and lumps every peer whose
-  remote address does not resolve into one shared bucket — enough against
-  someone guessing, not against an attacker with network access, time and more
-  than one address. Six digits are part of the same issue as the thumbprint
-  display ([#288](../../issues/288)).
+- **The share PIN is four digits, and the host budgets wrong guesses.** It is
+  drawn per share from `RandomNumberGenerator` and held in memory only on the
+  host; a joined device keeps it in `last-connection.json` so it can reconnect
+  without asking. A wrong PIN puts the offending source IP into an exponential
+  backoff (2^(failures-1) seconds, capped at 60), and on top of that the host
+  spends one budget of ten wrong PINs per PIN across *every* address: once it
+  is gone, new joins are refused — even with the right PIN — until the
+  Lagebuchführer draws a new one. Devices already joined keep working. The
+  renewal is deliberately manual: a PIN that renewed itself would only spread
+  the same guesses across rotations. So an attacker gets at most ten guesses in
+  10,000 per renewal a person has to make, and the closed state is the alarm
+  that someone is guessing. A peer whose remote address does not resolve is
+  refused outright. What remains is that a patient attacker can keep closing
+  joins on purpose, which blocks new devices but not the ones already joined
+  ([#288](../../issues/288)).
 - **The PIN plus network reachability is the entire access-control
   boundary.** A device that can reach the host over the LAN/Tailscale link
   and knows the (rate-limited, TLS-protected) PIN is already fully trusted

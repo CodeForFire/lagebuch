@@ -181,10 +181,15 @@ später ab, bricht die Verbindung mit einer Meldung ab. Eine Möglichkeit, ein
 beliebiges Zertifikat zu akzeptieren, gibt es nicht.
 
 **PIN.** Der Beitritt verlangt eine vierstellige PIN, die für jede Freigabe neu
-und kryptografisch zufällig erzeugt, nur im Arbeitsspeicher gehalten und nie
-gespeichert wird. Sie wird bei jeder Anfrage mitgeschickt. Bei falschen
+und kryptografisch zufällig erzeugt und auf dem Gastgeber nur im
+Arbeitsspeicher gehalten wird; ein beigetretenes Gerät merkt sie sich in
+`last-connection.json`. Sie wird bei jeder Anfrage mitgeschickt. Bei falschen
 Eingaben verzögert der Gastgeber die nächste Antwort je Gegenstelle
-exponentiell, bis zu einer Minute.
+exponentiell, bis zu einer Minute. Zusätzlich zählt er falsche Eingaben über
+alle Gegenstellen hinweg: Nach zehn Fehlversuchen nimmt er keine neuen Geräte
+mehr an, auch nicht mit der richtigen PIN, und meldet das im Einsatz. Erst
+„Neue PIN“ öffnet den Beitritt wieder. Bereits verbundene Geräte arbeiten
+währenddessen weiter.
 
 **Was übertragen wird.** Nach jeder Änderung erhält jedes verbundene Gerät den
 vollständigen Stand des Einsatzes: Einsatzdaten, das gesamte ETB einschließlich
@@ -227,7 +232,9 @@ ein Begleitgerät.
 - Datenhaltung ausschließlich lokal, ohne Konto und ohne Serverdienst.
 - Transportverschlüsselung mit TLS und Fingerabdruck-Bindung an die
   Gegenstelle, ohne Rückfallebene auf eine ungeprüfte Verbindung.
-- PIN-Pflicht beim Beitritt, mit Bremse gegen systematisches Durchprobieren.
+- PIN-Pflicht beim Beitritt, mit Bremse gegen systematisches Durchprobieren:
+  nach zehn Fehlversuchen ist der Beitritt gesperrt, bis eine neue PIN
+  erzeugt wird.
 - Anhänge nur als JPEG, PNG, GIF, WebP oder PDF; Dateiname und Dateityp werden
   geprüft, damit sich keine ausführbare Datei als Bild ausgeben kann.
   Dateinamen werden bereinigt, Pfadangaben entfernt, die Länge begrenzt.
@@ -354,9 +361,11 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
   abgeglichen werden. Wer in diesem Moment im selben Netz mitliest, könnte sich
   dazwischenschalten. Verbesserung ist geplant
   ([Issue #288](https://github.com/CodeForFire/lagebuch/issues/288)).
-- **Die PIN hat vier Stellen.** Zusammen mit der Bremse gegen Durchprobieren
-  reicht das gegen zufälliges Raten, nicht gegen einen entschlossenen Angreifer
-  mit Zeit und Netzzugang. Sechs Stellen sind Teil desselben Issues.
+- **Die PIN hat vier Stellen.** Das genügt, weil nach zehn Fehlversuchen der
+  Beitritt gesperrt bleibt, bis jemand eine neue PIN erzeugt: Ein Angreifer
+  hat so höchstens zehn Versuche unter 10.000 je Erneuerung. Er kann den
+  Beitritt aber absichtlich sperren; neue Geräte kommen dann erst nach „Neue
+  PIN“ hinein, verbundene arbeiten weiter.
 - **Erreichbarkeit plus PIN ist die gesamte Zugangskontrolle.** Wer beides hat,
   darf am Einsatz alles ändern.
 - **Der Name in „Wer dokumentiert?“ wird nicht überprüft.** Er dient der

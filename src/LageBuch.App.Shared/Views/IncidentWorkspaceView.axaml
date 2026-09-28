@@ -370,6 +370,32 @@
             </Grid>
           </Border>
 
+          <!-- Spent PIN budget (#288): too many wrong PINs, so someone may be guessing and new joins
+               are closed. Devices already joined keep working. Only NEUE PIN reopens joins, on
+               purpose: a PIN that renewed itself would just spread the same guesses over rotations. -->
+          <Border x:Name="ShareJoinsClosedBanner" Classes="meldung due" IsVisible="{Binding ShareJoinsClosed}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon" Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                  <TextBlock Classes="meldung-label" Text="FREIGABE" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" x:Name="ShareJoinsClosedText" Classes="meldung-text"
+                         Margin="14,10" TextWrapping="Wrap" TextTrimming="None"
+                         Text="Zu viele falsche PIN-Eingaben – neue Geräte können nicht beitreten. Verbundene Geräte arbeiten weiter." />
+              <StackPanel Grid.Column="2" Classes="meldung-actions">
+                <Button x:Name="RenewSharePinButton" Content="NEUE PIN"
+                        Command="{Binding RenewSharePinCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
           <!-- Druckabfrage due (#422): the row is the jump to the Trupp it names. While the check is
                still ahead, the same Trupp is a readout on the quiet strip instead. -->
           <Border x:Name="ScbaControlBar" Classes="meldung due">

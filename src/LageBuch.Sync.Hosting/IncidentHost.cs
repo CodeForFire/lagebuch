@@ -28,12 +28,12 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly LocalIncidentSession _session;
     private readonly IClock _clock;
     private readonly string _appVersion;
-    private readonly string _pin;
+    private readonly JoinGate _gate;
     private readonly IUiDispatcher _ui;
     private readonly string _masterDataJson;
     private readonly int _protocolVersion;
     private readonly int _minimumProtocolVersion;
-    private readonly PinRateLimiter _rateLimiter = new();
+    private readonly PinRateLimiter _rateLimiter;
     private X509Certificate2? _cert;
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
@@ -58,13 +58,20 @@ public sealed class IncidentHost : IAsyncDisposable
         string pin,
         MasterDataSet? masterData = null,
         int protocolVersion = SyncProtocol.ProtocolVersion,
-        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion)
+        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion,
+        TimeProvider? timeProvider = null)
     {
         _session = session;
         _clock = clock;
         _appVersion = appVersion;
-        _pin = pin;
+        _gate = new JoinGate(pin);
+        _gate.Closed += () => JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
         _ui = ui;
+
+        // Tests only, like the protocol overrides below: the per-address backoff runs on real time
+        // otherwise, which would make a test spending the PIN budget from one loopback address wait
+        // minutes between attempts.
+        _rateLimiter = new PinRateLimiter(timeProvider);
 
         // Overridable for tests only, the way ConnectAsync takes a reconnectPolicy. The app always
         // takes the defaults: a host advertising anything other than what this build actually speaks
@@ -82,7 +89,29 @@ public sealed class IncidentHost : IAsyncDisposable
         _masterDataJson = MasterDataJson.Serialize(masterData ?? MasterDataSet.Empty);
     }
 
+    /// <summary>
+    /// Raised when <see cref="JoinsClosed"/> flips: from a request thread when the PIN budget runs
+    /// out (#288), and from the caller of <see cref="ReplacePin"/> when joins reopen.
+    /// </summary>
+    public event EventHandler? JoinsClosedChanged;
+
     public bool IsRunning => _app is not null;
+
+    /// <summary>
+    /// Whether too many wrong PINs have closed joins. Devices already joined keep working; new ones
+    /// are refused until <see cref="ReplacePin"/>.
+    /// </summary>
+    public bool JoinsClosed => _gate.JoinsClosed;
+
+    /// <summary>
+    /// Makes <paramref name="pin"/> the PIN new joins need and reopens joins with a fresh budget.
+    /// Devices already joined keep the PIN they joined with.
+    /// </summary>
+    public void ReplacePin(string pin)
+    {
+        _gate.ReplacePin(pin);
+        JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     public async Task StartAsync(IPAddress bindAddress, int port = SyncProtocol.Port, CancellationToken cancellationToken = default)
     {
@@ -128,8 +157,10 @@ public sealed class IncidentHost : IAsyncDisposable
         // Retry-After before it even reaches the PIN comparison.
         app.Use(async (context, next) =>
         {
-            var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            if (_rateLimiter.ShouldThrottle(ip, out var retryAfter))
+            // A peer without an address is not throttled here; the join gate refuses it outright
+            // rather than pooling every such peer into one shared bucket (#288).
+            var ip = context.Connection.RemoteIpAddress?.ToString();
+            if (ip is not null && _rateLimiter.ShouldThrottle(ip, out var retryAfter))
             {
                 context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -143,13 +174,19 @@ public sealed class IncidentHost : IAsyncDisposable
         // negotiate/transport requests — must carry the share PIN in SyncProtocol.PinHeader. Rejecting
         // here, before routing, keeps every endpoint and the hub gated with one check. The PIN now
         // travels over TLS (not cleartext), so a LAN sniffer no longer sees it; the gate still stops
-        // uninvited joins that know or guess it.
+        // uninvited joins that know or guess it. JoinGate spends one budget per PIN across every
+        // address and closes joins when it runs out (#288); a refusal is a 401 either way, so a
+        // guesser learns nothing from it and older clients need nothing new.
         app.Use(async (context, next) =>
         {
-            var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            if (!PinMatches(context.Request.Headers[SyncProtocol.PinHeader]))
+            var ip = context.Connection.RemoteIpAddress?.ToString();
+            if (!_gate.Check(ip, context.Request.Headers[SyncProtocol.PinHeader]))
             {
-                _rateLimiter.RecordFailure(ip);
+                if (ip is not null)
+                {
+                    _rateLimiter.RecordFailure(ip);
+                }
+
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
@@ -332,18 +369,12 @@ public sealed class IncidentHost : IAsyncDisposable
         return Results.NoContent();
     }
 
-    // Exactly one PIN header, matching the host's, is accepted. A missing/duplicated/mismatched header
-    // is refused. The comparison is ordinal — the PIN is a short numeric string, not a secret to defend
-    // against timing analysis over a LAN it is already carried over TLS.
-    private bool PinMatches(Microsoft.Extensions.Primitives.StringValues header) =>
-        header.Count == 1 && string.Equals(header[0], _pin, StringComparison.Ordinal);
-
     // No header at all is a pre-negotiation peer (v0.6.1 or older), which by construction speaks
     // SyncProtocol.LegacyProtocolVersion and is gated like any other peer claiming that number —
     // served while the floor still includes it, refused once the floor has risen above it (protocol
     // 3, the Beteiligte commands). Anything present must be exactly one header
     // and must parse: a duplicated or garbled one is refused rather than silently coalesced, the same
-    // rule PinMatches applies. Indexed after the count check because StringValues converts implicitly
+    // rule JoinGate.Check applies. Indexed after the count check because StringValues converts implicitly
     // to both string and string[], which makes passing it to TryParse directly ambiguous.
     private static bool ProtocolAccepted(Microsoft.Extensions.Primitives.StringValues header, int minimum) =>
         (header.Count == 0 && minimum <= SyncProtocol.LegacyProtocolVersion)

@@ -1024,4 +1024,70 @@ public class IncidentHostTests
             "\"Der Einsatz ist abgeschlossen und schreibgeschützt.\"",
             await response.Content.ReadAsStringAsync());
     }
+
+    private static async Task<(IncidentHost Host, int Port, FakeTimeProvider Time)> StartGatedHostAsync()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var time = new FakeTimeProvider();
+        var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234", timeProvider: time);
+        var port = TestHost.FreeTcpPort();
+        await host.StartAsync(IPAddress.Loopback, port);
+        return (host, port, time);
+    }
+
+    private static async Task<HttpStatusCode> GetVersionWithPinAsync(int port, string pin)
+    {
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
+        return (await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.Relative))).StatusCode;
+    }
+
+    // #288: the attack replayed end to end. Each wrong PIN waits out the per-address backoff, the
+    // way a patient guesser would; the tenth closes joins, and from then on even the right PIN is
+    // refused to anyone who has not joined yet.
+    [Fact]
+    public async Task Ten_wrong_pins_close_joins_and_then_even_the_right_pin_is_refused()
+    {
+        var (host, port, time) = await StartGatedHostAsync();
+        await using var _ = host;
+        var raised = 0;
+        host.JoinsClosedChanged += (_, _) => raised++;
+
+        for (var i = 0; i < JoinGate.MaxFailuresPerPin; i++)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, await GetVersionWithPinAsync(port, "0000"));
+            time.Advance(TimeSpan.FromSeconds(PinRateLimiter.MaxBackoffSeconds + 1));
+        }
+
+        Assert.True(host.JoinsClosed);
+        Assert.Equal(1, raised);
+        Assert.Equal(HttpStatusCode.Unauthorized, await GetVersionWithPinAsync(port, "1234"));
+    }
+
+    [Fact]
+    public async Task After_a_new_pin_new_joins_use_it_and_a_device_joined_earlier_keeps_its_pin()
+    {
+        var (host, port, time) = await StartGatedHostAsync();
+        await using var _ = host;
+        Assert.Equal(HttpStatusCode.OK, await GetVersionWithPinAsync(port, "1234"));
+        for (var i = 0; i < JoinGate.MaxFailuresPerPin; i++)
+        {
+            await GetVersionWithPinAsync(port, "0000");
+            time.Advance(TimeSpan.FromSeconds(PinRateLimiter.MaxBackoffSeconds + 1));
+        }
+
+        host.ReplacePin("5678");
+
+        Assert.False(host.JoinsClosed);
+        Assert.Equal(HttpStatusCode.OK, await GetVersionWithPinAsync(port, "5678"));
+        Assert.Equal(HttpStatusCode.OK, await GetVersionWithPinAsync(port, "1234"));
+    }
 }
