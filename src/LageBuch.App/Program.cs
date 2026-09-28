@@ -53,7 +53,7 @@ internal static class Program
             new LageBuch.App.Shared.Services.DispatcherTimerTicker(),
             alarms,
             new MasterDataFileService(),
-            new IncidentHostController(clock, version, uiDispatcher),
+            new IncidentHostController(clock, version, uiDispatcher, AppPaths.HostKeyPath),
             uiDispatcher,
             version,
             new JsonLastSaveFolderStore(AppPaths.LastSaveFolderJsonPath),

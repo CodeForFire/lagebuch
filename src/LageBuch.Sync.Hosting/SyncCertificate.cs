@@ -5,20 +5,34 @@ using System.Security.Cryptography.X509Certificates;
 namespace LageBuch.Sync.Hosting;
 
 /// <summary>
-/// Generates the ephemeral self-signed certificate the sync host serves over TLS (§ P0 #2). A new
-/// certificate is minted per share session and discarded on stop; clients pin it via Trust-on-First-Use.
+/// Generates the self-signed certificate the sync host serves over TLS (§ P0 #2). A new certificate
+/// is minted per share session and discarded on stop; the key it carries is the host's persistent
+/// <see cref="HostIdentity"/>, which is what clients pin via Trust-on-First-Use.
 /// </summary>
 public static class SyncCertificate
 {
     /// <summary>
-    /// Creates a fresh self-signed X.509 certificate valid for approximately 24 hours.
+    /// Creates a fresh self-signed X.509 certificate with a throwaway key, valid for approximately 24 hours.
     /// </summary>
     /// <returns>A tuple containing the certificate and its uppercase hex SHA-256 thumbprint.</returns>
     public static (X509Certificate2 Cert, string Thumbprint) Generate()
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var request = new CertificateRequest(
-            $"CN=LageBuch-Sync-{Guid.NewGuid():N}", key, HashAlgorithmName.SHA256);
+        return Generate(key);
+    }
+
+    /// <summary>
+    /// Creates a fresh self-signed X.509 certificate for <paramref name="key"/>, valid for approximately
+    /// 24 hours. The certificate holds its own copy of the key; the caller still owns <paramref name="key"/>.
+    /// </summary>
+    /// <returns>A tuple containing the certificate and its uppercase hex SHA-256 thumbprint.</returns>
+    public static (X509Certificate2 Cert, string Thumbprint) Generate(ECDsa key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        // A fixed subject tells a joining client this host shows its Kennung (see HostKennung); the
+        // certificates still differ per share by their random serial number and validity.
+        var request = new CertificateRequest(HostKennung.CertificateSubject, key, HashAlgorithmName.SHA256);
 
         // Identify the loopback endpoints the host actually serves, so the certificate is a complete TLS
         // server certificate rather than a bare self-signed one.
@@ -29,8 +43,8 @@ public static class SyncCertificate
         request.CertificateExtensions.Add(san.Build());
 
         // Windows' Schannel refuses to finish a TLS server handshake with a certificate that lacks the
-        // Server Authentication EKU; Linux/OpenSSL tolerates the omission. The client pins via TOFU and
-        // accepts any certificate on the first connect, so this only needs to satisfy the server-side TLS
+        // Server Authentication EKU; Linux/OpenSSL tolerates the omission. The client pins the key via
+        // TOFU and accepts any certificate on the first connect, so this only needs to satisfy the server-side TLS
         // stack, not the client's trust decision.
         request.CertificateExtensions.Add(
             new X509EnhancedKeyUsageExtension(

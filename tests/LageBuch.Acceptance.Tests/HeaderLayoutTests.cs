@@ -32,6 +32,8 @@ public class HeaderLayoutTests
 
         public string? SharePin => IsHosting ? "5393" : null;
 
+        public string? ShareKennung => IsHosting ? "7K2Q-M9XD-4HPA" : null;
+
         public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
         {
             IsHosting = true;

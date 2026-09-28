@@ -83,20 +83,43 @@ public sealed class RemoteJoin : IAsyncDisposable
                 return false;
             }
 
-            var thumbprint = Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256));
+            // Pin the host's key, not its certificate: the host issues a new certificate per share
+            // but keeps its key, so a restarted share or a new incident is still the same host.
+            var presented = HostKennung.Pin(cert);
             var known = trustStore.GetThumbprint(host);
             if (known is null)
             {
-                trustStore.SaveThumbprint(host, thumbprint);
+                trustStore.SaveThumbprint(host, presented);
                 return true;
             }
 
-            if (string.Equals(known, thumbprint, StringComparison.OrdinalIgnoreCase))
+            if (!known.StartsWith(HostKennung.PinPrefix, StringComparison.Ordinal))
+            {
+                // A whole-certificate hash from before the persistent key. Upgraded only when this
+                // very certificate still matches it; anything else is a changed host like any other,
+                // never a silent first contact.
+                if (!string.Equals(known, Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256)), StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new CertificateChangedException(host, presented, HostKennung.FromPin(presented), HostKennung.ShowsKennung(cert));
+                }
+
+                trustStore.SaveThumbprint(host, presented);
+                return true;
+            }
+
+            if (string.Equals(known, presented, StringComparison.Ordinal))
             {
                 return true;
             }
 
-            throw new CertificateChangedException(host);
+            // Same Kennung, different key: someone ground a key to pass the comparison with the
+            // host's screen. Refused outright, with nothing offered to trust.
+            if (string.Equals(HostKennung.FromPin(known), HostKennung.FromPin(presented), StringComparison.Ordinal))
+            {
+                throw CertificateChangedException.Forged(host);
+            }
+
+            throw new CertificateChangedException(host, presented, HostKennung.FromPin(presented), HostKennung.ShowsKennung(cert));
         };
 
         // disposeHandler: false — the handler's owner disposes it explicitly (this join until it is

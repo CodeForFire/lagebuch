@@ -151,7 +151,7 @@ public class HomeViewModelJoinTests
     public async Task A_cert_that_differs_from_the_trusted_thumbprint_shows_a_banner()
     {
         var trust = new InMemoryTrustStore();
-        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        trust.SaveThumbprint("127.0.0.1", HostKennung.PinPrefix + "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
@@ -165,15 +165,15 @@ public class HomeViewModelJoinTests
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
-        Assert.Contains("geändert", vm.JoinError, StringComparison.Ordinal); // the cert-changed message
+        Assert.Contains(host.Kennung!, vm.JoinError, StringComparison.Ordinal); // to compare with the host's screen
         Assert.True(vm.CanResetTrustedCertificate); // #181: the banner alone left nobody a way out
     }
 
     [Fact]
-    public async Task Resetting_trust_after_a_cert_change_clears_the_banner_and_lets_a_retry_join()
+    public async Task Trusting_the_new_kennung_pins_exactly_that_key_and_lets_a_retry_join()
     {
         var trust = new InMemoryTrustStore();
-        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        trust.SaveThumbprint("127.0.0.1", HostKennung.PinPrefix + "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
@@ -189,7 +189,9 @@ public class HomeViewModelJoinTests
 
         Assert.Null(vm.JoinError);
         Assert.False(vm.CanResetTrustedCertificate);
-        Assert.Null(trust.GetThumbprint("127.0.0.1")); // the stale pin is gone, so the retry below can re-pin it
+
+        // Not removed, replaced: the retry accepts the key whose Kennung was shown, and no other.
+        Assert.Equal(host.Kennung, HostKennung.FromPin(trust.GetThumbprint("127.0.0.1")!));
 
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
@@ -198,6 +200,38 @@ public class HomeViewModelJoinTests
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
         await opened!.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task A_different_key_on_the_retry_after_trusting_a_kennung_still_fails()
+    {
+        // The swap the old "forget the pin" reset let through: the user compares one Kennung, and by
+        // the time they retry another device answers. Trusting pins the key that was shown, so the
+        // retry refuses the other one instead of pinning it unchecked.
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", HostKennung.PinPrefix + "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        var clock = new FixedClock();
+        var vm = Home(trust);
+        vm.WorkspaceOpened = _ => { };
+
+        var (shown, shownPort) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using (shown)
+        {
+            await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{shownPort}", TestHost.DefaultPin);
+            Assert.True(vm.CanResetTrustedCertificate);
+            vm.ResetTrustedCertificateCommand.Execute(null);
+        }
+
+        var (swapped, swappedPort) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = swapped;
+        var opened = false;
+        vm.WorkspaceOpened = _ => opened = true;
+
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{swappedPort}", TestHost.DefaultPin);
+
+        Assert.False(opened);
+        Assert.Contains(swapped.Kennung!, vm.JoinError, StringComparison.Ordinal);
+        Assert.True(vm.CanResetTrustedCertificate);
     }
 
     [Fact]
@@ -688,7 +722,7 @@ public class HomeViewModelJoinTests
     public async Task Resetting_trust_from_inside_the_dialog_clears_the_banner_and_lets_a_retry_join()
     {
         var trust = new InMemoryTrustStore();
-        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        trust.SaveThumbprint("127.0.0.1", HostKennung.PinPrefix + "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");

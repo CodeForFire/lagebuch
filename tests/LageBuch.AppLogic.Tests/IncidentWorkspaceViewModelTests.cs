@@ -48,11 +48,12 @@ public class IncidentWorkspaceViewModelTests
         Assert.True(host.StartCalled);
         Assert.True(vm.IsSharing);
         Assert.Equal(host.ShareHint, vm.ShareAddress);
+        Assert.Equal("7K2Q-M9XD-4HPA", vm.ShareKennung);
         Assert.Null(vm.ShareStatus); // the header line only carries a failure
     }
 
     [Fact]
-    public async Task Stopping_sharing_clears_the_address_and_the_pin()
+    public async Task Stopping_sharing_clears_the_address_the_pin_and_the_kennung()
     {
         var host = new FakeHostController(shareHint: "Im Netzwerk: https://192.168.0.5:5859");
         var vm = EditableWorkspace(host);
@@ -63,6 +64,7 @@ public class IncidentWorkspaceViewModelTests
         Assert.False(vm.IsSharing);
         Assert.Null(vm.ShareAddress);
         Assert.Null(vm.SharePin);
+        Assert.Null(vm.ShareKennung);
     }
 
     [Fact]
@@ -1827,6 +1829,8 @@ internal sealed class FakeHostController : IIncidentHostController
 
     public string? SharePin { get; private set; }
 
+    public string? ShareKennung { get; private set; }
+
     public bool StartCalled { get; private set; }
 
     /// <summary>The Stammdaten the workspace handed over when sharing started (#183).</summary>
@@ -1843,6 +1847,7 @@ internal sealed class FakeHostController : IIncidentHostController
 
         IsHosting = true;
         SharePin = "1234";
+        ShareKennung = "7K2Q-M9XD-4HPA";
         return Task.CompletedTask;
     }
 
@@ -1858,6 +1863,7 @@ internal sealed class FakeHostController : IIncidentHostController
         IsHosting = false;
         SharePin = null;
         JoinsClosed = false;
+        ShareKennung = null;
         return Task.CompletedTask;
     }
 

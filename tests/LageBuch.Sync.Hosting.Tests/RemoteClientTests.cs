@@ -611,7 +611,7 @@ public class RemoteClientTests
     public async Task Connect_rejects_a_cert_that_differs_from_the_trusted_thumbprint()
     {
         var trust = new InMemoryTrustStore();
-        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        trust.SaveThumbprint("127.0.0.1", HostKennung.PinPrefix + "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
@@ -626,6 +626,119 @@ public class RemoteClientTests
                 trust,
                 TestHost.DefaultPin,
                 port));
+    }
+
+    [Fact]
+    public async Task Rejoining_a_host_restarted_with_the_same_identity_key_needs_no_trust_reset()
+    {
+        // The bug this replays: every share minted a new key, so a client that had joined once got
+        // "Duplikat oder man-in-the-middle?" after any restart of the share, the app or the laptop.
+        using var keyDir = new TempDirectory();
+        var keyPath = Path.Join(keyDir.Path, "host-key.pem");
+        var trust = new InMemoryTrustStore();
+        var clock = new FixedClock();
+
+        var (first, firstPort) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", identityKeyPath: keyPath);
+        await using (first)
+        {
+            await using var client = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, firstPort);
+        }
+
+        var (second, secondPort) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", identityKeyPath: keyPath);
+        await using var _ = second;
+
+        await using var rejoined = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, secondPort);
+
+        Assert.NotNull(rejoined.Incident);
+    }
+
+    [Fact]
+    public async Task A_host_with_a_different_key_raises_certificate_changed_with_its_kennung()
+    {
+        using var keyDir = new TempDirectory();
+        var trust = new InMemoryTrustStore();
+        var clock = new FixedClock();
+
+        var (first, firstPort) = await TestHost.StartAsync(
+            HostSession(clock), clock, "1.0.0", identityKeyPath: Path.Join(keyDir.Path, "a.pem"));
+        await using (first)
+        {
+            await using var client = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, firstPort);
+        }
+
+        var (other, otherPort) = await TestHost.StartAsync(
+            HostSession(clock), clock, "1.0.0", identityKeyPath: Path.Join(keyDir.Path, "b.pem"));
+        await using var _ = other;
+
+        var ex = await Assert.ThrowsAsync<CertificateChangedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, otherPort));
+
+        Assert.Equal(other.Kennung, ex.Kennung);
+        Assert.Contains(other.Kennung!, ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_legacy_whole_certificate_pin_that_still_matches_is_upgraded_to_the_key_pin()
+    {
+        // Before the persistent key, trust.json held whole-certificate hashes. A host still serving
+        // that very certificate is the one that was trusted, so its pin is upgraded without asking.
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        using var presented = await TestHost.PresentedCertificateAsync(port);
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", Convert.ToHexString(presented.GetCertHash(System.Security.Cryptography.HashAlgorithmName.SHA256)));
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port);
+
+        Assert.Equal(HostKennung.Pin(presented), trust.GetThumbprint("127.0.0.1"));
+    }
+
+    [Fact]
+    public async Task A_legacy_whole_certificate_pin_that_no_longer_matches_asks_to_compare_the_kennung()
+    {
+        // The migration must not be a silent first contact: a man-in-the-middle active on the first
+        // connect after the update would be pinned without anyone being asked.
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var ex = await Assert.ThrowsAsync<CertificateChangedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
+
+        Assert.Equal(host.Kennung, ex.Kennung);
+        Assert.Equal("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", trust.GetThumbprint("127.0.0.1"));
+    }
+
+    [Fact]
+    public async Task A_key_ground_to_the_trusted_kennung_is_refused_with_nothing_to_trust()
+    {
+        // The attack a short Kennung invites: grind a key until its Kennung matches the known host's,
+        // so the comparison with the host's screen passes. The stored pin shares the presented key's
+        // Kennung but not the key, which only such a key can produce.
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        using var presented = await TestHost.PresentedCertificateAsync(port);
+        var pin = HostKennung.Pin(presented);
+        var sameKennungOtherKey = pin[..^1] + (pin[^1] == '0' ? '1' : '0');
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", sameKennungOtherKey);
+
+        var ex = await Assert.ThrowsAsync<CertificateChangedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
+
+        Assert.Null(ex.PresentedPin);
+        Assert.Equal(sameKennungOtherKey, trust.GetThumbprint("127.0.0.1"));
     }
 
     // A host older than #288 throttles a device after wrong PINs with 429 + Retry-After. This build's

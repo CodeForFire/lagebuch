@@ -40,6 +40,12 @@ public interface IIncidentHostController
     void RenewPin();
 
     /// <summary>
+    /// The host's Kennung while hosting, shown next to the address so a joining device that reports a
+    /// changed one can be checked against it; null when not hosting.
+    /// </summary>
+    string? ShareKennung { get; }
+
+    /// <summary>
     /// Starts hosting. <paramref name="masterData"/> is the Stammdaten this workspace is running
     /// on: the host is the Stammdaten master (#183), so joined clients run on this set for the
     /// session instead of their own local one.
@@ -71,6 +77,8 @@ public sealed class NoopIncidentHostController : IIncidentHostController
     public void RenewPin()
     {
     }
+
+    public string? ShareKennung => null;
 
     public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default) => Task.CompletedTask;
 

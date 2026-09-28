@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
@@ -306,6 +307,33 @@ internal static class TestHost
             ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
         };
 
+    /// <summary>The certificate the host on <paramref name="port"/> presents, read without pinning it.</summary>
+    public static async Task<X509Certificate2> PresentedCertificateAsync(int port)
+    {
+        // The callback runs once per handshake; the first certificate it sees completes the task.
+        var presented = new TaskCompletionSource<X509Certificate2>();
+        using var handler = new HttpClientHandler
+        {
+            CheckCertificateRevocationList = true,
+            ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
+            {
+                if (cert is not null && !presented.Task.IsCompleted)
+                {
+                    presented.TrySetResult(X509CertificateLoader.LoadCertificate(cert.RawData));
+                }
+
+                return true;
+            },
+        };
+        using var http = new HttpClient(handler) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+
+        // With the PIN: a request without it counts as a failed attempt, and the rate limiter would
+        // then throttle the test's own connect that follows.
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, DefaultPin);
+        using var response = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.Relative));
+        return await presented.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
     public static int FreeTcpPort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -323,7 +351,8 @@ internal static class TestHost
         string pin = DefaultPin,
         MasterDataSet? masterData = null,
         int protocolVersion = SyncProtocol.ProtocolVersion,
-        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion)
+        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion,
+        string? identityKeyPath = null)
     {
         var host = new IncidentHost(
             session,
@@ -333,7 +362,8 @@ internal static class TestHost
             pin,
             masterData,
             protocolVersion,
-            minimumProtocolVersion);
+            minimumProtocolVersion,
+            identityKeyPath);
         var port = FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
         return (host, port);
@@ -541,4 +571,12 @@ internal sealed class SerialUiDispatcher : IUiDispatcher, IDisposable
             action();
         }
     }
+}
+
+/// <summary>A fresh directory under the temp path, deleted with everything in it on dispose.</summary>
+internal sealed class TempDirectory : IDisposable
+{
+    public string Path { get; } = Directory.CreateTempSubdirectory("lagebuch-test-").FullName;
+
+    public void Dispose() => Directory.Delete(Path, recursive: true);
 }

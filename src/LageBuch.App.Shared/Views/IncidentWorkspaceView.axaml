@@ -223,6 +223,12 @@
                                              Text="{Binding ShareAddress}" />
                         <TextBlock Classes="secondary" TextWrapping="Wrap" MaxWidth="320" HorizontalAlignment="Left"
                                    Text="{Binding SharePin, StringFormat='Beim Verbinden die PIN {0} eingeben.'}" />
+                        <!-- The Kennung a joining device shows when this host's key is not the one it
+                             trusted: the Lagebuchführer there compares it with this line. -->
+                        <TextBlock Text="KENNUNG" Classes="overline" Margin="0,4,0,0" />
+                        <SelectableTextBlock x:Name="ShareKennungValue" Classes="body"
+                                             FontFamily="{StaticResource MonoFont}"
+                                             Text="{Binding ShareKennung}" />
                       </StackPanel>
                     </Flyout>
                   </Button.Flyout>
