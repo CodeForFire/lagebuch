@@ -21,7 +21,10 @@ internal sealed class FaultyRelay : IAsyncDisposable
     private readonly TcpListener _listener;
     private readonly int _targetPort;
     private readonly CancellationTokenSource _stop = new();
-    private readonly ConcurrentDictionary<Guid, (TcpClient Downstream, TcpClient Upstream)> _links = new();
+
+    // One reset switch per live link. The link's own LinkAsync owns its sockets outright; Reset only
+    // flips the switch, so exactly one party ever closes a socket.
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _links = new();
     private readonly SemaphoreSlim _held = new(0);
     private readonly Task _acceptLoop;
     private TaskCompletionSource _flowing = Completed();
@@ -67,12 +70,15 @@ internal sealed class FaultyRelay : IAsyncDisposable
     /// <summary>Tears every current connection down with a TCP reset. New connections are relayed as usual.</summary>
     public void Reset()
     {
-        foreach (var (id, link) in _links)
+        foreach (var reset in _links.Values)
         {
-            if (_links.TryRemove(id, out _))
+            try
             {
-                Abort(link.Downstream);
-                Abort(link.Upstream);
+                reset.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The link ended on its own between the listing and here.
             }
         }
     }
@@ -103,18 +109,17 @@ internal sealed class FaultyRelay : IAsyncDisposable
         return tcs;
     }
 
-    // Linger 0 makes Close send RST instead of FIN: the peer sees a reset connection, an error, rather
-    // than an orderly end of stream.
-    private static void Abort(TcpClient client)
+    // Linger 0 makes the coming close send RST instead of FIN: the peer sees a reset connection, an
+    // error, rather than an orderly end of stream.
+    private static void CloseWithReset(TcpClient client)
     {
         try
         {
             client.Client.LingerState = new LingerOption(true, 0);
-            client.Close();
         }
-        catch (ObjectDisposedException)
+        catch (Exception ex) when (ex is SocketException or ObjectDisposedException)
         {
-            // Already torn down by the other direction's pump.
+            // Never connected, or already gone: nothing to reset.
         }
     }
 
@@ -138,15 +143,19 @@ internal sealed class FaultyRelay : IAsyncDisposable
 
         async Task LinkAsync(TcpClient down)
         {
+            // This method owns both sockets, and the using closes them on every way out. A reset only
+            // cancels the link, and the close below then goes out as an RST.
+            using var downstream = down;
+            using var up = new TcpClient();
+            using var reset = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
             var id = Guid.NewGuid();
-            var up = new TcpClient();
+            _links[id] = reset;
             try
             {
-                await up.ConnectAsync(IPAddress.Loopback, _targetPort, _stop.Token);
-                _links[id] = (down, up);
+                await up.ConnectAsync(IPAddress.Loopback, _targetPort, reset.Token);
                 await Task.WhenAny(
-                    PumpAsync(down.GetStream(), up.GetStream()),
-                    PumpAsync(up.GetStream(), down.GetStream()));
+                    PumpAsync(downstream.GetStream(), up.GetStream(), reset.Token),
+                    PumpAsync(up.GetStream(), downstream.GetStream(), reset.Token));
             }
             catch (Exception)
             {
@@ -154,20 +163,21 @@ internal sealed class FaultyRelay : IAsyncDisposable
             }
             finally
             {
-                if (_links.TryRemove(id, out _))
+                _links.TryRemove(id, out _);
+                if (reset.IsCancellationRequested)
                 {
-                    down.Dispose();
-                    up.Dispose();
+                    CloseWithReset(downstream);
+                    CloseWithReset(up);
                 }
             }
         }
     }
 
-    private async Task PumpAsync(NetworkStream from, NetworkStream to)
+    private async Task PumpAsync(NetworkStream from, NetworkStream to, CancellationToken ct)
     {
         var buffer = new byte[16 * 1024];
         int read;
-        while ((read = await from.ReadAsync(buffer, _stop.Token)) > 0)
+        while ((read = await from.ReadAsync(buffer, ct)) > 0)
         {
             // Held here while paused: the bytes were accepted from one side and are not passed on,
             // which is exactly what a half-open link does to both peers.
@@ -177,8 +187,8 @@ internal sealed class FaultyRelay : IAsyncDisposable
                 _held.Release();
             }
 
-            await flowing.WaitAsync(_stop.Token);
-            await to.WriteAsync(buffer.AsMemory(0, read), _stop.Token);
+            await flowing.WaitAsync(ct);
+            await to.WriteAsync(buffer.AsMemory(0, read), ct);
         }
     }
 }
