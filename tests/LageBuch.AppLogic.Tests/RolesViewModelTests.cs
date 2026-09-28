@@ -6,6 +6,7 @@ using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
+using LageBuch.Domain.Involved;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
@@ -751,7 +752,8 @@ public class RolesViewModelTests
             Array.Empty<IncidentFile>(),
             Array.Empty<IncidentTask>(),
             Array.Empty<Building>(),
-            Array.Empty<Dwelling>()));
+            Array.Empty<Dwelling>(),
+            Array.Empty<InvolvedParty>()));
 
         var session = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
         return new RolesViewModel(session, clock, MdWithRoles(uniqueness), () => { });
