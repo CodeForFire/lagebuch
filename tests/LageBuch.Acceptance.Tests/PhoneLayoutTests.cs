@@ -157,6 +157,7 @@ public class PhoneLayoutTests
     [InlineData("CO-MESSUNG")]
     [InlineData("LINKS")]
     [InlineData("BETEILIGTE")]
+    [InlineData("KONTAKTE")]
     [InlineData("AUFBAU")]
     public void No_module_runs_past_the_phone_viewport(string header)
     {
@@ -257,6 +258,7 @@ public class PhoneLayoutTests
         object?[] modules =
         [
             vm.Etb, vm.Tasks, vm.Roles, vm.Forces, vm.InvolvedParties, vm.Scba, vm.CoMessprotokoll, vm.Files, vm.Links,
+            vm.Contacts,
         ];
 
         var aware = modules.OfType<INarrowAware>().ToArray();

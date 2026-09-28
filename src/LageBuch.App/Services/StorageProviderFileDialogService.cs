@@ -182,6 +182,35 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
         return Task.CompletedTask;
     }
 
+    public Task OpenMailAsync(string address)
+    {
+        // Enforced here independently of ContactLauncher, exactly as OpenUrlAsync is: this method's
+        // contract ("a plain e-mail address") has to hold regardless of what a future caller
+        // passes, and LaunchWithOsDefault is Process.Start with UseShellExecute=true. The allowlist
+        // is also what makes the Linux branch's naive quoting safe -- a validated address holds no
+        // quote, space or shell metacharacter to break out with.
+        if (!MailAddressValidator.TryGetMailtoUri(address, out var uri))
+        {
+            return Task.CompletedTask;
+        }
+
+        LaunchWithOsDefault(uri.AbsoluteUri);
+        return Task.CompletedTask;
+    }
+
+    public Task OpenPhoneAsync(string number)
+    {
+        // A desktop with no tel: handler makes xdg-open exit non-zero rather than throw, so nothing
+        // visible happens -- the same pre-existing gap OpenUrlAsync has with a browser-less install.
+        if (!PhoneNumberValidator.TryGetTelUri(number, out var uri))
+        {
+            return Task.CompletedTask;
+        }
+
+        LaunchWithOsDefault(uri.AbsoluteUri);
+        return Task.CompletedTask;
+    }
+
     // UseShellExecute launches the OS's registered default handler on Windows/macOS, for a local
     // path or a URL alike; Linux has no such shell-execute concept in .NET, so xdg-open is the
     // desktop-agnostic equivalent, and it resolves URLs the same way it resolves file paths.

@@ -96,7 +96,7 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone, is_own) VALUES ($l,$f,$r,$c,$p,$o);",
+                "INSERT INTO md_personnel (last_name, first_name, role, call_sign, phone, is_own, email, note) VALUES ($l,$f,$r,$c,$p,$o,$e,$n);",
                 p =>
                 {
                     p("$l", person.LastName);
@@ -105,6 +105,8 @@ public sealed class MasterDataStore
                     p("$c", (object?)person.CallSign ?? DBNull.Value);
                     p("$p", (object?)person.Phone ?? DBNull.Value);
                     p("$o", person.IsOwn ? 1 : 0);
+                    p("$e", (object?)person.Email ?? DBNull.Value);
+                    p("$n", (object?)person.Note ?? DBNull.Value);
                 });
         }
 
@@ -237,7 +239,9 @@ public sealed class MasterDataStore
                 role TEXT,
                 call_sign TEXT,
                 phone TEXT,
-                is_own INTEGER NOT NULL DEFAULT 1
+                is_own INTEGER NOT NULL DEFAULT 1,
+                email TEXT,
+                note TEXT
             );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             """;
@@ -258,13 +262,17 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "seats", "INTEGER NOT NULL DEFAULT 0");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_vehicles", "has_zugfuehrer", "INTEGER NOT NULL DEFAULT 0");
 
-        // md_personnel's optional columns. No shipped version ever lacked them, so these repair
-        // nothing today -- they are here because #397's sweep below holds every repairable column
-        // to the same rule, and a line that is missing is only ever noticed by a user whose store
-        // already broke. Cheap and idempotent; the alternative is finding out in the field.
+        // md_personnel's optional columns. role/call_sign/phone repair nothing today -- no shipped
+        // version ever lacked them -- and are listed because #397's sweep below holds every
+        // repairable column to the same rule, and a line that is missing is only ever noticed by a
+        // user whose store already broke. email/note are the opposite case: every store written by
+        // a released build really is missing them, so without these two lines opening one fails
+        // with "no such column: email" instead of reading the roster it already holds.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "role", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "call_sign", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "phone", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "email", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "note", "TEXT");
 
         // Widen both tables where they predate the own/foreign flag (#458). DEFAULT 1: every row
         // already there was entered as the brigade's own.
@@ -621,12 +629,13 @@ public sealed class MasterDataStore
     private static List<Person> ReadPersonnel(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT last_name, first_name, role, call_sign, phone, is_own FROM md_personnel ORDER BY last_name, first_name;";
+        cmd.CommandText = "SELECT last_name, first_name, role, call_sign, phone, is_own, email, note FROM md_personnel ORDER BY last_name, first_name;";
         using var r = cmd.ExecuteReader();
         var list = new List<Person>();
         while (r.Read())
         {
-            list.Add(new Person(r.GetString(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4), r.GetInt32(5) != 0));
+            list.Add(new Person(
+                r.GetString(0), r.GetString(1), Str(r, 2), Str(r, 3), Str(r, 4), r.GetInt32(5) != 0, Str(r, 6), Str(r, 7)));
         }
 
         return list;

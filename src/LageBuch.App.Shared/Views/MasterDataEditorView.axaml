@@ -27,7 +27,22 @@
       <Setter Property="Grid.ColumnSpan" Value="1" />
     </Style>
 
+    <!-- Personal rows: the wide grid by default, the stacked phone form only inside the query.
+         Style setters, not IsVisible attributes, or the query could never swap them. -->
+    <Style Selector="Grid.person-narrow">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+
     <ContainerQuery Name="Editor" Query="max-width:640">
+      <Style Selector="Grid.person-wide">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Grid.person-narrow">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="Grid#PersonnelHeader">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
       <Style Selector="DockPanel#EditorBody">
         <Setter Property="Margin" Value="12,16" />
       </Style>
@@ -86,6 +101,15 @@
                   Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
                   IsVisible="{Binding VehicleConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding VehicleConflicts}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
+          </Border>
+          <!-- An address Lagebuch would refuse to open would be a dead button in the Kontakte tab.
+               Same shape as the Funkrufname notice beside it: it names the person and blocks
+               saving until the address is fixed. -->
+          <Border x:Name="PersonnelConflictsBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
+                  Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
+                  IsVisible="{Binding PersonnelConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding PersonnelConflicts}" FontSize="11" FontWeight="SemiBold"
+                       Foreground="#F87171" TextWrapping="Wrap" MaxWidth="520" />
           </Border>
         </WrapPanel>
         <WrapPanel x:Name="EditorActions" Orientation="Horizontal" ItemSpacing="8" LineSpacing="6">
@@ -605,9 +629,13 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
-                  <!-- Column headers (#137): each row is unlabeled otherwise. The trailing column is
-                       the remove button's fixed 28px, not "Auto" (see the Fahrzeuge headers above). -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,110,120,150,70,28" Margin="0,0,0,6">
+                  <!-- Column headers (#137): each field is unlabeled otherwise, and a PlaceholderText
+                       disappears once the field is filled. Two lines, because each person takes two:
+                       a seventh and eighth column would run off the right edge of a narrow window
+                       (#146). The grid is the card's own, column for column, and the margin is the
+                       card's padding plus its border, so every label sits over its field. -->
+                  <Grid x:Name="PersonnelHeader" DockPanel.Dock="Top" Margin="13,0,13,6"
+                        ColumnDefinitions="*,*,110,120,150,70,28" RowDefinitions="Auto,Auto" RowSpacing="4">
                     <TextBlock Grid.Column="0" Text="NACHNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="VORNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="ROLLE" Classes="overline" FontSize="10" />
@@ -615,38 +643,103 @@
                     <TextBlock Grid.Column="4" Text="TELEFON" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="5" Text="EIGEN" Classes="overline" FontSize="10"
                                ToolTip.Tip="Eigenes Personal" />
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Text="E-MAIL"
+                               Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="4" Text="NOTIZ / ZUSTÄNDIGKEIT"
+                               Classes="overline" FontSize="10" />
                   </Grid>
-                  <ScrollViewer>
+                  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PersonRow">
-                          <Grid ColumnDefinitions="*,*,110,120,150,70,28" Margin="0,0,0,6">
-                            <TextBox Grid.Column="0"
-                                     PlaceholderText="{x:Static md:AnonymizedExampleData.PersonLastNamePlaceholder}"
-                                     Text="{Binding LastName}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="1"
-                                     PlaceholderText="{x:Static md:AnonymizedExampleData.PersonFirstNamePlaceholder}"
-                                     Text="{Binding FirstName}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="2"
-                                     PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
-                                     Text="{Binding Role}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="3"
-                                     PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
-                                     Text="{Binding CallSign}" Margin="0,0,6,0" />
-                            <TextBox Grid.Column="4"
-                                     PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
-                                     Text="{Binding Phone}" Margin="0,0,6,0" />
-                            <!-- Only own personnel are offered as Lagebuchführer (#458). -->
-                            <CheckBox Grid.Column="5" IsChecked="{Binding IsOwn}"
-                                      VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Eigenes Personal"
-                                      AutomationProperties.Name="Eigenes Personal" />
-                            <Button Grid.Column="6" Classes="icon-btn" ToolTip.Tip="Entfernen"
-                                    AutomationProperties.Name="Entfernen"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                            </Button>
-                          </Grid>
+                          <!-- One card per person, so the two lines read as one entry rather than as
+                               four loose rows of boxes. -->
+                          <Border Classes="row-card">
+                            <Panel>
+                              <Grid Classes="person-wide" ColumnDefinitions="*,*,110,120,150,70,28"
+                                    RowDefinitions="Auto,Auto" RowSpacing="6">
+                                <TextBox Grid.Column="0" AutomationProperties.Name="Nachname"
+                                         PlaceholderText="{x:Static md:AnonymizedExampleData.PersonLastNamePlaceholder}"
+                                         Text="{Binding LastName}" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="1" AutomationProperties.Name="Vorname"
+                                         PlaceholderText="{x:Static md:AnonymizedExampleData.PersonFirstNamePlaceholder}"
+                                         Text="{Binding FirstName}" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="2" AutomationProperties.Name="Rolle"
+                                         PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}"
+                                         Text="{Binding Role}" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="3" AutomationProperties.Name="Rufname"
+                                         PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
+                                         Text="{Binding CallSign}" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="4" AutomationProperties.Name="Telefon"
+                                         PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                                         Text="{Binding Phone}" Margin="0,0,6,0" />
+                                <!-- Only own personnel are offered as Lagebuchführer (#458). -->
+                                <CheckBox Grid.Column="5" IsChecked="{Binding IsOwn}"
+                                          VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="Eigenes Personal"
+                                          AutomationProperties.Name="Eigenes Personal" />
+                                <Button Grid.Column="6" Classes="icon-btn" ToolTip.Tip="Entfernen"
+                                        AutomationProperties.Name="Entfernen"
+                                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                        CommandParameter="{Binding}">
+                                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                </Button>
+                                <!-- Two name columns wide, so an address is not cut off. -->
+                                <TextBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" AutomationProperties.Name="E-Mail"
+                                         PlaceholderText="{x:Static md:AnonymizedExampleData.EmailPlaceholder}"
+                                         Text="{Binding Email}" Margin="0,0,6,0" />
+                                <TextBox Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="4"
+                                         AutomationProperties.Name="Notiz / Zuständigkeit"
+                                         PlaceholderText="{x:Static md:AnonymizedExampleData.PersonNotePlaceholder}"
+                                         Text="{Binding Note}" Margin="0,0,6,0" />
+                              </Grid>
+
+                              <!-- The phone form of the same row: ColumnDefinitions is not a styled
+                                   property, so the query cannot reshape the grid above and swaps in
+                                   this stacked one instead, as ForcesView swaps its grid for cards.
+                                   Every field carries its own label, since the header is gone. -->
+                              <Grid Classes="person-narrow" ColumnDefinitions="*,*" ColumnSpacing="8"
+                                    RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+                                <HeaderedContentControl Grid.Row="0" Grid.Column="0" Classes="field" Header="NACHNAME">
+                                  <TextBox Text="{Binding LastName}" AutomationProperties.Name="Nachname"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.PersonLastNamePlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="0" Grid.Column="1" Classes="field" Header="VORNAME">
+                                  <TextBox Text="{Binding FirstName}" AutomationProperties.Name="Vorname"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.PersonFirstNamePlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="1" Grid.Column="0" Classes="field" Header="ROLLE">
+                                  <TextBox Text="{Binding Role}" AutomationProperties.Name="Rolle"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.RolePlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="1" Grid.Column="1" Classes="field" Header="RUFNAME">
+                                  <TextBox Text="{Binding CallSign}" AutomationProperties.Name="Rufname"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="2" Grid.ColumnSpan="2" Classes="field" Header="TELEFON">
+                                  <TextBox Text="{Binding Phone}" AutomationProperties.Name="Telefon"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="3" Grid.ColumnSpan="2" Classes="field" Header="E-MAIL">
+                                  <TextBox Text="{Binding Email}" AutomationProperties.Name="E-Mail"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.EmailPlaceholder}" />
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Grid.Row="4" Grid.ColumnSpan="2" Classes="field"
+                                                        Header="NOTIZ / ZUSTÄNDIGKEIT">
+                                  <TextBox Text="{Binding Note}" TextWrapping="Wrap"
+                                           AutomationProperties.Name="Notiz / Zuständigkeit"
+                                           PlaceholderText="{x:Static md:AnonymizedExampleData.PersonNotePlaceholder}" />
+                                </HeaderedContentControl>
+                                <CheckBox Grid.Row="5" Grid.Column="0" IsChecked="{Binding IsOwn}"
+                                          Content="Eigenes Personal" VerticalAlignment="Center" />
+                                <Button Grid.Row="5" Grid.Column="1" Classes="icon-btn card-action" HorizontalAlignment="Right"
+                                        ToolTip.Tip="Entfernen" AutomationProperties.Name="Entfernen"
+                                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                        CommandParameter="{Binding}">
+                                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                </Button>
+                              </Grid>
+                            </Panel>
+                          </Border>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>

@@ -1,0 +1,1 @@
+A new Kontakte module lists the Personal Stammdaten as a searchable directory that finds a person by name, Funktion, Funkrufname, number or the new free-text Notiz, highlights why each entry matched, and hands the number or the new e-mail field to the device's phone or mail app, with both fields edited and validated in the Stammdaten editor (#451).

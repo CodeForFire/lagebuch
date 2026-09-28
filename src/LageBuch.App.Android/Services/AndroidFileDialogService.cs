@@ -294,5 +294,41 @@ public sealed class AndroidFileDialogService : IFileDialogService
         return Task.CompletedTask;
     }
 
+    // ActionSendto, not ActionView: it is the action documented for mailto: and it resolves only to
+    // apps declaring a SENDTO/mailto: intent filter, which narrows the redirection surface further
+    // than a generic view. The address check runs here too, for the same reason OpenUrlAsync's
+    // scheme check does -- this method's contract has to hold on its own.
+    public Task OpenMailAsync(string address)
+    {
+        if (!MailAddressValidator.TryGetMailtoUri(address, out var uri))
+        {
+            return Task.CompletedTask;
+        }
+
+        // Deliberately no ResolveActivity first: Android 11 package visibility would hide the
+        // result behind a <queries> declaration, and "hidden" would be indistinguishable from
+        // "absent". Starting and letting ActivityNotFoundException out is what lets ContactLauncher
+        // tell the operator there is no mail app, instead of failing silently.
+        var intent = new Intent(Intent.ActionSendto, global::Android.Net.Uri.Parse(uri.AbsoluteUri));
+        _activity.StartActivity(intent);
+        return Task.CompletedTask;
+    }
+
+    // ActionDial, never ActionCall. ActionDial opens the dialer with the number filled in and the
+    // operator still presses call; ActionCall places it immediately and needs the CALL_PHONE
+    // permission, which this app will not ask for -- a misparsed roster number would otherwise dial
+    // on its own from a device in an Einsatz. ActionDial needs no permission and no manifest entry.
+    public Task OpenPhoneAsync(string number)
+    {
+        if (!PhoneNumberValidator.TryGetTelUri(number, out var uri))
+        {
+            return Task.CompletedTask;
+        }
+
+        var intent = new Intent(Intent.ActionDial, global::Android.Net.Uri.Parse(uri.AbsoluteUri));
+        _activity.StartActivity(intent);
+        return Task.CompletedTask;
+    }
+
     private static string MimeTypeOf(string path) => IncidentFile.GetMimeType(path, "*/*");
 }
