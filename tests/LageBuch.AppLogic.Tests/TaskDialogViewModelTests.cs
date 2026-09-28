@@ -28,6 +28,22 @@ public class TaskDialogViewModelTests
     };
 
     [Fact]
+    public void Assignee_options_offer_callsigns_and_names_but_not_funktionen()
+    {
+        var (session, _) = NewSession();
+        var masterData = MasterData() with
+        {
+            Roles = new[] { new Role("EL") },
+            Personnel = new[] { new Person("Mustermann", "Max", "ZF", "FFB 1/10", null) },
+        };
+
+        var dialog = new TaskDialogViewModel(session, masterData, string.Empty, () => { });
+
+        // #468: the dialog offers exactly what the AUFGABEN dock does.
+        Assert.Equal(new[] { "FFB 1/44/1", "FFB 1/10", "Mustermann, Max" }, dialog.AssigneeOptions);
+    }
+
+    [Fact]
     public void Prefills_text_from_the_etb_entry_and_defaults_from_medium_urgency()
     {
         var (session, _) = NewSession();

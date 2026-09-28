@@ -28,11 +28,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         _session = session;
         _onChanged = onChanged;
         Text = prefilledText;
-        AssigneeOptions = masterData.RadioCallSigns
-            .Concat(masterData.Roles.Select(r => r.Name))
-            .Concat(masterData.Personnel.Select(p => $"{p.LastName} {p.FirstName}"))
-            .Distinct()
-            .ToArray();
+        AssigneeOptions = TasksViewModel.AssigneeSuggestions(masterData);
         ImportanceOptions = TasksViewModel.ImportanceLevels();
         UrgencyOptions = TasksViewModel.UrgencyLevels();
         _timerMinutes = IncidentTask.DefaultTimerMinutes(Urgency);

@@ -46,12 +46,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDi
         _onChanged = onChanged;
         IsReadOnly = session.IsReadOnly;
 
-        // Callsigns, Funktionen and personnel names suggest; anything else stays free text.
-        AssigneeOptions = masterData.RadioCallSigns
-            .Concat(masterData.Roles.Select(r => r.Name))
-            .Concat(masterData.Personnel.Select(p => $"{p.LastName} {p.FirstName}"))
-            .Distinct()
-            .ToArray();
+        AssigneeOptions = AssigneeSuggestions(masterData);
         Rows = new ObservableCollection<TaskRow>();
         _subscription = IsReadOnly ? null : ticker.Subscribe(OnTick);
         _session.Changed += Sync;
@@ -63,6 +58,14 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDi
     public ObservableCollection<TaskRow> Rows { get; }
 
     public IReadOnlyList<string> AssigneeOptions { get; }
+
+    // Callsigns and personnel names suggest; anything else stays free text. Funktionen are not
+    // who a task goes to (#468). Shared with TaskDialogViewModel so both offer the same list.
+    internal static IReadOnlyList<string> AssigneeSuggestions(MasterDataSet masterData) =>
+        masterData.RadioCallSigns
+            .Concat(masterData.Personnel.Select(p => p.DisplayName))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
     // Shared with TaskDialogViewModel (same assembly) so picker wording matches everywhere.
     internal static IReadOnlyList<ImportanceOption> ImportanceLevels() =>
