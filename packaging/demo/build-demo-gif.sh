@@ -24,9 +24,11 @@ frames=(
   "einsatzdaten.png|Stichwort, Einsatznummer, Adresse"
   "etb.png|Einsatztagebuch: jede Meldung mit Zeitstempel"
   "kraefte.png|Kräfte und Stärke im Blick"
+  "kontakte.png|Kontakte: die Mannschaft mit Funkrufname"
   "atemschutz.png|Atemschutzüberwachung mit Sprachansage"
   "aufgaben.png|Aufgaben mit Fälligkeit"
   "co-messung.png|CO-Messprotokoll Wohnung für Wohnung"
+  "beteiligte.png|Beteiligte: die Menschen des Einsatzes"
   "pdf-export.png|PDF-Bericht mit einem Klick"
 )
 
