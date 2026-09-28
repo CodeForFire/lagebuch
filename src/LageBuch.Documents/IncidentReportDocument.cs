@@ -26,8 +26,9 @@ public sealed class IncidentReportDocument : IDocument
     /// </param>
     /// <param name="asOf">
     /// The moment the export was taken. <see cref="Sections.TasksSection"/> uses it to decide which
-    /// Aufgaben are overdue, and the footer of a still-open incident prints it as the Zwischenstand
-    /// time (see <see cref="InterimMarker"/>); every other section is a pure function of the incident.
+    /// Aufgaben are overdue, <see cref="Sections.AtemschutzSection"/> to word each Trupp's status,
+    /// and the footer of a still-open incident prints it as the Zwischenstand time (see
+    /// <see cref="InterimMarker"/>); every other section is a pure function of the incident.
     /// </param>
     public IncidentReportDocument(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]>? fileBytes = null, IncidentPdfSections sections = IncidentPdfSections.All)
     {
@@ -96,7 +97,7 @@ public sealed class IncidentReportDocument : IDocument
 
                 if (_sections.HasFlag(IncidentPdfSections.Atemschutz))
                 {
-                    column.Item().Element(c => AtemschutzSection.Compose(c, _incident));
+                    column.Item().Element(c => AtemschutzSection.Compose(c, _incident, _asOf));
                 }
 
                 if (_sections.HasFlag(IncidentPdfSections.CoMessprotokoll))

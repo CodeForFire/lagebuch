@@ -132,15 +132,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         }
     }
 
-    public string StatusDisplay => _trupp switch
-    {
-        { IsReturned: true } => "Abgenommen",
-        { IsWaiting: true } => "Bereitgestellt",
-        _ when IsAlarm => "ALARM",
-        { IsWithdrawing: true } => "Rückzug",
-        _ when IsControlDue => "Druckabfrage",
-        _ => "Im Einsatz",
-    };
+    public string StatusDisplay => _trupp.StatusLabel(_clock.Now);
 
     /// <summary>The Trupps that may be designated as this one's Sicherheitstrupp, "— kein —"
     /// first. Carried on the row rather than the ViewModel because the flyout's item template binds

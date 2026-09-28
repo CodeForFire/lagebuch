@@ -650,4 +650,50 @@ public class AtemschutzTests
         Assert.Equal(first.Designation, second.Designation);
         Assert.NotEqual(first.DisplayNameWithCallSign, second.DisplayNameWithCallSign);
     }
+
+    // #426: the grid and the PDF both print this, so the wording lives on the Trupp.
+    [Fact]
+    public void StatusLabel_follows_the_lifecycle()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        Assert.Equal("Bereitgestellt", trupp.StatusLabel(T0.AddHours(2)));
+
+        incident.StartScbaTrupp(clock, trupp.Id);
+        Assert.Equal("Im Einsatz", trupp.StatusLabel(T0.AddMinutes(1)));
+
+        clock.Now = T0.AddMinutes(2);
+        incident.WithdrawScbaTrupp(clock, trupp.Id);
+        Assert.Equal("Rückzug", trupp.StatusLabel(T0.AddMinutes(3)));
+
+        clock.Now = T0.AddMinutes(4);
+        incident.MarkScbaRemoved(clock, trupp.Id);
+        Assert.Equal("Abgenommen", trupp.StatusLabel(T0.AddHours(5)));
+    }
+
+    [Fact]
+    public void StatusLabel_reports_a_due_druckabfrage()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+
+        Assert.Equal(
+            "Druckabfrage",
+            trupp.StatusLabel(T0.AddMinutes(AtemschutzTrupp.DefaultPressureControlIntervalMinutes)));
+    }
+
+    [Fact]
+    public void StatusLabel_reports_an_alarm_over_a_due_druckabfrage()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = incident.AddScbaTrupp(
+            clock, "Angriffstrupp", TruppMember.Crew("Müller", "Schmidt"), entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+        incident.RecordScbaPressure(clock, trupp.Id, AtemschutzTrupp.DefaultReturnPressureBar);
+
+        Assert.Equal("ALARM", trupp.StatusLabel(T0.AddMinutes(30)));
+    }
 }
