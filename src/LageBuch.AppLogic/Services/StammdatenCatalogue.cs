@@ -103,7 +103,11 @@ public static class StammdatenCatalogue
     // One loop for both row lookups, so the trimming, the case-insensitive comparison and the
     // first-match rule cannot drift apart between them; only the row type differs. A null row or a
     // null name is tolerated as it always was, which costs nothing next to a mid-Einsatz crash.
+    // The class constraint is what makes `return default` mean null: both callers pass records, but
+    // an unconstrained T would also compile with default(int), and this is a lookup whose "not
+    // found" answer is the only answer a caller can act on.
     private static T? FindByName<T>(string? name, IReadOnlyList<T> catalogue, Func<T, string?> nameOf)
+        where T : class
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))

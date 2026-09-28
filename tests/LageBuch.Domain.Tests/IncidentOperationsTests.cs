@@ -720,7 +720,9 @@ public class IncidentOperationsTests
 
         incident.TransferRole(clock, op, original.Id, "Schmidt", null, null);
 
-        Assert.Equal("Schmidt", incident.FindRunningRoleHolder("EL", "Abschnitt Nord")!.PersonName);
+        var holder = incident.FindRunningRoleHolder("EL", "Abschnitt Nord");
+        Assert.NotNull(holder);
+        Assert.Equal("Schmidt", holder!.PersonName);
     }
 
     [Fact]
@@ -772,7 +774,9 @@ public class IncidentOperationsTests
         incident.AssignRole(clock, op, "EL", "Müller");
         incident.AssignRole(clock, op, "EL", "Schmidt");
 
-        Assert.Equal("Müller", incident.FindRunningRoleHolder("EL", null)!.PersonName);
+        var holder = incident.FindRunningRoleHolder("EL", null);
+        Assert.NotNull(holder);
+        Assert.Equal("Müller", holder!.PersonName);
     }
 
     // A Funktion unique once per Einsatz does not care which Abschnitt either holder is typed into,
