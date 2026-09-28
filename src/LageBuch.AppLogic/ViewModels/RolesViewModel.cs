@@ -81,6 +81,17 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(BeginTransferCommand))]
     private DateTimeOffset? _to;
 
+    /// <summary>
+    /// Another running row holds the same Funktion — in the same Abschnitt too, when the Stammdaten
+    /// mark that one unique once per Abschnitt (#470). Set by <c>RolesViewModel.MarkDuplicates</c>,
+    /// never here: the grid reads this row, and while the rows are being built this one does not yet
+    /// have its partner in the list, so a single pass would mark the second of a pair and not the
+    /// first. A duplicate that arrived from an older Einsatzdatei, an import or a joined device is
+    /// neither refused nor hidden — it is marked, and both rows of it are.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDuplicate;
+
     public string FromDisplay => From is { } f ? Formatting.Timestamp(f) : "—";
 
     public string ToDisplay => To is { } t ? Formatting.Timestamp(t) : "—";
@@ -145,6 +156,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     {
         _all.Clear();
         _all.AddRange(_session.Incident.Roles.Select(CreateRow));
+        MarkDuplicates(); // after every row exists — see the comment on it
         ApplyFilter();
 
         // A handover changes who holds what without touching the form, so a conflict computed from
@@ -152,6 +164,59 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
         OnPropertyChanged(nameof(ConflictingRow));
         OnPropertyChanged(nameof(ConflictHint));
     }
+
+    // The add form refuses a second holder of a unique Funktion, but it cannot refuse one that is
+    // already recorded: an older Einsatzdatei, an imported .fwincident or a joined device running
+    // other Stammdaten can each bring one, and an Einsatz has to keep working. So such a row is
+    // marked instead — on both rows, since either could be the one to hand over, and a marker that
+    // picked a winner would be naming a culprit in a record of what happened.
+    //
+    // The second pass is a correctness requirement, not an optimisation: RefreshRoles builds the
+    // rows through CreateRow while _all is still filling, so a row's partner is not in the list yet
+    // when the row itself is created. O(n²) over _all costs nothing — an Einsatz holds tens of
+    // assignments, not thousands.
+    private void MarkDuplicates()
+    {
+        foreach (var row in _all)
+        {
+            // Resolved once per row. A Funktion the Stammdaten do not list, or one they leave
+            // Multiple, carries no mode and can never be a duplicate — the tolerance
+            // StammdatenCatalogue exists for, and the same case IsNewRoleUnknown hints about.
+            // Written false rather than skipped, so a row that was marked in the previous refresh
+            // is visibly cleared instead of merely having been replaced by a clean row.
+            if (StammdatenCatalogue.Find(row.Role, _roles) is not { Uniqueness: > RoleUniqueness.Multiple } mode)
+            {
+                row.IsDuplicate = false;
+                continue;
+            }
+
+            // The same question FindRunningHolder asks, and it must branch the same way (Ruling 16):
+            // a Funktion unique per Abschnitt is one holder per Abschnitt, one unique per Einsatz one
+            // for the whole Einsatz whatever Abschnitt either sits in. If the two call sites drifted,
+            // the grid would mark a row the add form does not flag, or the reverse.
+            //
+            // Liveness is tested on the row as well as on its partner, and a handover is the state
+            // that demands it: a handed-over Funktion always leaves an ended row beside a running
+            // one, so a partner-only test would mark the app's own history -- and put a warning
+            // where there is no ÜBERTRAGEN button to answer it with.
+            row.IsDuplicate = row.IsRunning && _all.Any(other =>
+                other.Id != row.Id
+                && other.IsRunning
+                && string.Equals(other.Role?.Trim(), row.Role?.Trim(), StringComparison.OrdinalIgnoreCase)
+                && (mode.Uniqueness != RoleUniqueness.UniquePerSection
+                    || SameSection(other.Section, row.Section)));
+        }
+    }
+
+    // Two absent Abschnitte are one bucket, one absent and one named are not. Same rule as
+    // Incident.FindRunningRoleHolder, which is what the add form asks and which has to agree with
+    // this: the domain keeps the normalisation in a private NormalizeSection, so the equality is
+    // spelled here rather than a second implementation of "blank ≡ blank" living next to it.
+    private static bool SameSection(string? left, string? right) =>
+        string.Equals(
+            left?.Trim() ?? string.Empty,
+            right?.Trim() ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
 
     private void ApplyFilter()
     {
@@ -240,8 +305,8 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     // Which question to ask is the whole rule (#470): a Funktion unique per Abschnitt is one holder
     // per Abschnitt, a Funktion unique per Einsatz one holder for the Einsatz whatever Abschnitt
     // either of them is typed into. Asking the section-scoped one for a per-Einsatz Funktion would
-    // leave a second EL in another Abschnitt unflagged, so the duplicate marking Task 7 adds to the
-    // grid has to branch the same way.
+    // leave a second EL in another Abschnitt unflagged, so the duplicate marking the grid carries
+    // (MarkDuplicates) has to branch the same way.
     private RoleAssignment? FindRunningHolder() =>
         NewRoleUniqueness == RoleUniqueness.UniquePerSection
             ? _session.Incident.FindRunningRoleHolder(NewRole, NewSection)

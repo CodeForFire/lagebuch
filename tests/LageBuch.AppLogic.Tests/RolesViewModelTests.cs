@@ -687,4 +687,89 @@ public class RolesViewModelTests
         Assert.Equal("EL", vm.NewRole);                            // the add form is left as typed
         Assert.Equal("Schmidt", vm.NewPersonName);
     }
+
+    // --- A duplicate that arrived from elsewhere (#470) ---
+    // The add form refuses a second holder, but it cannot refuse one that is already recorded: an
+    // older Einsatzdatei, an imported .fwincident or a joined device on other Stammdaten can all
+    // bring one. Seeded through the domain, which is the only way one can arrive.
+    private static RolesViewModel VmOverSeededDuplicate(
+        RoleUniqueness uniqueness, string? firstSection = null, string? secondSection = null)
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Müller");
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AssignRole(clock, op, "EL", "Müller", from: T0, section: firstSection);
+        session.Incident.AssignRole(clock, op, "EL", "Schmidt", from: T0, section: secondSection);
+
+        return new RolesViewModel(session, clock, MdWithRoles(uniqueness), () => { });
+    }
+
+    // Both rows are marked, not one: either could be the one to hand over, and a marker that picked
+    // a winner would be naming a culprit in a record of what happened. The first row is the one a
+    // single pass would miss, since its partner is only appended after it.
+    [Fact]
+    public void A_duplicate_already_in_the_incident_is_marked_on_both_rows()
+    {
+        var vm = VmOverSeededDuplicate(RoleUniqueness.UniquePerIncident, "Abschnitt Nord", "Abschnitt Nord");
+
+        Assert.Equal(2, vm.Roles.Count);
+        Assert.All(vm.Roles, r => Assert.True(r.IsDuplicate));
+    }
+
+    // The guard that keeps the default inert.
+    [Fact]
+    public void A_duplicate_of_a_multiple_funktion_is_not_marked()
+    {
+        var vm = VmOverSeededDuplicate(RoleUniqueness.Multiple, "Abschnitt Nord", "Abschnitt Nord");
+
+        Assert.Equal(2, vm.Roles.Count);
+        Assert.All(vm.Roles, r => Assert.False(r.IsDuplicate));
+    }
+
+    // The marker and the add form ask the same question (Ruling 16), so this is where a drift
+    // between the two call sites shows: once per Abschnitt the two holders are legitimate, once per
+    // Einsatz they are not whatever Abschnitt either of them sits in.
+    [Fact]
+    public void A_duplicate_across_abschnitte_is_marked_only_when_the_funktion_is_unique_for_the_einsatz()
+    {
+        var perSection = VmOverSeededDuplicate(RoleUniqueness.UniquePerSection, "Abschnitt Nord", "Abschnitt Süd");
+        Assert.All(perSection.Roles, r => Assert.False(r.IsDuplicate));
+
+        var perIncident = VmOverSeededDuplicate(RoleUniqueness.UniquePerIncident, "Abschnitt Nord", "Abschnitt Süd");
+        Assert.All(perIncident.Roles, r => Assert.True(r.IsDuplicate));
+    }
+
+    // Only a running assignment holds a Funktion — the same liveness test FindRunningRoleHolder
+    // applies, in both directions: the ended row must not be marked either, or every Übergabe of a
+    // unique Funktion would light up its own history.
+    [Fact]
+    public void An_ended_assignment_does_not_make_its_funktion_a_duplicate()
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Müller");
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var handedOver = session.Incident.AssignRole(clock, op, "EL", "Müller", from: T0);
+        session.Incident.EndRoleAssignment(handedOver.Id, T0.AddMinutes(10));
+        session.Incident.AssignRole(clock, op, "EL", "Schmidt", from: T0.AddMinutes(10));
+
+        var vm = new RolesViewModel(session, clock, MdWithRoles(RoleUniqueness.UniquePerIncident), () => { })
+        {
+            ShowAllRoles = true, // otherwise the ended row is filtered out of the grid
+        };
+
+        Assert.Equal(2, vm.Roles.Count);
+        Assert.All(vm.Roles, r => Assert.False(r.IsDuplicate));
+    }
 }
