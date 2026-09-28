@@ -57,9 +57,9 @@ public static class MailAddressValidator
         "Design",
         "CA1054",
         Justification = "A string is the input by design: deciding whether an unvalidated, possibly malformed string is a usable address is this method's job, so requiring a parsed System.Uri would push that decision back onto every caller.")]
-    public static bool TryGetMailtoUri(string? input, out Uri uri)
+    public static bool TryGetMailtoUri([NotNullWhen(true)] string? input, [NotNullWhen(true)] out Uri? uri)
     {
-        uri = null!;
+        uri = null;
         var address = input?.Trim();
         if (string.IsNullOrEmpty(address) || address.Length > MaxTotalLength)
         {
@@ -77,7 +77,7 @@ public static class MailAddressValidator
 
         return IsLocalPart(address.AsSpan(0, at))
             && IsDomain(address.AsSpan(at + 1))
-            && Uri.TryCreate("mailto:" + address, UriKind.Absolute, out uri!)
+            && Uri.TryCreate("mailto:" + address, UriKind.Absolute, out uri)
             && string.Equals(uri.Scheme, Uri.UriSchemeMailto, StringComparison.Ordinal);
     }
 

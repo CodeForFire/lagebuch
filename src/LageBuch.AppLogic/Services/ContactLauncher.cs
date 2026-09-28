@@ -36,7 +36,7 @@ public static class ContactLauncher
         try
         {
             // The bare address, not the URI: OpenMailAsync owns the scheme by contract.
-            await dialogs.OpenMailAsync(address!.Trim());
+            await dialogs.OpenMailAsync(address.Trim());
             return null;
         }
         catch (Exception ex)
@@ -61,7 +61,7 @@ public static class ContactLauncher
 
         try
         {
-            await dialogs.OpenPhoneAsync(number!.Trim());
+            await dialogs.OpenPhoneAsync(number.Trim());
             return null;
         }
         catch (Exception ex)

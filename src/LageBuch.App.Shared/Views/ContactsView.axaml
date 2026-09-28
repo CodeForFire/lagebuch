@@ -124,7 +124,7 @@
 
     <TextBlock DockPanel.Dock="Top" x:Name="EmptyText"
                Text="Keine Kontakte hinterlegt — Personal steht in den Stammdaten."
-               Foreground="{StaticResource TextMutedBrush}"
+               Foreground="{StaticResource TextSecondaryBrush}"
                IsVisible="{Binding !Contacts.Count}" />
 
     <Border x:Name="ContactsPanel"
@@ -134,87 +134,96 @@
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
         <Panel Margin="8">
           <!-- Distinct from EmptyText above: the Stammdaten do hold people, this search just found
-               none. Inside the panel so the frame doesn't collapse mid-keystroke. -->
+               none. Inside the panel so the frame doesn't collapse mid-keystroke. TextSecondary,
+               not TextMuted: that token is 50% alpha, and this line is all that explains the
+               empty list (#439 moved content lines off it for the same reason). -->
           <TextBlock x:Name="NoMatchesText" Text="{Binding NoMatchesMessage}" Margin="6"
-                     Foreground="{StaticResource TextMutedBrush}"
+                     Foreground="{StaticResource TextSecondaryBrush}"
                      IsVisible="{Binding !VisibleContacts.Count}" />
           <!-- ItemsControl, not ItemsRepeater: a Landkreis roster is tens of people, not
-               thousands. Not virtualized, so the capped, left-aligned width cannot change while
-               the list scrolls; capped so the actions stay within eye travel of the name on a
-               1920px ELW monitor. -->
-          <ItemsControl x:Name="ContactsList" ItemsSource="{Binding VisibleContacts}"
-                        MaxWidth="1100" HorizontalAlignment="Left"
-                        IsVisible="{Binding VisibleContacts.Count}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:ContactRow">
-                <Border Classes="row-card">
-                  <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
-                    <!-- #441: the Funkrufname is how the person is called on the radio, so it
-                         stays on the name line; a WrapPanel lets it drop below on a phone. -->
-                    <WrapPanel Grid.Row="0" Grid.Column="0" ItemSpacing="10" LineSpacing="2"
-                               VerticalAlignment="Center">
-                      <TextBlock x:Name="ContactName" FontSize="15" FontWeight="SemiBold"
-                                 Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
-                                 b:HighlightedText.Segments="{Binding NameSegments}" />
-                      <TextBlock Text="{Binding Person.Role}" VerticalAlignment="Center"
-                                 Foreground="{StaticResource TextSecondaryBrush}" />
-                      <TextBlock Classes="mono" Text="{Binding Person.CallSign}" VerticalAlignment="Center" />
-                      <!-- #458: somebody from a neighbouring brigade. A quiet tag, not a colour: it
-                           explains a surprise ("why can't I pick them as Lagebuchführer?") rather
-                           than warning about anything. -->
-                      <Border x:Name="ForeignTag" IsVisible="{Binding IsForeign}" VerticalAlignment="Center"
-                              BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
-                              CornerRadius="{StaticResource RadiusSm}" Padding="6,1">
-                        <TextBlock Text="fremd" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                      </Border>
-                    </WrapPanel>
-
-                    <!-- The Zuständigkeit is the answer the search exists to find, so it is primary
-                         text, not a muted caption, and a hit inside it lights up. In a Grid cell,
-                         not a StackPanel: a wrapping TextBlock in a horizontal StackPanel measures
-                         at infinite width and never wraps. -->
-                    <TextBlock Grid.Row="1" Grid.Column="0" x:Name="ContactNote" Margin="0,4,0,0"
-                               FontSize="14" TextWrapping="Wrap"
-                               Foreground="{StaticResource TextPrimaryBrush}"
-                               b:HighlightedText.Segments="{Binding NoteSegments}"
-                               IsVisible="{Binding NoteSegments.Count}" />
-
-                    <!-- The number is the button's own text: one control both shows it and dials
-                         it, and it stays readable where no dialer is registered. The glyph, not
-                         only the tooltip, says "this leaves Lagebuch" (#262) — Android has no
-                         hover. Mail is an icon: an address is rarely read out, and a second
-                         labelled button per row is what drowned the Notiz before. -->
-                    <DockPanel Classes="contact-actions" LastChildFill="True">
-                      <Panel DockPanel.Dock="Right" Classes="contact-mail-slot" Margin="4,0,0,0">
-                        <Button Classes="icon-btn contact-mail"
-                                IsVisible="{Binding Person.HasEmail}"
-                                Command="{ReflectionBinding $parent[ItemsControl].DataContext.MailCommand}"
+               thousands. Capped so the actions stay within eye travel of the name on a 1920px
+               ELW monitor, but by a capped column, never a left-aligned MaxWidth on the list:
+               that sizes the list to its widest card, and filtering changes the widest card on
+               every keystroke, so the number column would jump while the Lagebuchführer types. -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" MaxWidth="1100" />
+            </Grid.ColumnDefinitions>
+            <ItemsControl x:Name="ContactsList" ItemsSource="{Binding VisibleContacts}"
+                          IsVisible="{Binding VisibleContacts.Count}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ContactRow">
+                  <Border Classes="row-card">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                      <!-- #441: the Funkrufname is how the person is called on the radio, so it
+                           stays on the name line; a WrapPanel lets it drop below on a phone. -->
+                      <WrapPanel Grid.Row="0" Grid.Column="0" ItemSpacing="10" LineSpacing="2"
+                                 VerticalAlignment="Center">
+                        <TextBlock x:Name="ContactName" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
+                                   b:HighlightedText.Segments="{Binding NameSegments}" />
+                        <TextBlock Text="{Binding Person.Role}" VerticalAlignment="Center"
+                                   Foreground="{StaticResource TextSecondaryBrush}" />
+                        <TextBlock Classes="mono" Text="{Binding Person.CallSign}" VerticalAlignment="Center" />
+                        <!-- #458: somebody from a neighbouring brigade. A quiet tag, not a colour: it
+                             explains a surprise ("why can't I pick them as Lagebuchführer?") rather
+                             than warning about anything. -->
+                        <Border x:Name="ForeignTag" IsVisible="{Binding IsForeign}" VerticalAlignment="Center"
+                                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+                                CornerRadius="{StaticResource RadiusSm}" Padding="6,1">
+                          <TextBlock Text="fremd" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                        </Border>
+                      </WrapPanel>
+  
+                      <!-- The Zuständigkeit is the answer the search exists to find, so it is primary
+                           text, not a muted caption, and a hit inside it lights up. In a Grid cell,
+                           not a StackPanel: a wrapping TextBlock in a horizontal StackPanel measures
+                           at infinite width and never wraps. -->
+                      <TextBlock Grid.Row="1" Grid.Column="0" x:Name="ContactNote" Margin="0,4,0,0"
+                                 FontSize="14" TextWrapping="Wrap"
+                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                 b:HighlightedText.Segments="{Binding NoteSegments}"
+                                 IsVisible="{Binding NoteSegments.Count}" />
+  
+                      <!-- The number is the button's own text: one control both shows it and dials
+                           it, and it stays readable where no dialer is registered. The glyph, not
+                           only the tooltip, says "this leaves Lagebuch" (#262) — Android has no
+                           hover. Mail is an icon: an address is rarely read out, and a second
+                           labelled button per row is what drowned the Notiz before. -->
+                      <DockPanel Classes="contact-actions" LastChildFill="True">
+                        <Panel DockPanel.Dock="Right" Classes="contact-mail-slot" Margin="4,0,0,0">
+                          <Button Classes="icon-btn contact-mail"
+                                  IsVisible="{Binding Person.HasEmail}"
+                                  Command="{ReflectionBinding $parent[ItemsControl].DataContext.MailCommand}"
+                                  CommandParameter="{Binding Person}"
+                                  ToolTip.Tip="{Binding Person.Email, StringFormat='E-Mail an {0} verfassen'}"
+                                  AutomationProperties.Name="{Binding Person.Email, StringFormat='E-Mail an {0} verfassen'}">
+                            <PathIcon Width="16" Height="16"
+                                      Data="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
+                          </Button>
+                        </Panel>
+                        <!-- Named explicitly: the content is a panel, so no name is derived from it. -->
+                        <Button Classes="ghost contact-call" HorizontalContentAlignment="Left"
+                                IsVisible="{Binding Person.HasPhone}"
+                                AutomationProperties.Name="{Binding Person.Phone, StringFormat='{}{0} wählen'}"
+                                Command="{ReflectionBinding $parent[ItemsControl].DataContext.CallCommand}"
                                 CommandParameter="{Binding Person}"
-                                ToolTip.Tip="{Binding Person.Email, StringFormat='E-Mail an {0} verfassen'}"
-                                AutomationProperties.Name="{Binding Person.Email, StringFormat='E-Mail an {0} verfassen'}">
-                          <PathIcon Width="16" Height="16" Foreground="{StaticResource TextSecondaryBrush}"
-                                    Data="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
+                                ToolTip.Tip="In der Telefon-App wählen — verlässt Lagebuch">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Width="13" Height="13" VerticalAlignment="Center"
+                                      Foreground="{StaticResource TextSecondaryBrush}"
+                                      Data="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
+                            <TextBlock Text="{Binding Person.Phone}" Classes="mono" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                          </StackPanel>
                         </Button>
-                      </Panel>
-                      <Button Classes="ghost contact-call" HorizontalContentAlignment="Left"
-                              IsVisible="{Binding Person.HasPhone}"
-                              Command="{ReflectionBinding $parent[ItemsControl].DataContext.CallCommand}"
-                              CommandParameter="{Binding Person}"
-                              ToolTip.Tip="In der Telefon-App wählen — verlässt Lagebuch">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                          <PathIcon Width="13" Height="13" VerticalAlignment="Center"
-                                    Foreground="{StaticResource TextSecondaryBrush}"
-                                    Data="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
-                          <TextBlock Text="{Binding Person.Phone}" Classes="mono" VerticalAlignment="Center"
-                                     Foreground="{StaticResource TextPrimaryBrush}" />
-                        </StackPanel>
-                      </Button>
-                    </DockPanel>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+                      </DockPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Grid>
         </Panel>
       </ScrollViewer>
     </Border>

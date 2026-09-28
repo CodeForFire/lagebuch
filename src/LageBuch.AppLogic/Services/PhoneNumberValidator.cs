@@ -41,9 +41,9 @@ public static class PhoneNumberValidator
         "Design",
         "CA1054",
         Justification = "A string is the input by design: deciding whether an unvalidated, possibly malformed string is a dialable number is this method's job, so requiring a parsed System.Uri would push that decision back onto every caller.")]
-    public static bool TryGetTelUri(string? input, out Uri uri)
+    public static bool TryGetTelUri([NotNullWhen(true)] string? input, [NotNullWhen(true)] out Uri? uri)
     {
-        uri = null!;
+        uri = null;
         var raw = input?.Trim();
         if (string.IsNullOrEmpty(raw) || raw.Length > MaxInputLength)
         {
@@ -75,7 +75,7 @@ public static class PhoneNumberValidator
 
         return digits >= MinDigits
             && digits <= MaxDigits
-            && Uri.TryCreate("tel:" + dial, UriKind.Absolute, out uri!)
+            && Uri.TryCreate("tel:" + dial, UriKind.Absolute, out uri)
             && string.Equals(uri.Scheme, "tel", StringComparison.Ordinal);
     }
 }
