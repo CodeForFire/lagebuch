@@ -156,5 +156,9 @@ public class AboutRenderTests
         public void Add(string path)
         {
         }
+
+        public void Remove(string path)
+        {
+        }
     }
 }

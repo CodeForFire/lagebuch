@@ -206,6 +206,10 @@ internal sealed class NoRecentFiles : IRecentFilesStore
     public void Add(string path)
     {
     }
+
+    public void Remove(string path)
+    {
+    }
 }
 
 internal static class TestHost

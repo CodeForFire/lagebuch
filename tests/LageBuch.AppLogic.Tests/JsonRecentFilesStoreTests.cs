@@ -56,4 +56,50 @@ public class JsonRecentFilesStoreTests : IDisposable
         Assert.Equal(10, recent.Count);
         Assert.Equal("/file14.fwincident", recent[0]);
     }
+
+    [Fact]
+    public void Remove_drops_the_entry_and_keeps_the_rest_in_order()
+    {
+        var store = new JsonRecentFilesStore(_path);
+        store.Add("/a.fwincident");
+        store.Add("/b.fwincident");
+        store.Add("/c.fwincident");
+
+        store.Remove("/b.fwincident");
+
+        var recent = new JsonRecentFilesStore(_path).GetRecent();
+        Assert.Equal(new[] { "/c.fwincident", "/a.fwincident" }, recent);
+    }
+
+    // Add already treats paths differing only in case as one entry; Remove must find that entry
+    // the same way, or a row could be listed that no button can take off.
+    [Fact]
+    public void Remove_matches_the_path_case_insensitively_like_add()
+    {
+        var store = new JsonRecentFilesStore(_path);
+        store.Add("/Einsatz.fwincident");
+
+        store.Remove("/einsatz.fwincident");
+
+        Assert.Empty(new JsonRecentFilesStore(_path).GetRecent());
+    }
+
+    [Fact]
+    public void Removing_an_unlisted_path_leaves_the_list_unchanged()
+    {
+        var store = new JsonRecentFilesStore(_path);
+        store.Add("/a.fwincident");
+
+        store.Remove("/b.fwincident");
+
+        Assert.Equal(new[] { "/a.fwincident" }, new JsonRecentFilesStore(_path).GetRecent());
+    }
+
+    [Fact]
+    public void Removing_from_a_missing_file_creates_none()
+    {
+        new JsonRecentFilesStore(_path).Remove("/a.fwincident");
+
+        Assert.False(File.Exists(_path));
+    }
 }

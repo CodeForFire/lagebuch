@@ -11,9 +11,24 @@
     <Style Selector="StackPanel#ContentColumn">
       <Setter Property="Margin" Value="56,48" />
     </Style>
+    <!-- A recent row's ÖFFNEN and remove buttons. Placed by style, not by attribute, so the phone
+         query below can move them: a local value would win over its setters. -->
+    <Style Selector="StackPanel.recentActions">
+      <Setter Property="Grid.Row" Value="0" />
+      <Setter Property="Grid.Column" Value="2" />
+      <Setter Property="Margin" Value="10,0,0,0" />
+    </Style>
     <ContainerQuery Name="Shell" Query="max-width:640">
       <Style Selector="StackPanel#ContentColumn">
         <Setter Property="Margin" Value="16,24" />
+      </Style>
+      <!-- #481: ÖFFNEN plus the remove button left the file name a few letters wide on a phone,
+           so there the pair moves under the name, right-aligned, and the name gets the full row. -->
+      <Style Selector="StackPanel.recentActions">
+        <Setter Property="Grid.Row" Value="1" />
+        <Setter Property="Grid.Column" Value="1" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="Margin" Value="0,8,0,0" />
       </Style>
     </ContainerQuery>
   </UserControl.Styles>
@@ -59,13 +74,21 @@
                 IsVisible="{Binding OpenError, Converter={x:Static ObjectConverters.IsNotNull}}">
           <!-- Grid, not a horizontal StackPanel: the latter measures children at infinite width,
                so the message would never wrap and the banner would outgrow the column. -->
-          <Grid ColumnDefinitions="Auto,*">
-            <PathIcon Grid.Column="0" Width="15" Height="15" VerticalAlignment="Top" Margin="0,0,12,0"
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+            <PathIcon Grid.Row="0" Grid.Column="0" Width="15" Height="15" VerticalAlignment="Top" Margin="0,0,12,0"
                       Foreground="{StaticResource AmberBrush}"
                       Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
-            <TextBlock Grid.Column="1" x:Name="OpenErrorMessage" Text="{Binding OpenError}"
+            <TextBlock Grid.Row="0" Grid.Column="1" x:Name="OpenErrorMessage" Text="{Binding OpenError}"
                        FontWeight="SemiBold" TextWrapping="Wrap"
                        Foreground="{StaticResource AmberBrush}" />
+            <!-- #481: a moved or broken file is exactly the entry the user wants off the list. Only
+                 offered for a listed entry; a file picked through the dialog was never on it. -->
+            <Button Grid.Row="1" Grid.Column="1" x:Name="RemoveFailedRecentButton" Classes="ghost"
+                    Content="AUS DER LISTE ENTFERNEN" Margin="0,10,0,0" Padding="10,4"
+                    HorizontalAlignment="Left"
+                    Command="{Binding RemoveRecentCommand}"
+                    CommandParameter="{Binding FailedRecentPath}"
+                    IsVisible="{Binding FailedRecentPath, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </Grid>
         </Border>
 
@@ -160,7 +183,7 @@
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:RecentFileItem">
                   <!-- Fixed lock gutter so filenames line up whether or not the incident is closed -->
-                  <Grid ColumnDefinitions="22,*,Auto">
+                  <Grid ColumnDefinitions="22,*,Auto" RowDefinitions="Auto,Auto">
                     <PathIcon Grid.Column="0" Width="13" Height="13"
                               VerticalAlignment="Center" HorizontalAlignment="Left"
                               Foreground="{StaticResource TextSecondaryBrush}"
@@ -173,17 +196,35 @@
                                  Foreground="{StaticResource TextSecondaryBrush}"
                                  Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                    <!-- ReflectionBinding: OpenRecentCommand lives on the parent ListBox's
-                         DataContext (HomeViewModel), whose static type is object under compiled
-                         bindings, so a compiled $parent cast path won't resolve (#262 UX: a
-                         visible open affordance alongside the existing double-click). -->
-                    <Button Grid.Column="2" Content="ÖFFNEN" Margin="10,0,0,0" VerticalAlignment="Center"
-                            Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenRecentCommand}"
-                            CommandParameter="{Binding Path}" />
+                    <!-- ReflectionBinding: OpenRecentCommand and RemoveRecentCommand live on the
+                         parent ListBox's DataContext (HomeViewModel), whose static type is object
+                         under compiled bindings, so a compiled $parent cast path won't resolve (#262
+                         UX: a visible open affordance alongside the existing double-click). -->
+                    <StackPanel Classes="recentActions" Orientation="Horizontal" Spacing="6"
+                                VerticalAlignment="Center">
+                      <Button Content="ÖFFNEN" VerticalAlignment="Center"
+                              Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenRecentCommand}"
+                              CommandParameter="{Binding Path}" />
+                      <!-- #481: takes the entry off the list, never the file. A cross, not a bin:
+                           nothing is deleted. -->
+                      <Button x:Name="RemoveRecentButton" Classes="ghost" VerticalAlignment="Center"
+                              ToolTip.Tip="Aus der Liste entfernen"
+                              AutomationProperties.Name="Aus der Liste entfernen"
+                              Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveRecentCommand}"
+                              CommandParameter="{Binding Path}">
+                        <PathIcon Width="13" Height="13" VerticalAlignment="Center"
+                                  Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                      </Button>
+                    </StackPanel>
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
+
+            <TextBlock x:Name="RecentFilesError" TextWrapping="Wrap"
+                       Foreground="{StaticResource AmberBrush}"
+                       Text="{Binding RecentFilesError}"
+                       IsVisible="{Binding RecentFilesError, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
             <TextBlock Classes="secondary" FontSize="12"
                        IsVisible="{Binding !RecentFiles.Count}"
