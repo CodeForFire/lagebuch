@@ -2,6 +2,12 @@ using System.Globalization;
 using System.Text;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
+using LageBuch.Domain.Etb;
+using LageBuch.Domain.Files;
+using LageBuch.Domain.Tasks;
+using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -710,6 +716,47 @@ public class RolesViewModelTests
         return new RolesViewModel(session, clock, MdWithRoles(uniqueness), () => { });
     }
 
+    // The same, over assignments that were not made here and were not normalized on the way in:
+    // SnapshotMapper rehydrates a peer's roles with `new RoleAssignment(...)`, so an Abschnitt a
+    // peer stored as blanks reaches this device intact, where Incident's private NormalizeSection is
+    // the only thing that folds it. The grid's SameSection has to fold it the same way, or the two
+    // call sites disagree and the grid marks what the add form would let through.
+    private static RolesViewModel VmOverPeerRoles(
+        RoleUniqueness uniqueness, string? firstSection, string? secondSection)
+    {
+        var clock = new FixedClock(T0);
+        var store = new FakeStore();
+        store.Save("/x.fwincident", Incident.Rehydrate(
+            Guid.NewGuid(),
+            T0,
+            IncidentState.Open,
+            null,
+            "Brand",
+            null,
+            null,
+            null,
+            null,
+            null,
+            Array.Empty<ChecklistList>(),
+            Array.Empty<EtbEntry>(),
+            new[]
+            {
+                new RoleAssignment(Guid.NewGuid(), "EL", "Müller", null, T0, null, firstSection, null),
+                new RoleAssignment(Guid.NewGuid(), "EL", "Schmidt", null, T0, null, secondSection, null),
+            },
+            Array.Empty<ForceUnit>(),
+            Array.Empty<AtemschutzTrupp>(),
+            Array.Empty<AuditEvent>(),
+            Array.Empty<IncidentTimerState>(),
+            Array.Empty<IncidentFile>(),
+            Array.Empty<IncidentTask>(),
+            Array.Empty<Building>(),
+            Array.Empty<Dwelling>()));
+
+        var session = LocalIncidentSession.Open(store, clock, "/x.fwincident", new SessionOperator("Müller"));
+        return new RolesViewModel(session, clock, MdWithRoles(uniqueness), () => { });
+    }
+
     // Both rows are marked, not one: either could be the one to hand over, and a marker that picked
     // a winner would be naming a culprit in a record of what happened. The first row is the one a
     // single pass would miss, since its partner is only appended after it.
@@ -743,6 +790,32 @@ public class RolesViewModelTests
 
         var perIncident = VmOverSeededDuplicate(RoleUniqueness.UniquePerIncident, "Abschnitt Nord", "Abschnitt Süd");
         Assert.All(perIncident.Roles, r => Assert.True(r.IsDuplicate));
+    }
+
+    // Two Abschnitte that are both absent are the same Abschnitt, exactly as one named and one
+    // absent are not. A reader of SameSection would expect two missing sections to share nothing and
+    // leave both rows unmarked; under UniquePerSection they are one bucket, so both rows collide.
+    // Without a section argument the helper seeds exactly this, and nothing else in the file did.
+    [Fact]
+    public void Two_holder_of_a_funktion_unique_per_section_collide_without_an_abschnitt()
+    {
+        var vm = VmOverSeededDuplicate(RoleUniqueness.UniquePerSection);
+
+        Assert.Equal(2, vm.Roles.Count);
+        Assert.All(vm.Roles, r => Assert.True(r.IsDuplicate));
+    }
+
+    // Pins the fold itself rather than only walking it. Two rows of one bucket whose sections are
+    // blank, one null and one of nothing but spaces, is the case where a helper that compared the
+    // raw strings would put them in different buckets, and the domain, which trims before it
+    // compares, would still call them the same Abschnitt.
+    [Fact]
+    public void A_whitespace_only_abschnitt_from_a_joined_peer_counts_as_no_abschnitt()
+    {
+        var vm = VmOverPeerRoles(RoleUniqueness.UniquePerSection, "   ", null);
+
+        Assert.Equal(2, vm.Roles.Count);
+        Assert.All(vm.Roles, r => Assert.True(r.IsDuplicate));
     }
 
     // Only a running assignment holds a Funktion — the same liveness test FindRunningRoleHolder
