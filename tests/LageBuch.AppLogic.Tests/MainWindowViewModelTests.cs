@@ -81,7 +81,7 @@ public class MainWindowViewModelTests
     // the socket, hanging the TLS handshake exactly like a host that's reachable but unresponsive.
     //
     // Aborting the attempt must not also close the dialog: a cancelled join and a successful one both
-    // leave HomeViewModel.JoinError null, so ConfirmOperatorAsync cannot tell them apart from that
+    // leave HomeViewModel.JoinError null, so ConnectToDeviceAsync cannot tell them apart from that
     // alone -- it needs to know the abort was user-requested (via CancelJoinCommand) and keep the
     // prompt (and everything the operator already typed) up for a retry with adjusted Host/PIN.
     [Fact]
@@ -95,10 +95,9 @@ public class MainWindowViewModelTests
         vm.RequestJoinDeviceCommand.Execute(null);
         vm.PendingPrompt!.Host = $"127.0.0.1:{port}";
         vm.PendingPrompt.Pin = "0000";
-        vm.PendingPrompt.OperatorName = "Client";
         vm.PendingPrompt.ConfirmCommand.Execute(null);
 
-        var confirming = vm.ConfirmOperatorCommand.ExecuteAsync(null);
+        var confirming = vm.ConnectToDeviceCommand.ExecuteAsync(null);
 
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (vm.PendingPrompt is { IsBusy: false } && DateTime.UtcNow < deadline)
@@ -117,7 +116,7 @@ public class MainWindowViewModelTests
         Assert.Null(prompt.ErrorMessage); // a user-initiated cancel is not a failure
         Assert.Equal($"127.0.0.1:{port}", prompt.Host); // fields survive for an immediate retry
         Assert.Equal("0000", prompt.Pin);
-        Assert.Equal("Client", prompt.OperatorName);
+        Assert.True(prompt.IsHostStage);
         Assert.IsType<HomeViewModel>(vm.CurrentView);
     }
 

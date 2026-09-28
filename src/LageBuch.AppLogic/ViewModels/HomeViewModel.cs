@@ -52,7 +52,7 @@ public sealed partial class HomeViewModel : ObservableObject
 
     // Remembers the TLS thumbprint of each host a device first joined (Trust-on-First-Use), so a
     // re-join that presents a different certificate can be flagged as a potential MITM/duplicate.
-    // Null (most tests, which never join a device) just means "join is unavailable" -- JoinDeviceAsync
+    // Null (most tests, which never join a device) just means "join is unavailable" -- ReachDeviceAsync
     // refuses to connect rather than falling back to an unpinned connection (there is no accept-any
     // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
@@ -291,15 +291,29 @@ public sealed partial class HomeViewModel : ObservableObject
     }
 
     // ===== Multi-device join (#52 §4/§6): connect to another device's hosted incident as a thin client. =====
+    // Two steps (#459): ReachDevice opens the connection and reads the host's Stammdaten and incident,
+    // so the dialog can suggest the host's own personnel as Lagebuchführer; JoinDevice then completes
+    // it for whoever was chosen. The reached-but-not-joined connection is held here in between.
+    private PendingJoin? _pendingJoin;
+
+    /// <summary>The host's Stammdaten once <see cref="ReachDeviceCommand"/> succeeded, else null.</summary>
+    public MasterDataSet? PendingJoinMasterData => _pendingJoin?.MasterData;
+
+    /// <summary>The host's incident once <see cref="ReachDeviceCommand"/> succeeded, else null.</summary>
+    public Incident? PendingJoinIncident => _pendingJoin?.Join.Incident;
+
     // IncludeCancelCommand: a join can hang (host unreachable but not yet timed out), so the view
-    // offers a Cancel affordance bound to the generated JoinDeviceCancelCommand while IsRunning.
+    // offers a Cancel affordance bound to the generated ReachDeviceCancelCommand while IsRunning.
     [RelayCommand(IncludeCancelCommand = true)]
-    private async Task JoinDeviceAsync(JoinRequest request, CancellationToken cancellationToken)
+    private async Task ReachDeviceAsync(DeviceRequest request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        await DiscardPendingJoinAsync();
+
         // Unreachable in production (both app heads always construct this view model with a real
         // JsonTrustStore) -- only a misconfigured caller (or a test that never meant to join) ends up
-        // here. RemoteIncidentSession.ConnectAsync has no accept-any fallback any more, so this must
-        // fail the same graceful way as every other join precondition, not throw and take the app down.
+        // here. RemoteJoin.OpenAsync has no accept-any fallback any more, so this must fail the same
+        // graceful way as every other join precondition, not throw and take the app down.
         if (_trustStore is not { } trustStore)
         {
             JoinError = "Kein Trust Store konfiguriert — Verbindung zu anderen Geräten ist nicht möglich.";
@@ -310,25 +324,15 @@ public sealed partial class HomeViewModel : ObservableObject
         var (host, port) = ParseHost(request.Host);
         try
         {
-            var session = await RemoteIncidentSession.ConnectAsync(
-                host,
-                request.Operator,
-                _appVersion,
-                _uiDispatcher,
-                trustStore,
-                request.Pin,
-                port,
-                cacheRoot: _attachmentCacheRoot,
-                ct: cancellationToken);
+            var join = await RemoteJoin.OpenAsync(host, _appVersion, trustStore, request.Pin, port, cancellationToken);
 
-            // The host is the Stammdaten master (#183): the workspace is built from the host's set,
-            // never this device's. Parsed before anything opens, and the session is torn down if it
-            // fails — ConnectAsync has already opened a hub connection by this point, so simply
-            // letting the throw travel would leak it.
+            // The host is the Stammdaten master (#183): the dialog's suggestions and later the
+            // workspace are built from the host's set, never this device's. Parsed before anything
+            // else happens, and the connection released if it fails.
             MasterDataSet hostMasterData;
             try
             {
-                hostMasterData = MasterDataJson.Parse(session.HostMasterDataJson);
+                hostMasterData = MasterDataJson.Parse(join.HostMasterDataJson);
             }
             catch (Exception ex) when (ex is JsonException or InvalidOperationException
                                           or KeyNotFoundException or FormatException)
@@ -338,64 +342,116 @@ public sealed partial class HomeViewModel : ObservableObject
                 // fractional "seats") makes ParseRoot's TryGetProperty/GetProperty/GetString/GetInt32
                 // calls throw InvalidOperationException, KeyNotFoundException or FormatException
                 // instead — every one of those shapes must land here too, or the DisposeAsync below
-                // (and the hub connection it closes) never runs.
-                await session.DisposeAsync();
+                // never runs.
+                await join.DisposeAsync();
                 throw new HostMasterDataUnreadableException(
                     $"Stammdaten des Hosts konnten nicht gelesen werden. ({ex.Message})", ex);
             }
 
             JoinError = null;
-            _certificateChangedHost = null;
-            OnPropertyChanged(nameof(CanResetTrustedCertificate));
-            RememberConnection(session, request.Host, request.Pin);
-            OpenRemoteWorkspace(session, hostMasterData, request.Host);
-        }
-        catch (PinRejectedException ex)
-        {
-            // Wrong/missing share PIN — say so plainly and leave them on Home to retry.
-            JoinError = ex.Message;
             ClearCertificateChangedHost();
-        }
-        catch (VersionMismatchException ex)
-        {
-            // Distinct, explicit message: mixed versions across an un-auto-updated fleet are expected (§7).
-            JoinError = ex.Message;
-            ClearCertificateChangedHost();
-        }
-        catch (CertificateChangedException ex)
-        {
-            // The host presented a different TLS cert than the one previously trusted for this address
-            // (Trust-on-First-Use violation, § P0 #2) — a restart with a new ephemeral cert, or a
-            // man-in-the-middle. Surface the German "geändert" message, and remember the address so
-            // the Home screen can offer a "Vertrauen zurücksetzen" button (#181) instead of leaving the
-            // user stuck on a warning nobody can act on.
-            JoinError = ex.Message;
-            _certificateChangedHost = host;
-            OnPropertyChanged(nameof(CanResetTrustedCertificate));
-        }
-        catch (HostMasterDataUnreadableException ex)
-        {
-            // Both ends run the same app version (the handshake enforces it), so an unreadable
-            // Stammdaten payload means corruption or something past the TOFU pin. Refuse the join
-            // rather than degrade into it — and never let it escape: an unhandled throw here kills
-            // the app mid-Einsatz. Scoped to this typed exception (rather than JsonException) so it
-            // can't also catch a JsonException thrown deserializing the version/snapshot response
-            // inside RemoteIncidentSession.ConnectAsync and mislabel that as a Stammdaten problem.
-            JoinError = ex.Message;
-            ClearCertificateChangedHost();
+            _pendingJoin = new PendingJoin(join, request.Host, request.Pin, hostMasterData);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // User cancelled via JoinDeviceCancelCommand — leave them on Home without an error banner.
+            // User cancelled via ReachDeviceCancelCommand — leave them in the dialog without an error.
         }
-        catch (Exception ex) when (ex is HttpRequestException or SocketException or TaskCanceledException)
+        catch (Exception ex) when (IsJoinFailure(ex))
         {
-            // Host unreachable, or up but not currently sharing an incident — same answer for the user:
-            // say which device and why, and leave them on Home to try again.
-            JoinError = $"Verbindung zu {request.Host} nicht möglich. Teilt dieses Gerät gerade einen Einsatz? ({ex.Message})";
-            ClearCertificateChangedHost();
+            ReportJoinFailure(ex, request.Host, host);
         }
     }
+
+    // Completes the join ReachDevice opened, for the Lagebuchführer the dialog collected. A failure
+    // here (the host went away while the name was typed) spends the connection: the dialog goes back
+    // to asking for host and PIN.
+    [RelayCommand(IncludeCancelCommand = true)]
+    private async Task JoinDeviceAsync(SessionOperator op, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(op);
+        if (_pendingJoin is not { } pending)
+        {
+            JoinError = "Keine Verbindung zu einem Gerät. Bitte erneut verbinden.";
+            return;
+        }
+
+        _pendingJoin = null;
+        try
+        {
+            var session = await pending.Join.ConnectAsync(
+                op, _uiDispatcher, cacheRoot: _attachmentCacheRoot, ct: cancellationToken);
+            JoinError = null;
+            RememberConnection(session, pending.Address, pending.Pin);
+            OpenRemoteWorkspace(session, pending.MasterData, pending.Address);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // User cancelled via JoinDeviceCancelCommand. The connection is spent either way.
+        }
+        catch (Exception ex) when (IsJoinFailure(ex))
+        {
+            ReportJoinFailure(ex, pending.Address, ParseHost(pending.Address).Host);
+        }
+        finally
+        {
+            // A no-op once ConnectAsync handed the connection to the session.
+            await pending.Join.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Releases a device reached but not joined, when the dialog is closed in between. Idempotent.
+    /// </summary>
+    public async Task DiscardPendingJoinAsync()
+    {
+        if (_pendingJoin is { } pending)
+        {
+            _pendingJoin = null;
+            await pending.Join.DisposeAsync();
+        }
+    }
+
+    // The failures either join step expects and reports as JoinError; anything else is a bug and
+    // escapes. Unexpected OperationCanceledExceptions are covered by TaskCanceledException below.
+    private static bool IsJoinFailure(Exception ex) =>
+        ex is PinRejectedException or VersionMismatchException or CertificateChangedException
+            or HostMasterDataUnreadableException
+            or HttpRequestException or SocketException or TaskCanceledException;
+
+    private void ReportJoinFailure(Exception ex, string address, string host)
+    {
+        switch (ex)
+        {
+            case CertificateChangedException:
+                // The host presented a different TLS cert than the one previously trusted for this
+                // address (Trust-on-First-Use violation, § P0 #2) — a restart with a new ephemeral
+                // cert, or a man-in-the-middle. Surface the German "geändert" message, and remember
+                // the address so the dialog can offer "Vertrauen zurücksetzen" (#181) instead of
+                // leaving the user stuck on a warning nobody can act on.
+                JoinError = ex.Message;
+                _certificateChangedHost = host;
+                OnPropertyChanged(nameof(CanResetTrustedCertificate));
+                return;
+
+            case PinRejectedException or VersionMismatchException or HostMasterDataUnreadableException:
+                // A wrong/missing share PIN; a wire contract that does not overlap — expected across
+                // an un-auto-updated fleet (§7) and named explicitly; or a Stammdaten payload that
+                // cannot be read, which means corruption or something past the TOFU pin and refuses
+                // the join rather than degrading into it. Each carries its own German message.
+                JoinError = ex.Message;
+                break;
+
+            default:
+                // Host unreachable, or up but not currently sharing an incident — same answer for the
+                // user: say which device and why, and let them try again.
+                JoinError = $"Verbindung zu {address} nicht möglich. Teilt dieses Gerät gerade einen Einsatz? ({ex.Message})";
+                break;
+        }
+
+        ClearCertificateChangedHost();
+    }
+
+    private sealed record PendingJoin(RemoteJoin Join, string Address, string? Pin, MasterDataSet MasterData);
 
     // The Stichwort is often typed on the host only after this client joined, so the record follows
     // the session's broadcasts. The session is disposed when the workspace is left, which ends

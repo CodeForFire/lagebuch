@@ -89,6 +89,7 @@ public partial class MainView : UserControl
         prompt.Cancelled += OnPromptCancelled;
         prompt.CancelJoinRequested += OnPromptCancelJoinRequested;
         prompt.ResetTrustRequested += OnPromptResetTrustRequested;
+        prompt.ConnectRequested += OnPromptConnectRequested;
     }
 
     private void DetachPrompt()
@@ -102,6 +103,7 @@ public partial class MainView : UserControl
         _prompt.Cancelled -= OnPromptCancelled;
         _prompt.CancelJoinRequested -= OnPromptCancelJoinRequested;
         _prompt.ResetTrustRequested -= OnPromptResetTrustRequested;
+        _prompt.ConnectRequested -= OnPromptConnectRequested;
         _prompt = null;
     }
 
@@ -123,4 +125,7 @@ public partial class MainView : UserControl
 
     private void OnPromptResetTrustRequested(object? sender, EventArgs e) =>
         _viewModel?.ResetTrustCommand.Execute(null);
+
+    private void OnPromptConnectRequested(object? sender, EventArgs e) =>
+        _viewModel?.ConnectToDeviceCommand.Execute(null);
 }
