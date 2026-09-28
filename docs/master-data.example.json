@@ -1,5 +1,11 @@
 {
-  "roles": ["EL", "EAL", "ZF", "GF"],
+  "roles": [
+    { "name": "EL", "uniqueness": "uniquePerIncident" },
+    { "name": "EAL", "uniqueness": "multiple" },
+    { "name": "ZF", "uniqueness": "multiple" },
+    { "name": "GF", "uniqueness": "multiple" },
+    { "name": "Abschnittsleiter", "uniqueness": "uniquePerSection" }
+  ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz"],
   "truppTypes": [
     { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 },
