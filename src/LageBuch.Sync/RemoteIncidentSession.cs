@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -208,10 +207,6 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// wall clock.
     /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "The reconnect handler's catch-up failure surfaces on ReconcileFailed (an unconfirmed-state footer) and is retried by the poll; rethrowing inside a SignalR callback would instead leave Reconnected un-raised, which strands the workspace with its input disabled.")]
     public static async Task<RemoteIncidentSession> ConnectAsync(
         string host,
         SessionOperator op,
@@ -227,140 +222,44 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         TimeProvider? timeProvider = null,
         CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(trustStore);
+        // Both halves in one go, for callers that know the operator up front. The join dialog runs
+        // them apart (#459), asking for the operator only once the host's Stammdaten are in hand.
+        await using var join = await RemoteJoin.OpenAsync(host, localVersion, trustStore, pin, port, ct);
+        return await join.ConnectAsync(
+            op, ui, reconnectPolicy, cacheRoot, cacheMaxBytes, reconcileInterval, timeProvider, ct);
+    }
 
-        var baseUri = new Uri($"https://{host}:{port}");
-
-        // A single handler backs both the HttpClient and the SignalR hub connection, so they agree on
-        // TLS validation: pin the presented cert via Trust-on-First-Use. A certificate that differs
-        // from the previously-trusted one throws CertificateChangedException from inside the callback;
-        // the connect await surfaces it (§ P0 #2).
-        var handler = new HttpClientHandler { CheckCertificateRevocationList = true };
-        handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
-        {
-            if (cert is null)
-            {
-                return false;
-            }
-
-            var thumbprint = Convert.ToHexString(cert.GetCertHash(HashAlgorithmName.SHA256));
-            var known = trustStore.GetThumbprint(host);
-            if (known is null)
-            {
-                trustStore.SaveThumbprint(host, thumbprint);
-                return true;
-            }
-
-            if (string.Equals(known, thumbprint, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            throw new CertificateChangedException(host);
-        };
-
-        // disposeHandler: false — this class owns the handler explicitly (DisposeAsync disposes it
-        // after the hub, since the hub's long-lived transport also uses it via HttpMessageHandlerFactory
-        // below) rather than relying on HttpClient's default cascade, so ownership is one clear line
-        // instead of implicit via a constructor flag.
-        // MaxResponseContentBufferSize: every response here is read into memory, and each one comes
-        // from a sync peer, so none may be larger than SyncProtocol.MaxResponseBytes.
-        var http = new HttpClient(handler, disposeHandler: false)
-        {
-            BaseAddress = baseUri,
-            MaxResponseContentBufferSize = SyncProtocol.MaxResponseBytes,
-        };
-        if (!string.IsNullOrEmpty(pin))
-        {
-            http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
-        }
-
-        // Announced on every request, not just the handshake, so the host can refuse a contract it no
-        // longer serves at whichever endpoint the client reaches for. Unconditional — unlike the PIN
-        // there is nothing optional about which contract this build speaks. The hub needs the same
-        // header set on its own options bag below: sharing the handler does not share these.
-        http.DefaultRequestHeaders.Add(
-            SyncProtocol.ProtocolHeader,
-            SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
-
+    /// <summary>
+    /// The second half of a join (see <see cref="RemoteJoin.ConnectAsync"/>): opens the push channel on
+    /// the connection <see cref="RemoteJoin.OpenAsync"/> established and takes ownership of it — on
+    /// failure too, when it is released before the exception leaves.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The reconnect handler's catch-up failure surfaces on ReconcileFailed (an unconfirmed-state footer) and is retried by the poll; rethrowing inside a SignalR callback would instead leave Reconnected un-raised, which strands the workspace with its input disabled.")]
+    internal static async Task<RemoteIncidentSession> StartAsync(
+        HttpClient http,
+        HttpClientHandler handler,
+        Uri baseUri,
+        string? pin,
+        IncidentSnapshot initialSnapshot,
+        string hostMasterDataJson,
+        SessionOperator op,
+        IUiDispatcher ui,
+        IRetryPolicy? reconnectPolicy,
+        string? cacheRoot,
+        long cacheMaxBytes,
+        TimeSpan? reconcileInterval,
+        TimeProvider? timeProvider,
+        CancellationToken ct)
+    {
+        // Set once the session exists, because from then on it owns the hub as well as the
+        // connection, and only its own DisposeAsync releases all three in the right order.
+        RemoteIncidentSession? created = null;
         try
         {
-            // The PIN gates every endpoint, so the first request already reflects it: a 401 means the
-            // PIN is wrong/missing — reported as such before the version compare (auth precedes content).
-            // A cert that differs from the trusted one makes the TLS handshake fail: .NET wraps the
-            // CertificateChangedException the callback threw in an HttpRequestException, so unwrap and
-            // rethrow it so the cert change surfaces as its typed exception, not an opaque HTTP error.
-            HttpResponseMessage versionResponse;
-            try
-            {
-                versionResponse = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute), ct);
-            }
-            catch (HttpRequestException ex) when (FindInner<CertificateChangedException>(ex) is { } certChanged)
-            {
-                throw certChanged;
-            }
-
-            if (versionResponse.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                throw new PinRejectedException();
-            }
-
-            if (versionResponse.StatusCode == HttpStatusCode.TooManyRequests)
-            {
-                var retryAfter = versionResponse.Headers.RetryAfter?.Delta?.TotalSeconds ?? 60;
-                throw new PinRejectedException($"Zu viele Fehlversuche. Bitte {retryAfter:F0}s warten.");
-            }
-
-            // A host that refuses this build's contract outright. It cannot happen while /version is
-            // exempt from the host's own protocol gate — which it is, precisely so the payload below
-            // can name the versions — but a future host may stop exempting it, and a bare
-            // HttpRequestException would then reach the user as "Teilt dieses Gerät gerade einen
-            // Einsatz?", which sends them looking in the wrong place entirely.
-            if (versionResponse.StatusCode == HttpStatusCode.UpgradeRequired)
-            {
-                throw VersionMismatchException.ThisDeviceIsTooOld(localVersion, "unbekannt");
-            }
-
-            versionResponse.EnsureSuccessStatusCode();
-
-            // Compatibility is decided on the wire contract, never on the app version (§7): the two
-            // ends of a volunteer-run fleet are routinely on different releases while speaking an
-            // identical protocol, and an Android update additionally waits on Play review. A host
-            // that predates this handshake sends neither number, so 0 means LegacyProtocolVersion.
-            var hostInfo = SyncJson.Deserialize<VersionInfo>(await versionResponse.Content.ReadAsStringAsync(ct));
-            var hostProtocol = hostInfo.Protocol == 0 ? SyncProtocol.LegacyProtocolVersion : hostInfo.Protocol;
-            var hostMinProtocol = hostInfo.MinProtocol == 0 ? SyncProtocol.LegacyProtocolVersion : hostInfo.MinProtocol;
-
-            // The client is the end that sees both ranges, so it is the end that decides; the host's
-            // own gate is a one-sided backstop against a peer below its floor. The app version goes
-            // into the message so a human is told which of the two devices to update.
-            if (hostMinProtocol > SyncProtocol.ProtocolVersion)
-            {
-                throw VersionMismatchException.ThisDeviceIsTooOld(localVersion, hostInfo.Version);
-            }
-
-            if (hostProtocol < SyncProtocol.MinimumProtocolVersion)
-            {
-                throw VersionMismatchException.HostIsTooOld(localVersion, hostInfo.Version);
-            }
-
-            // The host is the Stammdaten master (#183). Pulled on the same HttpClient as everything
-            // else, so the PIN header and the Trust-on-First-Use certificate pin apply unchanged.
-            // Deliberately not re-fetched on reconnect: the host caches its serialized set at
-            // StartAsync, and both that cached copy and this client's workspace hold the same
-            // MasterDataSet as an immutable value fixed at open — the Stammdaten editor stays
-            // reachable throughout, but an edit made there produces a new value, it doesn't mutate
-            // the one already handed out. A resync round trip here would buy nothing.
-            var hostMasterDataJson = await http.GetStringAsync(
-                new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute), ct);
-
-            // Kept as the snapshot, not just the mapped Incident: its position seeds _applied, so the
-            // client starts level with the host instead of treating everything up to the joined-at
-            // revision as new.
-            var initialSnapshot = SyncJson.Deserialize<IncidentSnapshot>(
-                await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct));
             var initial = SnapshotMapper.FromSnapshot(initialSnapshot);
-
             var hub = new HubConnectionBuilder()
                 .WithUrl(new Uri(baseUri, SyncProtocol.HubPath), o =>
                 {
@@ -402,6 +301,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 hostMasterDataJson,
                 reconcileInterval ?? SyncProtocol.DefaultReconcileInterval,
                 timeProvider ?? TimeProvider.System);
+            created = session;
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -442,6 +342,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             };
             await hub.StartAsync(ct);
 
+            // The snapshot was fetched when the join was opened, and the join dialog then waited on
+            // the Lagebuchführer to type a name (#459); nothing the host broadcast in between reached
+            // this device, since the hub was not up yet. One pass now, rather than leaving it to the
+            // first poll: it costs a /revision round trip when nothing moved.
+            await session.ReconcileAsync(ct);
+
             // Task.Run, not a bare call: ConnectAsync is awaited from the UI thread, so a bare call
             // would capture Avalonia's SynchronizationContext and resume every continuation in the loop
             // — the HTTP GET included — on the UI thread. CA2007 is off repo-wide, so ConfigureAwait
@@ -457,8 +363,16 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         }
         catch
         {
-            http.Dispose();
-            handler.Dispose();
+            if (created is not null)
+            {
+                await created.DisposeAsync();
+            }
+            else
+            {
+                http.Dispose();
+                handler.Dispose();
+            }
+
             throw;
         }
     }

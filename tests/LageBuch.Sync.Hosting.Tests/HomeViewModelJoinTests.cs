@@ -40,6 +40,20 @@ public class HomeViewModelJoinTests
             new[] { ("Punkt A", false) },
             Array.Empty<(string, bool)>());
 
+    // Both join steps (#459) back to back, for tests about what a join does rather than about the
+    // dialog in between: reach the device, and join as the operator only if that worked.
+    private static async Task JoinAsync(HomeViewModel vm, SessionOperator op, string host, string? pin)
+    {
+        await vm.ReachDeviceCommand.ExecuteAsync(new DeviceRequest(host, pin));
+        if (vm.JoinError is null)
+        {
+            await vm.JoinDeviceCommand.ExecuteAsync(op);
+        }
+    }
+
+    private static Task JoinAsync(HomeViewModel vm, (SessionOperator Op, string Host, string? Pin) request) =>
+        JoinAsync(vm, request.Op, request.Host, request.Pin);
+
     [Fact]
     public async Task Successful_join_opens_a_thin_client_workspace()
     {
@@ -51,8 +65,7 @@ public class HomeViewModelJoinTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
@@ -75,8 +88,7 @@ public class HomeViewModelJoinTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
@@ -105,8 +117,7 @@ public class HomeViewModelJoinTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         // Session-scoped adoption: nothing is written back, so leaving the workspace is the whole
         // restore path and this device's own Stammdaten cannot be lost.
@@ -128,8 +139,7 @@ public class HomeViewModelJoinTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
@@ -151,8 +161,7 @@ public class HomeViewModelJoinTests
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
@@ -172,8 +181,8 @@ public class HomeViewModelJoinTests
 
         var vm = Home(trust);
         vm.WorkspaceOpened = _ => { };
-        var request = new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin);
-        await vm.JoinDeviceCommand.ExecuteAsync(request);
+        var request = (new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin);
+        await JoinAsync(vm, request);
         Assert.NotNull(vm.JoinError); // stale thumbprint from the setup above -- the actual host cert differs
 
         vm.ResetTrustedCertificateCommand.Execute(null);
@@ -184,7 +193,7 @@ public class HomeViewModelJoinTests
 
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
-        await vm.JoinDeviceCommand.ExecuteAsync(request);
+        await JoinAsync(vm, request);
 
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
@@ -199,8 +208,7 @@ public class HomeViewModelJoinTests
         await using var _ = host;
 
         var vm = Home(new InMemoryTrustStore());
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "9999"));
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", "9999");
 
         Assert.NotNull(vm.JoinError);
         Assert.False(vm.CanResetTrustedCertificate);
@@ -217,8 +225,7 @@ public class HomeViewModelJoinTests
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         // Two devices on different releases is the normal state of a volunteer fleet, not a fault.
         Assert.True(opened);
@@ -241,8 +248,7 @@ public class HomeViewModelJoinTests
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
@@ -265,8 +271,8 @@ public class HomeViewModelJoinTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        var request = new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
-        await vm.JoinDeviceCommand.ExecuteAsync(request);
+        var request = (Op: new SessionOperator("Client", "RUF 1"), Host: $"127.0.0.1:{port}", Pin: TestHost.DefaultPin);
+        await JoinAsync(vm, request);
 
         Assert.Null(vm.JoinError);
         var expected = new LastConnection(request.Host, "B3 Wohnung", clientClock.Now, TestHost.DefaultPin);
@@ -289,8 +295,7 @@ public class HomeViewModelJoinTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
@@ -311,8 +316,7 @@ public class HomeViewModelJoinTests
         var vm = Home(lastConnection: lastConnection);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
         Assert.Null(vm.LastConnection?.Keyword);
 
         var updated = new TaskCompletionSource();
@@ -342,8 +346,7 @@ public class HomeViewModelJoinTests
         var vm = Home(lastConnection: lastConnection);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         vm.ForgetLastConnectionCommand.Execute(null);
 
@@ -376,8 +379,7 @@ public class HomeViewModelJoinTests
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "9999"));
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", "9999");
 
         Assert.False(opened);
         Assert.Equal("Falsche PIN.", vm.JoinError);
@@ -393,8 +395,7 @@ public class HomeViewModelJoinTests
         var lastConnection = new InMemoryLastConnectionStore();
         var vm = Home(lastConnection: lastConnection);
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "9999"));
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", "9999");
 
         Assert.NotNull(vm.JoinError);
         Assert.Null(lastConnection.GetLast());
@@ -409,8 +410,7 @@ public class HomeViewModelJoinTests
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", TestHost.DefaultPin);
 
         Assert.False(opened);
         Assert.NotNull(vm.JoinError);
@@ -430,8 +430,7 @@ public class HomeViewModelJoinTests
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
-        await vm.JoinDeviceCommand.ExecuteAsync(
-            new JoinRequest(new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{host.Port}", TestHost.DefaultPin));
+        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{host.Port}", TestHost.DefaultPin);
 
         // The handshake guarantees a compatible wire contract on both ends, so an unreadable
         // payload means corruption or something past the TOFU pin — abort, don't degrade into it.
@@ -449,17 +448,33 @@ public class HomeViewModelJoinTests
         // the user an action that cannot help them.
         Assert.False(vm.CanResetTrustedCertificate);
 
-        // The property that actually matters: ConnectAsync had already opened the hub connection
-        // before the parse failed, so the banner alone doesn't prove anything -- the same assertions
-        // above would pass just as well if the session were leaked. Only the server observing the
-        // connection close proves it was torn down rather than abandoned (#183).
-        await host.WaitForClientDisconnectAsync(TimeSpan.FromSeconds(10));
+        // The Stammdaten are read while the device is only reached (#459), so an unreadable set stops
+        // the join before a hub connection exists at all -- nothing is left open to leak (#183), and
+        // there is nothing pending to join into afterwards.
+        Assert.Equal(0, host.HubConnectionCount);
+        Assert.Null(vm.PendingJoinMasterData);
     }
 
     // #182: the connect dialog (MainWindowViewModel.PendingPrompt) must stay open across a failed
     // join, with an inline error, instead of closing and forcing the operator to retype everything.
     private static MainWindowViewModel MainWindowVm(HomeViewModel home) =>
         new(home, new MasterDataEditorViewModel(new EmptyMasterData(), new NoDialogs(), new NoMasterDataFiles()), new NoDialogs(), "0.1.0");
+
+    // The dialog's first stage as the view drives it: Confirm raises ConnectRequested, which the
+    // view routes to ConnectToDeviceCommand.
+    private static async Task ReachAsync(MainWindowViewModel vm, OperatorPromptViewModel prompt)
+    {
+        prompt.ConfirmCommand.Execute(null);
+        await vm.ConnectToDeviceCommand.ExecuteAsync(null);
+    }
+
+    // The second stage: name the operator and confirm, as the view does on Result.
+    private static async Task ConfirmOperatorAsync(MainWindowViewModel vm, OperatorPromptViewModel prompt, string name)
+    {
+        prompt.OperatorName = name;
+        prompt.ConfirmCommand.Execute(null);
+        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+    }
 
     [Fact]
     public async Task Wrong_pin_keeps_the_join_dialog_open_with_the_error_and_clears_only_the_pin()
@@ -474,17 +489,14 @@ public class HomeViewModelJoinTests
         var prompt = vm.PendingPrompt!;
         prompt.Host = $"127.0.0.1:{port}";
         prompt.Pin = "9999";
-        prompt.OperatorName = "Client";
-        prompt.ConfirmCommand.Execute(null);
 
-        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+        await ReachAsync(vm, prompt);
 
-        Assert.NotNull(vm.PendingPrompt); // dialog stayed open
-        Assert.Same(prompt, vm.PendingPrompt);
+        Assert.Same(prompt, vm.PendingPrompt); // dialog stayed open
+        Assert.True(prompt.IsHostStage);       // and still asks for host and PIN
         Assert.Equal("Falsche PIN.", prompt.ErrorMessage);
         Assert.Equal(string.Empty, prompt.Pin);
-        Assert.Equal($"127.0.0.1:{port}", prompt.Host); // Host/Name kept, not lost
-        Assert.Equal("Client", prompt.OperatorName);
+        Assert.Equal($"127.0.0.1:{port}", prompt.Host); // Host kept, not lost
         Assert.Null(home.JoinError); // ownership moved to the dialog -- no duplicate Home banner
     }
 
@@ -515,10 +527,8 @@ public class HomeViewModelJoinTests
         var vm = MainWindowVm(Home(lastConnection: lastConnection));
         vm.RequestJoinDeviceCommand.Execute(null);
         var prompt = vm.PendingPrompt!;
-        prompt.OperatorName = "Client";
-        prompt.ConfirmCommand.Execute(null);
 
-        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+        await ReachAsync(vm, prompt);
 
         Assert.Same(prompt, vm.PendingPrompt);
         Assert.Equal("Falsche PIN.", prompt.ErrorMessage);
@@ -564,14 +574,114 @@ public class HomeViewModelJoinTests
         var prompt = vm.PendingPrompt!;
         prompt.Host = $"127.0.0.1:{port}";
         prompt.Pin = TestHost.DefaultPin;
-        prompt.OperatorName = "Client";
-        prompt.ConfirmCommand.Execute(null);
 
-        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+        await ReachAsync(vm, prompt);
+        await ConfirmOperatorAsync(vm, prompt, "Client");
 
         Assert.Null(vm.PendingPrompt);
         Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
         await ((IncidentWorkspaceViewModel)vm.CurrentView!).LeaveAsync();
+    }
+
+    // #459: the operator is asked for only once the host is reached, and the suggestions are the
+    // host's own personnel and call signs -- this device's roster is not the one the join uses.
+    [Fact]
+    public async Task Reaching_the_host_asks_for_the_operator_from_the_hosts_own_personnel()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        hostSession.SetKeyword("B3 Wohnung");
+        hostSession.SetAddress("Hauptstraße 5", "Nord");
+        var hostSet = MasterDataSyncTests.SetWith("Host-Wache", 60) with
+        {
+            Personnel = new[]
+            {
+                new Person("Schmidt", "Anna", null, "FFB 12/2", null),
+                new Person("Nachbar", "Nora", null, null, null, IsOwn: false),
+            },
+        };
+        var (host, port) = await TestHost.StartAsync(hostSession, clock, "1.0.0", masterData: hostSet);
+        await using var _ = host;
+
+        var local = MasterDataSet.Empty with { Personnel = new[] { new Person("Lokal", "Lena", null, "Lokal 1", null) } };
+        var vm = MainWindowVm(Home(masterData: new FixedMasterData(local)));
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        Assert.True(prompt.IsHostStage);
+        Assert.False(prompt.AsksForOperator);
+        Assert.Empty(prompt.PersonOptions); // nothing to suggest before the host is reached
+        prompt.Host = $"127.0.0.1:{port}";
+        prompt.Pin = TestHost.DefaultPin;
+
+        await ReachAsync(vm, prompt);
+
+        Assert.True(prompt.IsOperatorStage);
+        Assert.True(prompt.AsksForOperator);
+        Assert.Equal("B3 Wohnung · Hauptstraße 5, Nord", prompt.JoinedIncidentDisplay);
+        Assert.Equal(new[] { "Schmidt, Anna" }, prompt.PersonOptions);
+        Assert.Contains("FFB 12/2", prompt.CallSignOptions);
+        Assert.DoesNotContain("Lokal 1", prompt.CallSignOptions);
+
+        // Picking the host's person fills in the host's Funkrufname for them.
+        prompt.OperatorName = "Schmidt, Anna";
+        Assert.Equal("FFB 12/2", prompt.OperatorCallSign);
+
+        await ConfirmOperatorAsync(vm, prompt, "Schmidt, Anna");
+        var workspace = Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        Assert.Equal("Schmidt, Anna (FFB 12/2)", workspace.OperatorDisplay);
+        await workspace.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Closing_the_dialog_after_reaching_the_host_opens_nothing_and_forgets_the_host()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var home = Home();
+        var vm = MainWindowVm(home);
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.Host = $"127.0.0.1:{port}";
+        prompt.Pin = TestHost.DefaultPin;
+        await ReachAsync(vm, prompt);
+        Assert.NotNull(home.PendingJoinMasterData);
+
+        await vm.CancelOperatorCommand.ExecuteAsync(null);
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.Same(home, vm.CurrentView);
+        Assert.Null(home.PendingJoinMasterData);
+        Assert.Null(home.PendingJoinIncident);
+    }
+
+    // The host stopped sharing while the name was typed: the reached connection is spent, so the
+    // dialog goes back to host and PIN with the reason, instead of pretending the join still stands.
+    [Fact]
+    public async Task A_host_lost_before_the_operator_was_confirmed_sends_the_dialog_back_to_host_and_pin()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+
+        var home = Home();
+        var vm = MainWindowVm(home);
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.Host = $"127.0.0.1:{port}";
+        prompt.Pin = TestHost.DefaultPin;
+        await ReachAsync(vm, prompt);
+        Assert.True(prompt.IsOperatorStage);
+
+        await host.DisposeAsync();
+        await ConfirmOperatorAsync(vm, prompt, "Client");
+
+        Assert.Same(prompt, vm.PendingPrompt);
+        Assert.True(prompt.IsHostStage);
+        Assert.Contains("nicht möglich", prompt.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal("Client", prompt.OperatorName); // kept for the retry
+        Assert.Null(home.PendingJoinMasterData);
+        Assert.Same(home, vm.CurrentView);
     }
 
     [Fact]
@@ -590,9 +700,7 @@ public class HomeViewModelJoinTests
         var prompt = vm.PendingPrompt!;
         prompt.Host = $"127.0.0.1:{port}";
         prompt.Pin = TestHost.DefaultPin;
-        prompt.OperatorName = "Client";
-        prompt.ConfirmCommand.Execute(null);
-        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+        await ReachAsync(vm, prompt);
 
         Assert.NotNull(vm.PendingPrompt);
         Assert.True(prompt.CertificateChanged);
@@ -605,8 +713,8 @@ public class HomeViewModelJoinTests
         Assert.Same(prompt, vm.PendingPrompt); // dialog still open, ready for a retry
 
         prompt.Pin = TestHost.DefaultPin; // ReportJoinFailure cleared it
-        prompt.ConfirmCommand.Execute(null);
-        await vm.ConfirmOperatorCommand.ExecuteAsync(null);
+        await ReachAsync(vm, prompt);
+        await ConfirmOperatorAsync(vm, prompt, "Client");
 
         Assert.Null(vm.PendingPrompt);
         Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
@@ -631,26 +739,26 @@ public class HomeViewModelJoinTests
         vm.WorkspaceOpened = _ => opened = true;
 
         // The cancel affordance only makes sense while a join is actually in flight.
-        Assert.False(vm.JoinDeviceCancelCommand.CanExecute(null));
+        Assert.False(vm.ReachDeviceCancelCommand.CanExecute(null));
 
-        var request = new JoinRequest(new SessionOperator("Client"), $"127.0.0.1:{port}", "0000");
-        var join = vm.JoinDeviceCommand.ExecuteAsync(request);
+        var reach = vm.ReachDeviceCommand.ExecuteAsync(new DeviceRequest($"127.0.0.1:{port}", "0000"));
 
         // Let the connect attempt actually reach the hung TLS handshake before cancelling it.
         var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!vm.JoinDeviceCommand.IsRunning && DateTime.UtcNow < deadline)
+        while (!vm.ReachDeviceCommand.IsRunning && DateTime.UtcNow < deadline)
         {
             await Task.Delay(10);
         }
 
-        Assert.True(vm.JoinDeviceCommand.IsRunning);
-        Assert.True(vm.JoinDeviceCancelCommand.CanExecute(null));
-        vm.JoinDeviceCancelCommand.Execute(null);
-        await join;
+        Assert.True(vm.ReachDeviceCommand.IsRunning);
+        Assert.True(vm.ReachDeviceCancelCommand.CanExecute(null));
+        vm.ReachDeviceCancelCommand.Execute(null);
+        await reach;
 
-        Assert.False(vm.JoinDeviceCommand.IsRunning);
-        Assert.False(vm.JoinDeviceCancelCommand.CanExecute(null));
+        Assert.False(vm.ReachDeviceCommand.IsRunning);
+        Assert.False(vm.ReachDeviceCancelCommand.CanExecute(null));
         Assert.Null(vm.JoinError);
+        Assert.Null(vm.PendingJoinMasterData);
         Assert.False(opened);
     }
 }

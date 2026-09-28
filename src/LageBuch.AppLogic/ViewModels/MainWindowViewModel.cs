@@ -143,16 +143,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private Task RequestOpenFile() => NavigateAwayAsync(() => _home.OpenFileCommand.Execute(null));
 
-    // Joining another device's hosted incident (§6): one prompt collects the host address and who
-    // documents on this device, then HomeViewModel.JoinDeviceAsync connects.
+    // Joining another device's hosted incident (§6), in two stages of one prompt (#459): host and
+    // PIN first (ConnectToDevice -> HomeViewModel.ReachDeviceAsync), then who documents on this
+    // device, suggested from the host's Stammdaten (ConfirmOperator -> HomeViewModel.JoinDeviceAsync).
+    // No suggestions up front: this device's own roster is not the one the join will work with.
     [RelayCommand]
     private Task RequestJoinDevice() => NavigateAwayAsync(() =>
     {
         _pending = PendingAction.Join;
-        PendingPrompt = new OperatorPromptViewModel(
-            collectHost: true,
-            callSignOptions: _home.CallSignOptions,
-            personnel: _home.Personnel)
+        PendingPrompt = new OperatorPromptViewModel(collectHost: true)
         {
             // The host address rarely changes once set up (a station's ELW, a fixed Tailscale
             // node) -- prefill last time's so the operator doesn't retype it every join.
@@ -166,6 +165,56 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand]
     private Task ShowMasterData() => NavigateAwayAsync(() => CurrentView = _editor);
+
+    // The join prompt's first stage (#459): reach the host, then ask for the operator from its
+    // Stammdaten -- or report why not, in the same prompt, keeping what was typed (#182).
+    [RelayCommand]
+    private async Task ConnectToDeviceAsync()
+    {
+        if (PendingPrompt is not { IsHostStage: true } prompt)
+        {
+            return;
+        }
+
+        prompt.IsBusy = true;
+        await _home.ReachDeviceCommand.ExecuteAsync(new DeviceRequest(prompt.Host, prompt.Pin));
+        prompt.IsBusy = false;
+
+        if (_joinCancelledByUser)
+        {
+            // #196: only the attempt is dead, not the dialog -- stay put so Host/PIN can be adjusted.
+            _joinCancelledByUser = false;
+            return;
+        }
+
+        if (!ReferenceEquals(prompt, PendingPrompt))
+        {
+            // The prompt went away while the host was being reached; nobody is left to ask.
+            await _home.DiscardPendingJoinAsync();
+            return;
+        }
+
+        if (_home.PendingJoinIncident is { } incident && _home.PendingJoinMasterData is { } masterData)
+        {
+            prompt.ShowOperatorStage(incident, masterData);
+        }
+        else
+        {
+            ReportJoinErrorTo(prompt);
+        }
+    }
+
+    // Ownership of the message moves to the dialog so the Home banner underneath doesn't also show
+    // it; _home's cert-changed host tracking is deliberately left alone, since ResetTrust() still
+    // needs it.
+    private void ReportJoinErrorTo(OperatorPromptViewModel prompt)
+    {
+        if (_home.JoinError is { } error)
+        {
+            prompt.ReportJoinFailure(error, _home.CanResetTrustedCertificate);
+            _home.JoinError = null;
+        }
+    }
 
     [RelayCommand]
     private async Task ConfirmOperatorAsync()
@@ -186,20 +235,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        // Join (#182): keep the dialog up across the async connect attempt instead of closing it
-        // up front. On failure, report the error back into the same prompt instance rather than
-        // tearing it down, so a wrong PIN (or any other join failure) doesn't cost the operator
-        // every field they already typed.
+        // Join, second stage (#459): the host is reached, this completes it for the operator just
+        // chosen. Keep the dialog up across the attempt instead of closing it up front (#182). On
+        // failure the connection is spent, so the error goes back into the same prompt, which
+        // returns to host and PIN with everything else still as typed.
         prompt!.IsBusy = true;
-        await _home.JoinDeviceCommand.ExecuteAsync(new JoinRequest(op, prompt.Host, prompt.Pin));
+        await _home.JoinDeviceCommand.ExecuteAsync(op);
         prompt.IsBusy = false;
 
         if (_joinCancelledByUser)
         {
             // #196: the operator aborted the connection attempt itself (CancelJoin) — only that
-            // attempt is dead, not the dialog. Stay put with every field exactly as typed so they
-            // can adjust Host/PIN and retry immediately, instead of losing the whole prompt.
+            // attempt is dead, not the dialog. The reached connection went with it, so back to
+            // host and PIN, with every field exactly as typed, to retry immediately.
             _joinCancelledByUser = false;
+            prompt.ReportJoinFailure("Verbindung abgebrochen.", certificateChanged: false);
             return;
         }
 
@@ -210,11 +260,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         else
         {
-            // Ownership of the message moves to the dialog so the Home banner underneath doesn't
-            // also show it; _home's cert-changed host tracking is deliberately left alone, since
-            // ResetTrust() below still needs it.
-            prompt.ReportJoinFailure(_home.JoinError, _home.CanResetTrustedCertificate);
-            _home.JoinError = null;
+            ReportJoinErrorTo(prompt);
         }
     }
 
@@ -232,22 +278,33 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CancelOperator()
+    private async Task CancelOperatorAsync()
     {
         PendingPrompt = null;
         _pending = PendingAction.None;
         CurrentView = _home;
+
+        // A join dialog closed after its host was reached: release that connection (#459).
+        await _home.DiscardPendingJoinAsync();
     }
 
     // #196: the join dialog's own Cancel button raises this (instead of CancelOperator) while a
     // connection attempt is in flight. It only aborts the attempt — the dialog stays up (see the
-    // _joinCancelledByUser check in ConfirmOperatorAsync, which is what actually keeps it open once
-    // the already-awaited JoinDeviceCommand unwinds from the cancellation).
+    // _joinCancelledByUser checks in ConnectToDeviceAsync and ConfirmOperatorAsync, which are what
+    // actually keep it open once the already-awaited command unwinds from the cancellation).
     [RelayCommand]
     private void CancelJoin()
     {
-        _joinCancelledByUser = true;
-        _home.JoinDeviceCancelCommand.Execute(null);
+        if (_home.ReachDeviceCommand.IsRunning)
+        {
+            _joinCancelledByUser = true;
+            _home.ReachDeviceCancelCommand.Execute(null);
+        }
+        else if (_home.JoinDeviceCommand.IsRunning)
+        {
+            _joinCancelledByUser = true;
+            _home.JoinDeviceCancelCommand.Execute(null);
+        }
     }
 
     [RelayCommand]

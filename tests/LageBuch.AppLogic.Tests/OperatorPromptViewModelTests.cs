@@ -156,17 +156,127 @@ public class OperatorPromptViewModelTests
     [Fact]
     public void Join_flow_names_the_missing_pin()
     {
-        var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1" };
+        var vm = new OperatorPromptViewModel(collectHost: true) { Host = "elw-1" };
+        var connectRequested = false;
+        vm.ConnectRequested += (_, _) => connectRequested = true;
 
         vm.ConfirmCommand.Execute(null);
         Assert.Equal(ValidationMessages.Required, vm.PinError); // host given, PIN still missing
         Assert.Null(vm.HostError); // only the offending field is named
-        Assert.Null(vm.Result);
+        Assert.False(connectRequested);
 
         vm.Pin = "1234";
         Assert.Null(vm.PinError);
         vm.ConfirmCommand.Execute(null);
-        Assert.NotNull(vm.Result);
+        Assert.True(connectRequested);
+    }
+
+    // --- The two-stage join (#459) ---
+    private static Incident JoinedIncident()
+    {
+        var incident = Incident.Start(
+            new FixedClock(new DateTimeOffset(2026, 9, 28, 14, 0, 0, TimeSpan.FromHours(2))),
+            new SessionOperator("Host"),
+            keyword: "B3 Wohnung");
+        incident.SetAddress("Hauptstraße 5", "Nord");
+        return incident;
+    }
+
+    private static readonly MasterDataSet HostMasterData = MasterDataSet.Empty with
+    {
+        Vehicles = new[] { new Vehicle("Host-Wache", "Florian Host 40/1", 9) },
+        Personnel = Roster.Append(new Person("Nachbar", "Nora", null, "Florian Nachbarort 1", null, IsOwn: false)).ToArray(),
+    };
+
+    [Fact]
+    public void Join_prompt_asks_only_for_host_and_pin_first()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true);
+
+        Assert.True(vm.IsHostStage);
+        Assert.False(vm.AsksForOperator);
+        Assert.Equal("Mit Gerät verbinden", vm.Title);
+        Assert.Equal("VERBINDEN", vm.ConfirmLabel);
+        Assert.Null(vm.JoinedIncidentDisplay);
+    }
+
+    [Fact]
+    public void Confirming_the_host_step_raises_connect_instead_of_a_result()
+    {
+        // No name yet, and none demanded: it is not asked for in this stage.
+        var vm = new OperatorPromptViewModel(collectHost: true) { Host = "elw-1", Pin = "1234" };
+        var connectRequested = false;
+        vm.ConnectRequested += (_, _) => connectRequested = true;
+
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.True(connectRequested);
+        Assert.Null(vm.Result);
+        Assert.Null(vm.OperatorNameError);
+    }
+
+    [Fact]
+    public void Operator_stage_names_the_incident_and_offers_the_hosts_own_personnel_and_call_signs()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true) { Host = "elw-1", Pin = "1234" };
+
+        vm.ShowOperatorStage(JoinedIncident(), HostMasterData);
+
+        Assert.True(vm.IsOperatorStage);
+        Assert.False(vm.IsHostStage);
+        Assert.True(vm.AsksForOperator);
+        Assert.Equal("Wer dokumentiert?", vm.Title);
+        Assert.Equal("BESTÄTIGEN", vm.ConfirmLabel);
+        Assert.Equal("B3 Wohnung · Hauptstraße 5, Nord", vm.JoinedIncidentDisplay);
+        Assert.Equal(new[] { "Schmidt, Anna", "Huber, Max" }, vm.PersonOptions);
+        Assert.Equal(HostMasterData.RadioCallSigns, vm.CallSignOptions);
+        Assert.Null(vm.OperatorNameError); // a fresh stage starts quiet
+
+        vm.OperatorName = "Schmidt, Anna"; // the host's roster drives the Funkrufname prefill too
+        Assert.Equal("FFB 12/2", vm.OperatorCallSign);
+    }
+
+    [Fact]
+    public void An_incident_without_stichwort_or_address_is_still_named()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true);
+
+        vm.ShowOperatorStage(
+            Incident.Start(new FixedClock(DateTimeOffset.UnixEpoch), new SessionOperator("Host")),
+            MasterDataSet.Empty);
+
+        Assert.Equal("Unbenannter Einsatz", vm.JoinedIncidentDisplay);
+    }
+
+    [Fact]
+    public void Confirming_the_operator_stage_produces_the_result()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true) { Host = "elw-1", Pin = "1234" };
+        vm.ShowOperatorStage(JoinedIncident(), HostMasterData);
+
+        vm.ConfirmCommand.Execute(null);
+        Assert.Equal(ValidationMessages.Required, vm.OperatorNameError);
+        Assert.Null(vm.Result);
+
+        vm.OperatorName = "Huber, Max";
+        vm.ConfirmCommand.Execute(null);
+        Assert.Equal("Huber, Max", vm.Result!.Display);
+    }
+
+    [Fact]
+    public void A_failure_after_the_host_step_returns_to_host_and_pin()
+    {
+        var vm = new OperatorPromptViewModel(collectHost: true) { Host = "elw-1", Pin = "1234" };
+        vm.ShowOperatorStage(JoinedIncident(), HostMasterData);
+        vm.OperatorName = "Huber, Max";
+
+        vm.ReportJoinFailure("Verbindung zu elw-1 nicht möglich.", certificateChanged: false);
+
+        Assert.True(vm.IsHostStage);
+        Assert.Null(vm.JoinedIncidentDisplay);
+        Assert.Equal("Verbindung zu elw-1 nicht möglich.", vm.ErrorMessage);
+        Assert.Equal(string.Empty, vm.Pin);
+        Assert.Equal("Huber, Max", vm.OperatorName); // kept for the retry
     }
 
     [Fact]
@@ -226,11 +336,12 @@ public class OperatorPromptViewModelTests
     [Fact]
     public void Reporting_a_join_failure_resets_result_so_confirm_can_fire_again()
     {
-        var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1", Pin = "9999" };
+        var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1", Pin = "1234" };
+        vm.ShowOperatorStage(JoinedIncident(), HostMasterData);
         vm.ConfirmCommand.Execute(null);
         Assert.NotNull(vm.Result);
 
-        vm.ReportJoinFailure("Falsche PIN.", certificateChanged: false);
+        vm.ReportJoinFailure("Verbindung zu elw-1 nicht möglich.", certificateChanged: false);
         Assert.Null(vm.Result);
 
         var raised = false;
@@ -242,6 +353,7 @@ public class OperatorPromptViewModelTests
             }
         };
         vm.Pin = "1234";
+        vm.ShowOperatorStage(JoinedIncident(), HostMasterData);
         vm.ConfirmCommand.Execute(null);
 
         Assert.True(raised);

@@ -5,6 +5,8 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -15,11 +17,10 @@ public class JoinPromptRenderTests
 {
     private static (Window Window, OperatorPromptViewModel Vm) ShowJoinPrompt()
     {
-        var vm = new OperatorPromptViewModel(collectHost: true, callSignOptions: new[] { "FFB 1/40/1" })
+        var vm = new OperatorPromptViewModel(collectHost: true)
         {
             Host = "elw-1",
             Pin = "1234",
-            OperatorName = "Müller",
         };
         var window = new Window { Content = new OperatorPromptView { DataContext = vm }, Width = 640, Height = 560 };
         window.Show();
@@ -167,6 +168,57 @@ public class JoinPromptRenderTests
         var hostBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "HostBox");
         Assert.Equal(string.Empty, hostBox.Text);
         Capture(window, "join-prompt-host-empty.png");
+    }
+
+    // #459: the first stage asks only for the device; who documents is asked once the host is
+    // reached, so its own personnel can be suggested.
+    [AvaloniaFact]
+    public void Join_prompt_asks_for_the_device_first_without_the_name_fields()
+    {
+        var (window, _) = ShowJoinPrompt();
+
+        var visible = window.GetVisualDescendants().OfType<Control>()
+            .Where(c => c.IsEffectivelyVisible).Select(c => c.Name).ToHashSet();
+        Assert.Contains("HostBox", visible);
+        Assert.Contains("PinBox", visible);
+        Assert.DoesNotContain("OperatorNameBox", visible);
+        Assert.DoesNotContain("CallSignBox", visible);
+        Assert.DoesNotContain("JoinedIncidentLine", visible);
+
+        var confirm = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ConfirmButton");
+        Assert.Equal("VERBINDEN", confirm.Content);
+        Capture(window, "join-step-1-device.png");
+    }
+
+    [AvaloniaFact]
+    public void Reached_host_names_the_incident_and_asks_who_documents_with_focus_on_the_name()
+    {
+        var (window, vm) = ShowJoinPrompt();
+        var incident = Incident.Start(new FixedClock(), new SessionOperator("Host"), keyword: "B3 Wohnung");
+        incident.SetAddress("Hauptstraße 5", "Nord");
+        var hostMasterData = MasterDataSet.Empty with
+        {
+            Vehicles = new[] { new Vehicle("Musterwache", "Florian Muster 40/1", 9) },
+            Personnel = AnonymizedExampleData.Personnel,
+        };
+
+        vm.ShowOperatorStage(incident, hostMasterData);
+        Dispatcher.UIThread.RunJobs();
+
+        var visible = window.GetVisualDescendants().OfType<Control>()
+            .Where(c => c.IsEffectivelyVisible).Select(c => c.Name).ToHashSet();
+        Assert.DoesNotContain("HostBox", visible);
+        Assert.DoesNotContain("PinBox", visible);
+        Assert.Contains("CallSignBox", visible);
+
+        var line = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "JoinedIncidentLine");
+        Assert.True(line.IsEffectivelyVisible);
+        Assert.Equal("Einsatz: B3 Wohnung · Hauptstraße 5, Nord", line.Text);
+
+        var nameBox = window.GetVisualDescendants().OfType<AutoCompleteBox>().Single(t => t.Name == "OperatorNameBox");
+        Assert.True(nameBox.IsKeyboardFocusWithin, "NAME box not focused once the host is reached.");
+        Assert.Equal(AnonymizedExampleData.Personnel.Where(p => p.IsOwn).Select(p => p.DisplayName), nameBox.ItemsSource!.Cast<string>());
+        Capture(window, "join-step-2-operator.png");
     }
 
     [AvaloniaFact]

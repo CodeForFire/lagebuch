@@ -92,6 +92,9 @@ internal sealed class StubHost : IAsyncDisposable
     /// </summary>
     public Task WaitForClientDisconnectAsync(TimeSpan timeout) => _tracker.Disconnected.Task.WaitAsync(timeout);
 
+    /// <summary>How many hub connections a client has opened so far.</summary>
+    public int HubConnectionCount => _tracker.Connected;
+
     public async ValueTask DisposeAsync() => await _app.DisposeAsync();
 
     // Method-less like the real IncidentHub -- it carries no server-callable methods either -- only
@@ -106,6 +109,12 @@ internal sealed class StubHost : IAsyncDisposable
 
         public TrackingHub(ConnectionTracker tracker) => _tracker = tracker;
 
+        public override Task OnConnectedAsync()
+        {
+            _tracker.OnConnected();
+            return base.OnConnectedAsync();
+        }
+
         public override Task OnDisconnectedAsync(Exception? exception)
         {
             _tracker.Disconnected.TrySetResult();
@@ -115,6 +124,12 @@ internal sealed class StubHost : IAsyncDisposable
 
     private sealed class ConnectionTracker
     {
+        private int _connected;
+
+        public int Connected => Volatile.Read(ref _connected);
+
+        public void OnConnected() => Interlocked.Increment(ref _connected);
+
         public TaskCompletionSource Disconnected { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }
