@@ -38,6 +38,18 @@ public sealed class IncidentHost : IAsyncDisposable
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
 
+    // The change counter clients reconcile against (#295). Touched only on the UI thread: written by
+    // OnSessionChanged (LocalIncidentSession.Changed is always raised there) and read by the three
+    // endpoints below, each of which dispatches through _ui first. That is what makes it safe without
+    // Interlocked, and — more importantly — what makes (revision, aggregate) a single consistent pair:
+    // between two mutations the UI thread sees both or neither. In memory and per host instance by
+    // design; a client that rejoins re-seeds from GET /snapshot.
+    private long _revision;
+
+    // Which counter _revision is (#295): minted fresh by every StartAsync, so no client can mistake a
+    // revision from one sharing session for one from another. Not a secret — it only has to differ.
+    private Guid _epoch;
+
     public IncidentHost(
         LocalIncidentSession session,
         IClock clock,
@@ -85,6 +97,7 @@ public sealed class IncidentHost : IAsyncDisposable
         // Serve TLS with a fresh self-signed cert minted per share session; the client pins it via
         // Trust-on-First-Use (§ P0 #2) rather than the OS trust store.
         (_cert, _) = SyncCertificate.Generate();
+        _epoch = Guid.NewGuid();
         builder.WebHost.UseKestrel(o =>
         {
             // "Bind everything" is requested as either wildcard depending on caller history/tests;
@@ -186,7 +199,19 @@ public sealed class IncidentHost : IAsyncDisposable
         app.MapGet(
             SyncProtocol.VersionPath,
             () => Results.Json(new VersionInfo(_appVersion, _protocolVersion, _minimumProtocolVersion), SyncJson.Options));
-        app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options));
+
+        // Dispatched onto the UI thread, like HandleCommand: this used to read _session.Incident
+        // straight from a Kestrel request thread while the UI thread mutated it, which could enumerate
+        // a List<T> mid-Add. Now it also has to be atomic with _revision — a client that recorded a
+        // revision it does not hold the content for would discard the very broadcast that fixes it,
+        // silently and for good. Reading both inside one dispatched action removes both hazards.
+        app.MapGet(SyncProtocol.SnapshotPath, async () =>
+            await _ui.InvokeAsync(() => Results.Json(CurrentSnapshot(), SyncJson.Options)));
+
+        // The poll endpoint (#295). Takes the same UI hop so _revision stays single-threaded; it reads
+        // one long, so the hop costs nothing worth saving.
+        app.MapGet(SyncProtocol.RevisionPath, async () =>
+            await _ui.InvokeAsync(() => Results.Json(new RevisionInfo(_revision, _epoch), SyncJson.Options)));
 
         // Results.Content, not Results.Json: the payload is already serialized JSON text, and
         // Results.Json would re-encode it into a JSON string literal. MasterDataJson.Serialize uses
@@ -235,7 +260,7 @@ public sealed class IncidentHost : IAsyncDisposable
                 // background writer owns the actual SQLite I/O), so this dispatch is a snapshot copy,
                 // not a full save.
                 _session.SaveExternalChange();
-                return Results.Json(SnapshotMapper.ToSnapshot(_session.Incident), SyncJson.Options);
+                return Results.Json(CurrentSnapshot(), SyncJson.Options);
             });
 
             // The other half of RemoveFile's metadata/bytes split: CommandApplier only removed the
@@ -326,7 +351,21 @@ public sealed class IncidentHost : IAsyncDisposable
             && int.TryParse(header[0], System.Globalization.CultureInfo.InvariantCulture, out var claimed)
             && claimed >= minimum);
 
-    private void OnSessionChanged() => _ = Broadcast(SnapshotMapper.ToSnapshot(_session.Incident));
+    private void OnSessionChanged()
+    {
+        // Increment BEFORE serializing. (N, content_of_N+1) is harmless — the client applies content
+        // it will simply re-accept as N+1 — but (N+1, content_of_N) strands it, and reading the
+        // aggregate before the increment is the only way to produce that pair.
+        _revision++;
+        _ = Broadcast(CurrentSnapshot());
+    }
+
+    /// <summary>
+    /// The aggregate and its position as one value. Callers must already be on the UI thread, which is
+    /// what makes the pair consistent — see <see cref="_revision"/>.
+    /// </summary>
+    private IncidentSnapshot CurrentSnapshot() =>
+        SnapshotMapper.ToSnapshot(_session.Incident) with { Revision = _revision, Epoch = _epoch };
 
     private Task Broadcast(IncidentSnapshot snapshot) =>
         _hub is null ? Task.CompletedTask : _hub.Clients.All.SendAsync(SyncProtocol.SnapshotMethod, snapshot);

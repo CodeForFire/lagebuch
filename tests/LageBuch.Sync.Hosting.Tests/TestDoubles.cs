@@ -68,11 +68,89 @@ internal sealed class InMemoryStore : IIncidentStore
 
 internal sealed class FakeTimeProvider : TimeProvider
 {
+    private readonly object _gate = new();
+    private readonly List<FakeTimer> _timers = new();
+
     public DateTimeOffset UtcNow { get; set; } = new(2026, 8, 12, 9, 0, 0, TimeSpan.Zero);
 
     public override DateTimeOffset GetUtcNow() => UtcNow;
 
-    public void Advance(TimeSpan by) => UtcNow += by;
+    /// <summary>Moves the clock on and fires every timer that came due, once each, on the caller's thread.</summary>
+    public void Advance(TimeSpan by)
+    {
+        FakeTimer[] timers;
+        lock (_gate)
+        {
+            UtcNow += by;
+            timers = _timers.ToArray();
+        }
+
+        foreach (var timer in timers)
+        {
+            timer.FireIfDue(UtcNow);
+        }
+    }
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new FakeTimer(this, callback, state);
+        lock (_gate)
+        {
+            _timers.Add(timer);
+        }
+
+        timer.Change(dueTime, period);
+        return timer;
+    }
+
+    private void Remove(FakeTimer timer)
+    {
+        lock (_gate)
+        {
+            _timers.Remove(timer);
+        }
+    }
+
+    private sealed class FakeTimer(FakeTimeProvider owner, TimerCallback callback, object? state) : ITimer
+    {
+        private readonly object _gate = new();
+        private DateTimeOffset? _next;
+        private TimeSpan _period;
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            lock (_gate)
+            {
+                _next = dueTime == Timeout.InfiniteTimeSpan ? null : owner.UtcNow + dueTime;
+                _period = period;
+            }
+
+            return true;
+        }
+
+        public void FireIfDue(DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                if (_next is not { } next || next > now)
+                {
+                    return;
+                }
+
+                _next = _period == Timeout.InfiniteTimeSpan || _period == TimeSpan.Zero ? null : now + _period;
+            }
+
+            callback(state);
+        }
+
+        public void Dispose() => owner.Remove(this);
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
 }
 
 internal sealed class FixedClock : IClock
@@ -373,5 +451,90 @@ internal sealed class DelayedFileWriteStore : IIncidentStore
     {
         add { }
         remove { }
+    }
+}
+
+/// <summary>
+/// Reconnects almost at once, for as long as a test needs; the production policy waits 3 s between
+/// attempts.
+/// </summary>
+internal sealed class ReconnectImmediately : Microsoft.AspNetCore.SignalR.Client.IRetryPolicy
+{
+    public TimeSpan? NextRetryDelay(Microsoft.AspNetCore.SignalR.Client.RetryContext retryContext) =>
+        retryContext.PreviousRetryCount < 50 ? TimeSpan.FromMilliseconds(20) : null;
+}
+
+/// <summary>
+/// An <see cref="IUiDispatcher"/> with production's threading model: one dedicated thread that runs
+/// everything posted to it in order, and runs a call inline when it is already on that thread — which
+/// is what <c>AvaloniaUiDispatcher</c> does over <c>Dispatcher.UIThread</c>.
+/// <see cref="ImmediateUiDispatcher"/> instead runs every call on whichever thread made it, so under it
+/// SignalR's receive loop, an HTTP response and the reconcile poll all execute concurrently; this one
+/// serializes them, the way a device does.
+/// </summary>
+internal sealed class SerialUiDispatcher : IUiDispatcher, IDisposable
+{
+    private readonly System.Collections.Concurrent.BlockingCollection<Action> _queue = new();
+    private readonly Thread _thread;
+    private int _invocations;
+
+    public SerialUiDispatcher()
+    {
+        _thread = new Thread(Run) { IsBackground = true, Name = "SerialUiDispatcher" };
+        _thread.Start();
+    }
+
+    /// <summary>How many <see cref="InvokeAsync{T}"/> calls reached this dispatcher.</summary>
+    public int Invocations => Volatile.Read(ref _invocations);
+
+    public void Post(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (Thread.CurrentThread == _thread)
+        {
+            action();
+        }
+        else
+        {
+            _queue.Add(action);
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Not swallowed: the exception faults the returned task, which is where the caller awaits it — as Dispatcher.UIThread.InvokeAsync does.")]
+    public Task<T> InvokeAsync<T>(Func<T> func)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        Interlocked.Increment(ref _invocations);
+        var result = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Post(() =>
+        {
+            try
+            {
+                result.SetResult(func());
+            }
+            catch (Exception ex)
+            {
+                result.SetException(ex);
+            }
+        });
+        return result.Task;
+    }
+
+    public void Dispose()
+    {
+        _queue.CompleteAdding();
+        _thread.Join();
+        _queue.Dispose();
+    }
+
+    private void Run()
+    {
+        foreach (var action in _queue.GetConsumingEnumerable())
+        {
+            action();
+        }
     }
 }

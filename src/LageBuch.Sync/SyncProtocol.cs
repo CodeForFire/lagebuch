@@ -30,15 +30,21 @@ public static class SyncProtocol
     /// <c>removeInvolvedParty</c> commands and the snapshot's <c>involvedParties</c>. A host at 2
     /// would reject those commands, so the floor rises to 3 as well.
     /// </para>
+    /// <para>
+    /// 4: the snapshot carries <c>epoch</c> and <c>revision</c>, and the host serves them at
+    /// <see cref="RevisionPath"/> (#295). A client at 4 discards any snapshot that does not supersede
+    /// the one it holds, and a host at 3 sends revision 0 on every one — so such a client would drop
+    /// every update after the first and sit on the Lage it joined with. The floor rises to 4.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 3;
+    public const int ProtocolVersion = 4;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 3;
+    public const int MinimumProtocolVersion = 4;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,
@@ -60,6 +66,15 @@ public static class SyncProtocol
     public const string SnapshotPath = "/snapshot";
     public const string VersionPath = "/version";
     public const string HubPath = "/hub";
+
+    /// <summary>
+    /// The host's current snapshot position — epoch and revision — and nothing else. A joined client
+    /// polls this as an anti-entropy net (#295): a broadcast that never arrived leaves the host's
+    /// position different from the client's, and the next poll re-fetches <see cref="SnapshotPath"/>
+    /// to catch up. Deliberately tiny — it is requested every few seconds per client, unlike the
+    /// whole-incident snapshot.
+    /// </summary>
+    public const string RevisionPath = "/revision";
 
     /// <summary>Route template for the on-demand attachment-bytes pull, keyed by <see cref="LageBuch.Domain.Files.IncidentFile.Id"/>.</summary>
     public const string FilesRouteTemplate = "/files/{id:guid}";
@@ -90,6 +105,30 @@ public static class SyncProtocol
     /// <see cref="LegacyProtocolVersion"/>.
     /// </summary>
     public const string ProtocolHeader = "X-Lagebuch-Protocol";
+
+    /// <summary>
+    /// The most a joined client buffers from any one response of the host's: a snapshot, a command's
+    /// answer, an attachment. The host is outside the client's trust boundary, so a response that
+    /// would not fit is refused rather than read. Sized to hold the largest attachment
+    /// (<see cref="LageBuch.Domain.Files.IncidentFile.MaxSizeBytes"/>) with room to spare; a snapshot
+    /// is text and runs to megabytes at the very most.
+    /// </summary>
+    public const long MaxResponseBytes = LageBuch.Domain.Files.IncidentFile.MaxSizeBytes + (8 * 1024 * 1024);
+
+    /// <summary>
+    /// How often a joined client polls <see cref="RevisionPath"/>. This is the ceiling on how long a
+    /// device can sit on stale state after a lost broadcast, so it is chosen to be shorter than anyone
+    /// would spend reading a screen before acting on it — and the request is a few bytes over a LAN.
+    /// </summary>
+    public static readonly TimeSpan DefaultReconcileInterval = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// How long one reconcile pass may take before it counts as failed. Without it a pass on a link
+    /// that went silent without closing — a roaming WLAN, an access point asleep — would wait out the
+    /// HTTP client's 100 s default, and the footer would keep claiming a confirmed Stand for all of it.
+    /// With it, a device learns it cannot confirm its Stand within one interval plus this.
+    /// </summary>
+    public static readonly TimeSpan ReconcileTimeout = TimeSpan.FromSeconds(5);
 }
 
 /// <summary>
@@ -109,6 +148,13 @@ public static class SyncProtocol
 public sealed record VersionInfo(string Version, int Protocol = 0, int MinProtocol = 0);
 
 /// <summary>
+/// The host's current <see cref="IncidentSnapshot.Epoch"/> and <see cref="IncidentSnapshot.Revision"/>,
+/// served by <see cref="SyncProtocol.RevisionPath"/>. A joined client compares the pair against the
+/// one it last applied; any difference means re-fetch the snapshot (#295).
+/// </summary>
+public sealed record RevisionInfo(long Revision, Guid Epoch = default);
+
+/// <summary>
 /// Thrown when the host rejects the join because the supplied share PIN is wrong or missing (§ #64).
 /// Surfaced to the joining user on the same banner as <see cref="VersionMismatchException"/>.
 /// </summary>
@@ -125,6 +171,30 @@ public sealed class PinRejectedException : Exception
     }
 
     public PinRejectedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
+/// Thrown when the host refused a command with 400 — a domain guard, a closed incident, or an id it
+/// does not know. <see cref="Exception.Message"/> is the host's own German reason, verbatim, because
+/// that sentence is what the operator needs to read; the alternative they used to get was nothing at
+/// all (#295).
+/// </summary>
+public sealed class CommandRejectedException : Exception
+{
+    public CommandRejectedException()
+        : this("Die Änderung wurde vom Host abgelehnt.")
+    {
+    }
+
+    public CommandRejectedException(string message)
+        : base(message)
+    {
+    }
+
+    public CommandRejectedException(string message, Exception innerException)
         : base(message, innerException)
     {
     }

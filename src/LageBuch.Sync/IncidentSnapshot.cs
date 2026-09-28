@@ -12,6 +12,18 @@ namespace LageBuch.Sync;
 /// <see cref="Incident.Rehydrate"/> exactly, so <see cref="SnapshotMapper"/> is a JSON-shaped
 /// sibling of the SQL mapping in <c>LageBuch.Persistence.IncidentRepository</c>.
 /// </summary>
+/// <remarks>
+/// <c>Epoch</c> and <c>Revision</c> are the two members a client compares rather than displays
+/// (#295). <c>Revision</c> is the host's change counter; <c>Epoch</c> names the counter it belongs to,
+/// a fresh random value every time the host starts sharing. See <see cref="SyncPosition"/> for how a
+/// client orders two snapshots by them.
+/// <para>
+/// Their defaults mean nobody attached them. <see cref="SnapshotMapper.ToSnapshot"/> leaves both
+/// alone and only <c>IncidentHost</c> fills them in, so the persistence path (<c>IncidentStore</c>,
+/// which round-trips this type in memory and never reads them) is untouched. Appending defaulted
+/// trailing parameters is this type's documented compat convention.
+/// </para>
+/// </remarks>
 public sealed record IncidentSnapshot(
     Guid Id,
     DateTimeOffset StartedAt,
@@ -36,7 +48,9 @@ public sealed record IncidentSnapshot(
     IReadOnlyList<DwellingDto> Dwellings,
 
     // Defaulted like DwellingDto.Readings: a snapshot without the key reads as "no Beteiligte".
-    IReadOnlyList<InvolvedPartyDto>? InvolvedParties = null);
+    IReadOnlyList<InvolvedPartyDto>? InvolvedParties = null,
+    long Revision = 0,
+    Guid Epoch = default);
 
 public sealed record TimerDto(
     string Key,

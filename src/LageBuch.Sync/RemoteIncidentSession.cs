@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
@@ -40,7 +41,24 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     private readonly string? _cacheRoot;
     private readonly long _cacheMaxBytes;
     private readonly object _cacheEvictionGate = new();
+
+    // Guards the (_incident, _applied) pair, which must move together: the guard below is a
+    // read-modify-write, so Interlocked on the field alone would not do. It is contended for real,
+    // not defensively — ImmediateUiDispatcher.Post runs inline, so under it "the UI thread" is
+    // whichever thread called, and SignalR's receive loop, a command's response and the reconcile
+    // poll genuinely race here.
+    private readonly object _applyGate = new();
+    private readonly CancellationTokenSource _reconcileCts = new();
+
+    // Created with the session rather than inside the loop, so it exists the moment ConnectAsync returns:
+    // a tick that comes due before Task.Run has scheduled the loop is then held by the timer rather than
+    // lost, which is what lets a test advance a fake clock straight away.
+    private readonly PeriodicTimer _reconcileTimer;
+    private readonly TimeProvider _time;
     private Incident _incident;
+    private SyncPosition _applied;
+    private Task? _reconcileLoop;
+    private int _disposed;
 
     public SessionOperator? Operator { get; private set; }
 
@@ -78,6 +96,31 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public event Action? Reconnected;
 
     /// <summary>
+    /// Raised after a reconcile pass confirmed this device is on the host's revision — whether or not
+    /// it had to fetch anything. The workspace stamps its "Stand" from this: it is the only positive
+    /// evidence that what is on screen is current, as opposed to merely un-contradicted.
+    /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
+    public event Action? Reconciled;
+
+    /// <summary>
+    /// Raised when a reconcile pass could not reach the host, so currency is unconfirmed. Deliberately
+    /// not <see cref="Disconnected"/>: SignalR owns that, and this fires in the case SignalR cannot see
+    /// — the hub believing it is connected while the host is in fact unreachable.
+    /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
+    public event Action? ReconcileFailed;
+
+    /// <summary>
+    /// Raised when the host refused one of the fire-and-forget mutations, carrying its own reason. The
+    /// workspace shows it as a banner. Only the <c>void</c> mutations report here; the awaited ones
+    /// (<see cref="AddFileAsync"/>, <see cref="RemoveFileAsync"/>) throw
+    /// <see cref="CommandRejectedException"/> to their caller instead, so nothing is reported twice.
+    /// </summary>
+    [SuppressMessage("Design", "CA1003", Justification = "In-process fire-and-forget event with C#-only subscribers; see IIncidentSession.Changed.")]
+    public event Action<string>? CommandRejected;
+
+    /// <summary>
     /// Raised when the connection is gone for good — reconnect attempts were exhausted or the host
     /// stopped sharing. The UI returns to Home (§7); nothing further arrives on this session.
     /// </summary>
@@ -91,16 +134,22 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         IUiDispatcher ui,
         SessionOperator op,
         Incident initial,
+        SyncPosition initialPosition,
         string? cacheRoot,
         long cacheMaxBytes,
-        string hostMasterDataJson)
+        string hostMasterDataJson,
+        TimeSpan reconcileInterval,
+        TimeProvider time)
     {
+        _reconcileTimer = new PeriodicTimer(reconcileInterval, time);
+        _time = time;
         _http = http;
         _handler = handler;
         _hub = hub;
         _ui = ui;
         Operator = op;
         _incident = initial;
+        _applied = initialPosition;
         _cacheRoot = cacheRoot;
         _cacheMaxBytes = cacheMaxBytes;
         HostMasterDataJson = hostMasterDataJson;
@@ -147,7 +196,22 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// until it is back under. Defaults to <see cref="DefaultCacheMaxBytes"/>; irrelevant when
     /// <paramref name="cacheRoot"/> is null.
     /// </param>
+    /// <param name="reconcileInterval">
+    /// How often to poll <c>GET /revision</c> and re-fetch when it disagrees with what this device has
+    /// applied — the net that catches a broadcast lost without the connection dropping (#295). Defaults
+    /// to <see cref="SyncProtocol.DefaultReconcileInterval"/>; tests shorten it, or push it past the end
+    /// of the test and drive <see cref="ReconcileAsync"/> directly.
+    /// </param>
+    /// <param name="timeProvider">
+    /// Drives the reconcile timer and each pass's <see cref="SyncProtocol.ReconcileTimeout"/>. Defaults
+    /// to <see cref="TimeProvider.System"/>; tests pass a fake and advance it instead of waiting on the
+    /// wall clock.
+    /// </param>
     /// <param name="ct">Cancels the connect handshake.</param>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The reconnect handler's catch-up failure surfaces on ReconcileFailed (an unconfirmed-state footer) and is retried by the poll; rethrowing inside a SignalR callback would instead leave Reconnected un-raised, which strands the workspace with its input disabled.")]
     public static async Task<RemoteIncidentSession> ConnectAsync(
         string host,
         SessionOperator op,
@@ -159,6 +223,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         IRetryPolicy? reconnectPolicy = null,
         string? cacheRoot = null,
         long cacheMaxBytes = DefaultCacheMaxBytes,
+        TimeSpan? reconcileInterval = null,
+        TimeProvider? timeProvider = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(trustStore);
@@ -197,7 +263,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         // after the hub, since the hub's long-lived transport also uses it via HttpMessageHandlerFactory
         // below) rather than relying on HttpClient's default cascade, so ownership is one clear line
         // instead of implicit via a constructor flag.
-        var http = new HttpClient(handler, disposeHandler: false) { BaseAddress = baseUri };
+        // MaxResponseContentBufferSize: every response here is read into memory, and each one comes
+        // from a sync peer, so none may be larger than SyncProtocol.MaxResponseBytes.
+        var http = new HttpClient(handler, disposeHandler: false)
+        {
+            BaseAddress = baseUri,
+            MaxResponseContentBufferSize = SyncProtocol.MaxResponseBytes,
+        };
         if (!string.IsNullOrEmpty(pin))
         {
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
@@ -282,8 +354,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             var hostMasterDataJson = await http.GetStringAsync(
                 new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute), ct);
 
-            var initial = SnapshotMapper.FromSnapshot(
-                SyncJson.Deserialize<IncidentSnapshot>(await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct)));
+            // Kept as the snapshot, not just the mapped Incident: its position seeds _applied, so the
+            // client starts level with the host instead of treating everything up to the joined-at
+            // revision as new.
+            var initialSnapshot = SyncJson.Deserialize<IncidentSnapshot>(
+                await http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), ct));
+            var initial = SnapshotMapper.FromSnapshot(initialSnapshot);
 
             var hub = new HubConnectionBuilder()
                 .WithUrl(new Uri(baseUri, SyncProtocol.HubPath), o =>
@@ -301,13 +377,31 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                         SyncProtocol.ProtocolHeader,
                         SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
 
-                    o.HttpMessageHandlerFactory = _ => handler;
+                    // Wrapped, never the handler itself: SignalR disposes what this factory returns
+                    // whenever a connection ends, and _http runs on the same handler. Handing it over
+                    // bare meant the first dropped link disposed both — every reconnect attempt then
+                    // failed with ObjectDisposedException, every command with it, until the policy
+                    // gave up and the session ended. The wrapper is SignalR's to dispose; the handler
+                    // stays this session's, released in DisposeAsync.
+                    o.HttpMessageHandlerFactory = _ => new BorrowedHandler(handler);
                 })
                 .WithAutomaticReconnect(reconnectPolicy ?? new ReconnectForAWhile())
                 .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 .Build();
 
-            var session = new RemoteIncidentSession(http, handler, hub, ui, op, initial, cacheRoot, cacheMaxBytes, hostMasterDataJson);
+            var session = new RemoteIncidentSession(
+                http,
+                handler,
+                hub,
+                ui,
+                op,
+                initial,
+                SyncPosition.Of(initialSnapshot),
+                cacheRoot,
+                cacheMaxBytes,
+                hostMasterDataJson,
+                reconcileInterval ?? SyncProtocol.DefaultReconcileInterval,
+                timeProvider ?? TimeProvider.System);
             hub.On<IncidentSnapshot>(SyncProtocol.SnapshotMethod, session.OnSnapshot);
 
             // Every SignalR callback below arrives on the hub's receive loop, off the UI thread; each is
@@ -322,7 +416,23 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
             };
             hub.Reconnected += async _ =>
             {
-                await session.ResyncAsync();
+                // Reconcile rather than resync blindly: only a position that differs costs a snapshot
+                // fetch. Wrapped, and Reconnected raised regardless, because a throwing catch-up used to
+                // leave Reconnected un-raised — which left IsConnected false and the workspace's input
+                // disabled for good. A pass that fails here is exactly what the poll retries; one that
+                // succeeds re-confirms the Stand straight away, because when nothing was missed it
+                // applies nothing, and without Reconciled the footer would stay "nicht bestätigt" until
+                // the next tick although the device is demonstrably current.
+                try
+                {
+                    await session.ReconcileAsync(session._reconcileCts.Token);
+                    session._ui.Post(() => session.Reconciled?.Invoke());
+                }
+                catch (Exception)
+                {
+                    session._ui.Post(() => session.ReconcileFailed?.Invoke());
+                }
+
                 session._ui.Post(() => session.Reconnected?.Invoke());
             };
             hub.Closed += _ =>
@@ -331,6 +441,18 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
                 return Task.CompletedTask;
             };
             await hub.StartAsync(ct);
+
+            // Task.Run, not a bare call: ConnectAsync is awaited from the UI thread, so a bare call
+            // would capture Avalonia's SynchronizationContext and resume every continuation in the loop
+            // — the HTTP GET included — on the UI thread. CA2007 is off repo-wide, so ConfigureAwait
+            // is not the house style; Task.Run clears the context and hands back a Task to await in
+            // DisposeAsync.
+            // CancellationToken.None to Run on purpose: the loop observes the token itself and must be
+            // allowed to finish, because DisposeAsync awaits this task before disposing the HttpClient it
+            // uses. Handing the token to Run instead could leave the task cancelled-before-start, and
+            // that await would then throw on a perfectly ordinary teardown.
+            session._reconcileLoop = Task.Run(
+                () => session.ReconcileLoopAsync(session._reconcileCts.Token), CancellationToken.None);
             return session;
         }
         catch
@@ -642,29 +764,299 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     private OperatorDto Op() => new(Operator!.Name, Operator.CallSign);
 
-    // Fire-and-forget: the command is POSTed; the host's broadcast (or a rejection the host swallows)
-    // is what the UI ultimately reflects. Connection loss surfaces separately via Disconnected.
-    private void Send(SyncCommand command) => _ = SendAsync(command);
+    // The ~40 void mutations all land here. Still fire-and-forget -- they cannot await -- but the task
+    // is observed now rather than discarded (#295).
+    private void Send(SyncCommand command) => _ = SendAndReportAsync(command);
 
-    /// <summary>Sends one command to the host. The resulting state arrives via the broadcast, not this call.</summary>
+    /// <summary>
+    /// Send half of <see cref="Send"/>: reports a refusal on <see cref="CommandRejected"/> instead of
+    /// dropping it with the task. Kept separate from <see cref="SendAsync"/> so the awaited callers keep
+    /// getting an exception and the operator is never told the same thing twice.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "This is the end of a fire-and-forget path: a refusal or any other HTTP error status surfaces on CommandRejected (a workspace banner); a transport failure surfaces on Disconnected/Ended, and an unreadable success body on the reconcile poll, because the host's revision has moved. Rethrowing would fault a discarded task and take the process down mid-Einsatz.")]
+    private async Task SendAndReportAsync(SyncCommand command)
+    {
+        try
+        {
+            await SendAsync(command);
+        }
+        catch (CommandRejectedException ex)
+        {
+            _ui.Post(() => CommandRejected?.Invoke(ex.Message));
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is { } status)
+        {
+            // The host answered, but not with a domain guard's 400: a server error, a PIN the rate
+            // limiter now refuses, an oversized body. The connection stays up and the revision does
+            // not move, so nothing else would ever notice that this input was lost.
+            _ui.Post(() => CommandRejected?.Invoke(DescribeRefusal(status)));
+        }
+        catch (Exception)
+        {
+            // A transport failure is not reported here on purpose: losing the connection already shows
+            // on Disconnected/Ended, and once it is back the reconcile poll restores the true state. A
+            // second banner saying the same thing would only add noise at the worst possible moment.
+        }
+    }
+
+    /// <summary>
+    /// Sends one command to the host and adopts the snapshot it answers with.
+    /// </summary>
+    /// <remarks>
+    /// The host has always returned the snapshot its apply produced; it used to be thrown away, leaving
+    /// the sender to wait for the broadcast. Applying it costs nothing and makes a device that is
+    /// actually being used converge from its own round trip. The broadcast carries the same position,
+    /// so whichever of the two arrives second is dropped by the guard in <see cref="ApplySnapshot"/>.
+    /// That the two travel different channels — an HTTP response and the hub — with nothing ordering
+    /// them against each other is exactly why the guard exists.
+    /// </remarks>
+    /// <exception cref="CommandRejectedException">
+    /// The host refused the command (400) — a domain guard, a closed incident, an unknown id.
+    /// </exception>
     public async Task SendAsync(SyncCommand command, CancellationToken ct = default)
     {
         using var content = new StringContent(SyncJson.Serialize(command), Encoding.UTF8, "application/json");
-        var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
+        using var response = await _http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content, ct);
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            throw new CommandRejectedException(await ReadRejectionAsync(response, ct));
+        }
+
         response.EnsureSuccessStatusCode();
+        ApplySnapshot(SyncJson.Deserialize<IncidentSnapshot>(await response.Content.ReadAsStringAsync(ct)));
+    }
+
+    /// <summary>
+    /// What to tell the Lagebuchführer when the host refused a command with something other than a
+    /// domain guard's 400. The statuses the host's own middleware produces get a sentence that says
+    /// what to do; anything else names its code, because it is the host's fault and not the input's.
+    /// </summary>
+    private static string DescribeRefusal(HttpStatusCode status) => status switch
+    {
+        HttpStatusCode.Unauthorized => "Der Host hat die PIN nicht angenommen.",
+        HttpStatusCode.TooManyRequests => "Der Host nimmt nach zu vielen Fehlversuchen gerade nichts an.",
+        HttpStatusCode.UpgradeRequired => "Dieses Gerät ist zu alt für den Host. Bitte dieses Gerät aktualisieren.",
+        HttpStatusCode.RequestEntityTooLarge => "Die Änderung ist zu groß für den Host.",
+        _ => $"Der Host hat die Änderung nicht angenommen (Fehler {(int)status}).",
+    };
+
+    /// <summary>
+    /// Pulls the host's reason out of a 400 body.
+    /// </summary>
+    /// <remarks>
+    /// <c>Results.BadRequest(string)</c> in a minimal API goes through <c>TypedResults.BadRequest&lt;T&gt;</c>
+    /// and is written as JSON, so the reason arrives as a string <em>literal</em> — quotes and all —
+    /// rather than as plain text. Both shapes are accepted anyway, so a later change at the host cannot
+    /// put quotation marks on an operator's screen. Length-capped because this ends up in a banner, not
+    /// a log viewer, and read-capped because the body comes from a sync peer: however much it sends,
+    /// only <c>maxBodyBytes</c> of it is ever buffered. For the same reason control and formatting
+    /// characters are dropped: a peer's text must not be able to reorder itself with a bidi override
+    /// or break the banner's layout.
+    /// </remarks>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A body that cannot be read at all must still produce a readable German sentence for the banner; the alternative is the silent loss this change exists to remove.")]
+    private static async Task<string> ReadRejectionAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        const int maxLength = 300;
+        const int maxBodyBytes = 4096;
+
+        string body;
+        bool truncated;
+        try
+        {
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            var buffer = new byte[maxBodyBytes];
+            var read = 0;
+            int n;
+            while (read < buffer.Length && (n = await stream.ReadAsync(buffer.AsMemory(read), ct)) > 0)
+            {
+                read += n;
+            }
+
+            truncated = read == buffer.Length;
+            body = Encoding.UTF8.GetString(buffer, 0, read).Trim();
+        }
+        catch (Exception)
+        {
+            return "Die Änderung wurde vom Host abgelehnt.";
+        }
+
+        if (body.Length > 1 && body.StartsWith('"') && body.EndsWith('"'))
+        {
+            try
+            {
+                body = SyncJson.Deserialize<string>(body);
+            }
+            catch (JsonException)
+            {
+                // Not a JSON string after all — fall through and use it as it came.
+            }
+        }
+        else if (truncated && body.StartsWith('"'))
+        {
+            // A JSON string literal cut off by the read cap has lost its closing quote; drop the
+            // opening one too rather than show half a pair.
+            body = body[1..];
+        }
+
+        body = Displayable(body);
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return "Die Änderung wurde vom Host abgelehnt.";
+        }
+
+        return body.Length > maxLength ? body[..maxLength] : body;
+    }
+
+    // Line breaks and tabs become spaces so words stay apart; every other control or format character
+    // (bidi overrides, zero-width joiners, BEL) is dropped.
+    private static string Displayable(string text)
+    {
+        var builder = new StringBuilder(text.Length);
+        foreach (var c in text)
+        {
+            if (char.IsWhiteSpace(c))
+            {
+                builder.Append(char.IsControl(c) ? ' ' : c);
+            }
+            else if (!char.IsControl(c) && CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.Format)
+            {
+                builder.Append(c);
+            }
+        }
+
+        return builder.ToString().Trim();
     }
 
     // Arrives on SignalR's receive loop. Swap the cached incident and raise Changed on the UI thread:
     // the subscribers (EtbViewModel.Sync et al.) mutate Avalonia-bound collections, which Avalonia
     // rejects off-thread — so a broadcast raised here would otherwise never reach the view.
-    private void OnSnapshot(IncidentSnapshot snapshot) => _ui.Post(() =>
+    private void OnSnapshot(IncidentSnapshot snapshot) => ApplySnapshot(snapshot);
+
+    /// <summary>
+    /// Adopts <paramref name="snapshot"/> unless it does not supersede what this device holds (#295).
+    /// </summary>
+    /// <remarks>
+    /// Every channel lands here — the hub push, a command's own response, a resync — because nothing
+    /// orders those channels against each other: the same state can arrive twice, and an older copy can
+    /// arrive after a newer one. <see cref="SyncPosition.Supersedes"/> makes that harmless.
+    /// </remarks>
+    private void ApplySnapshot(IncidentSnapshot snapshot) => _ui.Post(() =>
     {
-        _incident = SnapshotMapper.FromSnapshot(snapshot);
+        lock (_applyGate)
+        {
+            var incoming = SyncPosition.Of(snapshot);
+            if (!incoming.Supersedes(_applied))
+            {
+                return;
+            }
+
+            _incident = SnapshotMapper.FromSnapshot(snapshot);
+            _applied = incoming;
+        }
+
+        // Outside the lock: subscribers re-enter this object and touch the UI, and holding a lock
+        // across that is how a deadlock gets built.
         Changed?.Invoke();
     });
 
-    private async Task ResyncAsync() =>
-        OnSnapshot(SyncJson.Deserialize<IncidentSnapshot>(await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))));
+    /// <summary>
+    /// Polls the host's revision forever, healing whenever the two disagree. A tick's failure is
+    /// reported and the loop carries on — the whole point of this net is to keep trying when something
+    /// nobody enumerated has gone wrong.
+    /// </summary>
+    /// <remarks>
+    /// Runs while disconnected too. A succeeding poll during SignalR's reconnect window is real
+    /// information, and a failing one is what puts the footer in its "nicht bestätigt" state. The
+    /// notifications go out through <see cref="IUiDispatcher.Post"/> and never
+    /// <c>InvokeAsync</c>: the workspace awaits <see cref="DisposeAsync"/> from the UI thread and
+    /// disposal awaits this loop, so a loop that awaited the UI thread would deadlock there.
+    /// <para>
+    /// On Android the process freezes while backgrounded. <see cref="PeriodicTimer"/> simply does not
+    /// tick then and does not replay what it missed, so resuming costs exactly one catch-up pass —
+    /// which is the wanted behaviour. Nothing here derives state from a wall-clock delta, because a
+    /// frozen process would make that lie.
+    /// </para>
+    /// </remarks>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A reconcile tick must never fault the loop: every failure surfaces on ReconcileFailed, which the workspace shows as an unconfirmed-state footer, and the next tick retries.")]
+    private async Task ReconcileLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (await _reconcileTimer.WaitForNextTickAsync(ct))
+            {
+                try
+                {
+                    await ReconcileAsync(ct);
+                    _ui.Post(() => Reconciled?.Invoke());
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception)
+                {
+                    // Including an OperationCanceledException that is *not* our shutdown: the pass's
+                    // own deadline, or an HTTP client timeout. Treating those as shutdown would end the
+                    // loop for good after one slow request, silently, which is the failure it exists
+                    // to catch.
+                    _ui.Post(() => ReconcileFailed?.Invoke());
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutdown: DisposeAsync cancelled the token, which WaitForNextTickAsync throws on.
+        }
+    }
+
+    /// <summary>
+    /// One reconcile pass: ask the host its position and re-fetch the snapshot when it differs from
+    /// what this device has applied.
+    /// </summary>
+    /// <remarks>
+    /// Any difference fetches, not only a host ahead of us: a different epoch means a different sharing
+    /// session, whose revisions say nothing about ours. Whether the fetched snapshot is then adopted is
+    /// <see cref="ApplySnapshot"/>'s decision, so a broadcast that overtakes the fetch still wins.
+    /// <para>
+    /// The whole pass runs against <see cref="SyncProtocol.ReconcileTimeout"/>, measured on the injected
+    /// <see cref="TimeProvider"/>, and throws <see cref="OperationCanceledException"/> when it runs
+    /// out while <paramref name="ct"/> is still live.
+    /// </para>
+    /// <para>
+    /// Internal so tests can drive exactly one pass instead of racing the timer.
+    /// </para>
+    /// </remarks>
+    internal async Task ReconcileAsync(CancellationToken ct = default)
+    {
+        using var deadline = new CancellationTokenSource(SyncProtocol.ReconcileTimeout, _time);
+        using var pass = CancellationTokenSource.CreateLinkedTokenSource(ct, deadline.Token);
+
+        var host = SyncPosition.Of(SyncJson.Deserialize<RevisionInfo>(
+            await _http.GetStringAsync(new Uri(SyncProtocol.RevisionPath, UriKind.RelativeOrAbsolute), pass.Token)));
+
+        SyncPosition applied;
+        lock (_applyGate)
+        {
+            applied = _applied;
+        }
+
+        if (host == applied)
+        {
+            return;
+        }
+
+        ApplySnapshot(SyncJson.Deserialize<IncidentSnapshot>(
+            await _http.GetStringAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute), pass.Token)));
+    }
 
     // .NET wraps an exception thrown inside ServerCertificateCustomValidationCallback in an
     // HttpRequestException, keeping it as an inner cause rather than letting it propagate as-is; walk
@@ -685,12 +1077,46 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Idempotent on purpose: IncidentWorkspaceViewModel.LeaveAsync disposes the session and then
+        // whoever owns it disposes it again (the shell on shutdown, an `await using` in a test).
+        // Everything below has always tolerated a second call; the CancellationTokenSource would not,
+        // and it would throw from a thread-pool thread and take the process with it.
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+        {
+            return;
+        }
+
+        // Stop the reconcile loop and *wait for it* before disposing anything it holds: a tick with a
+        // GET in flight would otherwise land on a disposed HttpClient, in a task nobody observes.
+        // Deliberately no timeout on that await — capping it would put the hazard straight back.
+        await _reconcileCts.CancelAsync();
+        if (_reconcileLoop is { } loop)
+        {
+            await loop;
+        }
+
         // The hub's transport uses _handler (via HttpMessageHandlerFactory) for as long as it's
         // running, so it must be torn down first; only then are the HttpClient and the handler it
         // doesn't own (disposeHandler: false, above) both disposed here explicitly.
         await _hub.DisposeAsync();
         _http.Dispose();
         _handler.Dispose();
+        _reconcileTimer.Dispose();
+        _reconcileCts.Dispose();
+    }
+
+    /// <summary>
+    /// Lends the session's handler to a SignalR connection without handing over its lifetime.
+    /// </summary>
+    [SuppressMessage(
+        "Usage",
+        "CA2215",
+        Justification = "Deliberately does not call base.Dispose: DelegatingHandler.Dispose disposes the inner handler, which is exactly what must not happen here — the session owns it and disposes it in DisposeAsync.")]
+    private sealed class BorrowedHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        protected override void Dispose(bool disposing)
+        {
+        }
     }
 
     // SignalR's default policy gives up after ~30s; on a callout a device's mobile data can blip for
