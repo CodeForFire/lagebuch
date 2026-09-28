@@ -198,8 +198,9 @@ Alle Screenshots zeigen fiktive Daten.
 
 | | | | |
 |---|---|---|---|
-| ![Startseite](docs/screenshots/home.png) | ![ETB](docs/screenshots/etb.png) | ![Kräfte](docs/screenshots/kraefte.png) | ![Aufgaben](docs/screenshots/aufgaben.png) |
-| ![Atemschutz](docs/screenshots/atemschutz.png) | ![CO-Messung](docs/screenshots/co-messung.png) | ![Checkliste](docs/screenshots/checkliste.png) | ![Stammdaten](docs/screenshots/stammdaten-editor.png) |
+| ![Startseite](docs/screenshots/home.png) | ![ETB](docs/screenshots/etb.png) | ![Kräfte](docs/screenshots/kraefte.png) | ![Kontakte](docs/screenshots/kontakte.png) |
+| ![Beteiligte](docs/screenshots/beteiligte.png) | ![Aufgaben](docs/screenshots/aufgaben.png) | ![Atemschutz](docs/screenshots/atemschutz.png) | ![CO-Messung](docs/screenshots/co-messung.png) |
+| ![Checkliste](docs/screenshots/checkliste.png) | ![Stammdaten](docs/screenshots/stammdaten-editor.png) | | |
 
 ## Mitmachen & Kontakt
 

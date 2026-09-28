@@ -228,12 +228,17 @@ public class DemoFlowRenderTests
         Assert.Equal(4, vm.Forces.Forces.Count);
         Capture(window, "kraefte.png");
 
-        // 5) Funktionen.
+        // 5) Kontakte: the roster the demo Stammdaten describe, Funkrufname included.
+        SelectTab(window, "KONTAKTE");
+        Assert.Equal(6, vm.Contacts.VisibleContacts.Count);
+        Capture(window, "kontakte.png");
+
+        // 6) Funktionen.
         SelectTab(window, "FUNKTIONEN");
         Assert.Equal(2, vm.Roles.Roles.Count);
         Capture(window, "funktionen.png");
 
-        // 6) Atemschutz: Trupp 1 started at t0 and past its 30 minutes (Rückzugsalarm), Trupp 2
+        // 7) Atemschutz: Trupp 1 started at t0 and past its 30 minutes (Rückzugsalarm), Trupp 2
         //    started 20 minutes later and still counting down, Trupp 3 waiting. Driven through the
         //    ScbaViewModel so the rows carry the same live state the operator sees.
         SelectTab(window, "ATEMSCHUTZ");
@@ -280,7 +285,7 @@ public class DemoFlowRenderTests
         Assert.Equal("kein Sicherheitstrupp", vm.Scba.Trupps[0].SafetyTruppHint);
         Capture(window, "atemschutz.png");
 
-        // 7) Aufgaben: one done, one overdue, one open.
+        // 8) Aufgaben: one done, one overdue, one open.
         session.AddTask("Nachbarwohnung 2. OG links kontrollieren", Lf2, TaskImportance.High, TaskUrgency.High, 10);
         session.AddTask("Stromversorgung abschalten lassen (Stadtwerke)", "Mustermann, Max", TaskImportance.High, TaskUrgency.Medium, 45);
         session.AddTask("Presse-Info vorbereiten", null, TaskImportance.Low, TaskUrgency.Low, 60);
@@ -292,7 +297,7 @@ public class DemoFlowRenderTests
         Assert.Contains(vm.Tasks.Rows, r => r.IsOverdue);
         Capture(window, "aufgaben.png");
 
-        // 8) CO-Messung: the search grid for the building, floor by floor.
+        // 9) CO-Messung: the search grid for the building, floor by floor.
         session.AddCoBuilding("Hauptstraße 12", 2, 2); // EG + 2 OG, two Wohnungen each
         var haus = session.Incident.Buildings[0].Id;
         session.RecordCoValue(haus, 2, 1, 120);
@@ -309,7 +314,16 @@ public class DemoFlowRenderTests
         Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);
         Capture(window, "co-messung.png");
 
-        // 9) PDF export: the section picker that precedes the report.
+        // 10) Beteiligte: the people this Einsatz touches, the same fictional house the CO search
+        //     just walked.
+        session.AddInvolvedParty("Musterfrau, Maria", "01 71 / 8 76 54 32", "Bewohnerin 2. OG, über DLK gerettet, Übergabe an RD");
+        session.AddInvolvedParty("Mustermann, Otto", "01 71 / 9 87 65 43", "Nachbar, hat die Feuerwehr alarmiert");
+        session.AddInvolvedParty("POK Beispiel", null, "Polizei vor Ort, Streife 12/3");
+        SelectTab(window, "BETEILIGTE");
+        Assert.Equal(3, session.Incident.InvolvedParties.Count);
+        Capture(window, "beteiligte.png");
+
+        // 11) PDF export: the section picker that precedes the report.
         SelectTab(window, "ETB");
         vm.ExportPdfCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
