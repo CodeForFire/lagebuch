@@ -314,7 +314,7 @@ public class PhoneLayoutTests
     {
         public MasterDataSet Get() => MasterDataSet.Empty with
         {
-            Roles = new[] { "EL", "ZF" },
+            Roles = new[] { new Role("EL"), new Role("ZF") },
             Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/10/1", 9) },
         };
 

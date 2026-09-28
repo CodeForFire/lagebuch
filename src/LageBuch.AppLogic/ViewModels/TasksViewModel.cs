@@ -48,7 +48,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDi
 
         // Callsigns, Funktionen and personnel names suggest; anything else stays free text.
         AssigneeOptions = masterData.RadioCallSigns
-            .Concat(masterData.Roles)
+            .Concat(masterData.Roles.Select(r => r.Name))
             .Concat(masterData.Personnel.Select(p => $"{p.LastName} {p.FirstName}"))
             .Distinct()
             .ToArray();

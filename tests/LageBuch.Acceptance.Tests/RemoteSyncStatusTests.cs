@@ -22,7 +22,7 @@ namespace LageBuch.Acceptance.Tests;
 // third IIncidentSession forwarder (see #298 on the two that already exist).
 public class RemoteSyncStatusTests
 {
-    private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
+    private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { new Role("EL") } };
 
     private static IncidentWorkspaceViewModel BuildWorkspace()
     {

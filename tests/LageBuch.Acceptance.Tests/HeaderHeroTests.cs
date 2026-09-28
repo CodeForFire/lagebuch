@@ -15,7 +15,7 @@ namespace LageBuch.Acceptance.Tests;
 // FixedClock, NoopTicker, NoopAlarmService are shared from WorkspaceAcceptanceTests.cs.
 public class HeaderHeroTests
 {
-    private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
+    private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { new Role("EL") } };
 
     private static IncidentWorkspaceViewModel BuildWorkspace(string? keyword)
     {

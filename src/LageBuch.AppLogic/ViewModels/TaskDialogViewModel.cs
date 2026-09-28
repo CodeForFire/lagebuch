@@ -29,7 +29,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         _onChanged = onChanged;
         Text = prefilledText;
         AssigneeOptions = masterData.RadioCallSigns
-            .Concat(masterData.Roles)
+            .Concat(masterData.Roles.Select(r => r.Name))
             .Concat(masterData.Personnel.Select(p => $"{p.LastName} {p.FirstName}"))
             .Distinct()
             .ToArray();

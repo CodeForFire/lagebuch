@@ -728,6 +728,83 @@ public sealed class Incident
     public int NextFreeScbaTruppNumber() =>
         Enumerable.Range(1, _scbaTrupps.Count + 1).First(n => _scbaTrupps.All(t => t.TruppNumber != n));
 
+    /// <summary>
+    /// The running assignment holding <paramref name="role"/> in <paramref name="section"/>, or null
+    /// when that slot is free. A pure query — it decides nothing and writes nothing, the same stance
+    /// <see cref="NextFreeScbaTruppNumber"/> takes.
+    /// <para>
+    /// It exists so the Funktionen tab can refuse a second holder of a Funktion the Stammdaten marked
+    /// unique (#470). The aggregate does not enforce that itself: the catalogue carrying the setting
+    /// lives in <c>LageBuch.Persistence</c>, and <c>Domain</c> references nothing, so the rule is
+    /// applied by <c>RolesViewModel</c> against what this returns. A blank <paramref name="role"/>
+    /// matches nothing rather than everything, and the first of several matches wins.
+    /// </para>
+    /// <para>
+    /// Only an assignment with no Bis stamp holds anything — the same liveness test
+    /// <see cref="Close"/> uses when it ends everything still running. Names are compared trimmed
+    /// and ignoring case, like every catalogue lookup in the app, so "el" finds "EL" and two
+    /// spellings of one Abschnittsleiter cannot sit side by side unnoticed. An empty
+    /// <paramref name="section"/> is a bucket of its own: a per-Abschnitt Funktion allows exactly
+    /// one holder that is in no Abschnitt at all.
+    /// </para>
+    /// <para>
+    /// A Funktion unique once per Einsatz asks
+    /// <see cref="FindRunningRoleHolderInAnySection(string)"/> instead, which does not compare the
+    /// Abschnitt at all.
+    /// </para>
+    /// </summary>
+    public RoleAssignment? FindRunningRoleHolder(string role, string? section)
+    {
+        var wantedSection = NormalizeSection(section);
+        return FirstRunningRoleHolder(
+            role,
+            candidate => string.Equals(NormalizeSection(candidate), wantedSection, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The running assignment holding <paramref name="role"/> in <em>any</em> Abschnitt, or null when
+    /// nobody holds it. This is the question a Funktion marked unique once per <c>Einsatz</c> asks:
+    /// one Einsatzleiter for the whole Einsatz, whatever the Abschnitt either of them is typed into.
+    /// <para>
+    /// A separate method rather than an overload of
+    /// <see cref="FindRunningRoleHolder(string, string?)"/>, and deliberately not spelled by passing
+    /// a null <c>section</c>: there, a blank Abschnitt is a bucket of its own, and collapsing the two
+    /// would quietly turn "un-sectioned" into "anywhere". The name carries the difference so a
+    /// caller cannot pick the wrong one by accident.
+    /// </para>
+    /// </summary>
+    public RoleAssignment? FindRunningRoleHolderInAnySection(string role) =>
+        FirstRunningRoleHolder(role, _ => true);
+
+    // One loop for both public forms, so liveness, the role comparison and the first-match rule
+    // cannot drift apart between them; only the Abschnitt test differs.
+    private RoleAssignment? FirstRunningRoleHolder(string role, Func<string?, bool> sectionMatches)
+    {
+        var wanted = role?.Trim();
+        if (string.IsNullOrEmpty(wanted))
+        {
+            return null;
+        }
+
+        foreach (var assignment in _roles)
+        {
+            if (assignment.To is null
+                && string.Equals(assignment.Role?.Trim(), wanted, StringComparison.OrdinalIgnoreCase)
+                && sectionMatches(assignment.Section))
+            {
+                return assignment;
+            }
+        }
+
+        return null;
+    }
+
+    // Both blanks collapse to one spelling so a null and a whitespace-only Abschnitt are the same
+    // bucket; anything else is compared trimmed, the same way names are. Ordinal-ignore-case rather
+    // than InvariantCulture: these are operator-typed labels, not identifiers, and the app compares
+    // every other such value this way.
+    private static string NormalizeSection(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
     public AtemschutzTrupp AddScbaTrupp(
         IClock clock,
         string designation,

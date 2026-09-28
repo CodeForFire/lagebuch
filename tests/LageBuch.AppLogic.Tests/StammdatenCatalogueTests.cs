@@ -108,4 +108,41 @@ public class StammdatenCatalogueTests
     [Fact]
     public void Find_on_an_empty_catalogue_is_simply_a_miss() =>
         Assert.Null(StammdatenCatalogue.Find("CSA-Trupp", Array.Empty<TruppType>()));
+
+    // --- Find: the Funktion lookup that hands back the row's uniqueness mode (#470) ---
+    // The blank row is one a hand-edited Stammdaten file really can hold -- ParseRoles trims a
+    // whitespace name to "" -- so a blank needle has to be refused by the lookup's own guard rather
+    // than by luck, matching nothing.
+    private static readonly Role[] Roles =
+    [
+        new("EL", RoleUniqueness.UniquePerIncident),
+        new("Abschnittsleiter", RoleUniqueness.UniquePerSection),
+        new(string.Empty),
+    ];
+
+    [Theory]
+    [InlineData("EL", "  el ")]
+    [InlineData("EL", "EL")]
+    public void Find_returns_the_funktion_row_carrying_its_uniqueness_mode(string expected, string typed)
+    {
+        // The whole reason this overload exists: RolesViewModel needs the mode off the row before it
+        // may refuse a second holder, so the lookup hands back the row rather than just the name.
+        var role = StammdatenCatalogue.Find(typed, Roles);
+
+        Assert.NotNull(role);
+        Assert.Equal(expected, role.Name);
+        Assert.Equal(RoleUniqueness.UniquePerIncident, role.Uniqueness);
+    }
+
+    [Theory]
+    [InlineData("Zugführer")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Find_returns_null_for_an_unlisted_funktion_rather_than_guessing(string? name) =>
+        Assert.Null(StammdatenCatalogue.Find(name, Roles));
+
+    [Fact]
+    public void Find_on_an_empty_funktion_catalogue_is_simply_a_miss() =>
+        Assert.Null(StammdatenCatalogue.Find("EL", Array.Empty<Role>()));
 }

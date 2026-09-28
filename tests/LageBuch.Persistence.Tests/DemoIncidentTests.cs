@@ -10,10 +10,11 @@ using Microsoft.Data.Sqlite;
 
 namespace LageBuch.Persistence.Tests;
 
-// The README's "Probefahrt" ships two fictional sample files under docs/samples/. This test is
-// what keeps them honest: it builds the demo Einsatz through the domain API, saves and reloads it
-// through the real repository, and parses the demo Stammdaten with the real importer -- so a
-// schema change that would break either sample breaks CI first.
+// The README's "Probefahrt" ships two fictional sample files under docs/samples/, and the README
+// names docs/master-data.example.json as the full schema reference. This test is what keeps them
+// honest: it builds the demo Einsatz through the domain API, saves and reloads it through the real
+// repository, and parses both master-data files with the real importer -- so a schema change that
+// would break either of them breaks CI first.
 //
 // Set SAMPLES_OUT=<dir> to also write docs/samples/uebung.fwincident (`make samples`).
 public class DemoIncidentTests : IDisposable
@@ -213,6 +214,47 @@ public class DemoIncidentTests : IDisposable
         Assert.All(
             demo.Forces.Select(f => f.CallSign!),
             callSign => Assert.Contains(callSign, set.RadioCallSigns));
+    }
+
+    // docs/master-data.example.json is what README.md:280 and docs/master-data.md:104 point a
+    // brigade at as the full schema reference, so it has to be a working file and not only
+    // readable JSON -- nothing else in the repository parses it. Two claims are pinned here: the
+    // real importer accepts every category it shows, and the Funktionen carry the uniqueness modes
+    // #470 added, so the reference documents the current object form rather than a legacy string.
+    [Fact]
+    public void The_master_data_example_file_parses_and_documents_every_uniqueness_mode()
+    {
+        var path = Path.Join(RepoRoot(), "docs", "master-data.example.json");
+        Assert.True(File.Exists(path), $"missing example file: {path}");
+
+        var set = MasterDataJson.Parse(File.ReadAllText(path));
+
+        // Every category the schema has, so a reference file that quietly stops demonstrating one
+        // fails here rather than in a reader's editor.
+        Assert.NotEmpty(set.Roles);
+        Assert.NotEmpty(set.UnitStatus);
+        Assert.NotEmpty(set.TruppTypes);
+        Assert.NotEmpty(set.ChecklistTemplates);
+        Assert.NotEmpty(set.Navigation);
+        Assert.NotEmpty(set.Links);
+        Assert.NotEmpty(set.Vehicles);
+        Assert.NotEmpty(set.Personnel);
+        Assert.NotEmpty(set.Brigades);
+        Assert.NotEmpty(set.RadioCallSigns);
+        Assert.Equal(15, set.Settings.IlsReminderIntervalMinutes);
+        Assert.Equal(30, set.Settings.IlsReminderFollowUpIntervalMinutes);
+        Assert.Equal(50, set.Settings.ReturnPressureBar);
+
+        Assert.Equal(
+            new[]
+            {
+                new Role("EL", RoleUniqueness.UniquePerIncident),
+                new Role("EAL", RoleUniqueness.Multiple),
+                new Role("ZF", RoleUniqueness.Multiple),
+                new Role("GF", RoleUniqueness.Multiple),
+                new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection),
+            },
+            set.Roles);
     }
 
     private static void WriteSampleIfRequested(Incident incident)

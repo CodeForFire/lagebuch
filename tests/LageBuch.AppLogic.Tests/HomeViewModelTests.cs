@@ -530,7 +530,7 @@ internal sealed class FakeMasterData : IMasterDataProvider
 {
     public MasterDataSet Get() => MasterDataSet.Empty with
     {
-        Roles = new[] { "EL" },
+        Roles = new[] { new Role("EL") },
         ChecklistTemplates = ChecklistTemplate.AufbauAbbau(new[] { new ChecklistTemplateItem("A?", false) }, null),
         TruppTypes = new[] { new TruppType("Angriffstrupp") },
     };

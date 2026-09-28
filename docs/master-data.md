@@ -146,6 +146,17 @@ the first time this version opens it — so nothing changes for a brigade using
 the shipped spellings, and a brigade that had renamed the type gets the row it
 can now correct itself.
 
+`roles` carries how often a Funktion may be held: `multiple` (the default, so
+any number of people may hold it), `uniquePerIncident` (one holder for the whole
+Einsatz, whatever Abschnitt either of them is in) or `uniquePerSection` (one per
+Abschnitt; an empty Abschnitt counts as a bucket of its own). A file exported
+before this version has `roles` as a plain list of names, from before the
+setting moved onto the row. It still imports, and every name comes
+back as `multiple`. Your existing `masterdata.db` is widened the same way, the
+first time this version opens it — the new column is simply absent before, and
+absent reads as `multiple` too. Nothing is marked for you: a Funktion that may
+not be held twice has to be marked in the editor afterwards.
+
 ## PII
 
 Any real master-data or personnel JSON — street lists, station and call-sign

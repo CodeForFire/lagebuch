@@ -23,10 +23,10 @@ public class MasterDataProviderTests : IDisposable
         var provider = new MasterDataProvider(_path);
         var current = provider.Get();
 
-        provider.Save(current with { Roles = new[] { "EL", "Nur Ich" } });
+        provider.Save(current with { Roles = new[] { new Role("EL"), new Role("Nur Ich") } });
 
-        Assert.Equal(new[] { "EL", "Nur Ich" }, provider.Get().Roles);          // cache refreshed
-        Assert.Equal(new[] { "EL", "Nur Ich" }, new MasterDataProvider(_path).Get().Roles); // and on disk
+        Assert.Equal(new[] { new Role("EL"), new Role("Nur Ich") }, provider.Get().Roles);          // cache refreshed
+        Assert.Equal(new[] { new Role("EL"), new Role("Nur Ich") }, new MasterDataProvider(_path).Get().Roles); // and on disk
     }
 
     [Fact]

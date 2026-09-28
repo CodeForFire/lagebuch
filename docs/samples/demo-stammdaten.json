@@ -1,6 +1,13 @@
 {
   "_comment": "Fiktive Demo-Stammdaten für die Probefahrt. Alle Wachen, Fahrzeuge, Namen und Nummern sind erfunden. Importieren über STAMMDATEN → IMPORTIEREN, dann SPEICHERN.",
-  "roles": ["EL", "EAL", "ZF", "GF", "AS-Überwachung", "Presse"],
+  "roles": [
+    { "name": "EL", "uniqueness": "uniquePerIncident" },
+    { "name": "EAL", "uniqueness": "multiple" },
+    { "name": "ZF", "uniqueness": "multiple" },
+    { "name": "GF", "uniqueness": "multiple" },
+    { "name": "AS-Überwachung", "uniqueness": "multiple" },
+    { "name": "Presse", "uniqueness": "multiple" }
+  ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz", "Einsatzbereit über Funk", "Abgerückt"],
   "truppTypes": [
     { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 },

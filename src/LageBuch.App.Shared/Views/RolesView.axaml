@@ -191,6 +191,14 @@
                    FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
                    TextWrapping="Wrap"
                    IsVisible="{Binding IsNewRoleUnknown}" />
+        <!-- Wer die schon vergebene Funktion hält (#470): der Druck auf ZUWEISEN wird zur Übergabe,
+             nicht zur zweiten Zuweisung. Gleiche Darstellung wie der Hinweis darüber — beides ist
+             Information, keine Eingabeverweigerung. -->
+        <TextBlock x:Name="RoleConflictHint"
+                   FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AmberBrush}"
+                   TextWrapping="Wrap"
+                   Text="{Binding ConflictHint}"
+                   IsVisible="{Binding ConflictHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
       </ScrollViewer>
     </Border>
@@ -286,12 +294,23 @@
           </DataGridTemplateColumn>
           <DataGridTextColumn Header="VON" Binding="{Binding FromDisplay}" />
           <DataGridTextColumn Header="BIS" Binding="{Binding ToDisplay}" />
-          <DataGridTemplateColumn Header="AKTION" Width="120">
+          <DataGridTemplateColumn Header="AKTION" Width="140">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:RoleAssignmentRow">
-                <Button Content="ÜBERTRAGEN" Margin="4,2"
-                        IsVisible="{Binding IsRunning}"
-                        Command="{Binding BeginTransferCommand}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <!-- Eine doppelt vergebene Funktion aus einer älteren Datei, einem Import oder
+                       einem anderen Gerät lässt sich nicht verweigern, nur anzeigen (#470). Neben dem
+                       Button, der sie auflöst. -->
+                  <PathIcon x:Name="RoleDuplicateIcon" Width="13" Height="13" VerticalAlignment="Center"
+                            Foreground="{StaticResource AmberBrush}"
+                            Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"
+                            IsVisible="{Binding IsDuplicate}"
+                            ToolTip.Tip="Doppelt vergeben – Funktion übertragen"
+                            AutomationProperties.Name="Funktion doppelt vergeben" />
+                  <Button x:Name="TransferRowButton" Content="ÜBERTRAGEN" Margin="4,2"
+                          IsVisible="{Binding IsRunning}"
+                          Command="{Binding BeginTransferCommand}" />
+                </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>

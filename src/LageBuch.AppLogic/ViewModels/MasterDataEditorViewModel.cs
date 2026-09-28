@@ -24,7 +24,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private bool _originalIsEmpty = true;
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
-    private EditableListSection _roles = null!;
+    private RolesSection _roles = null!;
 
     // Typed handles kept so BuildSet reads each section without fragile positional casts.
     private EditableListSection _unitStatus = null!;
@@ -199,7 +199,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
         EditorSection[] categories =
         {
-            _roles = new EditableListSection("Rollen", "ROLLE", set.Roles, MarkDirty),
+            _roles = new RolesSection("Rollen", set.Roles, MarkDirty),
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty),
             _links = new LinksSection("Links", set.Links, MarkDirty),

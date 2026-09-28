@@ -144,7 +144,7 @@ public class MasterDataRailGroupingTests
     public void Saving_while_editing_a_fixed_category_keeps_that_category_selected()
     {
         var vm = Vm(WithTwoChecklists());
-        var roles = (EditableListSection)vm.Sections.Single(s => s.Title == "Rollen");
+        var roles = (RolesSection)vm.Sections.Single(s => s.Title == "Rollen");
         vm.SelectedSection = roles;
         roles.AddCommand.Execute(null);
 

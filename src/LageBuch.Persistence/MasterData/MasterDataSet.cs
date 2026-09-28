@@ -7,7 +7,10 @@ using LageBuch.Domain.Atemschutz;
 namespace LageBuch.Persistence.MasterData;
 
 public sealed record MasterDataSet(
-    IReadOnlyList<string> Roles,
+
+    // Funktionen with how often each may be held (#470). Was a bare list of names, in which
+    // nothing said that an Einsatzleiter is one person -- the same move #398 made for Trupp-Typen.
+    IReadOnlyList<Role> Roles,
     IReadOnlyList<string> UnitStatus,
     IReadOnlyList<Link> Links,
 
@@ -36,7 +39,7 @@ public sealed record MasterDataSet(
     /// does not force an edit in every construction site.
     /// </summary>
     public static MasterDataSet Empty { get; } = new(
-        Array.Empty<string>(),
+        Array.Empty<Role>(),
         Array.Empty<string>(),
         Array.Empty<Link>(),
         Array.Empty<ChecklistTemplate>(),
@@ -163,6 +166,65 @@ public sealed record IncidentSettings(
         IlsReminderIntervalMinutes: 15,
         IlsReminderFollowUpIntervalMinutes: 30,
         ReturnPressureBar: AtemschutzTrupp.DefaultReturnPressureBar);
+}
+
+/// <summary>
+/// How often a single Funktion may be held at once (#470). <see cref="Multiple"/> is the default
+/// and keeps today's behaviour, in which any number of people hold the same Funktion.
+/// <para>
+/// The other two are what a brigade marks the leadership positions with: an Einsatzleiter is one
+/// person per Einsatz, an Abschnittsleiter one per Abschnitt. The setting is advisory at the moment
+/// of entry -- it is enforced by <c>RolesViewModel</c>, not by the aggregate, because the catalogue
+/// lives in <c>LageBuch.Persistence</c> and <c>LageBuch.Domain</c> references nothing.
+/// </para>
+/// </summary>
+public enum RoleUniqueness
+{
+    /// <summary>No limit -- any number of people hold this Funktion.</summary>
+    Multiple,
+
+    /// <summary>One running holder for the whole Einsatz, whatever the Abschnitt.</summary>
+    UniquePerIncident,
+
+    /// <summary>One running holder per Abschnitt. An empty Abschnitt is a bucket of its own.</summary>
+    UniquePerSection,
+}
+
+/// <summary>
+/// One Funktion from the Stammdaten: the name offered on the Funktionen tab, and how often it may
+/// be held (#470). Was a bare list of names, so a brigade had nowhere to say that EL is one person.
+/// <para>
+/// <see cref="UniquenessName"/> and <see cref="UniquenessFrom"/> are the file format's spelling, and
+/// are read back and forth by <see cref="MasterDataJson"/> and <see cref="MasterDataStore"/>. They
+/// take and return plain strings rather than a <c>JsonElement</c> so this record stays free of
+/// System.Text.Json, and they are total in both directions: an unrecognised name reads as
+/// <see cref="RoleUniqueness.Multiple"/> and never throws, because a file crosses a trust boundary
+/// and <c>HomeViewModel</c> catches only the JSON exception types around the master-data parse.
+/// </para>
+/// </summary>
+public sealed record Role(string Name, RoleUniqueness Uniqueness = RoleUniqueness.Multiple)
+{
+    /// <summary>The spelling <see cref="UniquenessFrom"/> reads back.</summary>
+    public static string UniquenessName(RoleUniqueness uniqueness) => uniqueness switch
+    {
+        RoleUniqueness.UniquePerIncident => "uniquePerIncident",
+        RoleUniqueness.UniquePerSection => "uniquePerSection",
+        _ => "multiple",
+    };
+
+    /// <summary>
+    /// The mode a stored name means. Case-insensitive, because these files are hand-edited, and
+    /// strict about the name itself: a bare "1" is a mistake to report, not a mode to honour. The
+    /// fold is upper-case because CA1308 rejects <c>ToLowerInvariant</c>, and for a fixed ASCII
+    /// token the two are the same comparison; only the matched literals are spelled this way. The
+    /// file's own spelling stays the camelCase <see cref="UniquenessName"/> writes.
+    /// </summary>
+    public static RoleUniqueness UniquenessFrom(string? name) => name?.Trim().ToUpperInvariant() switch
+    {
+        "UNIQUEPERINCIDENT" => RoleUniqueness.UniquePerIncident,
+        "UNIQUEPERSECTION" => RoleUniqueness.UniquePerSection,
+        _ => RoleUniqueness.Multiple,
+    };
 }
 
 /// <summary>
@@ -521,6 +583,53 @@ public static class MasterDataJson
             ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
             : Array.Empty<string>();
 
+    /// <summary>
+    /// The required name of a hand-edited object entry, trimmed.
+    /// </summary>
+    /// <remarks>
+    /// Absent (<c>GetProperty</c> throws <see cref="KeyNotFoundException"/>) and wrong-kind
+    /// (<c>InvalidOperationException</c>) both land inside the filter
+    /// <c>HomeViewModel.JoinDeviceAsync</c> applies around this parse, so the caller turns them
+    /// into a German banner and disposes the session. An *explicit* JSON null does not: there
+    /// <c>GetString()</c> returns null and the next <c>Trim()</c> raised a
+    /// <see cref="NullReferenceException"/> that escaped that filter, skipped the
+    /// <c>DisposeAsync</c> in its catch and killed the joining app mid-Einsatz. The property is
+    /// present and unusable, which is a malformed document -- so say so in the one exception type
+    /// the caller already handles, and in German, because the caller shows this message to the
+    /// Lagebuchführer.
+    /// </remarks>
+    private static string RequiredName(JsonElement entry, string what) =>
+        entry.GetProperty("name").GetString()
+        ?? throw new JsonException($"{what}: \"name\" darf nicht null sein.");
+
+    // The per-item branch #398 wrote for Trupp-Typen: a bare string is what every file written
+    // before #470 holds and must keep importing, an object is the current form. name is required
+    // (GetProperty throws KeyNotFoundException, which HomeViewModel catches; RequiredName covers
+    // the null it would otherwise pass through); uniqueness is optional and degrades to Multiple,
+    // because a hand-edited file may carry anything.
+    private static IReadOnlyList<Role> ParseRoles(JsonElement root)
+    {
+        if (!root.TryGetProperty("roles", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<Role>();
+        }
+
+        var result = new List<Role>();
+        foreach (var x in arr.EnumerateArray())
+        {
+            result.Add(x.ValueKind == JsonValueKind.String
+                ? new Role(x.GetString()!.Trim())
+                : new Role(
+                    RequiredName(x, "Funktion"),
+                    Role.UniquenessFrom(
+                        x.TryGetProperty("uniqueness", out var u) && u.ValueKind == JsonValueKind.String
+                            ? u.GetString()
+                            : null)));
+        }
+
+        return result;
+    }
+
     private static MasterDataSet ParseRoot(JsonElement root)
     {
         IReadOnlyList<Link> links =
@@ -545,7 +654,7 @@ public static class MasterDataJson
                 : Array.Empty<Vehicle>();
 
         return new MasterDataSet(
-            Arr(root, "roles"),
+            ParseRoles(root),
             Arr(root, "unitStatus"),
             links,
             checklists,
@@ -657,7 +766,7 @@ public static class MasterDataJson
             }
 
             result.Add(new TruppType(
-                x.GetProperty("name").GetString()!.Trim(),
+                RequiredName(x, "Trupp-Typ"),
                 TruppType.ClampMemberCount(Int(x, "memberCount", AtemschutzTrupp.StandardMemberCount)),
                 TruppType.ClampMaxDurationMinutes(
                     Int(x, "maxDurationMinutes", AtemschutzTrupp.DefaultMaxDurationMinutes))));
@@ -784,7 +893,11 @@ public static class MasterDataJson
         ArgumentNullException.ThrowIfNull(set);
         var model = new
         {
-            roles = set.Roles,
+            roles = set.Roles.Select(r => new
+            {
+                name = r.Name,
+                uniqueness = Role.UniquenessName(r.Uniqueness),
+            }),
             unitStatus = set.UnitStatus,
             truppTypes = set.TruppTypes.Select(t => new
             {

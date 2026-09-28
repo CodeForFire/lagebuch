@@ -43,7 +43,7 @@ public class HomeLayoutTests
 
     private sealed class Md : IMasterDataProvider
     {
-        public MasterDataSet Get() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
+        public MasterDataSet Get() => MasterDataSet.Empty with { Roles = new[] { new Role("EL") } };
 
         public void Save(MasterDataSet set)
         {

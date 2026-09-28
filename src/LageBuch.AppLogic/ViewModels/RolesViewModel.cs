@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -79,6 +81,17 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(BeginTransferCommand))]
     private DateTimeOffset? _to;
 
+    /// <summary>
+    /// Another running row holds the same Funktion — in the same Abschnitt too, when the Stammdaten
+    /// mark that one unique once per Abschnitt (#470). Set by <c>RolesViewModel.MarkDuplicates</c>,
+    /// never here: the grid reads this row, and while the rows are being built this one does not yet
+    /// have its partner in the list, so a single pass would mark the second of a pair and not the
+    /// first. A duplicate that arrived from an older Einsatzdatei, an import or a joined device is
+    /// neither refused nor hidden — it is marked, and both rows of it are.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isDuplicate;
+
     public string FromDisplay => From is { } f ? Formatting.Timestamp(f) : "—";
 
     public string ToDisplay => To is { } t ? Formatting.Timestamp(t) : "—";
@@ -98,11 +111,25 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     private readonly IClock _clock;
     private readonly Action _onChanged;
     private readonly IReadOnlyList<Person> _personnel;
+    private readonly IReadOnlyList<Role> _roles;
 
     // Every rendered row, regardless of the filter; Roles is the visible subset — mirrors
     // EtbViewModel's _all/Entries split, so ShowAllRoles can rebuild Roles without re-reading the
     // session.
     private readonly List<RoleAssignmentRow> _all = new();
+
+    // The two conflict messages, parsed once each: CompositeFormat is the cached form of a composite
+    // template, and this hint is rebuilt on every keystroke in the add form. De is the fixed culture
+    // Formatting applies to everything a person reads, repeated here because that class formats
+    // timestamps and labels rather than a message template. Every value substituted is a string, so
+    // the provider decides nothing either way today; it is there so the culture is never the
+    // device's, whatever a future argument turns out to be.
+    private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
+
+    private static readonly CompositeFormat HeldFormat = CompositeFormat.Parse(ValidationMessages.FunctionAlreadyHeld);
+
+    private static readonly CompositeFormat HeldInSectionFormat =
+        CompositeFormat.Parse(ValidationMessages.FunctionAlreadyHeldInSection);
 
     public RolesViewModel(IIncidentSession session, IClock clock, MasterDataSet masterData, Action onChanged)
     {
@@ -112,8 +139,9 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
         _clock = clock;
         _onChanged = onChanged;
         _personnel = masterData.Personnel;
+        _roles = masterData.Roles;
         IsReadOnly = session.IsReadOnly;
-        RoleOptions = masterData.Roles;
+        RoleOptions = _roles.Select(r => r.Name).ToArray();
         CallSignOptions = masterData.RadioCallSigns;
         PersonOptions = masterData.Personnel.Select(p => p.DisplayName).ToArray();
         Roles = new ObservableCollection<RoleAssignmentRow>();
@@ -128,8 +156,67 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     {
         _all.Clear();
         _all.AddRange(_session.Incident.Roles.Select(CreateRow));
+        MarkDuplicates(); // after every row exists — see the comment on it
         ApplyFilter();
+
+        // A handover changes who holds what without touching the form, so a conflict computed from
+        // the rows has to be re-raised here or the hint would name the person who just left (#470).
+        OnPropertyChanged(nameof(ConflictingRow));
+        OnPropertyChanged(nameof(ConflictHint));
     }
+
+    // The add form refuses a second holder of a unique Funktion, but it cannot refuse one that is
+    // already recorded: an older Einsatzdatei, an imported .fwincident or a joined device running
+    // other Stammdaten can each bring one, and an Einsatz has to keep working. So such a row is
+    // marked instead — on both rows, since either could be the one to hand over, and a marker that
+    // picked a winner would be naming a culprit in a record of what happened.
+    //
+    // The second pass is a correctness requirement, not an optimisation: RefreshRoles builds the
+    // rows through CreateRow while _all is still filling, so a row's partner is not in the list yet
+    // when the row itself is created. O(n²) over _all costs nothing — an Einsatz holds tens of
+    // assignments, not thousands.
+    private void MarkDuplicates()
+    {
+        foreach (var row in _all)
+        {
+            // Resolved once per row. A Funktion the Stammdaten do not list, or one they leave
+            // Multiple, carries no mode and can never be a duplicate — the tolerance
+            // StammdatenCatalogue exists for, and the same case IsNewRoleUnknown hints about.
+            // Written false rather than skipped, so a row that was marked in the previous refresh
+            // is visibly cleared instead of merely having been replaced by a clean row.
+            if (StammdatenCatalogue.Find(row.Role, _roles) is not { Uniqueness: > RoleUniqueness.Multiple } mode)
+            {
+                row.IsDuplicate = false;
+                continue;
+            }
+
+            // The same question FindRunningHolder asks, and it must branch the same way (Ruling 16):
+            // a Funktion unique per Abschnitt is one holder per Abschnitt, one unique per Einsatz one
+            // for the whole Einsatz whatever Abschnitt either sits in. If the two call sites drifted,
+            // the grid would mark a row the add form does not flag, or the reverse.
+            //
+            // Liveness is tested on the row as well as on its partner, and a handover is the state
+            // that demands it: a handed-over Funktion always leaves an ended row beside a running
+            // one, so a partner-only test would mark the app's own history -- and put a warning
+            // where there is no ÜBERTRAGEN button to answer it with.
+            row.IsDuplicate = row.IsRunning && _all.Any(other =>
+                other.Id != row.Id
+                && other.IsRunning
+                && string.Equals(other.Role?.Trim(), row.Role?.Trim(), StringComparison.OrdinalIgnoreCase)
+                && (mode.Uniqueness != RoleUniqueness.UniquePerSection
+                    || SameSection(other.Section, row.Section)));
+        }
+    }
+
+    // Two absent Abschnitte are one bucket, one absent and one named are not. Same rule as
+    // Incident.FindRunningRoleHolder, which is what the add form asks and which has to agree with
+    // this: the domain keeps the normalisation in a private NormalizeSection, so the equality is
+    // spelled here rather than a second implementation of "blank ≡ blank" living next to it.
+    private static bool SameSection(string? left, string? right) =>
+        string.Equals(
+            left?.Trim() ?? string.Empty,
+            right?.Trim() ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
 
     private void ApplyFilter()
     {
@@ -174,6 +261,8 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     [NotifyPropertyChangedFor(nameof(NewRoleError))]
     [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     [NotifyPropertyChangedFor(nameof(IsNewRoleUnknown))]
+    [NotifyPropertyChangedFor(nameof(ConflictingRow))]
+    [NotifyPropertyChangedFor(nameof(ConflictHint))]
     private string _newRole = string.Empty;
 
     /// <summary>
@@ -184,12 +273,78 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     /// </summary>
     public bool IsNewRoleUnknown => StammdatenCatalogue.IsUnknown(NewRole, RoleOptions);
 
+    /// <summary>
+    /// How often the typed Funktion may be held, per the Stammdaten. A Funktion they do not list
+    /// carries no mode, so it reads as <see cref="RoleUniqueness.Multiple"/> and nothing is refused
+    /// for it — the tolerance <see cref="StammdatenCatalogue"/> exists for, and the same case
+    /// <see cref="IsNewRoleUnknown"/> flags for the operator.
+    /// </summary>
+    private RoleUniqueness NewRoleUniqueness =>
+        StammdatenCatalogue.Find(NewRole, _roles)?.Uniqueness ?? RoleUniqueness.Multiple;
+
+    /// <summary>
+    /// The running holder of the typed Funktion when the Stammdaten say it may be held only once —
+    /// the row a press on ZUWEISEN opens the Übergabe on. Null while the Funktion may be held by
+    /// anyone, and while nothing is typed. It is a row rather than the domain's assignment because
+    /// the handover panel and the grid both work on rows.
+    /// </summary>
+    public RoleAssignmentRow? ConflictingRow
+    {
+        get
+        {
+            // The blank NewRole needs no guard of its own: StammdatenCatalogue.Find already returns
+            // null for one, so NewRoleUniqueness reads Multiple and this half fires. Were that ever
+            // to change, FindRunningRoleHolder's own blank-role guard -- pinned by
+            // Find_running_role_holder_returns_null_for_a_blank_funktions_role -- still yields no
+            // holder below, so the property cannot report a conflict on an empty field either way.
+            if (NewRoleUniqueness == RoleUniqueness.Multiple)
+            {
+                return null;
+            }
+
+            var holder = FindRunningHolder();
+            return holder is null ? null : _all.FirstOrDefault(r => r.Id == holder.Id);
+        }
+    }
+
+    // Which question to ask is the whole rule (#470): a Funktion unique per Abschnitt is one holder
+    // per Abschnitt, a Funktion unique per Einsatz one holder for the Einsatz whatever Abschnitt
+    // either of them is typed into. Asking the section-scoped one for a per-Einsatz Funktion would
+    // leave a second EL in another Abschnitt unflagged, so the duplicate marking the grid carries
+    // (MarkDuplicates) has to branch the same way.
+    private RoleAssignment? FindRunningHolder() =>
+        NewRoleUniqueness == RoleUniqueness.UniquePerSection
+            ? _session.Incident.FindRunningRoleHolder(NewRole, NewSection)
+            : _session.Incident.FindRunningRoleHolderInAnySection(NewRole);
+
+    /// <summary>What to say about the conflict, or null when there is none: who holds the typed
+    /// Funktion, so the operator can see that the press hands over rather than assigns.</summary>
+    public string? ConflictHint
+    {
+        get
+        {
+            if (ConflictingRow is not { } row)
+            {
+                return null;
+            }
+
+            // A holder with no Abschnitt names none, so the sentence drops that half rather than
+            // reading "in Abschnitt  bereits besetzt". Keyed on the holder's Abschnitt, which the
+            // section-scoped lookup has already matched against the typed one.
+            return string.IsNullOrWhiteSpace(row.Section)
+                ? string.Format(De, HeldFormat, row.Role, row.PersonName)
+                : string.Format(De, HeldInSectionFormat, row.Role, row.Section, row.PersonName);
+        }
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NewPersonNameError))]
     [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private string _newPersonName = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ConflictingRow))]
+    [NotifyPropertyChangedFor(nameof(ConflictHint))]
     private string? _newSection;
 
     [ObservableProperty]
@@ -253,6 +408,19 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     {
         if (!ValidateAdd())
         {
+            return;
+        }
+
+        // A Funktion the Stammdaten marked unique is already held, so rather than refusing with a
+        // dead end, point the operator at the handover: it is the only thing that legitimately
+        // replaces a running holder, and it is one click away in the grid. The form keeps its
+        // values, so cancelling the panel returns here as it was (#470).
+        if (ConflictingRow is { } taken)
+        {
+            BeginTransfer(taken);
+            TransferPersonName = NewPersonName;
+            TransferCallSign = NewCallSign;
+            TransferPhone = NewPhone;
             return;
         }
 

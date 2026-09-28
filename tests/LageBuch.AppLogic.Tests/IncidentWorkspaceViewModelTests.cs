@@ -14,7 +14,7 @@ public class IncidentWorkspaceViewModelTests
     private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
         (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
 
-    private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { "EL" } };
+    private static MasterDataSet Md() => MasterDataSet.Empty with { Roles = new[] { new Role("EL") } };
 
     private static IncidentWorkspaceViewModel EditableWorkspace(IIncidentHostController host)
     {
@@ -89,7 +89,7 @@ public class IncidentWorkspaceViewModelTests
         // The workspace's own set (Md()), not a re-read of the provider — so what joined clients
         // receive is what this device is actually operating with (#183).
         Assert.NotNull(host.LastMasterData);
-        Assert.Equal(new[] { "EL" }, host.LastMasterData!.Roles);
+        Assert.Equal(new[] { new Role("EL") }, host.LastMasterData!.Roles);
     }
 
     // #463: the host controller outlives the workspace, so leaving without stopping it kept the

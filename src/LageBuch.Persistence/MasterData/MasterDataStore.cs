@@ -38,7 +38,20 @@ public sealed class MasterDataStore
         EnsureSchema(cn);
         using var tx = cn.BeginTransaction();
 
-        ReplaceList(cn, tx, "md_roles", set.Roles);
+        Run(cn, tx, "DELETE FROM md_roles;", _ => { });
+        foreach (var r in set.Roles)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_roles (value, uniqueness) VALUES ($v,$u);",
+                p =>
+                {
+                    p("$v", r.Name);
+                    p("$u", Role.UniquenessName(r.Uniqueness));
+                });
+        }
+
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
 
         Run(cn, tx, "DELETE FROM md_links;", _ => { });
@@ -290,6 +303,14 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_trupp_types", "max_duration_minutes", "INTEGER NOT NULL DEFAULT 30");
         MigrateTruppTypeDefaults(cn);
 
+        // Widen a pre-#470 md_roles, where a Funktion was a bare name and nothing said how often it
+        // could be held. Unlike the Trupp-Typen above there is deliberately NO one-time marker: those
+        // rows needed MigrateTruppTypeDefaults because the old string rule gave two of them values
+        // other than the new default, so rewriting them preserved the old behaviour. Every Funktion
+        // that existed before #470 is Multiple, which is also what a NULL reads back as, so widening
+        // loses nothing and a flag would record nothing. Save always writes the column explicitly.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_roles", "uniqueness", "TEXT");
+
         // Wachen and Funkrufnamen used to be lists of their own; they are derived from md_vehicles
         // (and md_personnel) now. Drop the stale tables a pre-change store still carries -- their
         // rows were never more than the names already on the vehicles, and nothing reads them.
@@ -441,7 +462,7 @@ public sealed class MasterDataStore
     private static MasterDataSet Read(SqliteConnection cn)
     {
         return new(
-            ReadColumn(cn, "SELECT value FROM md_roles;"),
+            ReadRoles(cn),
             ReadColumn(cn, "SELECT value FROM md_unit_status;"),
             ReadLinks(cn),
             ReadChecklists(cn),
@@ -612,6 +633,22 @@ public sealed class MasterDataStore
         return list;
     }
 
+    // No ORDER BY, like every other reader here: row order is insertion (rowid) order, which is
+    // what preserves the order the Stammdaten editor lists the rows in.
+    private static List<Role> ReadRoles(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT value, uniqueness FROM md_roles;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<Role>();
+        while (r.Read())
+        {
+            list.Add(new Role(r.GetString(0), Role.UniquenessFrom(Str(r, 1))));
+        }
+
+        return list;
+    }
+
     private static List<Vehicle> ReadVehicles(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
@@ -639,9 +676,11 @@ public sealed class MasterDataStore
         }
 
         return list;
-
-        static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     }
+
+    // One nullable TEXT column. A column a later ALTER adds reads back as NULL until the row is saved
+    // again, so md_roles' uniqueness (#470) reads through here like md_personnel's optionals do.
+    private static string? Str(SqliteDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
     [SuppressMessage(
         "Security",
