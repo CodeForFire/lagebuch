@@ -75,7 +75,7 @@ public sealed class HostIdentityTests : IDisposable
             return; // the per-user AppData ACL does this job on Windows; there is no Unix mode to check
         }
 
-        using (var created = HostIdentity.LoadOrCreate(KeyPath))
+        using (HostIdentity.LoadOrCreate(KeyPath))
         {
             File.SetUnixFileMode(KeyPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
         }

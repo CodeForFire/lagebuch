@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 
 namespace LageBuch.Sync.Hosting;
@@ -23,9 +22,9 @@ public static class HostIdentity
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        if (TryLoad(path, out var existing))
+        if (TryReadKey(path, out var existing))
         {
-            return existing;
+            return CreateKey(existing);
         }
 
         var created = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -45,49 +44,63 @@ public static class HostIdentity
         // Two instances sharing for the first time at once: the one that lands second keeps the key
         // already on disk, so both serve the one key their clients will pin.
         created.Dispose();
-        return TryLoad(path, out var stored)
-            ? stored
+        return TryReadKey(path, out var stored)
+            ? CreateKey(stored)
             : throw new IOException($"Der Schlüssel des Hosts in {path} ist nicht lesbar.");
+    }
+
+    // The key object is built here, at the one place that returns it, from parameters that are no
+    // longer needed afterwards: the private scalar is not left lying in managed memory.
+    private static ECDsa CreateKey(ECParameters parameters)
+    {
+        try
+        {
+            return ECDsa.Create(parameters);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(parameters.D);
+        }
     }
 
     // False for a missing file, and for one that holds no usable key: garbage, a public key alone, or
     // another curve all import without complaint, yet only a P-256 private key can sign a certificate.
-    private static bool TryLoad(string path, [NotNullWhen(true)] out ECDsa? key)
+    // Parameters rather than a key object, so nothing disposable leaves this method.
+    private static bool TryReadKey(string path, out ECParameters parameters)
     {
-        key = null;
+        parameters = default;
         if (!File.Exists(path))
         {
             return false;
         }
 
-        var candidate = ECDsa.Create();
-        try
+        using (var candidate = ECDsa.Create())
         {
-            candidate.ImportFromPem(File.ReadAllText(path));
-            var parameters = candidate.ExportParameters(includePrivateParameters: true);
-            if (!string.Equals(parameters.Curve.Oid.Value, ECCurve.NamedCurves.nistP256.Oid.Value, StringComparison.Ordinal))
+            try
+            {
+                candidate.ImportFromPem(File.ReadAllText(path));
+                parameters = candidate.ExportParameters(includePrivateParameters: true);
+            }
+            catch (Exception ex) when (ex is CryptographicException or ArgumentException)
             {
                 return false;
             }
-
-            // A key file restored from a backup or copied between machines may have come back
-            // readable by others; the key is only as private as the file.
-            if (!OperatingSystem.IsWindows() && File.GetUnixFileMode(path) != OwnerOnly)
-            {
-                File.SetUnixFileMode(path, OwnerOnly);
-            }
-
-            (key, candidate) = (candidate, null);
-            return true;
         }
-        catch (Exception ex) when (ex is CryptographicException or ArgumentException)
+
+        if (!string.Equals(parameters.Curve.Oid.Value, ECCurve.NamedCurves.nistP256.Oid.Value, StringComparison.Ordinal))
         {
+            CryptographicOperations.ZeroMemory(parameters.D);
             return false;
         }
-        finally
+
+        // A key file restored from a backup or copied between machines may have come back readable
+        // by others; the key is only as private as the file.
+        if (!OperatingSystem.IsWindows() && File.GetUnixFileMode(path) != OwnerOnly)
         {
-            candidate?.Dispose();
+            File.SetUnixFileMode(path, OwnerOnly);
         }
+
+        return true;
     }
 
     // Written to a sibling of its own and moved into place without overwriting, so a crash mid-write
