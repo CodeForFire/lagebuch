@@ -32,6 +32,26 @@ public class TasksViewModelTests
     };
 
     [Fact]
+    public void Assignee_options_offer_callsigns_and_names_but_not_funktionen()
+    {
+        var (session, _, _) = NewSession();
+        var masterData = MasterData() with
+        {
+            Personnel = new[]
+            {
+                new Person("Mustermann", "Max", "ZF", "FFB 1/10", null),
+                new Person("Musterfrau", string.Empty, null, null, null),
+            },
+        };
+
+        using var vm = new TasksViewModel(
+            session, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), masterData, () => { });
+
+        // #468: Fahrzeuge and names, one name format — a Funktion is not who a task goes to.
+        Assert.Equal(new[] { "FFB 1/44/1", "FFB 1/10", "Mustermann, Max", "Musterfrau" }, vm.AssigneeOptions);
+    }
+
+    [Fact]
     public void AddTask_clears_text_keeps_priorities_sticky_and_fires_onchanged()
     {
         var (session, _, _) = NewSession();
