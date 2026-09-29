@@ -273,6 +273,29 @@ public class EtbViewModelTests
     }
 
     [Fact]
+    public void Opening_and_closing_the_edit_panel_tells_the_Save_button_to_recheck()
+    {
+        // A bound button reads CanExecute once and then only on CanExecuteChanged, so a live
+        // CanExecute alone would not have caught Save staying grey in the field (#467).
+        var vm = NewVm();
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+        var raised = 0;
+        vm.SaveEditCommand.CanExecuteChanged += (_, _) => raised++;
+
+        vm.Entries[0].BeginEditCommand.Execute(null);
+
+        Assert.True(raised > 0);
+        Assert.True(vm.SaveEditCommand.CanExecute(null));
+
+        raised = 0;
+        vm.CancelEditCommand.Execute(null);
+
+        Assert.True(raised > 0);
+        Assert.False(vm.SaveEditCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void SaveEdit_writes_through_and_clears_edit_state()
     {
         var vm = NewVm();
