@@ -264,6 +264,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
     // --- Edit an existing manual entry: a small panel below the grid, not inline cell editing. ---
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEditing))]
+    [NotifyCanExecuteChangedFor(nameof(SaveEditCommand))]
     private EtbEntryRow? _editingEntry;
 
     [ObservableProperty]
