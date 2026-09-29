@@ -51,11 +51,12 @@ public sealed record MasterDataSet(
 
     /// <summary>
     /// True when no category holds a single entry. A fresh install starts here, and it is the
-    /// condition under which the Stammdaten editor offers Import — a bootstrap, not a merge.
+    /// condition under which the Stammdaten editor's Import runs straight away instead of asking
+    /// first whether it may replace what is already there.
     /// <see cref="Settings"/> deliberately does not count: it always carries defaults, and letting it
-    /// mark the set non-empty would suppress the Import bootstrap on an otherwise fresh install.
+    /// mark the set non-empty would ask for confirmation on an otherwise fresh install.
     /// <see cref="Navigation"/> is excluded for exactly the same reason — a layout saved once would
-    /// otherwise permanently suppress the bootstrap.
+    /// otherwise permanently turn the silent bootstrap into a confirm prompt.
     /// </summary>
     public bool IsEmpty =>
         Roles.Count == 0
