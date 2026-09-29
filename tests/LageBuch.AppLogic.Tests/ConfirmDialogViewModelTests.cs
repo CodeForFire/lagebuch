@@ -28,4 +28,31 @@ public class ConfirmDialogViewModelTests
 
         Assert.True(seen);
     }
+
+    [Fact]
+    public void A_sub_option_is_offered_only_when_labelled()
+    {
+        var plain = new ConfirmDialogViewModel("Titel", "Text", "OK", () => { }, "Option");
+        var nested = new ConfirmDialogViewModel("Titel", "Text", "OK", () => { }, "Option", "Unteroption");
+
+        Assert.False(plain.HasSubOption);
+        Assert.Null(plain.SubOptionLabel);
+        Assert.True(nested.HasSubOption);
+        Assert.Equal("Unteroption", nested.SubOptionLabel);
+        Assert.False(nested.IsSubOptionChecked); // opt-in, like the option itself
+    }
+
+    [Fact]
+    public void Unticking_the_option_clears_the_sub_option()
+    {
+        var dialog = new ConfirmDialogViewModel("Titel", "Text", "OK", () => { }, "Option", "Unteroption")
+        {
+            IsOptionChecked = true,
+            IsSubOptionChecked = true,
+        };
+
+        dialog.IsOptionChecked = false;
+
+        Assert.False(dialog.IsSubOptionChecked);
+    }
 }
