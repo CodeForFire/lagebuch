@@ -183,10 +183,8 @@ beliebiges Zertifikat zu akzeptieren, gibt es nicht.
 **PIN.** Der Beitritt verlangt eine vierstellige PIN, die für jede Freigabe neu
 und kryptografisch zufällig erzeugt und auf dem Gastgeber nur im
 Arbeitsspeicher gehalten wird; ein beigetretenes Gerät merkt sie sich in
-`last-connection.json`. Sie wird bei jeder Anfrage mitgeschickt. Bei falschen
-Eingaben verzögert der Gastgeber die nächste Antwort je Gegenstelle
-exponentiell, bis zu einer Minute. Zusätzlich zählt er falsche Eingaben über
-alle Gegenstellen hinweg: Nach zehn Fehlversuchen nimmt er keine neuen Geräte
+`last-connection.json`. Sie wird bei jeder Anfrage mitgeschickt. Der
+Gastgeber zählt falsche Eingaben über alle Gegenstellen hinweg: Nach zehn Fehlversuchen nimmt er keine neuen Geräte
 mehr an, auch nicht mit der richtigen PIN, und meldet das im Einsatz. Erst
 „Neue PIN“ öffnet den Beitritt wieder. Bereits verbundene Geräte arbeiten
 währenddessen weiter.

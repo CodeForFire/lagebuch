@@ -92,21 +92,22 @@ one note on why the trust model around the middle two is where it is.
 - **The share PIN is four digits, and the host budgets wrong guesses.** It is
   drawn per share from `RandomNumberGenerator` and held in memory only on the
   host; a joined device keeps it in `last-connection.json` so it can reconnect
-  without asking. A wrong PIN puts the offending source IP into an exponential
-  backoff (2^(failures-1) seconds, capped at 60), and on top of that the host
-  spends one budget of ten wrong PINs per PIN across *every* address: once it
+  without asking. The host spends one budget of ten wrong PINs per PIN across
+  *every* address — there is no per-address backoff, which only slowed guessing
+  without capping it and was sidestepped by a peer with many addresses: once it
   is gone, new joins are refused — even with the right PIN — until the
   Lagebuchführer draws a new one. Devices already joined keep working. The
   renewal is deliberately manual: a PIN that renewed itself would only spread
   the same guesses across rotations. So an attacker gets at most ten guesses in
   10,000 per renewal a person has to make, and the closed state is the alarm
   that someone is guessing. A peer whose remote address does not resolve is
-  refused outright. What remains is that a patient attacker can keep closing
-  joins on purpose, which blocks new devices but not the ones already joined
+  refused outright. What remains is that an attacker on the LAN can close
+  joins on purpose with ten wrong PINs, and again after every renewal, which
+  blocks new devices but not the ones already joined
   ([#288](../../issues/288)).
 - **The PIN plus network reachability is the entire access-control
   boundary.** A device that can reach the host over the LAN/Tailscale link
-  and knows the (rate-limited, TLS-protected) PIN is already fully trusted
+  and knows the (guess-budgeted, TLS-protected) PIN is already fully trusted
   to make arbitrary changes to the incident, regardless of what operator
   name it claims. A compromised or careless device can misattribute its own
   edits to a different operator, but it could just as easily make those

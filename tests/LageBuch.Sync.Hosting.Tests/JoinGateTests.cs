@@ -2,7 +2,7 @@ using Microsoft.Extensions.Primitives;
 
 namespace LageBuch.Sync.Hosting.Tests;
 
-// #288: the per-IP backoff alone lets an attacker with many addresses walk the 10,000 PINs in
+// #288: the per-IP backoff this gate replaced let an attacker with many addresses walk the 10,000 PINs in
 // minutes. The gate spends one budget per PIN across every address, and once it is gone only a
 // person pressing NEUE PIN reopens joins — that person is the rate limit an attacker cannot rotate.
 public class JoinGateTests

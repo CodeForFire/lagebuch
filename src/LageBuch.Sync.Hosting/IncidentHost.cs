@@ -33,7 +33,6 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly string _masterDataJson;
     private readonly int _protocolVersion;
     private readonly int _minimumProtocolVersion;
-    private readonly PinRateLimiter _rateLimiter;
     private X509Certificate2? _cert;
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
@@ -58,8 +57,7 @@ public sealed class IncidentHost : IAsyncDisposable
         string pin,
         MasterDataSet? masterData = null,
         int protocolVersion = SyncProtocol.ProtocolVersion,
-        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion,
-        TimeProvider? timeProvider = null)
+        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion)
     {
         _session = session;
         _clock = clock;
@@ -67,11 +65,6 @@ public sealed class IncidentHost : IAsyncDisposable
         _gate = new JoinGate(pin);
         _gate.Closed += () => JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
         _ui = ui;
-
-        // Tests only, like the protocol overrides below: the per-address backoff runs on real time
-        // otherwise, which would make a test spending the PIN budget from one loopback address wait
-        // minutes between attempts.
-        _rateLimiter = new PinRateLimiter(timeProvider);
 
         // Overridable for tests only, the way ConnectAsync takes a reconnectPolicy. The app always
         // takes the defaults: a host advertising anything other than what this build actually speaks
@@ -153,45 +146,23 @@ public sealed class IncidentHost : IAsyncDisposable
 
         var app = builder.Build();
 
-        // Brute-force gate (§ P0 #3): a source IP inside its backoff window is refused with 429 +
-        // Retry-After before it even reaches the PIN comparison.
-        app.Use(async (context, next) =>
-        {
-            // A peer without an address is not throttled here; the join gate refuses it outright
-            // rather than pooling every such peer into one shared bucket (#288).
-            var ip = context.Connection.RemoteIpAddress?.ToString();
-            if (ip is not null && _rateLimiter.ShouldThrottle(ip, out var retryAfter))
-            {
-                context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                return;
-            }
-
-            await next();
-        });
-
         // The join gate (§ #64): every request — the version/snapshot/command HTTP calls and the hub's
         // negotiate/transport requests — must carry the share PIN in SyncProtocol.PinHeader. Rejecting
         // here, before routing, keeps every endpoint and the hub gated with one check. The PIN now
         // travels over TLS (not cleartext), so a LAN sniffer no longer sees it; the gate still stops
         // uninvited joins that know or guess it. JoinGate spends one budget per PIN across every
         // address and closes joins when it runs out (#288); a refusal is a 401 either way, so a
-        // guesser learns nothing from it and older clients need nothing new.
+        // guesser learns nothing from it and older clients need nothing new. It is the only brake on
+        // guessing: a per-address backoff used to sit in front of it, but it never capped the odds,
+        // and its 429s kept a person's retries from counting against the budget at all.
         app.Use(async (context, next) =>
         {
-            var ip = context.Connection.RemoteIpAddress?.ToString();
-            if (!_gate.Check(ip, context.Request.Headers[SyncProtocol.PinHeader]))
+            if (!_gate.Check(context.Connection.RemoteIpAddress?.ToString(), context.Request.Headers[SyncProtocol.PinHeader]))
             {
-                if (ip is not null)
-                {
-                    _rateLimiter.RecordFailure(ip);
-                }
-
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
 
-            _rateLimiter.RecordSuccess(ip);
             await next();
         });
 
@@ -220,8 +191,8 @@ public sealed class IncidentHost : IAsyncDisposable
             {
                 context.Response.StatusCode = StatusCodes.Status426UpgradeRequired;
 
-                // The only failure in this pipeline with a body: 401 and 429 are answered by a client
-                // that knows what they mean, while this one can reach a human through a generic error
+                // The only failure in this pipeline with a body: a 401 is answered by a client that
+                // knows what it means, while this one can reach a human through a generic error
                 // banner. Charset spelled out because WriteAsync encodes UTF-8 but does not say so,
                 // and the message carries an umlaut.
                 context.Response.ContentType = "text/plain; charset=utf-8";

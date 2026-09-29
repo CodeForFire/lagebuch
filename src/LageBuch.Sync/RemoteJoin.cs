@@ -145,6 +145,8 @@ public sealed class RemoteJoin : IAsyncDisposable
                 throw new PinRejectedException();
             }
 
+            // Only a host older than #288 throttles wrong PINs; this build's host answers every one
+            // with a 401 and counts it. The fleet is mixed, so the wait still has to be named.
             if (versionResponse.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 var retryAfter = versionResponse.Headers.RetryAfter?.Delta?.TotalSeconds ?? 60;

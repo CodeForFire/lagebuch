@@ -4,10 +4,10 @@ using Microsoft.Extensions.Primitives;
 namespace LageBuch.Sync.Hosting;
 
 /// <summary>
-/// Decides whether a request's share PIN lets it in (#288). Beside the per-address backoff in
-/// <see cref="PinRateLimiter"/>, it spends one failure budget per PIN across every address: that
-/// backoff alone is keyed per source IP, so a peer with many addresses (IPv4 aliases, an IPv6 /64)
-/// walked the 10,000 four-digit PINs in minutes.
+/// Decides whether a request's share PIN lets it in (#288), spending one failure budget per PIN
+/// across every address. It replaced a per-address backoff, which a peer with many addresses (IPv4
+/// aliases, an IPv6 /64) sidestepped to walk the 10,000 four-digit PINs in minutes, and which even
+/// from one address only slowed guessing down rather than capping it.
 /// <para>
 /// Once the budget is gone, joins close and stay closed until the host draws a new PIN through
 /// <see cref="ReplacePin"/>. Deliberately not automatic: a PIN that renews itself only spreads the

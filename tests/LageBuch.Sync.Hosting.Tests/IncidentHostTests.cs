@@ -253,10 +253,8 @@ public class IncidentHostTests
         // The PIN gate refuses the first request with 401 — the documented auth response.
         Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute))).StatusCode);
 
-        // Every later request from the same IP returns 429: the gate still refuses an unauthenticated
-        // client, and the brute-force guard (P0 #3) throttles the repeats — so no endpoint or the hub
-        // is reachable without the right PIN.
-        Assert.Equal(HttpStatusCode.TooManyRequests, (await http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))).StatusCode);
+        // So does every other endpoint and the hub: no route is reachable without the right PIN.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.GetAsync(new Uri(SyncProtocol.SnapshotPath, UriKind.RelativeOrAbsolute))).StatusCode);
 
         var command = new AddJournalEntryCommand(
             new OperatorDto("Client", null),
@@ -265,9 +263,9 @@ public class IncidentHostTests
             null,
             null);
         var content = new StringContent(SyncJson.Serialize<SyncCommand>(command), Encoding.UTF8, "application/json");
-        Assert.Equal(HttpStatusCode.TooManyRequests, (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(new Uri(SyncProtocol.CommandPath, UriKind.RelativeOrAbsolute), content)).StatusCode);
 
-        Assert.Equal(HttpStatusCode.TooManyRequests, (await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await http.PostAsync(new Uri(SyncProtocol.HubPath + "/negotiate?negotiateVersion=1", UriKind.RelativeOrAbsolute), null)).StatusCode);
     }
 
     [Fact]
@@ -762,38 +760,6 @@ public class IncidentHostTests
     }
 
     [Fact]
-    public async Task Repeated_wrong_pins_from_one_ip_trigger_429_with_retry_after()
-    {
-        var clock = new FixedClock();
-        var session = TestSession.StartNew(
-            new InMemoryStore(),
-            clock,
-            new SessionOperator("Host", "FFB 1"),
-            "/x.fwincident",
-            Array.Empty<(string, bool)>(),
-            Array.Empty<(string, bool)>());
-        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
-
-        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
-        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "9999");
-        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
-
-        // First wrong PIN: 401 (no backoff yet).
-        var first = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
-        Assert.Equal(HttpStatusCode.Unauthorized, first.StatusCode);
-
-        // Second wrong PIN from same IP: throttled with429 + Retry-After.
-        var second = await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute));
-        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
-        Assert.NotNull(second.Headers.RetryAfter);
-        Assert.True(second.Headers.TryGetValues("Retry-After", out var retryValues));
-        var retryAfterStr = Assert.Single(retryValues);
-        Assert.True(int.TryParse(retryAfterStr, out var retryAfter) && retryAfter >= 1 && retryAfter <= 60);
-    }
-
-    [Fact]
     public async Task Revision_starts_at_zero_and_advances_once_per_applied_change()
     {
         var clock = new FixedClock();
@@ -1025,7 +991,7 @@ public class IncidentHostTests
             await response.Content.ReadAsStringAsync());
     }
 
-    private static async Task<(IncidentHost Host, int Port, FakeTimeProvider Time)> StartGatedHostAsync()
+    private static async Task<(IncidentHost Host, int Port)> StartGatedHostAsync()
     {
         var clock = new FixedClock();
         var session = TestSession.StartNew(
@@ -1035,11 +1001,10 @@ public class IncidentHostTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
-        var time = new FakeTimeProvider();
-        var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234", timeProvider: time);
+        var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
         var port = TestHost.FreeTcpPort();
         await host.StartAsync(IPAddress.Loopback, port);
-        return (host, port, time);
+        return (host, port);
     }
 
     private static async Task<HttpStatusCode> GetVersionWithPinAsync(int port, string pin)
@@ -1050,13 +1015,14 @@ public class IncidentHostTests
         return (await http.GetAsync(new Uri(SyncProtocol.VersionPath, UriKind.Relative))).StatusCode;
     }
 
-    // #288: the attack replayed end to end. Each wrong PIN waits out the per-address backoff, the
-    // way a patient guesser would; the tenth closes joins, and from then on even the right PIN is
-    // refused to anyone who has not joined yet.
+    // #288: the attack replayed end to end, at the pace a person retries. Every wrong PIN is a 401
+    // and every one counts, so "ten wrong PINs" means the same to the Lagebuchführer as to the
+    // gate: the tenth closes joins, and from then on even the right PIN is refused to anyone who
+    // has not joined yet.
     [Fact]
     public async Task Ten_wrong_pins_close_joins_and_then_even_the_right_pin_is_refused()
     {
-        var (host, port, time) = await StartGatedHostAsync();
+        var (host, port) = await StartGatedHostAsync();
         await using var _ = host;
         var raised = 0;
         host.JoinsClosedChanged += (_, _) => raised++;
@@ -1064,7 +1030,6 @@ public class IncidentHostTests
         for (var i = 0; i < JoinGate.MaxFailuresPerPin; i++)
         {
             Assert.Equal(HttpStatusCode.Unauthorized, await GetVersionWithPinAsync(port, "0000"));
-            time.Advance(TimeSpan.FromSeconds(PinRateLimiter.MaxBackoffSeconds + 1));
         }
 
         Assert.True(host.JoinsClosed);
@@ -1075,13 +1040,12 @@ public class IncidentHostTests
     [Fact]
     public async Task After_a_new_pin_new_joins_use_it_and_a_device_joined_earlier_keeps_its_pin()
     {
-        var (host, port, time) = await StartGatedHostAsync();
+        var (host, port) = await StartGatedHostAsync();
         await using var _ = host;
         Assert.Equal(HttpStatusCode.OK, await GetVersionWithPinAsync(port, "1234"));
         for (var i = 0; i < JoinGate.MaxFailuresPerPin; i++)
         {
             await GetVersionWithPinAsync(port, "0000");
-            time.Advance(TimeSpan.FromSeconds(PinRateLimiter.MaxBackoffSeconds + 1));
         }
 
         host.ReplacePin("5678");
