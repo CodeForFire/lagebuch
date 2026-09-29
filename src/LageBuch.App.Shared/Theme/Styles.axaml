@@ -834,6 +834,29 @@
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
   </Style>
 
+  <!-- A row that looks like a recent-file ListBoxItem but is not in a list: Home's last-connection
+       row sits right above the recent files and must read as the same kind of thing. The left
+       padding is the item's 14 plus its template's 3px tick column and 6px presenter margin, so
+       the content starts where a list item's does; change both together. No hover, no tick: the
+       row itself does nothing, only its buttons do. -->
+  <Style Selector="Border.listRow">
+    <Setter Property="Background" Value="#0F141D" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="23,12,14,12" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+  </Style>
+  <!-- A list row's two lines: what it is, and where it lives. -->
+  <Style Selector="TextBlock.rowTitle">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="TextBlock.rowMeta">
+    <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    <Setter Property="Opacity" Value="0.7" />
+  </Style>
+
   <!-- =========================================================
        DATAGRID — operational log table
        ========================================================= -->
