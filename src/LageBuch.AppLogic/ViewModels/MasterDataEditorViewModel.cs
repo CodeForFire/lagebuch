@@ -10,9 +10,9 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// The Stammdaten editor. Loads every editable category from the provider into its own section,
-/// tracks a single dirty flag across them, and writes the whole set back on Save. Import (offered
-/// only while the data is empty) fills the editor from a JSON file for review; Export writes the
-/// current set back out.
+/// tracks a single dirty flag across them, and writes the whole set back on Save. Import fills the
+/// editor from a JSON file for review, asking for confirmation first when there is already
+/// something it would replace; Export writes the current set back out.
 /// </summary>
 public sealed partial class MasterDataEditorViewModel : ObservableObject, INarrowAware
 {
@@ -373,24 +373,45 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     [RelayCommand(CanExecute = nameof(IsDirty))]
     private void Discard() => Load();
 
-    private bool CanImport => !IsDirty && _originalIsEmpty;
+    private bool CanImport => !IsDirty;
 
     /// <summary>
-    /// Bootstrap a fresh, empty install from a JSON file. Loads the file into the sections as unsaved
-    /// changes for review — nothing reaches the database until the user presses Save. Legacy
-    /// Wachen / Funkrufnamen entries the file carries but nothing derives from are reported in
-    /// <see cref="FileNotice"/>. Offered only while the data is empty, so there is nothing to overwrite.
+    /// Loads a JSON file into the editor for review — nothing reaches the database until the user
+    /// presses Save. When the editor already holds data, confirms first: the file replaces every
+    /// category, not just the ones it mentions.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanImport))]
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Imports read arbitrary user-chosen files; any parse/IO failure is shown as an error.")]
     private async Task Import()
     {
         FileError = null;
         FileNotice = null;
 
+        if (_originalIsEmpty)
+        {
+            await ImportCore();
+            return;
+        }
+
+        var dialog = new ConfirmDialogViewModel(
+            "Stammdaten importieren?",
+            "Die Datei ersetzt alle Kategorien in diesem Editor. Erst SPEICHERN übernimmt sie dauerhaft, VERWERFEN stellt den aktuellen Stand wieder her.",
+            "IMPORTIEREN",
+            () => _ = ImportCore());
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
+    }
+
+    /// <summary>
+    /// Picks a file and, on success, stages its contents in the editor as unsaved changes. Legacy
+    /// Wachen / Funkrufnamen entries the file carries but nothing derives from are reported in
+    /// <see cref="FileNotice"/>.
+    /// </summary>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Imports read arbitrary user-chosen files; any parse/IO failure is shown as an error.")]
+    private async Task ImportCore()
+    {
         // The pick itself can fail, not just the read: on Android the chosen content:// URI is
         // streamed into app-private storage before this returns, and a provider that hands back
         // nothing (or a full disk) faults the task rather than returning null.
@@ -416,7 +437,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         FileNotice = imported.DroppedLegacyEntries.Count == 0
             ? null
             : $"Nicht übernommen (kein Fahrzeug / keine Person dazu): {string.Join(", ", imported.DroppedLegacyEntries)}";
-        IsDirty = true; // user reviews, then Save (or Discard to revert to empty)
+        IsDirty = true; // user reviews, then Save (or Discard to revert to what's on disk)
     }
 
     /// <summary>Writes the current editor contents (including unsaved edits) to a JSON file.</summary>

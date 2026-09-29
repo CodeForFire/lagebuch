@@ -87,8 +87,13 @@ public class MasterDataEditorViewModelTests
 
         public bool WriteThrows { get; set; }
 
-        public MasterDataImportResult Read(string path) =>
-            _readError is not null ? throw _readError : new MasterDataImportResult(_read ?? MasterDataSet.Empty, _dropped);
+        public string? ReadPath { get; private set; }
+
+        public MasterDataImportResult Read(string path)
+        {
+            ReadPath = path;
+            return _readError is not null ? throw _readError : new MasterDataImportResult(_read ?? MasterDataSet.Empty, _dropped);
+        }
 
         public void Write(string path, MasterDataSet set)
         {
@@ -461,17 +466,65 @@ public class MasterDataEditorViewModelTests
 
     // --- Import / Export (issue #46 follow-up) ---
     [Fact]
-    public void Import_is_disabled_when_master_data_already_exists()
-    {
-        var vm = Vm(new InMemoryProvider()); // DefaultSet is non-empty
-        Assert.False(vm.ImportCommand.CanExecute(null));
-    }
-
-    [Fact]
     public void Import_is_enabled_on_a_fresh_empty_install()
     {
         var vm = Vm(new InMemoryProvider(MasterDataSet.Empty));
         Assert.True(vm.ImportCommand.CanExecute(null));
+    }
+
+    // --- Re-import over existing data (issue #509) ---
+    [Fact]
+    public void Import_is_enabled_when_master_data_already_exists()
+    {
+        var vm = Vm(new InMemoryProvider()); // DefaultSet is non-empty
+        Assert.True(vm.ImportCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Import_over_existing_data_asks_for_confirmation_before_reading_the_file()
+    {
+        var provider = new InMemoryProvider(); // DefaultSet is non-empty
+        var files = new FakeFileService(read: MasterDataSet.Empty with { Roles = new[] { new Role("EL") } });
+        var vm = Vm(provider, new FakeDialogs { ImportPath = "/import.json" }, files);
+
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        Assert.NotNull(vm.PendingConfirm);
+        Assert.Null(files.ReadPath); // nothing read until the operator confirms
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public async Task Confirming_the_re_import_prompt_replaces_the_editor_contents()
+    {
+        var provider = new InMemoryProvider(); // DefaultSet is non-empty
+        var imported = MasterDataSet.Empty with { Roles = new[] { new Role("NEU") } };
+        var vm = Vm(provider, new FakeDialogs { ImportPath = "/import.json" }, new FakeFileService(read: imported));
+
+        await vm.ImportCommand.ExecuteAsync(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        await Task.Yield(); // the confirm callback fires the import as fire-and-forget
+
+        Assert.Equal(new[] { new Role("NEU") }, Roles(vm).ToValues());
+        Assert.True(vm.IsDirty);
+        Assert.Equal(0, provider.SaveCount); // nothing written until Save
+        Assert.Null(vm.PendingConfirm);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_re_import_prompt_changes_nothing()
+    {
+        var provider = new InMemoryProvider(); // DefaultSet is non-empty
+        var files = new FakeFileService(read: MasterDataSet.Empty with { Roles = new[] { new Role("NEU") } });
+        var vm = Vm(provider, new FakeDialogs { ImportPath = "/import.json" }, files);
+
+        await vm.ImportCommand.ExecuteAsync(null);
+        vm.PendingConfirm!.CancelCommand.Execute(null);
+
+        Assert.Null(vm.PendingConfirm);
+        Assert.Null(files.ReadPath);
+        Assert.False(vm.IsDirty);
+        Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, Roles(vm).ToValues());
     }
 
     [Fact]
@@ -833,7 +886,7 @@ public class MasterDataEditorViewModelTests
         // The pick itself can fail, not only the read: on Android it streams the chosen
         // content:// URI into app-private storage before returning. (#302)
         var dialogs = new FakeDialogs { ImportFailure = new IOException("Datei nicht lesbar.") };
-        var vm = new MasterDataEditorViewModel(new FakeMasterData(), dialogs, new NoFiles());
+        var vm = new MasterDataEditorViewModel(new InMemoryProvider(MasterDataSet.Empty), dialogs, new NoFiles());
 
         await vm.ImportCommand.ExecuteAsync(null);
 
