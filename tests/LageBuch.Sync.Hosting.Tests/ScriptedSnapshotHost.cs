@@ -114,9 +114,11 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
             : Results.Json(host.Current, SyncJson.Options));
         app.MapGet(SyncProtocol.RevisionPath, async (CancellationToken aborted) =>
         {
-            host._revisionRequests.Release();
             if (host._revisionGate is { } gate)
             {
+                // Counted only once held: an answered request, like the pass ConnectAsync runs, is
+                // over before a test could act on it (see WaitForRevisionRequestAsync).
+                host._revisionRequests.Release();
                 await gate.Task.WaitAsync(aborted);
             }
 
@@ -172,9 +174,14 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// Completes once one more <c>GET /revision</c> has reached the host — proof that a reconcile pass
-    /// is in flight, so a test never has to guess that it "very likely" is.
+    /// Completes once one more <c>GET /revision</c> is being held (see <see cref="HoldRevisionRequests"/>)
+    /// — proof that a reconcile pass is in flight, so a test never has to guess that it "very likely" is.
     /// </summary>
+    /// <remarks>
+    /// Requests answered straight away do not count. ConnectAsync runs a pass of its own, and when that
+    /// one counted, this returned before the tick's pass existed — so a test that then advanced time
+    /// past the pass's deadline did so before the deadline was armed, and waited on it forever.
+    /// </remarks>
     public async Task WaitForRevisionRequestAsync(TimeSpan? timeout = null)
     {
         if (!await _revisionRequests.WaitAsync(timeout ?? TimeSpan.FromSeconds(5)))
