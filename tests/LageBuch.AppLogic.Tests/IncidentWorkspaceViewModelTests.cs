@@ -92,6 +92,52 @@ public class IncidentWorkspaceViewModelTests
         Assert.Equal(new[] { new Role("EL") }, host.LastMasterData!.Roles);
     }
 
+    // #288: the alarm that someone is guessing PINs, and the one way to reopen joins.
+    [Fact]
+    public async Task Spent_pin_budget_shows_joins_closed_and_a_new_pin_reopens_them()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        host.CloseJoins();
+
+        Assert.True(vm.ShareJoinsClosed);
+        Assert.Equal("1234", vm.SharePin);
+
+        vm.RenewSharePinCommand.Execute(null);
+
+        Assert.False(vm.ShareJoinsClosed);
+        Assert.Equal("5678", vm.SharePin);
+    }
+
+    [Fact]
+    public async Task Stopping_sharing_clears_joins_closed()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        host.CloseJoins();
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.False(vm.ShareJoinsClosed);
+    }
+
+    // The controller outlives the workspace; a disposed workspace must not keep listening to it.
+    [Fact]
+    public async Task A_disposed_workspace_ignores_a_later_joins_closed()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        vm.Dispose();
+        host.CloseJoins();
+
+        Assert.False(vm.ShareJoinsClosed);
+    }
+
     // #463: the host controller outlives the workspace, so leaving without stopping it kept the
     // old session served -- clients stayed attached and sharing again showed the old PIN.
     [Fact]
@@ -1802,11 +1848,30 @@ internal sealed class FakeHostController : IIncidentHostController
 
     public bool StopCalled { get; private set; }
 
+    public bool JoinsClosed { get; private set; }
+
+    public event EventHandler? JoinsClosedChanged;
+
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
         StopCalled = true;
         IsHosting = false;
         SharePin = null;
+        JoinsClosed = false;
         return Task.CompletedTask;
+    }
+
+    /// <summary>Stands in for the host spending its PIN budget (#288).</summary>
+    public void CloseJoins()
+    {
+        JoinsClosed = true;
+        JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void RenewPin()
+    {
+        SharePin = "5678";
+        JoinsClosed = false;
+        JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
     }
 }

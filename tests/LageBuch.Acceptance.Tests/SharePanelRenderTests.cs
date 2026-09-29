@@ -26,7 +26,26 @@ public class SharePanelRenderTests
 
         public string? ShareHint => "Im Netzwerk: https://192.168.0.5:5859\nAuf diesem Gerät: https://localhost:5859";
 
-        public string? SharePin => IsHosting ? "1234" : null;
+        public string? SharePin => !IsHosting ? null : Renewed ? "5678" : "1234";
+
+        public bool JoinsClosed { get; private set; }
+
+        public event EventHandler? JoinsClosedChanged;
+
+        private bool Renewed { get; set; }
+
+        public void CloseJoins()
+        {
+            JoinsClosed = true;
+            JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void RenewPin()
+        {
+            Renewed = true;
+            JoinsClosed = false;
+            JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
+        }
 
         public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
         {
@@ -41,9 +60,11 @@ public class SharePanelRenderTests
         }
     }
 
-    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
+    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace() => ShowWorkspace(new FakeHost());
+
+    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace(FakeHost host)
     {
-        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars(new FakeHost());
+        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars(host);
         var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -138,5 +159,34 @@ public class SharePanelRenderTests
         Assert.True(
             pinValue.Bounds.Width > 0,
             $"PIN number '{pinValue.Text}' rendered at {pinValue.Bounds.Width:F0}px wide — it exists in the tree but is not laid out, so the number is invisible on first share.");
+    }
+
+    private static Border JoinsClosedBanner(Window window) =>
+        window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ShareJoinsClosedBanner");
+
+    // #288: the alarm that someone is guessing PINs is a Meldung, with the one action that reopens
+    // joins right on it.
+    [AvaloniaFact]
+    public async Task A_spent_pin_budget_raises_a_meldung_and_neue_pin_clears_it()
+    {
+        var host = new FakeHost();
+        var (window, vm) = ShowWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(JoinsClosedBanner(window).IsVisible);
+
+        host.CloseJoins();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(JoinsClosedBanner(window).IsEffectivelyVisible);
+        Capture(window, "share-joins-closed.png");
+
+        var renew = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "RenewSharePinButton");
+        renew.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(JoinsClosedBanner(window).IsVisible);
+        Assert.Equal("5678", window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "PinValue").Text);
+        Capture(window, "share-pin-renewed.png");
     }
 }

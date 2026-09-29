@@ -327,7 +327,8 @@ at an Einsatz, so confidentiality is a requirement, not a nice-to-have.
   - Certificates are pinned on first use through `ITrustStore`. Never add a
     certificate callback that accepts anything, not even temporarily and not
     even in a debug build.
-  - PIN attempts stay rate-limited by `PinRateLimiter`.
+  - Wrong PINs stay budgeted by `JoinGate`: ten per PIN across every
+    address, then joins close until a new PIN is drawn.
   - Anything secret comes from `RandomNumberGenerator`, never `Random`.
 - **Launching things.**
   - A URL is validated before it is opened (`HttpUrlValidator`, reached via
@@ -377,7 +378,7 @@ standing replacement for the persona prompts.
   parameterized and path-contained?
 - Can a failure surface to the user without leaking personal data or crashing
   the app mid-Einsatz?
-- Did I weaken pinning, rate limiting or a sanitiser, even temporarily?
+- Did I weaken pinning, the PIN budget or a sanitiser, even temporarily?
 
 **UI** (when any `.axaml` changed)
 - Does the view declare `x:DataType`, and do text-less controls carry

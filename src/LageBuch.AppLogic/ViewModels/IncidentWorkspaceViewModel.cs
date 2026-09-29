@@ -81,6 +81,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _dialogs = dialogs;
         _alarm = alarm;
         _hostController = hostController;
+        _hostController.JoinsClosedChanged += OnJoinsClosedChanged;
         _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         _lastPdfExportStore = lastPdfExport;
         _mailComposer = mailComposer ?? new NoopMailComposer();
@@ -644,6 +645,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         _disposed = true;
         _session.Changed -= RefreshIncidentData;
+        _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
 
         if (_session is RemoteIncidentSession remote)
         {
@@ -1170,7 +1172,29 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private string? _sharePin;
 
+    // Too many wrong PINs have closed joins (#288): someone may be guessing. Devices already joined
+    // keep working; a new one needs the PIN RenewSharePin draws. Deliberately not renewed on its
+    // own -- a PIN that renews itself only spreads the same guesses across rotations.
+    [ObservableProperty]
+    private bool _shareJoinsClosed;
+
     public string ShareButtonText => IsSharing ? "FREIGABE BEENDEN" : "IM NETZWERK FREIGEBEN";
+
+    [RelayCommand]
+    private void RenewSharePin()
+    {
+        _hostController.RenewPin();
+        ShareJoinsClosed = _hostController.JoinsClosed;
+        SharePin = _hostController.SharePin;
+    }
+
+    // Raised on a request thread when the budget runs out, so marshal before touching bound state.
+    private void OnJoinsClosedChanged(object? sender, EventArgs e) =>
+        _uiDispatcher.Post(() =>
+        {
+            ShareJoinsClosed = IsSharing && _hostController.JoinsClosed;
+            SharePin = IsSharing ? _hostController.SharePin : null;
+        });
 
     [RelayCommand]
     [SuppressMessage(
@@ -1220,5 +1244,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         ShareStatus = null;
         ShareAddress = null;
         SharePin = null;
+        ShareJoinsClosed = false;
     }
 }

@@ -175,7 +175,8 @@ public class CommandRejectionTests
     [InlineData(System.Net.HttpStatusCode.RequestEntityTooLarge, "Die Änderung ist zu groß für den Host.")]
     public async Task A_refusal_from_the_hosts_own_middleware_says_what_it_means(System.Net.HttpStatusCode status, string expected)
     {
-        // These are the statuses the host's PIN gate, rate limiter, protocol gate and Kestrel produce.
+        // These are the statuses the host's PIN gate, protocol gate and Kestrel produce, plus the 429
+        // an older host's rate limiter still sends.
         // "Fehler 426" tells a Lagebuchführer nothing; the sentence tells them which device to update.
         var basis = SnapshotFixture.BaseSnapshot();
         await using var scripted = await ScriptedSnapshotHost.StartAsync(basis);

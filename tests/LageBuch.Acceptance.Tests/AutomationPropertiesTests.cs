@@ -200,10 +200,22 @@ public class AutomationPropertiesTests
             return Task.CompletedTask;
         }
 
+        public bool JoinsClosed => false;
+
+        public event EventHandler? JoinsClosedChanged
+        {
+            add { }
+            remove { }
+        }
+
         public Task StopAsync(CancellationToken cancellationToken = default)
         {
             IsHosting = false;
             return Task.CompletedTask;
+        }
+
+        public void RenewPin()
+        {
         }
     }
 

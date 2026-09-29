@@ -27,6 +27,11 @@ namespace LageBuch.Sync.Hosting.Tests;
 /// any more, and those builds are already in the field. Otherwise the stub advertises this build's
 /// own protocol range, so a test aimed at the Stammdaten path gets past the handshake.
 /// </item>
+/// <item>
+/// A <c>429</c> with <c>Retry-After</c> at <c>/version</c> (<c>throttleRetryAfterSeconds</c>), which
+/// is how a host older than #288 answers a device that has just entered wrong PINs. The real host no
+/// longer throttles, but those builds are in the field, so a joining client still has to read it.
+/// </item>
 /// </list>
 /// No PIN middleware and no protocol gate — the client's headers are simply ignored.
 /// </summary>
@@ -45,7 +50,11 @@ internal sealed class StubHost : IAsyncDisposable
     public int Port { get; }
 
     public static async Task<StubHost> StartAsync(
-        Incident incident, string version = "1.0.0", string masterDataBody = "{ not json", bool legacyVersion = false)
+        Incident incident,
+        string version = "1.0.0",
+        string masterDataBody = "{ not json",
+        bool legacyVersion = false,
+        int? throttleRetryAfterSeconds = null)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -71,7 +80,16 @@ internal sealed class StubHost : IAsyncDisposable
         var versionInfo = legacyVersion
             ? new VersionInfo(version)
             : new VersionInfo(version, SyncProtocol.ProtocolVersion, SyncProtocol.MinimumProtocolVersion);
-        app.MapGet(SyncProtocol.VersionPath, () => Results.Json(versionInfo, SyncJson.Options));
+        app.MapGet(SyncProtocol.VersionPath, (HttpContext context) =>
+        {
+            if (throttleRetryAfterSeconds is { } retryAfter)
+            {
+                context.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+            }
+
+            return Results.Json(versionInfo, SyncJson.Options);
+        });
         app.MapGet(SyncProtocol.SnapshotPath, () => Results.Json(SnapshotMapper.ToSnapshot(incident), SyncJson.Options));
 
         // The whole point: well-formed HTTP, bad Stammdaten -- either malformed JSON (the default)

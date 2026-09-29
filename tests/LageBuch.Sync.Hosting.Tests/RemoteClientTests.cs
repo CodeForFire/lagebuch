@@ -628,57 +628,19 @@ public class RemoteClientTests
                 port));
     }
 
+    // A host older than #288 throttles a device after wrong PINs with 429 + Retry-After. This build's
+    // host no longer does, but a joining client still meets those hosts in a mixed fleet and has to
+    // name the wait instead of reporting an opaque HTTP error.
     [Fact]
-    public async Task Connect_surfaces_429_as_pin_rejected_during_rate_limiting()
+    public async Task Connect_surfaces_an_older_hosts_429_as_pin_rejected_with_the_wait()
     {
         var clock = new FixedClock();
-        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
-        await using var _ = host;
+        await using var host = await StubHost.StartAsync(HostSession(clock).Incident, throttleRetryAfterSeconds: 30);
 
-        // Drive the host's per-IP rate limiter into its backoff window with two wrong-PIN requests
-        // from this IP. The first wrong PIN is refused with 401 (and records a failure), the second
-        // inside the backoff window is refused with 429; after two failures the window is 2s wide.
-        using (var h = new HttpClient(TestHost.InsecureTrustAllHandler())
-        { BaseAddress = new Uri($"https://127.0.0.1:{port}") })
-        {
-            for (var i = 0; i < 2; i++)
-            {
-                var req = new HttpRequestMessage(HttpMethod.Get, SyncProtocol.VersionPath);
-                req.Headers.Add(SyncProtocol.PinHeader, "wrong");
-                await h.SendAsync(req);
-            }
-        }
+        var ex = await Assert.ThrowsAsync<PinRejectedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), "wrong", host.Port));
 
-        // Still inside the 2s backoff window, a client connect (whose first handshake GET hits the
-        // throttled /version endpoint) must surface the 429 as a PinRejectedException, not an opaque
-        // HTTP error. Done within the window; a 2s backoff gives this assertion ample time.
-        //
-        // A loopback TLS handshake can occasionally abort under CI load (unrelated to the rate
-        // limiter itself, e.g. HttpRequestException: unexpected EOF) — retry that transport-level
-        // noise a couple of times rather than let it masquerade as a behavior regression.
-        PinRejectedException? rejected = null;
-        for (var attempt = 0; rejected is null; attempt++)
-        {
-            try
-            {
-                await RemoteIncidentSession.ConnectAsync(
-                    "127.0.0.1",
-                    new SessionOperator("Client"),
-                    "1.0.0",
-                    new ImmediateUiDispatcher(),
-                    new InMemoryTrustStore(),
-                    "wrong",
-                    port);
-                Assert.Fail("ConnectAsync should have thrown for the wrong PIN.");
-            }
-            catch (PinRejectedException ex)
-            {
-                rejected = ex;
-            }
-            catch (HttpRequestException) when (attempt < 2)
-            {
-                // Transient loopback TLS hiccup — retry.
-            }
-        }
+        Assert.Equal("Zu viele Fehlversuche. Bitte 30s warten.", ex.Message);
     }
 }

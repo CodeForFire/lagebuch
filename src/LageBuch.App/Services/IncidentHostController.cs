@@ -38,6 +38,10 @@ internal sealed class IncidentHostController : IIncidentHostController
 
     public string? SharePin { get; private set; }
 
+    public bool JoinsClosed => _host?.JoinsClosed ?? false;
+
+    public event EventHandler? JoinsClosedChanged;
+
     public async Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
     {
         if (_host is not null)
@@ -45,12 +49,10 @@ internal sealed class IncidentHostController : IIncidentHostController
             return;
         }
 
-        // A fresh 4-digit PIN per share session: the host reads it out, joiners type it (§ #64).
-        // Cryptographic RNG so the PIN isn't predictable from a seeded/observed sequence — cheap
-        // hardening even though a 4-digit space is small (brute-force is the accepted, documented risk).
-        var pin = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10_000).ToString("D4", CultureInfo.InvariantCulture);
+        var pin = NewPin();
         var host = new IncidentHost(session, _clock, _appVersion, _ui, pin, masterData);
         await host.StartAsync(IPAddress.Any, cancellationToken: cancellationToken);
+        host.JoinsClosedChanged += OnJoinsClosedChanged;
         _host = host;
         SharePin = pin;
 
@@ -67,9 +69,33 @@ internal sealed class IncidentHostController : IIncidentHostController
             return;
         }
 
+        _host.JoinsClosedChanged -= OnJoinsClosedChanged;
         await _host.DisposeAsync();
         _host = null;
         ShareHint = null;
         SharePin = null;
     }
+
+    public void RenewPin()
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        // SharePin first: ReplacePin raises JoinsClosedChanged, and whoever handles it reads the
+        // new PIN from here.
+        var pin = NewPin();
+        SharePin = pin;
+        _host.ReplacePin(pin);
+    }
+
+    // A fresh 4-digit PIN per share session, and per renewal: the host reads it out, joiners type
+    // it (§ #64). Cryptographic RNG so the PIN isn't predictable from a seeded/observed sequence.
+    // Four digits hold because the host spends a budget of wrong PINs across every address and
+    // then closes joins until a person renews (#288, JoinGate) — not because the space is large.
+    private static string NewPin() =>
+        System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10_000).ToString("D4", CultureInfo.InvariantCulture);
+
+    private void OnJoinsClosedChanged(object? sender, EventArgs e) => JoinsClosedChanged?.Invoke(this, e);
 }

@@ -157,7 +157,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     /// <summary>
     /// Version-handshakes, fetches the initial snapshot, and opens the push channel. Throws
     /// <see cref="PinRejectedException"/> when the host refuses the share PIN (either a wrong/missing
-    /// PIN, i.e. a 401, or a rate-limited one, i.e. a 429 after too many failed attempts),
+    /// PIN, i.e. a 401, or, from a host older than #288, a 429 after too many failed attempts),
     /// <see cref="VersionMismatchException"/> when the two devices' wire contracts do not overlap
     /// (differing app versions on their own are fine — see <see cref="SyncProtocol.ProtocolVersion"/>),
     /// <see cref="CertificateChangedException"/> when the host presents a certificate that differs

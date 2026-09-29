@@ -25,6 +25,21 @@ public interface IIncidentHostController
     string? SharePin { get; }
 
     /// <summary>
+    /// Whether too many wrong PINs have closed joins (#288). Devices already joined keep working;
+    /// new ones are refused, even with the right PIN, until <see cref="RenewPin"/>.
+    /// </summary>
+    bool JoinsClosed { get; }
+
+    /// <summary>Raised when <see cref="JoinsClosed"/> flips, possibly on a non-UI thread.</summary>
+    event EventHandler? JoinsClosedChanged;
+
+    /// <summary>
+    /// Draws a new <see cref="SharePin"/> and reopens joins. Devices already joined keep the PIN
+    /// they joined with. Does nothing while not hosting.
+    /// </summary>
+    void RenewPin();
+
+    /// <summary>
     /// Starts hosting. <paramref name="masterData"/> is the Stammdaten this workspace is running
     /// on: the host is the Stammdaten master (#183), so joined clients run on this set for the
     /// session instead of their own local one.
@@ -44,6 +59,18 @@ public sealed class NoopIncidentHostController : IIncidentHostController
     public string? ShareHint => null;
 
     public string? SharePin => null;
+
+    public bool JoinsClosed => false;
+
+    public event EventHandler? JoinsClosedChanged
+    {
+        add { }
+        remove { }
+    }
+
+    public void RenewPin()
+    {
+    }
 
     public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
