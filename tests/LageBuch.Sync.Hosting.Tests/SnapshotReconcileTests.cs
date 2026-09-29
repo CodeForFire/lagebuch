@@ -198,6 +198,24 @@ public class SnapshotReconcileTests
     }
 
     [Fact]
+    public async Task Waiting_for_a_held_revision_request_does_not_count_the_pass_run_at_connect()
+    {
+        // ConnectAsync runs one reconcile pass of its own (#459). If that answered request counted,
+        // the wait below would return at once — before the tick's pass had even armed its deadline —
+        // and a test advancing time past that deadline would advance it too early and hang.
+        var basis = SnapshotFixture.BaseSnapshot();
+        var time = new FakeTimeProvider();
+        await using var host = await ScriptedSnapshotHost.StartAsync(basis);
+        await using var client = await SnapshotFixture.ConnectAsync(host, Interval, time);
+
+        host.HoldRevisionRequests();
+
+        // No tick has been driven, so no pass can be held.
+        await Assert.ThrowsAsync<TimeoutException>(
+            () => host.WaitForRevisionRequestAsync(TimeSpan.FromMilliseconds(200)));
+    }
+
+    [Fact]
     public async Task A_pass_the_host_never_answers_fails_at_its_deadline_and_the_poll_carries_on()
     {
         // A link that went silent without closing: the request is accepted and then nothing comes
