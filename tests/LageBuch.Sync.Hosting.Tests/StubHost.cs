@@ -60,8 +60,10 @@ internal sealed class StubHost : IAsyncDisposable
         builder.Logging.ClearProviders();
 
         var (cert, _) = SyncCertificate.Generate();
-        var port = TestHost.FreeTcpPort();
-        builder.WebHost.UseKestrel(o => o.Listen(IPAddress.Loopback, port, l => l.UseHttps(cert)));
+
+        // Port 0: the OS picks a free port during the bind, read back once started (see
+        // TestHost.StartOnFreePortAsync for why not to pick one first).
+        builder.WebHost.UseKestrel(o => o.Listen(IPAddress.Loopback, 0, l => l.UseHttps(cert)));
         builder.Services.AddSignalR().AddJsonProtocol(o =>
             o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
@@ -98,7 +100,7 @@ internal sealed class StubHost : IAsyncDisposable
         app.MapGet(SyncProtocol.MasterDataPath, () => Results.Content(masterDataBody, "application/json"));
 
         await app.StartAsync();
-        return new StubHost(app, port, tracker);
+        return new StubHost(app, new Uri(app.Urls.First()).Port, tracker);
     }
 
     /// <summary>

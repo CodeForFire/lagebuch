@@ -41,15 +41,15 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
     private int _commandsReceived;
     private TaskCompletionSource? _revisionGate;
 
-    private ScriptedSnapshotHost(WebApplication app, int port, IHubContext<IncidentHub> hub, IncidentSnapshot initial)
+    private ScriptedSnapshotHost(WebApplication app, IHubContext<IncidentHub> hub, IncidentSnapshot initial)
     {
         _app = app;
-        Port = port;
         _hub = hub;
         Current = initial;
     }
 
-    public int Port { get; }
+    /// <summary>The port Kestrel bound; 0 until <see cref="StartAsync"/> has started it.</summary>
+    public int Port { get; private set; }
 
     /// <summary>
     /// What the host would say if asked right now: served by <c>GET /snapshot</c>, and its
@@ -94,15 +94,17 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         builder.Logging.ClearProviders();
 
         var (cert, _) = SyncCertificate.Generate();
-        var port = TestHost.FreeTcpPort();
-        builder.WebHost.UseKestrel(o => o.Listen(IPAddress.Loopback, port, l => l.UseHttps(cert)));
+
+        // Port 0: the OS picks a free port during the bind, read back once started (see
+        // TestHost.StartOnFreePortAsync for why not to pick one first).
+        builder.WebHost.UseKestrel(o => o.Listen(IPAddress.Loopback, 0, l => l.UseHttps(cert)));
         builder.Services.AddSignalR().AddJsonProtocol(o =>
             o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         builder.Services.ConfigureHttpJsonOptions(o =>
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         var app = builder.Build();
-        var host = new ScriptedSnapshotHost(app, port, app.Services.GetRequiredService<IHubContext<IncidentHub>>(), initial);
+        var host = new ScriptedSnapshotHost(app, app.Services.GetRequiredService<IHubContext<IncidentHub>>(), initial);
 
         app.MapHub<IncidentHub>(SyncProtocol.HubPath);
         app.MapGet(
@@ -147,6 +149,7 @@ internal sealed class ScriptedSnapshotHost : IAsyncDisposable
         });
 
         await app.StartAsync();
+        host.Port = new Uri(app.Urls.First()).Port;
         return host;
     }
 

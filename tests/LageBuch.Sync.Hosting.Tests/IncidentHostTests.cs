@@ -27,6 +27,52 @@ public class IncidentHostTests
         response.EnsureSuccessStatusCode();
     }
 
+    // Port 0 lets the OS pick a port as part of the bind itself. Picking one first and binding it
+    // later left a gap in which a parallel test's socket took it: "address already in use".
+    [Fact]
+    public async Task A_host_started_on_port_zero_serves_on_the_port_it_reports()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+
+        await host.StartAsync(IPAddress.Loopback, 0);
+
+        var port = Assert.IsType<int>(host.BoundPort);
+        Assert.NotEqual(0, port);
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
+        var version = SyncJson.Deserialize<VersionInfo>(await http.GetStringAsync(new Uri(SyncProtocol.VersionPath, UriKind.RelativeOrAbsolute)));
+        Assert.Equal("1.2.3", version.Version);
+    }
+
+    [Fact]
+    public async Task A_host_reports_no_bound_port_before_it_starts_or_after_it_stops()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        Assert.Null(host.BoundPort);
+
+        await host.StartAsync(IPAddress.Loopback, 0);
+        await host.StopAsync();
+
+        Assert.Null(host.BoundPort);
+    }
+
     [Fact]
     public async Task Host_serves_version_and_snapshot_and_applies_a_posted_command()
     {
@@ -39,8 +85,7 @@ public class IncidentHostTests
             new[] { ("Punkt A", false) },
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -88,8 +133,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.IPv6Any, port);
+        var port = await TestHost.StartOnFreePortAsync(host, IPAddress.IPv6Any);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -111,8 +155,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -152,8 +195,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -179,8 +221,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>());
         session.Close();
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -211,8 +252,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -240,8 +280,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         if (pin is not null)
@@ -283,8 +322,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -337,8 +375,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -382,8 +419,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -412,8 +448,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -449,8 +484,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>());
         var dispatcher = new RecordingUiDispatcher();
         await using var host = new IncidentHost(session, clock, "1.0.0", dispatcher, "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -495,8 +529,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -519,8 +552,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
 
@@ -541,8 +573,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -707,8 +738,7 @@ public class IncidentHostTests
             null,
             Math.Max(minimumProtocolVersion, SyncProtocol.ProtocolVersion),
             minimumProtocolVersion);
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, pin);
@@ -748,8 +778,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -771,8 +800,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -805,8 +833,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -842,8 +869,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>());
         using var ui = new SerialUiDispatcher();
         await using var host = new IncidentHost(session, clock, "1.0.0", ui, "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -871,8 +897,7 @@ public class IncidentHostTests
 
         async Task<Guid> ShareAndReadEpochAsync()
         {
-            var port = TestHost.FreeTcpPort();
-            await host.StartAsync(IPAddress.Loopback, port);
+            var port = await TestHost.StartOnFreePortAsync(host);
             using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
             http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
             http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -913,8 +938,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -943,8 +967,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
 
@@ -968,8 +991,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         await using var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
         http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
@@ -1002,8 +1024,7 @@ public class IncidentHostTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         var host = new IncidentHost(session, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
         return (host, port);
     }
 
