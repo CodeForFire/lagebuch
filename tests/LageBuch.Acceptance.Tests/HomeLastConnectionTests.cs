@@ -15,6 +15,8 @@ namespace LageBuch.Acceptance.Tests;
 // The Home card naming where this device was last joined to (#464), and its way back in.
 public class HomeLastConnectionTests
 {
+    private const string RecentPath = "/home/user/Lagebuch/20260924-1405.fwincident";
+
     private static readonly DateTimeOffset T0 = new(2026, 9, 24, 14, 5, 0, TimeSpan.FromHours(2));
 
     private sealed class Md : IMasterDataProvider
@@ -26,9 +28,13 @@ public class HomeLastConnectionTests
         }
     }
 
-    private sealed class NoRecent : IRecentFilesStore
+    private sealed class Recent : IRecentFilesStore
     {
-        public IReadOnlyList<string> GetRecent() => Array.Empty<string>();
+        private readonly string[] _paths;
+
+        public Recent(params string[] paths) => _paths = paths;
+
+        public IReadOnlyList<string> GetRecent() => _paths;
 
         public void Add(string path)
         {
@@ -56,12 +62,13 @@ public class HomeLastConnectionTests
         }
     }
 
-    private static (Window Window, HomeViewModel Vm) ShowHome(LastConnection? last, double width = 1100)
+    private static (Window Window, HomeViewModel Vm) ShowHome(
+        LastConnection? last, double width = 1100, params string[] recent)
     {
         var vm = new HomeViewModel(
             new FakeStore(),
             new Md(),
-            new NoRecent(),
+            new Recent(recent),
             new FakeDialogs(),
             new FixedClock(),
             new ManualTicker(),
@@ -151,5 +158,52 @@ public class HomeLastConnectionTests
         var (window, _) = ShowHome(new LastConnection("elw-1", "B3 Wohnung", T0));
 
         Assert.False(ByName<LeadTrailPanel>(window, "LastConnectionLine").IsWrapped);
+    }
+
+    // The connection row and a recent-file row are one visual system: same inset tile, same text
+    // column, same type on the second line, buttons ending on the same edge.
+    private static double LeftX(Control control, Window window) =>
+        control.TranslatePoint(default, window)!.Value.X;
+
+    private static double RightX(Control control, Window window) =>
+        control.TranslatePoint(new Point(control.Bounds.Width, 0), window)!.Value.X;
+
+    private static TextBlock RecentText(Window window, string text) =>
+        window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == text);
+
+    [AvaloniaFact]
+    public void Connection_and_recent_rows_start_their_text_at_the_same_x()
+    {
+        var (window, _) = ShowHome(new LastConnection("elw-1", "B3 Wohnung", T0), recent: RecentPath);
+
+        var host = LeftX(ByName<TextBlock>(window, "LastConnectionHost"), window);
+        var fileName = LeftX(RecentText(window, "20260924-1405.fwincident"), window);
+
+        Assert.True(Math.Abs(host - fileName) <= 1.0, $"host starts at x={host}, file name at x={fileName}");
+    }
+
+    [AvaloniaFact]
+    public void Connection_and_recent_rows_end_their_buttons_at_the_same_x()
+    {
+        var (window, _) = ShowHome(new LastConnection("elw-1", "B3 Wohnung", T0), recent: RecentPath);
+
+        var forget = RightX(ByName<Button>(window, "ForgetLastConnectionButton"), window);
+        var remove = RightX(ByName<Button>(window, "RemoveRecentButton"), window);
+
+        Assert.True(Math.Abs(forget - remove) <= 1.0, $"forget ends at x={forget}, remove at x={remove}");
+    }
+
+    [AvaloniaFact]
+    public void Connection_detail_uses_the_same_type_as_a_recent_path()
+    {
+        var (window, _) = ShowHome(new LastConnection("elw-1", "B3 Wohnung", T0), recent: RecentPath);
+
+        var detail = ByName<TextBlock>(window, "LastConnectionDetail");
+        var path = RecentText(window, RecentPath);
+
+        Assert.Equal(path.FontFamily, detail.FontFamily);
+        Assert.Equal(path.FontSize, detail.FontSize, precision: 1);
+        Assert.Equal(path.Foreground, detail.Foreground);
+        Assert.Equal(path.Opacity, detail.Opacity, precision: 2);
     }
 }
