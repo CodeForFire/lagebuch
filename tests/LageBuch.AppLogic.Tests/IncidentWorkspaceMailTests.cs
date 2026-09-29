@@ -5,7 +5,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
-// Closing an incident can go straight on to the final PDF and a prefilled e-mail.
+// Closing an incident can go straight on to the final PDF (#425) and, optionally, a prefilled e-mail.
 public sealed class IncidentWorkspaceMailTests : IDisposable
 {
     private static readonly DateTimeOffset T0 = new(2026, 9, 19, 22, 17, 0, TimeSpan.FromHours(2));
@@ -17,7 +17,8 @@ public sealed class IncidentWorkspaceMailTests : IDisposable
     private static IncidentWorkspaceViewModel Workspace(
         FakeDialogs? dialogs = null,
         IIncidentPdfExporter? exporter = null,
-        IMailComposer? mail = null)
+        IMailComposer? mail = null,
+        ILastPdfExportStore? lastPdfExport = null)
     {
         var clock = new FixedClock(T0);
         var session = TestSession.StartNew(
@@ -37,47 +38,97 @@ public sealed class IncidentWorkspaceMailTests : IDisposable
             new FakeAlarmService(),
             new NoopIncidentHostController(),
             exporter ?? new TestPdfExporter(),
+            lastPdfExport,
             mailComposer: mail);
     }
 
-    private static void CloseWithMail(IncidentWorkspaceViewModel vm, bool mail)
+    // Mailing is nested under exporting in the close dialog, so mail implies export.
+    private static void CloseWith(IncidentWorkspaceViewModel vm, bool export, bool mail = false)
     {
         vm.CloseIncidentCommand.Execute(null);
         var confirm = vm.PendingConfirm;
         Assert.NotNull(confirm);
-        confirm.IsOptionChecked = mail;
+        confirm.IsOptionChecked = export || mail;
+        confirm.IsSubOptionChecked = mail;
         confirm.ConfirmCommand.Execute(null);
     }
 
+    private static void CloseWithMail(IncidentWorkspaceViewModel vm, bool mail) => CloseWith(vm, export: mail, mail);
+
     [Fact]
-    public void Close_dialog_offers_mailing_the_pdf_when_export_and_mail_are_available()
+    public void Close_dialog_offers_the_pdf_export_with_mailing_nested_under_it()
     {
         var vm = Workspace(mail: new FakeMailComposer());
 
         vm.CloseIncidentCommand.Execute(null);
 
         Assert.True(vm.PendingConfirm?.HasOption);
-        Assert.Equal("PDF erstellen und per E-Mail senden", vm.PendingConfirm?.OptionLabel);
+        Assert.Equal("PDF exportieren", vm.PendingConfirm?.OptionLabel);
+        Assert.True(vm.PendingConfirm?.HasSubOption);
+        Assert.Equal("und per E-Mail senden", vm.PendingConfirm?.SubOptionLabel);
     }
 
     [Fact]
-    public void Close_dialog_has_no_mail_option_without_a_pdf_exporter()
+    public void Close_dialog_offers_nothing_without_a_pdf_exporter()
     {
         var vm = Workspace(exporter: new NoopIncidentPdfExporter(), mail: new FakeMailComposer());
 
         vm.CloseIncidentCommand.Execute(null);
 
         Assert.False(vm.PendingConfirm?.HasOption);
+        Assert.False(vm.PendingConfirm?.HasSubOption);
     }
 
     [Fact]
-    public void Close_dialog_has_no_mail_option_without_a_mail_composer()
+    public void Close_dialog_offers_the_export_but_no_mail_without_a_mail_composer()
     {
         var vm = Workspace();
 
         vm.CloseIncidentCommand.Execute(null);
 
-        Assert.False(vm.PendingConfirm?.HasOption);
+        Assert.True(vm.PendingConfirm?.HasOption);
+        Assert.Equal("PDF exportieren", vm.PendingConfirm?.OptionLabel);
+        Assert.False(vm.PendingConfirm?.HasSubOption);
+    }
+
+    [Fact]
+    public void Closing_with_the_export_option_opens_the_pdf_section_dialog_after_closing()
+    {
+        var vm = Workspace();
+
+        CloseWith(vm, export: true);
+
+        Assert.True(vm.IsReadOnly);
+        Assert.Null(vm.PendingConfirm);
+        Assert.Equal("EXPORTIEREN", vm.PendingPdfExportOptions?.ExportLabel);
+    }
+
+    [Fact]
+    public async Task Closing_with_the_export_option_writes_the_pdf_and_records_the_last_export()
+    {
+        var store = new FakeLastPdfExportStore();
+        var vm = Workspace(new FakeDialogs { ExportPath = _exportPath }, lastPdfExport: store);
+        CloseWith(vm, export: true);
+
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        Assert.True(File.Exists(_exportPath));
+        Assert.Equal($"PDF exportiert: {Path.GetFileName(_exportPath)}", vm.ExportStatus);
+        Assert.Equal(_exportPath, store.SetPath);
+        Assert.Null(vm.PendingPdfExportOptions);
+    }
+
+    [Fact]
+    public async Task Closing_with_export_but_not_mail_composes_no_mail()
+    {
+        var mail = new FakeMailComposer();
+        var vm = Workspace(new FakeDialogs { ExportPath = _exportPath }, mail: mail);
+        CloseWith(vm, export: true, mail: false);
+
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        Assert.True(File.Exists(_exportPath));
+        Assert.Empty(mail.Drafts);
     }
 
     [Fact]
@@ -94,11 +145,11 @@ public sealed class IncidentWorkspaceMailTests : IDisposable
     }
 
     [Fact]
-    public void Closing_without_the_mail_option_opens_no_export_dialog()
+    public void Closing_without_any_option_opens_no_export_dialog()
     {
         var vm = Workspace(mail: new FakeMailComposer());
 
-        CloseWithMail(vm, mail: false);
+        CloseWith(vm, export: false);
 
         Assert.True(vm.IsReadOnly);
         Assert.Null(vm.PendingPdfExportOptions);

@@ -925,8 +925,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
               "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?"
             : "Der Einsatz wird unwiderruflich abgeschlossen und schreibgeschützt. Fortfahren?";
 
-        // The final PDF is usually the next thing the Lagebuchführer makes, and it goes out by
-        // e-mail; offering it here saves the trip through PDF EXPORTIEREN and the mail program.
+        // The final PDF is usually the next thing the Lagebuchführer makes, and a closed incident
+        // can no longer be corrected, so offer it here (#425); sending it by e-mail is a nested
+        // follow-up, since mailing always exports first. Both open the usual section dialog.
         ConfirmDialogViewModel? dialog = null;
         dialog = new ConfirmDialogViewModel(
             "Einsatz abschließen?",
@@ -935,12 +936,22 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             () =>
             {
                 PerformClose();
-                if (dialog?.IsOptionChecked == true)
+                if (dialog?.IsOptionChecked != true)
+                {
+                    return;
+                }
+
+                if (dialog.IsSubOptionChecked)
                 {
                     OpenPdfExportOptions(RunExportAndMailAsync, "PDF ERSTELLEN & MAILEN");
                 }
+                else
+                {
+                    OpenPdfExportOptions(RunExportAsync);
+                }
             },
-            CanMailPdf ? "PDF erstellen und per E-Mail senden" : null);
+            CanExport ? "PDF exportieren" : null,
+            CanMailPdf ? "und per E-Mail senden" : null);
 
         // Clear the overlay on either outcome; PerformClose has already run on confirm.
         dialog.Closed += (_, _) => PendingConfirm = null;

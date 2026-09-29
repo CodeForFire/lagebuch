@@ -23,6 +23,10 @@
           <TextBlock Text="{Binding Message}" Classes="secondary" TextWrapping="Wrap" />
           <CheckBox x:Name="OptionCheckBox" IsVisible="{Binding HasOption}"
                     IsChecked="{Binding IsOptionChecked}" Content="{Binding OptionLabel}" />
+          <!-- Nested under the option it refines, and only enabled while that one is ticked. -->
+          <CheckBox x:Name="SubOptionCheckBox" Margin="28,-4,0,0" IsVisible="{Binding HasSubOption}"
+                    IsEnabled="{Binding IsOptionChecked}"
+                    IsChecked="{Binding IsSubOptionChecked}" Content="{Binding SubOptionLabel}" />
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
             <Button x:Name="ConfirmButton" Classes="signal" Content="{Binding ConfirmLabel}"

@@ -12,13 +12,20 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
 {
     private readonly Action _onConfirm;
 
-    public ConfirmDialogViewModel(string title, string message, string confirmLabel, Action onConfirm, string? optionLabel = null)
+    public ConfirmDialogViewModel(
+        string title,
+        string message,
+        string confirmLabel,
+        Action onConfirm,
+        string? optionLabel = null,
+        string? subOptionLabel = null)
     {
         Title = title;
         Message = message;
         ConfirmLabel = confirmLabel;
         _onConfirm = onConfirm;
         OptionLabel = optionLabel;
+        SubOptionLabel = subOptionLabel;
     }
 
     public string Title { get; }
@@ -36,8 +43,29 @@ public sealed partial class ConfirmDialogViewModel : ObservableObject
     [ObservableProperty]
     private bool _isOptionChecked;
 
+    /// <summary>
+    /// A refinement of the option, offered as a nested checkbox that is only enabled while the
+    /// option is ticked; the host reads <see cref="IsSubOptionChecked"/> on confirm.
+    /// </summary>
+    public string? SubOptionLabel { get; }
+
+    public bool HasSubOption => SubOptionLabel is not null;
+
+    [ObservableProperty]
+    private bool _isSubOptionChecked;
+
     /// <summary>Raised after Confirm or Cancel so the host removes the overlay.</summary>
     public event EventHandler? Closed;
+
+    // The sub-option only means something under the option, so it never outlives it — a tick
+    // left on a disabled checkbox must not fire.
+    partial void OnIsOptionCheckedChanged(bool value)
+    {
+        if (!value)
+        {
+            IsSubOptionChecked = false;
+        }
+    }
 
     [RelayCommand]
     private void Confirm()
