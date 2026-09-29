@@ -120,6 +120,13 @@ public sealed class IncidentHost : IAsyncDisposable
     /// </summary>
     public string? Kennung { get; private set; }
 
+    /// <summary>
+    /// The port the host is listening on, or null while it is not. It differs from the port passed
+    /// to <see cref="StartAsync"/> only when that was 0, which has the OS pick a free one as part of
+    /// the bind.
+    /// </summary>
+    public int? BoundPort { get; private set; }
+
     public async Task StartAsync(IPAddress bindAddress, int port = SyncProtocol.Port, CancellationToken cancellationToken = default)
     {
         if (_app is not null)
@@ -257,6 +264,9 @@ public sealed class IncidentHost : IAsyncDisposable
         _session.Changed += OnSessionChanged; // the host's own edits reach clients too
         await app.StartAsync(cancellationToken);
         _app = app;
+
+        // After the start, Urls holds what Kestrel actually bound (port 0 resolved to the real one).
+        BoundPort = new Uri(app.Urls.First()).Port;
     }
 
     private async Task<IResult> HandleCommand(SyncCommand command)
@@ -406,6 +416,7 @@ public sealed class IncidentHost : IAsyncDisposable
             _cert?.Dispose();
             _cert = null;
             Kennung = null;
+            BoundPort = null;
         }
     }
 

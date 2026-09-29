@@ -43,8 +43,7 @@ public class CommandRejectionTests
         var clock = new FixedClock();
         var hostSession = HostSession(clock);
         await using var host = new IncidentHost(hostSession, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(System.Net.IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1",
@@ -78,8 +77,7 @@ public class CommandRejectionTests
         var clock = new FixedClock();
         var hostSession = HostSession(clock);
         await using var host = new IncidentHost(hostSession, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(System.Net.IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1",
@@ -108,8 +106,7 @@ public class CommandRejectionTests
         var clock = new FixedClock();
         var hostSession = HostSession(clock);
         await using var host = new IncidentHost(hostSession, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
-        var port = TestHost.FreeTcpPort();
-        await host.StartAsync(System.Net.IPAddress.Loopback, port);
+        var port = await TestHost.StartOnFreePortAsync(host);
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1",

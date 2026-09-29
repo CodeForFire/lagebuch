@@ -334,6 +334,21 @@ internal static class TestHost
         return await presented.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
+    /// <summary>
+    /// Starts <paramref name="host"/> on a port the OS picks as part of the bind and returns it. Never
+    /// pick a port with <see cref="FreeTcpPort"/> and bind it afterwards: between the two a parallel
+    /// test's socket can take it, and the bind fails with "address already in use".
+    /// </summary>
+    public static async Task<int> StartOnFreePortAsync(IncidentHost host, IPAddress? bindAddress = null)
+    {
+        await host.StartAsync(bindAddress ?? IPAddress.Loopback, 0);
+        return Assert.IsType<int>(host.BoundPort);
+    }
+
+    /// <summary>
+    /// A port nothing listens on right now, for a test that needs a refused connection. Not for
+    /// starting a server on: use <see cref="StartOnFreePortAsync"/> or bind port 0 directly.
+    /// </summary>
     public static int FreeTcpPort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -364,8 +379,7 @@ internal static class TestHost
             protocolVersion,
             minimumProtocolVersion,
             identityKeyPath);
-        var port = FreeTcpPort();
-        await host.StartAsync(IPAddress.Loopback, port);
+        var port = await StartOnFreePortAsync(host);
         return (host, port);
     }
 }
