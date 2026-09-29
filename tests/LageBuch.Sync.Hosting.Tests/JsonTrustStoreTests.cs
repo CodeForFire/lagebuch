@@ -46,11 +46,14 @@ public class JsonTrustStoreTests : IDisposable
     }
 
     [Fact]
-    public void CertificateChangedException_carries_the_host_and_a_german_message()
+    public void CertificateChangedException_carries_the_host_the_kennung_and_a_german_message()
     {
-        var ex = new CertificateChangedException("10.0.0.5");
+        var ex = new CertificateChangedException("10.0.0.5", "SPKI:AB", "7K2Q-M9XD-4HPA");
         Assert.Contains("10.0.0.5", ex.Message, StringComparison.Ordinal);
-        Assert.True(ex.Message.Contains("geändert", StringComparison.Ordinal));
+        Assert.Contains("7K2Q-M9XD-4HPA", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("neuen Kennung", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("SPKI:AB", ex.PresentedPin);
+        Assert.Equal("7K2Q-M9XD-4HPA", ex.Kennung);
     }
 
     [Fact]

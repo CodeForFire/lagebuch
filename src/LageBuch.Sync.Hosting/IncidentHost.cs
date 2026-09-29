@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -33,6 +34,7 @@ public sealed class IncidentHost : IAsyncDisposable
     private readonly string _masterDataJson;
     private readonly int _protocolVersion;
     private readonly int _minimumProtocolVersion;
+    private readonly string? _identityKeyPath;
     private X509Certificate2? _cert;
     private WebApplication? _app;
     private IHubContext<IncidentHub>? _hub;
@@ -57,7 +59,8 @@ public sealed class IncidentHost : IAsyncDisposable
         string pin,
         MasterDataSet? masterData = null,
         int protocolVersion = SyncProtocol.ProtocolVersion,
-        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion)
+        int minimumProtocolVersion = SyncProtocol.MinimumProtocolVersion,
+        string? identityKeyPath = null)
     {
         _session = session;
         _clock = clock;
@@ -73,6 +76,11 @@ public sealed class IncidentHost : IAsyncDisposable
         // shipping untested until the first release that raises the floor — during an Einsatz.
         _protocolVersion = protocolVersion;
         _minimumProtocolVersion = minimumProtocolVersion;
+
+        // Where the host's persistent key lives (see HostIdentity). Null means a throwaway key per
+        // share — what tests want, and never what the app does: its clients would have to compare a
+        // new Kennung after every restart.
+        _identityKeyPath = identityKeyPath;
 
         // Serialized once, here, rather than per request: the Stammdaten editor is a top-level view
         // that an open workspace replaces, so the host's set provably cannot change while sharing.
@@ -106,6 +114,12 @@ public sealed class IncidentHost : IAsyncDisposable
         JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// The Kennung joined clients pin this host by (see <see cref="HostKennung"/>), shown next to
+    /// the PIN so a changed one can be compared. Null until <see cref="StartAsync"/>.
+    /// </summary>
+    public string? Kennung { get; private set; }
+
     public async Task StartAsync(IPAddress bindAddress, int port = SyncProtocol.Port, CancellationToken cancellationToken = default)
     {
         if (_app is not null)
@@ -116,9 +130,17 @@ public sealed class IncidentHost : IAsyncDisposable
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
 
-        // Serve TLS with a fresh self-signed cert minted per share session; the client pins it via
-        // Trust-on-First-Use (§ P0 #2) rather than the OS trust store.
-        (_cert, _) = SyncCertificate.Generate();
+        // Serve TLS with a fresh self-signed cert minted per share session, carrying the host's
+        // persistent key; the client pins that key via Trust-on-First-Use (§ P0 #2) rather than the
+        // OS trust store, so the next share is still recognised as this host.
+        using (var key = _identityKeyPath is null
+                   ? ECDsa.Create(ECCurve.NamedCurves.nistP256)
+                   : HostIdentity.LoadOrCreate(_identityKeyPath))
+        {
+            (_cert, _) = SyncCertificate.Generate(key);
+        }
+
+        Kennung = HostKennung.Of(_cert);
         _epoch = Guid.NewGuid();
         builder.WebHost.UseKestrel(o =>
         {
@@ -383,6 +405,7 @@ public sealed class IncidentHost : IAsyncDisposable
             _hub = null;
             _cert?.Dispose();
             _cert = null;
+            Kennung = null;
         }
     }
 

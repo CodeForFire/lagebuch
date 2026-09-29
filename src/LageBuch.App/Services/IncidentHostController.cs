@@ -21,13 +21,15 @@ internal sealed class IncidentHostController : IIncidentHostController
     private readonly IClock _clock;
     private readonly string _appVersion;
     private readonly IUiDispatcher _ui;
+    private readonly string _identityKeyPath;
     private IncidentHost? _host;
 
-    public IncidentHostController(IClock clock, string appVersion, IUiDispatcher ui)
+    public IncidentHostController(IClock clock, string appVersion, IUiDispatcher ui, string identityKeyPath)
     {
         _clock = clock;
         _appVersion = appVersion;
         _ui = ui;
+        _identityKeyPath = identityKeyPath;
     }
 
     public bool CanHost => true;
@@ -42,6 +44,8 @@ internal sealed class IncidentHostController : IIncidentHostController
 
     public event EventHandler? JoinsClosedChanged;
 
+    public string? ShareKennung { get; private set; }
+
     public async Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
     {
         if (_host is not null)
@@ -50,11 +54,14 @@ internal sealed class IncidentHostController : IIncidentHostController
         }
 
         var pin = NewPin();
-        var host = new IncidentHost(session, _clock, _appVersion, _ui, pin, masterData);
+
+        // The persistent key is what lets joined devices recognise this host on the next share.
+        var host = new IncidentHost(session, _clock, _appVersion, _ui, pin, masterData, identityKeyPath: _identityKeyPath);
         await host.StartAsync(IPAddress.Any, cancellationToken: cancellationToken);
         host.JoinsClosedChanged += OnJoinsClosedChanged;
         _host = host;
         SharePin = pin;
+        ShareKennung = host.Kennung;
 
         // Bound on every interface; show the nicest address to dial plus the same-machine shortcut.
         // One per line: the flyout that shows it supplies the "Erreichbar unter" heading.
@@ -74,6 +81,7 @@ internal sealed class IncidentHostController : IIncidentHostController
         _host = null;
         ShareHint = null;
         SharePin = null;
+        ShareKennung = null;
     }
 
     public void RenewPin()

@@ -47,6 +47,8 @@ public class SharePanelRenderTests
             JoinsClosedChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        public string? ShareKennung => IsHosting ? "7K2Q-M9XD-4HPA" : null;
+
         public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
         {
             IsHosting = true;
@@ -135,6 +137,9 @@ public class SharePanelRenderTests
             .Single(t => t.Name == "ShareAddressValue");
         Assert.Contains("https://192.168.0.5:5859", address.Text, StringComparison.Ordinal);
         Assert.Contains("https://localhost:5859", address.Text, StringComparison.Ordinal);
+        var kennung = content.GetVisualDescendants().Prepend(content).OfType<SelectableTextBlock>()
+            .Single(t => t.Name == "ShareKennungValue");
+        Assert.Equal("7K2Q-M9XD-4HPA", kennung.Text); // what a joining device that reports a changed key is compared against
         Capture(window, "share-flyout.png");
         button.Flyout.Hide();
     }

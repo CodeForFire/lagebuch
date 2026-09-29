@@ -194,6 +194,8 @@ public class AutomationPropertiesTests
 
         public string? SharePin => IsHosting ? "1234" : null;
 
+        public string? ShareKennung => IsHosting ? "7K2Q-M9XD-4HPA" : null;
+
         public Task StartAsync(LocalIncidentSession session, MasterDataSet masterData, CancellationToken cancellationToken = default)
         {
             IsHosting = true;

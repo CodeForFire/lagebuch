@@ -72,22 +72,36 @@ one note on why the trust model around the middle two is where it is.
   release's `SHA256SUMS.txt` and its Sigstore-backed build attestation
   (`gh attestation verify <file> --repo CodeForFire/lagebuch`). See the
   [roadmap](ROADMAP.md).
-- **The first connection to a host is unauthenticated.** Sync pins the host
-  certificate Trust-on-First-Use: the joining device records its SHA-256
-  thumbprint in `trust.json` on first contact and from then on accepts only
-  that thumbprint: a changed one aborts the connection, and there is no
-  fallback to an unverified one. The pin can be reset — "forget" on a host
-  drops its entry, which is what makes a legitimately reissued certificate
-  usable — so that action is itself the downgrade path back to an
-  unauthenticated first contact. That thumbprint comparison is the *whole*
-  client-side trust
-  decision — the per-share certificate is self-signed and its SAN covers only
-  `localhost` and loopback while the host binds every interface, so chain and
-  hostname validation are replaced outright rather than layered on. The
-  thumbprint is never surfaced in the UI either, so the first exchange cannot
-  be compared against the host out of band: an attacker already positioned on
-  the LAN at that moment can get themselves pinned instead, and every later
-  connection will then look correct.
+- **The first connection to a host is unauthenticated.** Sync pins the host's
+  key Trust-on-First-Use: the joining device records the SHA-256 of the
+  certificate's public key (SPKI) in `trust.json` on first contact and from
+  then on accepts only that key. The host issues a new self-signed certificate
+  per share but keeps one ECDSA P-256 key per install (`host-key.pem` in the
+  app-data folder, owner-only on Unix), so a restarted share, app or laptop is
+  still the same pin. A different key aborts the connection and the error shows
+  its Kennung — the first 60 bits of the SPKI hash, 12 Crockford base32
+  characters, which the host displays behind its PIN. Trusting it after
+  comparing pins exactly the key that was shown, never whatever answers the
+  retry. 60 bits is a trade between what a person compares during an Einsatz
+  and the cost of grinding a key to match a known host's Kennung (about 2^60
+  key generations, years on current hardware); a presented key whose Kennung
+  equals the pinned one's while the key differs can only be such a ground key,
+  and is refused with nothing offered to trust. Host certificates carry a fixed
+  subject so a client can tell an older host, which shows no Kennung, from a
+  changed one. Whole-certificate pins from before the persistent key are
+  upgraded only if the presented certificate still matches them; otherwise the
+  Kennung is asked for like any other change. That key comparison is the *whole*
+  client-side trust decision — the certificate is self-signed and its SAN
+  covers only `localhost` and loopback while the host binds every interface, so
+  chain and hostname validation are replaced outright rather than layered on.
+  The first exchange is not compared, though: nothing asks for the Kennung on
+  first contact, so an attacker already positioned on the LAN at that moment
+  can get themselves pinned instead, and every later connection will then look
+  correct. Anyone who can read `host-key.pem` can impersonate that host, which
+  is the same user-profile boundary that already guards the Einsatzdaten: the
+  app-data folder is created with the default umask, and on Windows it is the
+  roaming `%AppData%`, so a roaming profile carries the key to the profile
+  server along with everything else stored there.
   ([#288](../../issues/288))
 - **The share PIN is four digits, and the host budgets wrong guesses.** It is
   drawn per share from `RandomNumberGenerator` and held in memory only on the

@@ -19,6 +19,8 @@ internal static class AppPaths
 
     public static string TrustJsonPath => Path.Join(Root, "trust.json");
 
+    public static string HostKeyPath => Path.Join(Root, "host-key.pem");
+
     public static string GetAppDataDir(string baseDir)
     {
         var dir = Path.Join(baseDir, "Lagebuch");

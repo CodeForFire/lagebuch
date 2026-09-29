@@ -124,7 +124,8 @@ Anwendungsdaten.
 | `last-save-folder.json` | der zuletzt zum Speichern verwendete Ordner |
 | `last-pdf-export.json` | der zuletzt für den PDF-Export verwendete Ordner |
 | `last-connection.json` | die zuletzt erfolgreich verbundene Gegenstelle, mit **Stichwort** des Einsatzes, Zeitpunkt und **PIN**, damit ein Wiederverbinden im Einsatz ohne Nachfragen geht; auf der Startseite mit „Letzte Verbindung vergessen“ löschbar (ältere Versionen: `last-join-host.json`, nur die Gegenstelle) |
-| `trust.json` | die gespeicherten Zertifikats-Fingerabdrücke der Gegenstellen |
+| `trust.json` | die gespeicherten Schlüssel-Fingerabdrücke der Gegenstellen |
+| `host-key.pem` | der private Schlüssel, mit dem dieses Gerät sich beim Freigeben ausweist; entsteht bei der ersten Freigabe, unter Linux und macOS nur für den eigenen Benutzer lesbar |
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
 
 Beim Öffnen eines Anhangs legt Lagebuch zusätzlich eine Arbeitskopie im
@@ -173,12 +174,29 @@ Betriebssystem). Einen unverschlüsselten Zugang gibt es nicht.
 
 **Zertifikat.** Für jede Freigabe wird ein eigenes Zertifikat erzeugt: ECDSA
 P-256, SHA-256, rund 24 Stunden gültig. Es wird nie auf die Festplatte
-geschrieben und beim Beenden der Freigabe verworfen.
+geschrieben und beim Beenden der Freigabe verworfen. Der Schlüssel darin
+bleibt dagegen derselbe: Er entsteht bei der ersten Freigabe und liegt in
+`host-key.pem`. So erkennen beigetretene Geräte den Gastgeber auch nach einem
+Neustart oder bei einem neuen Einsatz wieder.
+
+**Kennung.** Aus dem Schlüssel ergibt sich eine zwölfstellige Kennung, etwa
+`7K2Q-M9XD-4HPA`. Der Gastgeber zeigt sie an, wenn man auf seine PIN klickt.
+Einen Schlüssel mit derselben Kennung zu errechnen, würde Jahre dauern; stimmt
+die Kennung, der Schlüssel aber nicht, weist das Programm die Verbindung ohne
+Rückfrage ab.
 
 **Vertrauen.** Beim ersten Verbinden merkt sich das beitretende Gerät den
-SHA-256-Fingerabdruck der Gegenstelle in `trust.json`. Weicht der Fingerabdruck
-später ab, bricht die Verbindung mit einer Meldung ab. Eine Möglichkeit, ein
-beliebiges Zertifikat zu akzeptieren, gibt es nicht.
+SHA-256-Fingerabdruck des Schlüssels der Gegenstelle in `trust.json`. Meldet
+sich unter derselben Adresse später ein anderer Schlüssel – ein anderer
+Rechner, ein verlorener `host-key.pem` oder jemand, der sich dazwischenschaltet
+–, bricht die Verbindung ab und die Meldung nennt dessen Kennung. Erst wenn sie
+mit der Anzeige am Gastgeber übereinstimmt, vertraut „Kennung stimmt –
+vertrauen“ genau diesem Schlüssel. Zeigt der Gastgeber keine Kennung, läuft
+dort eine ältere Version; die Meldung sagt das. Fingerabdrücke aus älteren
+Versionen werden beim nächsten Verbinden nur dann still übernommen, wenn die
+Gegenstelle noch dasselbe Zertifikat vorlegt, sonst fragt das Programm nach
+der Kennung. Eine Möglichkeit, ein beliebiges Zertifikat zu akzeptieren, gibt
+es nicht.
 
 **PIN.** Der Beitritt verlangt eine vierstellige PIN, die für jede Freigabe neu
 und kryptografisch zufällig erzeugt und auf dem Gastgeber nur im
@@ -354,9 +372,9 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
   Prüfsumme und Herkunftsnachweis der belastbare Ersatz. Einzelheiten in der
   [Roadmap](../ROADMAP.md).
 - **Die erste Verbindung zu einer Gegenstelle ist ungeprüft.** Der Fingerabdruck
-  wird beim ersten Kontakt übernommen und ab dann erzwungen; er wird im Programm
-  bislang nicht angezeigt, kann also beim ersten Mal nicht mit dem Gastgeber
-  abgeglichen werden. Wer in diesem Moment im selben Netz mitliest, könnte sich
+  wird beim ersten Kontakt übernommen und ab dann erzwungen. Abgeglichen wird die
+  Kennung erst, wenn sie sich ändert; beim ersten Mal fragt das Programm nicht
+  danach. Wer in diesem Moment im selben Netz mitliest, könnte sich
   dazwischenschalten. Verbesserung ist geplant
   ([Issue #288](https://github.com/CodeForFire/lagebuch/issues/288)).
 - **Die PIN hat vier Stellen.** Das genügt, weil nach zehn Fehlversuchen der

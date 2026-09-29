@@ -111,18 +111,23 @@ public class JoinPromptRenderTests
         Capture(window, "join-prompt-wrong-pin.png");
     }
 
-    // #182: a TOFU certificate-changed failure additionally offers a reset-trust action in-dialog.
+    // #182: a TOFU key-changed failure shows the new Kennung and offers to trust it in-dialog.
     [AvaloniaFact]
-    public void Join_prompt_offers_reset_trust_after_a_certificate_changed_failure()
+    public void Join_prompt_offers_to_trust_the_new_kennung_after_a_key_change()
     {
         var (window, vm) = ShowJoinPrompt();
 
-        vm.ReportJoinFailure("Zertifikat für elw-1 hat sich geändert.", certificateChanged: true);
+        var changed = new LageBuch.Sync.CertificateChangedException("elw-1", "SPKI:00", "7K2Q-M9XD-4HPA");
+        vm.ReportJoinFailure(changed.Message, certificateChanged: true);
         Dispatcher.UIThread.RunJobs();
 
+        var errorText = window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(t => t.Name == "PromptErrorMessage");
+        Assert.Contains("7K2Q-M9XD-4HPA", errorText.Text, StringComparison.Ordinal);
         var resetTrustButton = window.GetVisualDescendants().OfType<Button>()
             .Single(b => b.Name == "PromptResetTrustButton");
         Assert.True(resetTrustButton.IsVisible);
+        Assert.Equal("KENNUNG STIMMT – VERTRAUEN", resetTrustButton.Content);
         Capture(window, "join-prompt-cert-changed.png");
     }
 

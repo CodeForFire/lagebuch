@@ -1178,6 +1178,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private bool _shareJoinsClosed;
 
+    // This host's Kennung, for a Lagebuchführer on a joining device whose app reports a changed one.
+    [ObservableProperty]
+    private string? _shareKennung;
+
     public string ShareButtonText => IsSharing ? "FREIGABE BEENDEN" : "IM NETZWERK FREIGEBEN";
 
     [RelayCommand]
@@ -1235,6 +1239,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         ShareStatus = null; // clears a previous attempt's failure
         ShareAddress = _hostController.ShareHint;
         SharePin = _hostController.SharePin;
+        ShareKennung = _hostController.ShareKennung;
     }
 
     private async Task StopSharingAsync()
@@ -1245,5 +1250,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         ShareAddress = null;
         SharePin = null;
         ShareJoinsClosed = false;
+        ShareKennung = null;
     }
 }

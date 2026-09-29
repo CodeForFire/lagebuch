@@ -237,8 +237,14 @@ public sealed partial class HomeViewModel : ObservableObject
     /// </summary>
     private string? _certificateChangedHost;
 
-    /// <summary>Whether the Home screen should offer a "reset trust and try again" button.</summary>
-    public bool CanResetTrustedCertificate => _certificateChangedHost is not null;
+    /// <summary>
+    /// The key pin the host presented in that failure, whose Kennung the banner shows. Trusting stores
+    /// exactly this one, so the retry cannot pin a different key than the one the user compared.
+    /// </summary>
+    private string? _certificateChangedPin;
+
+    /// <summary>Whether the Home screen should offer a "Kennung stimmt – vertrauen" button.</summary>
+    public bool CanResetTrustedCertificate => _certificateChangedHost is not null && _certificateChangedPin is not null;
 
     [RelayCommand]
     private async Task NewIncidentAsync(NewIncidentRequest request)
@@ -518,14 +524,16 @@ public sealed partial class HomeViewModel : ObservableObject
     {
         switch (ex)
         {
-            case CertificateChangedException:
-                // The host presented a different TLS cert than the one previously trusted for this
-                // address (Trust-on-First-Use violation, § P0 #2) — a restart with a new ephemeral
-                // cert, or a man-in-the-middle. Surface the German "geändert" message, and remember
-                // the address so the dialog can offer "Vertrauen zurücksetzen" (#181) instead of
-                // leaving the user stuck on a warning nobody can act on.
+            case CertificateChangedException changed:
+                // The host presented a different key than the one previously trusted for this
+                // address (Trust-on-First-Use violation, § P0 #2). Hosts keep their key across
+                // shares and restarts, so this is another device: a different laptop, a lost key
+                // file, or a man-in-the-middle. Show its Kennung to compare, and remember the
+                // address and key so the dialog can offer to trust exactly that key (#181) instead
+                // of leaving the user stuck on a warning nobody can act on.
                 JoinError = ex.Message;
                 _certificateChangedHost = host;
+                _certificateChangedPin = changed.PresentedPin;
                 OnPropertyChanged(nameof(CanResetTrustedCertificate));
                 return;
 
@@ -598,23 +606,24 @@ public sealed partial class HomeViewModel : ObservableObject
         }
 
         _certificateChangedHost = null;
+        _certificateChangedPin = null;
         OnPropertyChanged(nameof(CanResetTrustedCertificate));
     }
 
     /// <summary>
-    /// Forgets the TLS thumbprint pinned for the host that just failed a TOFU check, so the next join
-    /// attempt re-pins whatever certificate it presents (#181). This is the user's only way out of a
-    /// "Zertifikat geändert" banner short of hand-editing the trust store file.
+    /// Trusts the key the host just presented, once the Lagebuchführer has compared its Kennung with
+    /// the host's screen (#181). It pins that key rather than forgetting the old pin: forgetting
+    /// would let the retry pin whatever answers next, unchecked.
     /// </summary>
     [RelayCommand]
     private void ResetTrustedCertificate()
     {
-        if (_certificateChangedHost is not { } host)
+        if (_certificateChangedHost is not { } host || _certificateChangedPin is not { } pin)
         {
             return;
         }
 
-        _trustStore?.RemoveThumbprint(host);
+        _trustStore?.SaveThumbprint(host, pin);
         JoinError = null;
         ClearCertificateChangedHost();
     }
