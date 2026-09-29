@@ -162,6 +162,55 @@ public class HomeViewModelTests
         Assert.Equal("closed.fwincident", vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").FileName);
     }
 
+    // #291: the probes open each file's database, so they run after the list is up. Capturing the
+    // work instead of running it pins what the first frame shows -- no timing involved.
+    [Fact]
+    public void RecentFiles_is_populated_and_sorted_before_any_state_probe_runs()
+    {
+        var store = new StateProbeStore { ["/20260101-0900-A.fwincident"] = IncidentState.Closed };
+        var recent = new FakeRecent("/20260101-0900-A.fwincident", "/20260301-0900-B.fwincident", "/20260201-0900-C.fwincident");
+        Action? probe = null;
+
+        var vm = HomeWithRecent(recent, store, runInBackground: work => probe = work);
+
+        var expectedOrder = new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" };
+        Assert.Equal(expectedOrder, vm.RecentFiles.Select(f => f.FileName));
+        Assert.All(vm.RecentFiles, f => Assert.False(f.IsClosed));
+        Assert.Equal(0, store.Probes);
+        Assert.NotNull(probe);
+
+        probe();
+
+        Assert.Equal(expectedOrder, vm.RecentFiles.Select(f => f.FileName));
+        Assert.True(vm.RecentFiles.Single(f => f.Path == "/20260101-0900-A.fwincident").IsClosed);
+        Assert.False(vm.RecentFiles.Single(f => f.Path == "/20260301-0900-B.fwincident").IsClosed);
+    }
+
+    [Fact]
+    public void A_state_probe_that_throws_leaves_the_row_unmarked()
+    {
+        var store = new StateProbeStore { ["/closed.fwincident"] = IncidentState.Closed };
+        store.Throws.Add("/broken.fwincident");
+
+        var vm = HomeWithRecent(new FakeRecent("/broken.fwincident", "/closed.fwincident"), store);
+
+        Assert.False(vm.RecentFiles.Single(f => f.Path == "/broken.fwincident").IsClosed);
+        Assert.True(vm.RecentFiles.Single(f => f.Path == "/closed.fwincident").IsClosed);
+    }
+
+    [Fact]
+    public void A_late_state_probe_does_not_bring_back_a_removed_row()
+    {
+        var store = new StateProbeStore { ["/closed.fwincident"] = IncidentState.Closed };
+        Action? probe = null;
+        var vm = HomeWithRecent(new FakeRecent("/open.fwincident", "/closed.fwincident"), store, runInBackground: work => probe = work);
+
+        vm.RemoveRecentCommand.Execute("/closed.fwincident");
+        probe!();
+
+        Assert.Equal(new[] { "/open.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+    }
+
     [Fact]
     public void OpenRecent_of_closed_incident_opens_readonly()
     {
@@ -305,7 +354,7 @@ public class HomeViewModelTests
         Assert.Null(vm.OpenError);
     }
 
-    private static HomeViewModel HomeWithRecent(FakeRecent recent, IIncidentStore? store = null, IFileDialogService? dialogs = null) =>
+    private static HomeViewModel HomeWithRecent(FakeRecent recent, IIncidentStore? store = null, IFileDialogService? dialogs = null, Action<Action>? runInBackground = null) =>
         new(
             store ?? new FakeStore(),
             new FakeMasterData(),
@@ -315,7 +364,8 @@ public class HomeViewModelTests
             new FakeTicker(),
             new FakeAlarmService(),
             new NoopIncidentHostController(),
-            "1.0.0");
+            "1.0.0",
+            runInBackground: runInBackground);
 
     [Fact]
     public void Removing_a_recent_entry_drops_it_from_the_list_and_the_store()
@@ -637,6 +687,67 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     public Task OpenPhoneAsync(string number) => Task.CompletedTask;
 
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
+}
+
+// Answers only TryReadState, from a fixed table, and counts the calls; a path in Throws stands in
+// for a store that breaks its own null-on-failure contract.
+internal sealed class StateProbeStore : IIncidentStore
+{
+    private readonly Dictionary<string, IncidentState> _states = new();
+
+    public IncidentState this[string path]
+    {
+        set => _states[path] = value;
+    }
+
+    public HashSet<string> Throws { get; } = new();
+
+    public int Probes { get; private set; }
+
+    public void Save(string path, Incident incident)
+    {
+    }
+
+    public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Incident Load(string path) => throw new InvalidOperationException("Nicht geladen.");
+
+    public IncidentState? TryReadState(string path)
+    {
+        Probes++;
+        if (Throws.Contains(path))
+        {
+            throw new IOException("Datei gesperrt.");
+        }
+
+        return _states.TryGetValue(path, out var state) ? state : null;
+    }
+
+    public Task SaveFileBytesAsync(string path, string storageFileName, byte[] bytes, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task SaveFileStreamAsync(string path, string storageFileName, Stream source, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task<byte[]?> TryReadFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
+
+    public string ResolveFileDiskPath(string path, string storageFileName) => Path.Join(path, storageFileName);
+
+    public Task DeleteFileBytesAsync(string path, string storageFileName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public event Action<Exception>? SaveFailed
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action? SaveSucceeded
+    {
+        add { }
+        remove { }
+    }
 }
 
 // Every Load fails, standing in for a moved, truncated, or too-new file.

@@ -31,6 +31,11 @@ public sealed partial class HomeViewModel : ObservableObject
     // HomeViewModel tests (which never open a RemoteIncidentSession) construction-noise free.
     private readonly IUiDispatcher _uiDispatcher;
 
+    // Runs the recent files' closed-state probes (#291), which open each file's SQLite database and
+    // must stay off the UI thread. Production wires Task.Run via CompositionRoot; the inline default
+    // keeps tests single-threaded, so the fakes need no locking and the markers are set on return.
+    private readonly Action<Action> _runInBackground;
+
     // Where the last new-incident save landed, so the next one opens the picker there instead of
     // wherever the OS last remembered. Null when not supplied (e.g. most tests) -- every use site
     // is null-guarded, so the feature is simply inert rather than required.
@@ -57,7 +62,7 @@ public sealed partial class HomeViewModel : ObservableObject
     // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
         _store = store;
@@ -71,6 +76,7 @@ public sealed partial class HomeViewModel : ObservableObject
         _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         _appVersion = appVersion;
         _uiDispatcher = uiDispatcher ?? new ImmediateUiDispatcher();
+        _runInBackground = runInBackground ?? (work => work());
         _lastSaveFolder = lastSaveFolder;
         _attachmentCacheRoot = attachmentCacheRoot;
         _trustStore = trustStore;
@@ -78,15 +84,61 @@ public sealed partial class HomeViewModel : ObservableObject
         _mailComposer = mailComposer;
         _lastConnectionStore = lastConnection;
         _lastConnection = lastConnection?.GetLast();
-        RecentFiles = new ObservableCollection<RecentFileItem>(
-            SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed(path)))));
+
+        // The rows go up unmarked and already in their final order, so the first frame never waits on
+        // a file; the lock markers are filled in afterwards without the list reshuffling (#291).
+        var rows = SortByFileNameDescending(recent.GetRecent().Select(path => new RecentFileItem(path, IsClosed: false))).ToArray();
+        RecentFiles = new ObservableCollection<RecentFileItem>(rows);
+        ProbeRecentFileStates(rows);
     }
 
     public ObservableCollection<RecentFileItem> RecentFiles { get; }
 
+    // Only closed files are posted back: an open or unreadable one already shows no marker.
+    private void ProbeRecentFileStates(IReadOnlyList<RecentFileItem> rows) =>
+        _runInBackground(() =>
+        {
+            foreach (var row in rows)
+            {
+                if (IsClosed(row.Path))
+                {
+                    _uiDispatcher.Post(() => MarkClosed(row));
+                }
+            }
+        });
+
+    // Matched by reference, not by record equality: if the row was removed in the meantime, or
+    // OpenWorkspace replaced it with one built from the loaded incident, the late probe leaves it be.
+    private void MarkClosed(RecentFileItem row)
+    {
+        for (var i = 0; i < RecentFiles.Count; i++)
+        {
+            if (ReferenceEquals(RecentFiles[i], row))
+            {
+                RecentFiles[i] = row with { IsClosed = true };
+                return;
+            }
+        }
+    }
+
     // Passive peek: never migrates or mutates the file. A moved, corrupt, or too-new file just
-    // shows no marker (TryReadState returns null) rather than blocking the overview.
-    private bool IsClosed(string path) => _store.TryReadState(path) == IncidentState.Closed;
+    // shows no marker (TryReadState returns null) rather than blocking the overview. Runs off the
+    // UI thread, so a store that throws anyway must not take the probe loop -- or the app -- down.
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The marker is cosmetic: any failure reading a file's state means 'no marker', matching TryReadState's null contract.")]
+    private bool IsClosed(string path)
+    {
+        try
+        {
+            return _store.TryReadState(path) == IncidentState.Closed;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 
     public Action<IncidentWorkspaceViewModel>? WorkspaceOpened { get; set; }
 
