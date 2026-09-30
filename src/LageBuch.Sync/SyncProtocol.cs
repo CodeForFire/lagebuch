@@ -36,8 +36,13 @@ public static class SyncProtocol
     /// the one it holds, and a host at 3 sends revision 0 on every one — so such a client would drop
     /// every update after the first and sit on the Lage it joined with. The floor rises to 4.
     /// </para>
+    /// <para>
+    /// 5: the Stammdaten payload carries <c>group</c> on links (#518). A peer at 4 skips the key and
+    /// shows the links ungrouped, and a payload without it reads as ungrouped, so the floor stays
+    /// at 4.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 4;
+    public const int ProtocolVersion = 5;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

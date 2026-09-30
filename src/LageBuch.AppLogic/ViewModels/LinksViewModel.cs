@@ -16,11 +16,21 @@ public sealed partial class LinksViewModel : ObservableObject
 {
     private readonly IFileDialogService _dialogs;
 
+    /// <summary>
+    /// The groups the Lagebuchführer collapsed, by the case-insensitive key the grouping uses. Kept
+    /// here rather than on <see cref="LinkGroupViewModel"/> because the groups are rebuilt on every
+    /// keystroke in the search box, and a search must not forget what was collapsed before it.
+    /// </summary>
+    private readonly HashSet<string> _collapsed = new(StringComparer.OrdinalIgnoreCase);
+
     public LinksViewModel(IReadOnlyList<Link> links, IFileDialogService dialogs)
     {
+        ArgumentNullException.ThrowIfNull(links);
         _dialogs = dialogs;
         Links = links;
         VisibleLinks = new ObservableCollection<Link>(links);
+        ShowGroupHeaders = links.Any(l => l.Group.Length > 0);
+        RebuildGroups();
     }
 
     public IReadOnlyList<Link> Links { get; }
@@ -33,6 +43,20 @@ public sealed partial class LinksViewModel : ObservableObject
     /// <see cref="RolesViewModel"/> and <see cref="EtbViewModel"/>.
     /// </summary>
     public ObservableCollection<Link> VisibleLinks { get; }
+
+    /// <summary>
+    /// <see cref="VisibleLinks"/> gathered by <see cref="Link.Group"/> (#518). Groups appear where
+    /// their first link sits in the Stammdaten, so the order the editor's up/down buttons set is the
+    /// order on screen; the ungrouped links come last under "Ohne Gruppe". Groups whose names differ
+    /// only in case are one group — a typo in the editor should not split Gefahrgut in two.
+    /// </summary>
+    public ObservableCollection<LinkGroupViewModel> VisibleGroups { get; } = new();
+
+    /// <summary>
+    /// False while no link has a group: the tab then shows one headerless group, which is exactly
+    /// the flat list a Wehr without groups had before #518.
+    /// </summary>
+    public bool ShowGroupHeaders { get; }
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -66,12 +90,77 @@ public sealed partial class LinksViewModel : ObservableObject
         VisibleLinks.Clear();
         foreach (var link in Links)
         {
-            if (term.Length == 0
-                || link.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || link.Url.Contains(term, StringComparison.OrdinalIgnoreCase))
+            if (Matches(link, term))
             {
                 VisibleLinks.Add(link);
             }
+        }
+
+        RebuildGroups();
+    }
+
+    private static bool Matches(Link link, string term) =>
+        term.Length == 0
+        || link.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+        || link.Url.Contains(term, StringComparison.OrdinalIgnoreCase)
+        || link.Group.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// While a search is active every shown group is open, since a hit inside a collapsed group
+    /// would read as no hit at all; what the Lagebuchführer collapses meanwhile is not remembered.
+    /// </summary>
+    private void RebuildGroups()
+    {
+        var filtered = IsFiltered;
+        var groups = new List<(string Key, List<Link> Links)>();
+        foreach (var link in VisibleLinks)
+        {
+            var i = groups.FindIndex(g => string.Equals(g.Key, link.Group, StringComparison.OrdinalIgnoreCase));
+            if (i < 0)
+            {
+                groups.Add((link.Group, new List<Link> { link }));
+            }
+            else
+            {
+                groups[i].Links.Add(link);
+            }
+        }
+
+        VisibleGroups.Clear();
+        foreach (var (key, links) in groups.OrderBy(g => g.Key.Length == 0))
+        {
+            VisibleGroups.Add(new LinkGroupViewModel(key, links, filtered || !_collapsed.Contains(key), OnGroupExpandedChanged));
+        }
+    }
+
+    private void OnGroupExpandedChanged(LinkGroupViewModel group)
+    {
+        if (IsFiltered)
+        {
+            return;
+        }
+
+        if (group.IsExpanded)
+        {
+            _collapsed.Remove(group.Key);
+        }
+        else
+        {
+            _collapsed.Add(group.Key);
+        }
+    }
+
+    [RelayCommand]
+    private void ExpandAll() => SetAllExpanded(true);
+
+    [RelayCommand]
+    private void CollapseAll() => SetAllExpanded(false);
+
+    private void SetAllExpanded(bool expanded)
+    {
+        foreach (var group in VisibleGroups)
+        {
+            group.IsExpanded = expanded;
         }
     }
 

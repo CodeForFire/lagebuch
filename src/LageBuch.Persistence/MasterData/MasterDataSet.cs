@@ -94,10 +94,14 @@ public sealed record MasterDataSet(
             .ToList();
 }
 
-/// <summary>A named link — Stammdaten entry so useful external resources can be opened from an Einsatz.</summary>
+/// <summary>
+/// A named link — Stammdaten entry so useful external resources can be opened from an Einsatz.
+/// Group is a free-text heading the Links tab gathers links under (#518), e.g. "Gefahrgut";
+/// empty means ungrouped. It trails and defaults, so older files and sync hosts read as ungrouped.
+/// </summary>
 [SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 [SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
-public sealed record Link(string Name, string Url);
+public sealed record Link(string Name, string Url, string Group = "");
 
 /// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's
 /// Checklisten are seeded from at start.</summary>
@@ -466,6 +470,7 @@ public static class AnonymizedExampleData
     public const string TimerMinutesExample = "30";
     public const string LinkName = "Wetterdienst";
     public const string LinkUrl = "https://dwd.de";
+    public const string LinkGroup = "Gefahrgut";
 
     // Derived placeholder strings. Compile-time const concatenation, so the "z. B." prefix and
     // the underlying value can never drift apart from one another.
@@ -492,6 +497,7 @@ public static class AnonymizedExampleData
     public const string TimerMinutesPlaceholder = "z. B. " + TimerMinutesExample;
     public const string LinkNamePlaceholder = "z. B. " + LinkName;
     public const string LinkUrlPlaceholder = "z. B. " + LinkUrl;
+    public const string LinkGroupPlaceholder = "z. B. " + LinkGroup;
 
     // A field that is genuinely optional reuses this idiom rather than inventing a second
     // convention for the same idea.
@@ -517,7 +523,9 @@ public static class AnonymizedExampleData
     public static readonly IReadOnlyList<Link> Links = new[]
     {
         new Link(LinkName, LinkUrl),
-        new Link("Kartendienst", "https://example.org/karte"),
+        new Link("ERICard", "https://example.org/ericard", LinkGroup),
+        new Link("GESTIS-Stoffdatenbank", "https://example.org/gestis", LinkGroup),
+        new Link("Kartendienst", "https://example.org/karte", "Karten"),
     };
 }
 
@@ -636,7 +644,7 @@ public static class MasterDataJson
         IReadOnlyList<Link> links =
             root.TryGetProperty("links", out var lk) && lk.ValueKind == JsonValueKind.Array
                 ? lk.EnumerateArray()
-                    .Select(l => new Link(l.GetProperty("name").GetString()!, l.GetProperty("url").GetString()!))
+                    .Select(l => new Link(l.GetProperty("name").GetString()!, l.GetProperty("url").GetString()!, LinkGroup(l)))
                     .ToList()
                 : Array.Empty<Link>();
 
@@ -879,6 +887,15 @@ public static class MasterDataJson
     }
 
     /// <summary>
+    /// A link's optional group (#518), trimmed. Absent — every file and sync host from before the
+    /// field — null, or not a string all read as ungrouped rather than failing the whole import.
+    /// </summary>
+    private static string LinkGroup(JsonElement link) =>
+        link.TryGetProperty("group", out var g) && g.ValueKind == JsonValueKind.String && g.GetString() is { } group
+            ? group.Trim()
+            : string.Empty;
+
+    /// <summary>
     /// Only an explicit <c>false</c> marks an entry foreign (#458): a file or a sync host from before
     /// the flag existed carries no isOwn at all, and everything in it is the brigade's own.
     /// </summary>
@@ -908,7 +925,7 @@ public static class MasterDataJson
             }),
             checklists = ChecklistsForExport(set),
             navigation = NavigationForExport(set),
-            links = set.Links.Select(l => new { name = l.Name, url = l.Url }),
+            links = set.Links.Select(l => new { name = l.Name, url = l.Url, group = l.Group }),
             vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn }),
             personnel = set.Personnel.Select(p => new
             {

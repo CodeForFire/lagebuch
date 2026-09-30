@@ -44,8 +44,8 @@
   ],
   "links": [
     { "name": "Wetterdienst (DWD)", "url": "https://www.dwd.de" },
-    { "name": "BayernAtlas", "url": "https://geoportal.bayern.de/bayernatlas/" },
-    { "name": "Hydrantenplan", "url": "https://example.org/hydranten" },
+    { "name": "BayernAtlas", "url": "https://geoportal.bayern.de/bayernatlas/", "group": "Karten" },
+    { "name": "Hydrantenplan", "url": "https://example.org/hydranten", "group": "Karten" },
     { "name": "ILS Musterstadt", "url": "https://example.org/ils" }
   ],
   "vehicles": [

@@ -55,8 +55,9 @@
     { "module": "checklist", "checklistId": "b7f3c611-2a58-4c9e-8d40-5f1a2b3c4d5e", "visible": true }
   ],
   "links": [
-    { "name": "Wetterdienst", "url": "https://dwd.de" },
-    { "name": "Kartendienst", "url": "https://example.org/karte" }
+    { "name": "Wetterdienst", "url": "https://dwd.de", "group": "" },
+    { "name": "ERICard", "url": "https://example.org/ericard", "group": "Gefahrgut" },
+    { "name": "Kartendienst", "url": "https://example.org/karte", "group": "Karten" }
   ],
   "vehicles": [
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false, "isOwn": true },

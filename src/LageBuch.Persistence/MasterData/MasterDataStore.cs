@@ -60,11 +60,12 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_links (name, url) VALUES ($n,$u);",
+                "INSERT INTO md_links (name, url, group_name) VALUES ($n,$u,$g);",
                 p =>
                 {
                     p("$n", l.Name);
                     p("$u", l.Url);
+                    p("$g", l.Group);
                 });
         }
 
@@ -221,7 +222,7 @@ public sealed class MasterDataStore
         const string schema = """
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
@@ -286,6 +287,9 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "phone", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "email", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "note", "TEXT");
+
+        // Widen an md_links that predates link groups (#518): every link already there is ungrouped.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_links", "group_name", "TEXT NOT NULL DEFAULT ''");
 
         // Widen both tables where they predate the own/foreign flag (#458). DEFAULT 1: every row
         // already there was entered as the brigade's own.
@@ -602,12 +606,12 @@ public sealed class MasterDataStore
     private static List<Link> ReadLinks(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT name, url FROM md_links;";
+        cmd.CommandText = "SELECT name, url, group_name FROM md_links ORDER BY rowid;";
         using var r = cmd.ExecuteReader();
         var list = new List<Link>();
         while (r.Read())
         {
-            list.Add(new Link(r.GetString(0), r.GetString(1)));
+            list.Add(new Link(r.GetString(0), r.GetString(1), r.GetString(2)));
         }
 
         return list;

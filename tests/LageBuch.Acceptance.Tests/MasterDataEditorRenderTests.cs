@@ -56,7 +56,7 @@ public class MasterDataEditorRenderTests
             Links = new[]
             {
                 new Link("Wetterdienst", "https://dwd.de"),
-                new Link("Kartendienst", "https://example.org/karte"),
+                new Link("Kartendienst", "https://example.org/karte", "Karten"),
             },
             Personnel = new[]
             {
@@ -279,6 +279,13 @@ public class MasterDataEditorRenderTests
             .Where(t => t.Text is "Wetterdienst" or "https://dwd.de" or "Kartendienst" or "https://example.org/karte")
             .ToList();
         Assert.Equal(4, textBoxes.Count);
+
+        // #518: each row carries its group, blank for an ungrouped link.
+        var groups = view.GetVisualDescendants().OfType<AutoCompleteBox>()
+            .Where(b => b.Name == "LinkGroupBox")
+            .Select(b => b.Text ?? string.Empty)
+            .ToList();
+        Assert.Equal(new[] { string.Empty, "Karten" }, groups);
 
         var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);

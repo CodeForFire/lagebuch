@@ -97,7 +97,7 @@ public class MasterDataJsonTests
         {
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
-            Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä") },
+            Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä"), new Link("ERICard", "https://example.org/ericard", "Gefahrgut") },
 
             // relaxed escaping must survive the round trip
             ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
@@ -118,6 +118,25 @@ public class MasterDataJsonTests
         Assert.Equal(original.ChecklistTemplates[1].Items, reparsed.ChecklistTemplates[1].Items);
         Assert.Equal(original.Links, reparsed.Links);
         Assert.Equal(original.Personnel, reparsed.Personnel);
+    }
+
+    [Fact]
+    public void Parse_reads_a_link_group_trimmed()
+    {
+        var set = Parse("""{ "links": [{ "name": "ERICard", "url": "https://example.org/ericard", "group": " Gefahrgut " }] }""");
+
+        Assert.Equal(new Link("ERICard", "https://example.org/ericard", "Gefahrgut"), Assert.Single(set.Links));
+    }
+
+    [Theory]
+    [InlineData("""{ "links": [{ "name": "Wetterdienst", "url": "https://dwd.de" }] }""")]
+    [InlineData("""{ "links": [{ "name": "Wetterdienst", "url": "https://dwd.de", "group": null }] }""")]
+    [InlineData("""{ "links": [{ "name": "Wetterdienst", "url": "https://dwd.de", "group": 42 }] }""")]
+    public void Parse_reads_a_missing_or_unusable_link_group_as_ungrouped(string json)
+    {
+        // A file or sync host from before #518 carries no group; a hand-edited one may carry
+        // anything. Neither is a reason to refuse the whole Stammdaten set.
+        Assert.Equal(string.Empty, Assert.Single(Parse(json).Links).Group);
     }
 
     // #76: vehicles hang off their Wache with a seat count, so the Kräfte entry can offer the

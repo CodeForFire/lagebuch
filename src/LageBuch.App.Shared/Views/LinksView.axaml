@@ -8,7 +8,7 @@
     <!-- Search sits on the section header line rather than in a band of its own, the way the ETB
          tab's "Systemmeldungen ausblenden" toggle does (#262); a separate row would push the
          list down by a control height on a tab whose whole point is at-a-glance scanning. -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="0,0,0,14">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,14">
       <TextBlock Grid.Column="0" Text="LINKS" Classes="overline" VerticalAlignment="Center" />
       <!-- Star column with MaxWidth rather than a fixed Width in an Auto column: an Auto column
            never shrinks, so a pinned width runs off the right edge on a phone-width window (#146
@@ -33,6 +33,19 @@
           <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
         </TextBox.KeyBindings>
       </TextBox>
+      <!-- Only offered once there are groups to fold (#518); without any, the tab is the flat list
+           it always was and these would do nothing. -->
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="8,0,0,0"
+                  VerticalAlignment="Center" IsVisible="{Binding ShowGroupHeaders}">
+        <Button x:Name="ExpandAllLinkGroupsButton" Classes="icon-btn" ToolTip.Tip="Alle Gruppen aufklappen"
+                AutomationProperties.Name="Alle Gruppen aufklappen" Command="{Binding ExpandAllCommand}">
+          <PathIcon Data="M12 5.83 15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z" />
+        </Button>
+        <Button x:Name="CollapseAllLinkGroupsButton" Classes="icon-btn" ToolTip.Tip="Alle Gruppen zuklappen"
+                AutomationProperties.Name="Alle Gruppen zuklappen" Command="{Binding CollapseAllCommand}">
+          <PathIcon Data="M7.41 18.59 8.83 20 12 16.83 15.17 20l1.41-1.41L12 14l-4.59 4.59zm9.18-13.18L15.17 4 12 7.17 8.83 4 7.41 5.41 12 10l4.59-4.59z" />
+        </Button>
+      </StackPanel>
     </Grid>
 
     <!-- Open failure banner: same shape as Files' ErrorBanner -->
@@ -63,31 +76,72 @@
           <TextBlock x:Name="NoMatchesText" Text="{Binding NoMatchesMessage}"
                      Foreground="{StaticResource TextMutedBrush}"
                      IsVisible="{Binding !VisibleLinks.Count}" />
-          <ItemsControl x:Name="LinksList" ItemsSource="{Binding VisibleLinks}"
+          <!-- Groups (#518): nested ItemsControls rather than a TreeView: one level deep is all
+               the issue asks for, and it behaves the same on a phone. -->
+          <ItemsControl x:Name="LinksList" ItemsSource="{Binding VisibleGroups}"
                         IsVisible="{Binding VisibleLinks.Count}">
+            <ItemsControl.Styles>
+              <!-- Banding: with a wide window the name and the URL sit far apart, and a tinted
+                   every-other row keeps the eye on one line. Restarts in each group. -->
+              <Style Selector="ItemsControl.link-rows > ContentPresenter:nth-child(2n)">
+                <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+              </Style>
+              <Style Selector="ItemsControl.link-rows > ContentPresenter">
+                <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+              </Style>
+            </ItemsControl.Styles>
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="md:Link">
-                <Grid ColumnDefinitions="*,*,Auto" Margin="0,0,0,10">
-                  <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Url}" Margin="10,0"
-                             VerticalAlignment="Center" />
-                  <!-- ReflectionBinding: OpenCommand lives on the parent ItemsControl's DataContext
-                       (LinksViewModel), whose static type is object under compiled bindings, so a
-                       compiled $parent cast path won't resolve. -->
-                  <!-- The glyph, not just the tooltip, carries "this leaves Lagebuch" (#262):
-                       on Android there is no hover, so a tooltip alone reaches nobody. -->
-                  <Button Grid.Column="2"
-                          Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenCommand}"
-                          CommandParameter="{Binding}"
-                          ToolTip.Tip="Im Standard-Browser des Geräts öffnen — verlässt Lagebuch">
+              <DataTemplate x:DataType="vm:LinkGroupViewModel">
+                <StackPanel Margin="0,0,0,8">
+                  <!-- The whole header toggles, so the target is the full row, not a small chevron. -->
+                  <Button x:Name="LinkGroupHeader" Classes="ghost" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left" Padding="4,6" Margin="0,0,0,4"
+                          Command="{Binding ToggleCommand}"
+                          AutomationProperties.Name="{Binding Name, StringFormat='Gruppe {0} auf- oder zuklappen'}"
+                          IsVisible="{ReflectionBinding $parent[UserControl].DataContext.ShowGroupHeaders}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBlock Text="ÖFFNEN" VerticalAlignment="Center" />
                       <PathIcon Width="12" Height="12" VerticalAlignment="Center"
-                                Foreground="{StaticResource TextSecondaryBrush}"
-                                Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+                                IsVisible="{Binding IsExpanded}"
+                                Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                      <PathIcon Width="12" Height="12" VerticalAlignment="Center"
+                                IsVisible="{Binding !IsExpanded}"
+                                Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                      <TextBlock Text="{Binding Name}" Classes="overline" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Links.Count}" Foreground="{StaticResource TextMutedBrush}"
+                                 VerticalAlignment="Center" />
                     </StackPanel>
                   </Button>
-                </Grid>
+                  <ItemsControl Classes="link-rows" ItemsSource="{Binding Links}" IsVisible="{Binding IsExpanded}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="md:Link">
+                        <!-- ÖFFNEN leads the row (#518): at the far right it sat a window-width away
+                             from the name it belongs to. -->
+                        <Grid ColumnDefinitions="Auto,*,*" Margin="6,4">
+                          <!-- ReflectionBinding: OpenCommand lives on the view's DataContext
+                               (LinksViewModel), two ItemsControls up, whose static type is object
+                               under compiled bindings, so a compiled $parent cast path won't resolve. -->
+                          <!-- The glyph, not just the tooltip, carries "this leaves Lagebuch" (#262):
+                               on Android there is no hover, so a tooltip alone reaches nobody. -->
+                          <Button Grid.Column="0" x:Name="OpenLinkButton" Margin="0,0,12,0"
+                                  Command="{ReflectionBinding $parent[UserControl].DataContext.OpenCommand}"
+                                  CommandParameter="{Binding}"
+                                  ToolTip.Tip="Im Standard-Browser des Geräts öffnen — verlässt Lagebuch">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Text="ÖFFNEN" VerticalAlignment="Center" />
+                              <PathIcon Width="12" Height="12" VerticalAlignment="Center"
+                                        Foreground="{StaticResource TextSecondaryBrush}"
+                                        Data="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+                            </StackPanel>
+                          </Button>
+                          <TextBlock Grid.Column="1" x:Name="LinkNameText" Text="{Binding Name}"
+                                     VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="2" Classes="mono" Text="{Binding Url}" Margin="10,0,0,0"
+                                     VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>

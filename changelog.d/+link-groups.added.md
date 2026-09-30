@@ -1,0 +1,1 @@
+Links in the Stammdaten can carry an optional group such as Gefahrgut or Karten, and the LINKS tab shows them under collapsible group headers with buttons to expand or collapse them all, puts ÖFFNEN next to each link's name instead of at the far edge of the row, and tints every other row (#518).

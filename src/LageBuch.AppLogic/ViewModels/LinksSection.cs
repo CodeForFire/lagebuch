@@ -11,13 +11,23 @@ namespace LageBuch.AppLogic.ViewModels;
 public sealed partial class LinksSection : EditorSection
 {
     private readonly Action _onChanged;
+    private readonly IReadOnlyList<string> _groupOptions;
 
-    public LinksSection(string title, IEnumerable<Link> links, Action onChanged)
+    public LinksSection(string title, IReadOnlyList<Link> links, Action onChanged)
         : base(title)
     {
+        ArgumentNullException.ThrowIfNull(links);
         _onChanged = onChanged;
+
+        // Case-insensitive like the Links tab's grouping, so the suggestions never offer a second
+        // spelling of a group the tab would merge anyway.
+        _groupOptions = links
+            .Select(l => l.Group)
+            .Where(g => g.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         Rows = new ObservableCollection<LinkRow>(
-            links.Select(l => new LinkRow(l.Name, l.Url, onChanged)));
+            links.Select(l => new LinkRow(l.Name, l.Url, l.Group, _groupOptions, onChanged)));
     }
 
     public ObservableCollection<LinkRow> Rows { get; }
@@ -25,7 +35,7 @@ public sealed partial class LinksSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(new LinkRow(string.Empty, string.Empty, _onChanged));
+        Rows.Add(new LinkRow(string.Empty, string.Empty, string.Empty, _groupOptions, _onChanged));
         _onChanged();
     }
 
@@ -70,7 +80,7 @@ public sealed partial class LinksSection : EditorSection
             var url = row.Url?.Trim() ?? string.Empty;
             if (name.Length > 0 && url.Length > 0)
             {
-                result.Add(new Link(name, url));
+                result.Add(new Link(name, url, row.Group?.Trim() ?? string.Empty));
             }
         }
 

@@ -48,8 +48,17 @@ public class VersionHandshakeTests
         // revision (#295). A 4 client discards snapshots that do not supersede the one it holds, and a
         // 3 host stamps revision 0 on every one, so that pair must not connect. A pre-handshake peer
         // (LegacyProtocolVersion) stays below the floor.
-        Assert.Equal(4, SyncProtocol.ProtocolVersion);
         Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
         Assert.InRange(SyncProtocol.LegacyProtocolVersion, int.MinValue, SyncProtocol.MinimumProtocolVersion - 1);
+    }
+
+    [Fact]
+    public void Link_groups_raise_the_protocol_but_not_the_floor()
+    {
+        // #518: the Stammdaten payload carries a group on each link. A peer at 4 skips the key and
+        // shows its links ungrouped, and a payload without it reads as ungrouped -- so 5 and 4 still
+        // connect in either direction.
+        Assert.Equal(5, SyncProtocol.ProtocolVersion);
+        Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
     }
 }
