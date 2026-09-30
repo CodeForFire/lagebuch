@@ -123,4 +123,45 @@ public class ChecklistViewModelTests
         Assert.True(aufbau.AllMandatoryDone);
         Assert.False(abbau.AllMandatoryDone);
     }
+
+    [Fact]
+    public void A_toggle_from_elsewhere_updates_the_item_without_writing_it_back()
+    {
+        var changes = 0;
+        var session = NewSession();
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => changes++);
+
+        // Another tab, or a remote peer, toggles the item straight on the session.
+        session.ToggleChecklistItem(Aufbau(session).Items[0].Id);
+
+        Assert.True(vm.Items[0].IsDone);
+
+        // A state pull echoed back as a toggle would have reverted the domain item.
+        Assert.True(session.Incident.Checklists[0].Items[0].IsDone);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void A_toggle_from_elsewhere_recomputes_AllMandatoryDone()
+    {
+        var session = NewSession(aufbau: new[] { ("Pflicht", true) });
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => { });
+
+        session.ToggleChecklistItem(Aufbau(session).Items[0].Id);
+
+        Assert.True(vm.AllMandatoryDone);
+    }
+
+    [Fact]
+    public void A_disposed_view_model_no_longer_follows_the_incident()
+    {
+        var session = NewSession(aufbau: new[] { ("Pflicht", true) });
+        var vm = new ChecklistViewModel(session, Aufbau(session), () => { });
+        vm.Dispose();
+
+        session.ToggleChecklistItem(Aufbau(session).Items[0].Id);
+
+        Assert.False(vm.Items[0].IsDone);
+        Assert.False(vm.AllMandatoryDone);
+    }
 }
