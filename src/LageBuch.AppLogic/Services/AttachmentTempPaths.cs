@@ -45,6 +45,52 @@ public static class AttachmentTempPaths
     }
 
     /// <summary>
+    /// Deletes every directory <see cref="CreateOpenDirectory"/> ever left under <see cref="Root"/>.
+    /// Nothing else removes them, and Windows never empties its temp directory on its own, so
+    /// without this every attachment ever opened would stay behind as an unencrypted copy (#383).
+    /// <para>
+    /// Meant for startup, not exit: a crash never reaches an exit handler, and a crashed run's
+    /// leftovers are exactly what wants cleaning. Best-effort and never throws — a copy still held
+    /// open by a viewer cannot be deleted on Windows, so that directory is skipped and removed on a
+    /// later start instead. There is no age grace: a second instance started while a first one is
+    /// running may remove the first one's copies too, which is accepted.
+    /// </para>
+    /// </summary>
+    public static void SweepOpenDirectories() => SweepOpenDirectories(Root);
+
+    internal static void SweepOpenDirectories(string root)
+    {
+        string[] directories;
+        try
+        {
+            directories = Directory.GetDirectories(root);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // No root yet (DirectoryNotFoundException is an IOException) or not ours to read.
+            return;
+        }
+
+        foreach (var directory in directories)
+        {
+            // Only what CreateOpenDirectory names; anything else under the root is not ours to judge.
+            if (!Guid.TryParseExact(Path.GetFileName(directory), "N", out _))
+            {
+                continue;
+            }
+
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Still open in a viewer, most likely; the next start tries again.
+            }
+        }
+    }
+
+    /// <summary>
     /// True only for an existing regular file (no symlink, no directory) that resolves to a location
     /// inside <see cref="Root"/> and carries one of <see cref="IncidentFile.MimeTypesByExtension"/>'s
     /// extensions — the precondition for handing a path to the OS's default handler, which will

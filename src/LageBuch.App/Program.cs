@@ -13,6 +13,10 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // At startup rather than exit, so a crashed run's copies go too; off the UI path because
+        // nothing waits on it and the amount of file I/O is unknown (#383).
+        _ = Task.Run(AttachmentTempPaths.SweepOpenDirectories);
+
         LageBuch.App.Shared.App.CreateMainViewModel = CreateMainViewModel;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
