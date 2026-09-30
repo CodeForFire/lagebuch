@@ -21,11 +21,15 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
     // No SND_ASYNC: playback must block the queue's worker thread until the clip finishes,
     // so cues play one after another instead of overlapping (see SerialAudioQueue).
 
-    // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent.
-    private static readonly IReadOnlyDictionary<AlarmSound, string> VoiceAssets =
+    // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent,
+    // which is why SystemAlarmServiceTests checks that every file named here is in Assets/.
+    internal static readonly IReadOnlyDictionary<AlarmSound, string> VoiceAssets =
         new Dictionary<AlarmSound, string>
         {
-            [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-ils.wav",
+            // Says „Rückmeldung an die Leitstelle", which fits whatever Leitstelle is configured
+            // (#400). Generated once with ElevenLabs (voice "Chris Norddeutscher"), levelled to
+            // the clip it replaced.
+            [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-leitstelle.wav",
 
             // Spoken since #460: a bare tone told an operator on another tab nothing about what
             // had come due. Generated once with Piper (Thorsten-Voice, CC0), not at run time.
