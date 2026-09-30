@@ -288,7 +288,7 @@ public class AttachmentTempPathsTests
             }
 
             // A block, not a `using var`: the lock has to be gone before the finally deletes the root.
-            using (var handle = OperatingSystem.IsWindows()
+            using (OperatingSystem.IsWindows()
                 ? new FileStream(Path.Join(locked, "brand.jpg"), FileMode.Open, FileAccess.Read, FileShare.None)
                 : null)
             {
