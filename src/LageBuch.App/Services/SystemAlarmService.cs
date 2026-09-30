@@ -28,7 +28,8 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
             [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-ils.wav",
 
             // Spoken since #460: a bare tone told an operator on another tab nothing about what
-            // had come due. Generated once with Piper (Thorsten-Voice, CC0), not at run time.
+            // had come due. Generated once with ElevenLabs (converted to 16-bit mono 22050 Hz, peak
+            // -3 dBFS like the other clips), not at run time.
             [AlarmSound.TaskDue] = "voice-aufgabe-faellig.wav",
             [AlarmSound.PressureCheckDue] = "voice-druckabfrage.wav",
             [AlarmSound.RetreatAlarm] = "voice-rueckzugsalarm.wav",
