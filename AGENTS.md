@@ -250,7 +250,8 @@ what they cannot see.
   - Anything persisted or sent over the wire uses `InvariantCulture`.
   - Keys and identifiers compare with `StringComparison.Ordinal`.
 - **Dispose deterministically.** Use `using` or `await using` for every
-  `IDisposable` you own.
+  `IDisposable` you own — never a manual `.Dispose()` in a `finally`; see
+  *Static analysis* below.
 - **Packages:**
   - Versions live in `Directory.Packages.props` (central package management).
     Never put a `Version` on a `PackageReference` in a `.csproj`.
@@ -417,6 +418,26 @@ Write code that trips neither:
   a bound error string, a documented `null` contract, an event. The build
   rejects the catch without one; the justification is also what makes CodeQL's
   duplicate finding defensible instead of an open alert nobody can explain.
+- **Never dispose a local by hand — put it in `using`, even when it only
+  exists on some paths** (`cs/missed-using-statement`). CA2000 is satisfied by
+  a `finally { x?.Dispose(); }`, so the build never objects; CodeQL does, and
+  this shape has been flagged on review again and again:
+
+  ```csharp
+  FileStream? handle = null;
+  try { if (OperatingSystem.IsWindows()) handle = new FileStream(…); … }
+  finally { handle?.Dispose(); }
+  ```
+
+  `using` accepts `null`, so a conditional resource is still one line:
+  `using var handle = OperatingSystem.IsWindows() ? new FileStream(…) : null;`.
+  When the resource has to be released *before* other cleanup in a `finally`
+  runs — unlock a file, then delete its directory — a `using var` declaration
+  is wrong, because it disposes at the end of the method, after the `finally`.
+  Use a `using (…) { … }` block inside the `try`, so its scope ends first.
+  The one exception is a method that has to hand a disposable to its caller:
+  CA2000 and this query pull in opposite directions there, so return plain
+  data and build the object where it is used (see `HostIdentity`, #503).
 - **Leave no dead locals.** `IDE0059` is a warning here and warnings are
   errors. Use `_` for a value you do not need, including inside a tuple
   deconstruction or an `out var` call.
