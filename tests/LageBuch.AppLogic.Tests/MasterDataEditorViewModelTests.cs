@@ -401,6 +401,44 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
+    public void Save_persists_a_link_group_trimmed()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+        var links = Links(vm);
+
+        links.AddCommand.Execute(null);
+        links.Rows[^1].Name = "ERICard";
+        links.Rows[^1].Url = "https://example.org/ericard";
+        links.Rows[^1].Group = "  Gefahrgut ";
+
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(new Link("ERICard", "https://example.org/ericard", "Gefahrgut"), Assert.Single(provider.Get().Links));
+    }
+
+    [Fact]
+    public void Link_rows_offer_each_saved_group_once_in_stammdaten_order()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Links = new[]
+            {
+                new Link("Kartendienst", "https://example.org/karte", "Karten"),
+                new Link("Wetterdienst", "https://dwd.de"),
+                new Link("ERICard", "https://example.org/ericard", "Gefahrgut"),
+                new Link("GESTIS", "https://example.org/gestis", "gefahrgut"),
+            },
+        });
+        var links = Links(Vm(provider));
+
+        links.AddCommand.Execute(null);
+
+        Assert.Equal(new[] { "Karten", "Gefahrgut" }, links.Rows[^1].GroupOptions);
+        Assert.Equal("Gefahrgut", links.Rows[2].Group);
+    }
+
+    [Fact]
     public void Settings_section_is_seeded_from_the_provider()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty with

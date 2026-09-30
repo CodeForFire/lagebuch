@@ -211,4 +211,148 @@ public class LinksViewModelTests
 
         Assert.Equal("https://example.org/karte", dialogs.LastOpenedUrl);
     }
+
+    // Issue #518: a long flat list was hard to scan, so links carry a self-defined group and the
+    // tab shows them as collapsible groups.
+    private static LinksViewModel Grouped() => new(
+        new[]
+        {
+            new Link("Wetterdienst", "https://dwd.de"),
+            new Link("ERICard", "https://example.org/ericard", "Gefahrgut"),
+            new Link("Kartendienst", "https://example.org/karte", "Karten"),
+            new Link("GESTIS", "https://example.org/gestis", "Gefahrgut"),
+        },
+        new FakeDialogs());
+
+    private static LinkGroupViewModel Group(LinksViewModel vm, string name) =>
+        vm.VisibleGroups.Single(g => g.Name == name);
+
+    [Fact]
+    public void Groups_follow_the_stammdaten_order_and_keep_their_links_in_it()
+    {
+        var vm = Grouped();
+
+        Assert.Equal(new[] { "Gefahrgut", "Karten", "Ohne Gruppe" }, vm.VisibleGroups.Select(g => g.Name));
+        Assert.Equal(new[] { "ERICard", "GESTIS" }, Group(vm, "Gefahrgut").Links.Select(l => l.Name));
+    }
+
+    [Fact]
+    public void Ungrouped_links_come_last_under_Ohne_Gruppe()
+    {
+        var vm = Grouped();
+
+        var last = vm.VisibleGroups[^1];
+        Assert.Equal("Ohne Gruppe", last.Name);
+        Assert.Equal("Wetterdienst", Assert.Single(last.Links).Name);
+    }
+
+    [Fact]
+    public void Groups_differing_only_in_case_are_one_group_named_as_first_seen()
+    {
+        var vm = new LinksViewModel(
+            new[] { new Link("A", "a.example", "Gefahrgut"), new Link("B", "b.example", "gefahrgut") },
+            new FakeDialogs());
+
+        var group = Assert.Single(vm.VisibleGroups);
+        Assert.Equal("Gefahrgut", group.Name);
+        Assert.Equal(2, group.Links.Count);
+    }
+
+    [Fact]
+    public void Without_any_group_no_headers_are_shown_and_every_link_is_in_one_open_group()
+    {
+        var vm = WithThreeLinks();
+
+        Assert.False(vm.ShowGroupHeaders);
+        var only = Assert.Single(vm.VisibleGroups);
+        Assert.True(only.IsExpanded);
+        Assert.Equal(3, only.Links.Count);
+    }
+
+    [Fact]
+    public void With_a_group_the_headers_are_shown()
+    {
+        Assert.True(Grouped().ShowGroupHeaders);
+    }
+
+    [Fact]
+    public void Every_group_starts_expanded()
+    {
+        Assert.All(Grouped().VisibleGroups, g => Assert.True(g.IsExpanded));
+    }
+
+    [Fact]
+    public void Toggle_collapses_and_expands_a_group()
+    {
+        var vm = Grouped();
+        var group = Group(vm, "Karten");
+
+        group.ToggleCommand.Execute(null);
+        Assert.False(group.IsExpanded);
+
+        group.ToggleCommand.Execute(null);
+        Assert.True(group.IsExpanded);
+    }
+
+    [Fact]
+    public void CollapseAll_and_ExpandAll_affect_every_group()
+    {
+        var vm = Grouped();
+
+        vm.CollapseAllCommand.Execute(null);
+        Assert.All(vm.VisibleGroups, g => Assert.False(g.IsExpanded));
+
+        vm.ExpandAllCommand.Execute(null);
+        Assert.All(vm.VisibleGroups, g => Assert.True(g.IsExpanded));
+    }
+
+    [Fact]
+    public void Searching_drops_groups_without_a_match()
+    {
+        var vm = Grouped();
+
+        vm.FilterText = "gestis";
+
+        var group = Assert.Single(vm.VisibleGroups);
+        Assert.Equal("Gefahrgut", group.Name);
+        Assert.Equal("GESTIS", Assert.Single(group.Links).Name);
+    }
+
+    [Fact]
+    public void Searching_for_a_group_name_shows_the_whole_group()
+    {
+        var vm = Grouped();
+
+        vm.FilterText = "gefahr";
+
+        Assert.Equal(new[] { "ERICard", "GESTIS" }, Assert.Single(vm.VisibleGroups).Links.Select(l => l.Name));
+    }
+
+    // A match hidden inside a collapsed group would read as "no hit" -- so a search opens every
+    // group it shows, and clearing it hands back exactly what the Lagebuchführer had collapsed.
+    [Fact]
+    public void A_search_opens_collapsed_groups_and_clearing_it_restores_what_was_collapsed()
+    {
+        var vm = Grouped();
+        Group(vm, "Gefahrgut").ToggleCommand.Execute(null);
+
+        vm.FilterText = "e";
+        Assert.All(vm.VisibleGroups, g => Assert.True(g.IsExpanded));
+
+        vm.ClearFilterCommand.Execute(null);
+        Assert.False(Group(vm, "Gefahrgut").IsExpanded);
+        Assert.True(Group(vm, "Karten").IsExpanded);
+    }
+
+    [Fact]
+    public void Collapsing_during_a_search_does_not_outlive_the_search()
+    {
+        var vm = Grouped();
+
+        vm.FilterText = "e";
+        vm.CollapseAllCommand.Execute(null);
+        vm.ClearFilterCommand.Execute(null);
+
+        Assert.All(vm.VisibleGroups, g => Assert.True(g.IsExpanded));
+    }
 }

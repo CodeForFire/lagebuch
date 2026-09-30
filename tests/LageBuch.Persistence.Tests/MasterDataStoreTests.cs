@@ -332,6 +332,41 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Save_round_trips_a_link_group_and_keeps_the_stammdaten_order()
+    {
+        var links = new[]
+        {
+            new Link("ERICard", "https://example.org/ericard", "Gefahrgut"),
+            new Link("Wetterdienst", "https://dwd.de"),
+            new Link("Kartendienst", "https://example.org/karte", "Karten"),
+        };
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Links = links });
+
+        Assert.Equal(links, MasterDataStore.GetOrCreate(_path).Links);
+    }
+
+    [Fact]
+    public void A_database_written_before_link_groups_widens_in_place_and_reads_its_links_as_ungrouped()
+    {
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_links (name TEXT NOT NULL, url TEXT NOT NULL);
+                INSERT INTO md_links (name, url) VALUES ('Wetterdienst', 'https://dwd.de');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var set = MasterDataStore.GetOrCreate(_path);
+
+        Assert.Equal(new Link("Wetterdienst", "https://dwd.de", string.Empty), Assert.Single(set.Links));
+    }
+
+    [Fact]
     public void Save_round_trips_a_checklist_reorder_and_delete()
     {
         MasterDataStore.Save(_path, MasterDataSet.Empty with

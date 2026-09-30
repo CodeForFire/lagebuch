@@ -1,5 +1,7 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -69,7 +71,7 @@ public class LinksTabRenderTests
 
         WorkspaceRenderHelper.SelectTab(window, "LINKS");
 
-        Assert.Equal(2, vm.Links.Links.Count);
+        Assert.Equal(4, vm.Links.Links.Count);
         Assert.Contains(vm.Links.Links, l => l.Name == "Wetterdienst" && l.Url == "https://dwd.de");
         Capture(window, "links-after.png");
     }
@@ -95,6 +97,15 @@ public class LinksTabRenderTests
         where T : Control =>
         root.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
 
+    // Rows the Lagebuchführer can actually see: since #518 LinksList holds groups, and a collapsed
+    // group's rows still exist in the tree, so count the effectively visible ÖFFNEN buttons.
+    private static List<Button> RenderedOpenButtons(Visual root) =>
+        root.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Name == "OpenLinkButton" && b.IsEffectivelyVisible)
+            .ToList();
+
+    private static int RenderedLinkCount(Visual root) => RenderedOpenButtons(root).Count;
+
     private static (Window Window, IncidentWorkspaceViewModel Vm) ShowLinksTab()
     {
         var (window, vm) = ShowWorkspace();
@@ -106,12 +117,12 @@ public class LinksTabRenderTests
     public void Typing_a_search_term_narrows_the_rendered_link_list()
     {
         var (window, vm) = ShowLinksTab();
-        Assert.Equal(2, Named<ItemsControl>(window, "LinksList").ItemCount);
+        Assert.Equal(4, RenderedLinkCount(window));
 
         vm.Links.FilterText = "wetter";
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(1, Named<ItemsControl>(window, "LinksList").ItemCount);
+        Assert.Equal(1, RenderedLinkCount(window));
         Assert.True(Named<Button>(window, "ClearLinkSearchButton").IsVisible);
         Capture(window, "links-filtered.png");
     }
@@ -140,7 +151,7 @@ public class LinksTabRenderTests
         vm.Links.ClearFilterCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(2, Named<ItemsControl>(window, "LinksList").ItemCount);
+        Assert.Equal(4, RenderedLinkCount(window));
         Assert.False(Named<Button>(window, "ClearLinkSearchButton").IsVisible);
     }
 
@@ -180,14 +191,14 @@ public class LinksTabRenderTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("wetter", vm.Links.FilterText);
-        Assert.Equal(1, Named<ItemsControl>(window, "LinksList").ItemCount);
+        Assert.Equal(1, RenderedLinkCount(window));
 
         window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(string.Empty, vm.Links.FilterText);
         Assert.Equal(string.Empty, box.Text);
-        Assert.Equal(2, Named<ItemsControl>(window, "LinksList").ItemCount);
+        Assert.Equal(4, RenderedLinkCount(window));
     }
 
     /// <summary>
@@ -219,11 +230,114 @@ public class LinksTabRenderTests
     {
         var (window, _) = ShowLinksTab();
 
-        var open = Named<ItemsControl>(window, "LinksList")
-            .GetVisualDescendants().OfType<Button>().First();
+        var open = RenderedOpenButtons(window)[0];
 
         var tip = Assert.IsType<string>(ToolTip.GetTip(open));
         Assert.Contains("Browser", tip, StringComparison.Ordinal);
         Assert.NotEmpty(open.GetVisualDescendants().OfType<PathIcon>());
+    }
+
+    // --- Issue #518: groups, ÖFFNEN beside the name, banding ---
+    private static List<Button> GroupHeaders(Visual root) =>
+        root.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Name == "LinkGroupHeader" && b.IsEffectivelyVisible)
+            .ToList();
+
+    private static Window ShowLinksView(params Link[] links)
+    {
+        var view = new LinksView { DataContext = new LinksViewModel(links, new FakeDialogs()) };
+        var window = new Window { Content = view, Width = 1280, Height = 720 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return window;
+    }
+
+    [AvaloniaFact]
+    public void The_open_button_sits_left_of_the_link_name()
+    {
+        var (window, _) = ShowLinksTab();
+
+        var open = RenderedOpenButtons(window)[0];
+        var name = ((Visual)open.Parent!).GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "LinkNameText");
+        var openRight = open.TranslatePoint(new Point(open.Bounds.Width, 0), window)!.Value.X;
+        var nameLeft = name.TranslatePoint(new Point(0, 0), window)!.Value.X;
+
+        Assert.True(openRight <= nameLeft, $"ÖFFNEN ends at {openRight}px, right of the name starting at {nameLeft}px");
+    }
+
+    [AvaloniaFact]
+    public void Each_group_gets_a_header_in_stammdaten_order_with_the_ungrouped_last()
+    {
+        var (window, _) = ShowLinksTab();
+
+        var names = GroupHeaders(window)
+            .Select(h => h.GetVisualDescendants().OfType<TextBlock>().First().Text)
+            .ToList();
+
+        Assert.Equal(new[] { "Gefahrgut", "Karten", "Ohne Gruppe" }, names);
+        Assert.All(GroupHeaders(window), h => Assert.False(string.IsNullOrEmpty(AutomationProperties.GetName(h))));
+        Capture(window, "links-grouped.png");
+    }
+
+    [AvaloniaFact]
+    public void Clicking_a_group_header_hides_and_shows_its_links()
+    {
+        var (window, _) = ShowLinksTab();
+        var header = GroupHeaders(window)[0];
+
+        header.Command!.Execute(header.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2, RenderedLinkCount(window));
+        Capture(window, "links-group-collapsed.png");
+
+        header.Command.Execute(header.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(4, RenderedLinkCount(window));
+    }
+
+    [AvaloniaFact]
+    public void Collapse_all_and_expand_all_fold_every_group()
+    {
+        var (window, _) = ShowLinksTab();
+        var collapse = Named<Button>(window, "CollapseAllLinkGroupsButton");
+        var expand = Named<Button>(window, "ExpandAllLinkGroupsButton");
+        Assert.True(collapse.IsEffectivelyVisible);
+        Assert.Equal("Alle Gruppen zuklappen", AutomationProperties.GetName(collapse));
+        Assert.Equal("Alle Gruppen aufklappen", AutomationProperties.GetName(expand));
+
+        collapse.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, RenderedLinkCount(window));
+        Assert.Equal(3, GroupHeaders(window).Count);
+
+        expand.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(4, RenderedLinkCount(window));
+    }
+
+    // A Wehr that never uses groups keeps exactly the flat list it had: no header, nothing to fold.
+    [AvaloniaFact]
+    public void Without_any_group_the_list_shows_no_headers_and_no_fold_buttons()
+    {
+        var window = ShowLinksView(new Link("Wetterdienst", "https://dwd.de"), new Link("Kartendienst", "https://example.org/karte"));
+
+        Assert.Empty(GroupHeaders(window));
+        Assert.False(Named<Button>(window, "CollapseAllLinkGroupsButton").IsEffectivelyVisible);
+        Assert.Equal(2, RenderedLinkCount(window));
+    }
+
+    [AvaloniaFact]
+    public void Every_other_row_is_tinted()
+    {
+        var window = ShowLinksView(
+            new Link("A", "a.example"), new Link("B", "b.example"), new Link("C", "c.example"));
+
+        var rows = RenderedOpenButtons(window)
+            .Select(b => b.FindAncestorOfType<ContentPresenter>()!)
+            .ToList();
+
+        Assert.Null(rows[0].Background);
+        Assert.NotNull(rows[1].Background);
+        Assert.Null(rows[2].Background);
     }
 }
