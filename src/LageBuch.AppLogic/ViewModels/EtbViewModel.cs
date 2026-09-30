@@ -29,6 +29,11 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
     // every row's create-task icon too.
     private readonly Action<string>? _createTaskFromEntry;
 
+    // #415: an entry addressed to the Leitstelle is usually the Rückmeldung itself, so adding one
+    // offers to restart the reminder. Not automatic: not every message to the Leitstelle is one.
+    private readonly Action? _offerReminderReset;
+    private readonly string _dispatchCentreName;
+
     // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
     // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
     private readonly List<EtbEntryRow> _all = new();
@@ -42,7 +47,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
         IClock clock,
         MasterDataSet masterData,
         Action onChanged,
-        Action<string>? createTaskFromEntry = null)
+        Action<string>? createTaskFromEntry = null,
+        Action? offerReminderReset = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
@@ -50,6 +56,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
         _clock = clock;
         _onChanged = onChanged;
         _createTaskFromEntry = createTaskFromEntry;
+        _offerReminderReset = offerReminderReset;
+        _dispatchCentreName = masterData.Settings.DispatchCentreName;
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
         Entries = new ObservableCollection<EtbEntryRow>();
@@ -217,8 +225,10 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
         }
 
         _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo); // Changed → Sync() renders it
+        var toDispatchCentre = IsToDispatchCentre(NewTo);
         ClearNewEntry();
         _onChanged();
+        OfferReminderResetIf(toDispatchCentre);
     }
 
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
@@ -231,9 +241,23 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
 
         _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo);
         var text = NewText;
+        var toDispatchCentre = IsToDispatchCentre(NewTo);
         ClearNewEntry();
         _onChanged();
+        OfferReminderResetIf(toDispatchCentre);
         _createTaskFromEntry?.Invoke(text);
+    }
+
+    // An "An" field is free text: match the configured name exactly, ignoring case and padding.
+    private bool IsToDispatchCentre(string? to) =>
+        string.Equals(to?.Trim(), _dispatchCentreName, StringComparison.OrdinalIgnoreCase);
+
+    private void OfferReminderResetIf(bool toDispatchCentre)
+    {
+        if (toDispatchCentre)
+        {
+            _offerReminderReset?.Invoke();
+        }
     }
 
     private void ClearNewEntry()

@@ -453,6 +453,21 @@ public class MasterDataEditorViewModelTests
     }
 
     [Fact]
+    public void Editing_the_dispatch_centre_name_marks_dirty_and_Save_persists_it()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty);
+        var vm = Vm(provider);
+        var settings = Settings(vm);
+        Assert.Equal("ILS", settings.DispatchCentreName);
+
+        settings.DispatchCentreName = "Kreisleitstelle";
+        Assert.True(vm.IsDirty);
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Kreisleitstelle", provider.Get().Settings.DispatchCentreName);
+    }
+
+    [Fact]
     public void Unticking_own_marks_dirty_and_Save_persists_the_foreign_flag()
     {
         var provider = new InMemoryProvider(MasterDataSet.Empty with

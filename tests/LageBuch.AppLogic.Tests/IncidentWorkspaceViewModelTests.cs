@@ -1584,6 +1584,71 @@ public class IncidentWorkspaceViewModelTests
         Assert.True(raised > 0);
     }
 
+    // --- #415: an ETB entry to the Leitstelle offers the Rückmelde reset -------------------------
+    private static (IncidentWorkspaceViewModel Vm, FixedClock Clock) DueReminderWorkspace()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session, clock, ticker, Md(), new FakeDialogs(), new FakeAlarmService(), new NoopIncidentHostController());
+        clock.Now = T0.AddMinutes(16);
+        ticker.Fire();
+        return (vm, clock);
+    }
+
+    [Fact]
+    public void Confirming_the_offer_after_an_etb_entry_to_the_ils_resets_the_reminder_without_a_second_entry()
+    {
+        var (vm, _) = DueReminderWorkspace();
+        var reminder = Assert.IsType<ReminderViewModel>(vm.Reminder);
+        Assert.True(reminder.IsDue);
+
+        vm.Etb.NewText = "Lagemeldung: Feuer aus";
+        vm.Etb.NewTo = "ILS";
+        vm.Etb.AddEntryCommand.Execute(null);
+
+        var confirm = Assert.IsType<ConfirmDialogViewModel>(vm.PendingConfirm);
+        confirm.ConfirmCommand.Execute(null);
+
+        Assert.False(reminder.IsDue);
+        Assert.Null(vm.PendingConfirm);
+        Assert.DoesNotContain(vm.Etb.Entries, e => e.Text.StartsWith("Rückmeldung an", StringComparison.Ordinal));
+        Assert.Single(vm.Etb.Entries, e => e.Text == "Lagemeldung: Feuer aus");
+    }
+
+    [Fact]
+    public void Cancelling_the_offer_leaves_the_reminder_due()
+    {
+        var (vm, _) = DueReminderWorkspace();
+
+        vm.Etb.NewText = "Nachforderung RTW";
+        vm.Etb.NewTo = "ILS";
+        vm.Etb.AddEntryCommand.Execute(null);
+        Assert.IsType<ConfirmDialogViewModel>(vm.PendingConfirm).CancelCommand.Execute(null);
+
+        Assert.True(Assert.IsType<ReminderViewModel>(vm.Reminder).IsDue);
+        Assert.Null(vm.PendingConfirm);
+    }
+
+    [Fact]
+    public void An_etb_entry_to_someone_else_asks_nothing()
+    {
+        var (vm, _) = DueReminderWorkspace();
+
+        vm.Etb.NewText = "Lagemeldung";
+        vm.Etb.NewTo = "EL";
+        vm.Etb.AddEntryCommand.Execute(null);
+
+        Assert.Null(vm.PendingConfirm);
+    }
+
     [Fact]
     public void Countdown_strip_stays_off_in_a_read_only_workspace()
     {

@@ -483,13 +483,17 @@
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                   <PathIcon Classes="meldung-icon"
                             Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
-                  <TextBlock Classes="meldung-label" Text="ILS" />
+                  <!-- The configured Leitstelle (#400): capped, so a long name cannot widen every
+                       tile in the shared MeldungTile column. -->
+                  <TextBlock x:Name="ReminderDueLabel" Classes="meldung-label" MaxWidth="150"
+                             TextTrimming="CharacterEllipsis" Text="{Binding DispatchCentreLabel}" />
                 </StackPanel>
               </Border>
-              <TextBlock Grid.Column="1" Classes="meldung-text" Text="ILS-Rückmeldung fällig" />
+              <TextBlock Grid.Column="1" Classes="meldung-text"
+                         Text="{Binding DispatchCentreName, StringFormat='Rückmeldung an {0} fällig'}" />
               <StackPanel Grid.Column="2" Classes="meldung-actions">
                 <Button x:Name="ReminderSnoozeButton" Content="+5 MIN"
-                        ToolTip.Tip="Noch nichts zu melden — in 5 Minuten erneut fällig, ohne Rückmeldung an ILS zu protokollieren"
+                        ToolTip.Tip="{Binding DispatchCentreName, StringFormat='Noch nichts zu melden — in 5 Minuten erneut fällig, ohne Rückmeldung an {0} zu protokollieren'}"
                         Command="{Binding SnoozeFiveMinutesCommand}" />
                 <Button x:Name="ReminderAckButton" Content="ERLEDIGT" Command="{Binding AcknowledgeCommand}" />
               </StackPanel>
@@ -530,8 +534,10 @@
                             DataContext="{Binding Reminder}">
                   <PathIcon Classes="meldung-icon"
                             Data="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
-                  <TextBlock Classes="meldung-readout-label" Text="RÜCKMELDUNG AN ILS" />
-                  <TextBlock Classes="meldung-readout-short" Text="ILS" />
+                  <TextBlock Classes="meldung-readout-label" MaxWidth="360" TextTrimming="CharacterEllipsis"
+                             Text="{Binding DispatchCentreLabel, StringFormat='RÜCKMELDUNG AN {0}'}" />
+                  <TextBlock Classes="meldung-readout-short" MaxWidth="120" TextTrimming="CharacterEllipsis"
+                             Text="{Binding DispatchCentreLabel}" />
                   <TextBlock x:Name="ReminderCountdownText" Classes="meldung-readout-value"
                              Text="{Binding RemainingDisplay}" />
                 </StackPanel>

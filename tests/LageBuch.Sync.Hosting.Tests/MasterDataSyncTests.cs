@@ -53,6 +53,23 @@ public class MasterDataSyncTests
         Assert.Equal(60, set.Settings.ReturnPressureBar);
     }
 
+    // #400: a joined client labels its Rückmeldung header with the host's Leitstelle, not "ILS".
+    [Fact]
+    public async Task Host_serves_its_dispatch_centre_name()
+    {
+        var clock = new FixedClock();
+        var hostSet = SetWith("Löschzug Fürstenfeldbruck", 60);
+        hostSet = hostSet with { Settings = hostSet.Settings with { DispatchCentreName = "Kreisleitstelle" } };
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
+        await using var _ = host;
+
+        using var http = Client(port, TestHost.DefaultPin);
+        var set = MasterDataJson.Parse(
+            await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
+
+        Assert.Equal("Kreisleitstelle", set.Settings.DispatchCentreName);
+    }
+
     [Fact]
     public async Task Host_serves_the_own_flag_of_vehicles_and_personnel()
     {

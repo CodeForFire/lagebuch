@@ -2,6 +2,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Time;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -90,6 +91,65 @@ public class ReminderViewModelTests
         Assert.Equal("Müller (FFB 12/1)", entry.EnteredBy);
         Assert.False(vm.IsDue);                 // re-anchored to now
         Assert.Equal(1, changes);               // save triggered once
+    }
+
+    // Not every Leitstelle is an ILS (#400): the ETB entry names the one this install reports to.
+    [Fact]
+    public void Acknowledge_logs_the_configured_dispatch_centre_name()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30, dispatchCentreName: "Kreisleitstelle");
+        clock.Now = T0.AddMinutes(16);
+        ticker.Fire();
+
+        vm.AcknowledgeCommand.Execute(null);
+
+        var entry = Assert.Single(session.Incident.Journal, e => e.Text == "Rückmeldung an Kreisleitstelle");
+        Assert.Equal("Kreisleitstelle", entry.To);
+        Assert.Equal("Kreisleitstelle", vm.DispatchCentreName);
+        Assert.Equal("KREISLEITSTELLE", vm.DispatchCentreLabel);
+    }
+
+    // The Lagebuchführer has just typed the Rückmeldung into the ETB (#415): resetting from there
+    // must not write it a second time.
+    [Fact]
+    public void Acknowledge_without_entry_resets_the_cycle_and_writes_nothing_to_the_etb()
+    {
+        var (session, clock) = NewSession();
+        var changes = 0;
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = new ReminderViewModel(session, clock, ticker, alarm, () => changes++, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        clock.Now = T0.AddMinutes(16);
+        ticker.Fire();
+        var journalBefore = session.Incident.Journal.Count;
+
+        vm.AcknowledgeWithoutEntry();
+
+        Assert.Equal(journalBefore, session.Incident.Journal.Count);
+        Assert.False(vm.IsDue);
+        Assert.Equal("30:00", vm.RemainingDisplay); // on the recurring cadence, as ERLEDIGT would
+        var timer = Assert.IsType<IncidentTimerState>(session.Incident.FindTimer("ils-reminder"));
+        Assert.Equal(T0.AddMinutes(16), timer.CycleAnchor);
+        Assert.Equal(1, changes);
+
+        clock.Now = T0.AddMinutes(16).AddSeconds(90);
+        ticker.Fire();
+        Assert.Single(alarm.Played); // the repeat cue stops with the reset
+    }
+
+    // A Lagemeldung made before the countdown ran out still counts as the Rückmeldung.
+    [Fact]
+    public void Acknowledge_without_entry_also_resets_a_cycle_that_is_not_yet_due()
+    {
+        var (session, clock) = NewSession();
+        var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        clock.Now = T0.AddMinutes(10);
+
+        vm.AcknowledgeWithoutEntry();
+
+        Assert.Equal("30:00", vm.RemainingDisplay);
     }
 
     [Fact]

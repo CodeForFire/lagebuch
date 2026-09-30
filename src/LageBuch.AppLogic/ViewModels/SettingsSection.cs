@@ -4,10 +4,10 @@ using LageBuch.Persistence.MasterData;
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// Editor for the operational defaults (<see cref="IncidentSettings"/>): the ILS reminder
-/// intervals and the Rückzugsdruck. Unlike the list sections these are scalar numbers, so the
-/// section exposes one bindable property each and reports any change through the shared dirty
-/// callback. The Einsatzzeiten used to sit here too, one per hard-coded Trupp-Typ name; they are
+/// Editor for the operational defaults (<see cref="IncidentSettings"/>): the Leitstelle and the
+/// intervals of the Rückmeldung reminder, and the Rückzugsdruck. Unlike the list sections these are
+/// scalars, so the section exposes one bindable property each and reports any change through the
+/// shared dirty callback. The Einsatzzeiten used to sit here too, one per hard-coded Trupp-Typ name; they are
 /// edited on the Trupp-Typen themselves now (#398).
 /// </summary>
 public sealed partial class SettingsSection : EditorSection
@@ -22,6 +22,7 @@ public sealed partial class SettingsSection : EditorSection
         _ilsReminderIntervalMinutes = settings.IlsReminderIntervalMinutes;
         _ilsReminderFollowUpIntervalMinutes = settings.IlsReminderFollowUpIntervalMinutes;
         _returnPressureBar = settings.ReturnPressureBar;
+        _dispatchCentreName = settings.DispatchCentreName;
     }
 
     [ObservableProperty]
@@ -33,14 +34,21 @@ public sealed partial class SettingsSection : EditorSection
     [ObservableProperty]
     private int _returnPressureBar;
 
+    /// <summary>The Leitstelle the Rückmeldung goes to, "ILS" unless configured (#400).</summary>
+    [ObservableProperty]
+    private string _dispatchCentreName;
+
     partial void OnIlsReminderIntervalMinutesChanged(int value) => _onChanged();
 
     partial void OnIlsReminderFollowUpIntervalMinutesChanged(int value) => _onChanged();
 
     partial void OnReturnPressureBarChanged(int value) => _onChanged();
 
+    partial void OnDispatchCentreNameChanged(string value) => _onChanged();
+
     public IncidentSettings ToSettings() => new(
         IlsReminderIntervalMinutes,
         IlsReminderFollowUpIntervalMinutes,
-        ReturnPressureBar);
+        ReturnPressureBar,
+        DispatchCentreName);
 }

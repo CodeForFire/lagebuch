@@ -489,6 +489,43 @@ public class MasterDataJsonTests
         Assert.Equal(original.TruppTypes, Parse(MasterDataJson.Serialize(original)).TruppTypes);
     }
 
+    // #400: the Leitstelle's name is local vocabulary, like every other Stammdaten list.
+    [Fact]
+    public void Parse_reads_the_dispatch_centre_name()
+    {
+        var set = Parse("""{ "settings": { "dispatchCentreName": "  Kreisleitstelle " } }""");
+
+        Assert.Equal("Kreisleitstelle", set.Settings.DispatchCentreName);
+        Assert.Equal(IncidentSettings.Defaults.IlsReminderIntervalMinutes, set.Settings.IlsReminderIntervalMinutes);
+    }
+
+    [Theory]
+    [InlineData("""{ "settings": { } }""")]
+    [InlineData("""{ "settings": { "dispatchCentreName": "   " } }""")]
+    [InlineData("""{ "settings": { "dispatchCentreName": 42 } }""")]
+    [InlineData("""{ "settings": { "dispatchCentreName": null } }""")]
+    public void Parse_falls_back_to_ils_for_a_missing_or_unusable_dispatch_centre_name(string json)
+        => Assert.Equal("ILS", Parse(json).Settings.DispatchCentreName);
+
+    // An import is hostile input: a name that would swamp the header row is cut to the cap.
+    [Fact]
+    public void Parse_caps_an_oversized_dispatch_centre_name()
+    {
+        var huge = new string('X', 100_000);
+
+        var name = Parse($$"""{ "settings": { "dispatchCentreName": "{{huge}}" } }""").Settings.DispatchCentreName;
+
+        Assert.Equal(IncidentSettings.MaxDispatchCentreNameLength, name.Length);
+    }
+
+    [Fact]
+    public void Serialize_round_trips_the_dispatch_centre_name()
+    {
+        var original = MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 55, "Rettungsleitstelle") };
+
+        Assert.Equal("Rettungsleitstelle", Parse(MasterDataJson.Serialize(original)).Settings.DispatchCentreName);
+    }
+
     [Fact]
     public void Serialize_round_trips_settings()
     {

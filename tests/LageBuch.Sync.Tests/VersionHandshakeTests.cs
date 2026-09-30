@@ -58,7 +58,16 @@ public class VersionHandshakeTests
         // #518: the Stammdaten payload carries a group on each link. A peer at 4 skips the key and
         // shows its links ungrouped, and a payload without it reads as ungrouped -- so 5 and 4 still
         // connect in either direction.
-        Assert.Equal(5, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 5, int.MaxValue);
+        Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
+    }
+
+    [Fact]
+    public void The_dispatch_centre_name_raises_the_protocol_but_not_the_floor()
+    {
+        // 6 adds settings.dispatchCentreName to the Stammdaten payload (#400). A peer at 4 or 5 skips
+        // the key and falls back to "ILS", so it stays joinable.
+        Assert.Equal(6, SyncProtocol.ProtocolVersion);
         Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
     }
 }

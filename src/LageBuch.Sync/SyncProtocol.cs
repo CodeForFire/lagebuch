@@ -41,8 +41,12 @@ public static class SyncProtocol
     /// shows the links ungrouped, and a payload without it reads as ungrouped, so the floor stays
     /// at 4.
     /// </para>
+    /// <para>
+    /// 6: the Stammdaten payload's <c>settings</c> carry <c>dispatchCentreName</c> (#400). A peer at
+    /// 4 or 5 skips the key, and a payload without it reads as "ILS", so the floor stays at 4.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 5;
+    public const int ProtocolVersion = 6;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

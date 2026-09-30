@@ -454,6 +454,36 @@ public class MasterDataStoreTests : IDisposable
     }
 
     [Fact]
+    public void Save_then_GetOrCreate_round_trips_the_dispatch_centre_name()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 55, "Kreisleitstelle") });
+
+        var settings = MasterDataStore.GetOrCreate(_path).Settings;
+        Assert.Equal("Kreisleitstelle", settings.DispatchCentreName);
+        Assert.Equal(12, settings.IlsReminderIntervalMinutes);
+    }
+
+    // A masterdata.db written before #400 has no text-settings table at all.
+    [Fact]
+    public void A_store_without_the_text_settings_table_reads_ils()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 55, "Kreisleitstelle") });
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "DROP TABLE md_text_settings;";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var settings = MasterDataStore.GetOrCreate(_path).Settings;
+        Assert.Equal("ILS", settings.DispatchCentreName);
+        Assert.Equal(12, settings.IlsReminderIntervalMinutes);
+    }
+
+    [Fact]
     public void A_missing_setting_key_falls_back_to_its_default()
     {
         MasterDataStore.Save(_path, MasterDataSet.Empty with { Settings = new IncidentSettings(12, 33, 55) });

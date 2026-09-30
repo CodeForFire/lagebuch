@@ -1,0 +1,1 @@
+An ETB entry addressed to the Leitstelle now offers to restart the Rückmelde timer without writing the Rückmeldung a second time (#415), and the Leitstelle's name — "ILS" by default — is configurable in the Stammdaten settings and used throughout the Rückmeldung header, while the spoken reminder now says „Rückmeldung an die Leitstelle" (#400).

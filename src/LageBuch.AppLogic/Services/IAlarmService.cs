@@ -6,7 +6,7 @@ namespace LageBuch.AppLogic.Services;
 /// </summary>
 public enum AlarmSound
 {
-    /// <summary>"Rückmeldung an ILS fällig" — the ILS report-back reminder has come due.</summary>
+    /// <summary>"Rückmeldung an die Leitstelle" — the report-back reminder has come due.</summary>
     IlsReminderDue,
 
     /// <summary>"Aufgabe fällig" — a task's timer expired while still open (#88).</summary>
