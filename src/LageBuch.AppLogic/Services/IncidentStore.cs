@@ -11,7 +11,9 @@ namespace LageBuch.AppLogic.Services;
 /// <see cref="Save"/> never blocks its caller on SQLite I/O — see issue #167 P0 #1. <see cref="Save"/>
 /// captures a cheap, independent snapshot of the aggregate on the calling thread, then hands the
 /// actual write to the worker; writes land in the order <see cref="Save"/> was called, since one
-/// thread drains one FIFO queue.
+/// thread drains one FIFO queue. A queued write whose path has since been saved again is dropped:
+/// every save carries the whole aggregate, so only the newest snapshot of a path is worth writing
+/// once the writer falls behind a burst of edits (issue #290).
 /// </summary>
 [SuppressMessage(
     "Design",
@@ -22,6 +24,7 @@ public sealed class IncidentStore : IIncidentStore
     private readonly IncidentFileStore _fileStore = new IncidentFileStore();
     private readonly Action<string, Incident> _write;
     private readonly BlockingCollection<Action> _writeQueue = new();
+    private readonly ConcurrentDictionary<string, IncidentSnapshot> _latest = new(StringComparer.Ordinal);
 
     public IncidentStore()
         : this(IncidentRepository.Save)
@@ -46,9 +49,18 @@ public sealed class IncidentStore : IIncidentStore
         Justification = "A failed write must reach SaveFailed, not crash the background writer thread or its caller.")]
     public void Save(string path, Incident incident)
     {
-        var snapshot = SnapshotMapper.ToSnapshot(incident);
+        // Publish before enqueueing: the work item below, or an earlier one for the same path that
+        // runs first, is then guaranteed to find this snapshot or a newer one. A work item that
+        // finds nothing was beaten to it and has nothing left to write. That also keeps FlushAsync
+        // honest -- its marker queues behind the work item of every snapshot saved before it.
+        _latest[path] = SnapshotMapper.ToSnapshot(incident);
         _writeQueue.Add(() =>
         {
+            if (!_latest.TryRemove(path, out var snapshot))
+            {
+                return;
+            }
+
             try
             {
                 _write(path, SnapshotMapper.FromSnapshot(snapshot));

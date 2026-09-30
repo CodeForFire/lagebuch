@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using LageBuch.Domain;
@@ -10,12 +11,48 @@ public sealed class IncidentRepository
 {
     private const string Iso = "O";
 
+    // Files this process has already brought up to the current schema, by full path. Save runs on
+    // every mutation, and Migrate reconciles the whole schema each time it runs (see SchemaGuard) --
+    // work that cannot find anything new on a file this process migrated a moment ago. The shortcut
+    // trusts the file for the rest of the process; Load always migrates, and a save that fails
+    // without migrating forgets the path and retries with it (issue #290).
+    private static readonly ConcurrentDictionary<string, byte> MigratedPaths = new(StringComparer.Ordinal);
+
     public static void Save(string path, Incident incident)
     {
+        ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(incident);
+        var fullPath = Path.GetFullPath(path);
+        if (File.Exists(fullPath) && MigratedPaths.ContainsKey(fullPath))
+        {
+            try
+            {
+                Write(path, incident, migrate: false);
+                return;
+            }
+            catch (SqliteException)
+            {
+                // Not swallowed: the file changed behind this process's back -- deleted, or
+                // rewritten by another build -- so catch up on the skipped migration and write
+                // again below. A failure there propagates to the caller.
+                MigratedPaths.TryRemove(fullPath, out _);
+            }
+        }
+
+        Write(path, incident, migrate: true);
+        MigratedPaths[fullPath] = 0;
+    }
+
+    private static void Write(string path, Incident incident, bool migrate)
+    {
         using var cn = SqliteConnectionFactory.OpenReadWrite(path);
-        Migrations.Migrate(cn);
+        if (migrate)
+        {
+            Migrations.Migrate(cn);
+        }
+
         using var tx = cn.BeginTransaction();
+        using var inserts = new InsertCommands(cn, tx);
 
         foreach (var table in new[]
                  {
@@ -30,8 +67,7 @@ public sealed class IncidentRepository
         }
 
         Run(
-            cn,
-            tx,
+            inserts,
             "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy);",
             p =>
             {
@@ -53,15 +89,14 @@ public sealed class IncidentRepository
 
         for (var i = 0; i < incident.Checklists.Count; i++)
         {
-            WriteChecklist(cn, tx, incident.Checklists[i], ordinal: i);
+            WriteChecklist(inserts, incident.Checklists[i], ordinal: i);
         }
 
         for (var i = 0; i < incident.Journal.Count; i++)
         {
             var e = incident.Journal[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO etb_entries (id, ordinal, timestamp, direction, from_party, to_party, text, entered_by) VALUES ($id,$o,$ts,$dir,$from,$to,$txt,$by);",
                 p =>
                 {
@@ -79,8 +114,7 @@ public sealed class IncidentRepository
             {
                 var edit = e.Edits[j];
                 Run(
-                    cn,
-                    tx,
+                    inserts,
                     "INSERT INTO etb_entry_edits (id, entry_id, ordinal, previous_text, edited_by, edited_at) VALUES ($id,$eid,$o,$txt,$by,$at);",
                     p =>
                     {
@@ -98,8 +132,7 @@ public sealed class IncidentRepository
         {
             var r = incident.Roles[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph);",
                 p =>
                 {
@@ -119,8 +152,7 @@ public sealed class IncidentRepository
         {
             var f = incident.Forces[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO force_units (id, ordinal, brigade, call_sign, personnel_count, scba_count, status, notes, officer_count, zugfuehrer_count) VALUES ($id,$o,$b,$cs,$pc,$ac,$st,$n,$oc,$zc);",
                 p =>
                 {
@@ -140,8 +172,7 @@ public sealed class IncidentRepository
             {
                 var edit = f.Edits[j];
                 Run(
-                    cn,
-                    tx,
+                    inserts,
                     "INSERT INTO force_unit_edits (id, unit_id, ordinal, previous_officer_count, previous_personnel_count, previous_scba_count, edited_by, edited_at, previous_zugfuehrer_count) " + "VALUES ($id,$uid,$o,$poc,$ppc,$psc,$by,$at,$pzc);",
                     p =>
                     {
@@ -162,8 +193,7 @@ public sealed class IncidentRepository
         {
             var t = incident.ScbaTrupps[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO scba_trupps (id, ordinal, trupp_number, designation, call_sign, task, registered_at, start_time, entry_pressure, withdraw_time, max_duration_minutes, return_pressure_bar, pressure_control_interval_minutes, exit_time, safety_trupp_id) " + "VALUES ($id,$o,$num,$des,$cs,$task,$reg,$start,$ep,$wd,$max,$ret,$interval,$exit,$safety);",
                 p =>
                 {
@@ -188,8 +218,7 @@ public sealed class IncidentRepository
             {
                 var member = t.Members[j];
                 Run(
-                    cn,
-                    tx,
+                    inserts,
                     "INSERT INTO scba_trupp_members (trupp_id, ordinal, role, name) VALUES ($tid,$o,$role,$name);",
                     p =>
                     {
@@ -204,8 +233,7 @@ public sealed class IncidentRepository
             {
                 var reading = t.PressureReadings[j];
                 Run(
-                    cn,
-                    tx,
+                    inserts,
                     "INSERT INTO scba_pressure_readings (id, trupp_id, ordinal, reading_time, bar) VALUES ($id,$tid,$o,$time,$bar);",
                     p =>
                     {
@@ -222,8 +250,7 @@ public sealed class IncidentRepository
         {
             var a = incident.Audit[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO audit_events (ordinal, at, action, by_operator) VALUES ($o,$at,$act,$by);",
                 p =>
                 {
@@ -237,8 +264,7 @@ public sealed class IncidentRepository
         foreach (var t in incident.Timers)
         {
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO incident_timers (key, cycle_anchor, interval_minutes, recurring_interval_minutes, is_running) VALUES ($k,$a,$i,$r,$run);",
                 p =>
                 {
@@ -254,8 +280,7 @@ public sealed class IncidentRepository
         {
             var f = incident.Files[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by, display_name) VALUES ($id,$o,$fn,$ct,$sz,$at,$by,$dn);",
                 p =>
                 {
@@ -277,8 +302,7 @@ public sealed class IncidentRepository
             var apartmentLabelsJson = System.Text.Json.JsonSerializer.Serialize(b.ApartmentLabels);
             var apartmentCountsJson = System.Text.Json.JsonSerializer.Serialize(b.ApartmentCounts);
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO co_buildings (id, name, floor_count, apartments_per_floor, floor_descriptions, ordinal, apartment_labels, underground_floor_count, apartment_counts) VALUES ($id,$name,$fc,$apf,$fd,$o,$al,$ufc,$ac);",
                 p =>
                 {
@@ -298,8 +322,7 @@ public sealed class IncidentRepository
         {
             var d = incident.Dwellings[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO co_dwellings (id, building_id, floor_ordinal, apartment_number, resident_name, status, key_available, co_value) VALUES ($id,$bid,$fo,$an,$rn,$st,$kv,$cv);",
                 p =>
                 {
@@ -317,8 +340,7 @@ public sealed class IncidentRepository
             {
                 var reading = d.Readings[j];
                 Run(
-                    cn,
-                    tx,
+                    inserts,
                     "INSERT INTO co_readings (id, dwelling_id, ordinal, measured_at, value, recorded_by) " + "VALUES ($id,$did,$o,$at,$v,$by);",
                     p =>
                     {
@@ -336,8 +358,7 @@ public sealed class IncidentRepository
         {
             var t = incident.Tasks[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO incident_tasks (id, ordinal, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by) " + "VALUES ($id,$o,$txt,$asg,$imp,$urg,$by,$cat,$due,$coat,$coby);",
                 p =>
                 {
@@ -359,8 +380,7 @@ public sealed class IncidentRepository
         {
             var party = incident.InvolvedParties[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO involved_parties (id, ordinal, name, phone, notes, created_by, created_at) " + "VALUES ($id,$o,$name,$phone,$notes,$by,$cat);",
                 p =>
                 {
@@ -377,12 +397,10 @@ public sealed class IncidentRepository
         tx.Commit();
     }
 
-    private static void WriteChecklist(
-        SqliteConnection cn, SqliteTransaction tx, Domain.ChecklistList list, int ordinal)
+    private static void WriteChecklist(InsertCommands inserts, Domain.ChecklistList list, int ordinal)
     {
         Run(
-            cn,
-            tx,
+            inserts,
             "INSERT INTO checklist_lists (id, ordinal, title) VALUES ($id,$o,$t);",
             p =>
             {
@@ -395,8 +413,7 @@ public sealed class IncidentRepository
         {
             var c = list.Items[i];
             Run(
-                cn,
-                tx,
+                inserts,
                 "INSERT INTO checklist_items (id, ordinal, text, is_done, note, is_mandatory, kind, list_id) VALUES ($id,$o,$t,$d,$n,$m,$k,$l);",
                 p =>
                 {
@@ -466,6 +483,8 @@ public sealed class IncidentRepository
         {
             Migrations.Migrate(migrateCn);
         }
+
+        MigratedPaths[Path.GetFullPath(path)] = 0;
 
         // Peek at state with a read-only connection to decide open mode.
         IncidentState state;
@@ -826,12 +845,20 @@ public sealed class IncidentRepository
         "Security",
         "CA2100",
         Justification = "Audited: SQL is built from compile-time schema constants at call sites; values use bound parameters.")]
-    private static void Run(SqliteConnection cn, SqliteTransaction tx, string sql, Action<Action<string, object>> bind)
+    private static void Run(InsertCommands inserts, string sql, Action<Action<string, object>> bind)
     {
-        using var cmd = cn.CreateCommand();
-        cmd.Transaction = tx;
-        cmd.CommandText = sql;
-        bind((name, value) => cmd.Parameters.AddWithValue(name, value));
+        var cmd = inserts.For(sql);
+        bind((name, value) =>
+        {
+            if (cmd.Parameters.Contains(name))
+            {
+                cmd.Parameters[name].Value = value;
+            }
+            else
+            {
+                cmd.Parameters.AddWithValue(name, value);
+            }
+        });
         cmd.ExecuteNonQuery();
     }
 
@@ -845,5 +872,50 @@ public sealed class IncidentRepository
         cmd.Transaction = tx;
         cmd.CommandText = sql;
         cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// One command per distinct INSERT for the length of a save. Reusing a command, rather than
+    /// building one per row, lets SQLite compile each statement once instead of once per row --
+    /// the ETB alone is a row per entry, so a long Einsatz used to recompile the same INSERT
+    /// hundreds of times on every save (issue #290). Parameters are created on the first row and
+    /// rebound on every later one.
+    /// </summary>
+    private sealed class InsertCommands : IDisposable
+    {
+        private readonly SqliteConnection _cn;
+        private readonly SqliteTransaction _tx;
+        private readonly Dictionary<string, SqliteCommand> _commands = new(StringComparer.Ordinal);
+
+        public InsertCommands(SqliteConnection cn, SqliteTransaction tx)
+        {
+            _cn = cn;
+            _tx = tx;
+        }
+
+        [SuppressMessage(
+            "Security",
+            "CA2100",
+            Justification = "Audited: SQL is built from compile-time schema constants at call sites; values use bound parameters.")]
+        public SqliteCommand For(string sql)
+        {
+            if (!_commands.TryGetValue(sql, out var cmd))
+            {
+                cmd = _cn.CreateCommand();
+                cmd.Transaction = _tx;
+                cmd.CommandText = sql;
+                _commands.Add(sql, cmd);
+            }
+
+            return cmd;
+        }
+
+        public void Dispose()
+        {
+            foreach (var cmd in _commands.Values)
+            {
+                cmd.Dispose();
+            }
+        }
     }
 }

@@ -89,6 +89,61 @@ public class IncidentStoreTests
         Assert.Equal(new[] { "/good.fwincident" }, goodWrites);
     }
 
+    // Issue #290: a burst of edits used to queue one full rewrite per edit. While the writer is
+    // busy, only the newest snapshot of a path is worth writing.
+    [Fact]
+    public async Task Queued_saves_of_one_path_write_only_the_latest_snapshot()
+    {
+        var started = new ManualResetEventSlim();
+        var release = new ManualResetEventSlim();
+        var written = new List<string?>();
+        var store = new IncidentStore((path, incident) =>
+        {
+            started.Set();
+            release.Wait();
+            written.Add(incident.Keyword);
+        });
+        var incident = Incident.Start(new FixedClock(T0), new SessionOperator("Müller"), keyword: "B1");
+
+        store.Save("/x.fwincident", incident);
+        Assert.True(started.Wait(TimeSpan.FromSeconds(1)), "write never started");
+        foreach (var keyword in new[] { "B2", "B3", "B4" })
+        {
+            incident.SetKeyword(keyword);
+            store.Save("/x.fwincident", incident);
+        }
+
+        release.Set();
+        await store.FlushAsync();
+
+        Assert.Equal(new[] { "B1", "B4" }, written);
+    }
+
+    [Fact]
+    public async Task Coalescing_does_not_merge_saves_of_different_paths()
+    {
+        var started = new ManualResetEventSlim();
+        var release = new ManualResetEventSlim();
+        var written = new List<string>();
+        var store = new IncidentStore((path, incident) =>
+        {
+            started.Set();
+            release.Wait();
+            written.Add(path);
+        });
+
+        store.Save("/a.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        Assert.True(started.Wait(TimeSpan.FromSeconds(1)), "write never started");
+        store.Save("/b.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/c.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+        store.Save("/b.fwincident", Incident.Start(new FixedClock(T0), new SessionOperator("Müller")));
+
+        release.Set();
+        await store.FlushAsync();
+
+        Assert.Equal(new[] { "/a.fwincident", "/b.fwincident", "/c.fwincident" }, written);
+    }
+
     [Fact]
     public async Task A_successful_write_raises_SaveSucceeded()
     {
