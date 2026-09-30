@@ -525,6 +525,110 @@ public class EtbViewModelTests
         Assert.False(row.CreateTaskCommand.CanExecute(null));
     }
 
+    // #415: an entry to the Leitstelle is usually the Rückmeldung itself, so the Lagebuchführer is
+    // offered the reset rather than left with a header still shouting FÄLLIG.
+    [Theory]
+    [InlineData("ILS")]
+    [InlineData(" ils ")]
+    public void An_entry_to_the_dispatch_centre_offers_the_reminder_reset(string to)
+    {
+        var offers = 0;
+        var vm = NewVm(MasterDataSet.Empty, () => offers++);
+        vm.NewText = "Lagemeldung: Brand unter Kontrolle";
+        vm.NewTo = to;
+
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.Equal(1, offers);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("EL")]
+    [InlineData("ILS Ffb")]
+    public void An_entry_to_anyone_else_offers_nothing(string to)
+    {
+        var offers = 0;
+        var vm = NewVm(MasterDataSet.Empty, () => offers++);
+        vm.NewText = "Lagemeldung";
+        vm.NewTo = to;
+
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.Equal(0, offers);
+    }
+
+    // #400: the match follows the configured name, so an install that says "Kreisleitstelle" gets
+    // the offer for that name and not for the Bavarian default.
+    [Fact]
+    public void The_offer_follows_the_configured_dispatch_centre_name()
+    {
+        var offers = 0;
+        var md = MasterDataSet.Empty with
+        {
+            Settings = IncidentSettings.Defaults with { DispatchCentreName = "Kreisleitstelle" },
+        };
+        var vm = NewVm(md, () => offers++);
+
+        vm.NewText = "Lagemeldung";
+        vm.NewTo = "ILS";
+        vm.AddEntryCommand.Execute(null);
+        Assert.Equal(0, offers);
+
+        vm.NewText = "Lagemeldung";
+        vm.NewTo = "Kreisleitstelle";
+        vm.AddEntryCommand.Execute(null);
+        Assert.Equal(1, offers);
+    }
+
+    [Fact]
+    public void Adding_an_entry_to_the_dispatch_centre_with_a_task_also_offers_the_reset()
+    {
+        var offers = 0;
+        var tasks = new List<string>();
+        var vm = NewVm(MasterDataSet.Empty, () => offers++, tasks.Add);
+        vm.NewText = "Lagemeldung";
+        vm.NewTo = "ILS";
+
+        vm.AddEntryAndCreateTaskCommand.Execute(null);
+
+        Assert.Equal(1, offers);
+        Assert.Single(tasks);
+    }
+
+    // The offer comes after the entry is in the journal, so confirming it never races the entry.
+    [Fact]
+    public void The_offer_is_made_after_the_entry_is_written()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var journalCountAtOffer = -1;
+        var vm = new EtbViewModel(
+            session, clock, MasterDataSet.Empty, () => { }, offerReminderReset: () => journalCountAtOffer = session.Incident.Journal.Count)
+        {
+            NewText = "Lagemeldung",
+            NewTo = "ILS",
+        };
+
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.Equal(2, journalCountAtOffer); // "Einsatz begonnen" + the new entry
+    }
+
+    private static LocalIncidentSession NewSession(FixedClock clock) => TestSession.StartNew(
+        new FakeStore(),
+        clock,
+        new SessionOperator("Müller", "FFB 12/1"),
+        "/x.fwincident",
+        Array.Empty<(string, bool)>(),
+        Array.Empty<(string, bool)>());
+
+    private static EtbViewModel NewVm(MasterDataSet masterData, Action offerReminderReset, Action<string>? createTask = null)
+    {
+        var clock = new FixedClock(T0);
+        return new EtbViewModel(NewSession(clock), clock, masterData, () => { }, createTask, offerReminderReset);
+    }
+
     private static EtbViewModel NewVm()
     {
         var clock = new FixedClock(T0);

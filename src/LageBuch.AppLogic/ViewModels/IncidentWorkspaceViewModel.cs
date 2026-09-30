@@ -764,7 +764,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             _clock,
             _masterData,
             OnChanged,
-            OpenTaskDialog);
+            OpenTaskDialog,
+            OfferReminderReset);
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
@@ -797,7 +798,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 _alarm,
                 OnChanged,
                 _masterData.Settings.IlsReminderIntervalMinutes,
-                _masterData.Settings.IlsReminderFollowUpIntervalMinutes);
+                _masterData.Settings.IlsReminderFollowUpIntervalMinutes,
+                _masterData.Settings.DispatchCentreName);
 
         if (Reminder is not null)
         {
@@ -904,6 +906,27 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private void RequestConfirm(string message, Action onConfirmed)
     {
         var dialog = new ConfirmDialogViewModel("Bestätigen", message, "ENTFERNEN", onConfirmed);
+        dialog.Closed += (_, _) => PendingConfirm = null;
+        PendingConfirm = dialog;
+    }
+
+    /// <summary>
+    /// An ETB entry to the Leitstelle was just added (#415): ask whether it was the Rückmeldung, and
+    /// if so restart the reminder without logging it a second time. Resolved at call time, because
+    /// Etb is built before Reminder; a joined client or a read-only file has none and is not asked.
+    /// </summary>
+    private void OfferReminderReset()
+    {
+        if (Reminder is not { IsRunning: true } reminder)
+        {
+            return;
+        }
+
+        var dialog = new ConfirmDialogViewModel(
+            "Rückmeldung erfolgt?",
+            $"War das die Rückmeldung an {reminder.DispatchCentreName}? Der Rückmelde-Timer startet dann neu.",
+            "NEU STARTEN",
+            reminder.AcknowledgeWithoutEntry);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }

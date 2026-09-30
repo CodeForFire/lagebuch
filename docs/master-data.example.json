@@ -72,6 +72,7 @@
   "settings": {
     "ilsReminderIntervalMinutes": 15,
     "ilsReminderFollowUpIntervalMinutes": 30,
-    "returnPressureBar": 50
+    "returnPressureBar": 50,
+    "dispatchCentreName": "ILS"
   }
 }

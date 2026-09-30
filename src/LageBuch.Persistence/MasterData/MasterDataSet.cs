@@ -161,8 +161,40 @@ public sealed record IncidentSettings(
 
     // Rückzugsdruck: pressure at or below which a Trupp must turn back. The Einsatzzeiten used to
     // sit beside it, one per hard-coded Trupp-Typ name; they are per-Trupp-Typ Stammdaten now (#398).
-    int ReturnPressureBar)
+    int ReturnPressureBar,
+
+    // The Leitstelle the Rückmeldung goes to (#400). "ILS" is the Bavarian name; elsewhere it is a
+    // Kreisleitstelle, a Rettungsleitstelle or plain Leitstelle.
+    string DispatchCentreName = IncidentSettings.DefaultDispatchCentreName)
 {
+    public const string DefaultDispatchCentreName = "ILS";
+
+    /// <summary>
+    /// Long enough for "Integrierte Leitstelle Fürstenfeldbruck"; the name sits in the header row, and
+    /// it arrives from a Stammdaten import and from a sync host, both untrusted.
+    /// </summary>
+    public const int MaxDispatchCentreNameLength = 40;
+
+    private readonly string _dispatchCentreName = NormalizeDispatchCentreName(DispatchCentreName);
+
+    /// <summary>Trimmed, never blank (falls back to "ILS") and at most <see cref="MaxDispatchCentreNameLength"/> long.</summary>
+    public string DispatchCentreName
+    {
+        get => _dispatchCentreName;
+        init => _dispatchCentreName = NormalizeDispatchCentreName(value);
+    }
+
+    private static string NormalizeDispatchCentreName(string? name)
+    {
+        var trimmed = name?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return DefaultDispatchCentreName;
+        }
+
+        return trimmed.Length > MaxDispatchCentreNameLength ? trimmed[..MaxDispatchCentreNameLength].TrimEnd() : trimmed;
+    }
+
     /// <summary>
     /// The compiled-in fallbacks, kept in step with the domain's Atemschutz constants so there is a
     /// single source of truth for the shared values. Used whenever the store holds no override.
@@ -857,10 +889,15 @@ public static class MasterDataJson
         static int Int(JsonElement e, string prop, int fallback) =>
             e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : fallback;
 
+        // IncidentSettings trims, caps and replaces a blank name itself.
+        static string? Str(JsonElement e, string prop) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
         return new IncidentSettings(
             Int(s, "ilsReminderIntervalMinutes", d.IlsReminderIntervalMinutes),
             Int(s, "ilsReminderFollowUpIntervalMinutes", d.IlsReminderFollowUpIntervalMinutes),
-            Int(s, "returnPressureBar", d.ReturnPressureBar));
+            Int(s, "returnPressureBar", d.ReturnPressureBar),
+            Str(s, "dispatchCentreName") ?? d.DispatchCentreName);
     }
 
     private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
@@ -943,6 +980,7 @@ public static class MasterDataJson
                 ilsReminderIntervalMinutes = set.Settings.IlsReminderIntervalMinutes,
                 ilsReminderFollowUpIntervalMinutes = set.Settings.IlsReminderFollowUpIntervalMinutes,
                 returnPressureBar = set.Settings.ReturnPressureBar,
+                dispatchCentreName = set.Settings.DispatchCentreName,
             },
         };
 

@@ -159,6 +159,39 @@ public class MasterDataEditorRenderTests
     // The Trupp-Typen editor gained a Staerke and an Einsatzzeit per row (#398), so it is no
     // longer the single-string-per-row EditableListSection the simple categories use.
     [AvaloniaFact]
+    public void Settings_section_labels_the_intervals_with_the_configured_leitstelle()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var settings = vm.Sections.OfType<SettingsSection>().Single();
+        vm.SelectedSection = settings;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var box = view.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "DispatchCentreNameBox");
+        Assert.Equal("ILS", box.Text);
+
+        // #400: the interval labels follow the name as it is typed.
+        settings.DispatchCentreName = "Kreisleitstelle";
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(
+            view.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Text == "Rückmeldung an Kreisleitstelle – Erstmeldung nach");
+
+        // The name box has no unit beside it; the shared unit column keeps it in line with the spinners.
+        var boxLeft = box.TranslatePoint(new Point(0, 0), view)!.Value.X;
+        Assert.All(
+            view.GetVisualDescendants().OfType<NumericUpDown>(),
+            n => Assert.Equal(boxLeft, n.TranslatePoint(new Point(0, 0), view)!.Value.X, precision: 0));
+
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "master-data-editor-einstellungen.png"));
+    }
+
+    [AvaloniaFact]
     public void Trupp_typen_section_renders_staerke_and_einsatzzeit_per_row()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());

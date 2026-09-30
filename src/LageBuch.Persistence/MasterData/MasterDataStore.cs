@@ -137,6 +137,17 @@ public sealed class MasterDataStore
                     p("$v", value);
                 });
 
+        // Text settings get their own table: md_settings is typed INTEGER and read as such.
+        Run(
+            cn,
+            tx,
+            "INSERT INTO md_text_settings (key, value) VALUES ($k,$v) ON CONFLICT(key) DO UPDATE SET value=excluded.value;",
+            p =>
+            {
+                p("$k", DispatchCentreNameKey);
+                p("$v", set.Settings.DispatchCentreName);
+            });
+
         tx.Commit();
     }
 
@@ -204,6 +215,8 @@ public sealed class MasterDataStore
         }
     }
 
+    private const string DispatchCentreNameKey = "dispatch_centre_name";
+
     private static (string Key, int Value)[] SettingsRows(IncidentSettings s) => new[]
     {
         ("ils_reminder_interval_minutes", s.IlsReminderIntervalMinutes),
@@ -258,6 +271,7 @@ public sealed class MasterDataStore
                 note TEXT
             );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """;
         Exec(cn, schema);
 
@@ -574,7 +588,17 @@ public sealed class MasterDataStore
         return new IncidentSettings(
             Get("ils_reminder_interval_minutes", d.IlsReminderIntervalMinutes),
             Get("ils_reminder_follow_up_interval_minutes", d.IlsReminderFollowUpIntervalMinutes),
-            Get("return_pressure_bar", d.ReturnPressureBar));
+            Get("return_pressure_bar", d.ReturnPressureBar),
+            ReadTextSetting(cn, DispatchCentreNameKey) ?? d.DispatchCentreName);
+    }
+
+    /// <summary>One md_text_settings value, or null when the key has no row.</summary>
+    private static string? ReadTextSetting(SqliteConnection cn, string key)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT value FROM md_text_settings WHERE key = $k;";
+        cmd.Parameters.AddWithValue("$k", key);
+        return cmd.ExecuteScalar() as string;
     }
 
     private static void InsertList(SqliteConnection cn, SqliteTransaction tx, string table, IReadOnlyList<string> values)

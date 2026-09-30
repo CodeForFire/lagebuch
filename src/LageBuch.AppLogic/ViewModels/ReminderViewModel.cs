@@ -1,16 +1,18 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
+using LageBuch.Domain;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Time;
+using LageBuch.Persistence.MasterData;
 
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
-/// The "Rückmeldung an ILS" reminder. It is autonomous: it starts running the moment the workspace
-/// is built for a live incident (there is no manual start/stop — reporting back to the ILS is an
+/// The "Rückmeldung an ILS" reminder, or whatever the Leitstelle is called here (#400). It is
+/// autonomous: it starts running the moment the workspace is built for a live incident (there is no manual start/stop — reporting back to the ILS is an
 /// ongoing obligation for the whole incident), alerts first after the configured "Erstmeldung nach"
 /// interval and then cyclically on the follow-up "Intervall", speaking a cue and offering ERLEDIGT
 /// each time it falls due. The intervals come from the Stammdaten settings.
@@ -28,6 +30,7 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
+    private readonly string _dispatchCentreName;
     private readonly ReminderTimer _timer = new();
     private readonly IDisposable _subscription;
 
@@ -44,13 +47,16 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         IAlarmService alarm,
         Action onChanged,
         int firstIntervalMinutes,
-        int recurringIntervalMinutes)
+        int recurringIntervalMinutes,
+        string dispatchCentreName = IncidentSettings.DefaultDispatchCentreName)
     {
         ArgumentNullException.ThrowIfNull(ticker);
+        ArgumentNullException.ThrowIfNull(dispatchCentreName);
         _session = session;
         _clock = clock;
         _alarm = alarm;
         _onChanged = onChanged;
+        _dispatchCentreName = dispatchCentreName;
 
         // Autonomous: the reminder runs for the whole incident, no manual start required. Recover the
         // running cycle from persisted state after a reopen/crash; otherwise start fresh and persist
@@ -73,6 +79,12 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         _session.UpsertTimer(TimerKey, _timer.CycleAnchor, _timer.IntervalMinutes, _timer.RecurringIntervalMinutes, _timer.IsRunning);
 
     public bool IsRunning => _timer.IsRunning;
+
+    /// <summary>The Leitstelle the Rückmeldung goes to, as configured in the Stammdaten (#400).</summary>
+    public string DispatchCentreName => _dispatchCentreName;
+
+    /// <summary>The same name in upper case, for the header's tile and readout labels.</summary>
+    public string DispatchCentreLabel => Formatting.Upper(_dispatchCentreName);
 
     public bool IsDue => _timer.IsDue(_clock.Now);
 
@@ -116,13 +128,25 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanAcknowledge))]
     private void Acknowledge()
     {
+        // "Von" is us — the logged-in operator's call sign (e.g. the ELW's Funkrufname).
+        _session.AddJournalEntry(
+            EtbDirection.Outgoing,
+            $"Rückmeldung an {_dispatchCentreName}",
+            from: _session.Operator?.CallSign,
+            to: _dispatchCentreName);
+        AcknowledgeWithoutEntry();
+    }
+
+    /// <summary>
+    /// Starts the next cycle without logging anything: the Rückmeldung is already in the ETB, typed
+    /// there by the Lagebuchführer (#415). Unlike ERLEDIGT it is allowed before the cycle is due,
+    /// since a Lagemeldung made early still counts.
+    /// </summary>
+    public void AcknowledgeWithoutEntry()
+    {
         _timer.Acknowledge(_clock);
         _lastAnnouncedAt = null;
         PersistTimer(); // durable anchor for the new (recurring) cycle
-
-        // "Von" is us — the logged-in operator's call sign (e.g. the ELW's Funkrufname).
-        _session.AddJournalEntry(
-            EtbDirection.Outgoing, "Rückmeldung an ILS", from: _session.Operator?.CallSign, to: "ILS");
         _onChanged();
         OnPropertyChanged(nameof(IsDue));
         OnPropertyChanged(nameof(IsCountingDown));

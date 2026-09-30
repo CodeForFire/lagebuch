@@ -20,6 +20,13 @@ public static class Formatting
         _ => state.ToString(),
     };
 
+    /// <summary>Upper case for a header label built from configured text ("ILS", "Kreisleitstelle").</summary>
+    public static string Upper(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return value.ToUpper(De);
+    }
+
     public static string OrDash(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "—" : value;
 

@@ -254,20 +254,51 @@
               <!-- Operational defaults (timers/durations) -->
               <DataTemplate x:DataType="vm:SettingsSection">
                 <ScrollViewer>
-                  <StackPanel Spacing="12" MaxWidth="440" HorizontalAlignment="Left">
-                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
-                      <TextBlock Grid.Column="0" Text="Rückmeldung an ILS – Erstmeldung nach" VerticalAlignment="Center" />
+                  <StackPanel Spacing="12" MaxWidth="440" HorizontalAlignment="Left" Grid.IsSharedSizeScope="True">
+                    <!-- #400: "ILS" is Bavarian; elsewhere the Leitstelle has another name. -->
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsUnit" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" Text="Leitstelle" VerticalAlignment="Center" />
+                      <TextBox x:Name="DispatchCentreNameBox" Grid.Column="1"
+                               Text="{Binding DispatchCentreName}"
+                               MaxLength="{x:Static md:IncidentSettings.MaxDispatchCentreNameLength}"
+                               PlaceholderText="z. B. ILS, Kreisleitstelle"
+                               AutomationProperties.Name="Name der Leitstelle" />
+                    </Grid>
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsUnit" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" TextWrapping="Wrap" VerticalAlignment="Center"
+                                 Text="{Binding DispatchCentreName, StringFormat='Rückmeldung an {0} – Erstmeldung nach'}" />
                       <NumericUpDown Grid.Column="1" Value="{Binding IlsReminderIntervalMinutes}"
                                      Minimum="1" Maximum="120" Increment="1" FormatString="0" />
                       <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
-                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
-                      <TextBlock Grid.Column="0" Text="Rückmeldung an ILS – Intervall" VerticalAlignment="Center" />
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsUnit" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" TextWrapping="Wrap" VerticalAlignment="Center"
+                                 Text="{Binding DispatchCentreName, StringFormat='Rückmeldung an {0} – Intervall'}" />
                       <NumericUpDown Grid.Column="1" Value="{Binding IlsReminderFollowUpIntervalMinutes}"
                                      Minimum="1" Maximum="120" Increment="1" FormatString="0" />
                       <TextBlock Grid.Column="2" Text="Min." Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </Grid>
-                    <Grid ColumnDefinitions="*,140,Auto" VerticalAlignment="Center">
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsUnit" />
+                      </Grid.ColumnDefinitions>
                       <TextBlock Grid.Column="0" Text="Rückzugsdruck" VerticalAlignment="Center" />
                       <NumericUpDown Grid.Column="1" Value="{Binding ReturnPressureBar}"
                                      Minimum="0" Maximum="400" Increment="5" FormatString="0" />
