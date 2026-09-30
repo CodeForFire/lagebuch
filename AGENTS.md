@@ -435,6 +435,9 @@ Write code that trips neither:
   runs — unlock a file, then delete its directory — a `using var` declaration
   is wrong, because it disposes at the end of the method, after the `finally`.
   Use a `using (…) { … }` block inside the `try`, so its scope ends first.
+  If the block never reads the object — it only has to exist, as a file lock
+  does — give `using` the bare expression, `using (cond ? new X(…) : null)`;
+  naming a variable nobody reads trips `cs/useless-assignment-to-local`.
   The one exception is a method that has to hand a disposable to its caller:
   CA2000 and this query pull in opposite directions there, so return plain
   data and build the object where it is used (see `HostIdentity`, #503).
