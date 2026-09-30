@@ -1114,6 +1114,16 @@ public sealed class Incident
 
         var building = FindBuilding(buildingId);
         var updated = building.WithStructure(floorCount, apartmentsPerFloor, undergroundFloorCount);
+
+        // Whole floors falling out of the range are described off the building as it stands, so
+        // the ETB says which Geschoss went and what was on it, not just the new range (#443).
+        var removedFloors = _dwellings
+            .Where(d => d.BuildingId == buildingId && (d.FloorOrdinal > floorCount || d.FloorOrdinal < -undergroundFloorCount))
+            .GroupBy(d => d.FloorOrdinal)
+            .OrderByDescending(g => g.Key)
+            .Select(g => (Count: g.Count(), Text: RemovedFloorDescription(building, g.Key, g.OrderBy(d => d.ApartmentNumber).ToList())))
+            .ToList();
+
         var index = _buildings.IndexOf(building);
         _buildings[index] = updated;
 
@@ -1147,9 +1157,12 @@ public sealed class Incident
         }
 
         var text = $"CO-Struktur geändert: {building.Name} jetzt {FloorRangeLabel(undergroundFloorCount, floorCount)}, {apartmentsPerFloor} Wohnungen je Geschoss";
-        if (removed > 0)
+
+        // Only what the floor list below doesn't already name, so no loss is counted twice.
+        var truncated = removed - removedFloors.Sum(f => f.Count);
+        if (truncated > 0)
         {
-            text += $", {removed} Wohnungen entfernt";
+            text += $", {truncated} Wohnungen entfernt";
         }
 
         if (added > 0)
@@ -1157,7 +1170,27 @@ public sealed class Incident
             text += $", {added} Wohnungen hinzugefügt";
         }
 
+        if (removedFloors.Count > 0)
+        {
+            text += $", entfernt: {string.Join(", ", removedFloors.Select(f => f.Text))}";
+        }
+
         AppendSystemEntry(clock, op, text);
+    }
+
+    /// <summary>"3. OG (6 Wohnungen: Mitte (120 ppm), Kiosk)" -- the floor, its size, and each
+    /// Wohnung that carried something a crew put there, by the label they had on screen (#443).
+    /// Same notion of "carried" as the #419 picker: a Bezeichnung counts, since it lives on the
+    /// Building and Dwelling.HasData can't see it.</summary>
+    private static string RemovedFloorDescription(Building building, int floorOrdinal, List<Dwelling> onFloor)
+    {
+        var carrying = onFloor
+            .Where(d => d.HasData || building.HasApartmentLabel(floorOrdinal, d.ApartmentNumber))
+            .Select(d => $"{CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber)}{DwellingContentSuffix(d)}")
+            .ToList();
+
+        var contents = carrying.Count > 0 ? $": {string.Join(", ", carrying)}" : ", leer";
+        return $"{CoMeasurementLabels.FloorLabel(floorOrdinal)} ({onFloor.Count} Wohnungen{contents})";
     }
 
     public void RemoveCoBuilding(IClock clock, SessionOperator op, Guid buildingId)
