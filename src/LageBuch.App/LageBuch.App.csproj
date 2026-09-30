@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- alarm.wav (a short chime, re-triggered on a cadence rather than looped) plus the spoken voice-*.wav cues. -->
+    <!-- The spoken voice-*.wav cues (see SystemAlarmService.VoiceAssets). -->
     <AvaloniaResource Include="Assets\*.wav" />
   </ItemGroup>
 
