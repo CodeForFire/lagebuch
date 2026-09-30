@@ -428,6 +428,36 @@ public sealed partial class ApartmentRemovalViewModel : ObservableObject
     }
 }
 
+/// <summary>The open "remove this whole Geschoss?" question (#443). Unlike
+/// <see cref="ApartmentRemovalViewModel"/> there is nothing to pick -- the floor goes or it
+/// doesn't -- so it only says what hangs on it.</summary>
+public sealed class FloorRemovalViewModel
+{
+    public FloorRemovalViewModel(Guid buildingId, int floorOrdinal, int apartmentCount, IReadOnlyList<string> items)
+    {
+        BuildingId = buildingId;
+        FloorOrdinal = floorOrdinal;
+        ApartmentCount = apartmentCount;
+        Items = items;
+    }
+
+    public Guid BuildingId { get; }
+
+    public int FloorOrdinal { get; }
+
+    public int ApartmentCount { get; }
+
+    /// <summary>One line per Wohnung that carries something, e.g. "Mitte · 120 ppm".</summary>
+    public IReadOnlyList<string> Items { get; }
+
+    public string FloorLabel => CoMeasurementLabels.FloorLabel(FloorOrdinal);
+
+    public string Header => $"{FloorLabel} ENTFERNEN";
+
+    public string Question =>
+        $"{FloorLabel} entfernen? {ApartmentCount} Wohnungen, davon {Items.Count} mit erfassten Daten.";
+}
+
 public sealed partial class FloorRowViewModel : ObservableObject
 {
     private readonly Action<int, int> _onApartmentCountChanged;
@@ -558,6 +588,14 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
     public bool IsApartmentRemovalOpen => PendingApartmentRemoval is not null;
 
+    /// <summary>The open "remove this Geschoss?" question, or null when none is pending (#443).
+    /// Nothing it holds has reached the session.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFloorRemovalOpen))]
+    private FloorRemovalViewModel? _pendingFloorRemoval;
+
+    public bool IsFloorRemovalOpen => PendingFloorRemoval is not null;
+
     /// <summary>Structure editing (each floor's Wohnungen count) is a setup job done once when the
     /// building is first described; measuring is what the view is for the rest of the incident.
     /// Keeping the count spinners permanently in the grid puts an edit control between the crew and
@@ -629,8 +667,10 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         }
         else
         {
-            // The spinner that raised the question is gone with the structure toolbar (#419).
+            // The spinner that raised the question is gone with the structure toolbar (#419), and
+            // so is the ENTFERNEN button that raised a floor removal (#443).
             PendingApartmentRemoval = null;
+            PendingFloorRemoval = null;
         }
 
         BuildMatrix();
@@ -642,6 +682,10 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         // floor the pending question was asked about, and a picker listing Wohnungen that have
         // since shifted is worse than no picker at all. Drop it and let the crew re-type (#419).
         PendingApartmentRemoval = null;
+
+        // Same for a floor removal: after any change the floor it names may no longer be the top
+        // or bottom one, or may hold something the question didn't mention (#443).
+        PendingFloorRemoval = null;
 
         // Capture the selection BEFORE clearing BuildingOptions: the "HAUS" ComboBox is two-way
         // bound to SelectedBuilding (SelectedItem="{Binding SelectedBuilding}") with BuildingOptions
@@ -681,10 +725,13 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
         // Same for a pending removal, which names a floor of the Haus being left (#419).
         PendingApartmentRemoval = null;
+        PendingFloorRemoval = null;
         BuildMatrix();
         OnPropertyChanged(nameof(CanRemoveBuilding));
         AddUntergeschossCommand.NotifyCanExecuteChanged();
         AddObergeschossCommand.NotifyCanExecuteChanged();
+        RemoveUntergeschossCommand.NotifyCanExecuteChanged();
+        RemoveObergeschossCommand.NotifyCanExecuteChanged();
     }
 
     private void BuildMatrix()
@@ -870,6 +917,8 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
             return;
         }
 
+        // One question at a time: two open panels would leave the crew unsure which ENTFERNEN is which.
+        PendingFloorRemoval = null;
         PendingApartmentRemoval = BuildApartmentRemoval(building, floorOrdinal, count, committed, onFloor, CarriesAnything);
     }
 
@@ -1137,6 +1186,105 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
     private bool CanAddObergeschoss =>
         !IsReadOnly && SelectedBuilding is not null && SelectedBuilding.FloorCount < 50;
+
+    /// <summary>Removes the highest Obergeschoss (#443), the way back from OG HINZUFÜGEN. EG plus
+    /// one OG is Building's floor, so the button stops there.</summary>
+    [RelayCommand(CanExecute = nameof(CanRemoveObergeschoss))]
+    private void RemoveObergeschoss()
+    {
+        if (SelectedBuilding is { } building)
+        {
+            RequestFloorRemoval(building, building.FloorCount);
+        }
+    }
+
+    private bool CanRemoveObergeschoss => !IsReadOnly && SelectedBuilding is { FloorCount: > 1 };
+
+    /// <summary>Removes the lowest Untergeschoss (#443), down to none at all.</summary>
+    [RelayCommand(CanExecute = nameof(CanRemoveUntergeschoss))]
+    private void RemoveUntergeschoss()
+    {
+        if (SelectedBuilding is { } building)
+        {
+            RequestFloorRemoval(building, -building.UndergroundFloorCount);
+        }
+    }
+
+    private bool CanRemoveUntergeschoss => !IsReadOnly && SelectedBuilding is { UndergroundFloorCount: > 0 };
+
+    /// <summary>An empty floor goes straight away -- trimming a freshly described building is the
+    /// normal case and must not nag, the same rule as the Wohnungen spinner (#419). A floor
+    /// carrying anything a crew put there stops and asks, naming what hangs on it.</summary>
+    private void RequestFloorRemoval(Building building, int floorOrdinal)
+    {
+        var onFloor = _session.Incident.Dwellings
+            .Where(d => d.BuildingId == building.Id && d.FloorOrdinal == floorOrdinal)
+            .OrderBy(d => d.ApartmentNumber)
+            .ToList();
+
+        // Same notion of "carries" as the spinner's question: a Bezeichnung lives on the Building.
+        var items = onFloor
+            .Where(d => d.HasData || building.HasApartmentLabel(floorOrdinal, d.ApartmentNumber))
+            .Select(d => $"{CoMeasurementLabels.ApartmentLabel(building, floorOrdinal, d.ApartmentNumber)} · {DescribeContents(d)}")
+            .ToList();
+
+        if (items.Count == 0)
+        {
+            PendingFloorRemoval = null;
+            CommitFloorRemoval(building, floorOrdinal);
+            return;
+        }
+
+        PendingApartmentRemoval = null;
+        PendingFloorRemoval = new FloorRemovalViewModel(building.Id, floorOrdinal, onFloor.Count, items);
+    }
+
+    [RelayCommand]
+    private void ConfirmFloorRemoval()
+    {
+        if (PendingFloorRemoval is not { } pending)
+        {
+            return;
+        }
+
+        PendingFloorRemoval = null;
+        if (SelectedBuilding is { } building && building.Id == pending.BuildingId)
+        {
+            CommitFloorRemoval(building, pending.FloorOrdinal);
+        }
+    }
+
+    [RelayCommand]
+    private void CancelFloorRemoval() => PendingFloorRemoval = null;
+
+    /// <summary>Shrinks the structure by exactly the named floor, and only while it still is the
+    /// top OG or bottom UG: the counts sent are absolute, so acting on a stale ordinal would take a
+    /// different Geschoss than the one the crew was shown.</summary>
+    private void CommitFloorRemoval(Building building, int floorOrdinal)
+    {
+        var floorCount = building.FloorCount;
+        var undergroundFloorCount = building.UndergroundFloorCount;
+        if (floorOrdinal > 0 && floorOrdinal == floorCount)
+        {
+            floorCount--;
+        }
+        else if (floorOrdinal < 0 && floorOrdinal == -undergroundFloorCount)
+        {
+            undergroundFloorCount--;
+        }
+        else
+        {
+            return;
+        }
+
+        // The open sidebar may address a unit on the floor about to go -- empty floors included,
+        // since opening a tile doesn't make it carry anything -- and FERTIG would then write to a
+        // Wohnung that no longer exists. Discard it, as switching Haus does.
+        Editor = null;
+        _session.UpdateCoBuildingStructure(building.Id, floorCount, building.ApartmentsPerFloor, undergroundFloorCount);
+        _onChanged();
+        Refresh();
+    }
 
     /// <summary>ABBRECHEN. Drops the buffer without writing anything; the rebuild puts the tile back
     /// to committed state, undoing the pending preview.</summary>
