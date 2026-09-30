@@ -278,33 +278,33 @@ public class AttachmentTempPathsTests
         var locked = NewOpenDirectory(root);
         var free = NewOpenDirectory(root);
         var inner = Path.Join(locked, "inner");
-        FileStream? handle = null;
         try
         {
-            if (OperatingSystem.IsWindows())
-            {
-                handle = new FileStream(Path.Join(locked, "brand.jpg"), FileMode.Open, FileAccess.Read, FileShare.None);
-            }
-            else
+            if (!OperatingSystem.IsWindows())
             {
                 Directory.CreateDirectory(inner);
                 File.WriteAllBytes(Path.Join(inner, "lageplan.pdf"), new byte[] { 1, 2, 3 });
                 File.SetUnixFileMode(inner, UnixFileMode.UserRead | UnixFileMode.UserExecute);
             }
 
-            AttachmentTempPaths.SweepOpenDirectories(root);
-
-            Assert.False(Directory.Exists(free));
-
-            // Root ignores the permission bits and deletes it anyway; there is nothing to lock then.
-            if (OperatingSystem.IsWindows() || Environment.UserName != "root")
+            // A block, not a `using var`: the lock has to be gone before the finally deletes the root.
+            using (var handle = OperatingSystem.IsWindows()
+                ? new FileStream(Path.Join(locked, "brand.jpg"), FileMode.Open, FileAccess.Read, FileShare.None)
+                : null)
             {
-                Assert.True(Directory.Exists(locked));
+                AttachmentTempPaths.SweepOpenDirectories(root);
+
+                Assert.False(Directory.Exists(free));
+
+                // Root ignores the permission bits and deletes it anyway; there is nothing to lock then.
+                if (OperatingSystem.IsWindows() || Environment.UserName != "root")
+                {
+                    Assert.True(Directory.Exists(locked));
+                }
             }
         }
         finally
         {
-            handle?.Dispose();
             if (!OperatingSystem.IsWindows() && Directory.Exists(inner))
             {
                 File.SetUnixFileMode(inner, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
