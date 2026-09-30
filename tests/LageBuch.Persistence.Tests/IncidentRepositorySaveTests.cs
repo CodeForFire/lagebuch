@@ -126,4 +126,69 @@ public class IncidentRepositorySaveTests : IDisposable
 
         Assert.Equal(2, IncidentRepository.Load(_path).Forces.Single().Edits.Count);
     }
+
+    [Fact]
+    public void Repeated_saves_in_one_process_round_trip_the_latest_state()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op, "Brand");
+        IncidentRepository.Save(_path, incident);
+
+        for (var i = 0; i < 3; i++)
+        {
+            incident.AddJournalEntry(clock, op, EtbDirection.Incoming, $"Meldung {i}", from: "ILS");
+            IncidentRepository.Save(_path, incident);
+        }
+
+        incident.SetKeyword("THL");
+        IncidentRepository.Save(_path, incident);
+
+        var loaded = IncidentRepository.Load(_path);
+        Assert.Equal("THL", loaded.Keyword);
+        Assert.Equal(
+            incident.Journal.Select(e => e.Text),
+            loaded.Journal.Select(e => e.Text));
+    }
+
+    [Fact]
+    public void Save_after_the_file_was_deleted_recreates_the_schema()
+    {
+        // Issue #290: Save skips the migration for a file it already migrated in this process. A
+        // file removed behind its back must not turn that shortcut into "no such table".
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op, "Brand");
+        IncidentRepository.Save(_path, incident);
+        SqliteConnection.ClearAllPools();
+        File.Delete(_path);
+
+        IncidentRepository.Save(_path, incident);
+
+        Assert.Equal("Brand", IncidentRepository.Load(_path).Keyword);
+    }
+
+    [Fact]
+    public void Save_after_a_foreign_build_dropped_a_column_repairs_it()
+    {
+        // The shape SchemaGuard exists for, arriving mid-session: another build rewrote the file
+        // since this process last migrated it. The skipped migration must be caught up rather
+        // than surface as a failed save.
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        var unit = incident.AddForceUnit(clock, op, "FFB", 6);
+        IncidentRepository.Save(_path, incident);
+        using (var cn = SqliteConnectionFactory.OpenExisting(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText = "ALTER TABLE force_units DROP COLUMN zugfuehrer_count;";
+            cmd.ExecuteNonQuery();
+        }
+
+        incident.UpdateForceStrength(clock, op, unit.Id, officerCount: 1, personnelCount: 5, scbaCount: 2);
+        IncidentRepository.Save(_path, incident);
+
+        Assert.Equal(5, IncidentRepository.Load(_path).Forces.Single().PersonnelCount);
+    }
 }
