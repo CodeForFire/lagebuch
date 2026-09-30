@@ -129,7 +129,9 @@ Anwendungsdaten.
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
 
 Beim Öffnen eines Anhangs legt Lagebuch zusätzlich eine Arbeitskopie im
-temporären Verzeichnis des Systems an, unterhalb von `lagebuch/`.
+temporären Verzeichnis des Systems an, unterhalb von `lagebuch/`. Diese
+Arbeitskopien löscht Lagebuch beim nächsten Programmstart; eine Kopie, die dann
+noch in einem Betrachter geöffnet ist, bleibt bis zu einem späteren Start liegen.
 
 ### Android
 
@@ -347,7 +349,9 @@ abgearbeitet sind.
    `attachment-cache/`.
 4. Exportierte PDF-Berichte an ihren Ablageorten (den zuletzt verwendeten nennt
    `last-pdf-export.json`).
-5. Den Ordner `lagebuch` im temporären Verzeichnis des Systems.
+5. Den Ordner `lagebuch` im temporären Verzeichnis des Systems. Lagebuch
+   leert ihn bei jedem Start selbst; übrig sind darin normalerweise nur die
+   Arbeitskopien seit dem letzten Start.
 
 Danach ist der Programmordner selbst entbehrlich; Lagebuch legt ihn beim
 nächsten Start leer wieder an.
@@ -392,10 +396,8 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
   ([Issue #384](https://github.com/CodeForFire/lagebuch/issues/384)).
 - **Der Anhang-Zwischenspeicher eines beitretenden Geräts wird nicht
   automatisch geleert**
-  ([Issue #382](https://github.com/CodeForFire/lagebuch/issues/382)); dasselbe
-  gilt für die Arbeitskopien im temporären Verzeichnis
-  ([Issue #383](https://github.com/CodeForFire/lagebuch/issues/383)). Beide
-  stehen deshalb auf der Löschliste oben.
+  ([Issue #382](https://github.com/CodeForFire/lagebuch/issues/382)) und
+  steht deshalb auf der Löschliste oben.
 - **Das Dateiformat ist vor Version 1.0 nicht eingefroren.** Ältere Dateien
   werden beim Öffnen migriert; ab 1.0 gilt die Zusage, dass eine Datei dauerhaft
   lesbar bleibt.
