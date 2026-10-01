@@ -12,9 +12,9 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// The AUFGABEN tab (#88). Unlike the journal this list mutates in place (completion reorders,
-/// remote broadcasts replace), so Sync() rebuilds the visible rows wholesale — cheap at task
-/// counts, and because the input dock's state lives here rather than on rows, a rebuild never
-/// eats half-finished input. The ticker drives the countdown displays and the one-shot due alarm.
+/// remote broadcasts replace), so Sync() reconciles the visible rows by id: kept rows are updated
+/// and moved, never thrown away, so the grid keeps its selection, focus and scroll position (#294).
+/// The ticker drives the countdown displays and the one-shot due alarm.
 /// </summary>
 public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDisposable
 {
@@ -386,27 +386,31 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDi
     // --- Sync ---
 
     /// <summary>
-    /// Rebuilds Rows from the incident. Idempotent; runs on every incident change (this tab, the
-    /// ETB dialog, another tab, another device). Rows are recreated fresh each time, which also
-    /// makes checkbox echo-guards trivially safe: a pull can never race a half-finished write-back.
+    /// Brings Rows in line with the incident. Idempotent; runs on every incident change (this tab,
+    /// the ETB dialog, another tab, another device) and on a filter change. Rows are reconciled by
+    /// id rather than rebuilt with Clear()+re-add, whose Reset dropped the selection and focus on
+    /// every change (#294): a completion re-sorts by Move, a filter change inserts and removes.
+    /// Because rows now outlive a pull, <see cref="TaskRow.Update"/> carries an explicit echo
+    /// guard so a pulled IsDone is never written back.
     /// </summary>
     public void Sync()
     {
         var now = _clock.Now;
         var visible = SortForDisplay(_session.Incident.Tasks)
             .Where(IsVisible)
-            .Select(t => new TaskRow(_session, t, IsReadOnly, now, _onChanged))
             .ToList();
 
-        // Rows are recreated, so the selection is carried over by task id rather than by row.
         var selectedId = SelectedTask?.Id;
-        Rows.Clear();
-        foreach (var row in visible)
-        {
-            Rows.Add(row);
-        }
+        RowReconciler.Reconcile(
+            Rows,
+            visible,
+            r => r.Id,
+            t => t.Id,
+            t => new TaskRow(_session, t, IsReadOnly, now, _onChanged),
+            (row, t) => row.Update(t, now));
 
-        SelectedTask = visible.FirstOrDefault(r => r.Id == selectedId);
+        // A backstop: a kept row stays selected on its own, but one filtered out must not linger.
+        SelectedTask = Rows.FirstOrDefault(r => r.Id == selectedId);
         RefreshHeader();
     }
 
@@ -419,8 +423,8 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDi
 
 /// <summary>
 /// One rendered task row. Two-way IsDone mirrors ChecklistItemViewModel: the CheckBox binding is
-/// the single source of truth, and the echo-guard keeps state pulls (remote broadcast) from
-/// writing back what was only just pulled.
+/// the single source of truth, and the echo-guard keeps state pulls (<see cref="Update"/>, after a
+/// change made anywhere) from writing back what was only just pulled.
 /// </summary>
 public sealed partial class TaskRow : ObservableObject
 {
@@ -447,14 +451,42 @@ public sealed partial class TaskRow : ObservableObject
         IsImportanceLow = task.Importance == TaskImportance.Low;
         _isDone = task.IsCompleted;
 
-        // German short stamp for completed rows; Sync() recreates the row on completion, so a
-        // static snapshot is enough. Empty while open — the view hides the label then.
-        CompletedDisplay = task.CompletedAt is { } completedAt
-            ? $"ERLEDIGT · {completedAt:HH:mm}"
-            : string.Empty;
+        _completedDisplay = CompletedDisplayOf(task);
         RemainingDisplay = ComputeRemaining(task, now);
         IsOverdue = IsOverdueAt(task, now);
     }
+
+    // Set while Update() writes the incident's completion into the row, so OnIsDoneChanged does
+    // not push what was only just pulled back to the session (#294).
+    private bool _pulling;
+
+    /// <summary>
+    /// Brings a kept row in line with its task after a change anywhere in the incident (#294),
+    /// instead of the row being thrown away and rebuilt. Only the completion can move on an
+    /// existing task -- there is no session operation that edits its text or priorities.
+    /// </summary>
+    public void Update(IncidentTask task, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        _pulling = true;
+        try
+        {
+            IsDone = task.IsCompleted;
+        }
+        finally
+        {
+            _pulling = false;
+        }
+
+        CompletedDisplay = CompletedDisplayOf(task);
+        IsOverdue = IsOverdueAt(task, now);
+        RemainingDisplay = ComputeRemaining(task, now);
+        OnPropertyChanged(nameof(IsOverdue));
+    }
+
+    // German short stamp for completed rows. Empty while open — the view hides the label then.
+    private static string CompletedDisplayOf(IncidentTask task) =>
+        task.CompletedAt is { } completedAt ? $"ERLEDIGT · {completedAt:HH:mm}" : string.Empty;
 
     public Guid Id { get; }
 
@@ -483,19 +515,22 @@ public sealed partial class TaskRow : ObservableObject
     public bool IsReadOnly { get; }
 
     /// <summary>"ERLEDIGT · HH:mm" once done, empty while open (completion time from the task).</summary>
-    public string CompletedDisplay { get; }
+    [ObservableProperty]
+    private string _completedDisplay;
 
     [ObservableProperty]
     private bool _isDone;
 
     partial void OnIsDoneChanged(bool value)
     {
-        if (IsReadOnly)
+        if (IsReadOnly || _pulling)
             return;
         var task = _session.Incident.Tasks.FirstOrDefault(t => t.Id == Id);
         if (task is { } current && current.IsCompleted != value)
+        {
             _session.SetTaskCompleted(Id, value);
-        _onChanged();
+            _onChanged();
+        }
     }
 
     /// <summary>True while the task is open and past its due time. Order is unaffected by design.</summary>
