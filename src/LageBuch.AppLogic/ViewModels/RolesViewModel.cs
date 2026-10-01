@@ -66,13 +66,37 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     [ObservableProperty]
     private string? _phone;
 
+    // Set while Update() writes the incident's values into the row, so the phone setter does not
+    // push what was only just pulled back to the session as a new edit (#294).
+    private bool _pulling;
+
     /// <summary>Writes the correction straight through. A closed or remotely read-only incident is
     /// a historical record, so the push is skipped rather than throwing — mirrors ForceRow.Push().</summary>
     partial void OnPhoneChanged(string? value)
     {
-        if (IsReadOnly)
+        if (IsReadOnly || _pulling)
             return;
         _onPhoneEdited(this, value);
+    }
+
+    /// <summary>
+    /// Brings a kept row in line with its assignment after a change anywhere in the incident (#294),
+    /// instead of the row being thrown away and rebuilt. Only Bis and the Handynummer can move on an
+    /// existing assignment -- a handover ends it and starts a new one -- so the rest stays as built.
+    /// </summary>
+    public void Update(Domain.RoleAssignment assignment)
+    {
+        ArgumentNullException.ThrowIfNull(assignment);
+        To = assignment.To;
+        _pulling = true;
+        try
+        {
+            Phone = assignment.Phone;
+        }
+        finally
+        {
+            _pulling = false;
+        }
     }
 
     [ObservableProperty]
@@ -114,7 +138,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
     private readonly IReadOnlyList<Role> _roles;
 
     // Every rendered row, regardless of the filter; Roles is the visible subset — mirrors
-    // EtbViewModel's _all/Entries split, so ShowAllRoles can rebuild Roles without re-reading the
+    // EtbViewModel's _all/Entries split, so ShowAllRoles can reconcile Roles without re-reading the
     // session.
     private readonly List<RoleAssignmentRow> _all = new();
 
@@ -151,11 +175,26 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
 
     public void Dispose() => _session.Changed -= RefreshRoles;
 
-    // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
+    // Brings the rows in line with the incident on any change -- this device's edit, or (when
+    // joined) another's -- by id and in place rather than Clear()+re-add, which dropped the
+    // selection and focus in the grid on every change (#294).
     private void RefreshRoles()
     {
+        var kept = _all.ToDictionary(r => r.Id);
         _all.Clear();
-        _all.AddRange(_session.Incident.Roles.Select(CreateRow));
+        foreach (var assignment in _session.Incident.Roles)
+        {
+            if (kept.TryGetValue(assignment.Id, out var row))
+            {
+                row.Update(assignment);
+                _all.Add(row);
+            }
+            else
+            {
+                _all.Add(CreateRow(assignment));
+            }
+        }
+
         MarkDuplicates(); // after every row exists — see the comment on it
         ApplyFilter();
 
@@ -218,17 +257,16 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
             right?.Trim() ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
 
-    private void ApplyFilter()
-    {
-        Roles.Clear();
-        foreach (var row in _all)
-        {
-            if (ShowAllRoles || row.IsRunning)
-            {
-                Roles.Add(row);
-            }
-        }
-    }
+    // _all already holds the reconciled rows, so the visible subset is reconciled from those
+    // same instances: a filter toggle or a handover inserts and removes rows, never resets the grid.
+    private void ApplyFilter() =>
+        RowReconciler.Reconcile(
+            Roles,
+            _all.Where(r => ShowAllRoles || r.IsRunning).ToList(),
+            r => r.Id,
+            r => r.Id,
+            r => r,
+            (_, _) => { });
 
     public bool IsReadOnly { get; }
 
@@ -576,7 +614,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
 
     private void EditPhone(RoleAssignmentRow row, string? phone)
     {
-        _session.EditRolePhone(row.Id, phone); // Changed → RefreshRoles rebuilds the row
+        _session.EditRolePhone(row.Id, phone); // Changed → RefreshRoles updates the row
         _onChanged();
     }
 }
