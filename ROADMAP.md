@@ -48,9 +48,30 @@ for its pressure.
 Nothing new gets added here. The tab you are looking at should stay where you
 left it.
 
-Issues: #241, #246, #290, #291, #292, #293, #294, #383, #414, #415, #425, #426
+Issues: #241, #290, #291, #292, #293, #294, #383, #414, #415, #425, #426
 
-## v0.8 — Security and trust
+## v0.8 — Keyboard control
+
+A Lagebuchführer at the ELW laptop types far more than they click, and under
+pressure every trip to the mouse costs time. The field feedback said it directly
+(#466), and an audit of the app showed how far there is still to go: no
+shortcuts at all, dialogs that neither take focus nor give it back — the
+Aufgabe dialog even leaves the typing in the hidden ETB field behind it — Enter
+that submits some forms but not others, grids without row keys, and a focus
+position you can only see in text fields.
+
+This milestone writes down one keyboard contract (#545) and makes every part of
+the app keep it: dialogs and inline panels, Enter-submit with focus back on the
+first field, one keyboard model for the suggestion fields, Druckkontrolle without
+the mouse, row keys in the lists, global shortcuts with an overview, and a
+visible focus edge. All of it lands as headless tests, so it stays that way.
+
+It comes before the security work because it is what the field asked for next,
+and because it changes no file format.
+
+Issues: #545, #537, #538, #539, #540, #466, #541, #542, #543, #246, #544, #282
+
+## v0.9 — Security and trust
 
 Two halves. Harden the parts that face the network and the file system: the sync
 host's pairing, the Android attachment path, the attachment size cap that today
@@ -73,7 +94,7 @@ a second maintainer exists, at which point the requirement goes to one. Force
 pushes, branch deletion and merging without green CI are already blocked, for
 administrators included.
 
-## v0.9 — Install without warnings
+## v0.10 — Install without warnings
 
 Today every install path asks the user to click past a warning: SmartScreen on
 Windows, quarantine on macOS, unknown sources on Android. For a public-sector
@@ -108,7 +129,7 @@ both.
 
 Issues: #209, #308, #208
 
-## v0.10 — i18n and architecture
+## v0.11 — i18n and architecture
 
 Lagebuch is German software, and that is a strength. It should not also be an
 accident of implementation. Today the German wording is literal text inside
@@ -131,7 +152,7 @@ wording moving out of the domain types.
 
 Issues: #297, #298, #299, #302, #304, #350, #400, #402, #403, #404
 
-## v0.11 — New incident modules and Stammdaten
+## v0.12 — New incident modules and Stammdaten
 
 The feature wishes that came back from the field, as opposed to the corrections:
 a Dekon-Platz with its Platzführung, up to six freely named gases instead of CO
