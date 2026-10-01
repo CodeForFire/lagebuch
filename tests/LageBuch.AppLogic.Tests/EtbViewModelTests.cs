@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
@@ -613,6 +614,117 @@ public class EtbViewModelTests
         vm.AddEntryCommand.Execute(null);
 
         Assert.Equal(2, journalCountAtOffer); // "Einsatz begonnen" + the new entry
+    }
+
+    [Fact]
+    public void An_edit_updates_the_row_in_place_so_the_grid_keeps_its_selection()
+    {
+        // #529: replacing the row instance is a Replace on Entries, and the DataGrid drops the
+        // selection of an item it no longer sees. The edit must reach the same instance instead.
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Lagemeldung" };
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        var changedProperties = new List<string?>();
+        row.PropertyChanged += (_, e) => changedProperties.Add(e.PropertyName);
+        var nonAdds = new List<NotifyCollectionChangedAction>();
+        vm.Entries.CollectionChanged += (_, e) =>
+        {
+            if (e.Action != NotifyCollectionChangedAction.Add)
+            {
+                nonAdds.Add(e.Action);
+            }
+        };
+
+        // Straight through the session, as an edit from another device arrives: Changed -> Sync.
+        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert");
+
+        Assert.Empty(nonAdds);
+        Assert.Same(row, Assert.Single(vm.Entries, e => e.Id == row.Id));
+        Assert.Equal("Lagemeldung korrigiert", row.Text);
+        Assert.True(row.WasEdited);
+        Assert.Single(row.Edits);
+        Assert.Contains(nameof(EtbEntryRow.Text), changedProperties);
+        Assert.True(row.ShowHistoryCommand.CanExecute(null)); // the first edit enables the history
+    }
+
+    [Fact]
+    public void An_open_history_follows_a_later_edit_of_its_entry()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Lagemeldung" };
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert");
+        row.ShowHistoryCommand.Execute(null);
+
+        session.EditJournalEntry(row.Id, "Lagemeldung nochmals korrigiert");
+
+        Assert.Same(row, vm.HistoryEntry);
+        Assert.Equal(2, vm.HistoryEntry!.Edits.Count);
+    }
+
+    [Fact]
+    public void An_edit_from_elsewhere_closes_the_editor_open_on_that_entry()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Lagemeldung" };
+        vm.AddEntryCommand.Execute(null);
+        var row = vm.Entries[0];
+        row.BeginEditCommand.Execute(null);
+        vm.EditText = "halb getippt";
+
+        session.EditJournalEntry(row.Id, "Lagemeldung korrigiert"); // another device saved first
+
+        Assert.False(vm.IsEditing);
+        Assert.Equal(string.Empty, vm.EditText);
+    }
+
+    [Fact]
+    public void A_batch_of_new_entries_lands_newest_first_and_in_order()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        for (var i = 1; i <= 5; i++)
+        {
+            session.AddJournalEntry(EtbDirection.Internal, $"vorher {i}");
+        }
+
+        // The first Sync renders a five-entry tail at once, as joining mid-Einsatz does.
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+        Assert.Equal(["vorher 5", "vorher 4", "vorher 3", "vorher 2", "vorher 1"], vm.Entries.Select(e => e.Text));
+
+        // A second batch reaching the journal between two Syncs, as a snapshot does: the domain
+        // call bypasses the session, so Changed does not fire per entry.
+        for (var i = 1; i <= 3; i++)
+        {
+            session.Incident.AddJournalEntry(clock, session.Operator!, EtbDirection.Internal, $"danach {i}", null, null);
+        }
+
+        vm.Sync();
+
+        Assert.Equal(
+            ["danach 3", "danach 2", "danach 1", "vorher 5", "vorher 4", "vorher 3", "vorher 2", "vorher 1"],
+            vm.Entries.Select(e => e.Text));
+    }
+
+    [Fact]
+    public void Toggling_the_System_filter_keeps_newest_first()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        session.AddJournalEntry(EtbDirection.Internal, "erste");
+        session.AddJournalEntry(EtbDirection.Internal, "zweite");
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { });
+
+        vm.HideSystemEntries = false;
+        Assert.Equal(["zweite", "erste", "Einsatz begonnen"], vm.Entries.Select(e => e.Text));
+
+        vm.HideSystemEntries = true;
+        Assert.Equal(["zweite", "erste"], vm.Entries.Select(e => e.Text));
     }
 
     private static LocalIncidentSession NewSession(FixedClock clock) => TestSession.StartNew(
