@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Globalization;
 using System.Text;
 using LageBuch.AppLogic.ViewModels;
@@ -846,5 +847,157 @@ public class RolesViewModelTests
 
         Assert.Equal(2, vm.Roles.Count);
         Assert.All(vm.Roles, r => Assert.False(r.IsDuplicate));
+    }
+
+    // #294: the grid is reconciled by id rather than rebuilt with Clear()+re-add.
+    private static LocalIncidentSession SessionWithTwoRoles(FixedClock clock)
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AssignRole("EL", "Müller", from: clock.Now, phone: "0171 1");
+        session.AssignRole("ZF", "Huber", from: clock.Now);
+        return session;
+    }
+
+    private static Func<int> CountResets(RolesViewModel vm)
+    {
+        var resets = 0;
+        vm.Roles.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                resets++;
+            }
+        };
+        return () => resets;
+    }
+
+    [Fact]
+    public void An_unrelated_change_keeps_the_role_rows_and_raises_no_reset()
+    {
+        var clock = new FixedClock(T0);
+        var session = SessionWithTwoRoles(clock);
+        var vm = new RolesViewModel(session, clock, Md(), () => { });
+        var rows = vm.Roles.ToArray();
+        var resets = CountResets(vm);
+
+        session.AddJournalEntry(EtbDirection.Outgoing, "Lagemeldung");
+
+        Assert.Equal(0, resets());
+        Assert.Equal(rows, vm.Roles);
+        Assert.Same(rows[0], vm.Roles[0]);
+    }
+
+    [Fact]
+    public void Toggling_show_all_inserts_the_ended_row_in_place_without_a_reset()
+    {
+        var clock = new FixedClock(T0);
+        var session = SessionWithTwoRoles(clock);
+        var vm = new RolesViewModel(session, clock, Md(), () => { });
+        session.TransferRole(vm.Roles[0].Id, "Schmid");
+        var resets = CountResets(vm);
+
+        Assert.Equal(new[] { "Huber", "Schmid" }, vm.Roles.Select(r => r.PersonName));
+
+        vm.ShowAllRoles = true;
+        Assert.Equal(new[] { "Müller", "Huber", "Schmid" }, vm.Roles.Select(r => r.PersonName));
+
+        vm.ShowAllRoles = false;
+        Assert.Equal(new[] { "Huber", "Schmid" }, vm.Roles.Select(r => r.PersonName));
+        Assert.Equal(0, resets());
+    }
+
+    [Fact]
+    public void A_handover_ends_the_kept_row_in_place_and_appends_the_successor()
+    {
+        var clock = new FixedClock(T0);
+        var session = SessionWithTwoRoles(clock);
+        var vm = new RolesViewModel(session, clock, Md(), () => { })
+        {
+            ShowAllRoles = true,
+        };
+        var el = vm.Roles[0];
+        var resets = CountResets(vm);
+
+        clock.Now = T0.AddMinutes(30);
+        session.TransferRole(el.Id, "Schmid");
+
+        Assert.Equal(0, resets());
+        Assert.Same(el, vm.Roles[0]);
+        Assert.Equal(T0.AddMinutes(30), el.To);
+        Assert.False(el.IsRunning);
+        Assert.False(el.BeginTransferCommand.CanExecute(null));
+        Assert.Equal("Schmid", vm.Roles[2].PersonName);
+    }
+
+    [Fact]
+    public void A_phone_edit_made_elsewhere_updates_the_row_without_writing_back()
+    {
+        var clock = new FixedClock(T0);
+        var session = SessionWithTwoRoles(clock);
+        var changes = 0;
+        var vm = new RolesViewModel(session, clock, Md(), () => changes++);
+        var row = vm.Roles[0];
+        var sessionChanges = 0;
+        session.Changed += () => sessionChanges++;
+
+        session.EditRolePhone(row.Id, "0171 2");
+
+        Assert.Same(row, vm.Roles[0]);
+        Assert.Equal(session.Incident.Roles[0].Phone, row.Phone);
+        Assert.Equal(1, sessionChanges);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void A_phone_edit_arriving_in_a_snapshot_updates_the_row_without_writing_back()
+    {
+        var clock = new FixedClock(T0);
+        var local = SessionWithTwoRoles(clock);
+        var remote = new SnapshotRoundTrippingSession(local);
+        var changes = 0;
+        var vm = new RolesViewModel(remote, clock, Md(), () => changes++);
+        var row = vm.Roles[0];
+        var resets = CountResets(vm);
+        var sessionChanges = 0;
+        remote.Changed += () => sessionChanges++;
+
+        local.EditRolePhone(row.Id, "0171 2");
+
+        Assert.Same(row, vm.Roles[0]);
+        Assert.Equal(remote.Incident.Roles[0].Phone, row.Phone);
+        Assert.Equal(0, resets());
+        Assert.Equal(1, sessionChanges);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void A_duplicate_mark_clears_on_the_kept_row_once_its_partner_ends()
+    {
+        var clock = new FixedClock(T0);
+        var op = new SessionOperator("Müller");
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            op,
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var first = session.Incident.AssignRole(clock, op, "EL", "Müller", from: T0);
+        session.Incident.AssignRole(clock, op, "EL", "Schmidt", from: T0);
+        var vm = new RolesViewModel(session, clock, MdWithRoles(RoleUniqueness.UniquePerIncident), () => { });
+        var kept = vm.Roles[1];
+        Assert.True(kept.IsDuplicate);
+
+        session.Incident.EndRoleAssignment(first.Id, T0.AddMinutes(10));
+        session.AddJournalEntry(EtbDirection.Outgoing, "Lagemeldung"); // raises Changed
+
+        Assert.Same(kept, Assert.Single(vm.Roles));
+        Assert.False(kept.IsDuplicate);
     }
 }
