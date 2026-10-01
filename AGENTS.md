@@ -76,6 +76,35 @@ Any migration that adds a column must also declare it in
 (`src/LageBuch.Persistence/Sqlite/SchemaGuard.cs`);
 `SchemaReconciliationTests` fails the build otherwise.
 
+## Stammdaten in an incident
+
+An incident stores the **values** it takes from the Stammdaten, never a
+**reference** into them. The Stammdaten are global (`masterdata.db`) and edited
+freely: a status is renamed, a vehicle is sold, a Haus is deleted. An
+`.fwincident` has to survive all of that and still read the way it did on the
+day, on another Feuerwehr's machine, for years. Decided in #337.
+
+- **Copy at the moment of use.** When something from the Stammdaten enters the
+  incident, write its name, text or rule into the incident's own tables:
+  - `Incident.SeedChecklist` copies a checklist's text and `is_mandatory`;
+  - an `AtemschutzTrupp` keeps its own `MaxDurationMinutes` from its Trupp-Typ.
+  
+  Never store a Stammdaten id or key and look it up again on open.
+- **No snapshot of the catalogues.** An incident file carries no `md_*` tables
+  and no copy of the `MasterDataSet`. Pickers and suggestion lists read today's
+  Stammdaten, which is what someone carrying on with an Einsatz wants.
+- **An off-catalogue value is shown, never rejected.** An old file, an imported
+  one or a joined client on other Stammdaten all hold values the local
+  catalogue lacks. `StammdatenCatalogue` (`Including`, `IsUnknown`, `Find`)
+  handles this; a closed picker must still display what is recorded.
+- **Live rules are fine for live work.** Settings such as reminder intervals
+  apply from today's Stammdaten when an incident is reopened. A rule that has
+  to stay attached to a past record is copied onto that record, the way the
+  Trupp's Einsatzzeit is.
+
+The Bericht cannot drift: `LageBuch.Documents` references only `Domain`, so it
+renders from the incident alone. Keep it that way.
+
 ## Sync protocol version
 
 Two devices are allowed to sync when their **wire contracts** overlap, never
