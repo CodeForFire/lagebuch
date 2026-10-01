@@ -70,12 +70,18 @@ This milestone writes down one keyboard contract (#545) and makes every part of
 the app keep it: dialogs and inline panels, Enter-submit with focus back on the
 first field, one keyboard model for the suggestion fields, Druckkontrolle without
 the mouse, row keys in the lists, global shortcuts with an overview, and a
-visible focus edge. All of it lands as headless tests, so it stays that way.
+visible focus edge. All of it lands as headless tests, so it stays that way. But
+reachable is not the same as fast: the milestone closes only after the key
+presses for the everyday flows are counted before and after, and Lagebuchführer
+have run an Übung keyboard-only.
 
 It comes before the security work because it is what the field asked for next,
 and because it changes no file format.
 
-Issues: #545, #537, #538, #539, #540, #466, #541, #542, #543, #246, #544, #282
+#246, editing an Aufgabe, ships in the same release. It is a field bug of its
+own, not keyboard work, but the row keys need it.
+
+Issues: #545, #537, #541, #538, #539, #540, #466, #542, #543, #544, #246
 
 ## v0.9 — Security and trust
 
@@ -156,7 +162,10 @@ Alongside it, the layering work: `MasterDataSet` moving out of the persistence
 assembly, the session abstractions finding their right home, and German ETB
 wording moving out of the domain types.
 
-Issues: #297, #298, #299, #302, #304, #350, #400, #402, #403, #404, #462
+Alt-mnemonics wait for the same decision: a mnemonic is a letter of the label,
+so picking them before the labels are translatable means picking them twice.
+
+Issues: #282, #297, #298, #299, #302, #304, #350, #400, #402, #403, #404, #462
 
 ## v0.12 — New incident modules and Stammdaten
 
