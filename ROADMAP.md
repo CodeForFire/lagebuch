@@ -70,7 +70,10 @@ This milestone writes down one keyboard contract (#545) and makes every part of
 the app keep it: dialogs and inline panels, Enter-submit with focus back on the
 first field, one keyboard model for the suggestion fields, Druckkontrolle without
 the mouse, row keys in the lists, global shortcuts with an overview, and a
-visible focus edge. All of it lands as headless tests, so it stays that way.
+visible focus edge. All of it lands as headless tests, so it stays that way. But
+reachable is not the same as fast: the milestone closes only after the key
+presses for the everyday flows are counted before and after, and Lagebuchführer
+have run an Übung keyboard-only.
 
 It comes before the security work because it is what the field asked for next,
 and because it changes no file format.
