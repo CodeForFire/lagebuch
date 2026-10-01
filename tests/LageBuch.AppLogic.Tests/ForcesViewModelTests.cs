@@ -1,5 +1,7 @@
+using System.Collections.Specialized;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -985,5 +987,156 @@ public class ForcesViewModelTests
         var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
 
         Assert.Equal(new[] { "Alarmiert", "Im Einsatz" }, vm.Forces[0].StatusOptions);
+    }
+
+    // #294: the grid is reconciled by id rather than rebuilt with Clear()+re-add.
+    private static LocalIncidentSession SessionWithTwoUnits()
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(T0),
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.AddForceUnit("FFB Wache 1", 9, "FFB 11/1", "Alarmiert", "erste Meldung");
+        session.AddForceUnit("Emmering", 6, "FFB 12/1", "Alarmiert", null);
+        return session;
+    }
+
+    private static Func<int> CountResets(ForcesViewModel vm)
+    {
+        var resets = 0;
+        vm.Forces.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                resets++;
+            }
+        };
+        return () => resets;
+    }
+
+    [Fact]
+    public void An_unrelated_change_keeps_the_rows_and_raises_no_reset()
+    {
+        var session = SessionWithTwoUnits();
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        var rows = vm.Forces.ToArray();
+        var resets = CountResets(vm);
+
+        session.AddJournalEntry(EtbDirection.Outgoing, "Lagemeldung");
+
+        Assert.Equal(0, resets());
+        Assert.Equal(2, vm.Forces.Count);
+        Assert.Same(rows[0], vm.Forces[0]);
+        Assert.Same(rows[1], vm.Forces[1]);
+    }
+
+    [Fact]
+    public void Adding_and_removing_a_unit_still_shows_up_without_a_reset()
+    {
+        var session = SessionWithTwoUnits();
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        var second = vm.Forces[1];
+        var resets = CountResets(vm);
+
+        session.AddForceUnit("Aich", 6, "FFB 13/1", null, null);
+        session.RemoveForceUnit(vm.Forces[0].Id);
+
+        Assert.Equal(0, resets());
+        Assert.Equal(new[] { "FFB 12/1", "FFB 13/1" }, vm.Forces.Select(r => r.CallSign));
+        Assert.Same(second, vm.Forces[0]);
+    }
+
+    [Fact]
+    public void A_status_change_made_elsewhere_updates_the_row_without_writing_back()
+    {
+        var session = SessionWithTwoUnits();
+        var changes = 0;
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => changes++);
+        var row = vm.Forces[0];
+        var sessionChanges = 0;
+        session.Changed += () => sessionChanges++;
+
+        session.UpdateForceUnit(row.Id, "Im Einsatz", "zweite Meldung");
+
+        Assert.Same(row, vm.Forces[0]);
+        Assert.Equal("Im Einsatz", row.Status);
+        Assert.Equal("zweite Meldung", row.Notes);
+
+        // A write-back would be a second mutation, and with it a second Changed and a save.
+        Assert.Equal(1, sessionChanges);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void A_status_change_arriving_in_a_snapshot_updates_the_row_without_writing_back()
+    {
+        // A joined device rebuilds its whole Incident from every broadcast, so the unit the row is
+        // matched to is a new instance each time.
+        var local = SessionWithTwoUnits();
+        var remote = new SnapshotRoundTrippingSession(local);
+        var changes = 0;
+        var vm = new ForcesViewModel(remote, new FixedClock(T0), Md(), () => changes++);
+        var row = vm.Forces[0];
+        var resets = CountResets(vm);
+        var sessionChanges = 0;
+        remote.Changed += () => sessionChanges++;
+
+        local.UpdateForceUnit(row.Id, "Im Einsatz", null);
+
+        Assert.Same(row, vm.Forces[0]);
+        Assert.Equal("Im Einsatz", row.Status);
+        Assert.Equal(0, resets());
+        Assert.Equal(1, sessionChanges);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void A_status_off_the_catalogue_set_elsewhere_becomes_selectable_on_the_kept_row()
+    {
+        var session = SessionWithTwoUnits();
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        var row = vm.Forces[0];
+
+        session.UpdateForceUnit(row.Id, "Abgerückt", null);
+
+        Assert.Same(row, vm.Forces[0]);
+        Assert.Equal("Abgerückt", row.Status);
+        Assert.Contains("Abgerückt", row.StatusOptions);
+    }
+
+    [Fact]
+    public void A_half_typed_strength_survives_an_unrelated_change()
+    {
+        var session = SessionWithTwoUnits();
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        var row = vm.Forces[0];
+
+        row.MannschaftCount = 12; // typed into the editor, not yet Übernehmen
+
+        session.AddJournalEntry(EtbDirection.Outgoing, "Lagemeldung");
+
+        Assert.Same(row, vm.Forces[0]);
+        Assert.Equal(12, row.MannschaftCount);
+        Assert.Equal(9, session.Incident.Forces[0].PersonnelCount);
+    }
+
+    [Fact]
+    public void A_strength_correction_made_elsewhere_reaches_the_kept_row()
+    {
+        var session = SessionWithTwoUnits();
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        var row = vm.Forces[0];
+
+        session.UpdateForceStrength(row.Id, officerCount: 1, personnelCount: 8, scbaCount: 2);
+
+        Assert.Same(row, vm.Forces[0]);
+        Assert.Equal(1, row.OfficerCount);
+        Assert.Equal(7, row.MannschaftCount);
+        Assert.Equal(2, row.ScbaCount);
+        Assert.True(row.HasHistory);
+        Assert.Single(row.EditLines);
     }
 }
