@@ -16,6 +16,75 @@ cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see 
 
 <!-- towncrier release notes start -->
 
+## [0.7.0] - 2026-10-01
+
+Stability under a large incident and the rest of the Übung feedback. The Kräfte, Funktionen,
+Aufgaben, ETB and CO-Messung lists now update in place instead of being rebuilt, so a change
+from anywhere in the Einsatz no longer throws away the selection, the focus or an open editor;
+saves are cheaper and the Übersicht no longer probes every recent file on the UI thread.
+Devices sync whenever their protocol versions overlap rather than only on identical app
+versions, and joining is harder to attack and easier to use: a global PIN budget, one host
+identity per install and a two-step join. Alongside that come the Kontakte module and the
+BETEILIGTE tab, a Lagebuchführer handover without leaving the incident, required-field
+markers, a Rückmelde timer that can restart from the ETB, a phone layout, and closing an
+Einsatz straight into the PDF protocol.
+
+### Added
+
+- [#452](https://github.com/CodeForFire/lagebuch/pull/452) - A new Kontakte module lists the Personal Stammdaten as a searchable directory that finds a person by name, Funktion, Funkrufname, number or the new free-text Notiz, highlights why each entry matched, and hands the number or the new e-mail field to the device's phone or mail app, with both fields edited and validated in the Stammdaten editor (#451).
+- [#472](https://github.com/CodeForFire/lagebuch/pull/472) - The incident header now shows who documents on this device, and a new Lagebuchführer can take over without leaving the incident, with the handover logged in the ETB and the name picked from own personnel (#469).
+- [#480](https://github.com/CodeForFire/lagebuch/pull/480) - A joined device's home screen shows where it was last connected — host, Stichwort and time — with a Neu verbinden button that reopens the connect dialog with host and PIN pre-filled and a button that forgets the connection again, and while connected the incident header names the host (#464).
+- [#484](https://github.com/CodeForFire/lagebuch/pull/484) - When an Aufgabe falls due, the app now says "Aufgabe, fällig" instead of playing a plain tone, and a header bar visible from every tab names the task and who it is assigned to, opens it in the Aufgaben tab on a tap, and marks it done with ERLEDIGT (#460).
+- [#486](https://github.com/CodeForFire/lagebuch/pull/486) - Stammdaten vehicles and personnel can be marked as own or foreign with a new EIGEN checkbox, and the Lagebuchführer name suggestions now list own personnel only (#458).
+- [#496](https://github.com/CodeForFire/lagebuch/pull/496) - A new BETEILIGTE tab keeps a per-Einsatz list of people involved who are not forces, such as the house owner, the vehicle owner or the police contact, with name, phone number and a note that sync to joined devices and appear as their own section in the PDF report, without writing an ETB line.
+- [#498](https://github.com/CodeForFire/lagebuch/pull/498) - Closing an Einsatz on the desktop can now go straight on to the final PDF and open the mail program with it attached and a subject prefilled from the Einsatzdaten.
+- [#499](https://github.com/CodeForFire/lagebuch/pull/499) - Required fields carry a red asterisk next to their caption, so a missing entry is visible before pressing the button, and screen readers announce them as required (#414).
+- [#500](https://github.com/CodeForFire/lagebuch/pull/500) - An incident can be taken off the Home screen's ZULETZT VERWENDET list, from its row or from the banner shown when it fails to open, without touching the file (#481).
+- [#504](https://github.com/CodeForFire/lagebuch/pull/504) - A Funktion can be marked in the Stammdaten as unique per Einsatz or per Abschnitt (#470), so assigning one that is already held offers the Übergabe instead of a second holder; a duplicate that arrives from an older Einsatzdatei, an import or another device is marked in the grid, with the Übergabe live on that row.
+- [#506](https://github.com/CodeForFire/lagebuch/pull/506) - The Atemschutz table in the PDF report shows each Trupp's status, the time of its last Druckabfrage and its Messreihe (#426).
+- [#512](https://github.com/CodeForFire/lagebuch/pull/512) - The Einsatz abschließen dialog now offers to export the PDF protocol right away, with sending it by e-mail as an optional follow-up, so a closed incident no longer leaves without a protocol (#425).
+- [#519](https://github.com/CodeForFire/lagebuch/pull/519) - Links in the Stammdaten can carry an optional group such as Gefahrgut or Karten, and the LINKS tab shows them under collapsible group headers with buttons to expand or collapse them all, puts ÖFFNEN next to each link's name instead of at the far edge of the row, and tints every other row (#518).
+- [#520](https://github.com/CodeForFire/lagebuch/pull/520) - The CO-Messprotokoll Struktur toolbar gains OG ENTFERNEN and UG ENTFERNEN, which remove the highest Obergeschoss or lowest Untergeschoss straight away when it is empty, ask first and name each Wohnung with recorded data when it is not, and log the removed floor with what it carried in the ETB (#443).
+- [#521](https://github.com/CodeForFire/lagebuch/pull/521) - An ETB entry addressed to the Leitstelle now offers to restart the Rückmelde timer without writing the Rückmeldung a second time (#415), and the Leitstelle's name — "ILS" by default — is configurable in the Stammdaten settings and used throughout the Rückmeldung header, while the spoken reminder now says „Rückmeldung an die Leitstelle" (#400).
+
+### Changed
+
+- [#473](https://github.com/CodeForFire/lagebuch/pull/473) - While an incident is shared, the header shows only the PIN, and the address other devices dial now opens with a click on it; on a narrower window the header moves the Lagebuchführer, sharing and status onto a second line instead of drawing them on top of the Stichwort.
+- [#476](https://github.com/CodeForFire/lagebuch/pull/476) - Leaving an open, editable incident through ÜBERSICHT, STAMMDATEN, ÖFFNEN, NEUER EINSATZ or VERBINDEN now asks first, and leaving an incident always ends its sharing, so clients no longer stay attached to a session the host has left and a new share gets a fresh PIN (#463).
+- [#483](https://github.com/CodeForFire/lagebuch/pull/483) - Two devices now sync whenever their wire contracts are compatible instead of only when their app versions match exactly, so a phone still waiting on a Play Store update can join a newer desktop host, and a genuinely incompatible pair is refused with a message naming which device to update.
+- [#485](https://github.com/CodeForFire/lagebuch/pull/485) - The header notifications share one design: a countdown that is only running (ILS-Rückmeldung, next Druckabfrage) is a quiet readout on one strip, and anything due or alarming becomes a row whose tile lights up amber when it needs action and red only for the Rückzugsalarm and failed saves, with the tiles aligned in one column and reduced to icons on a phone.
+- [#487](https://github.com/CodeForFire/lagebuch/pull/487) - On a phone the app now lays itself out for one: the module rail becomes a bottom navigation bar with the rest behind MEHR, the command bar keeps NEUER EINSATZ and folds its other actions into an overflow, the Einsatztagebuch, Kräfte, Atemschutz, Aufgaben, Funktionen and Dateien read as one card per row instead of a grid built for the ELW monitor, each add-entry dock opens as a stacked sheet that closes again once the entry is saved, the Stammdaten editor drills into a category instead of squeezing its rail beside it, and the soft keyboard no longer covers the field being filled.
+- [#495](https://github.com/CodeForFire/lagebuch/pull/495) - The ETB no longer asks for a RICHTUNG: the field is gone from the entry dock, the ETB grid and the PDF, and manually added entries are recorded as internal.
+- [#501](https://github.com/CodeForFire/lagebuch/pull/501) - Joining a shared Einsatz now asks for the device and PIN first and, once the host is reached, names the Einsatz being joined and suggests the host's own personnel and Funkrufnamen for the Lagebuchführer (#459).
+- [#507](https://github.com/CodeForFire/lagebuch/pull/507) - The Aufgaben field Zugeteilt suggests only Funkrufnamen and names, written "Nachname, Vorname" as everywhere else, and no longer Funktionen (#468).
+- [#515](https://github.com/CodeForFire/lagebuch/pull/515) - The Übersicht no longer opens every recently used Einsatz file before it first appears; the list shows up at once and the lock marker for closed Einsätze fills in right after, without the list reordering (#291).
+- [#523](https://github.com/CodeForFire/lagebuch/pull/523) - The spoken "Aufgabe fällig" cue uses a new, clearer voice recording.
+- [#525](https://github.com/CodeForFire/lagebuch/pull/525) - Saving a long Einsatz is cheaper: a burst of edits writes only the latest state, and each write reuses its SQL statements and skips re-migrating a file already migrated this session (#290).
+- [#528](https://github.com/CodeForFire/lagebuch/pull/528) - Checklisten sync their items from one incident change handler per list instead of one per item (#293).
+
+### Fixed
+
+- [#455](https://github.com/CodeForFire/lagebuch/pull/455) - A joined device no longer drops back to the start page after a brief network outage and no longer sits unnoticed on a stale Stand: it reconnects, discards out-of-order updates, checks itself against the host every ten seconds, shows in the footer whether its Stand is confirmed, and reports a change the host did not take with the host's reason, which needs host and joined devices on sync protocol 4 (#295).
+- [#457](https://github.com/CodeForFire/lagebuch/pull/457) - On Windows 10 the window's title bar is now dark as well instead of white.
+- [#477](https://github.com/CodeForFire/lagebuch/pull/477) - A joined device can now export the PDF from the synced Einsatzdaten but can no longer close the host's incident, which the host now refuses, and a PDF of a still-open incident is marked as Zwischenstand (#465).
+- [#478](https://github.com/CodeForFire/lagebuch/pull/478) - The Android app now reports the version it was built from — `versionCode` and `versionName` were pinned in `AndroidManifest.xml`, which silently overrode the release workflow and left every published APK identifying itself as 0.1.0, build 1 — and the build now also produces the signed Android App Bundle that Google Play requires, with the APK extracted from that same bundle.
+- [#488](https://github.com/CodeForFire/lagebuch/pull/488) - The Android app can now be installed on devices with a 32-bit ARM system, such as the Samsung Galaxy Tab A, which Google Play had listed as incompatible.
+- [#503](https://github.com/CodeForFire/lagebuch/pull/503) - Joined devices no longer warn about a possible man-in-the-middle every time the host restarts its share or starts a new incident, because the host now keeps one key per install; a genuinely different host shows a Kennung to compare against the host's screen before it is trusted.
+- [#510](https://github.com/CodeForFire/lagebuch/pull/510) - The Stammdaten editor's IMPORTIEREN button no longer stays greyed out once Stammdaten already exist; importing over existing data now asks for confirmation first, since the file replaces every category (#509).
+- [#514](https://github.com/CodeForFire/lagebuch/pull/514) - Saving an edited ETB entry works again — the Speichern button in the edit panel stayed greyed out and Enter did nothing, because opening the panel never told the button to re-check (#467).
+- [#516](https://github.com/CodeForFire/lagebuch/pull/516) - The Übersicht's last-connection row now matches the recent files in spacing, type and remove icon, and the intro mentions reconnecting to an Einsatz on another device.
+- [#524](https://github.com/CodeForFire/lagebuch/pull/524) - The copies an attachment leaves in the system temp directory when it is opened are now deleted the next time the desktop app starts, instead of piling up there indefinitely (#383).
+- [#530](https://github.com/CodeForFire/lagebuch/pull/530) - CO-Messung: an open WOHNUNG BEARBEITEN sidebar, and the value typed into it, now survives an unrelated change elsewhere in the incident, such as a new ETB line or an edit arriving from a joined device (#241).
+- [#531](https://github.com/CodeForFire/lagebuch/pull/531) - Kräfte: a change saved anywhere in the Einsatz no longer clears the selected row or takes keyboard focus out of its STATUS box (#294).
+- [#532](https://github.com/CodeForFire/lagebuch/pull/532) - Funktionen: a change saved anywhere in the Einsatz, or switching between current and all assignments, no longer clears the selected row in the grid (#294).
+- [#533](https://github.com/CodeForFire/lagebuch/pull/533) - Aufgaben: a change saved anywhere in the Einsatz, checking off a task or switching the filter no longer clears the selected row in the list (#294).
+- [#535](https://github.com/CodeForFire/lagebuch/pull/535) - Editing an ETB entry, on this device or another, no longer clears the row's selection in the journal or leaves its open history stale (#529).
+
+### Security
+
+- [#502](https://github.com/CodeForFire/lagebuch/pull/502) - After ten wrong share PINs across all devices the host stops accepting new joins until the Lagebuchführer draws a new PIN, which closes the way a peer with many addresses could guess the four-digit PIN, and it replaces the per-address backoff, so every wrong PIN a joining device enters counts and none is answered with a wait any more, while devices already joined keep working (#288).
+
+
 ## [0.6.0] - 2026-09-22
 
 The findings of the first exercise, verifiable downloads and the Einsatzdaten dialog the PDF
@@ -361,7 +430,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/CodeForFire/lagebuch/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/CodeForFire/lagebuch/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/CodeForFire/lagebuch/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/CodeForFire/lagebuch/compare/v0.4.0...v0.4.1

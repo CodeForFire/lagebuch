@@ -1,1 +1,0 @@
-A new BETEILIGTE tab keeps a per-Einsatz list of people involved who are not forces, such as the house owner, the vehicle owner or the police contact, with name, phone number and a note that sync to joined devices and appear as their own section in the PDF report, without writing an ETB line.

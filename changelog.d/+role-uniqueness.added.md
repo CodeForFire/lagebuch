@@ -1,1 +1,0 @@
-A Funktion can be marked in the Stammdaten as unique per Einsatz or per Abschnitt (#470), so assigning one that is already held offers the Übergabe instead of a second holder; a duplicate that arrives from an older Einsatzdatei, an import or another device is marked in the grid, with the Übergabe live on that row.
