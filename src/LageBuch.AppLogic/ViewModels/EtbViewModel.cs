@@ -34,12 +34,12 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
     private readonly Action? _offerReminderReset;
     private readonly string _dispatchCentreName;
 
-    // Every rendered row, newest-first, regardless of the filter. Entries is the visible subset;
-    // keeping the full list here lets a filter toggle rebuild Entries without re-reading the journal.
+    // Every rendered row, oldest-first like the journal, regardless of the filter. Entries is the
+    // visible subset, newest-first; keeping the full list here lets a filter toggle rebuild Entries
+    // without re-reading the journal. Oldest-first so a new entry is an append, not a shift (#529).
     private readonly List<EtbEntryRow> _all = new();
 
-    // Id -> current row, kept in step with _all so Sync()'s edit-detection pass is O(1) per entry
-    // instead of a linear scan of _all for every journal entry.
+    // Id -> row, so Sync()'s edit-detection pass finds a row in O(1) instead of scanning _all.
     private readonly Dictionary<Guid, EtbEntryRow> _byId = new();
 
     public EtbViewModel(
@@ -68,31 +68,33 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
         Sync();
     }
 
+    public void Dispose() => _session.Changed -= Sync;
+
     /// <summary>
     /// Brings the list up to date with the journal. Entries reach the journal from every module --
     /// Kräfte, Atemschutz, the ILS reminder -- not only from this tab, and without this they stayed
     /// invisible until the Einsatz was closed, resumed or reopened.
     ///
-    /// The journal is append-only, so the first pass renders just the tail it has not rendered yet
-    /// and inserts at the top to keep the newest-first order. That leaves the existing rows
-    /// untouched, which matters because rebuilding the collection resets the grid's scroll and
-    /// selection -- and it makes the method idempotent, so calling it on every save is free.
+    /// The journal is append-only, so the first pass renders just the tail it has not rendered yet:
+    /// an append to _all, and an insert at the top of Entries to keep it newest-first. That insert
+    /// shifts the visible rows once per new visible entry, so a large batch (joining mid-Einsatz)
+    /// costs O(k·n) pointer moves. It is accepted on purpose: the alternative, a rebuild, resets the
+    /// grid's scroll and selection, and leaving existing rows untouched is what this method is for.
+    /// It also makes the method idempotent, so calling it on every save is free.
     ///
     /// A second pass handles the one way an already-rendered row's content can change without a new
     /// journal entry: an edit (this device's Save, or a remote device's edit arriving via Changed).
-    /// It walks every entry once, looking up its currently-rendered row by id (O(1) via _byId) and
-    /// swapping in a replacement wherever the edit count no longer matches -- O(n) total per
-    /// Sync() call, not O(n²), since Sync() runs on every incident change from every device.
+    /// It walks every entry once, finds its row by id (O(1) via _byId) and updates that row in place
+    /// wherever the edit count no longer matches -- O(n) per call, and no collection change at all,
+    /// so the grid keeps the edited row selected (#529).
     /// </summary>
-    public void Dispose() => _session.Changed -= Sync;
-
     public void Sync()
     {
         var journal = _session.Incident.Journal;
         for (var i = _all.Count; i < journal.Count; i++)
         {
             var row = ToRow(journal[i]);
-            _all.Insert(0, row);
+            _all.Add(row);
             _byId[row.Id] = row;
             if (IsVisible(row))
             {
@@ -107,14 +109,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
                 continue;
             }
 
-            var updated = ToRow(entry);
-            _all[_all.IndexOf(current)] = updated;
-            _byId[entry.Id] = updated;
-            var entriesIndex = Entries.IndexOf(current);
-            if (entriesIndex >= 0)
-            {
-                Entries[entriesIndex] = updated;
-            }
+            current.Update(entry);
 
             if (EditingEntry?.Id == entry.Id)
             {
@@ -143,9 +138,9 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
     partial void OnHideSystemEntriesChanged(bool value)
     {
         Entries.Clear();
-        foreach (var row in _all)
-            if (IsVisible(row))
-                Entries.Add(row);
+        for (var i = _all.Count - 1; i >= 0; i--) // _all is oldest-first, Entries newest-first
+            if (IsVisible(_all[i]))
+                Entries.Add(_all[i]);
     }
 
     private bool IsVisible(EtbEntryRow row) =>
@@ -378,11 +373,12 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
 /// <summary>
 /// One rendered ETB row. Carries its own <see cref="BeginEditCommand"/> (rather than the view
 /// reaching back up to <see cref="EtbViewModel"/> via a $parent binding, mirroring
-/// <see cref="ForceRow"/>'s reasoning) but is otherwise plain data: an edit happens through
-/// <see cref="EtbViewModel"/>'s edit panel, not a per-keystroke two-way binding on the row itself,
-/// so the row is replaced wholesale (not mutated in place) whenever its entry changes.
+/// <see cref="ForceRow"/>'s reasoning). An edit happens through <see cref="EtbViewModel"/>'s edit
+/// panel, not a two-way binding on the row, and reaches the row through <see cref="Update"/>: the
+/// same instance stays in the list, so the grid keeps it selected and an open history panel follows
+/// the new version (#529).
 /// </summary>
-public sealed class EtbEntryRow
+public sealed class EtbEntryRow : ObservableObject
 {
     public EtbEntryRow(
         EtbEntry entry,
@@ -426,15 +422,15 @@ public sealed class EtbEntryRow
 
     public string? To { get; }
 
-    public string Text { get; }
+    public string Text { get; private set; }
 
     public string EnteredBy { get; }
 
     public EtbDirection DirectionValue { get; }
 
-    public bool WasEdited { get; }
+    public bool WasEdited { get; private set; }
 
-    public IReadOnlyList<EtbEntryEdit> Edits { get; }
+    public IReadOnlyList<EtbEntryEdit> Edits { get; private set; }
 
     public bool IsEditable { get; }
 
@@ -442,7 +438,31 @@ public sealed class EtbEntryRow
 
     public ICommand BeginEditCommand { get; }
 
-    public ICommand ShowHistoryCommand { get; }
+    public IRelayCommand ShowHistoryCommand { get; }
 
     public ICommand CreateTaskCommand { get; }
+
+    /// <summary>
+    /// Re-points this row at the current version of its entry, instead of the view model replacing
+    /// the row object, which the grid sees as a different item and deselects. An edit changes only
+    /// the text and its history (<see cref="EtbEntry.WithEditedText"/>), so nothing else is touched.
+    /// </summary>
+    public void Update(EtbEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (entry.Id != Id)
+        {
+            throw new ArgumentException("Eintrag gehört nicht zu dieser Zeile.", nameof(entry));
+        }
+
+        Text = entry.Text;
+        Edits = entry.Edits;
+        WasEdited = entry.Edits.Count > 0;
+        OnPropertyChanged(nameof(Text));
+        OnPropertyChanged(nameof(Edits));
+        OnPropertyChanged(nameof(WasEdited));
+
+        // The first edit is what makes the history viewable at all.
+        ShowHistoryCommand.NotifyCanExecuteChanged();
+    }
 }
