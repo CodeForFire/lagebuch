@@ -51,12 +51,79 @@ public sealed partial class ForceRow : ObservableObject
         _onStrengthEdited = onStrengthEdited;
         _onRemoved = onRemoved;
         Edits = unit.Edits;
+        _syncedStrength = StrengthOf(unit);
         _zugfuehrerCount = unit.ZugfuehrerCount;
         _officerCount = unit.OfficerCount;
         _mannschaftCount = unit.MannschaftCount;
         _scbaCount = unit.ScbaCount;
         _status = unit.Status;
         _notes = unit.Notes;
+    }
+
+    // Set while Update() writes the incident's values into the row, so the Status/Notes setters do
+    // not push what was only just pulled back to the session as a new edit (#294).
+    private bool _pulling;
+
+    // The Stärke the row last read from the incident. The four count fields double as the strength
+    // editor's input, so Update() overwrites them only when the incident's Stärke actually moved:
+    // a correction half-typed into the editor survives a change made elsewhere in the Einsatz.
+    private (int Zugfuehrer, int Officer, int Mannschaft, int Scba) _syncedStrength;
+
+    private static (int Zugfuehrer, int Officer, int Mannschaft, int Scba) StrengthOf(Domain.ForceUnit unit) =>
+        (unit.ZugfuehrerCount, unit.OfficerCount, unit.MannschaftCount, unit.ScbaCount);
+
+    /// <summary>
+    /// Brings a kept row in line with its unit after a change anywhere in the incident (#294),
+    /// instead of the row being thrown away and rebuilt.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="unit"/> may be a different instance than the one the row was built from: a
+    /// joined device rebuilds its whole aggregate from each snapshot. Brigade and Funkrufname are
+    /// not touched -- no session operation changes them.
+    /// </remarks>
+    public void Update(Domain.ForceUnit unit, IReadOnlyList<string> statusOptions)
+    {
+        ArgumentNullException.ThrowIfNull(unit);
+        ArgumentNullException.ThrowIfNull(statusOptions);
+
+        // Options first, so a status set elsewhere that the Stammdaten do not list already has an
+        // entry to select when Status changes. Replaced only when the list really differs: swapping
+        // a ComboBox's ItemsSource under it is what froze the Atemschutz picker in #408.
+        var options = StammdatenCatalogue.Including(statusOptions, unit.Status);
+        if (!options.SequenceEqual(StatusOptions, StringComparer.Ordinal))
+        {
+            StatusOptions = options;
+            OnPropertyChanged(nameof(StatusOptions));
+        }
+
+        _pulling = true;
+        try
+        {
+            Status = unit.Status;
+            Notes = unit.Notes;
+        }
+        finally
+        {
+            _pulling = false;
+        }
+
+        var strength = StrengthOf(unit);
+        if (strength != _syncedStrength)
+        {
+            _syncedStrength = strength;
+            ZugfuehrerCount = strength.Zugfuehrer;
+            OfficerCount = strength.Officer;
+            MannschaftCount = strength.Mannschaft;
+            ScbaCount = strength.Scba;
+        }
+
+        if (!ReferenceEquals(Edits, unit.Edits))
+        {
+            Edits = unit.Edits;
+            OnPropertyChanged(nameof(Edits));
+            OnPropertyChanged(nameof(HasHistory));
+            OnPropertyChanged(nameof(EditLines));
+        }
     }
 
     public Guid Id { get; }
@@ -68,7 +135,7 @@ public sealed partial class ForceRow : ObservableObject
     public bool IsReadOnly { get; }
 
     /// <summary>Wert-Historie der Stärke (#76), für die Verlauf-Anzeige.</summary>
-    public IReadOnlyList<Domain.ForceUnitStrengthEdit> Edits { get; }
+    public IReadOnlyList<Domain.ForceUnitStrengthEdit> Edits { get; private set; }
 
     /// <summary>The Verlauf affordance only makes sense once something was corrected.</summary>
     public bool HasHistory => Edits.Count > 0;
@@ -118,7 +185,7 @@ public sealed partial class ForceRow : ObservableObject
     /// the row, and reaching back up to the ForcesViewModel from inside it is a brittle
     /// $parent expression for no gain.
     /// </summary>
-    public IReadOnlyList<string> StatusOptions { get; }
+    public IReadOnlyList<string> StatusOptions { get; private set; }
 
     [ObservableProperty]
     private string? _status;
@@ -137,7 +204,7 @@ public sealed partial class ForceRow : ObservableObject
     /// </summary>
     private void PushStatusNotes()
     {
-        if (IsReadOnly)
+        if (IsReadOnly || _pulling)
         {
             return;
         }
@@ -239,14 +306,18 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, ID
 
     public void Dispose() => _session.Changed -= RefreshForces;
 
-    // Rebuild from the incident on any change — this device's edit, or (when joined) another's.
+    // Brings the rows in line with the incident on any change -- this device's edit, or (when
+    // joined) another's -- by id and in place rather than Clear()+re-add, which dropped the
+    // selected row and the STATUS combo's focus on every change (#294).
     private void RefreshForces()
     {
-        Forces.Clear();
-        foreach (var f in _session.Incident.Forces)
-        {
-            Forces.Add(ToRow(f));
-        }
+        RowReconciler.Reconcile(
+            Forces,
+            _session.Incident.Forces,
+            r => r.Id,
+            f => f.Id,
+            ToRow,
+            (row, f) => row.Update(f, StatusOptions));
 
         TotalPersonnel = _session.Incident.TotalPersonnel;
         TotalOfficer = _session.Incident.TotalOfficer;
@@ -610,6 +681,8 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, ID
         OnPropertyChanged(nameof(ErrorSummary));
     }
 
+    // A kept row keeps the callbacks it was built with. They read only f.Id, f.Brigade and
+    // f.CallSign, which no session operation changes, so a stale f is harmless here.
     private ForceRow ToRow(Domain.ForceUnit f) =>
         new(
             f,
