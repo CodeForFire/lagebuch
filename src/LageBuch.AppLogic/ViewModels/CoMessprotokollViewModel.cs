@@ -700,24 +700,87 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         // a snapshot round trip either — but doesn't help if the read itself already happened too late.
         var selectedId = SelectedBuilding?.Id;
 
-        BuildingOptions.Clear();
-        foreach (var b in _session.Incident.Buildings)
+        // #241: the null the ComboBox pushes back, and the re-selection after it, are this method
+        // keeping the list current, not the crew switching Haus. Letting them through to
+        // OnSelectedBuildingChanged discarded the open sidebar (a half-typed ppm value) on every
+        // unrelated edit, and rebuilt the matrix twice more besides.
+        _syncingBuildingOptions = true;
+        try
         {
-            BuildingOptions.Add(b);
+            SyncBuildingOptions();
+            SelectedBuilding = selectedId is { } id
+                ? BuildingOptions.FirstOrDefault(b => b.Id == id) ?? BuildingOptions.FirstOrDefault()
+                : BuildingOptions.FirstOrDefault();
+        }
+        finally
+        {
+            _syncingBuildingOptions = false;
         }
 
-        SelectedBuilding = selectedId is { } id
-            ? BuildingOptions.FirstOrDefault(b => b.Id == id) ?? BuildingOptions.FirstOrDefault()
-            : BuildingOptions.FirstOrDefault();
+        if (SelectedBuilding?.Id != selectedId)
+        {
+            // The selected Haus is really gone (or this is the first load): that is a switch.
+            DiscardHausBoundState();
+        }
+        else if (Editor is { } editor && !_session.Incident.Dwellings.Any(d =>
+            d.BuildingId == editor.BuildingId
+            && d.FloorOrdinal == editor.FloorOrdinal
+            && d.ApartmentNumber == editor.ApartmentNumber))
+        {
+            // A joined device removed the floor under the open sidebar; FERTIG would write nowhere.
+            Editor = null;
+        }
 
         BuildMatrix();
+        NotifyHausCommandsChanged();
         OnPropertyChanged(nameof(IsReadOnly));
         OnPropertyChanged(nameof(HasBuildings));
         OnPropertyChanged(nameof(ShowMatrix));
         OnPropertyChanged(nameof(CanModify));
     }
 
+    private bool _syncingBuildingOptions;
+
+    /// <summary>Brings BuildingOptions in line with the session without a Reset when the Haus list
+    /// itself is unchanged (#241). Compared by Id: a joined session's Building instances are neither
+    /// reference- nor value-equal across a snapshot round trip. A Haus whose structure changed
+    /// (same Id, new record) is swapped in place, so the matrix still sees the fresh floor counts.</summary>
+    private void SyncBuildingOptions()
+    {
+        var current = _session.Incident.Buildings;
+        if (current.Select(b => b.Id).SequenceEqual(BuildingOptions.Select(b => b.Id)))
+        {
+            for (var i = 0; i < current.Count; i++)
+            {
+                if (!ReferenceEquals(BuildingOptions[i], current[i]))
+                {
+                    BuildingOptions[i] = current[i];
+                }
+            }
+
+            return;
+        }
+
+        BuildingOptions.Clear();
+        foreach (var b in current)
+        {
+            BuildingOptions.Add(b);
+        }
+    }
+
     partial void OnSelectedBuildingChanged(Building? value)
+    {
+        if (_syncingBuildingOptions)
+        {
+            return;
+        }
+
+        DiscardHausBoundState();
+        BuildMatrix();
+        NotifyHausCommandsChanged();
+    }
+
+    private void DiscardHausBoundState()
     {
         // A pending edit belongs to a unit in the Haus being left; carrying it across would leave
         // the sidebar editing a tile that is no longer on screen. Switching discards, like ABBRECHEN.
@@ -726,7 +789,10 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         // Same for a pending removal, which names a floor of the Haus being left (#419).
         PendingApartmentRemoval = null;
         PendingFloorRemoval = null;
-        BuildMatrix();
+    }
+
+    private void NotifyHausCommandsChanged()
+    {
         OnPropertyChanged(nameof(CanRemoveBuilding));
         AddUntergeschossCommand.NotifyCanExecuteChanged();
         AddObergeschossCommand.NotifyCanExecuteChanged();
@@ -749,14 +815,21 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
         var building = SelectedBuilding;
 
+        // One pass over the incident's Dwellings instead of a scan per tile. TryAdd keeps the first
+        // match on a duplicate key, as the FirstOrDefault it replaces did.
+        var dwellings = new Dictionary<(int Floor, int Apartment), Dwelling>();
+        foreach (var d in _session.Incident.Dwellings.Where(x => x.BuildingId == building.Id))
+        {
+            dwellings.TryAdd((d.FloorOrdinal, d.ApartmentNumber), d);
+        }
+
         for (var floor = building.FloorCount; floor >= -building.UndergroundFloorCount; floor--)
         {
             var apartmentCount = building.ApartmentsFor(floor);
             var all = Enumerable.Range(1, apartmentCount)
                 .Select(apt =>
                 {
-                    var dwelling = _session.Incident.Dwellings.FirstOrDefault(d =>
-                        d.BuildingId == building.Id && d.FloorOrdinal == floor && d.ApartmentNumber == apt);
+                    var dwelling = dwellings.GetValueOrDefault((floor, apt));
                     return dwelling is not null
                         ? new DwellingCellViewModel(dwelling, building, IsReadOnly, OnOpenEditor)
                         : null;
