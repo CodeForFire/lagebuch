@@ -497,6 +497,135 @@ public class CoMessprotokollViewModelTests
         Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
     }
 
+    // --- Issue #241: Refresh's own list upkeep must not count as switching Haus --------------
+    private static LocalIncidentSession NewSessionWithTwoHouses()
+    {
+        var local = TestSession.StartNew(
+            new FakeStore(),
+            Clock,
+            new SessionOperator("Test", null),
+            Path.GetTempFileName(),
+            Enumerable.Empty<(string, bool)>(),
+            Enumerable.Empty<(string, bool)>());
+        local.AddCoBuilding("Haus A", 2, 3);
+        local.AddCoBuilding("Haus B", 2, 3);
+        return local;
+    }
+
+    /// <summary>What the real "HAUS" ComboBox does to its two-way bound SelectedItem: a Reset, or
+    /// a Replace of the selected item, makes the Selector push null back through the binding.</summary>
+    private static void AttachComboBoxStandIn(CoMessprotokollViewModel vm) =>
+        vm.BuildingOptions.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset
+                || (e.Action == NotifyCollectionChangedAction.Replace
+                    && e.OldItems!.Contains(vm.SelectedBuilding)))
+            {
+                vm.SelectedBuilding = null;
+            }
+        };
+
+    [Fact]
+    public void UnrelatedChange_RaisesNoCollectionChangeOnBuildingOptions()
+    {
+        var (session, vm) = CreateVm();
+        var events = new List<NotifyCollectionChangedAction>();
+        vm.BuildingOptions.CollectionChanged += (_, e) => events.Add(e.Action);
+
+        session.AddJournalEntry(EtbDirection.Internal, "Lage unverändert");
+
+        Assert.Empty(events);
+    }
+
+    [Fact]
+    public void UnrelatedChange_OnAJoinedSession_RaisesNoResetOnBuildingOptions()
+    {
+        var local = NewSessionWithTwoHouses();
+        var vm = new CoMessprotokollViewModel(new SnapshotRoundTrippingSession(local), Clock, () => { });
+        var events = new List<NotifyCollectionChangedAction>();
+        vm.BuildingOptions.CollectionChanged += (_, e) => events.Add(e.Action);
+
+        local.AddJournalEntry(EtbDirection.Internal, "Lage unverändert");
+
+        // Every instance is fresh after a snapshot round trip, so each is swapped in place.
+        Assert.DoesNotContain(NotifyCollectionChangedAction.Reset, events);
+        Assert.Equal(2, vm.BuildingOptions.Count);
+    }
+
+    [Fact]
+    public void AddingABuilding_StillUpdatesBuildingOptions_AndKeepsTheSelection()
+    {
+        var local = NewSessionWithTwoHouses();
+        var vm = new CoMessprotokollViewModel(local, Clock, () => { });
+        vm.SelectedBuilding = vm.BuildingOptions.Single(b => b.Name == "Haus B");
+
+        local.AddCoBuilding("Haus C", 1, 1);
+
+        Assert.Equal(new[] { "Haus A", "Haus B", "Haus C" }, vm.BuildingOptions.Select(b => b.Name));
+        Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
+    }
+
+    [Fact]
+    public void AddingAFloor_SelectsTheFreshBuildingInstance()
+    {
+        var (_, vm) = CreateVm();
+        var rowsBefore = vm.MatrixRows.Count;
+
+        vm.AddObergeschossCommand.Execute(null);
+
+        Assert.Equal(3, vm.SelectedBuilding!.FloorCount);
+        Assert.Same(vm.SelectedBuilding, vm.BuildingOptions.Single());
+        Assert.Equal(rowsBefore + 1, vm.MatrixRows.Count);
+    }
+
+    [Fact]
+    public void UnrelatedChange_OnAJoinedSession_KeepsTheOpenEditor_WithABoundComboBox()
+    {
+        var local = NewSessionWithTwoHouses();
+        var vm = new CoMessprotokollViewModel(new SnapshotRoundTrippingSession(local), Clock, () => { });
+        vm.SelectedBuilding = vm.BuildingOptions.Single(b => b.Name == "Haus B");
+        AttachComboBoxStandIn(vm);
+
+        var editor = OpenEditor(vm, 1, 2);
+        editor.CoValue = 45;
+
+        local.AddJournalEntry(EtbDirection.Internal, "Lage unverändert");
+
+        Assert.Same(editor, vm.Editor);
+        Assert.Equal(45, vm.Editor!.CoValue);
+        Assert.Equal("Haus B", vm.SelectedBuilding?.Name);
+        Assert.Equal(45, Cell(vm, 1, 2).CoValue);
+    }
+
+    [Fact]
+    public void RemovingTheSelectedHaus_ClosesTheEditor()
+    {
+        var local = NewSessionWithTwoHouses();
+        var vm = new CoMessprotokollViewModel(local, Clock, () => { });
+        var houseB = vm.BuildingOptions.Single(b => b.Name == "Haus B");
+        vm.SelectedBuilding = houseB;
+        AttachComboBoxStandIn(vm);
+        OpenEditor(vm, 1, 1);
+
+        local.RemoveCoBuilding(houseB.Id);
+
+        Assert.Null(vm.Editor);
+        Assert.Equal("Haus A", vm.SelectedBuilding?.Name);
+    }
+
+    [Fact]
+    public void RemovingTheEditedFloorRemotely_ClosesTheEditor()
+    {
+        var (session, vm) = CreateVm();
+        var building = vm.SelectedBuilding!;
+        OpenEditor(vm, 2, 1);
+
+        // Another device takes the top OG away; this VM only sees the resulting Changed.
+        session.UpdateCoBuildingStructure(building.Id, 1, building.ApartmentsPerFloor);
+
+        Assert.Null(vm.Editor);
+    }
+
     [Fact]
     public void ViewModel_EmptyState_NoBuildings()
     {
