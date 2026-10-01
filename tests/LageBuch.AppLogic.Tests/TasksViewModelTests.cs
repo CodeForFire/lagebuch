@@ -1,6 +1,8 @@
+using System.Collections.Specialized;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
@@ -561,6 +563,138 @@ public class TasksViewModelTests
         var vm = new TasksViewModel(ro, clock, new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
 
         Assert.False(vm.HasDueTask);
+    }
+
+    // #294: the list is reconciled by id rather than rebuilt with Clear()+re-add.
+    private static Func<int> CountResets(TasksViewModel vm)
+    {
+        var resets = 0;
+        vm.Rows.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                resets++;
+            }
+        };
+        return () => resets;
+    }
+
+    private static LocalIncidentSession SessionWithThreeTasks(out FixedClock clock)
+    {
+        var (session, c, _) = NewSession();
+        clock = c;
+        session.AddTask("Erste", null, TaskImportance.High, TaskUrgency.High, 5);
+        session.AddTask("Zweite", null, TaskImportance.Medium, TaskUrgency.Medium, 15);
+        session.AddTask("Dritte", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        return session;
+    }
+
+    [Fact]
+    public void An_unrelated_change_keeps_the_task_rows_and_raises_no_reset()
+    {
+        var session = SessionWithThreeTasks(out var clock);
+        using var vm = NewVm(session, clock);
+        var rows = vm.Rows.ToArray();
+        var resets = CountResets(vm);
+
+        session.AddJournalEntry(EtbDirection.Outgoing, "Lagemeldung");
+
+        Assert.Equal(0, resets());
+        Assert.Equal(rows, vm.Rows);
+    }
+
+    [Fact]
+    public void A_completion_moves_the_kept_row_to_the_end_without_a_reset()
+    {
+        var session = SessionWithThreeTasks(out var clock);
+        using var vm = NewVm(session, clock);
+        vm.Filter = TaskFilterKind.All;
+        var first = vm.Rows[0];
+        var actions = new List<NotifyCollectionChangedAction>();
+        vm.Rows.CollectionChanged += (_, e) => actions.Add(e.Action);
+
+        session.SetTaskCompleted(first.Id, true);
+
+        Assert.Equal(new[] { "Zweite", "Dritte", "Erste" }, vm.Rows.Select(r => r.Text));
+        Assert.Same(first, vm.Rows[2]);
+        Assert.True(first.IsDone);
+        Assert.NotEqual(string.Empty, first.CompletedDisplay);
+        Assert.Equal("–", first.RemainingDisplay);
+        Assert.All(actions, a => Assert.Equal(NotifyCollectionChangedAction.Move, a));
+        Assert.NotEmpty(actions);
+    }
+
+    [Fact]
+    public void A_completion_made_elsewhere_updates_the_row_without_writing_back()
+    {
+        var session = SessionWithThreeTasks(out var clock);
+        var changes = 0;
+        using var vm = new TasksViewModel(
+            session, clock, new FakeTicker(), new FakeAlarmService(), MasterData(), () => changes++);
+        vm.Filter = TaskFilterKind.All;
+        var row = vm.Rows[1];
+        var sessionChanges = 0;
+        session.Changed += () => sessionChanges++;
+
+        session.SetTaskCompleted(row.Id, true);
+
+        Assert.True(row.IsDone);
+        Assert.Equal(1, sessionChanges);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void A_completion_arriving_in_a_snapshot_updates_the_row_without_writing_back()
+    {
+        var local = SessionWithThreeTasks(out var clock);
+        var remote = new SnapshotRoundTrippingSession(local);
+        var changes = 0;
+        using var vm = new TasksViewModel(
+            remote, clock, new FakeTicker(), new FakeAlarmService(), MasterData(), () => changes++);
+        vm.Filter = TaskFilterKind.All;
+        var row = vm.Rows[1];
+        var resets = CountResets(vm);
+        var sessionChanges = 0;
+        remote.Changed += () => sessionChanges++;
+
+        local.SetTaskCompleted(row.Id, true);
+
+        Assert.Same(row, vm.Rows[2]);
+        Assert.True(row.IsDone);
+        Assert.Equal(0, resets());
+        Assert.Equal(1, sessionChanges);
+        Assert.Equal(0, changes);
+    }
+
+    [Fact]
+    public void Switching_the_filter_shows_the_right_subset_without_a_reset()
+    {
+        var session = SessionWithThreeTasks(out var clock);
+        session.SetTaskCompleted(session.Incident.Tasks[1].Id, true);
+        using var vm = NewVm(session, clock);
+        var resets = CountResets(vm);
+
+        Assert.Equal(new[] { "Erste", "Dritte" }, vm.Rows.Select(r => r.Text));
+        vm.Filter = TaskFilterKind.Done;
+        Assert.Equal(new[] { "Zweite" }, vm.Rows.Select(r => r.Text));
+        vm.Filter = TaskFilterKind.All;
+        Assert.Equal(new[] { "Erste", "Dritte", "Zweite" }, vm.Rows.Select(r => r.Text));
+        Assert.Equal(0, resets());
+    }
+
+    [Fact]
+    public void The_selected_row_survives_a_resort()
+    {
+        var session = SessionWithThreeTasks(out var clock);
+        using var vm = NewVm(session, clock);
+        vm.Filter = TaskFilterKind.All;
+        var selected = vm.Rows[2];
+        vm.SelectedTask = selected;
+
+        session.SetTaskCompleted(vm.Rows[0].Id, true);
+
+        Assert.Same(selected, vm.SelectedTask);
+        Assert.Same(selected, vm.Rows[1]);
     }
 
     private static TasksViewModel NewVm(
