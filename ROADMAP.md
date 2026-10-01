@@ -11,7 +11,7 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.6.0, with a release every one to two weeks. The app is in real use,
+Version 0.7.0, with a release every one to two weeks. The app is in real use,
 but the `.fwincident` file format can still change between versions. That caveat
 is what 1.0 removes.
 
@@ -32,23 +32,29 @@ impossible in a released build (#381).
 
 See [CHANGELOG.md](CHANGELOG.md#060---2026-09-22) for the full list.
 
-## v0.7 — Stability, performance and field polish
+## v0.7 — Stability, performance and field polish — **released**
 
-The September 2026 architecture review found a set of hot spots that are
-invisible on a small incident and painful on a large one: quadratic rescans,
-SQLite probes on the UI thread at startup, and list rebuilds that throw away the
-user's selection and scroll position mid-Einsatz.
+Shipped 2026-10-01. The hot spots the September 2026 architecture review found
+are gone: the Kräfte, Funktionen, Aufgaben, ETB and CO-Messung lists update in
+place instead of being rebuilt, so a change from anywhere in the Einsatz no
+longer throws away the selection, the focus or an open editor; saves coalesce,
+and the Übersicht no longer opens every recent file on the UI thread.
 
-Alongside them the rest of the Übung feedback that changes no file format and
-adds no module: marking which fields are mandatory, offering to reset the
-ILS-Erinnerung after a Rückmeldung, an attachment opened from the Files tab that
-cleans its temp copy up again, and a report that says when a Trupp was last asked
-for its pressure.
+Sync grew up with it. Two devices now connect when their wire contracts overlap
+instead of when their app versions match, a joined device heals missed updates
+and survives a dropped link, the host keeps one identity per install, and a
+global PIN budget closes the share after ten wrong guesses.
 
-Nothing new gets added here. The tab you are looking at should stay where you
-left it.
+The rest of the Übung feedback landed too — Pflichtfeld markers, restarting the
+Rückmelde timer from an ETB entry, the Lagebuchführer handover, the two-step
+join, the Kontakte module, the BETEILIGTE tab, a phone layout and closing an
+Einsatz straight into the PDF protocol.
 
-Issues: #241, #290, #291, #292, #293, #294, #383, #414, #415, #425, #426
+See [CHANGELOG.md](CHANGELOG.md#070---2026-10-01) for the full list.
+
+Issues: #241, #288, #290, #291, #292, #293, #294, #295, #383, #414, #415, #425,
+#426, #443, #458, #459, #460, #463, #464, #465, #467, #468, #469, #470, #481,
+#509, #511, #518, #529
 
 ## v0.8 — Keyboard control
 
@@ -73,10 +79,10 @@ Issues: #545, #537, #538, #539, #540, #466, #541, #542, #543, #246, #544, #282
 
 ## v0.9 — Security and trust
 
-Two halves. Harden the parts that face the network and the file system: the sync
-host's pairing, the Android attachment path, the attachment size cap that today
-is enforced on upload only, and the fire-and-forget broadcasts that can swallow a
-rejected command without telling anyone. The photos a joined device pulls from
+Two halves. Harden the parts that face the network and the file system: the
+Android attachment path and the attachment size cap that today is enforced on
+upload only. (The sync host's pairing and the broadcasts that could swallow a
+rejected command were planned here and shipped early, in 0.7.) The photos a joined device pulls from
 the host belong here too — they are now capped at 500 MB, but nothing deletes
 them when the Einsatz ends, and nothing strips the GPS coordinates out of them.
 
@@ -84,7 +90,7 @@ Then make failures visible. File logging and global unhandled-exception handlers
 mean that when something goes wrong on an ELW laptop at two in the morning, there
 is something to send us afterwards.
 
-Issues: #288, #289, #295, #296, #300, #382, #384, #406, #407
+Issues: #289, #296, #300, #382, #384, #406, #407
 
 The OpenSSF Scorecard badge in the README reports two checks as weak, and both
 readings are correct. Branch-Protection and Code-Review score low because `main`
@@ -150,7 +156,7 @@ Alongside it, the layering work: `MasterDataSet` moving out of the persistence
 assembly, the session abstractions finding their right home, and German ETB
 wording moving out of the domain types.
 
-Issues: #297, #298, #299, #302, #304, #350, #400, #402, #403, #404
+Issues: #297, #298, #299, #302, #304, #350, #400, #402, #403, #404, #462
 
 ## v0.12 — New incident modules and Stammdaten
 
@@ -166,7 +172,7 @@ changes something the `.fwincident` file stores. That makes them the last work
 that can be done cheaply, because after the freeze below every one of them costs
 a forward migration that has to keep working for good.
 
-Issues: #401, #410, #420, #421, #423, #427, #428, #429
+Issues: #401, #410, #420, #421, #423, #427, #428, #429, #461
 
 ## v1.0 — File format freeze
 
@@ -189,7 +195,7 @@ Listed so the direction is visible, deliberately not scheduled:
   [lagebuch-regions](https://github.com/CodeForFire/lagebuch-regions).
   Issues: #87, #150.
 - **The UX review backlog** — accumulated findings from using the app on real
-  incidents. Issues: #262, #282.
+  incidents. Issue: #262.
 
 ## Influencing this
 

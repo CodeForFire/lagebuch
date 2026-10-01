@@ -1,1 +1,0 @@
-CO-Messung: an open WOHNUNG BEARBEITEN sidebar, and the value typed into it, now survives an unrelated change elsewhere in the incident, such as a new ETB line or an edit arriving from a joined device (#241).

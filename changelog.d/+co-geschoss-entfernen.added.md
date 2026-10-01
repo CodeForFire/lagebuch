@@ -1,1 +1,0 @@
-The CO-Messprotokoll Struktur toolbar gains OG ENTFERNEN and UG ENTFERNEN, which remove the highest Obergeschoss or lowest Untergeschoss straight away when it is empty, ask first and name each Wohnung with recorded data when it is not, and log the removed floor with what it carried in the ETB (#443).

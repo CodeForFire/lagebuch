@@ -1,1 +1,0 @@
-Joining a shared Einsatz now asks for the device and PIN first and, once the host is reached, names the Einsatz being joined and suggests the host's own personnel and Funkrufnamen for the Lagebuchführer (#459).

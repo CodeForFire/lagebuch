@@ -1,1 +1,0 @@
-Joined devices no longer warn about a possible man-in-the-middle every time the host restarts its share or starts a new incident, because the host now keeps one key per install; a genuinely different host shows a Kennung to compare against the host's screen before it is trusted.

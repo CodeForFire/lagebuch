@@ -1,1 +1,0 @@
-The Stammdaten editor's IMPORTIEREN button no longer stays greyed out once Stammdaten already exist; importing over existing data now asks for confirmation first, since the file replaces every category (#509).
