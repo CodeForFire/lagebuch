@@ -16,6 +16,16 @@ cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see 
 
 <!-- towncrier release notes start -->
 
+## [0.7.1] - 2026-10-02
+
+A patch release so the 0.7 line can be published on Google Play: Play automatic protection
+refused the 0.7.0 bundle for its Android 6.0 floor. Nothing else changes from 0.7.0.
+
+### Changed
+
+- [#551](https://github.com/CodeForFire/lagebuch/pull/551) - The Android app now requires Android 7.0 (API 24), the minimum Google Play accepts for a new release, so the 0.7 line can be published there (#550).
+
+
 ## [0.7.0] - 2026-10-01
 
 Stability under a large incident and the rest of the Übung feedback. The Kräfte, Funktionen,
@@ -430,7 +440,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/CodeForFire/lagebuch/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/CodeForFire/lagebuch/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/CodeForFire/lagebuch/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/CodeForFire/lagebuch/compare/v0.4.1...v0.5.0

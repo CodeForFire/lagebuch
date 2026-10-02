@@ -11,7 +11,7 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.7.0, with a release every one to two weeks. The app is in real use,
+Version 0.7.1, with a release every one to two weeks. The app is in real use,
 but the `.fwincident` file format can still change between versions. That caveat
 is what 1.0 removes.
 
@@ -55,6 +55,10 @@ See [CHANGELOG.md](CHANGELOG.md#070---2026-10-01) for the full list.
 Issues: #241, #288, #290, #291, #292, #293, #294, #295, #383, #414, #415, #425,
 #426, #443, #458, #459, #460, #463, #464, #465, #467, #468, #469, #470, #481,
 #509, #511, #518, #529
+
+0.7.1 followed on 2026-10-02 as a patch so the 0.7 line could go to Google Play:
+Play automatic protection refuses a bundle below Android 7.0 (API 24), which is
+now the app's floor (#550).
 
 ## v0.8 — Keyboard control
 
