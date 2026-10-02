@@ -145,7 +145,7 @@ Betriebssystem beim ersten Start einmal:
   `dpkg -i`: das Paket deklariert seine Systemabhängigkeiten (ICU, fontconfig,
   X11-Bibliotheken), die nur `apt` auflöst. Falls doch `dpkg -i`:
   `sudo apt-get -f install` räumt auf.
-- **Android** – ab Android 6.0 (API 23); `.apk` öffnen und die Installation
+- **Android** – ab Android 7.0 (API 24); `.apk` öffnen und die Installation
   aus unbekannten Quellen für diese App einmal erlauben. Die Android-App ist
   ein Begleitgerät: sie verbindet sich mit einem Einsatz, der auf einem Laptop
   gehostet wird.

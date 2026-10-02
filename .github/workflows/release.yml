@@ -215,6 +215,11 @@ jobs:
           for abi in armeabi-v7a arm64-v8a x86_64; do
             unzip -l "$apk" "lib/$abi/*" > /dev/null || { echo "::error::The APK has no lib/$abi - check RuntimeIdentifiers"; exit 1; }
           done
+          # Play automatic protection rejects a bundle whose minSdkVersion is below 24, and 0.7.0
+          # only found out at the Play upload (#550). The .apk is rendered from the same bundle.
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -n1)
+          min_sdk=$("$aapt2" dump badging "$apk" | sed -n "s/^\(minSdkVersion\|sdkVersion\):'\([0-9]*\)'$/\2/p")
+          test "${min_sdk:-0}" -ge 24 || { echo "::error::The APK has minSdkVersion '${min_sdk}', Play needs 24 - check SupportedOSPlatformVersion"; exit 1; }
           mkdir -p dist play
           cp "$apk" "dist/lagebuch-${VERSION}.apk"
           cp "$aab" "play/lagebuch-${VERSION}.aab"
