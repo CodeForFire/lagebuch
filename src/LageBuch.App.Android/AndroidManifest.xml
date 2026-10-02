@@ -4,9 +4,11 @@
      -p:ApplicationVersion, -p:ApplicationDisplayVersion and $(ApplicationId) from the csproj and
      the release workflow. That is exactly what happened: every published APK up to and including
      lagebuch-0.6.0.apk reported versionName 0.1.0 / versionCode 1, whatever its tag said. The
-     csproj is the only source of truth; the tag feeds it through release.yml. -->
+     csproj is the only source of truth; the tag feeds it through release.yml.
+     minSdkVersion is absent for the same reason: $(SupportedOSPlatformVersion) sets it. Play
+     automatic protection refuses a bundle below API 24 (#550), and release.yml checks the floor. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="36" />
+    <uses-sdk android:targetSdkVersion="36" />
     <!-- Required to join a hosted Einsatz. The Android SDK adds INTERNET to Debug builds by
          itself so the debugger can attach, which is why every development device had it and no
          released one did: a Release APK declared no permission at all and the connection could
