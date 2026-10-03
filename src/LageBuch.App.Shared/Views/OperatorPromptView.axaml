@@ -11,7 +11,8 @@
        screen. Avalonia centres a Stretch element that MaxWidth has made narrower than its
        slot, so a wide window looks exactly as it did. The scrim inset drops 40 -> 16 for the
        same reason; on a desktop the card never comes near either. -->
-  <Border Background="#B3070A10" Padding="16" Focusable="True" KeyDown="OnKeyDown">
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CancelCommand}">
     <Border MaxWidth="400" VerticalAlignment="Center" HorizontalAlignment="Stretch"
             Background="{StaticResource SurfaceRaisedBrush}"
             BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"

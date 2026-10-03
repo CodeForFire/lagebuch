@@ -1,0 +1,1 @@
+Every dialog now takes keyboard focus when it opens, keeps Tab inside, closes on Esc and returns focus to where it was opened; the task dialog no longer leaves typing going into the ETB field behind it, and Enter on a remove confirmation cancels instead of confirming (#538).

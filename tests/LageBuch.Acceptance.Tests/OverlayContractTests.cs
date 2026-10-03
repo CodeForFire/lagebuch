@@ -33,32 +33,9 @@ internal enum OverlayClause
 // so the fix in #538 turns this red until its entry is deleted.
 public class OverlayContractTests
 {
-    // Measured on main before #538. Each entry is a promise that the clause still fails; delete it
-    // with the fix.
-    private static readonly Dictionary<(string Scenario, OverlayClause Clause), string> KnownFailures = new()
-    {
-        [("Workspace.Confirm", OverlayClause.FocusInside)] = "#538: ConfirmDialogView focuses CancelButton synchronously on attach, before layout, and the call is dropped",
-        [("MasterDataEditor.Confirm", OverlayClause.FocusInside)] = "#538: ConfirmDialogView focuses CancelButton synchronously on attach, before layout, and the call is dropped",
-        [("Workspace.TaskDialog", OverlayClause.FocusInside)] = "#538: the view sets no initial focus",
-        [("Workspace.PdfExportOptions", OverlayClause.FocusInside)] = "#538: the view sets no initial focus",
-        [("Workspace.OperatorPrompt", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("Workspace.Confirm", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("Workspace.TaskDialog", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("Workspace.PdfExportOptions", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("Workspace.IncidentDataDialog", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("Main.OperatorPrompt", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("Main.About", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("MasterDataEditor.Confirm", OverlayClause.TabStaysInside)] = "#538: no overlay keeps Tab inside (no TabNavigation=Cycle)",
-        [("Workspace.TaskDialog", OverlayClause.EscCancels)] = "#538: TaskDialogView has no Esc handler",
-        [("Workspace.OperatorPrompt", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-        [("Workspace.Confirm", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-        [("Workspace.TaskDialog", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-        [("Workspace.PdfExportOptions", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-        [("Workspace.IncidentDataDialog", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-        [("Main.OperatorPrompt", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-        [("Main.About", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-        [("MasterDataEditor.Confirm", OverlayClause.FocusReturns)] = "#538: nothing hands focus back to the opener when an overlay closes",
-    };
+    // Clauses an overlay still fails, each with its reason and the issue that fixes it. A listed
+    // clause must keep failing; delete the entry with the fix. Empty since #538.
+    private static readonly Dictionary<(string Scenario, OverlayClause Clause), string> KnownFailures = new();
 
     private static readonly OverlayScenario[] Scenarios =
     [

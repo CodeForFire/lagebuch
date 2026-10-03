@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Threading;
 using LageBuch.AppLogic.ViewModels;
 
@@ -63,16 +62,6 @@ public partial class OperatorPromptView : UserControl
         else
         {
             OperatorNameBox.Focus();
-        }
-    }
-
-    // Escape dismisses the prompt. The textboxes' KeyBindings already map Enter to confirm.
-    private void OnKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape && DataContext is OperatorPromptViewModel vm)
-        {
-            vm.CancelCommand.Execute(null);
-            e.Handled = true;
         }
     }
 }
