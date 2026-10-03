@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              x:Class="LageBuch.App.Shared.Views.IncidentDataDialogView"
              x:DataType="vm:IncidentDataDialogViewModel">
@@ -8,7 +9,9 @@
        screen. Avalonia centres a Stretch element that MaxWidth has made narrower than its
        slot, so a wide window looks exactly as it did. The scrim inset drops 40 -> 16 for the
        same reason; on a desktop the card never comes near either. -->
-  <Border Background="#B3070A10" Padding="16" Focusable="True" KeyDown="OnKeyDown">
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CancelCommand}" b:Overlay.PrimaryCommand="{Binding SaveCommand}"
+          b:Overlay.InitialFocus="{Binding #IncidentDataKeywordBox}">
     <Border x:Name="IncidentDataDialogCard" MaxWidth="480" VerticalAlignment="Center" HorizontalAlignment="Stretch"
             Background="{StaticResource SurfaceRaisedBrush}"
             BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
