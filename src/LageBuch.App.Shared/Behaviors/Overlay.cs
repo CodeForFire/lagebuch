@@ -226,7 +226,7 @@ public static class Overlay
     private static bool IsWithin(Control root, IInputElement? element) =>
         element is Visual visual
         && (ReferenceEquals(visual, root) || root.IsVisualAncestorOf(visual)
-            || (visual is ILogical logical && root.IsLogicalAncestorOf(logical)));
+            || root.IsLogicalAncestorOf(visual));
 
     private static bool IsInOverlay(Visual visual) =>
         visual.GetSelfAndVisualAncestors().OfType<Control>().Any(c => GetCancelCommand(c) is not null);
