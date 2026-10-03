@@ -410,8 +410,13 @@
     <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
     <Setter Property="Background" Value="#0C1119" />
   </Style>
+  <!-- Text inputs show focus on their own edge, on any focus: a click into a field must show where
+       the typing goes too. So they take the focus colour on :focus and no adorner (#541). -->
+  <Style Selector="TextBox, ComboBox">
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+  </Style>
   <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-    <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
     <Setter Property="Background" Value="#0C1119" />
   </Style>
   <Style Selector="TextBox /template/ TextBlock#PART_Watermark, TextBox /template/ TextBlock#PART_FloatingWatermark">
@@ -436,7 +441,7 @@
     <Setter Property="Background" Value="#0C1119" />
   </Style>
   <Style Selector="ComboBox:focus /template/ Border#Background">
-    <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource FocusBrush}" />
     <Setter Property="Background" Value="#0C1119" />
   </Style>
   <Style Selector="ComboBoxItem">
