@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -49,8 +48,7 @@ public class RolesPhoneFocusTests
 
         foreach (var ch in "2345")
         {
-            window.KeyTextInput(ch.ToString());
-            Dispatcher.UIThread.RunJobs();
+            window.Type(ch.ToString());
 
             var focused = window.FocusManager?.GetFocusedElement();
             Assert.True(
@@ -78,8 +76,7 @@ public class RolesPhoneFocusTests
         phoneBox.Focus();
         Dispatcher.UIThread.RunJobs();
         phoneBox.SelectAll();
-        window.KeyTextInput("0172");
-        Dispatcher.UIThread.RunJobs();
+        window.Type("0172");
 
         // Blur the field the way an operator tabbing away would.
         view.GetControl<AutoCompleteBox>("RoleBox").Focus();

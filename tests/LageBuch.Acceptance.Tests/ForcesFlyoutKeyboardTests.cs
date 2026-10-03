@@ -71,8 +71,7 @@ public class ForcesFlyoutKeyboardTests
         zfHeader.GetVisualDescendants().OfType<TextBox>().Single().Focus();
         Dispatcher.UIThread.RunJobs();
 
-        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Escape);
 
         var message = "Escape did not close the Stärke-korrigieren flyout -- Avalonia's built-in " +
             "Flyout light-dismiss no longer covers this, so explicit Escape handling needs to be added.";
@@ -93,8 +92,7 @@ public class ForcesFlyoutKeyboardTests
         zfBox.Focus();
         zfBox.SelectAll();
         window.KeyTextInput("1");
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
 
         // A commit rebuilds the row (same idiom as ForcesTabRenderTests' strength-correction
         // test), so the current state has to be re-read from the collection, not the pre-commit
@@ -129,8 +127,7 @@ public class ForcesFlyoutKeyboardTests
         Dispatcher.UIThread.RunJobs();
         Assert.True(historyButton.Flyout!.IsOpen);
 
-        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Escape);
 
         var message = "Escape did not close the Verlauf flyout -- its content must grab focus " +
             "on open (OnHistoryFlyoutOpened) for Avalonia's built-in Flyout light-dismiss to " +

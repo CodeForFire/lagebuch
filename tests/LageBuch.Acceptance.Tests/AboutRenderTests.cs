@@ -103,8 +103,7 @@ public class AboutRenderTests
         var about = Assert.IsType<AboutViewModel>(mainVm.PendingAbout);
         Capture(window, "about-open.png");
 
-        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Escape);
 
         Assert.Null(mainVm.PendingAbout);
 

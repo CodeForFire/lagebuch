@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -54,8 +53,7 @@ public class CoMessprotokollCoValueInputTests
         var input = view.GetControl<NumericUpDown>("CoValueInput");
 
         input.Focus();
-        window.KeyTextInput("2500");
-        Dispatcher.UIThread.RunJobs();
+        window.Type("2500");
 
         Assert.NotNull(vm.Editor);
         Assert.Equal(2500, vm.Editor!.CoValue);
@@ -73,10 +71,8 @@ public class CoMessprotokollCoValueInputTests
         var input = view.GetControl<NumericUpDown>("CoValueInput");
 
         input.Focus();
-        window.KeyTextInput("2500");
-        Dispatcher.UIThread.RunJobs();
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Type("2500");
+        window.Press(PhysicalKey.Enter);
 
         Assert.NotNull(vm.Editor);
         Assert.True(vm.Editor!.IsCoImplausible);
@@ -96,8 +92,7 @@ public class CoMessprotokollCoValueInputTests
         var input = view.GetControl<NumericUpDown>("CoValueInput");
 
         input.Focus();
-        window.KeyTextInput("111111111");
-        Dispatcher.UIThread.RunJobs();
+        window.Type("111111111");
 
         Assert.NotNull(vm.Editor);
         Assert.Equal(9999, vm.Editor!.CoValue);
@@ -112,8 +107,7 @@ public class CoMessprotokollCoValueInputTests
         var input = view.GetControl<NumericUpDown>("CoValueInput");
 
         input.Focus();
-        window.KeyTextInput("2500");
-        Dispatcher.UIThread.RunJobs();
+        window.Type("2500");
 
         vm.ConfirmEditorCommand.Execute(null); // what the FERTIG Button invokes
         Dispatcher.UIThread.RunJobs();
