@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Avalonia;
@@ -18,6 +19,10 @@ namespace LageBuch.App.Shared.Behaviors;
 ///
 /// A destructive confirm sets no primary command: Enter then activates the focused button, which
 /// starts out as ABBRECHEN, so a reflex Enter cancels.
+///
+/// An inline panel (<see cref="IsInlineProperty"/>) is drawn by its module's own XAML and shown
+/// by <c>IsVisible</c>, so it opens and closes with that rather than with the visual tree, and it
+/// is not modal: the page beside it stays live, so focus that leaves it is not pulled back.
 /// </summary>
 public static class Overlay
 {
@@ -30,6 +35,20 @@ public static class Overlay
     /// <summary>Where focus goes when the overlay opens; the first tab stop when unset.</summary>
     public static readonly AttachedProperty<Control?> InitialFocusProperty =
         AvaloniaProperty.RegisterAttached<Control, Control?>("InitialFocus", typeof(Overlay));
+
+    /// <summary>
+    /// Marks an inline panel: it opens and closes with its own <c>IsVisible</c>, and focus may
+    /// leave it for the page beside it.
+    /// </summary>
+    public static readonly AttachedProperty<bool> IsInlineProperty =
+        AvaloniaProperty.RegisterAttached<Control, bool>("IsInline", typeof(Overlay));
+
+    /// <summary>
+    /// Where focus goes on close when the opener is gone, as a row button is once saving rebuilt
+    /// its row.
+    /// </summary>
+    public static readonly AttachedProperty<Control?> FallbackFocusProperty =
+        AvaloniaProperty.RegisterAttached<Control, Control?>("FallbackFocus", typeof(Overlay));
 
     // The control that had focus when the overlay was shown: the one focus goes back to.
     private static readonly ConditionalWeakTable<Control, IInputElement> Openers = new();
@@ -82,6 +101,30 @@ public static class Overlay
         return target.GetValue(InitialFocusProperty);
     }
 
+    public static void SetIsInline(Control target, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        target.SetValue(IsInlineProperty, value);
+    }
+
+    public static bool GetIsInline(Control target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.GetValue(IsInlineProperty);
+    }
+
+    public static void SetFallbackFocus(Control target, Control? value)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        target.SetValue(FallbackFocusProperty, value);
+    }
+
+    public static Control? GetFallbackFocus(Control target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.GetValue(FallbackFocusProperty);
+    }
+
     private static void Attach(Control root)
     {
         // Focusable so focus can rest on the overlay itself when the focused control inside is
@@ -93,7 +136,8 @@ public static class Overlay
         root.DetachedFromVisualTree += OnDetached;
         root.AddHandler(InputElement.KeyDownEvent, OnKeyDown);
         root.AddHandler(InputElement.LostFocusEvent, OnLostFocus);
-        if (root.IsAttachedToVisualTree())
+        root.PropertyChanged += OnPropertyChanged;
+        if (root.IsAttachedToVisualTree() && !GetIsInline(root))
         {
             Opened(root);
         }
@@ -105,11 +149,14 @@ public static class Overlay
         root.DetachedFromVisualTree -= OnDetached;
         root.RemoveHandler(InputElement.KeyDownEvent, OnKeyDown);
         root.RemoveHandler(InputElement.LostFocusEvent, OnLostFocus);
+        root.PropertyChanged -= OnPropertyChanged;
     }
 
+    // An inline panel stays in the tree; arriving at its module by the rail is not opening it, so
+    // only its IsVisible counts.
     private static void OnAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        if (sender is Control root)
+        if (sender is Control root && !GetIsInline(root))
         {
             Opened(root);
         }
@@ -157,13 +204,57 @@ public static class Overlay
 
     private static void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        if (sender is not Control root || !Openers.TryGetValue(root, out var opener))
+        if (sender is not Control root)
         {
             return;
         }
 
+        if (GetIsInline(root))
+        {
+            // Leaving the module by the rail is not closing the panel; nothing to give back.
+            Openers.Remove(root);
+            return;
+        }
+
+        if (Openers.TryGetValue(root, out var opener))
+        {
+            Closed(root, TopLevel.GetTopLevel(e.RootVisual), opener);
+        }
+    }
+
+    private static void OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != Visual.IsVisibleProperty || sender is not Control root
+            || !GetIsInline(root) || !root.IsAttachedToVisualTree())
+        {
+            return;
+        }
+
+        if (root.IsVisible)
+        {
+            Opened(root);
+            return;
+        }
+
+        // Closed. Focus goes back only if it was in the panel: a Lagebuchführer who has already
+        // moved on to the page beside it keeps their place.
+        var topLevel = TopLevel.GetTopLevel(root);
+        var focused = topLevel?.FocusManager?.GetFocusedElement();
+        Openers.TryGetValue(root, out var opener);
+        if (focused is null || IsWithin(root, focused))
+        {
+            Closed(root, topLevel, opener);
+        }
+        else
+        {
+            Openers.Remove(root);
+        }
+    }
+
+    private static void Closed(Control root, TopLevel? topLevel, IInputElement? opener)
+    {
         Openers.Remove(root);
-        var topLevel = TopLevel.GetTopLevel(e.RootVisual);
+        var fallback = GetFallbackFocus(root);
         Dispatcher.UIThread.Post(() =>
         {
             // Another overlay may have opened in the same breath (a confirm chaining into the PDF
@@ -173,13 +264,14 @@ public static class Overlay
                 return;
             }
 
-            if (opener is Visual { } visual && visual.IsAttachedToVisualTree()
-                && opener.IsEffectivelyVisible && opener.IsEffectivelyEnabled)
-            {
-                opener.Focus(NavigationMethod.Tab);
-            }
+            var target = CanTakeFocus(opener) ? opener : CanTakeFocus(fallback) ? fallback : null;
+            target?.Focus(NavigationMethod.Tab);
         });
     }
+
+    private static bool CanTakeFocus([NotNullWhen(true)] IInputElement? element) =>
+        element is Visual visual && visual.IsAttachedToVisualTree()
+        && element.IsEffectivelyVisible && element.IsEffectivelyEnabled;
 
     private static void OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -206,7 +298,7 @@ public static class Overlay
     // overlay instead.
     private static void OnLostFocus(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Control root)
+        if (sender is not Control root || GetIsInline(root))
         {
             return;
         }

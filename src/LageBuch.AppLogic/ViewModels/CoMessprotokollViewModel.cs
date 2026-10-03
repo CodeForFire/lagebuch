@@ -584,6 +584,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
     /// Like <see cref="Editor"/>, nothing it holds has reached the session.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsApartmentRemovalOpen))]
+    [NotifyCanExecuteChangedFor(nameof(CancelApartmentRemovalCommand))]
     private ApartmentRemovalViewModel? _pendingApartmentRemoval;
 
     public bool IsApartmentRemovalOpen => PendingApartmentRemoval is not null;
@@ -1094,7 +1095,9 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         Refresh();
     }
 
-    [RelayCommand]
+    // Gated so the Esc bound on the matrix (#538) does nothing, and in particular does not rebuild
+    // the rows under the focused spinner, while no removal is pending.
+    [RelayCommand(CanExecute = nameof(IsApartmentRemovalOpen))]
     private void CancelApartmentRemoval()
     {
         PendingApartmentRemoval = null;

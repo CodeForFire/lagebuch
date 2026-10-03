@@ -205,11 +205,14 @@
 
     <!-- Transfer panel: a small form below the grid, mirroring EtbView's edit panel, shown only
          while a handover is in progress (not inline DataGrid cell editing) — a transfer needs its
-         own person/call sign/phone, not a single cell. -->
+         own person/call sign/phone, not a single cell. Keyboard as EtbView's edit panel (#538). -->
     <Border DockPanel.Dock="Bottom" x:Name="TransferPanel" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
-            IsVisible="{Binding IsTransferring}">
+            IsVisible="{Binding IsTransferring}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CancelTransferCommand}" b:Overlay.PrimaryCommand="{Binding ConfirmTransferCommand}"
+            b:Overlay.InitialFocus="{Binding #TransferPersonNameBox}" b:Overlay.FallbackFocus="{Binding #PersonNameBox}">
       <StackPanel Spacing="10">
         <!-- No Foreground here (#413): "mono" already paints TextSecondary, and the inline
              override this line used to carry pushed it down to TextMuted. Muted is a

@@ -165,11 +165,16 @@
     </Border>
 
     <!-- Edit panel: a small form below the grid, mirroring the input dock's visual language, shown
-         only while a row is being edited (not inline DataGrid cell editing). -->
+         only while a row is being edited (not inline DataGrid cell editing). It keeps the overlay
+         keyboard contract (#538) as an inline panel. Closing hands focus back to the row's edit
+         button; if a rebuild has taken that away meanwhile, to the entry field. -->
     <Border DockPanel.Dock="Bottom" x:Name="EditPanel" Margin="0,16,0,0"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
-            IsVisible="{Binding IsEditing}">
+            IsVisible="{Binding IsEditing}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CancelEditCommand}" b:Overlay.PrimaryCommand="{Binding SaveEditCommand}"
+            b:Overlay.InitialFocus="{Binding #EditTextBox}" b:Overlay.FallbackFocus="{Binding #EtbTextBox}">
       <StackPanel Spacing="6">
         <StackPanel x:Name="EditFields" Spacing="8">
           <HeaderedContentControl Classes="field required" Header="EINTRAG"

@@ -99,4 +99,29 @@ public class ScbaSafetyTruppFlyoutTests
 
         Assert.False(picker.Flyout!.IsOpen);
     }
+
+    // #538: Avalonia's Flyout already keeps the overlay contract here, so this pins it rather than
+    // fixing anything. Opened from the keyboard, focus goes to the first entry, and Esc hands it
+    // back to the button.
+    [AvaloniaFact]
+    public void The_picker_opened_by_keyboard_takes_focus_and_gives_it_back_on_Esc()
+    {
+        var (window, view, scba) = Build();
+        var picker = PickerButton(view, scba.Trupps[^1]);
+        picker.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+
+        var flyout = Assert.IsType<Flyout>(picker.Flyout);
+
+        window.Press(PhysicalKey.Enter);
+
+        Assert.True(flyout.IsOpen);
+        var first = window.GetVisualDescendants().OfType<Button>().First(b => b.DataContext is SafetyTruppChoice);
+        window.AssertFocused(first);
+
+        window.Press(PhysicalKey.Escape);
+
+        Assert.False(flyout.IsOpen);
+        window.AssertFocused(picker);
+    }
 }

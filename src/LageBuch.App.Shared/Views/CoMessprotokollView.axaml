@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              xmlns:dom="clr-namespace:LageBuch.Domain.CoMeasurement;assembly=LageBuch.Domain"
@@ -105,7 +106,7 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
         </HeaderedContentControl>
-        <Button Content="HAUS ENTFERNEN"
+        <Button x:Name="RemoveBuildingButton" Content="HAUS ENTFERNEN"
                 Command="{Binding RemoveBuildingCommand}"
                 IsEnabled="{Binding CanModify}"
                 VerticalAlignment="Bottom" Margin="0,0,0,1" />
@@ -119,9 +120,12 @@
 
     <!-- Add Building Dialog: opened by the HAUS HINZUFÜGEN button in the bottom dock, so it
          expands directly above that dock rather than at the top, away from the button that
-         opened it. -->
-    <Border DockPanel.Dock="Bottom"
+         opened it. Keeps the overlay keyboard contract as an inline panel (#538). -->
+    <Border x:Name="AddBuildingPanel" DockPanel.Dock="Bottom"
             IsVisible="{Binding IsAddBuildingDialogOpen}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CancelAddBuildingCommand}" b:Overlay.PrimaryCommand="{Binding ConfirmAddBuildingCommand}"
+            b:Overlay.InitialFocus="{Binding #NewBuildingNameBox}"
             Background="#0F141D"
             BorderBrush="{StaticResource HairlineBrush}"
             BorderThickness="1"
@@ -155,9 +159,15 @@
       </StackPanel>
     </Border>
 
-    <!-- Remove Building Confirmation -->
-    <Border DockPanel.Dock="Top" 
+    <!-- Remove Building Confirmation. A destructive confirm (#538, contract 1 of #545): focus
+         starts on ABBRECHEN and there is no primary command, so a reflex Enter cancels. HAUS HINZUFÜGEN
+         is the fallback: HAUS ENTFERNEN is disabled once the last house is gone. -->
+    <Border x:Name="RemoveBuildingPanel" DockPanel.Dock="Top"
             IsVisible="{Binding IsRemoveBuildingConfirmOpen}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CancelRemoveBuildingCommand}"
+            b:Overlay.InitialFocus="{Binding #CancelRemoveBuildingButton}"
+            b:Overlay.FallbackFocus="{Binding #AddBuildingButton}"
             Background="#0F141D" 
             BorderBrush="{StaticResource HairlineBrush}" 
             BorderThickness="1"
@@ -167,8 +177,8 @@
         <TextBlock Text="HAUS ENTFERNEN" Classes="overline" />
         <TextBlock Text="Möchten Sie das ausgewählte Haus wirklich entfernen? Alle zugehörigen Wohnungen werden ebenfalls gelöscht." TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Classes="signal" Content="ENTFERNEN" Command="{Binding ConfirmRemoveBuildingCommand}" />
-          <Button Content="ABBRECHEN" Command="{Binding CancelRemoveBuildingCommand}" />
+          <Button x:Name="ConfirmRemoveBuildingButton" Classes="signal" Content="ENTFERNEN" Command="{Binding ConfirmRemoveBuildingCommand}" />
+          <Button x:Name="CancelRemoveBuildingButton" Content="ABBRECHEN" Command="{Binding CancelRemoveBuildingCommand}" />
         </StackPanel>
       </StackPanel>
     </Border>
@@ -178,7 +188,9 @@
          overlay: that one focuses its Cancel button on attach, and NumericUpDown commits its
          pending text on LostFocus, so opening it would push another value through the spinner's
          binding and re-enter the very handler that raised the question. A Border takes no focus,
-         so the crew can keep typing the count they meant. -->
+         so the crew can keep typing the count they meant. For the same reason it is the one panel
+         outside the overlay keyboard contract (#538): it never takes focus, and Esc reaches its
+         cancel through the KeyBinding on the matrix, where the spinner that raised it sits. -->
     <Border x:Name="ApartmentRemovalPanel"
             DockPanel.Dock="Top"
             IsVisible="{Binding IsApartmentRemovalOpen}"
@@ -237,10 +249,15 @@
                IsVisible="{Binding !HasBuildings}"
                Margin="0,20,0,0" HorizontalAlignment="Center" />
 
-    <!-- Editor Sidebar (right) -->
+    <!-- Editor Sidebar (right). An inline panel under the overlay keyboard contract (#538), but
+         with no primary command: Enter must not commit, see CoValueInput below. FERTIG rebuilds
+         the tile that opened it, so focus falls back to the house picker. -->
     <Border x:Name="DwellingEditor"
             DockPanel.Dock="Right"
             IsVisible="{Binding IsEditorOpen}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CloseEditorCommand}"
+            b:Overlay.FallbackFocus="{Binding #BuildingBox}"
             Background="#0F141D"
             BorderBrush="{StaticResource HairlineBrush}"
             BorderThickness="1,0,0,0"
@@ -454,10 +471,14 @@
 
     <!-- Geschoss entfernen (#443): raised only when the floor carries something a crew recorded.
          No picker as for Wohnungen (#419): the whole floor goes or none of it, so this just
-         names what hangs on it. Sits under the toolbar that raised it. -->
+         names what hangs on it. Sits under the toolbar that raised it. A destructive confirm
+         (#538): focus starts on ABBRECHEN, and Enter only presses the focused button. -->
     <Border x:Name="FloorRemovalPanel"
             DockPanel.Dock="Top"
             IsVisible="{Binding IsFloorRemovalOpen}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CancelFloorRemovalCommand}"
+            b:Overlay.InitialFocus="{Binding #CancelFloorRemovalButton}"
             Background="#0F141D"
             BorderBrush="{StaticResource HairlineBrush}"
             BorderThickness="1"
@@ -499,7 +520,12 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                   AllowAutoHide="False"
                   IsVisible="{Binding ShowMatrix}">
-      <ItemsControl ItemsSource="{Binding MatrixRows}">
+      <ItemsControl x:Name="MatrixRowsList" ItemsSource="{Binding MatrixRows}">
+        <!-- Esc from a floor's Wohnungen spinner cancels the removal it raised (#538); see
+             ApartmentRemovalPanel for why focus stays here instead of moving into the panel. -->
+        <ItemsControl.KeyBindings>
+          <KeyBinding Gesture="Escape" Command="{Binding CancelApartmentRemovalCommand}" />
+        </ItemsControl.KeyBindings>
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
             <StackPanel Spacing="2" />
