@@ -482,6 +482,14 @@ Write code that trips neither:
   `Assert.Equal(expected, actual, precision: 0)`, or `Math.Abs(a - b) <= 1.0` —
   and never with `Assert.Equal(0, someDouble)`, which is an exact comparison
   wearing a method call.
+- **Never type-test a value against a type it already is** (`cs/useless-type-test`).
+  Neither the compiler nor the analyzers warn, so `make clean ci` passes and
+  the pull request's code scanning blocks it instead. Avalonia makes this easy
+  to miss, because the hierarchy is deep: every `Visual` is a `StyledElement`
+  and therefore an `ILogical`, so `visual is ILogical logical` is always true
+  (#555). Pass the value directly — `root.IsLogicalAncestorOf(visual)`. The
+  quick proof is to delete the test and build: if it still compiles, the test
+  was useless.
 - **Never call an API the toolchain marks obsolete.** When the warning names
   the replacement, use it — `TextBox.Watermark` → `PlaceholderText`. On the C#
   side `TreatWarningsAsErrors` already fails the build (CS0612/0618/0619), but
