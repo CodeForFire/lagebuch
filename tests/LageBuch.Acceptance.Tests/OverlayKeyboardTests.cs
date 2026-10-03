@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -6,6 +7,7 @@ using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.App.Shared.Behaviors;
 using LageBuch.App.Shared.Views;
+using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -14,10 +16,10 @@ using LageBuch.Persistence.MasterData;
 namespace LageBuch.Acceptance.Tests;
 
 // #538: the flows the overlay contract exists for, end to end, and the Overlay behaviour's own
-// rules on a minimal overlay. OverlayContractTests checks the four clauses on every overlay.
+// rules on a minimal overlay and a minimal inline panel. OverlayContractTests checks the four clauses on every overlay.
 public class OverlayKeyboardTests
 {
-    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
+    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace(Action<LocalIncidentSession>? seed = null)
     {
         var session = TestSession.StartNew(
             new FakeStore(),
@@ -26,6 +28,7 @@ public class OverlayKeyboardTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
+        seed?.Invoke(session);
         var vm = new IncidentWorkspaceViewModel(
             session,
             new FixedClock(),
@@ -90,6 +93,71 @@ public class OverlayKeyboardTests
         Assert.Single(vm.Forces.Forces);
     }
 
+    // #538, an inline panel end to end: Enter on a row's edit button opens the panel with focus in
+    // the text, Enter saves, and focus goes back to that row's button, which the save kept.
+    [AvaloniaFact]
+    public void An_ETB_entry_is_edited_by_keyboard_and_focus_returns_to_its_row()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        vm.Etb.NewText = "Lagemeldung übermittelt";
+        vm.Etb.AddEntryCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        var edit = Named<DataGrid>(window, "EtbGrid").GetVisualDescendants().OfType<Button>()
+            .First(b => b.IsEffectivelyVisible && AutomationProperties.GetName(b) == "Bearbeiten");
+        edit.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+
+        window.Press(PhysicalKey.Enter);
+
+        Assert.True(vm.Etb.IsEditing);
+        window.AssertFocused(Named<TextBox>(window, "EditTextBox"));
+
+        window.Type("Lagemeldung an ILS übermittelt");
+        window.Press(PhysicalKey.Enter);
+
+        Assert.False(vm.Etb.IsEditing);
+        Assert.Contains(vm.Etb.Entries, e => e.Text == "Lagemeldung an ILS übermittelt");
+        window.AssertFocused(edit);
+    }
+
+    // Contract 1 on an inline confirm: HAUS ENTFERNEN, then a reflex Enter, keeps the house.
+    [AvaloniaFact]
+    public void Enter_on_the_CO_remove_house_panel_removes_nothing()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AddCoBuilding("Mehrfamilienhaus A", 2, 2));
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        var remove = Named<Button>(window, "RemoveBuildingButton");
+        remove.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+
+        window.Press(PhysicalKey.Enter);
+        Assert.True(vm.CoMessprotokoll.IsRemoveBuildingConfirmOpen);
+        window.Press(PhysicalKey.Enter);
+
+        Assert.False(vm.CoMessprotokoll.IsRemoveBuildingConfirmOpen);
+        Assert.Single(vm.CoMessprotokoll.BuildingOptions);
+        window.AssertFocused(remove);
+    }
+
+    // Arriving at a module by the rail is not opening its panel: an inline panel that is still open
+    // from before does not pull focus in (#542's "the rail doesn't steal focus").
+    [AvaloniaFact]
+    public void Returning_to_a_module_with_an_open_panel_does_not_pull_focus_into_it()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        vm.CoMessprotokoll.AddBuildingCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(vm.CoMessprotokoll.IsAddBuildingDialogOpen);
+
+        WorkspaceRenderHelper.SelectTab(window, "KRÄFTE");
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+
+        Assert.True(vm.CoMessprotokoll.IsAddBuildingDialogOpen);
+        Assert.False(window.IsFocusWithin(Named<Border>(window, "AddBuildingPanel")), $"focus is on {window.DescribeFocus()}");
+    }
+
     // The busy state disables the whole form, focused button included; focus must not fall out to
     // the page behind, where the next key would land.
     [AvaloniaFact]
@@ -135,6 +203,74 @@ public class OverlayKeyboardTests
         host.Children.Add(root);
         Dispatcher.UIThread.RunJobs();
         return new(window, root, field, notes, opener, host);
+    }
+
+    private sealed record Inline(Window Window, Border Panel, TextBox Field, Button Opener, TextBox Page, StackPanel Host);
+
+    // An inline panel: in the tree from the start, hidden, beside a page that stays live.
+    private static Inline ShowInline(Action<Border>? configure = null)
+    {
+        var field = new TextBox { Name = "Field" };
+        var panel = new Border { IsVisible = false, Child = new StackPanel { Children = { field, new Button { Content = "OK" } } } };
+        Overlay.SetIsInline(panel, true);
+        Overlay.SetCancelCommand(panel, new RelayCommand(() => panel.IsVisible = false));
+        configure?.Invoke(panel);
+        var opener = new Button { Name = "Opener", Content = "BEARBEITEN" };
+        var page = new TextBox { Name = "Page" };
+        var host = new StackPanel { Children = { page, opener, panel } };
+        var window = new Window { Content = host, Width = 800, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        opener.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        return new(window, panel, field, opener, page, host);
+    }
+
+    [AvaloniaFact]
+    public void An_inline_panel_takes_focus_when_shown_and_gives_it_back_on_Esc()
+    {
+        var o = ShowInline();
+
+        o.Panel.IsVisible = true;
+        Dispatcher.UIThread.RunJobs();
+        o.Window.AssertFocused(o.Field);
+
+        o.Window.Press(PhysicalKey.Escape);
+
+        Assert.False(o.Panel.IsVisible);
+        o.Window.AssertFocused(o.Opener);
+    }
+
+    // Not modal: the page beside it stays live.
+    [AvaloniaFact]
+    public void Focus_that_leaves_an_inline_panel_is_not_pulled_back_nor_moved_when_it_closes()
+    {
+        var o = ShowInline();
+        o.Panel.IsVisible = true;
+        Dispatcher.UIThread.RunJobs();
+
+        o.Page.Focus(NavigationMethod.Pointer);
+        Dispatcher.UIThread.RunJobs();
+        o.Window.AssertFocused(o.Page);
+
+        o.Panel.IsVisible = false;
+        Dispatcher.UIThread.RunJobs();
+        o.Window.AssertFocused(o.Page);
+    }
+
+    [AvaloniaFact]
+    public void Focus_falls_back_when_the_opener_is_gone()
+    {
+        var o = ShowInline();
+        Overlay.SetFallbackFocus(o.Panel, o.Page);
+        o.Panel.IsVisible = true;
+        Dispatcher.UIThread.RunJobs();
+
+        // Saving rebuilt the row, and its button with it.
+        o.Host.Children.Remove(o.Opener);
+        o.Window.Press(PhysicalKey.Escape);
+
+        o.Window.AssertFocused(o.Page);
     }
 
     [AvaloniaFact]

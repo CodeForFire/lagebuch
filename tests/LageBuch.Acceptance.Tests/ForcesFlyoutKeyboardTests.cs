@@ -134,4 +134,36 @@ public class ForcesFlyoutKeyboardTests
             "have a focused element inside the popup to route the key press through.";
         Assert.False(historyButton.Flyout!.IsOpen, message);
     }
+
+    // #538: Avalonia's Flyout already keeps the overlay contract here, so this pins it rather than
+    // fixing anything. Opened from the keyboard, focus goes to its first field, and Esc hands it
+    // back to the button, so the next Tab carries on along the row.
+    [AvaloniaFact]
+    public void The_strength_flyout_opened_by_keyboard_takes_focus_and_gives_it_back_on_Esc()
+    {
+        var vm = BuildForcesVm(out _);
+        var view = new ForcesView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1200, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var flyoutButton = view.GetControl<DataGrid>("ForcesGrid").GetVisualDescendants().OfType<Button>()
+            .Single(b => (ToolTip.GetTip(b) as string) == "Stärke korrigieren");
+        flyoutButton.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+
+        var flyout = Assert.IsType<Flyout>(flyoutButton.Flyout);
+
+        window.Press(PhysicalKey.Enter);
+
+        Assert.True(flyout.IsOpen);
+        var zfBox = window.GetVisualDescendants().OfType<HeaderedContentControl>()
+            .Single(h => (h.Header as string) == "ZUGFÜHRER (ZF)")
+            .GetVisualDescendants().OfType<TextBox>().Single();
+        window.AssertFocused(zfBox);
+
+        window.Press(PhysicalKey.Escape);
+
+        Assert.False(flyout.IsOpen);
+        window.AssertFocused(flyoutButton);
+    }
 }

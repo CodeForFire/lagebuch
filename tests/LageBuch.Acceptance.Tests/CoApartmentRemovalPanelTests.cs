@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -89,5 +90,43 @@ public class CoApartmentRemovalPanelTests
         Assert.False(Panel(window).IsEffectivelyVisible);
         Assert.Equal(4, vm.MatrixRows.Single(r => r.Ordinal == 0).ApartmentCount);
         Assert.Equal(4, session.Incident.Buildings[0].ApartmentsFor(0));
+    }
+
+    private static NumericUpDown Spinner(Window window) =>
+        window.GetVisualDescendants().OfType<NumericUpDown>().Single(n => n.DataContext is FloorRowViewModel { Ordinal: 0 });
+
+    // #538: the panel takes no focus (see its XAML comment), so Esc has to reach its cancel from
+    // the spinner that raised it.
+    [AvaloniaFact]
+    public void Esc_on_the_spinner_cancels_the_removal_it_raised()
+    {
+        var (window, _, vm, session) = Show();
+        Spinner(window).Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        vm.MatrixRows.Single(r => r.Ordinal == 0).ApartmentCount = 3;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(Panel(window).IsEffectivelyVisible);
+
+        window.Press(PhysicalKey.Escape);
+
+        Assert.False(Panel(window).IsEffectivelyVisible);
+        Assert.Equal(4, vm.MatrixRows.Single(r => r.Ordinal == 0).ApartmentCount);
+        Assert.Equal(4, session.Incident.Buildings[0].ApartmentsFor(0));
+    }
+
+    // Cancelling rebuilds the matrix; with nothing pending, Esc must leave the focused spinner be.
+    [AvaloniaFact]
+    public void Esc_on_the_spinner_with_nothing_pending_leaves_the_matrix_alone()
+    {
+        var (window, _, vm, _) = Show();
+        var spinner = Spinner(window);
+        spinner.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+        var row = vm.MatrixRows[0];
+
+        window.Press(PhysicalKey.Escape);
+
+        Assert.Same(row, vm.MatrixRows[0]);
+        window.AssertFocused(spinner);
     }
 }

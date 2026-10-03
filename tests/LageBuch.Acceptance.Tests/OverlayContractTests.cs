@@ -1,5 +1,6 @@
 using System.Reflection;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -7,9 +8,11 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LageBuch.App.Shared.Views;
+using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -26,8 +29,13 @@ internal enum OverlayClause
 // Esc and hands focus back to the control that opened it. Every overlay is shown the same way, as
 // a view model in a Pending* property of its host that ViewLocator turns into its view, so the
 // scenarios are checked against that set: a new overlay fails
-// Overlay_scenarios_cover_every_Pending_overlay until it has a scenario here. Inline panels drawn
-// by their host's own XAML (CoMessprotokoll's removal panels) are #538's to decide.
+// Overlay_scenarios_cover_every_Pending_overlay until it has a scenario here.
+//
+// Inline panels, drawn by their module's own XAML and shown by IsVisible, keep the same four
+// clauses (#538) and are listed apart in InlinePanelScenarios. They are not modal, so focus may
+// still leave one for the page beside it by a click; that is not a clause. The one exception is
+// CoMessprotokoll's Wohnungen-entfernen panel, which must not take focus (#419) and is covered in
+// OverlayKeyboardTests instead.
 //
 // What is broken today is listed in KnownFailures, which ratchets: a listed clause must still fail,
 // so the fix in #538 turns this red until its entry is deleted.
@@ -49,10 +57,22 @@ public class OverlayContractTests
         new("MasterDataEditor.Confirm", typeof(MasterDataEditorViewModel), typeof(ConfirmDialogViewModel), OpenMasterDataEditorConfirm),
     ];
 
+    private static readonly OverlayScenario[] InlinePanelScenarios =
+    [
+        new("Etb.EditPanel", typeof(EtbViewModel), typeof(EtbEntryRow), OpenEtbEditPanel),
+        new("Roles.TransferPanel", typeof(RolesViewModel), typeof(RoleAssignmentRow), OpenRolesTransferPanel),
+        new("Co.AddBuildingPanel", typeof(CoMessprotokollViewModel), typeof(Building), OpenCoAddBuildingPanel),
+        new("Co.RemoveBuildingPanel", typeof(CoMessprotokollViewModel), typeof(Building), OpenCoRemoveBuildingPanel),
+        new("Co.FloorRemovalPanel", typeof(CoMessprotokollViewModel), typeof(FloorRemovalViewModel), OpenCoFloorRemovalPanel),
+        new("Co.DwellingEditor", typeof(CoMessprotokollViewModel), typeof(DwellingEditorViewModel), OpenCoDwellingEditor),
+    ];
+
+    private static IEnumerable<OverlayScenario> AllScenarios => Scenarios.Concat(InlinePanelScenarios);
+
     public static TheoryData<string, string> Cases()
     {
         var data = new TheoryData<string, string>();
-        foreach (var scenario in Scenarios)
+        foreach (var scenario in AllScenarios)
         {
             foreach (var clause in Enum.GetValues<OverlayClause>())
             {
@@ -90,7 +110,7 @@ public class OverlayContractTests
     [AvaloniaFact]
     public void Known_failures_name_existing_scenarios()
     {
-        var ids = Scenarios.Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
+        var ids = AllScenarios.Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
         Assert.All(KnownFailures.Keys, k => Assert.Contains(k.Scenario, ids));
     }
 
@@ -99,7 +119,7 @@ public class OverlayContractTests
     public void Overlay_keeps_the_keyboard_contract(string scenarioId, string clauseName)
     {
         var clause = Enum.Parse<OverlayClause>(clauseName);
-        var scenario = Scenarios.Single(s => s.Id == scenarioId);
+        var scenario = AllScenarios.Single(s => s.Id == scenarioId);
         var opened = scenario.Open();
         var ok = Check(opened, clause, out var message);
 
@@ -183,8 +203,9 @@ public class OverlayContractTests
             case OverlayClause.FocusReturns:
                 opened.Cancel();
                 Dispatcher.UIThread.RunJobs();
-                message = $"after closing, focus is on {window.DescribeFocus()}, not on the opener {KeyboardInput.Describe(opened.Opener)}";
-                return opened.IsCancelled() && window.IsFocused(opened.Opener);
+                var returnsTo = opened.ReturnsTo ?? opened.Opener;
+                message = $"after closing, focus is on {window.DescribeFocus()}, not on {KeyboardInput.Describe(returnsTo)}";
+                return opened.IsCancelled() && window.IsFocused(returnsTo);
 
             default:
                 throw new ArgumentOutOfRangeException(nameof(clause), clause, null);
@@ -237,7 +258,7 @@ public class OverlayContractTests
         where TView : Control =>
         () => window.GetVisualDescendants().OfType<TView>().SingleOrDefault(v => v.IsEffectivelyVisible);
 
-    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace()
+    private static (Window Window, IncidentWorkspaceViewModel Vm) ShowWorkspace(Action<LocalIncidentSession>? seed = null)
     {
         var session = TestSession.StartNew(
             new FakeStore(),
@@ -246,6 +267,7 @@ public class OverlayContractTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
+        seed?.Invoke(session);
         var vm = new IncidentWorkspaceViewModel(
             session,
             new FixedClock(),
@@ -300,6 +322,90 @@ public class OverlayContractTests
         return new(window, opener, ViewOf<IncidentDataDialogView>(window), () => vm.PendingIncidentDataDialog is null, () => vm.PendingIncidentDataDialog?.CancelCommand.Execute(null));
     }
 
+    // A row's own button, the way a keyboard user reaches it: Tab into the grid, then to the row.
+    private static Button RowButton(Window window, string grid, Func<Button, bool> match) =>
+        Named<DataGrid>(window, grid).GetVisualDescendants().OfType<Button>()
+            .First(b => b.IsEffectivelyVisible && match(b));
+
+    private static Opened OpenEtbEditPanel()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        vm.Etb.NewText = "Lagemeldung übermittelt";
+        vm.Etb.AddEntryCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        var opener = RowButton(window, "EtbGrid", b => AutomationProperties.GetName(b) == "Bearbeiten");
+        Activate(opener);
+
+        // Cancel leaves the grid as it was, so the row's own button is still there to go back to.
+        return new(window, opener, PanelOf(window, "EditPanel"), () => !vm.Etb.IsEditing && vm.Etb.Entries.Any(e => e.Text == "Lagemeldung übermittelt"), () => vm.Etb.CancelEditCommand.Execute(null));
+    }
+
+    private static Opened OpenRolesTransferPanel()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AssignRole("ZF", AnonymizedExampleData.OperatorSurname));
+        WorkspaceRenderHelper.SelectTab(window, "FUNKTIONEN");
+        var assignments = vm.Roles.Roles.Count;
+        var opener = RowButton(window, "RolesGrid", b => b.Name == "TransferRowButton");
+        Activate(opener);
+        return new(window, opener, PanelOf(window, "TransferPanel"), () => !vm.Roles.IsTransferring && vm.Roles.Roles.Count == assignments, () => vm.Roles.CancelTransferCommand.Execute(null));
+    }
+
+    private static Opened OpenCoAddBuildingPanel()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        var opener = Named<Button>(window, "AddBuildingButton");
+        Activate(opener);
+        var co = vm.CoMessprotokoll;
+        return new(window, opener, PanelOf(window, "AddBuildingPanel"), () => !co.IsAddBuildingDialogOpen && co.BuildingOptions.Count == 0, () => co.CancelAddBuildingCommand.Execute(null));
+    }
+
+    private static Opened OpenCoRemoveBuildingPanel()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AddCoBuilding("Mehrfamilienhaus A", 2, 2));
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        var opener = Named<Button>(window, "RemoveBuildingButton");
+        Activate(opener);
+        var co = vm.CoMessprotokoll;
+        return new(window, opener, PanelOf(window, "RemoveBuildingPanel"), () => !co.IsRemoveBuildingConfirmOpen && co.BuildingOptions.Count == 1, () => co.CancelRemoveBuildingCommand.Execute(null));
+    }
+
+    private static Opened OpenCoFloorRemovalPanel()
+    {
+        // The panel asks only when the floor carries something: a reading on the top floor.
+        var (window, vm) = ShowWorkspace(s =>
+        {
+            s.AddCoBuilding("Mehrfamilienhaus A", 2, 2);
+            var building = s.Incident.Buildings[0];
+            s.RecordCoValue(building.Id, building.FloorCount, 1, 45);
+        });
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        var co = vm.CoMessprotokoll;
+        co.IsStructureMode = true;
+        Dispatcher.UIThread.RunJobs();
+        var floors = co.MatrixRows.Count;
+        var opener = Named<Button>(window, "RemoveObergeschossButton");
+        Activate(opener);
+        return new(window, opener, PanelOf(window, "FloorRemovalPanel"), () => !co.IsFloorRemovalOpen && co.MatrixRows.Count == floors, () => co.CancelFloorRemovalCommand.Execute(null));
+    }
+
+    private static Opened OpenCoDwellingEditor()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AddCoBuilding("Mehrfamilienhaus A", 2, 2));
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        var co = vm.CoMessprotokoll;
+        var opener = window.GetVisualDescendants().OfType<Button>().First(b => b.DataContext is DwellingCellViewModel && b.IsEffectivelyVisible);
+        Activate(opener);
+
+        // ABBRECHEN rebuilds the matrix, so the tile that opened the editor is gone; focus falls
+        // back to the house picker. Landing on the rebuilt tile is #542's (rebuilds keep focus).
+        return new(window, opener, PanelOf(window, "DwellingEditor"), () => !co.IsEditorOpen, () => co.CloseEditorCommand.Execute(null), Named<ComboBox>(window, "BuildingBox"));
+    }
+
+    private static Func<Control?> PanelOf(Window window, string name) =>
+        () => window.GetVisualDescendants().OfType<Border>().SingleOrDefault(b => b.Name == name && b.IsEffectivelyVisible);
+
     private static (Window Window, MainWindowViewModel Vm) ShowMain()
     {
         var dialogs = new FakeDialogs();
@@ -352,8 +458,9 @@ public class OverlayContractTests
 
     private sealed record OverlayScenario(string Id, Type Host, Type Overlay, Func<Opened> Open);
 
-    // IsCancelled: closed, and the action it asks about did not happen.
-    private sealed record Opened(Window Window, Control Opener, Func<Control?> Overlay, Func<bool> IsCancelled, Action Cancel);
+    // IsCancelled: closed, and the action it asks about did not happen. ReturnsTo: where focus goes
+    // on close when that is not the opener, because closing rebuilt it.
+    private sealed record Opened(Window Window, Control Opener, Func<Control?> Overlay, Func<bool> IsCancelled, Action Cancel, Control? ReturnsTo = null);
 
     // Lets EXPORTIEREN run: the default exporter is the Android one, which hides the button.
     private sealed class ExportablePdf : IIncidentPdfExporter
