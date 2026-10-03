@@ -71,6 +71,13 @@ public static class ValidationMessages
     /// </summary>
     public const string EntryPressure = "Einstiegsdruck eintragen";
 
+    /// <summary>
+    /// A Druckkontrolle pressed with nothing in the field, or with a number outside the gauge
+    /// (#539). The field used to be pre-filled with the last reading, so the press recorded that
+    /// old value as a new one -- the believable-but-wrong Druck the plausibility check exists for.
+    /// </summary>
+    public const string ControlPressure = "Druck eintragen";
+
     /// <summary>A PDF export with every section unticked, which would produce an empty document.</summary>
     public const string NoPdfSection = "Mindestens einen Abschnitt wählen";
 

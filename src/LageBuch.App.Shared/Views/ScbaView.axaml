@@ -9,6 +9,23 @@
   <UserControl.Styles>
     <!-- Field widths as Styles, not Width= on the controls: a local value in XAML outranks a
          Style setter, so the narrow query below could never widen them. -->
+    <!-- The Druckkontrolle's answer to a press it could not record (#539): red for nothing to
+         record, amber for a reading that is asked about once before it goes in. -->
+    <Style Selector="TextBlock.pressureError">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.pressureWarning">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="NumericUpDown#PressureInput.invalid">
+      <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+    </Style>
     <Style Selector="AutoCompleteBox#CallSignBox">
       <Setter Property="Width" Value="140" />
     </Style>
@@ -359,21 +376,35 @@
           <DataGridTemplateColumn Header="AKTION" Width="300">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:ScbaTruppRow">
-                <StackPanel Orientation="Horizontal" Spacing="6" Margin="8,4" VerticalAlignment="Center">
-                  <!-- Einstiegsdruck is captured at Bereitstellen now, so this is purely the
-                       Druckkontrolle input while under air (Im Einsatz or Rückzug). -->
-                  <NumericUpDown Width="104" Minimum="0" Maximum="400" Value="{Binding PressureInput}"
-                                 FormatString="0" IsEnabled="{Binding !IsReturned}" />
-                  <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}"
-                          IsVisible="{Binding IsWaiting}" />
-                  <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
-                          IsVisible="{Binding IsActive}" />
-                  <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}"
-                          IsVisible="{Binding IsActive}" />
-                  <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
-                          IsVisible="{Binding IsWithdrawing}" />
-                  <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}"
-                          IsVisible="{Binding IsWithdrawing}" />
+                <StackPanel Spacing="2" Margin="8,4" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <!-- Einstiegsdruck is captured at Bereitstellen now, so this is purely the
+                         Druckkontrolle input while under air (Im Einsatz or Rückzug). Enter records
+                         it like DRUCK (#539). ClipValueToMinMax is load-bearing: without it a typed
+                         value above Maximum never reaches the binding, and the press recorded the
+                         previous one; see CoMessprotokollView's CO-WERT for the same trap. -->
+                    <NumericUpDown x:Name="PressureInput" Width="104" Minimum="0" Maximum="400"
+                                   ClipValueToMinMax="True" Value="{Binding PressureInput}"
+                                   FormatString="0" PlaceholderText="{Binding PressurePlaceholder}"
+                                   AutomationProperties.Name="Druck in bar"
+                                   Classes.invalid="{Binding HasPressureError}"
+                                   b:EnterSubmit.Command="{Binding RecordPressureCommand}"
+                                   IsEnabled="{Binding !IsReturned}" />
+                    <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}"
+                            IsVisible="{Binding IsWaiting}" />
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                            IsVisible="{Binding IsActive}" />
+                    <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}"
+                            IsVisible="{Binding IsActive}" />
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                            IsVisible="{Binding IsWithdrawing}" />
+                    <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}"
+                            IsVisible="{Binding IsWithdrawing}" />
+                  </StackPanel>
+                  <TextBlock Classes="pressureError" Text="{Binding PressureError}"
+                             IsVisible="{Binding HasPressureError}" />
+                  <TextBlock Classes="pressureWarning" Text="{Binding PressureWarning}"
+                             IsVisible="{Binding HasPressureWarning}" />
                 </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
@@ -484,8 +515,13 @@
 
                   <!-- The Druckkontrolle input and whatever the Trupp's state allows next. -->
                   <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
-                    <NumericUpDown Width="120" Minimum="0" Maximum="400" Value="{Binding PressureInput}"
-                                   FormatString="0" IsEnabled="{Binding !IsReturned}" />
+                    <NumericUpDown x:Name="PressureInput" Width="120" Minimum="0" Maximum="400"
+                                   ClipValueToMinMax="True" Value="{Binding PressureInput}"
+                                   FormatString="0" PlaceholderText="{Binding PressurePlaceholder}"
+                                   AutomationProperties.Name="Druck in bar"
+                                   Classes.invalid="{Binding HasPressureError}"
+                                   b:EnterSubmit.Command="{Binding RecordPressureCommand}"
+                                   IsEnabled="{Binding !IsReturned}" />
                     <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}"
                             IsVisible="{Binding IsWaiting}" />
                     <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
@@ -497,6 +533,10 @@
                     <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}"
                             IsVisible="{Binding IsWithdrawing}" />
                   </WrapPanel>
+                  <TextBlock Classes="pressureError" Text="{Binding PressureError}"
+                             IsVisible="{Binding HasPressureError}" />
+                  <TextBlock Classes="pressureWarning" Text="{Binding PressureWarning}"
+                             IsVisible="{Binding HasPressureWarning}" />
                 </StackPanel>
               </Border>
             </DataTemplate>
