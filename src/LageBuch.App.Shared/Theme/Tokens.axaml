@@ -49,6 +49,11 @@
   <Color x:Key="ErrorInkColor">#260A0D</Color>
   <Color x:Key="ErrorDeepColor">#7A2B31</Color>
   <Color x:Key="ErrorWashColor">#2A1013</Color>
+  <!-- Keyboard focus (#541), and nothing else. Deliberately not SignalColor: a red ring roaming
+       every control would wear out the meaning of red next to a Rückzugsalarm. Keep it apart
+       from Signal, Error, Amber and Incoming, which all carry a meaning of their own. -->
+  <Color x:Key="FocusColor">#2DD4E8</Color>
+
   <Color x:Key="ActiveColor">#37D17C</Color>
   <Color x:Key="IncomingColor">#52ABFF</Color>
 
@@ -77,6 +82,18 @@
   <SolidColorBrush x:Key="SignalDeepBrush" Color="{StaticResource SignalDeepColor}" />
   <SolidColorBrush x:Key="ActiveBrush" Color="{StaticResource ActiveColor}" />
   <SolidColorBrush x:Key="IncomingBrush" Color="{StaticResource IncomingColor}" />
+  <SolidColorBrush x:Key="FocusBrush" Color="{StaticResource FocusColor}" />
+
+  <!-- Fluent draws its focus adorner on every control that is :focus-visible (keyboard focus,
+       never a click or a touch): a 2px ring on the control's edge with a 1px line inside it.
+       Recolouring it here gives every control, custom templates included, the one focus edge;
+       the dark inner line keeps it readable against a selected row's fill. Only the brushes:
+       overriding SystemControlFocusVisualMargin or the thickness keys makes Fluent draw no ring
+       at all. DataGrid draws its own per-cell ring from the second pair. -->
+  <SolidColorBrush x:Key="SystemControlFocusVisualPrimaryBrush" Color="{StaticResource FocusColor}" />
+  <SolidColorBrush x:Key="SystemControlFocusVisualSecondaryBrush" Color="{StaticResource AppBgColor}" />
+  <SolidColorBrush x:Key="DataGridCellFocusVisualPrimaryBrush" Color="{StaticResource FocusColor}" />
+  <SolidColorBrush x:Key="DataGridCellFocusVisualSecondaryBrush" Color="{StaticResource AppBgColor}" />
 
   <!-- Atmospheric app background: vertical charcoal wash -->
   <LinearGradientBrush x:Key="AppBackgroundBrush" StartPoint="0%,0%" EndPoint="0%,100%">

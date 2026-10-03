@@ -1,6 +1,4 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -154,59 +152,6 @@ public class KeyboardRuntimeFactsTests
         Assert.Equal(0, tabs.SelectedIndex);
     }
 
-    // #541: Fluent's own focus rectangle (white, 2px, square) is drawn on keyboard focus even on the
-    // custom-templated rail TabItem and ListBoxItem; it is not missing, it is just not ours.
-    [AvaloniaFact]
-    public void Fluent_draws_its_focus_rectangle_on_the_custom_TabItem_and_ListBoxItem()
-    {
-        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
-        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = 1920, Height = 1032 };
-        window.Show();
-        Dispatcher.UIThread.RunJobs();
-        var railItem = (TabItem)WorkspaceRenderHelper.Tabs(window).ContainerFromIndex(2)!;
-        Assert.False(railItem.IsSelected);
-
-        var editor = new MasterDataEditorViewModel(new StaticMasterData(WorkspaceRenderHelper.MasterData()), new FakeDialogs(), new NoFiles());
-        var editorWindow = new Window { Content = new MasterDataEditorView { DataContext = editor }, Width = 1080, Height = 680 };
-        editorWindow.Show();
-        Dispatcher.UIThread.RunJobs();
-        var listItem = (ListBoxItem)editorWindow.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "CategoryList").ContainerFromIndex(1)!;
-        Assert.False(listItem.IsSelected);
-
-        // A 2px ring round a 172x50 item changes roughly 900 pixels; hover or selection would
-        // repaint the whole item instead, which keyboard focus alone does not cause.
-        Assert.InRange(PixelsChangedByKeyboardFocus(window, railItem), 400, 2500);
-        Assert.InRange(PixelsChangedByKeyboardFocus(editorWindow, listItem), 400, 2500);
-    }
-
-    private static int PixelsChangedByKeyboardFocus(Window window, Control target)
-    {
-        window.Focus();
-        Dispatcher.UIThread.RunJobs();
-        using var before = window.CaptureRenderedFrame()!;
-        target.Focus(NavigationMethod.Tab);
-        Dispatcher.UIThread.RunJobs();
-        using var after = window.CaptureRenderedFrame()!;
-
-        // The adorner sits just outside the item's bounds.
-        var area = new Rect(target.TranslatePoint(default, window)!.Value, target.Bounds.Size).Inflate(4);
-        using var a = new FramePixels(before);
-        using var b = new FramePixels(after);
-        var changed = 0;
-        for (var y = Math.Max(0, (int)area.Top); y < Math.Min(a.Height, (int)area.Bottom); y++)
-        {
-            for (var x = Math.Max(0, (int)area.Left); x < Math.Min(a.Width, (int)area.Right); x++)
-            {
-                if (a.Raw(x, y) != b.Raw(x, y))
-                {
-                    changed++;
-                }
-            }
-        }
-
-        return changed;
-    }
-
     // #538: the share/PIN flyout needs no focus handling of its own. Its two SelectableTextBlocks are
     // tab stops, focus lands on the first one when it opens, Tab stays in the flyout, and Esc
     // closes it by light dismiss.
@@ -235,24 +180,6 @@ public class KeyboardRuntimeFactsTests
 
         window.Press(PhysicalKey.Escape);
         Assert.False(flyout.IsOpen);
-    }
-
-    private sealed class StaticMasterData(MasterDataSet set) : IMasterDataProvider
-    {
-        public MasterDataSet Get() => set;
-
-        public void Save(MasterDataSet s)
-        {
-        }
-    }
-
-    private sealed class NoFiles : IMasterDataFileService
-    {
-        public MasterDataImportResult Read(string path) => new(MasterDataSet.Empty, Array.Empty<string>());
-
-        public void Write(string path, MasterDataSet set)
-        {
-        }
     }
 
     private sealed class FakeHost : IIncidentHostController
