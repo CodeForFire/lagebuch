@@ -82,13 +82,11 @@ public class IncidentDataDialogRenderTests
 
         var street = Find<TextBox>(window, "IncidentDataStreetBox");
         street.Focus();
-        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Escape);
         Assert.Equal(1, closed);
 
         street.Text = "Nebenstr. 1";
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
         Assert.Equal(2, closed);
         Assert.Equal("Nebenstr. 1", session.Incident.Street);
     }

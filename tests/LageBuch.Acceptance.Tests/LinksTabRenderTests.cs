@@ -187,14 +187,12 @@ public class LinksTabRenderTests
         box.Focus();
         Dispatcher.UIThread.RunJobs();
 
-        window.KeyTextInput("wetter");
-        Dispatcher.UIThread.RunJobs();
+        window.Type("wetter");
 
         Assert.Equal("wetter", vm.Links.FilterText);
         Assert.Equal(1, RenderedLinkCount(window));
 
-        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Escape);
 
         Assert.Equal(string.Empty, vm.Links.FilterText);
         Assert.Equal(string.Empty, box.Text);

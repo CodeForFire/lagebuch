@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -60,8 +59,7 @@ public class EnterOnDropdownTests
         box.IsDropDownOpen = true; // the suggestion list is open
         Dispatcher.UIThread.RunJobs();
 
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
 
         Assert.Empty(vm.Trupps); // picking a suggestion must not create the Trupp
     }
@@ -84,8 +82,7 @@ public class EnterOnDropdownTests
         box.IsDropDownOpen = false; // nothing to pick — Enter should submit
         Dispatcher.UIThread.RunJobs();
 
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
 
         Assert.Single(vm.Trupps); // keyboard-first submit still works
     }
@@ -107,8 +104,7 @@ public class EnterOnDropdownTests
         box.IsDropDownOpen = true;
         Dispatcher.UIThread.RunJobs();
 
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
 
         Assert.Null(vm.Result); // picking a call sign must not confirm the dialog
     }

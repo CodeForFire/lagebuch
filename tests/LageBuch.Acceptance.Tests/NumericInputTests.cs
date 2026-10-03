@@ -33,8 +33,7 @@ public class NumericInputTests
         box.Focus();
         box.SelectAll();
         window.KeyTextInput(text);
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
 
         // Tab away, as a user filling the row does.
         view.GetControl<TextBox>("NotesBox").Focus();

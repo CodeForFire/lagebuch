@@ -68,8 +68,7 @@ public class JoinPromptRenderTests
 
         pinBox.Focus();
         pinBox.SelectAll();
-        window.KeyTextInput(typed);
-        Dispatcher.UIThread.RunJobs();
+        window.Type(typed);
 
         // Refused wholesale -- the original PIN stands rather than a mutilated mix.
         Assert.Equal("1234", pinBox.Text);
@@ -84,8 +83,7 @@ public class JoinPromptRenderTests
 
         pinBox.Focus();
         pinBox.SelectAll();
-        window.KeyTextInput("5678");
-        Dispatcher.UIThread.RunJobs();
+        window.Type("5678");
 
         Assert.Equal("5678", pinBox.Text);
         Assert.Equal("5678", vm.Pin);

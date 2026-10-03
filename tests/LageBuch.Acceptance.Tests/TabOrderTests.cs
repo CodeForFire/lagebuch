@@ -1,7 +1,5 @@
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
-using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -19,8 +17,6 @@ namespace LageBuch.Acceptance.Tests;
 // failing, that specific spot needs an explicit TabIndex fix, not a blanket sweep.
 public class TabOrderTests
 {
-    private static void Tab(Window window) => window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.None);
-
     [AvaloniaFact]
     public void Forces_input_dock_tabs_left_to_right_in_reading_order()
     {
@@ -56,40 +52,31 @@ public class TabOrderTests
         Dispatcher.UIThread.RunJobs();
         Assert.True(view.GetControl<ComboBox>("VehicleBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("BrigadeBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("CallSignBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("ZugfuehrerBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("OfficerBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("MannschaftBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("ScbaBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<ComboBox>("StatusBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<TextBox>("NotesBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<Button>("AddForceButton").IsKeyboardFocusWithin);
     }
 
@@ -141,25 +128,20 @@ public class TabOrderTests
         Dispatcher.UIThread.RunJobs();
         Assert.True(nameBox.IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(urlBox.IsKeyboardFocusWithin);
 
         // #518: the optional group follows the URL, before the row actions.
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(groupBox.IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(upButton.IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(downButton.IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(removeButton.IsKeyboardFocusWithin);
     }
 
@@ -195,16 +177,13 @@ public class TabOrderTests
         Dispatcher.UIThread.RunJobs();
         Assert.True(view.GetControl<AutoCompleteBox>("CallSignBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<ComboBox>("TruppTypeBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<AutoCompleteBox>("TruppfuehrerBox").IsKeyboardFocusWithin);
 
-        Tab(window);
-        Dispatcher.UIThread.RunJobs();
+        window.Tab();
         Assert.True(view.GetControl<AutoCompleteBox>("TruppmannBox").IsKeyboardFocusWithin);
 
         // The chain stops here on purpose. ZweiterTruppmannBox is collapsed

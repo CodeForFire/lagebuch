@@ -233,8 +233,7 @@ public class ForcesTabRenderTests
 
         grid.Focus();
         Dispatcher.UIThread.RunJobs();
-        window.KeyPressQwerty(PhysicalKey.Tab, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Tab);
 
         Assert.True(
             strengthButton.IsKeyboardFocusWithin,
@@ -317,8 +316,7 @@ public class ForcesTabRenderTests
 
         callSignBox.Focus();
         Dispatcher.UIThread.RunJobs();
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
 
         var row = Assert.Single(vm.Forces.Forces);
         Assert.Equal("Nachbarort 40/1", row.CallSign);
@@ -330,8 +328,7 @@ public class ForcesTabRenderTests
 
         brigadeBox.Focus();
         Dispatcher.UIThread.RunJobs();
-        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Enter);
 
         Assert.Equal(2, vm.Forces.Forces.Count);
         Capture(window, "forces-manual-entry-plain-text.png");

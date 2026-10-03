@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -51,8 +50,7 @@ public class ForcesNotesFocusTests
 
         foreach (var ch in "!!!")
         {
-            window.KeyTextInput(ch.ToString());
-            Dispatcher.UIThread.RunJobs();
+            window.Type(ch.ToString());
 
             var focused = window.FocusManager?.GetFocusedElement();
             Assert.True(
@@ -82,8 +80,7 @@ public class ForcesNotesFocusTests
         notesBox.SelectAll();
         foreach (var ch in "Alarm")
         {
-            window.KeyTextInput(ch.ToString());
-            Dispatcher.UIThread.RunJobs();
+            window.Type(ch.ToString());
         }
 
         // Blur the field the way an operator tabbing away would.

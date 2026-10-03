@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -96,8 +95,7 @@ public class ScbaSafetyTruppFlyoutTests
 
         // The entries are buttons and therefore focusable, so the flyout can route Escape without
         // the Opened="…" focus workaround ForcesView's read-only history list needs.
-        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.Escape);
 
         Assert.False(picker.Flyout!.IsOpen);
     }
