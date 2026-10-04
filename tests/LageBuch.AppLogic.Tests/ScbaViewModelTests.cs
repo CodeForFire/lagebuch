@@ -33,6 +33,25 @@ public class ScbaViewModelTests
         },
     };
 
+    // #540: the view refocuses on EntrySubmitted -- FUNKRUFNAME after an add, the invalid field
+    // after a refusal.
+    [Fact]
+    public void Submitting_reports_whether_the_trupp_was_added()
+    {
+        var clock = new FixedClock(T0);
+        using var vm = Vm(clock, NewSession(clock));
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        vm.NewDesignation = "Angriffstrupp";
+        vm.AddTruppCommand.Execute(null); // no crew: refused
+        vm.NewTruppfuehrer = "Müller";
+        vm.NewTruppmann = "Schmidt";
+        vm.AddTruppCommand.Execute(null);
+
+        Assert.Equal(new[] { false, true }, outcomes);
+    }
+
     private static LocalIncidentSession NewSession(FixedClock clock) =>
         TestSession.StartNew(
             new FakeStore(),

@@ -320,6 +320,6 @@ public static class Overlay
         && (ReferenceEquals(visual, root) || root.IsVisualAncestorOf(visual)
             || root.IsLogicalAncestorOf(visual));
 
-    private static bool IsInOverlay(Visual visual) =>
+    internal static bool IsInOverlay(Visual visual) =>
         visual.GetSelfAndVisualAncestors().OfType<Control>().Any(c => GetCancelCommand(c) is not null);
 }

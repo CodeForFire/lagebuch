@@ -11,7 +11,7 @@ using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
 
-public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisposable
+public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
 {
     // A real Einsatz showed the Lagebuchführer never gained anything from picking Eingang, Ausgang
     // or Intern, so the dock no longer asks. The domain still records a direction on every entry,
@@ -211,6 +211,9 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
         ShowAddErrors(false); // a dismissed sheet must not reopen still complaining
     }
 
+    /// <inheritdoc />
+    public event EventHandler<EntrySubmittedEventArgs>? EntrySubmitted;
+
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void AddEntry()
     {
@@ -223,6 +226,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
         var toDispatchCentre = IsToDispatchCentre(NewTo);
         ClearNewEntry();
         _onChanged();
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Succeeded);
         OfferReminderResetIf(toDispatchCentre);
     }
 
@@ -267,10 +271,18 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IDisp
         IsComposerOpen = false;
     }
 
+    // A refusal is reported from both add paths; only "Hinzufügen" reports a success, because
+    // "Hinzufügen & Aufgabe" opens the task dialog, which owns focus from there (#540).
     private bool ValidateAdd()
     {
         ShowAddErrors(true);
-        return NewTextError is null;
+        if (NewTextError is null)
+        {
+            return true;
+        }
+
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
+        return false;
     }
 
     private void ShowAddErrors(bool shown)

@@ -16,7 +16,7 @@ namespace LageBuch.AppLogic.ViewModels;
 /// and moved, never thrown away, so the grid keeps its selection, focus and scroll position (#294).
 /// The ticker drives the countdown displays and the one-shot due alarm.
 /// </summary>
-public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDisposable
+public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -231,11 +231,15 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDi
         ShowErrors(false); // a dismissed form must not reopen still complaining
     }
 
+    /// <inheritdoc />
+    public event EventHandler<EntrySubmittedEventArgs>? EntrySubmitted;
+
     [RelayCommand(CanExecute = nameof(CanAddTask))]
     private void AddTask()
     {
         if (!Validate())
         {
+            EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
             return;
         }
 
@@ -246,6 +250,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IDi
         // Reached only on success, so this is where the phone's form closes again.
         IsComposerOpen = false;
         _onChanged();
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Succeeded);
     }
 
     private bool Validate()

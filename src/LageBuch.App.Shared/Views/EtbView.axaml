@@ -102,8 +102,12 @@
             Command="{Binding OpenComposerCommand}" />
 
     <!-- Input dock -->
+    <!-- Enter submits from every field; focus then goes back to EINTRAG, not VON (#540). Most
+         entries carry no sender, so EINTRAG is where the next one starts, as it always has. -->
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
+            b:EntryForm.SubmitCommand="{Binding AddEntryCommand}"
+            b:EntryForm.FirstField="{Binding #EtbTextBox}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- Scrolls so a focused field can still be reached once Android's AdjustResize has taken
@@ -131,22 +135,18 @@
               <AutoCompleteBox x:Name="FromBox" PlaceholderText="{x:Static md:AnonymizedExampleData.CallSignPlaceholder}"
                                ItemsSource="{Binding CallSignOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                               Text="{Binding NewFrom}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+                               Text="{Binding NewFrom}" />
             </HeaderedContentControl>
             <HeaderedContentControl Classes="field suggest" Header="AN">
               <AutoCompleteBox x:Name="ToBox" PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
                                ItemsSource="{Binding CallSignOptions}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                               Text="{Binding NewTo}" b:EnterSubmit.Command="{Binding AddEntryCommand}" />
+                               Text="{Binding NewTo}" />
             </HeaderedContentControl>
             <HeaderedContentControl Classes="field required" Header="EINTRAG"
                                       Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
               <!-- Freitext: kein Platzhalter, siehe #137 -->
-              <TextBox x:Name="EtbTextBox" Text="{Binding NewText}">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding AddEntryCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
+              <TextBox x:Name="EtbTextBox" Text="{Binding NewText}" />
             </HeaderedContentControl>
             <Button x:Name="EtbAddButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddEntryCommand}"
                     VerticalAlignment="Bottom" Margin="0,0,0,1" />

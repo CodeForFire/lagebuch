@@ -697,6 +697,23 @@ public class TasksViewModelTests
         Assert.Same(selected, vm.Rows[1]);
     }
 
+    // #540: the view refocuses on EntrySubmitted -- AUFGABE after an add, the invalid field after a
+    // refusal.
+    [Fact]
+    public void Submitting_reports_whether_the_task_was_added()
+    {
+        var (session, clock, _) = NewSession();
+        using var vm = NewVm(session, clock);
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        vm.AddTaskCommand.Execute(null); // no text: refused
+        vm.NewText = "Tür sichern";
+        vm.AddTaskCommand.Execute(null);
+
+        Assert.Equal(new[] { false, true }, outcomes);
+    }
+
     private static TasksViewModel NewVm(
         LocalIncidentSession session,
         FixedClock clock,

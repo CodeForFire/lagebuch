@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.InvolvedPartiesView"
              x:DataType="vm:InvolvedPartiesViewModel">
   <!-- Same dock idiom as ForcesView: the fields run side by side on a wide window and stack on a
@@ -59,9 +60,11 @@
             IsVisible="{Binding ShowComposerButton}"
             Command="{Binding OpenComposerCommand}" />
 
-    <!-- Input dock -->
+    <!-- Input dock. Enter submits from every field; focus then goes back to NAME (#540). -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             IsVisible="{Binding ShowComposer}"
+            b:EntryForm.SubmitCommand="{Binding AddCommand}"
+            b:EntryForm.FirstField="{Binding #NewNameBox}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
@@ -85,11 +88,7 @@
               <TextBox x:Name="NewNameBox"
                        MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNameLength}"
                        PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}"
-                       Text="{Binding NewName}">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
+                       Text="{Binding NewName}" />
             </HeaderedContentControl>
             <!-- Plain text: a number is read out over the radio or typed into a phone, never
                  dialled from here (tel: launch is out of scope). -->
@@ -97,21 +96,13 @@
               <TextBox x:Name="NewPhoneBox"
                        MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxPhoneLength}"
                        PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
-                       Text="{Binding NewPhone}">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
+                       Text="{Binding NewPhone}" />
             </HeaderedContentControl>
             <HeaderedContentControl Classes="field" Header="NOTIZ">
               <!-- Freitext: kein Platzhalter, siehe #137 -->
               <TextBox x:Name="NewNotesBox"
                        MaxLength="{x:Static vm:InvolvedPartiesViewModel.MaxNotesLength}"
-                       Text="{Binding NewNotes}">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
+                       Text="{Binding NewNotes}" />
             </HeaderedContentControl>
             <Button x:Name="AddInvolvedPartyButton" Classes="signal dock-action" Content="HINZUFÜGEN"
                     Command="{Binding AddCommand}" VerticalAlignment="Bottom" Margin="0,0,0,1" />

@@ -118,8 +118,11 @@
             IsVisible="{Binding ShowComposerButton}"
             Command="{Binding OpenComposerCommand}" />
 
+    <!-- Enter submits from every field; focus then goes back to FUNKRUFNAME (#540). -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
+            b:EntryForm.SubmitCommand="{Binding AddTruppCommand}"
+            b:EntryForm.FirstField="{Binding #CallSignBox}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
@@ -166,8 +169,7 @@
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             Text="{Binding NewTruppfuehrer}"
-                             b:EnterSubmit.Command="{Binding AddTruppCommand}" />
+                             Text="{Binding NewTruppfuehrer}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest required" Header="TRUPPMANN"
                                     Classes.invalid="{Binding NewTruppmannError, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -175,8 +177,7 @@
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderAlt}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             Text="{Binding NewTruppmann}"
-                             b:EnterSubmit.Command="{Binding AddTruppCommand}" />
+                             Text="{Binding NewTruppmann}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest required" Header="2. TRUPPMANN" IsVisible="{Binding RequiresThirdMember}"
                                     Classes.invalid="{Binding NewZweiterTruppmannError, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -184,8 +185,7 @@
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholderThird}"
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             Text="{Binding NewZweiterTruppmann}"
-                             b:EnterSubmit.Command="{Binding AddTruppCommand}" />
+                             Text="{Binding NewZweiterTruppmann}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field required" Header="EINSTIEGSDRUCK"
                                     Classes.invalid="{Binding NewEntryPressureError, Converter={x:Static ObjectConverters.IsNotNull}}">

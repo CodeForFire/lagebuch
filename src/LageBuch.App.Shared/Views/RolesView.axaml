@@ -113,9 +113,11 @@
             IsVisible="{Binding ShowComposerButton}"
             Command="{Binding OpenComposerCommand}" />
 
-    <!-- Input dock -->
+    <!-- Input dock. Enter submits from every field; focus then goes back to FUNKTION (#540). -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
+            b:EntryForm.SubmitCommand="{Binding AddRoleCommand}"
+            b:EntryForm.FirstField="{Binding #RoleBox}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
@@ -154,8 +156,7 @@
                              ItemsSource="{Binding PersonOptions}"
                              FilterMode="ContainsOrdinal"
                              MinimumPrefixLength="0"
-                             Text="{Binding NewPersonName}"
-                             b:EnterSubmit.Command="{Binding AddRoleCommand}" />
+                             Text="{Binding NewPersonName}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="ABSCHNITT">
             <TextBox x:Name="SectionBox"

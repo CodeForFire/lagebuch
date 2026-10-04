@@ -129,7 +129,7 @@ public sealed partial class RoleAssignmentRow : ObservableObject
     private void BeginTransfer() => _onTransfer(this);
 }
 
-public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDisposable
+public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -441,18 +441,23 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
         ShowAddErrors(false); // a dismissed form must not reopen still complaining
     }
 
+    /// <inheritdoc />
+    public event EventHandler<EntrySubmittedEventArgs>? EntrySubmitted;
+
     [RelayCommand(CanExecute = nameof(CanAddRole))]
     private void AddRole()
     {
         if (!ValidateAdd())
         {
+            EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
             return;
         }
 
         // A Funktion the Stammdaten marked unique is already held, so rather than refusing with a
         // dead end, point the operator at the handover: it is the only thing that legitimately
         // replaces a running holder, and it is one click away in the grid. The form keeps its
-        // values, so cancelling the panel returns here as it was (#470).
+        // values, so cancelling the panel returns here as it was (#470). Nothing is reported: the
+        // panel takes focus, and gives it back to the form when it closes (#540).
         if (ConflictingRow is { } taken)
         {
             BeginTransfer(taken);
@@ -486,6 +491,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IDi
         // Reached only on success, so this is where the phone's form closes again.
         IsComposerOpen = false;
         _onChanged();
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Succeeded);
     }
 
     private bool ValidateAdd()

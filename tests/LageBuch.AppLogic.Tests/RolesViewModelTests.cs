@@ -477,6 +477,29 @@ public class RolesViewModelTests
         Assert.Null(vm.ConflictingRow);
     }
 
+    // #540: the view refocuses on EntrySubmitted -- FUNKTION after an add, the invalid field after a
+    // refusal. A Funktion already held opens the handover panel instead, which owns focus.
+    [Fact]
+    public void Submitting_reports_whether_the_role_was_added_and_stays_quiet_on_a_handover()
+    {
+        var clock = new FixedClock(T0);
+        using var vm = NewVm(clock, MdWithRoles(RoleUniqueness.UniquePerIncident));
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        vm.NewRole = "EL";
+        vm.AddRoleCommand.Execute(null); // no name: refused
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        clock.Now = T0.AddMinutes(1);
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Schmidt";
+        vm.AddRoleCommand.Execute(null); // EL is held: the handover panel opens
+
+        Assert.True(vm.IsTransferring);
+        Assert.Equal(new[] { false, true }, outcomes);
+    }
+
     [Fact]
     public void A_funktion_unique_per_einsatz_is_flagged_while_a_holder_runs()
     {

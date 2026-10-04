@@ -1,0 +1,1 @@
+Enter now submits every entry form from any of its fields, including Kräfte with a FAHRZEUG picked; after the entry is added, focus goes back to the form's first field (EINTRAG in the ETB, AUFGABE in Aufgaben), and when an entry is refused, it goes to the first field that is missing; Kräfte keeps FEUERWEHR for the next unit (#540).
