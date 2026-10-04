@@ -102,12 +102,13 @@
             Command="{Binding OpenComposerCommand}" />
 
     <!-- Input dock -->
-    <!-- Enter submits from every field; focus then goes back to EINTRAG, not VON (#540). Most
-         entries carry no sender, so EINTRAG is where the next one starts, as it always has. -->
+    <!-- Enter submits from every field; focus then goes back to VON, cleared like AN (#540): an
+         entry starts with who sent it, in reading order. VON is deliberately not sticky: a
+         leftover sender would put the next message in the record under the wrong unit. -->
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
             b:EntryForm.SubmitCommand="{Binding AddEntryCommand}"
-            b:EntryForm.FirstField="{Binding #EtbTextBox}"
+            b:EntryForm.FirstField="{Binding #FromBox}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- Scrolls so a focused field can still be reached once Android's AdjustResize has taken

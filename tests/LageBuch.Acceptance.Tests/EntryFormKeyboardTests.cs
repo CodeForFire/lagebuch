@@ -51,42 +51,54 @@ public class EntryFormKeyboardTests
         Dispatcher.UIThread.RunJobs();
     }
 
+    // VON is the first field and is cleared like AN: an entry is VON, Tab, AN, Tab, EINTRAG, Enter,
+    // and the next one starts at VON again -- no Shift+Tab anywhere.
     [AvaloniaFact]
     public void Etb_three_entries_in_a_row_without_shift_tab()
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "ETB");
-        var text = Named<TextBox>(window, "EtbTextBox");
-        FocusByTab(window, text);
+        var from = Named<AutoCompleteBox>(window, "FromBox");
+        FocusByTab(window, from);
 
-        foreach (var entry in new[] { "Erste Lagemeldung", "Wasserversorgung steht", "Nachforderung RTW" })
+        foreach (var (sender, entry) in new[]
+                 {
+                     ("Florian Testort 40/1", "Erste Lagemeldung"),
+                     ("Florian Testort 11/1", "Wasserversorgung steht"),
+                     ("Florian Testort 40/1", "Nachforderung RTW"),
+                 })
         {
+            window.Type(sender);
+            window.Tab();
+            window.Tab(); // AN stays empty
             window.Type(entry);
             window.Press(PhysicalKey.Enter);
-            window.AssertFocused(text);
+            window.AssertFocused(from);
+            Assert.True(string.IsNullOrEmpty(from.Text)); // not sticky
         }
 
         Assert.Equal(
             new[] { "Nachforderung RTW", "Wasserversorgung steht", "Erste Lagemeldung" },
             vm.Etb.Entries.Take(3).Select(e => e.Text));
+        Assert.Equal(
+            new[] { "Florian Testort 40/1", "Florian Testort 11/1", "Florian Testort 40/1" },
+            vm.Etb.Entries.Take(3).Select(e => e.From));
     }
 
     [AvaloniaFact]
-    public void Etb_enter_from_von_submits_and_focus_goes_back_to_eintrag()
+    public void Etb_enter_from_von_without_eintrag_is_refused_and_focus_goes_to_eintrag()
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "ETB");
-        FocusByTab(window, Named<TextBox>(window, "EtbTextBox"));
-        window.Type("Lage unverändert");
-        FocusByTab(window, Named<AutoCompleteBox>(window, "FromBox"));
+        var from = Named<AutoCompleteBox>(window, "FromBox");
+        FocusByTab(window, from);
         window.Type("Florian Testort 40/1");
-        Dispatcher.UIThread.RunJobs();
-        Named<AutoCompleteBox>(window, "FromBox").IsDropDownOpen = false; // nothing highlighted
+        from.IsDropDownOpen = false; // nothing highlighted
 
         window.Press(PhysicalKey.Enter);
 
-        Assert.Equal("Lage unverändert", vm.Etb.Entries[0].Text);
-        Assert.Equal("Florian Testort 40/1", vm.Etb.Entries[0].From);
+        Assert.DoesNotContain(vm.Etb.Entries, e => e.From == "Florian Testort 40/1");
+        Assert.Equal("Florian Testort 40/1", from.Text); // a refusal keeps what was typed
         window.AssertFocused(Named<TextBox>(window, "EtbTextBox"));
     }
 
@@ -293,26 +305,44 @@ public class EntryFormKeyboardTests
         Assert.Contains(vm.Roles.Roles, r => r.PersonName == "Max Testmann");
     }
 
+    // WICHTIGKEIT is the first field; it, DRINGLICHKEIT and ZUGETEILT keep their values between
+    // tasks, so the next task is Tab x4, the text, Enter.
     [AvaloniaFact]
-    public void Aufgaben_enter_from_the_timer_submits_and_focus_goes_to_aufgabe()
+    public void Aufgaben_enter_from_the_last_field_submits_and_focus_goes_to_wichtigkeit()
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
-        var text = Named<TextBox>(window, "TaskNewTextBox");
-        FocusByTab(window, text);
+        var importance = Named<ComboBox>(window, "ImportanceBox");
+        FocusByTab(window, importance);
+        window.Press(PhysicalKey.ArrowDown); // a closed ComboBox steps its selection
+        var picked = vm.Tasks.NewImportance;
+        window.Tab();
+        window.Tab();
+        window.Tab();
+        window.Tab();
+        window.AssertFocused(Named<TextBox>(window, "TaskNewTextBox"));
         window.Type("Hydrantenplan holen");
-        window.ShiftTab(); // TIMER
 
         window.Press(PhysicalKey.Enter);
 
         Assert.Equal("Hydrantenplan holen", Assert.Single(vm.Tasks.Rows).Text);
-        window.AssertFocused(text);
+        window.AssertFocused(importance);
+        Assert.Equal(picked, vm.Tasks.NewImportance); // kept for the next task
+    }
 
+    [AvaloniaFact]
+    public void Aufgaben_enter_from_the_timer_submits_and_focus_goes_to_wichtigkeit()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        FocusByTab(window, Named<TextBox>(window, "TaskNewTextBox"));
         window.Type("Zufahrt freihalten");
+        window.ShiftTab(); // TIMER
+
         window.Press(PhysicalKey.Enter);
 
-        Assert.Equal(2, vm.Tasks.Rows.Count);
-        window.AssertFocused(text);
+        Assert.Equal("Zufahrt freihalten", Assert.Single(vm.Tasks.Rows).Text);
+        window.AssertFocused(Named<ComboBox>(window, "ImportanceBox"));
     }
 
     [AvaloniaFact]
