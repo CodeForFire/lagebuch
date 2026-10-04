@@ -9,9 +9,10 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// Enter has two jobs on an AutoCompleteBox: accept the highlighted suggestion, and (via the
-// input dock's KeyBinding) submit the form. Pressing Enter to pick a suggestion must NOT also
-// submit — on Atemschutz that was creating the Trupp mid-selection.
+// Enter has two jobs on an AutoCompleteBox: accept the highlighted suggestion, and submit the
+// form. Pressing Enter to pick a suggestion must NOT also submit — on Atemschutz that was creating
+// the Trupp mid-selection. An open list with nothing picked submits in one press (#466; see
+// SuggestionBoxKeyboardTests).
 public class EnterOnDropdownTests
 {
     private static MasterDataSet Md() => MasterDataSet.Empty with
@@ -58,10 +59,12 @@ public class EnterOnDropdownTests
         box.Focus();
         box.IsDropDownOpen = true; // the suggestion list is open
         Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.ArrowDown); // onto "Mustermann, Max"
 
         window.Press(PhysicalKey.Enter);
 
         Assert.Empty(vm.Trupps); // picking a suggestion must not create the Trupp
+        Assert.Equal("Mustermann, Max", vm.NewTruppmann);
     }
 
     [AvaloniaFact]
@@ -103,6 +106,7 @@ public class EnterOnDropdownTests
         box.Focus();
         box.IsDropDownOpen = true;
         Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.ArrowDown); // onto the first call sign
 
         window.Press(PhysicalKey.Enter);
 

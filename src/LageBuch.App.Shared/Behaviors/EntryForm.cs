@@ -17,12 +17,13 @@ namespace LageBuch.App.Shared.Behaviors;
 /// is added, focus goes to <see cref="FirstFieldProperty"/>; after validation refuses it, focus
 /// goes to the first field marked <c>invalid</c>.
 ///
-/// Enter is left alone in an AutoCompleteBox or a ComboBox whose list is open (Enter picks the
-/// row there), in multi-line text, on a button (Enter presses it) and inside an inline overlay
-/// panel, which keeps its own primary command. The handler is <b>tunneling</b> for the same
-/// reason as <see cref="EnterSubmit"/>: it must read <c>IsDropDownOpen</c> before the box handles
-/// Enter and closes the list. A closed ComboBox therefore submits on Enter, and Space or Alt+↓
-/// still open it.
+/// Enter is left alone in a suggestion box with a pick pending (<see cref="SuggestionBox.ClaimsEnter"/>:
+/// Enter takes the row there), in a ComboBox whose list is open, in multi-line text, on a button
+/// (Enter presses it) and inside an inline overlay panel, which keeps its own primary command. A
+/// suggestion box whose list is merely open submits in one press (#466) and closes the list. The
+/// handler is <b>tunneling</b> for the same reason as <see cref="EnterSubmit"/>: it must read the
+/// box before the box handles Enter and closes the list. A closed ComboBox therefore submits on
+/// Enter, and Space or Alt+↓ still open it.
 ///
 /// Whether a submit went through is known only to the view model, so the refocus listens to
 /// <see cref="IEntryForm.EntrySubmitted"/>, which also covers a click on the add button. A field
@@ -148,6 +149,7 @@ public static class EntryForm
             return;
         }
 
+        SuggestionBox.CloseList(source);
         var command = GetSubmitCommand(root);
         if (command?.CanExecute(null) == true)
         {
@@ -168,7 +170,7 @@ public static class EntryForm
 
             switch (visual)
             {
-                case AutoCompleteBox { IsDropDownOpen: true }:
+                case AutoCompleteBox box when SuggestionBox.ClaimsEnter(box):
                 case ComboBox { IsDropDownOpen: true }:
                 case TextBox { AcceptsReturn: true }:
                 case Button:

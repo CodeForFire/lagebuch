@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using LageBuch.App.Shared.Behaviors;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -46,25 +47,78 @@ public class KeyboardRuntimeFactsTests
         return (window, view, vm);
     }
 
-    // #466: Tab never takes a match the user cannot see. "Musterm" is a prefix of exactly one
-    // person, and Tab still keeps what was typed.
-    [AvaloniaTheory]
-    [InlineData("Must")]
-    [InlineData("Musterm")]
-    public void Tab_on_an_open_suggestion_list_closes_it_moves_on_and_keeps_what_was_typed(string typed)
+    // #466: Tab never takes a match the user cannot see. "Must" is a prefix of two people, and Tab
+    // keeps what was typed. (A prefix of exactly one is completed visibly by SuggestionBox first; see
+    // SuggestionBoxKeyboardTests.)
+    [AvaloniaFact]
+    public void Tab_on_an_open_suggestion_list_closes_it_moves_on_and_keeps_what_was_typed()
     {
         var (window, view, vm) = ShowScba();
         var box = view.GetControl<AutoCompleteBox>("TruppfuehrerBox");
         box.Focus();
         Dispatcher.UIThread.RunJobs();
-        window.Type(typed);
+        window.Type("Must");
         Assert.True(box.IsDropDownOpen);
 
         window.Tab();
 
         window.AssertFocused(view.GetControl<AutoCompleteBox>("TruppmannBox"));
         Assert.False(box.IsDropDownOpen);
-        Assert.Equal(typed, vm.NewTruppfuehrer);
+        Assert.Equal("Must", vm.NewTruppfuehrer);
+    }
+
+    // Avalonia's box as it ships, without this app's SuggestionBox on top.
+    private static (Window Window, AutoCompleteBox Box) ShowBareBox(params string[] items)
+    {
+        var box = new AutoCompleteBox { ItemsSource = items, FilterMode = AutoCompleteFilterMode.ContainsOrdinal, MinimumPrefixLength = 0 };
+        SuggestionBox.SetIsEnabled(box, false);
+        var window = new Window { Content = new StackPanel { Children = { box, new TextBox() } }, Width = 600, Height = 400 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        box.Focus();
+        box.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        return (window, box);
+    }
+
+    // #466: ContainsOrdinal ignores case, umlauts included, so no box needs another FilterMode.
+    [AvaloniaFact]
+    public void ContainsOrdinal_ignores_case_including_umlauts()
+    {
+        var (_, box) = ShowBareBox("Müller, Hans");
+
+        Assert.NotNull(box.TextFilter);
+        Assert.True(box.TextFilter("müll", "Müller, Hans"));
+    }
+
+    // #466: Avalonia's own text completion takes the first prefix match even with several left, so
+    // SuggestionBox switches it on only for a single one.
+    [AvaloniaFact]
+    public void Avalonia_text_completion_takes_the_first_of_several_prefix_matches()
+    {
+        var (window, box) = ShowBareBox("Mustermann, Max", "Musterfrau, Erika");
+        box.IsTextCompletionEnabled = true;
+
+        window.Type("Must");
+
+        Assert.Equal("Mustermann, Max", box.Text);
+    }
+
+    // #466: SearchText keeps what was typed while the box shows an arrowed row, and Esc closes the
+    // list and puts it back. That is what SuggestionBox.ClaimsEnter reads.
+    [AvaloniaFact]
+    public void SearchText_keeps_what_was_typed_and_Esc_puts_it_back()
+    {
+        var (window, box) = ShowBareBox("Mustermann, Max", "Musterfrau, Erika");
+        window.Type("Must");
+        window.Press(PhysicalKey.ArrowDown);
+        Assert.Equal("Mustermann, Max", box.Text);
+        Assert.Equal("Must", box.SearchText);
+
+        window.Press(PhysicalKey.Escape);
+
+        Assert.False(box.IsDropDownOpen);
+        Assert.Equal("Must", box.Text);
     }
 
     // The match the user can see: arrowing onto a suggestion already writes it into the box, and Tab
