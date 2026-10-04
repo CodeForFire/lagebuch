@@ -97,7 +97,7 @@ public sealed partial class InvolvedPartyRow : ObservableObject
 /// owner, the vehicle owner, the police contact. Deliberately writes no ETB line: a third party's
 /// name and phone number stay in this one list.
 /// </summary>
-public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrowAware, IDisposable
+public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
@@ -216,12 +216,16 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
     // Only the read-only rule gates the button; the input rule answers on the press (#412).
     private bool CanAdd => !IsReadOnly;
 
+    /// <inheritdoc />
+    public event EventHandler<EntrySubmittedEventArgs>? EntrySubmitted;
+
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private void Add()
     {
         ShowErrors(true);
         if (NewNameError is not null)
         {
+            EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
             return;
         }
 
@@ -232,6 +236,7 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
         ShowErrors(false);
         IsComposerOpen = false;
         _onChanged();
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Succeeded);
     }
 
     private void ShowErrors(bool shown)

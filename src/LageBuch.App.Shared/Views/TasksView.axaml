@@ -110,9 +110,13 @@
             IsVisible="{Binding ShowComposerButton}"
             Command="{Binding OpenComposerCommand}" />
 
-    <!-- Input dock -->
+    <!-- Input dock. Enter submits from every field; focus then goes back to WICHTIGKEIT, the
+         first field in reading order (#540). The view model keeps WICHTIGKEIT, DRINGLICHKEIT and
+         ZUGETEILT between tasks, so Tab walks past them unchanged. -->
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
+            b:EntryForm.SubmitCommand="{Binding AddTaskCommand}"
+            b:EntryForm.FirstField="{Binding #ImportanceBox}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- Scrolls so a focused field stays reachable once Android's AdjustResize has given the
@@ -156,25 +160,17 @@
             <AutoCompleteBox x:Name="AssigneeBox" ItemsSource="{Binding AssigneeOptions}"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
-                             Text="{Binding NewAssignee}" b:EnterSubmit.Command="{Binding AddTaskCommand}" />
+                             Text="{Binding NewAssignee}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="TIMER (MIN)"
                                     Classes.invalid="{Binding NewTimerMinutesError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBox x:Name="TimerBox" Text="{Binding NewTimerMinutes}" b:IntegerOnly.IsEnabled="True"
-                     PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+                     PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field required" Header="AUFGABE"
                                     Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding AddTaskCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+            <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}" />
           </HeaderedContentControl>
           <Button x:Name="TaskAddButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />

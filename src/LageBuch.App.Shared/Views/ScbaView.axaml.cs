@@ -30,10 +30,10 @@ public partial class ScbaView : UserControl
         // A jump from another tab (#422) reaches no live view — this one is built a moment later,
         // once its tab is selected — so the scroll has to happen on arrival as well as on request.
         // A warning-bar jump (#539) built it to take that Trupp's Druck; arriving any other way
-        // starts at the registration form, as it always has.
+        // starts at the registration form's first field, FUNKRUFNAME (#540).
         if (!Reveal())
         {
-            TruppfuehrerBox.Focus();
+            CallSignBox.Focus();
         }
     }
 

@@ -265,7 +265,9 @@ public class ForcesViewModelTests
         vm.NewNotes = "Notiz";
         vm.AddForceCommand.Execute(null);
 
-        Assert.Equal(string.Empty, vm.NewBrigade);
+        // FEUERWEHR is sticky (#540): the next vehicle usually comes from the same Feuerwehr.
+        Assert.Equal("FFB Wache 1", vm.NewBrigade);
+        Assert.Null(vm.NewCallSign);
 
         // Empty means 0 -- the fields are nullable so the placeholder shows instead of a "0".
         Assert.Null(vm.NewOfficerCount);
@@ -935,6 +937,54 @@ public class ForcesViewModelTests
 
         Assert.Equal(after, session.Incident.Journal.Count);
         Assert.Equal("übe", session.Incident.Forces[0].Notes);
+    }
+
+    // --- #540: Enter-submit and refocus. The view moves focus on EntrySubmitted; FEUERWEHR is sticky.
+    [Fact]
+    public void A_vehicle_submit_keeps_its_feuerwehr_and_clears_the_vehicle()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Single(vm.Forces);
+        Assert.Null(vm.SelectedVehicle);
+        Assert.False(vm.IsVehicleSelected); // FEUERWEHR and FUNKRUFNAME are editable again
+        Assert.Equal("Aich", vm.NewBrigade);
+        Assert.Null(vm.NewCallSign);
+    }
+
+    [Fact]
+    public void Two_units_from_one_feuerwehr_need_the_feuerwehr_typed_once()
+    {
+        var vm = NewVm();
+        vm.NewBrigade = "FF Nachbarort";
+        vm.NewCallSign = "Florian Nachbarort 40/1";
+        vm.NewMannschaftCount = 6;
+        vm.AddForceCommand.Execute(null);
+
+        vm.NewCallSign = "Florian Nachbarort 11/1";
+        vm.NewMannschaftCount = 9;
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Equal(new[] { "FF Nachbarort", "FF Nachbarort" }, vm.Forces.Select(f => f.Brigade));
+    }
+
+    [Fact]
+    public void Submitting_reports_whether_the_unit_was_added()
+    {
+        var vm = NewVm();
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        vm.AddForceCommand.Execute(null); // no identity: refused
+        vm.NewBrigade = "FFB";
+        vm.NewCallSign = "FFB 11/1";
+        vm.NewMannschaftCount = 6;
+        vm.AddForceCommand.Execute(null);
+
+        Assert.Equal(new[] { false, true }, outcomes);
     }
 
     private static ForcesViewModel NewVm()

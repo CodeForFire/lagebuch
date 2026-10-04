@@ -8,8 +8,8 @@ public partial class EtbView : UserControl
     {
         InitializeComponent();
 
-        // Land the cursor in the entry field so the operator can log radio traffic
-        // without first reaching for the mouse.
-        AttachedToVisualTree += (_, _) => EtbTextBox.Focus();
+        // Land the cursor in the form's first field, VON (#540), so the Lagebuchführer can log
+        // radio traffic without first reaching for the mouse.
+        AttachedToVisualTree += (_, _) => FromBox.Focus();
     }
 }

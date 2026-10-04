@@ -727,6 +727,36 @@ public class EtbViewModelTests
         Assert.Equal(["zweite", "erste"], vm.Entries.Select(e => e.Text));
     }
 
+    // #540: the view refocuses on EntrySubmitted -- EINTRAG after an add, the invalid field after a
+    // refusal. "Hinzufügen & Aufgabe" hands over to the task dialog, which owns focus from there.
+    [Fact]
+    public void Submitting_reports_whether_the_entry_was_added()
+    {
+        var vm = NewVm();
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        vm.AddEntryCommand.Execute(null); // no text: refused
+        vm.NewText = "Lagemeldung";
+        vm.AddEntryCommand.Execute(null);
+
+        Assert.Equal(new[] { false, true }, outcomes);
+    }
+
+    [Fact]
+    public void Adding_with_a_task_reports_only_a_refusal()
+    {
+        var vm = NewVm(MasterDataSet.Empty, () => { }, _ => { });
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        vm.AddEntryAndCreateTaskCommand.Execute(null); // no text: refused, focus goes to EINTRAG
+        vm.NewText = "Wasserversorgung prüfen";
+        vm.AddEntryAndCreateTaskCommand.Execute(null); // the task dialog takes focus
+
+        Assert.Equal(new[] { false }, outcomes);
+    }
+
     private static LocalIncidentSession NewSession(FixedClock clock) => TestSession.StartNew(
         new FakeStore(),
         clock,

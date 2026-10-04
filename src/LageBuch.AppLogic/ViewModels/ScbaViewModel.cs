@@ -294,7 +294,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
     private static string Clock(TimeSpan span) => $"{(int)span.TotalMinutes:00}:{span.Seconds:00}";
 }
 
-public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDisposable
+public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -809,11 +809,15 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDis
         OnPropertyChanged(nameof(ErrorSummary));
     }
 
+    /// <inheritdoc />
+    public event EventHandler<EntrySubmittedEventArgs>? EntrySubmitted;
+
     [RelayCommand(CanExecute = nameof(CanAddTrupp))]
     private void AddTrupp()
     {
         if (!Validate())
         {
+            EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
             return;
         }
 
@@ -861,6 +865,7 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDis
         ApplyDefaultMaxDuration(); // empty designation => AGT default; also re-derives the interval
         RefreshHeader();
         _onChanged();
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Succeeded);
     }
 
     private ScbaTruppRow CreateRow(AtemschutzTrupp trupp) =>

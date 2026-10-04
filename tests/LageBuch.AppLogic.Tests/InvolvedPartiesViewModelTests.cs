@@ -197,6 +197,21 @@ public class InvolvedPartiesViewModelTests
         Assert.Null(vm.NewNameError);
     }
 
+    // #540: the view refocuses on EntrySubmitted -- NAME after an add and after a refusal alike.
+    [Fact]
+    public void Submitting_reports_whether_the_party_was_added()
+    {
+        using var vm = new InvolvedPartiesViewModel(NewSession(), () => { });
+        var outcomes = new List<bool>();
+        vm.EntrySubmitted += (_, e) => outcomes.Add(e.Added);
+
+        vm.AddCommand.Execute(null); // no name: refused
+        vm.NewName = "Erika Beispiel";
+        vm.AddCommand.Execute(null);
+
+        Assert.Equal(new[] { false, true }, outcomes);
+    }
+
     [Fact]
     public void Dispose_stops_listening_to_the_session()
     {

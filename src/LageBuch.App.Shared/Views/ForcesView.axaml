@@ -142,8 +142,13 @@
             Command="{Binding OpenComposerCommand}" />
 
     <!-- Input dock -->
+    <!-- Enter submits from every field, a closed FAHRZEUG included, so a vehicle is ↓ and Enter.
+         Focus then goes back to FAHRZEUG; FEUERWEHR keeps its value for the next unit of the same
+         Feuerwehr and is selected when Tab reaches it (#540). -->
     <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
+            b:EntryForm.SubmitCommand="{Binding AddForceCommand}"
+            b:EntryForm.FirstField="{Binding #VehicleBox}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <!-- The duplicate-callsign hint used to sit at the end of the horizontal fields row below,
@@ -200,11 +205,7 @@
             <TextBox x:Name="BrigadeBox"
                      IsEnabled="{Binding !IsVehicleSelected}"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.BrigadePlaceholder}"
-                     Text="{Binding NewBrigade}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding AddForceCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+                     Text="{Binding NewBrigade}" />
           </HeaderedContentControl>
           <!-- Same reasoning as Feuerwehr/Wache above: free text for vehicles outside the Stammdaten,
                readonly while a Fahrzeug is selected. Required together with the Wache (#220): a
@@ -214,11 +215,7 @@
             <TextBox x:Name="CallSignBox"
                      IsEnabled="{Binding !IsVehicleSelected}"
                      PlaceholderText="{x:Static md:AnonymizedExampleData.SecondCallSignPlaceholder}"
-                     Text="{Binding NewCallSign}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding AddForceCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+                     Text="{Binding NewCallSign}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN"
                                   Classes.invalid="{Binding NewStrengthError, Converter={x:Static ObjectConverters.IsNotNull}}">

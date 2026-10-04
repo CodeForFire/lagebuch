@@ -266,7 +266,7 @@ public sealed partial class ForceRow : ObservableObject
         }).ToArray();
 }
 
-public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IDisposable
+public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
 {
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
@@ -623,11 +623,15 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, ID
         }
     }
 
+    /// <inheritdoc />
+    public event EventHandler<EntrySubmittedEventArgs>? EntrySubmitted;
+
     [RelayCommand(CanExecute = nameof(CanAddForce))]
     private void AddForce()
     {
         if (!Validate())
         {
+            EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Rejected);
             return;
         }
 
@@ -640,7 +644,11 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, ID
             NewScbaCount ?? 0,
             NewOfficerCount ?? 0,
             NewZugfuehrerCount ?? 0); // Changed → RefreshForces
-        NewBrigade = string.Empty;
+
+        // FEUERWEHR is sticky (#540): several vehicles of one Feuerwehr usually arrive together, so
+        // it stays, and the view selects it on the way past. The vehicle goes -- it is taken now --
+        // and that frees FEUERWEHR and FUNKRUFNAME for typing again.
+        SelectedVehicle = null;
         NewCallSign = null;
         NewZugfuehrerCount = null;
         NewOfficerCount = null;
@@ -654,6 +662,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, ID
         // phone's form closes and gives the list back.
         IsComposerOpen = false;
         _onChanged();
+        EntrySubmitted?.Invoke(this, EntrySubmittedEventArgs.Succeeded);
     }
 
     /// <summary>
