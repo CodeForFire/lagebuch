@@ -33,6 +33,12 @@ public sealed class AtemschutzTrupp
     public const int DefaultPressureControlIntervalMinutes = 5;
     public const int MaxPressureBar = 400;
 
+    /// <summary>How far a reading may sit above the last one before it is questioned (#539).</summary>
+    public const int PlausibleRiseToleranceBar = 10;
+
+    /// <summary>The fastest pressure loss taken as a reading rather than a typo (#539).</summary>
+    public const int PlausibleMaxDropBarPerMinute = 25;
+
     /// <summary>
     /// Crew size of an ordinary Trupp: Truppführer + Truppmann. Also the minimum — Atemschutz is
     /// never a solo activity.
@@ -383,6 +389,36 @@ public sealed class AtemschutzTrupp
 
     public bool IsControlDue(DateTimeOffset now) =>
         (IsActive || IsWithdrawing) && NextControlDueAt is { } due && now >= due;
+
+    /// <summary>
+    /// Whether <paramref name="bar"/> is a believable next reading at <paramref name="now"/>, not
+    /// just a valid one (#539). <c>27</c> typed for <c>270</c> passes the 0–400 range, trips the
+    /// Rückzugsalarm and stays in the Bericht for good: a Druck that is believable but wrong is
+    /// worse than one that is questioned.
+    /// </summary>
+    /// <remarks>
+    /// Advice, never an invariant: <see cref="RecordPressure"/> still accepts the reading, because a
+    /// leaking cylinder genuinely loses air faster than any crew breathes it. Judged against the
+    /// last reading (the Einstiegsdruck before the first): air does not come back, beyond a gauge
+    /// read a little high, and it does not fall faster than <see cref="PlausibleMaxDropBarPerMinute"/>
+    /// — hard work on a 6.8 l cylinder is about 15 bar a minute.
+    /// </remarks>
+    public bool IsPlausiblePressure(int bar, DateTimeOffset now)
+    {
+        if (LatestPressure is not { } last || LastControlAt is not { } since)
+        {
+            return true;
+        }
+
+        if (bar > last + PlausibleRiseToleranceBar)
+        {
+            return false;
+        }
+
+        // A correction seconds after a reading is judged over a minute, not divided by nearly zero.
+        var minutes = Math.Max(1.0, (now - since).TotalMinutes);
+        return (last - bar) / minutes <= PlausibleMaxDropBarPerMinute;
+    }
 
     /// <summary>
     /// The Trupp's state as one word at <paramref name="now"/>, as the grid and the PDF print it

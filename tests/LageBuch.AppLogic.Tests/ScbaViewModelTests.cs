@@ -151,6 +151,8 @@ public class ScbaViewModelTests
         var row = Register(vm);
         row.StartCommand.Execute(null);
 
+        // A quarter of an hour in, 45 bar is a believable reading rather than a typo (#539).
+        clock.Now = T0.AddMinutes(15);
         row.PressureInput = 45;
         row.RecordPressureCommand.Execute(null);
 
@@ -1095,5 +1097,184 @@ public class ScbaViewModelTests
 
         Assert.Same(row, Assert.Single(vm.Trupps));
         Assert.Same(row, vm.SelectedTrupp);
+    }
+
+    // ----- #539: a Druckkontrolle that is typed and entered -----
+    private static int ReadingsOf(LocalIncidentSession session, ScbaTruppRow row) =>
+        session.Incident.ScbaTrupps.Single(t => t.Id == row.Id).PressureReadings.Count;
+
+    [Fact]
+    public void The_pressure_field_starts_empty_and_names_the_last_reading()
+    {
+        var clock = new FixedClock(T0);
+        var row = StartTrupp(Vm(clock, NewSession(clock)), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+
+        Assert.Null(row.PressureInput);
+        Assert.Equal("zuletzt 300", row.PressurePlaceholder);
+    }
+
+    [Fact]
+    public void An_empty_pressure_field_records_nothing_and_says_so()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal(0, ReadingsOf(session, row));
+        Assert.Equal(ValidationMessages.ControlPressure, row.PressureError);
+        Assert.True(row.HasPressureError);
+    }
+
+    [Fact]
+    public void A_pressure_beyond_the_gauge_records_nothing_and_stays_in_the_field()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+
+        row.PressureInput = 4000;
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal(0, ReadingsOf(session, row));
+        Assert.Equal(4000, row.PressureInput);
+        Assert.Equal(ValidationMessages.ControlPressure, row.PressureError);
+    }
+
+    [Fact]
+    public void Typing_again_clears_the_pressure_error()
+    {
+        var clock = new FixedClock(T0);
+        var row = StartTrupp(Vm(clock, NewSession(clock)), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        row.RecordPressureCommand.Execute(null);
+
+        row.PressureInput = 270;
+
+        Assert.Null(row.PressureError);
+    }
+
+    [Fact]
+    public void A_recorded_pressure_empties_the_field_and_writes_the_etb()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+
+        row.PressureInput = 270;
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal(1, ReadingsOf(session, row));
+        Assert.Null(row.PressureInput);
+        Assert.Equal("zuletzt 270", row.PressurePlaceholder);
+        Assert.Contains(session.Incident.Journal, e => e.Text.Contains("270 bar", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void An_implausible_pressure_is_held_back_once_with_a_warning()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+
+        // 27 for 270: a valid number, and a Rückzugsalarm nobody meant to raise.
+        row.PressureInput = 27;
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal(0, ReadingsOf(session, row));
+        Assert.Equal(27, row.PressureInput);
+        Assert.True(row.HasPressureWarning);
+        Assert.Contains("zuletzt 300 bar", row.PressureWarning, StringComparison.Ordinal);
+        Assert.False(row.IsAlarm);
+    }
+
+    [Fact]
+    public void Pressing_again_records_the_implausible_pressure_it_warned_about()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+        row.PressureInput = 27;
+        row.RecordPressureCommand.Execute(null);
+
+        // A leaking cylinder really does lose air this fast; it is asked about, never refused.
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal(1, ReadingsOf(session, row));
+        Assert.False(row.HasPressureWarning);
+        Assert.True(row.IsAlarm);
+    }
+
+    [Fact]
+    public void Changing_the_value_after_a_warning_asks_again()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var row = StartTrupp(Vm(clock, session), "Müller", maxDurationMinutes: 30, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(5);
+        row.PressureInput = 27;
+        row.RecordPressureCommand.Execute(null);
+
+        row.PressureInput = 28;
+        Assert.False(row.HasPressureWarning);
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal(0, ReadingsOf(session, row));
+        Assert.True(row.HasPressureWarning);
+    }
+
+    [Fact]
+    public void Recording_one_due_trupp_names_the_next_due_one()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var first = StartTrupp(vm, "Müller", maxDurationMinutes: 60, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(2);
+        var second = StartTrupp(vm, "Huber", maxDurationMinutes: 60, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(8);
+        Assert.True(first.IsControlDue && second.IsControlDue);
+
+        ScbaTruppRow? next = first;
+        vm.PressureRecorded += (_, e) => next = e.NextDue;
+        first.PressureInput = 270;
+        first.RecordPressureCommand.Execute(null);
+        Assert.Same(second, next);
+
+        second.PressureInput = 270;
+        second.RecordPressureCommand.Execute(null);
+        Assert.Null(next);
+    }
+
+    [Fact]
+    public void A_warning_bar_jump_asks_for_the_trupps_pressure_field_once()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var row = StartTrupp(vm, "Müller", maxDurationMinutes: 60, controlIntervalMinutes: 5);
+        clock.Now = T0.AddMinutes(6);
+
+        Assert.Null(vm.TakePressureFocusRequest());
+        vm.ShowMostUrgentControlCommand.Execute(null);
+
+        Assert.Same(row, vm.TakePressureFocusRequest());
+
+        // Taken: coming back to the tab later by the rail must not pull focus into the row.
+        Assert.Null(vm.TakePressureFocusRequest());
+    }
+
+    [Fact]
+    public void The_rueckzug_bar_jump_asks_for_the_alarming_trupps_pressure_field()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var alarming = StartTrupp(vm, "Huber", maxDurationMinutes: 20, controlIntervalMinutes: 30);
+        clock.Now = T0.AddMinutes(25);
+
+        vm.ShowAlarmingTruppCommand.Execute(null);
+
+        Assert.Same(alarming, vm.TakePressureFocusRequest());
     }
 }

@@ -45,9 +45,11 @@ internal static class WorkspaceRenderHelper
 
     public static IncidentWorkspaceViewModel BuildEditableWorkspaceWithAllBars(
         IIncidentHostController? host = null,
-        bool withOverdueTask = false)
+        bool withOverdueTask = false,
+        FixedClock? clock = null)
     {
-        var clock = new FixedClock();
+        // Passed in by a test that has to move time on after the bars are up (#539).
+        clock ??= new FixedClock();
         var checklistAufbau = new[]
         {
             ("Aufstellort ELW weit genug weg um nicht zu behindern?", true),

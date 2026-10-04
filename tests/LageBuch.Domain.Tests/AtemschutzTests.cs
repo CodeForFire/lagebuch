@@ -125,6 +125,86 @@ public class AtemschutzTests
         Assert.True(trupp.IsControlDue(T0.AddMinutes(10)));
     }
 
+    // ----- #539: a Druck that is a valid number but not a believable reading -----
+    private static AtemschutzTrupp TruppUnderAir(Incident incident, FixedClock clock)
+    {
+        var trupp = incident.AddScbaTrupp(
+            clock,
+            "Angriffstrupp",
+            TruppMember.Crew("Müller", "Schmidt"),
+            entryPressure: 300);
+        incident.StartScbaTrupp(clock, trupp.Id);
+        return trupp;
+    }
+
+    [Fact]
+    public void An_ordinary_drop_is_a_plausible_pressure()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = TruppUnderAir(incident, clock);
+
+        Assert.True(trupp.IsPlausiblePressure(270, T0.AddMinutes(5)));
+        Assert.True(trupp.IsPlausiblePressure(300, T0.AddMinutes(5)));
+    }
+
+    [Fact]
+    public void A_drop_by_a_missing_digit_is_not_a_plausible_pressure()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = TruppUnderAir(incident, clock);
+        clock.Now = T0.AddMinutes(5);
+        incident.RecordScbaPressure(clock, trupp.Id, 270);
+
+        // 27 for 270: about 49 bar a minute, far beyond any crew's consumption.
+        Assert.False(trupp.IsPlausiblePressure(27, T0.AddMinutes(10)));
+    }
+
+    [Fact]
+    public void A_steep_but_real_drop_over_time_stays_plausible()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = TruppUnderAir(incident, clock);
+
+        // 10 bar a minute: hard work, not a typo.
+        Assert.True(trupp.IsPlausiblePressure(200, T0.AddMinutes(10)));
+    }
+
+    [Fact]
+    public void A_reading_well_above_the_last_one_is_not_plausible()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = TruppUnderAir(incident, clock);
+        clock.Now = T0.AddMinutes(5);
+        incident.RecordScbaPressure(clock, trupp.Id, 250);
+
+        // Air does not come back; a gauge read a little high does.
+        Assert.True(trupp.IsPlausiblePressure(260, T0.AddMinutes(10)));
+        Assert.False(trupp.IsPlausiblePressure(261, T0.AddMinutes(10)));
+    }
+
+    [Fact]
+    public void The_first_reading_is_judged_against_the_entry_pressure()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = TruppUnderAir(incident, clock);
+
+        Assert.False(trupp.IsPlausiblePressure(320, T0.AddMinutes(5)));
+        Assert.False(trupp.IsPlausiblePressure(30, T0.AddMinutes(5)));
+    }
+
+    [Fact]
+    public void Two_readings_seconds_apart_are_judged_over_at_least_a_minute()
+    {
+        var incident = NewIncident(out var clock);
+        var trupp = TruppUnderAir(incident, clock);
+        clock.Now = T0.AddMinutes(5);
+        incident.RecordScbaPressure(clock, trupp.Id, 250);
+
+        // A correction ten seconds later is not a drop of 60 bar a minute.
+        Assert.True(trupp.IsPlausiblePressure(240, T0.AddMinutes(5).AddSeconds(10)));
+        Assert.False(trupp.IsPlausiblePressure(220, T0.AddMinutes(5).AddSeconds(10)));
+    }
+
     [Fact]
     public void Withdraw_requires_an_active_trupp()
     {

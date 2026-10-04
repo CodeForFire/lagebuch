@@ -53,7 +53,6 @@ public sealed partial class ScbaTruppRow : ObservableObject
         _onWithdraw = onWithdraw;
         _onMarkRemoved = onMarkRemoved;
         _onAssignSafetyTrupp = onAssignSafetyTrupp;
-        _pressureInput = trupp.LatestPressure ?? 300;
         SafetyTruppChoices = safetyTruppChoices;
         SafetyTruppHint = safetyTruppHint;
     }
@@ -153,8 +152,47 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     public bool CanAssignSafetyTrupp => !_isReadOnly && !_trupp.IsReturned;
 
+    /// <summary>
+    /// The Druck being typed for the next Druckkontrolle; null while the field is empty. It starts
+    /// empty and is emptied after every recording (#539): pre-filled with the last reading, one
+    /// reflex Enter recorded that old value as a new one.
+    /// </summary>
     [ObservableProperty]
-    private int _pressureInput;
+    private int? _pressureInput;
+
+    /// <summary>The last reading as the empty field's placeholder, so the operator sees what the
+    /// Trupp reported last without it being one keypress away from being recorded again.</summary>
+    public string PressurePlaceholder =>
+        _trupp.LatestPressure is { } p ? $"zuletzt {p}" : "bar";
+
+    /// <summary>Set by a press that could not record anything; null otherwise (#412).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPressureError))]
+    private string? _pressureError;
+
+    public bool HasPressureError => PressureError is not null;
+
+    /// <summary>
+    /// Set by the first press of a Druck that is valid but not believable (#539), which records
+    /// nothing. Pressing again with the same value records it: a leaking cylinder really does lose
+    /// air that fast, and must never be refused.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPressureWarning))]
+    private string? _pressureWarning;
+
+    public bool HasPressureWarning => PressureWarning is not null;
+
+    // The value the operator has already been warned about; a second press of it is the confirmation.
+    private int? _warnedPressure;
+
+    partial void OnPressureInputChanged(int? value)
+    {
+        // Any edit is a new attempt: what was said about the previous value no longer applies.
+        PressureError = null;
+        PressureWarning = null;
+        _warnedPressure = null;
+    }
 
     private bool CanStart => !_isReadOnly && _trupp.IsWaiting;
 
@@ -163,8 +201,30 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     private bool CanRecordPressure => !_isReadOnly && (_trupp.IsActive || _trupp.IsWithdrawing);
 
+    /// <summary>
+    /// DRUCK, and Enter in the field (#539). Only the read-only rule and the Trupp's state gate it;
+    /// a value that cannot be recorded says so and stays in the field, the way every form does
+    /// since #437.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanRecordPressure))]
-    private void RecordPressure() => _onRecordPressure(PressureInput);
+    private void RecordPressure()
+    {
+        if (PressureInput is not { } bar || bar < 0 || bar > AtemschutzTrupp.MaxPressureBar)
+        {
+            PressureError = ValidationMessages.ControlPressure;
+            return;
+        }
+
+        if (bar != _warnedPressure && !_trupp.IsPlausiblePressure(bar, _clock.Now))
+        {
+            _warnedPressure = bar;
+            PressureWarning = $"⚠ Ungewöhnlicher Druck (zuletzt {_trupp.LatestPressure} bar) – erneut bestätigen";
+            return;
+        }
+
+        _onRecordPressure(bar);
+        PressureInput = null; // only once it is recorded: a failed write must not take the value with it
+    }
 
     private bool CanWithdraw => !_isReadOnly && _trupp.IsActive;
 
@@ -219,6 +279,7 @@ public sealed partial class ScbaTruppRow : ObservableObject
         OnPropertyChanged(nameof(IsControlDue));
         OnPropertyChanged(nameof(StartTimeDisplay));
         OnPropertyChanged(nameof(PressureDisplay));
+        OnPropertyChanged(nameof(PressurePlaceholder));
         OnPropertyChanged(nameof(ElapsedDisplay));
         OnPropertyChanged(nameof(RemainingDisplay));
         OnPropertyChanged(nameof(ControlRemainingDisplay));
@@ -484,10 +545,12 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDis
     // and Rückzugsalarm both stay live through Rückzug, not just Im Einsatz.
     public bool HasControlReminder => !IsReadOnly && Trupps.Any(r => r.IsActive || r.IsWithdrawing);
 
-    private ScbaTruppRow? MostUrgentActive =>
+    private ScbaTruppRow? MostUrgentActive => ByControlUrgency().FirstOrDefault();
+
+    /// <summary>The Trupps under air, the most overdue Druckabfrage first.</summary>
+    private IEnumerable<ScbaTruppRow> ByControlUrgency() =>
         Trupps.Where(r => r.IsActive || r.IsWithdrawing)
-              .OrderBy(r => _session.Incident.ScbaTrupps.First(t => t.Id == r.Id).ControlRemaining(_clock.Now))
-              .FirstOrDefault();
+              .OrderBy(r => _session.Incident.ScbaTrupps.First(t => t.Id == r.Id).ControlRemaining(_clock.Now));
 
     public bool IsAnyControlDue => MostUrgentActive?.IsControlDue ?? false;
 
@@ -546,6 +609,29 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDis
     [RelayCommand]
     private void ShowAlarmingTrupp() => Reveal(Trupps.FirstOrDefault(r => r.IsAlarm));
 
+    // The row whose Druck field a warning-bar jump asked for, until the view takes it (#539).
+    private ScbaTruppRow? _pressureFocusRequest;
+
+    /// <summary>
+    /// The Trupp whose Druck field should take focus, once: a warning bar was activated and the
+    /// next thing the operator types is that Trupp's pressure (#539). Taking it clears it, so
+    /// arriving on the tab any other way — arrowing the rail, a sync rebuild — keeps the view's
+    /// own initial focus instead of being pulled into an old row.
+    /// </summary>
+    public ScbaTruppRow? TakePressureFocusRequest()
+    {
+        var row = _pressureFocusRequest;
+        _pressureFocusRequest = null;
+        return row;
+    }
+
+    /// <summary>
+    /// Raised after a Druckkontrolle has been recorded, carrying the Trupp whose Druckabfrage is
+    /// due next, or null when none is (#539). The view moves focus there only when the reading
+    /// was typed and entered: a DRUCK click leaves the pointer user where they were.
+    /// </summary>
+    public event EventHandler<PressureRecordedEventArgs>? PressureRecorded;
+
     private void Reveal(ScbaTruppRow? row)
     {
         if (row is null)
@@ -553,7 +639,10 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDis
             return;
         }
 
+        // Both bars name a Trupp whose pressure is the next thing to ask for: the Druckabfrage
+        // that is due, or the reading of a crew in Rückzugsalarm.
         SelectedTrupp = row;
+        _pressureFocusRequest = row;
         RevealRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -966,6 +1055,10 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IDis
         UpdateAlarm(tripped);
         RefreshHeader();
         _onChanged();
+
+        // The recorded Trupp is no longer due, so it cannot come back as its own successor.
+        PressureRecorded?.Invoke(this, new PressureRecordedEventArgs(
+            ByControlUrgency().FirstOrDefault(r => r.Id != truppId && r.IsControlDue)));
     }
 
     private void Withdraw(Guid truppId)
