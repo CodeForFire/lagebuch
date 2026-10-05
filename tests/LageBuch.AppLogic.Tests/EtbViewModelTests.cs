@@ -208,6 +208,42 @@ public class EtbViewModelTests
     }
 
     [Fact]
+    public void Toggling_the_system_filter_never_resets_the_entries()
+    {
+        // A Reset takes the grid's selected row and focus with it (#542, as #294 elsewhere).
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var vm = new EtbViewModel(session, clock, MasterDataSet.Empty, () => { }) { NewText = "Erste" };
+        vm.AddEntryCommand.Execute(null);
+        session.Incident.AddForceUnit(clock, session.Operator!, "FFB", 6);
+        vm.NewText = "Zweite";
+        vm.AddEntryCommand.Execute(null);
+        var human = vm.Entries.ToList();
+        var resets = 0;
+        vm.Entries.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                resets++;
+            }
+        };
+
+        vm.HideSystemEntries = false;
+        Assert.Equal(4, vm.Entries.Count);
+        Assert.Equal(["Zweite", "Erste"], vm.Entries.Where(r => r.DirectionValue != EtbDirection.System).Select(r => r.Text));
+        vm.HideSystemEntries = true;
+
+        Assert.Equal(0, resets);
+        Assert.Equal(human, vm.Entries);
+    }
+
+    [Fact]
     public void System_entry_added_while_filtering_stays_hidden_but_human_entry_appears()
     {
         var clock = new FixedClock(T0);

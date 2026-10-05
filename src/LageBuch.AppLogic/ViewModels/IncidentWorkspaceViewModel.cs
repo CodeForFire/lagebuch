@@ -357,6 +357,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private WorkspaceNavItemViewModel? _selectedNavItem;
 
     /// <summary>
+    /// The user asked for the open module — a warning bar jumped to it — so the view puts the
+    /// caret in its first field (#542). Never raised for a rail entry reached by arrowing, a
+    /// rebuild or the phone's bottom bar: a module that takes focus whenever it appears is one the
+    /// rail cannot be arrowed past.
+    /// </summary>
+    public event EventHandler? ModuleFocusRequested;
+
+    /// <summary>
     /// The rail entries the narrow bottom bar shows directly, and the ones behind its MEHR button.
     /// The split is by position, because the order is the Kommandant's own: Stammdaten's
     /// Navigation list is what decides which modules are one tap away on a phone.
@@ -720,8 +728,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         _checklists.Clear();
 
-        // The rail is gone with NavItems, so whatever it had open is gone too; BuildNavItems
-        // repopulates and the view selects the first entry again.
+        // The rail is gone with NavItems, so whatever it had open is gone too. BuildChildren opens
+        // the same entry again on the new rail; after Dispose nothing is left open.
         SelectedNavItem = null;
 
         Etb?.Dispose();
@@ -757,6 +765,11 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private void BuildChildren()
     {
+        // A rebuild replaces every rail entry, and the rail stays on the one that was open (#542):
+        // on a joined device a sync read-only flip runs this because of something done elsewhere.
+        // A Checkliste's key is shared by every list, so its label tells them apart.
+        var reopen = SelectedNavItem is { } open ? (open.ModuleKey, open.Header) : default((string Key, string Header)?);
+
         DisposeChildren();
 
         Etb = new EtbViewModel(
@@ -807,6 +820,14 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
 
         BuildNavItems();
+
+        if (reopen is { } previous)
+        {
+            SelectedNavItem = NavItems.FirstOrDefault(item =>
+                    string.Equals(item.ModuleKey, previous.Key, StringComparison.Ordinal)
+                    && string.Equals(item.Header, previous.Header, StringComparison.Ordinal))
+                ?? NavItems.FirstOrDefault();
+        }
 
         OnPropertyChanged(nameof(Etb));
         OnPropertyChanged(nameof(Roles));
@@ -895,6 +916,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, module)) is { } navItem)
         {
             SelectedNavItem = navItem;
+
+            // Not on a phone: there focus pops the soft keyboard over half the module.
+            if (!IsNarrow)
+            {
+                ModuleFocusRequested?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 

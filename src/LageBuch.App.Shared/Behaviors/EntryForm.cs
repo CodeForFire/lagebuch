@@ -208,7 +208,7 @@ public static class EntryForm
             },
             DispatcherPriority.Background);
 
-    private static InputElement? FirstField(Control root) =>
+    internal static InputElement? FirstField(Control root) =>
         GetFirstField(root) is { } first && CanTakeFocus(first) ? first : FirstTabStop(root);
 
     private static InputElement? FirstInvalidField(Control root) =>
@@ -223,12 +223,12 @@ public static class EntryForm
 
     // A picker with nothing left to pick (Kräfte FAHRZEUG once every vehicle is taken, or with
     // none in the Stammdaten) is no place to start an entry.
-    private static bool CanTakeFocus(InputElement element) =>
+    internal static bool CanTakeFocus(InputElement element) =>
         element.Focusable && element.IsEffectivelyVisible && element.IsEffectivelyEnabled
         && element is not ItemsControl { ItemCount: 0 };
 
     // Typing replaces what is there: an emptied field has nothing to select, a sticky or invalid one does.
-    private static void SelectText(InputElement target)
+    internal static void SelectText(InputElement target)
     {
         var box = target as TextBox ?? (target as AutoCompleteBox)?.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
         box?.SelectAll();

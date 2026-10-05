@@ -135,12 +135,23 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     [ObservableProperty]
     private bool _hideSystemEntries = true;
 
-    partial void OnHideSystemEntriesChanged(bool value)
+    // In place, never Clear()+re-add: a Reset takes the grid's selected row and focus with it (#542).
+    partial void OnHideSystemEntriesChanged(bool value) =>
+        RowReconciler.Reconcile(Entries, VisibleNewestFirst(), r => r.Id, r => r.Id, r => r, (_, _) => { });
+
+    private List<EtbEntryRow> VisibleNewestFirst()
     {
-        Entries.Clear();
-        for (var i = _all.Count - 1; i >= 0; i--) // _all is oldest-first, Entries newest-first
+        // _all is oldest-first, Entries newest-first.
+        var visible = new List<EtbEntryRow>(_all.Count);
+        for (var i = _all.Count - 1; i >= 0; i--)
+        {
             if (IsVisible(_all[i]))
-                Entries.Add(_all[i]);
+            {
+                visible.Add(_all[i]);
+            }
+        }
+
+        return visible;
     }
 
     private bool IsVisible(EtbEntryRow row) =>

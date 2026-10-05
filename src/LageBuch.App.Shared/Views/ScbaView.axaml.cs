@@ -29,12 +29,9 @@ public partial class ScbaView : UserControl
 
         // A jump from another tab (#422) reaches no live view — this one is built a moment later,
         // once its tab is selected — so the scroll has to happen on arrival as well as on request.
-        // A warning-bar jump (#539) built it to take that Trupp's Druck; arriving any other way
-        // starts at the registration form's first field, FUNKRUFNAME (#540).
-        if (!Reveal())
-        {
-            CallSignBox.Focus();
-        }
+        // A warning-bar jump (#539) built it to take that Trupp's Druck. Any other start, at the
+        // form's FUNKRUFNAME (#540), is WorkspaceFocus's, and only when the user asked (#542).
+        Reveal();
     }
 
     private void Subscribe()
@@ -61,21 +58,18 @@ public partial class ScbaView : UserControl
     private void OnRevealRequested(object? sender, EventArgs e) => Reveal();
 
     /// <summary>Scrolls to the selected Trupp, and focuses its Druck field if a warning bar asked
-    /// for it. Returns whether focus was placed.</summary>
-    private bool Reveal()
+    /// for it.</summary>
+    private void Reveal()
     {
         if (_vm?.SelectedTrupp is { } row)
         {
             TruppGrid.ScrollIntoView(row, null);
         }
 
-        if (_vm?.TakePressureFocusRequest() is not { } target)
+        if (_vm?.TakePressureFocusRequest() is { } target)
         {
-            return false;
+            FocusPressureField(target);
         }
-
-        FocusPressureField(target);
-        return true;
     }
 
     // Only a Druck typed and entered moves on to the next due Trupp (#539). A DRUCK click leaves
