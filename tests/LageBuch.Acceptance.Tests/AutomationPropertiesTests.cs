@@ -252,7 +252,7 @@ public class AutomationPropertiesTests
         // The share-toggle button's Name mirrors its ToolTip binding, so both sharing states
         // must carry the right label, not just whichever rendered first.
         var shareButton = view.GetVisualDescendants().OfType<Button>()
-            .Single(b => b.Classes.Contains("icon-btn") && b != pencil);
+            .Single(b => b.Classes.Contains("icon-btn") && b != pencil && b.IsEffectivelyVisible);
         var beforeName = Name(shareButton);
         Assert.False(string.IsNullOrWhiteSpace(beforeName));
 

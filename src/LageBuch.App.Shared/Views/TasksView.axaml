@@ -188,11 +188,22 @@
     <Panel>
     <Border x:Name="TasksGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="TasksGrid" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
+      <DataGrid x:Name="TasksGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
                 IsReadOnly="{Binding IsReadOnly}" CanUserSortColumns="False">
         <DataGrid.Columns>
-          <DataGridCheckBoxColumn Header="" Width="44"
-              Binding="{Binding IsDone, Mode=TwoWay}" />
+          <!-- A live CheckBox rather than a DataGridCheckBoxColumn (#543): that column only toggles
+               in edit mode, so ticking an Aufgabe off took F2, Space, Enter. Space on the row
+               ticks it now, and the workspace offers it back for a few seconds. -->
+          <DataGridTemplateColumn Header="" Width="44" IsReadOnly="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <CheckBox x:Name="TaskDoneBox" HorizontalAlignment="Center" MinWidth="0"
+                          IsChecked="{Binding IsDone, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}"
+                          b:RowKeys.Role="Toggle"
+                          ToolTip.Tip="Erledigt (Leertaste)" AutomationProperties.Name="Aufgabe erledigt" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTemplateColumn Header="WICHTIG" Width="120" IsReadOnly="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
@@ -244,13 +255,14 @@
             Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <ItemsControl x:Name="TasksCards" ItemsSource="{Binding Rows}" Margin="8">
+        <ItemsControl x:Name="TasksCards" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Rows}" Margin="8">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TaskRow">
               <Border Classes="row-card">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                   <CheckBox Grid.Column="0" VerticalAlignment="Top" MinWidth="0"
-                            IsChecked="{Binding IsDone, Mode=TwoWay}"
+                            IsChecked="{Binding IsDone, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}"
+                            b:RowKeys.Role="Toggle"
                             AutomationProperties.Name="Aufgabe erledigt" />
                   <StackPanel Grid.Column="1" Spacing="4">
                     <TextBlock Text="{Binding Text}" TextWrapping="Wrap"

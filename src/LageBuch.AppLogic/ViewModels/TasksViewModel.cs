@@ -22,6 +22,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
     private readonly Action _onChanged;
+    private readonly Action<string, Action> _offerUndo;
 
     // Null on a read-only workspace: rows are static history there and the due alarm is gated off
     // anyway, so holding a live ticker subscription would only keep the clock ticking for nothing
@@ -35,7 +36,8 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         ITicker ticker,
         IAlarmService alarm,
         MasterDataSet masterData,
-        Action onChanged)
+        Action onChanged,
+        Action<string, Action>? offerUndo = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(ticker);
@@ -44,6 +46,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         _clock = clock;
         _alarm = alarm;
         _onChanged = onChanged;
+        _offerUndo = offerUndo ?? ((_, _) => { });
         IsReadOnly = session.IsReadOnly;
 
         AssigneeOptions = AssigneeSuggestions(masterData);
@@ -411,7 +414,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
             visible,
             r => r.Id,
             t => t.Id,
-            t => new TaskRow(_session, t, IsReadOnly, now, _onChanged),
+            t => new TaskRow(_session, t, IsReadOnly, now, _onChanged, _offerUndo),
             (row, t) => row.Update(t, now));
 
         // A backstop: a kept row stays selected on its own, but one filtered out must not linger.
@@ -435,13 +438,21 @@ public sealed partial class TaskRow : ObservableObject
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
+    private readonly Action<string, Action>? _offerUndo;
 
-    public TaskRow(IIncidentSession session, IncidentTask task, bool isReadOnly, DateTimeOffset now, Action onChanged)
+    public TaskRow(
+        IIncidentSession session,
+        IncidentTask task,
+        bool isReadOnly,
+        DateTimeOffset now,
+        Action onChanged,
+        Action<string, Action>? offerUndo = null)
     {
         ArgumentNullException.ThrowIfNull(task);
         _session = session;
         Id = task.Id;
         _onChanged = onChanged;
+        _offerUndo = offerUndo;
         IsReadOnly = isReadOnly;
         Text = task.Text;
         Assignee = task.Assignee;
@@ -534,6 +545,23 @@ public sealed partial class TaskRow : ObservableObject
         if (task is { } current && current.IsCompleted != value)
         {
             _session.SetTaskCompleted(Id, value);
+            _onChanged();
+
+            // Only a tick is offered back (#543): a stray Space closes an Aufgabe without anyone
+            // noticing, while reopening one is never the silent mistake.
+            if (value)
+            {
+                _offerUndo?.Invoke($"„{Text}“ erledigt.", Reopen);
+            }
+        }
+    }
+
+    // Undoes this row's tick, unless the task was reopened (or removed) meanwhile.
+    private void Reopen()
+    {
+        if (_session.Incident.Tasks.FirstOrDefault(t => t.Id == Id) is { IsCompleted: true })
+        {
+            _session.SetTaskCompleted(Id, false);
             _onChanged();
         }
     }

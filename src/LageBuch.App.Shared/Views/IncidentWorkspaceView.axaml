@@ -10,7 +10,8 @@
        its container's descendants, not the container itself, so the element carrying the name has
        to sit outside everything the query touches. The header keeps its own, narrower container
        below — that one is about the width the Meldungen have, this one about the whole shell. -->
-  <Panel Container.Name="Workspace" Container.Sizing="Width" b:WorkspaceFocus.Rail="{Binding #ModuleTabs}">
+  <Panel Container.Name="Workspace" Container.Sizing="Width" b:WorkspaceFocus.Rail="{Binding #ModuleTabs}"
+         b:RowKeys.UndoCommand="{Binding UndoCommand}">
     <Panel.Styles>
       <!-- The wide defaults. Every one of these has to be a Style and not an attribute on the
            control: a local value in XAML outranks a Style setter, so the query could not win. -->
@@ -373,6 +374,37 @@
               <StackPanel Grid.Column="2" Classes="meldung-actions">
                 <Button x:Name="DismissCommandRejectedButton" Content="VERSTANDEN"
                         Command="{Binding DismissCommandRejectedCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Rückgängig (#543): ticking an Aufgabe off takes one stray Space, so the change is
+               offered back for a few seconds, also on Ctrl+Z. A quiet row: nothing is wrong, it
+               only says what just happened. -->
+          <Border x:Name="UndoNoticeBanner" Classes="meldung info"
+                  IsVisible="{Binding UndoNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon" Data="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                  <TextBlock Classes="meldung-label" Text="ERLEDIGT" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" x:Name="UndoNoticeText" Classes="meldung-text"
+                         Margin="14,10" Text="{Binding UndoNotice.Message}" />
+              <StackPanel Grid.Column="2" Classes="meldung-actions">
+                <Button x:Name="UndoNoticeButton" Content="RÜCKGÄNGIG" ToolTip.Tip="Rückgängig (Strg+Z)"
+                        Command="{Binding UndoNotice.UndoCommand}" />
+                <Button x:Name="DismissUndoNoticeButton" Classes="icon-btn"
+                        Command="{Binding UndoNotice.DismissCommand}"
+                        ToolTip.Tip="Schließen" AutomationProperties.Name="Hinweis schließen">
+                  <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </Button>
               </StackPanel>
             </Grid>
           </Border>

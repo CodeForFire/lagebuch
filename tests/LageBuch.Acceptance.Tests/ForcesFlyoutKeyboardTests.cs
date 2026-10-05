@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
@@ -49,7 +50,7 @@ public class ForcesFlyoutKeyboardTests
 
         var grid = view.GetControl<DataGrid>("ForcesGrid");
         var flyoutButton = grid.GetVisualDescendants().OfType<Button>()
-            .Single(b => b.Classes.Contains("icon-btn") && (ToolTip.GetTip(b) as string) == "Stärke korrigieren");
+            .Single(b => b.Classes.Contains("icon-btn") && AutomationProperties.GetName(b) == "Stärke korrigieren");
         flyoutButton.Flyout!.ShowAt(flyoutButton);
         Dispatcher.UIThread.RunJobs();
         window.Measure(new Avalonia.Size(1200, 600));
@@ -147,7 +148,7 @@ public class ForcesFlyoutKeyboardTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
         var flyoutButton = view.GetControl<DataGrid>("ForcesGrid").GetVisualDescendants().OfType<Button>()
-            .Single(b => (ToolTip.GetTip(b) as string) == "Stärke korrigieren");
+            .Single(b => AutomationProperties.GetName(b) == "Stärke korrigieren");
         flyoutButton.Focus(NavigationMethod.Tab);
         Dispatcher.UIThread.RunJobs();
 

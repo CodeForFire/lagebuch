@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -160,7 +161,7 @@ public class KeyboardRuntimeFactsTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
         var grid = view.GetControl<DataGrid>("EtbGrid");
-        var edit = grid.GetVisualDescendants().OfType<Button>().Single(b => (ToolTip.GetTip(b) as string) == "Bearbeiten");
+        var edit = grid.GetVisualDescendants().OfType<Button>().Single(b => AutomationProperties.GetName(b) == "Bearbeiten");
         grid.Focus();
         Dispatcher.UIThread.RunJobs();
 
