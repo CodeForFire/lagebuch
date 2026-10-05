@@ -188,6 +188,29 @@ public class WorkspaceCollaborationTests
     }
 
     [Fact]
+    public async Task A_read_only_flip_from_the_host_keeps_the_client_on_its_open_module()
+    {
+        // The flip rebuilds every module on the client because of something done on another
+        // device; the rail must not jump back to the first tab under the user (#542).
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        var clientWs = Workspace(client, clock);
+        clientWs.SelectedNavItem = clientWs.NavItems.Single(i => i.ModuleKey == NavModules.Scba);
+
+        var change = NextChange(client);
+        hostSession.Close();
+        await change;
+
+        Assert.True(clientWs.IsReadOnly);
+        Assert.Same(clientWs.Scba, clientWs.SelectedNavItem?.Content);
+    }
+
+    [Fact]
     public async Task Client_header_reflects_einsatzdaten_edited_on_the_host()
     {
         var clock = new FixedClock();

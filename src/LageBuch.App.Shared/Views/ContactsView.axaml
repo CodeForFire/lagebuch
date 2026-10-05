@@ -81,7 +81,7 @@
       </Grid.ColumnDefinitions>
       <TextBlock Grid.Column="0" x:Name="ContactsTitle" Text="KONTAKTE" Classes="overline"
                  VerticalAlignment="Center" />
-      <TextBox Grid.Column="1" x:Name="ContactSearchBox" MinWidth="130" VerticalAlignment="Center"
+      <TextBox Grid.Column="1" x:Name="ContactSearchBox" b:WorkspaceFocus.IsStart="True" MinWidth="130" VerticalAlignment="Center"
                Text="{Binding FilterText}"
                PlaceholderText="Name, Funktion, Zuständigkeit oder Nummer"
                AutomationProperties.Name="Kontakte durchsuchen"

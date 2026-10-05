@@ -3,13 +3,14 @@
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              xmlns:conv="clr-namespace:LageBuch.App.Shared.Converters"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.IncidentWorkspaceView"
              x:DataType="vm:IncidentWorkspaceViewModel">
   <!-- The workspace is its own container, measured on the root Panel: a container query styles
        its container's descendants, not the container itself, so the element carrying the name has
        to sit outside everything the query touches. The header keeps its own, narrower container
        below — that one is about the width the Meldungen have, this one about the whole shell. -->
-  <Panel Container.Name="Workspace" Container.Sizing="Width">
+  <Panel Container.Name="Workspace" Container.Sizing="Width" b:WorkspaceFocus.Rail="{Binding #ModuleTabs}">
     <Panel.Styles>
       <!-- The wide defaults. Every one of these has to be a Style and not an attribute on the
            control: a local value in XAML outranks a Style setter, so the query could not win. -->

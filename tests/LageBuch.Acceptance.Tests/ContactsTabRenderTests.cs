@@ -127,16 +127,7 @@ public class ContactsTabRenderTests
         Assert.Single(tags);
     }
 
-    // Opening the tab means looking somebody up, so typing goes straight into the search.
-    [AvaloniaFact]
-    public void Opening_the_tab_puts_the_caret_in_the_search_box()
-    {
-        var (window, _) = ShowWorkspace(MasterData());
-        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.True(ContactsView(window).GetControl<TextBox>("ContactSearchBox").IsFocused);
-    }
+    // Opening the tab by click puts the caret in the search box: WorkspaceFocusTests (#542).
 
     // 412x915 is the phone PhoneLayoutTests renders at. The overflow check itself lives there;
     // this is the screenshot.

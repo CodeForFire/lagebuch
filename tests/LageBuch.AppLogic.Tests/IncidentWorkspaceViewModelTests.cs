@@ -1551,6 +1551,77 @@ public class IncidentWorkspaceViewModelTests
         Assert.Same(vm.Scba.Trupps[0], vm.Scba.SelectedTrupp);
     }
 
+    // --- Focus stays where the user left it (#542) ---------------------------------------------
+    [Fact]
+    public void Rebuilding_after_close_keeps_the_selected_module()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+        vm.SelectedNavItem = NavItemFor(vm, vm.Scba);
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.Same(NavItemFor(vm, vm.Scba), vm.SelectedNavItem);
+        Assert.True(vm.SelectedNavItem!.IsSelected);
+    }
+
+    [Fact]
+    public void Rebuilding_after_close_keeps_the_selected_checklist()
+    {
+        var vm = NewWorkspace(out _, out _);
+        var checklist = vm.NavItems.First(i => i.IsChecklist);
+        vm.SelectedNavItem = checklist;
+
+        vm.CloseIncidentCommand.Execute(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+
+        Assert.NotSame(checklist, vm.SelectedNavItem);
+        Assert.True(vm.SelectedNavItem!.IsChecklist);
+        Assert.Equal(checklist.Header, vm.SelectedNavItem.Header);
+    }
+
+    [Fact]
+    public void Showing_a_trupp_asks_the_view_for_focus()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+        StartATrupp(vm);
+        var requests = 0;
+        vm.ModuleFocusRequested += (_, _) => requests++;
+
+        vm.Scba.ShowMostUrgentControlCommand.Execute(null);
+
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
+    public void Selecting_a_rail_entry_does_not_ask_for_focus()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+        var requests = 0;
+        vm.ModuleFocusRequested += (_, _) => requests++;
+
+        vm.SelectedNavItem = NavItemFor(vm, vm.Scba);
+        vm.SelectNavItemCommand.Execute(NavItemFor(vm, vm.Forces));
+
+        Assert.Equal(0, requests);
+    }
+
+    [Fact]
+    public void The_narrow_layout_never_asks_for_focus()
+    {
+        // On a phone, focus pops the soft keyboard over half the module.
+        var vm = EditableWorkspace(new FakeHostController());
+        vm.IsNarrow = true;
+        StartATrupp(vm);
+        var requests = 0;
+        vm.ModuleFocusRequested += (_, _) => requests++;
+
+        vm.Scba.ShowMostUrgentControlCommand.Execute(null);
+
+        Assert.Same(NavItemFor(vm, vm.Scba), vm.SelectedNavItem);
+        Assert.Equal(0, requests);
+    }
+
     // --- Header Meldungen: the quiet strip holds running countdowns only ----------------------
     [Fact]
     public void Countdown_strip_shows_the_running_ils_reminder_and_leaves_when_it_falls_due()
