@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.HomeView"
              x:DataType="vm:HomeViewModel">
   <!-- 56px of gutter each side is 27% of a 412dp phone. The column and its MaxWidth already
@@ -192,7 +193,7 @@
                  it: the templated ScrollViewer then measures at infinite height and never
                  scrolls. JsonRecentFilesStore caps the list at 10 rows. -->
             <ListBox x:Name="RecentList" ItemsSource="{Binding RecentFiles}"
-                     SelectionMode="Single"
+                     SelectionMode="Single" b:RowKeys.IsEnabled="True"
                      ScrollViewer.VerticalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:RecentFileItem">
@@ -215,6 +216,7 @@
                     <StackPanel Classes="recentActions" Orientation="Horizontal" Spacing="6"
                                 VerticalAlignment="Center">
                       <Button Content="ÖFFNEN" VerticalAlignment="Center"
+                              b:RowKeys.Role="Primary" ToolTip.Tip="Öffnen (Enter)"
                               Command="{ReflectionBinding $parent[ItemsControl].DataContext.OpenRecentCommand}"
                               CommandParameter="{Binding Path}" />
                       <!-- #481: takes the entry off the list, never the file. A cross, not a bin:
@@ -246,7 +248,7 @@
               <PathIcon Width="11" Height="11" VerticalAlignment="Center"
                         Foreground="{StaticResource TextSecondaryBrush}"
                         Data="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
-              <TextBlock Classes="secondary mono" FontSize="11" Text="Doppelklick oder ÖFFNEN" />
+              <TextBlock Classes="secondary mono" FontSize="11" Text="Doppelklick, Enter oder ÖFFNEN" />
             </StackPanel>
           </StackPanel>
         </Border>
