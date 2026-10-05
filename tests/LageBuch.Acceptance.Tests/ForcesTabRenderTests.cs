@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -229,7 +230,7 @@ public class ForcesTabRenderTests
 
         var grid = view.GetControl<DataGrid>("ForcesGrid");
         var strengthButton = grid.GetVisualDescendants().OfType<Button>()
-            .Single(b => (ToolTip.GetTip(b) as string) == "Stärke korrigieren");
+            .Single(b => AutomationProperties.GetName(b) == "Stärke korrigieren");
 
         grid.Focus();
         Dispatcher.UIThread.RunJobs();

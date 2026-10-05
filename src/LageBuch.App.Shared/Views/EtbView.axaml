@@ -241,7 +241,7 @@
     <Panel>
       <Border x:Name="EtbGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-        <DataGrid x:Name="EtbGrid" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
+        <DataGrid x:Name="EtbGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
           <DataGrid.Columns>
             <DataGridTextColumn Header="ZEIT" Binding="{Binding Time}" />
             <DataGridTextColumn Header="VON" Binding="{Binding From}" />
@@ -258,8 +258,8 @@
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate x:DataType="vm:EtbEntryRow">
                   <StackPanel Orientation="Horizontal" Spacing="2" Margin="6,4">
-                    <Button Classes="icon-btn" Command="{Binding BeginEditCommand}"
-                            IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten"
+                    <Button Classes="icon-btn" Command="{Binding BeginEditCommand}" b:RowKeys.Role="Primary"
+                            IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten (Enter)"
                             AutomationProperties.Name="Bearbeiten">
                       <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                     </Button>
@@ -296,7 +296,7 @@
               Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <ItemsControl x:Name="EtbCards" ItemsSource="{Binding Entries}" Margin="8">
+          <ItemsControl x:Name="EtbCards" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Entries}" Margin="8">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:EtbEntryRow">
                 <Border Classes="row-card">
@@ -318,8 +318,8 @@
                       <TextBlock Grid.Column="0" Classes="mono" FontSize="11" VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis" Text="{Binding EnteredBy}" />
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-                        <Button Classes="icon-btn card-action" Command="{Binding BeginEditCommand}"
-                                IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten"
+                        <Button Classes="icon-btn card-action" Command="{Binding BeginEditCommand}" b:RowKeys.Role="Primary"
+                                IsVisible="{Binding IsEditable}" ToolTip.Tip="Bearbeiten (Enter)"
                                 AutomationProperties.Name="Bearbeiten">
                           <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                         </Button>

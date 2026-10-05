@@ -273,7 +273,7 @@
     <Panel>
     <Border x:Name="RolesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="RolesGrid" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid x:Name="RolesGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FUNKTION" Binding="{Binding Role}" />
           <DataGridTextColumn Header="NAME" Binding="{Binding PersonName}" Width="*" />
@@ -313,7 +313,8 @@
                             AutomationProperties.Name="Funktion doppelt vergeben" />
                   <Button x:Name="TransferRowButton" Content="ÜBERTRAGEN" Margin="4,2"
                           IsVisible="{Binding IsRunning}"
-                          Command="{Binding BeginTransferCommand}" />
+                          Command="{Binding BeginTransferCommand}"
+                          b:RowKeys.Role="Primary" ToolTip.Tip="Funktion übertragen (Enter)" />
                 </StackPanel>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
@@ -329,7 +330,7 @@
             Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <ItemsControl x:Name="RolesCards" ItemsSource="{Binding Roles}" Margin="8">
+        <ItemsControl x:Name="RolesCards" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Roles}" Margin="8">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:RoleAssignmentRow">
               <Border Classes="row-card">
@@ -360,7 +361,8 @@
                   <Button Content="ÜBERTRAGEN" HorizontalAlignment="Stretch"
                           Height="{StaticResource ControlHeightTouch}"
                           IsVisible="{Binding IsRunning}"
-                          Command="{Binding BeginTransferCommand}" />
+                          Command="{Binding BeginTransferCommand}"
+                          b:RowKeys.Role="Primary" ToolTip.Tip="Funktion übertragen (Enter)" />
                 </StackPanel>
               </Border>
             </DataTemplate>

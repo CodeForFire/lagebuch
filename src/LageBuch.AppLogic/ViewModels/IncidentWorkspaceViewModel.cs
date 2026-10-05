@@ -236,6 +236,20 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private ConfirmDialogViewModel? _pendingConfirm;
 
+    /// <summary>How long a "Rückgängig" offer stays up (#543): long enough to notice, short enough not to linger.</summary>
+    internal static readonly TimeSpan UndoNoticeLifetime = TimeSpan.FromSeconds(8);
+
+    // The "Rückgängig" offer after a toggle (#543); null while there is nothing to take back.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUndoNotice))]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
+    private UndoNoticeViewModel? _undoNotice;
+
+    public bool HasUndoNotice => UndoNotice is not null;
+
+    // Ticks only while a notice shows, so an idle workspace holds no ticker subscription for it.
+    private IDisposable? _undoNoticeExpiry;
+
     // The create-task overlay behind an ETB row's button (#88); null while no dialog is open.
     [ObservableProperty]
     private TaskDialogViewModel? _pendingTaskDialog;
@@ -761,6 +775,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
 
         Reminder?.Dispose();
+
+        // An offer made by the outgoing generation must not outlive it: the rebuild may be the
+        // switch to read-only, where taking a tick back is no longer allowed.
+        CloseUndoNotice();
     }
 
     private void BuildChildren()
@@ -797,7 +815,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         CoMessprotokoll = new CoMessprotokollViewModel(_session, _clock, OnChanged);
 
-        Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged);
+        Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged, OfferUndo);
         Tasks.RevealRequested += OnTasksRevealRequested;
 
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
@@ -935,6 +953,44 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var dialog = new ConfirmDialogViewModel("Bestätigen", message, "ENTFERNEN", onConfirmed);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
+    }
+
+    /// <summary>
+    /// Offers a change back for <see cref="UndoNoticeLifetime"/> (#543). A newer offer replaces the
+    /// one showing: only the latest toggle can be taken back, and Ctrl+Z always means that one.
+    /// </summary>
+    private void OfferUndo(string message, Action undo)
+    {
+        CloseUndoNotice();
+        var notice = new UndoNoticeViewModel(message, undo, _clock.Now + UndoNoticeLifetime);
+        notice.Closed += OnUndoNoticeClosed;
+        UndoNotice = notice;
+        _undoNoticeExpiry = _ticker.Subscribe(ExpireUndoNotice);
+    }
+
+    /// <summary>Ctrl+Z: takes back the change the notice offers. Does nothing while none shows.</summary>
+    [RelayCommand(CanExecute = nameof(HasUndoNotice))]
+    private void Undo() => UndoNotice?.UndoCommand.Execute(null);
+
+    private void ExpireUndoNotice()
+    {
+        if (UndoNotice is { } notice && _clock.Now >= notice.ExpiresAt)
+        {
+            CloseUndoNotice();
+        }
+    }
+
+    private void OnUndoNoticeClosed(object? sender, EventArgs e) => CloseUndoNotice();
+
+    private void CloseUndoNotice()
+    {
+        _undoNoticeExpiry?.Dispose();
+        _undoNoticeExpiry = null;
+        if (UndoNotice is { } notice)
+        {
+            notice.Closed -= OnUndoNoticeClosed;
+            UndoNotice = null;
+        }
     }
 
     /// <summary>
