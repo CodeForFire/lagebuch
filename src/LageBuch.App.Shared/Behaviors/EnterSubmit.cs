@@ -8,14 +8,15 @@ namespace LageBuch.App.Shared.Behaviors;
 
 /// <summary>
 /// Runs a command when Enter is pressed in an input — and, in an <see cref="AutoCompleteBox"/>,
-/// only while its suggestion dropdown is closed. With the dropdown open, Enter belongs to the list
-/// (accept the highlighted suggestion); submitting the surrounding form then would fire two actions
-/// from one keypress — e.g. picking a Truppmann would also create the Trupp. The Atemschutz row's
-/// Druck field uses it too (#539), so a Druckkontrolle is typed and entered like any other value.
+/// only while no pick is pending (<see cref="SuggestionBox.ClaimsEnter"/>). With a row arrowed onto
+/// or a completion showing, Enter belongs to the list; submitting then would fire two actions from
+/// one keypress — e.g. picking a call sign would also confirm the dialog. An open list with nothing
+/// picked closes and submits in one press (#466). The Atemschutz row's Druck field uses it too
+/// (#539), so a Druckkontrolle is typed and entered like any other value.
 ///
 /// A plain <c>KeyBinding Gesture="Enter"</c> cannot make that distinction, so it is replaced by
-/// this attached command. The handler is <b>tunneling</b> on purpose: it must read
-/// <see cref="AutoCompleteBox.IsDropDownOpen"/> before the box processes Enter and closes the list.
+/// this attached command. The handler is <b>tunneling</b> on purpose: it must read the box before
+/// it processes Enter and closes the list.
 /// </summary>
 public static class EnterSubmit
 {
@@ -48,11 +49,12 @@ public static class EnterSubmit
 
     private static void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || sender is not InputElement input || input is AutoCompleteBox { IsDropDownOpen: true })
+        if (e.Key != Key.Enter || sender is not InputElement input || (input is AutoCompleteBox box && SuggestionBox.ClaimsEnter(box)))
         {
             return;
         }
 
+        SuggestionBox.CloseList(input);
         var command = GetCommand(input);
         if (command?.CanExecute(null) == true)
         {

@@ -468,9 +468,9 @@
     <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
-    <!-- Opens the suggestion dropdown on focus/click app-wide instead of requiring a keystroke
-         first (#259) — see Behaviors/OpenDropDownOnFocus.cs. -->
-    <Setter Property="b:OpenDropDownOnFocus.IsEnabled" Value="True" />
+    <!-- One keyboard model app-wide (#466): the list opens on focus/click (#259), a single prefix
+         match completes inline, Shift+Tab never takes a match — see Behaviors/SuggestionBox.cs. -->
+    <Setter Property="b:SuggestionBox.IsEnabled" Value="True" />
   </Style>
 
   <!-- NumericUpDown

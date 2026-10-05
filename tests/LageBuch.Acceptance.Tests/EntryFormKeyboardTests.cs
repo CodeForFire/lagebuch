@@ -93,7 +93,6 @@ public class EntryFormKeyboardTests
         var from = Named<AutoCompleteBox>(window, "FromBox");
         FocusByTab(window, from);
         window.Type("Florian Testort 40/1");
-        from.IsDropDownOpen = false; // nothing highlighted
 
         window.Press(PhysicalKey.Enter);
 
@@ -253,7 +252,6 @@ public class EntryFormKeyboardTests
         window.Press(PhysicalKey.ArrowDown);
         FocusByTab(window, Named<AutoCompleteBox>(window, "TruppmannBox"));
         window.Type("Max Testmann");
-        Named<AutoCompleteBox>(window, "TruppmannBox").IsDropDownOpen = false;
 
         window.Press(PhysicalKey.Enter); // no Truppführer
 
@@ -296,7 +294,6 @@ public class EntryFormKeyboardTests
         Dispatcher.UIThread.RunJobs();
         window.AssertFocused(Named<AutoCompleteBox>(window, "TransferPersonNameBox"));
         window.Type("Max Testmann");
-        Named<AutoCompleteBox>(window, "TransferPersonNameBox").IsDropDownOpen = false;
 
         window.Press(PhysicalKey.Enter);
 
