@@ -1,1 +1,0 @@
-In the Stammdaten editor, Entfernen now asks before removing a filled row, as every other remove in the app does, and "+ HINZUFÜGEN" puts the caret in the row it adds instead of leaving focus on the button (#543).

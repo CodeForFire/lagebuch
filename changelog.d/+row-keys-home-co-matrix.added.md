@@ -1,1 +1,0 @@
-Enter now opens the selected recent file on the start screen, and the arrow keys move across the CO-Messung matrix — left and right between the Wohnungen of a floor, up and down between floors — so a Wohnung is reached and opened without tabbing through every tile before it (#543).

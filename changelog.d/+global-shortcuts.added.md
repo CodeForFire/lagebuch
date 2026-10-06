@@ -1,1 +1,0 @@
-Global keyboard shortcuts: Ctrl+1 … Ctrl+0 open a module whatever its place on the rail, Ctrl+Tab and Ctrl+Shift+Tab walk the rail, Ctrl+N starts an ETB entry in VON, F9 goes to the most urgent warning (Rückzugsalarm, Druckabfrage, Aufgabe, ILS Rückmeldung), and F1 or the ? button in the command bar lists them all, with each module's key shown on the rail (#544).
