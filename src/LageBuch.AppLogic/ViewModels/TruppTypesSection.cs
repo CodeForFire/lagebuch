@@ -15,8 +15,8 @@ public sealed partial class TruppTypesSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public TruppTypesSection(string title, IEnumerable<TruppType> truppTypes, Action onChanged)
-        : base(title)
+    public TruppTypesSection(string title, IEnumerable<TruppType> truppTypes, Action onChanged, Action<string, Action>? requestConfirm = null)
+        : base(title, requestConfirm)
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<TruppTypeRow>(
@@ -31,18 +31,28 @@ public sealed partial class TruppTypesSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(NewRow(
-            string.Empty, AtemschutzTrupp.StandardMemberCount, AtemschutzTrupp.DefaultMaxDurationMinutes));
+        var row = NewRow(
+            string.Empty, AtemschutzTrupp.StandardMemberCount, AtemschutzTrupp.DefaultMaxDurationMinutes);
+        Rows.Add(row);
         _onChanged();
+        OnRowAdded(row);
     }
 
     [RelayCommand]
     private void Remove(TruppTypeRow row)
     {
-        if (Rows.Remove(row))
+        if (!Rows.Contains(row))
         {
-            _onChanged();
+            return;
         }
+
+        RemoveAfterConfirm(row.Name, AllBlank(row.Name), () =>
+        {
+            if (Rows.Remove(row))
+            {
+                _onChanged();
+            }
+        });
     }
 
     [RelayCommand]

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.MasterDataEditorView"
              x:DataType="vm:MasterDataEditorViewModel">
   <!-- Its own container rather than the shell's: this view is hosted directly by the render
@@ -318,7 +319,7 @@
                     <TextBlock Grid.Column="0" Text="{Binding ColumnHeader}" Classes="overline" FontSize="10" />
                   </Grid>
                   <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl ItemsSource="{Binding Items}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:MasterDataItem">
                           <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
@@ -378,7 +379,7 @@
                     <TextBlock Grid.Column="1" Text="PFLICHT" Classes="overline" FontSize="10" />
                   </Grid>
                   <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ChecklistTemplateRow">
                           <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
@@ -473,7 +474,7 @@
                                ToolTip.Tip="Optional — gleichnamige Links stehen im Einsatz unter einer Überschrift" />
                   </Grid>
                   <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LinkRow">
                           <Grid ColumnDefinitions="*,*,*,28,32,32" Margin="0,0,0,6">
@@ -547,7 +548,7 @@
                                ToolTip.Tip="Eigenes Fahrzeug" />
                   </Grid>
                   <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
                           <Grid ColumnDefinitions="*,*,150,70,70,28,32,32" Margin="0,0,0,6">
@@ -629,7 +630,7 @@
                                ToolTip.Tip="Vorgeschlagene Einsatzzeit bei der Anmeldung" />
                   </Grid>
                   <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TruppTypeRow">
                           <Grid ColumnDefinitions="*,110,150,28,32,32" Margin="0,0,0,6">
@@ -688,7 +689,7 @@
                                ToolTip.Tip="Wie oft die Funktion besetzt werden darf" />
                   </Grid>
                   <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:RoleRow">
                           <Grid ColumnDefinitions="*,180,28,32,32" Margin="0,0,0,6">
@@ -760,7 +761,7 @@
                                Classes="overline" FontSize="10" />
                   </Grid>
                   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PersonRow">
                           <!-- One card per person, so the two lines read as one entry rather than as

@@ -19,8 +19,8 @@ public sealed partial class ChecklistTemplateSection : EditorSection
     private readonly Action _onChanged;
 
     public ChecklistTemplateSection(
-        Guid id, string title, IEnumerable<ChecklistTemplateItem> items, Action onChanged)
-        : base(title)
+        Guid id, string title, IEnumerable<ChecklistTemplateItem> items, Action onChanged, Action<string, Action>? requestConfirm = null)
+        : base(title, requestConfirm)
     {
         ArgumentNullException.ThrowIfNull(items);
         Id = id;
@@ -47,17 +47,27 @@ public sealed partial class ChecklistTemplateSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(new ChecklistTemplateRow(string.Empty, false, _onChanged));
+        var row = new ChecklistTemplateRow(string.Empty, false, _onChanged);
+        Rows.Add(row);
         _onChanged();
+        OnRowAdded(row);
     }
 
     [RelayCommand]
     private void Remove(ChecklistTemplateRow row)
     {
-        if (Rows.Remove(row))
+        if (!Rows.Contains(row))
         {
-            _onChanged();
+            return;
         }
+
+        RemoveAfterConfirm(row.Text, AllBlank(row.Text), () =>
+        {
+            if (Rows.Remove(row))
+            {
+                _onChanged();
+            }
+        });
     }
 
     [RelayCommand]

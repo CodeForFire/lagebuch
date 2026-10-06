@@ -199,16 +199,16 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
         EditorSection[] categories =
         {
-            _roles = new RolesSection("Rollen", set.Roles, MarkDirty),
-            _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty),
-            _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty),
-            _links = new LinksSection("Links", set.Links, MarkDirty),
-            _personnel = new PersonnelSection("Personal", set.Personnel, OnPersonnelChanged),
+            _roles = new RolesSection("Rollen", set.Roles, MarkDirty, RequestConfirm),
+            _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty, RequestConfirm),
+            _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty, RequestConfirm),
+            _links = new LinksSection("Links", set.Links, MarkDirty, RequestConfirm),
+            _personnel = new PersonnelSection("Personal", set.Personnel, OnPersonnelChanged, RequestConfirm),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
             // rows (plus the roster), so the vehicle list is the single place to maintain them.
             // The derived lists still serve as typing suggestions for further rows.
-            _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged),
+            _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged, RequestConfirm),
         };
 
         foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
@@ -220,7 +220,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         // that order is the operator's own, expressed in the Navigation list.
         foreach (var template in set.ChecklistTemplates)
         {
-            Checklists.Add(new ChecklistTemplateSection(template.Id, template.Title, template.Items, MarkDirty));
+            Checklists.Add(new ChecklistTemplateSection(template.Id, template.Title, template.Items, MarkDirty, RequestConfirm));
         }
 
         _navigation.Rebuild(set.Navigation, Checklists);
@@ -313,7 +313,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private void AddChecklist()
     {
         var section = new ChecklistTemplateSection(
-            Guid.NewGuid(), "Neue Checkliste", Array.Empty<ChecklistTemplateItem>(), MarkDirty);
+            Guid.NewGuid(), "Neue Checkliste", Array.Empty<ChecklistTemplateItem>(), MarkDirty, RequestConfirm);
         Checklists.Add(section);
 
         // Rebuilt rather than appended to, so the new list reaches the Navigation layout: the
@@ -339,10 +339,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         var name = ChecklistDefaults.TitleOrFallback(section.Title);
         var message = $"„{name}“ wird aus den Stammdaten entfernt. "
             + "Bereits begonnene Einsätze behalten ihre Kopie.";
-        var dialog = new ConfirmDialogViewModel(
-            "Checkliste löschen?", message, "LÖSCHEN", () => RemoveChecklist(section));
-        dialog.Closed += (_, _) => PendingConfirm = null;
-        PendingConfirm = dialog;
+        Confirm("Checkliste löschen?", message, "LÖSCHEN", () => RemoveChecklist(section));
     }
 
     private void RemoveChecklist(ChecklistTemplateSection section)
@@ -392,13 +389,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             return;
         }
 
-        var dialog = new ConfirmDialogViewModel(
+        Confirm(
             "Stammdaten importieren?",
             "Die Datei ersetzt alle Kategorien in diesem Editor. Erst SPEICHERN übernimmt sie dauerhaft, VERWERFEN stellt den aktuellen Stand wieder her.",
             "IMPORTIEREN",
             () => _ = ImportCore());
-        dialog.Closed += (_, _) => PendingConfirm = null;
-        PendingConfirm = dialog;
     }
 
     /// <summary>
@@ -480,7 +475,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             return;
         }
 
-        var dialog = new ConfirmDialogViewModel(
+        Confirm(
             "Änderungen verwerfen?",
             "Die Stammdaten wurden geändert. Beim Verlassen gehen die nicht gespeicherten Änderungen verloren.",
             "VERWERFEN",
@@ -489,6 +484,15 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
                 Load();
                 proceed();
             });
+    }
+
+    // A row's Entfernen (#543): asked like every other remove, with focus starting on ABBRECHEN.
+    private void RequestConfirm(string question, Action onConfirmed) =>
+        Confirm("Entfernen?", question, "ENTFERNEN", onConfirmed);
+
+    private void Confirm(string title, string message, string confirmLabel, Action onConfirmed)
+    {
+        var dialog = new ConfirmDialogViewModel(title, message, confirmLabel, onConfirmed);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }

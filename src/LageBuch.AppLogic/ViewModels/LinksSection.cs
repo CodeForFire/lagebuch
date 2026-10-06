@@ -13,8 +13,8 @@ public sealed partial class LinksSection : EditorSection
     private readonly Action _onChanged;
     private readonly IReadOnlyList<string> _groupOptions;
 
-    public LinksSection(string title, IReadOnlyList<Link> links, Action onChanged)
-        : base(title)
+    public LinksSection(string title, IReadOnlyList<Link> links, Action onChanged, Action<string, Action>? requestConfirm = null)
+        : base(title, requestConfirm)
     {
         ArgumentNullException.ThrowIfNull(links);
         _onChanged = onChanged;
@@ -35,17 +35,27 @@ public sealed partial class LinksSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(new LinkRow(string.Empty, string.Empty, string.Empty, _groupOptions, _onChanged));
+        var row = new LinkRow(string.Empty, string.Empty, string.Empty, _groupOptions, _onChanged);
+        Rows.Add(row);
         _onChanged();
+        OnRowAdded(row);
     }
 
     [RelayCommand]
     private void Remove(LinkRow row)
     {
-        if (Rows.Remove(row))
+        if (!Rows.Contains(row))
         {
-            _onChanged();
+            return;
         }
+
+        RemoveAfterConfirm(row.Name, AllBlank(row.Name, row.Url, row.Group), () =>
+        {
+            if (Rows.Remove(row))
+            {
+                _onChanged();
+            }
+        });
     }
 
     [RelayCommand]
