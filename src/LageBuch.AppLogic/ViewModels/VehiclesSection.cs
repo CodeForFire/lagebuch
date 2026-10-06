@@ -22,8 +22,9 @@ public sealed partial class VehiclesSection : EditorSection
         IEnumerable<Vehicle> vehicles,
         IReadOnlyList<string> wacheOptions,
         IReadOnlyList<string> callSignOptions,
-        Action onChanged)
-        : base(title)
+        Action onChanged,
+        Action<string, Action>? requestConfirm = null)
+        : base(title, requestConfirm)
     {
         _onChanged = onChanged;
         _wacheOptions = wacheOptions;
@@ -40,17 +41,27 @@ public sealed partial class VehiclesSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(NewRow(string.Empty, string.Empty, 0, false, isOwn: true));
+        var row = NewRow(string.Empty, string.Empty, 0, false, isOwn: true);
+        Rows.Add(row);
         _onChanged();
+        OnRowAdded(row);
     }
 
     [RelayCommand]
     private void Remove(VehicleRow row)
     {
-        if (Rows.Remove(row))
+        if (!Rows.Contains(row))
         {
-            _onChanged();
+            return;
         }
+
+        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign), () =>
+        {
+            if (Rows.Remove(row))
+            {
+                _onChanged();
+            }
+        });
     }
 
     [RelayCommand]

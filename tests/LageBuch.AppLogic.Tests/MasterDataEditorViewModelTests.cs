@@ -210,6 +210,7 @@ public class MasterDataEditorViewModelTests
         var vm = Vm(provider);
         var roles = Roles(vm);
         roles.RemoveCommand.Execute(roles.Rows.First(r => r.Name == "EL"));
+        Assert.IsType<ConfirmDialogViewModel>(vm.PendingConfirm).ConfirmCommand.Execute(null); // asks first (#543)
 
         vm.SaveCommand.Execute(null);
 

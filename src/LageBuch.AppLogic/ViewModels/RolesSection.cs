@@ -14,8 +14,8 @@ public sealed partial class RolesSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public RolesSection(string title, IEnumerable<Role> roles, Action onChanged)
-        : base(title)
+    public RolesSection(string title, IEnumerable<Role> roles, Action onChanged, Action<string, Action>? requestConfirm = null)
+        : base(title, requestConfirm)
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<RoleRow>(roles.Select(r => NewRow(r.Name, r.Uniqueness)));
@@ -53,17 +53,27 @@ public sealed partial class RolesSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(NewRow(string.Empty, RoleUniqueness.Multiple));
+        var row = NewRow(string.Empty, RoleUniqueness.Multiple);
+        Rows.Add(row);
         _onChanged();
+        OnRowAdded(row);
     }
 
     [RelayCommand]
     private void Remove(RoleRow row)
     {
-        if (Rows.Remove(row))
+        if (!Rows.Contains(row))
         {
-            _onChanged();
+            return;
         }
+
+        RemoveAfterConfirm(row, row.Name, AllBlank(row.Name), () =>
+        {
+            if (Rows.Remove(row))
+            {
+                _onChanged();
+            }
+        });
     }
 
     [RelayCommand]

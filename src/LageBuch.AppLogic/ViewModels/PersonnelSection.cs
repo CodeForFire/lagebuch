@@ -9,8 +9,8 @@ public sealed partial class PersonnelSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public PersonnelSection(string title, IEnumerable<Person> people, Action onChanged)
-        : base(title)
+    public PersonnelSection(string title, IEnumerable<Person> people, Action onChanged, Action<string, Action>? requestConfirm = null)
+        : base(title, requestConfirm)
     {
         _onChanged = onChanged;
         Rows = new ObservableCollection<PersonRow>(
@@ -23,17 +23,29 @@ public sealed partial class PersonnelSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Rows.Add(new PersonRow(string.Empty, string.Empty, null, null, null, isOwn: true, null, null, _onChanged));
+        var row = new PersonRow(string.Empty, string.Empty, null, null, null, isOwn: true, null, null, _onChanged);
+        Rows.Add(row);
         _onChanged();
+        OnRowAdded(row);
     }
 
     [RelayCommand]
     private void Remove(PersonRow row)
     {
-        if (Rows.Remove(row))
+        if (!Rows.Contains(row))
         {
-            _onChanged();
+            return;
         }
+
+        var name = string.Join(", ", new[] { row.LastName, row.FirstName }.Where(n => !string.IsNullOrWhiteSpace(n)));
+        var isBlank = AllBlank(row.LastName, row.FirstName, row.Role, row.CallSign, row.Phone, row.Email, row.Note);
+        RemoveAfterConfirm(row, name, isBlank, () =>
+        {
+            if (Rows.Remove(row))
+            {
+                _onChanged();
+            }
+        });
     }
 
     /// <summary>Rows with a non-blank last name; trimmed, with blank optionals collapsed to null.</summary>

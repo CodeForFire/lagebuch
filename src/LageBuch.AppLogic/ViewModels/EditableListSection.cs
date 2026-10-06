@@ -8,8 +8,8 @@ public sealed partial class EditableListSection : EditorSection
 {
     private readonly Action _onChanged;
 
-    public EditableListSection(string title, string columnHeader, IEnumerable<string> values, Action onChanged)
-        : base(title)
+    public EditableListSection(string title, string columnHeader, IEnumerable<string> values, Action onChanged, Action<string, Action>? requestConfirm = null)
+        : base(title, requestConfirm)
     {
         _onChanged = onChanged;
         ColumnHeader = columnHeader;
@@ -23,17 +23,27 @@ public sealed partial class EditableListSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        Items.Add(new MasterDataItem(string.Empty, _onChanged));
+        var item = new MasterDataItem(string.Empty, _onChanged);
+        Items.Add(item);
         _onChanged();
+        OnRowAdded(item);
     }
 
     [RelayCommand]
     private void Remove(MasterDataItem item)
     {
-        if (Items.Remove(item))
+        if (!Items.Contains(item))
         {
-            _onChanged();
+            return;
         }
+
+        RemoveAfterConfirm(item, item.Value, AllBlank(item.Value), () =>
+        {
+            if (Items.Remove(item))
+            {
+                _onChanged();
+            }
+        });
     }
 
     [RelayCommand]
