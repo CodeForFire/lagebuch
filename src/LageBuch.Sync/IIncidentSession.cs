@@ -103,6 +103,12 @@ public interface IIncidentSession
     /// <summary>Takes a Beteiligte/n back completely. No ETB line.</summary>
     void RemoveInvolvedParty(Guid partyId);
 
+    /// <summary>Corrects a task's fields (#246): typo fixes, reassignment, re-prioritizing.</summary>
+    void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency);
+
+    /// <summary>Adds minutes to a task's due time (#246 "+5" quick action).</summary>
+    void ExtendTaskTimer(Guid taskId, int minutes);
+
     void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

@@ -18,6 +18,10 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
 {
+    // +5 MIN, in the edit panel and on the Aufgabe-fällig bar alike (#246); the Rückmeldung bar's
+    // snooze is the same five minutes.
+    private const int ExtendMinutes = 5;
+
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
@@ -70,16 +74,17 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-    // Shared with TaskDialogViewModel (same assembly) so picker wording matches everywhere.
+    // Shared with TaskDialogViewModel (same assembly) so picker wording matches everywhere. Low to
+    // high, because the triage segments read as a scale left to right (#246).
     internal static IReadOnlyList<ImportanceOption> ImportanceLevels() =>
         Enum.GetValues<TaskImportance>()
-            .OrderByDescending(v => (int)v)
+            .OrderBy(v => (int)v)
             .Select(v => new ImportanceOption(v, Formatting.Level(v)))
             .ToArray();
 
     internal static IReadOnlyList<UrgencyOption> UrgencyLevels() =>
         Enum.GetValues<TaskUrgency>()
-            .OrderByDescending(v => (int)v)
+            .OrderBy(v => (int)v)
             .Select(v => new UrgencyOption(v, Formatting.Level(v)))
             .ToArray();
 
@@ -218,11 +223,14 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
     private bool _isComposerOpen;
 
-    /// <summary>Whether the dock is on screen: always when wide, only while composing on a phone.</summary>
-    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+    /// <summary>
+    /// Whether the dock is on screen: always when wide, only while composing on a phone, and never
+    /// while the edit panel is open, so two forms are never stacked under the grid (#246).
+    /// </summary>
+    public bool ShowComposer => (!IsNarrow || IsComposerOpen) && !IsEditing;
 
-    /// <summary>The phone's "add a task" affordance, shown exactly when the dock is not.</summary>
-    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+    /// <summary>The phone's "add a task" affordance, shown exactly when no form is.</summary>
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen && !IsEditing;
 
     [RelayCommand(CanExecute = nameof(CanAddTask))]
     private void OpenComposer() => IsComposerOpen = true;
@@ -271,6 +279,119 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         OnPropertyChanged(nameof(ErrorSummary));
     }
 
+    // --- Edit an existing Aufgabe (#246): a panel below the grid, not inline cell editing, so the
+    //     grid keeps its triage colours while a task is being corrected. ---
+
+    // Quiet until SPEICHERN is pressed, like the dock.
+    private bool _editErrorsShown;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditing))]
+    [NotifyPropertyChangedFor(nameof(ShowComposer))]
+    [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    [NotifyCanExecuteChangedFor(nameof(SaveEditCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ExtendEditingTimerCommand))]
+    private TaskRow? _editingTask;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EditTextError))]
+    [NotifyPropertyChangedFor(nameof(EditErrorSummary))]
+    private string _editText = string.Empty;
+
+    [ObservableProperty]
+    private string? _editAssignee;
+
+    [ObservableProperty]
+    private TaskImportance _editImportance = TaskImportance.Medium;
+
+    [ObservableProperty]
+    private TaskUrgency _editUrgency = TaskUrgency.Medium;
+
+    public bool IsEditing => EditingTask is not null;
+
+    /// <summary>Whether the edited Aufgabe was emptied, once the Lagebuchführer has asked (#412).</summary>
+    public string? EditTextError =>
+        _editErrorsShown && string.IsNullOrWhiteSpace(EditText) ? ValidationMessages.Required : null;
+
+    /// <summary>Everything the edit panel is still waiting on, on one line beneath its fields (#412).</summary>
+    public string? EditErrorSummary => ValidationMessages.Summarize(EditTextError);
+
+    // A done task is history, as on the ETB: reopen it first.
+    private bool CanEdit(TaskRow row) => !IsReadOnly && !row.IsDone;
+
+    private void BeginEdit(TaskRow row)
+    {
+        EditText = row.Text;
+        EditAssignee = string.IsNullOrEmpty(row.Assignee) ? null : row.Assignee;
+        EditImportance = row.Importance;
+        EditUrgency = row.Urgency;
+        ShowEditErrors(false); // a freshly opened panel starts quiet
+        EditingTask = row;
+        SelectedTask = row; // the grid's selection marks the row the panel is about
+    }
+
+    private bool CanSaveEdit => IsEditing;
+
+    [RelayCommand(CanExecute = nameof(CanSaveEdit))]
+    private void SaveEdit()
+    {
+        ShowEditErrors(true);
+        if (EditTextError is not null || EditingTask is not { } row)
+        {
+            return;
+        }
+
+        var text = EditText.Trim();
+        var assignee = EditAssignee?.Trim() ?? string.Empty;
+        var importance = EditImportance;
+        var urgency = EditUrgency;
+        CancelEdit(); // closed first: the session's Changed re-syncs the rows, which must not find a panel open
+
+        // An unchanged SPEICHERN sends nothing: a silent edit that changes nothing is only traffic.
+        if (!string.Equals(text, row.Text, StringComparison.Ordinal)
+            || !string.Equals(assignee, row.Assignee, StringComparison.Ordinal)
+            || importance != row.Importance
+            || urgency != row.Urgency)
+        {
+            _session.UpdateTask(row.Id, text, assignee, importance, urgency);
+            _onChanged();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelEdit()
+    {
+        EditingTask = null;
+        EditText = string.Empty;
+        EditAssignee = null;
+        ShowEditErrors(false);
+    }
+
+    private bool CanExtendEditingTimer => !IsReadOnly && EditingTask is { HasTimer: true, IsDone: false };
+
+    /// <summary>
+    /// The panel's +5 MIN: an action rather than a field, so it applies at once and leaves the
+    /// panel open. An overdue task is put off from now, not from its passed due time.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanExtendEditingTimer))]
+    private void ExtendEditingTimer()
+    {
+        if (EditingTask is not { } row)
+        {
+            return;
+        }
+
+        _session.ExtendTaskTimer(row.Id, ExtendMinutes);
+        _onChanged();
+    }
+
+    private void ShowEditErrors(bool shown)
+    {
+        _editErrorsShown = shown;
+        OnPropertyChanged(nameof(EditTextError));
+        OnPropertyChanged(nameof(EditErrorSummary));
+    }
+
     // --- Live countdown + one-shot due alarm ---
     private void OnTick()
     {
@@ -288,9 +409,16 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         {
             foreach (var task in _session.Incident.Tasks)
             {
-                if (TaskRow.IsOverdueAt(task, now) && _dueAnnounced.Add(task.Id))
+                if (TaskRow.IsOverdueAt(task, now))
                 {
-                    _alarm.Play(AlarmSound.TaskDue);
+                    if (_dueAnnounced.Add(task.Id))
+                    {
+                        _alarm.Play(AlarmSound.TaskDue);
+                    }
+                }
+                else if (!task.IsCompleted)
+                {
+                    _dueAnnounced.Remove(task.Id); // put off with +5 MIN: it has to sound again (#246)
                 }
             }
         }
@@ -385,6 +513,19 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         _onChanged();
     }
 
+    /// <summary>The bar's +5 MIN: puts the task it names off by five minutes from now (#246).</summary>
+    [RelayCommand]
+    private void ExtendMostOverdueTask()
+    {
+        if (IsReadOnly || OverdueTasks().FirstOrDefault() is not { } task)
+        {
+            return;
+        }
+
+        _session.ExtendTaskTimer(task.Id, ExtendMinutes);
+        _onChanged();
+    }
+
     private void RefreshHeader()
     {
         OnPropertyChanged(nameof(HasDueTask));
@@ -414,11 +555,20 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
             visible,
             r => r.Id,
             t => t.Id,
-            t => new TaskRow(_session, t, IsReadOnly, now, _onChanged, _offerUndo),
+            t => new TaskRow(_session, t, IsReadOnly, now, _onChanged, BeginEdit, CanEdit, _offerUndo),
             (row, t) => row.Update(t, now));
 
         // A backstop: a kept row stays selected on its own, but one filtered out must not linger.
         SelectedTask = Rows.FirstOrDefault(r => r.Id == selectedId);
+
+        // The panel stays open across other changes and keeps what was typed; it closes only once
+        // its task is gone or done, which another device can do at any moment.
+        if (EditingTask is { } editing && Rows.FirstOrDefault(r => r.Id == editing.Id) is not { IsDone: false })
+        {
+            CancelEdit();
+        }
+
+        ExtendEditingTimerCommand.NotifyCanExecuteChanged();
         RefreshHeader();
     }
 
@@ -432,13 +582,16 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
 /// <summary>
 /// One rendered task row. Two-way IsDone mirrors ChecklistItemViewModel: the CheckBox binding is
 /// the single source of truth, and the echo-guard keeps state pulls (<see cref="Update"/>, after a
-/// change made anywhere) from writing back what was only just pulled.
+/// change made anywhere) from writing back what was only just pulled. Everything else is display:
+/// a correction happens in <see cref="TasksViewModel"/>'s edit panel (#246) and reaches the row
+/// through <see cref="Update"/>, so the grid's cells never turn into controls.
 /// </summary>
 public sealed partial class TaskRow : ObservableObject
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
     private readonly Action<string, Action>? _offerUndo;
+    private readonly RelayCommand _beginEditCommand;
 
     public TaskRow(
         IIncidentSession session,
@@ -446,30 +599,30 @@ public sealed partial class TaskRow : ObservableObject
         bool isReadOnly,
         DateTimeOffset now,
         Action onChanged,
+        Action<TaskRow> beginEdit,
+        Func<TaskRow, bool> canEdit,
         Action<string, Action>? offerUndo = null)
     {
         ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(beginEdit);
+        ArgumentNullException.ThrowIfNull(canEdit);
         _session = session;
         Id = task.Id;
         _onChanged = onChanged;
         _offerUndo = offerUndo;
         IsReadOnly = isReadOnly;
-        Text = task.Text;
-        Assignee = task.Assignee;
         CreatedDisplay = $"{Formatting.Timestamp(task.CreatedAt)} · {task.CreatedBy}";
-        ImportanceLabel = Formatting.Level(task.Importance);
-        UrgencyLabel = Formatting.Level(task.Urgency);
-        IsUrgencyHigh = task.Urgency == TaskUrgency.High;
-        IsUrgencyMedium = task.Urgency == TaskUrgency.Medium;
-        IsUrgencyLow = task.Urgency == TaskUrgency.Low;
-        IsImportanceHigh = task.Importance == TaskImportance.High;
-        IsImportanceMedium = task.Importance == TaskImportance.Medium;
-        IsImportanceLow = task.Importance == TaskImportance.Low;
+        HasTimer = task.DueAt != DateTimeOffset.MaxValue;
+        _text = task.Text;
+        _assignee = task.Assignee;
+        _importance = task.Importance;
+        _urgency = task.Urgency;
         _isDone = task.IsCompleted;
 
         _completedDisplay = CompletedDisplayOf(task);
-        RemainingDisplay = ComputeRemaining(task, now);
+        _remainingDisplay = ComputeRemaining(task, now);
         IsOverdue = IsOverdueAt(task, now);
+        _beginEditCommand = new RelayCommand(() => beginEdit(this), () => canEdit(this));
     }
 
     // Set while Update() writes the incident's completion into the row, so OnIsDoneChanged does
@@ -478,8 +631,8 @@ public sealed partial class TaskRow : ObservableObject
 
     /// <summary>
     /// Brings a kept row in line with its task after a change anywhere in the incident (#294),
-    /// instead of the row being thrown away and rebuilt. Only the completion can move on an
-    /// existing task -- there is no session operation that edits its text or priorities.
+    /// instead of the row being thrown away and rebuilt: its completion, and since #246 its text,
+    /// assignee and priorities, which the edit panel or another device may have corrected.
     /// </summary>
     public void Update(IncidentTask task, DateTimeOffset now)
     {
@@ -494,10 +647,15 @@ public sealed partial class TaskRow : ObservableObject
             _pulling = false;
         }
 
+        Text = task.Text;
+        Assignee = task.Assignee;
+        Importance = task.Importance;
+        Urgency = task.Urgency;
         CompletedDisplay = CompletedDisplayOf(task);
         IsOverdue = IsOverdueAt(task, now);
         RemainingDisplay = ComputeRemaining(task, now);
         OnPropertyChanged(nameof(IsOverdue));
+        _beginEditCommand.NotifyCanExecuteChanged();
     }
 
     // German short stamp for completed rows. Empty while open — the view hides the label then.
@@ -506,29 +664,51 @@ public sealed partial class TaskRow : ObservableObject
 
     public Guid Id { get; }
 
-    public string Text { get; }
+    [ObservableProperty]
+    private string _text;
 
-    public string Assignee { get; }
+    [ObservableProperty]
+    private string _assignee;
 
     public string CreatedDisplay { get; }
 
-    public string ImportanceLabel { get; }
+    /// <summary>Whether the task runs on a timer at all; +5 MIN has nothing to extend otherwise.</summary>
+    public bool HasTimer { get; }
 
-    public string UrgencyLabel { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ImportanceLabel))]
+    [NotifyPropertyChangedFor(nameof(IsImportanceHigh))]
+    [NotifyPropertyChangedFor(nameof(IsImportanceMedium))]
+    [NotifyPropertyChangedFor(nameof(IsImportanceLow))]
+    private TaskImportance _importance;
 
-    public bool IsUrgencyHigh { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UrgencyLabel))]
+    [NotifyPropertyChangedFor(nameof(IsUrgencyHigh))]
+    [NotifyPropertyChangedFor(nameof(IsUrgencyMedium))]
+    [NotifyPropertyChangedFor(nameof(IsUrgencyLow))]
+    private TaskUrgency _urgency;
 
-    public bool IsUrgencyMedium { get; }
+    public string ImportanceLabel => Formatting.Level(Importance);
 
-    public bool IsUrgencyLow { get; }
+    public string UrgencyLabel => Formatting.Level(Urgency);
 
-    public bool IsImportanceHigh { get; }
+    public bool IsUrgencyHigh => Urgency == TaskUrgency.High;
 
-    public bool IsImportanceMedium { get; }
+    public bool IsUrgencyMedium => Urgency == TaskUrgency.Medium;
 
-    public bool IsImportanceLow { get; }
+    public bool IsUrgencyLow => Urgency == TaskUrgency.Low;
+
+    public bool IsImportanceHigh => Importance == TaskImportance.High;
+
+    public bool IsImportanceMedium => Importance == TaskImportance.Medium;
+
+    public bool IsImportanceLow => Importance == TaskImportance.Low;
 
     public bool IsReadOnly { get; }
+
+    /// <summary>Enter or F2 on the row, or its pencil: opens the edit panel below the grid (#246).</summary>
+    public IRelayCommand BeginEditCommand => _beginEditCommand;
 
     /// <summary>"ERLEDIGT · HH:mm" once done, empty while open (completion time from the task).</summary>
     [ObservableProperty]
@@ -621,7 +801,28 @@ public enum TaskFilterKind
 
 /// <summary>An enum value paired with its German label, so a picker never falls back to the enum
 /// identifier. Two closed records instead of a generic one, so Avalonia compiled-bind templates
-/// stay simple.</summary>
-public readonly record struct ImportanceOption(TaskImportance Value, string Label);
+/// stay simple. The Is* flags colour the triage segments (#246) the way the grid colours a level.</summary>
+public readonly record struct ImportanceOption(TaskImportance Value, string Label)
+{
+    public bool IsHigh => Value == TaskImportance.High;
 
-public readonly record struct UrgencyOption(TaskUrgency Value, string Label);
+    public bool IsMedium => Value == TaskImportance.Medium;
+
+    public bool IsLow => Value == TaskImportance.Low;
+
+    // What a screen reader announces for the segment, instead of the record's member dump.
+    public override string ToString() => Label;
+}
+
+/// <summary>See <see cref="ImportanceOption"/>.</summary>
+public readonly record struct UrgencyOption(TaskUrgency Value, string Label)
+{
+    public bool IsHigh => Value == TaskUrgency.High;
+
+    public bool IsMedium => Value == TaskUrgency.Medium;
+
+    public bool IsLow => Value == TaskUrgency.Low;
+
+    // What a screen reader announces for the segment, instead of the record's member dump.
+    public override string ToString() => Label;
+}

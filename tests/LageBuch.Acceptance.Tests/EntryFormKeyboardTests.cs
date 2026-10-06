@@ -7,6 +7,7 @@ using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -302,17 +303,19 @@ public class EntryFormKeyboardTests
         Assert.Contains(vm.Roles.Roles, r => r.PersonName == "Max Testmann");
     }
 
-    // WICHTIGKEIT is the first field; it, DRINGLICHKEIT and ZUGETEILT keep their values between
-    // tasks, so the next task is Tab x4, the text, Enter.
+    // WICHTIGKEIT is the first field; it, DRINGLICHKEIT and ZUGETEILT AN keep their values between
+    // tasks, so the next task is Tab x4, the text, Enter. The priorities are triage segments
+    // (#246): focus sits on the chosen segment, and Left/Right step the scale.
     [AvaloniaFact]
     public void Aufgaben_enter_from_the_last_field_submits_and_focus_goes_to_wichtigkeit()
     {
         var (window, vm) = ShowWorkspace();
         WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
-        var importance = Named<ComboBox>(window, "ImportanceBox");
+        var importance = Named<ListBox>(window, "ImportanceBox");
         FocusByTab(window, importance);
-        window.Press(PhysicalKey.ArrowDown); // a closed ComboBox steps its selection
+        window.Press(PhysicalKey.ArrowRight); // Mittel -> Hoch
         var picked = vm.Tasks.NewImportance;
+        Assert.Equal(TaskImportance.High, picked);
         window.Tab();
         window.Tab();
         window.Tab();
@@ -323,7 +326,7 @@ public class EntryFormKeyboardTests
         window.Press(PhysicalKey.Enter);
 
         Assert.Equal("Hydrantenplan holen", Assert.Single(vm.Tasks.Rows).Text);
-        window.AssertFocused(importance);
+        window.AssertFocusWithin(importance);
         Assert.Equal(picked, vm.Tasks.NewImportance); // kept for the next task
     }
 
@@ -339,7 +342,7 @@ public class EntryFormKeyboardTests
         window.Press(PhysicalKey.Enter);
 
         Assert.Equal("Zufahrt freihalten", Assert.Single(vm.Tasks.Rows).Text);
-        window.AssertFocused(Named<ComboBox>(window, "ImportanceBox"));
+        window.AssertFocusWithin(Named<ListBox>(window, "ImportanceBox"));
     }
 
     [AvaloniaFact]

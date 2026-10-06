@@ -32,25 +32,22 @@
 
     <!-- Wide defaults as Styles, not Width= on the controls: a local value in XAML outranks a
          Style setter, so the narrow query below could never widen them. -->
-    <Style Selector="ComboBox#ImportanceBox">
-      <Setter Property="Width" Value="110" />
+    <Style Selector="StackPanel#EditFields">
+      <Setter Property="Orientation" Value="Horizontal" />
     </Style>
-    <Style Selector="ComboBox#UrgencyBox">
-      <Setter Property="Width" Value="130" />
-    </Style>
-    <Style Selector="AutoCompleteBox#AssigneeBox">
+    <Style Selector="AutoCompleteBox#AssigneeBox, AutoCompleteBox#EditAssigneeBox">
       <Setter Property="Width" Value="150" />
     </Style>
     <Style Selector="TextBox#TimerBox">
       <Setter Property="Width" Value="70" />
     </Style>
-    <Style Selector="TextBox#TaskNewTextBox">
+    <Style Selector="TextBox#TaskNewTextBox, TextBox#EditTextBox">
       <Setter Property="Width" Value="320" />
     </Style>
 
     <!-- The narrow layout, keyed off the workspace's container. -->
     <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="StackPanel#DockFields">
+      <Style Selector="StackPanel#DockFields, StackPanel#EditFields">
         <Setter Property="Orientation" Value="Vertical" />
       </Style>
       <!-- The bottom bar already says AUFGABEN; the heading would only cost the filters room. -->
@@ -63,21 +60,20 @@
       <Style Selector="Border#TasksCardPanel">
         <Setter Property="IsVisible" Value="True" />
       </Style>
-      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
-           leaves it the width of its longest entry. -->
-      <Style Selector="ComboBox#ImportanceBox">
-        <Setter Property="Width" Value="356" />
+      <!-- The segments share the width out evenly (UniformGrid) and grow to a thumb's height. -->
+      <Style Selector="ListBox.triage">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
       </Style>
-      <Style Selector="ComboBox#UrgencyBox">
-        <Setter Property="Width" Value="356" />
+      <Style Selector="ListBox.triage Border.seg">
+        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
       </Style>
-      <Style Selector="AutoCompleteBox#AssigneeBox">
+      <Style Selector="AutoCompleteBox#AssigneeBox, AutoCompleteBox#EditAssigneeBox">
         <Setter Property="Width" Value="NaN" />
       </Style>
       <Style Selector="TextBox#TimerBox">
         <Setter Property="Width" Value="NaN" />
       </Style>
-      <Style Selector="TextBox#TaskNewTextBox">
+      <Style Selector="TextBox#TaskNewTextBox, TextBox#EditTextBox">
         <Setter Property="Width" Value="NaN" />
       </Style>
       <Style Selector="HeaderedContentControl.field">
@@ -137,26 +133,18 @@
         </Grid>
         <StackPanel x:Name="DockFields" Spacing="12">
           <HeaderedContentControl Classes="field" Header="WICHTIGKEIT">
-            <ComboBox x:Name="ImportanceBox" ItemsSource="{Binding ImportanceOptions}"
-                      SelectedValue="{Binding NewImportance}" SelectedValueBinding="{Binding Value}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:ImportanceOption">
-                  <TextBlock Text="{Binding Label}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
+            <ListBox x:Name="ImportanceBox" Classes="triage" ItemsSource="{Binding ImportanceOptions}"
+                     SelectedValue="{Binding NewImportance}" SelectedValueBinding="{Binding Value}"
+                     AutomationProperties.Name="Wichtigkeit"
+                     ItemTemplate="{StaticResource ImportanceSegment}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="DRINGLICHKEIT">
-            <ComboBox x:Name="UrgencyBox" ItemsSource="{Binding UrgencyOptions}"
-                      SelectedValue="{Binding NewUrgency}" SelectedValueBinding="{Binding Value}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:UrgencyOption">
-                  <TextBlock Text="{Binding Label}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
+            <ListBox x:Name="UrgencyBox" Classes="triage" ItemsSource="{Binding UrgencyOptions}"
+                     SelectedValue="{Binding NewUrgency}" SelectedValueBinding="{Binding Value}"
+                     AutomationProperties.Name="Dringlichkeit"
+                     ItemTemplate="{StaticResource UrgencySegment}" />
           </HeaderedContentControl>
-          <HeaderedContentControl Classes="field suggest" Header="ZUGETEILT">
+          <HeaderedContentControl Classes="field suggest" Header="ZUGETEILT AN">
             <AutoCompleteBox x:Name="AssigneeBox" ItemsSource="{Binding AssigneeOptions}"
                              PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                              FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
@@ -181,6 +169,74 @@
         <TextBlock x:Name="DockErrorSummary" Classes="field-error"
                    Text="{Binding ErrorSummary}"
                    IsVisible="{Binding ErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Edit panel (#246): the dock's fields in the dock's place, filled from the row, shown
+         only while a task is being corrected. Not inline cell editing: the grid keeps Wichtigkeit
+         and Dringlichkeit in their colours, which is what it is read for. It keeps the overlay
+         keyboard contract (#538) as an inline panel, as the ETB's does; closing hands focus back
+         to the row's pencil. -->
+    <Border DockPanel.Dock="Bottom" x:Name="TaskEditPanel" Margin="0,16,0,0"
+            Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14"
+            IsVisible="{Binding IsEditing}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding CancelEditCommand}" b:Overlay.PrimaryCommand="{Binding SaveEditCommand}"
+            b:Overlay.InitialFocus="{Binding #EditImportanceBox}" b:Overlay.FallbackFocus="{Binding #ImportanceBox}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="6">
+        <TextBlock Text="AUFGABE BEARBEITEN" Classes="overline" Margin="0,0,0,4" />
+        <StackPanel x:Name="EditFields" Spacing="12">
+          <HeaderedContentControl Classes="field" Header="WICHTIGKEIT">
+            <ListBox x:Name="EditImportanceBox" Classes="triage" ItemsSource="{Binding ImportanceOptions}"
+                     SelectedValue="{Binding EditImportance}" SelectedValueBinding="{Binding Value}"
+                     AutomationProperties.Name="Wichtigkeit"
+                     ItemTemplate="{StaticResource ImportanceSegment}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="DRINGLICHKEIT">
+            <ListBox x:Name="EditUrgencyBox" Classes="triage" ItemsSource="{Binding UrgencyOptions}"
+                     SelectedValue="{Binding EditUrgency}" SelectedValueBinding="{Binding Value}"
+                     AutomationProperties.Name="Dringlichkeit"
+                     ItemTemplate="{StaticResource UrgencySegment}" />
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field suggest" Header="ZUGETEILT AN">
+            <AutoCompleteBox x:Name="EditAssigneeBox" ItemsSource="{Binding AssigneeOptions}"
+                             PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
+                             FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                             Text="{Binding EditAssignee}" />
+          </HeaderedContentControl>
+          <!-- The timer is not a field here: +5 MIN acts at once and the countdown beside it
+               moves, so there is nothing to save and nothing to get wrong. -->
+          <HeaderedContentControl Classes="field" Header="TIMER">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock x:Name="EditRemaining" VerticalAlignment="Center" MinWidth="72"
+                         Text="{Binding EditingTask.RemainingDisplay, FallbackValue=''}"
+                         Classes.due="{Binding EditingTask.IsOverdue, FallbackValue=False}" />
+              <Button x:Name="EditExtendTimerButton" Content="+5 MIN"
+                      ToolTip.Tip="Timer um 5 Minuten verlängern"
+                      Command="{Binding ExtendEditingTimerCommand}" />
+            </StackPanel>
+          </HeaderedContentControl>
+          <HeaderedContentControl Classes="field required" Header="AUFGABE"
+                                    Classes.invalid="{Binding EditTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <!-- Freitext: kein Platzhalter, siehe #137 -->
+            <TextBox x:Name="EditTextBox" Text="{Binding EditText}">
+              <TextBox.KeyBindings>
+                <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
+              </TextBox.KeyBindings>
+            </TextBox>
+          </HeaderedContentControl>
+          <Button x:Name="SaveEditButton" Classes="signal dock-action" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+          <Button x:Name="CancelEditButton" Classes="dock-action" Content="ABBRECHEN" Command="{Binding CancelEditCommand}"
+                  VerticalAlignment="Bottom" Margin="0,0,0,1" />
+        </StackPanel>
+        <!-- Was noch fehlt (#412), as in the dock. -->
+        <TextBlock x:Name="EditErrorSummary" Classes="field-error"
+                   Text="{Binding EditErrorSummary}"
+                   IsVisible="{Binding EditErrorSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
       </ScrollViewer>
     </Border>
@@ -232,7 +288,7 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTextColumn Header="ZUGETEILT" Binding="{Binding Assignee}" IsReadOnly="True" />
+          <DataGridTextColumn Header="ZUGETEILT AN" Binding="{Binding Assignee}" IsReadOnly="True" />
           <DataGridTemplateColumn Header="AUFGABE" Width="*" IsReadOnly="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:TaskRow">
@@ -241,6 +297,19 @@
                   <TextBlock Text="{Binding CreatedDisplay}" Classes="overline" FontSize="9"
                              Foreground="{StaticResource TextSecondaryBrush}" />
                 </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+          <!-- Enter or F2 on the row presses this (#543): the way into the edit panel (#246). -->
+          <DataGridTemplateColumn Header="" Width="44" IsReadOnly="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:TaskRow">
+                <Button x:Name="TaskEditButton" Classes="icon-btn" HorizontalAlignment="Center"
+                        Command="{Binding BeginEditCommand}" b:RowKeys.Role="Primary"
+                        IsVisible="{Binding !IsDone}" ToolTip.Tip="Bearbeiten (Enter)"
+                        AutomationProperties.Name="Aufgabe bearbeiten">
+                  <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                </Button>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
@@ -259,7 +328,13 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:TaskRow">
               <Border Classes="row-card">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                  <Button Grid.Column="2" Classes="icon-btn card-action" VerticalAlignment="Top"
+                          Command="{Binding BeginEditCommand}" b:RowKeys.Role="Primary"
+                          IsVisible="{Binding !IsDone}" ToolTip.Tip="Bearbeiten (Enter)"
+                          AutomationProperties.Name="Aufgabe bearbeiten">
+                    <PathIcon Data="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                  </Button>
                   <CheckBox Grid.Column="0" VerticalAlignment="Top" MinWidth="0"
                             IsChecked="{Binding IsDone, Mode=TwoWay}" IsEnabled="{Binding !IsReadOnly}"
                             b:RowKeys.Role="Toggle"

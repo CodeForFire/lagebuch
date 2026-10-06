@@ -154,7 +154,7 @@ public class WorkspaceFocusTests
 
         Click(window, view.GetControl<Button>("TaskDueJumpButton"));
 
-        window.AssertFocused(Named<Control>(window, "ImportanceBox"));
+        window.AssertFocusWithin(Named<Control>(window, "ImportanceBox"));
     }
 
     [AvaloniaFact]

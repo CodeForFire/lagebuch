@@ -1,7 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -49,6 +51,11 @@ public class TasksTabRenderTests
         }
 
         Directory.CreateDirectory(dir);
+
+        // Brush transitions (the triage segments' fill) run on the wall clock, not the dispatcher;
+        // only a screenshot needs them finished.
+        Thread.Sleep(250);
+        Dispatcher.UIThread.RunJobs();
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, name));
     }
@@ -91,4 +98,71 @@ public class TasksTabRenderTests
         Assert.NotNull(vm.PendingTaskDialog);
         Capture(window, "aufgaben-dialog.png");
     }
+
+    // #246: editing opens a panel in the dock's place; the grid above keeps reading as triage, and
+    // the chosen segments fill in the colour the grid uses for that level.
+    [AvaloniaFact]
+    public void Editing_an_aufgabe_shows_the_panel_with_filled_segments_in_the_docks_place()
+    {
+        var (window, vm, session, ticker, clock) = ShowWorkspace();
+        session.AddTask("Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
+        session.AddTask("Presse-Info vorbereiten", null, TaskImportance.Low, TaskUrgency.Medium, 15);
+        session.AddTask("Gerät nachlegen", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        clock.Now = clock.Now.AddMinutes(6); // Tür sichern overdue: the fällig bar shows +5 MIN
+        ticker.Pulse();
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        var row = vm.Tasks.Rows.Single(r => r.Text == "Presse-Info vorbereiten");
+
+        row.BeginEditCommand.Execute(null);
+        vm.Tasks.EditImportance = TaskImportance.High;
+        Dispatcher.UIThread.RunJobs();
+
+        var panel = Named<Border>(window, "TaskEditPanel");
+        Assert.True(panel.IsEffectivelyVisible);
+        Assert.False(Named<StackPanel>(window, "DockFields").IsEffectivelyVisible);
+        Assert.True(Named<Button>(window, "TaskDueExtendButton").IsEffectivelyVisible);
+        var importance = Named<ListBox>(window, "EditImportanceBox");
+        Assert.Equal(2, importance.SelectedIndex); // Hoch
+        Assert.Equal(1, Named<ListBox>(window, "EditUrgencyBox").SelectedIndex); // Mittel
+        Capture(window, "aufgaben-bearbeiten.png");
+
+        window.Width = 412;
+        window.Height = 915;
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "aufgaben-bearbeiten-phone.png");
+    }
+
+    // The triage scale stands in a row of 36dp fields with SPEICHERN bottom-aligned beside them; a
+    // taller scale pushed both buttons below the fields' line. The recent-files ListBoxItem style
+    // gives every item a 7dp bottom margin, which the segments must not inherit.
+    [AvaloniaFact]
+    public void The_triage_scale_is_as_tall_as_the_fields_beside_it()
+    {
+        var (window, vm, session, _, _) = ShowWorkspace();
+        session.AddTask("Presse-Info vorbereiten", null, TaskImportance.High, TaskUrgency.Medium, 15);
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        vm.Tasks.Rows.Single().BeginEditCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var text = Named<TextBox>(window, "EditTextBox");
+        var save = Named<Button>(window, "SaveEditButton");
+        var top = text.TranslatePoint(default, window)!.Value.Y;
+
+        foreach (var name in new[] { "EditImportanceBox", "EditUrgencyBox", "ImportanceBox", "UrgencyBox" })
+        {
+            var scale = Named<ListBox>(window, name);
+            if (scale.IsEffectivelyVisible)
+            {
+                Assert.Equal(text.Bounds.Height, scale.Bounds.Height, precision: 0);
+            }
+        }
+
+        // Within the 1dp every dock button is lifted by (Margin="0,0,0,1"), as HINZUFÜGEN always was.
+        var saveTop = save.TranslatePoint(default, window)!.Value.Y;
+        Assert.True(Math.Abs(top - saveTop) <= 1.0, $"SPEICHERN starts at y={saveTop:0.#}, the fields at y={top:0.#}");
+    }
+
+    private static T Named<T>(Window window, string name)
+        where T : Control =>
+        window.GetVisualDescendants().OfType<T>().First(c => c.Name == name);
 }

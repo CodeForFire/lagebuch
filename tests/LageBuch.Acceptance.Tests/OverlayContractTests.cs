@@ -13,6 +13,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.CoMeasurement;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -61,6 +62,7 @@ public class OverlayContractTests
     private static readonly OverlayScenario[] InlinePanelScenarios =
     [
         new("Etb.EditPanel", typeof(EtbViewModel), typeof(EtbEntryRow), OpenEtbEditPanel),
+        new("Tasks.EditPanel", typeof(TasksViewModel), typeof(TaskRow), OpenTasksEditPanel),
         new("Roles.TransferPanel", typeof(RolesViewModel), typeof(RoleAssignmentRow), OpenRolesTransferPanel),
         new("Co.AddBuildingPanel", typeof(CoMessprotokollViewModel), typeof(Building), OpenCoAddBuildingPanel),
         new("Co.RemoveBuildingPanel", typeof(CoMessprotokollViewModel), typeof(Building), OpenCoRemoveBuildingPanel),
@@ -340,6 +342,15 @@ public class OverlayContractTests
 
         // Cancel leaves the grid as it was, so the row's own button is still there to go back to.
         return new(window, opener, PanelOf(window, "EditPanel"), () => !vm.Etb.IsEditing && vm.Etb.Entries.Any(e => e.Text == "Lagemeldung übermittelt"), () => vm.Etb.CancelEditCommand.Execute(null));
+    }
+
+    private static Opened OpenTasksEditPanel()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AddTask("Presse-Info vorbereiten", null, TaskImportance.Low, TaskUrgency.Medium, 15));
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        var opener = RowButton(window, "TasksGrid", b => b.Name == "TaskEditButton");
+        Activate(opener);
+        return new(window, opener, PanelOf(window, "TaskEditPanel"), () => !vm.Tasks.IsEditing && vm.Tasks.Rows.Single().Text == "Presse-Info vorbereiten", () => vm.Tasks.CancelEditCommand.Execute(null));
     }
 
     private static Opened OpenRolesTransferPanel()

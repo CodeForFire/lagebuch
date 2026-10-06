@@ -1,13 +1,28 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
-        xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls">
+        xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
+        xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic">
 
   <Styles.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://LageBuch.App.Shared/Theme/Tokens.axaml" />
       </ResourceDictionary.MergedDictionaries>
+      <!-- One triage segment, coloured by its level; see ListBox.triage below (#246). Shared by
+           the Aufgaben dock, its edit panel and the task dialog. -->
+      <DataTemplate x:Key="ImportanceSegment" x:DataType="vm:ImportanceOption">
+        <Border Classes="seg" Classes.high="{Binding IsHigh}" Classes.medium="{Binding IsMedium}"
+                Classes.low="{Binding IsLow}">
+          <TextBlock Text="{Binding Label}" />
+        </Border>
+      </DataTemplate>
+      <DataTemplate x:Key="UrgencySegment" x:DataType="vm:UrgencyOption">
+        <Border Classes="seg" Classes.high="{Binding IsHigh}" Classes.medium="{Binding IsMedium}"
+                Classes.low="{Binding IsLow}">
+          <TextBlock Text="{Binding Label}" />
+        </Border>
+      </DataTemplate>
     </ResourceDictionary>
   </Styles.Resources>
 
@@ -448,6 +463,122 @@
     <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     <Setter Property="Padding" Value="11,8" />
+  </Style>
+
+  <!-- Triage segments (#246) — Wichtigkeit and Dringlichkeit as Niedrig | Mittel | Hoch, the
+       chosen segment filled in the colour the AUFGABEN grid shows that level in. A ComboBox hid the
+       colour inside a bordered box exactly where the value was being chosen; here the colour is the
+       choice. A ListBox, not RadioButtons: Tab lands on the chosen segment and Left/Right moves the
+       value, one stop in the tab order for the whole scale.
+
+       The item template is a Border.seg carrying .high / .medium / .low from the option's flags
+       (ImportanceOption, UrgencyOption); everything below keys off those. The list and its items
+       get bare templates of their own: the app's recent-files ListBoxItem style (LISTBOX, below)
+       draws each item as a bordered card with a signal-red tick when selected, and Fluent's list
+       adds a scroll viewer; each drew a box or a sliver of red between the segments. -->
+  <Style Selector="ListBox.triage">
+    <Setter Property="Background" Value="#0C1119" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+    <!-- Focus from code and Left/Right; see Behaviors/TriageSegments.cs. -->
+    <Setter Property="b:TriageSegments.IsEnabled" Value="True" />
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <UniformGrid Rows="1" />
+      </ItemsPanelTemplate>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
+          <ItemsPresenter x:Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem">
+    <!-- The recent-files ListBoxItem style below spaces its cards 7dp apart and Fluent sets an
+         item minimum; either would make the scale taller than the 36dp fields beside it, and the
+         dock's bottom-aligned buttons drop with it. -->
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                          HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.triage Border.seg">
+    <Setter Property="MinWidth" Value="62" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1,0,0,0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <!-- The frame draws the outer edge; a segment draws only the hairline to its left, and the
+       outer two round off with the frame so a filled end does not poke out of its corner. -->
+  <Style Selector="ListBox.triage ListBoxItem:nth-child(1) Border.seg">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="4,0,0,4" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:nth-last-child(1) Border.seg">
+    <Setter Property="CornerRadius" Value="0,4,4,0" />
+  </Style>
+  <Style Selector="ListBox.triage Border.seg > TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="10,0" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <!-- Hover previews the colour a click would give. -->
+  <Style Selector="ListBox.triage ListBoxItem:pointerover Border.seg.low">
+    <Setter Property="Background" Value="#14FFFFFF" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:pointerover Border.seg.medium">
+    <Setter Property="Background" Value="#26FFB23E" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:pointerover Border.seg.high">
+    <Setter Property="Background" Value="#26FF3D2E" />
+  </Style>
+  <!-- Chosen: Niedrig stays quiet, as it is in the grid; Mittel and Hoch fill in amber and signal. -->
+  <Style Selector="ListBox.triage ListBoxItem:selected Border.seg.low">
+    <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:selected Border.seg.low > TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:selected Border.seg.medium">
+    <Setter Property="Background" Value="{StaticResource AmberBrush}" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:selected Border.seg.medium > TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource AmberInkBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:selected Border.seg.high">
+    <Setter Property="Background" Value="{StaticResource SignalBrush}" />
+  </Style>
+  <Style Selector="ListBox.triage ListBoxItem:selected Border.seg.high > TextBlock">
+    <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="ListBox.triage:disabled">
+    <Setter Property="Opacity" Value="0.4" />
   </Style>
 
   <!-- AutoCompleteBox — an editable text field backed by a suggestion list (call-sign, personnel

@@ -28,29 +28,28 @@
             <!-- Freitext: kein Platzhalter, siehe #137 -->
             <TextBox x:Name="TaskDialogText" Text="{Binding Text}" AcceptsReturn="False" />
           </HeaderedContentControl>
-          <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="12">
-            <HeaderedContentControl Grid.Column="0" Classes="field" Header="WICHTIGKEIT">
-              <ComboBox Width="100" ItemsSource="{Binding ImportanceOptions}"
-                        SelectedValue="{Binding Importance}" SelectedValueBinding="{Binding Value}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ImportanceOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
+          <!-- Triage segments (#246) on a row of their own: a scale wants its width. -->
+          <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="12">
+            <HeaderedContentControl Classes="field" Header="WICHTIGKEIT">
+              <ListBox Classes="triage" ItemsSource="{Binding ImportanceOptions}"
+                       SelectedValue="{Binding Importance}" SelectedValueBinding="{Binding Value}"
+                       AutomationProperties.Name="Wichtigkeit"
+                       ItemTemplate="{StaticResource ImportanceSegment}" />
             </HeaderedContentControl>
-            <HeaderedContentControl Grid.Column="1" Classes="field" Header="DRINGLICHKEIT">
-              <ComboBox Width="110" ItemsSource="{Binding UrgencyOptions}"
-                        SelectedValue="{Binding Urgency}" SelectedValueBinding="{Binding Value}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:UrgencyOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
+            <HeaderedContentControl Classes="field" Header="DRINGLICHKEIT">
+              <ListBox Classes="triage" ItemsSource="{Binding UrgencyOptions}"
+                       SelectedValue="{Binding Urgency}" SelectedValueBinding="{Binding Value}"
+                       AutomationProperties.Name="Dringlichkeit"
+                       ItemTemplate="{StaticResource UrgencySegment}" />
             </HeaderedContentControl>
-            <HeaderedContentControl Grid.Column="2" Classes="field" Header="TIMER (MIN)"
+          </WrapPanel>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <HeaderedContentControl Grid.Column="0" Classes="field" Header="TIMER (MIN)"
                                     ctrl:Field.Error="{Binding TimerMinutesError}">
               <TextBox Width="60" Text="{Binding TimerMinutes}" b:IntegerOnly.IsEnabled="True"
                        PlaceholderText="{x:Static md:AnonymizedExampleData.TimerMinutesPlaceholder}" />
             </HeaderedContentControl>
-            <HeaderedContentControl Grid.Column="3" Classes="field suggest" Header="ZUGETEILT">
+            <HeaderedContentControl Grid.Column="1" Classes="field suggest" Header="ZUGETEILT AN">
               <AutoCompleteBox ItemsSource="{Binding AssigneeOptions}"
                                PlaceholderText="{x:Static md:AnonymizedExampleData.OperatorNamePlaceholder}"
                                FilterMode="ContainsOrdinal" MinimumPrefixLength="0"

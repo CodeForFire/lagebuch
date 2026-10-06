@@ -48,7 +48,7 @@ public class VersionHandshakeTests
         // revision (#295). A 4 client discards snapshots that do not supersede the one it holds, and a
         // 3 host stamps revision 0 on every one, so that pair must not connect. A pre-handshake peer
         // (LegacyProtocolVersion) stays below the floor.
-        Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 4, int.MaxValue);
         Assert.InRange(SyncProtocol.LegacyProtocolVersion, int.MinValue, SyncProtocol.MinimumProtocolVersion - 1);
     }
 
@@ -59,7 +59,7 @@ public class VersionHandshakeTests
         // shows its links ungrouped, and a payload without it reads as ungrouped -- so 5 and 4 still
         // connect in either direction.
         Assert.InRange(SyncProtocol.ProtocolVersion, 5, int.MaxValue);
-        Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, SyncProtocol.ProtocolVersion);
     }
 
     [Fact]
@@ -67,7 +67,16 @@ public class VersionHandshakeTests
     {
         // 6 adds settings.dispatchCentreName to the Stammdaten payload (#400). A peer at 4 or 5 skips
         // the key and falls back to "ILS", so it stays joinable.
-        Assert.Equal(6, SyncProtocol.ProtocolVersion);
-        Assert.Equal(4, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 6, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, int.MinValue, SyncProtocol.ProtocolVersion);
+    }
+
+    [Fact]
+    public void Editing_an_Aufgabe_raises_the_floor_to_protocol_seven()
+    {
+        // 7 lets a client send updateTask and extendTaskTimer (#246). A host at 6 has neither in its
+        // command allowlist and would reject the edit, so a 6 and a 7 must not connect.
+        Assert.Equal(7, SyncProtocol.ProtocolVersion);
+        Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
     }
 }

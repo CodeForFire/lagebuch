@@ -47,7 +47,7 @@ public class RequiredFieldMarkerTests
         var (_, view) = ShowTaskDialog();
 
         Assert.False(RequiredMarkerOf(view, "TIMER (MIN)").IsVisible);
-        Assert.False(RequiredMarkerOf(view, "ZUGETEILT").IsVisible);
+        Assert.False(RequiredMarkerOf(view, "ZUGETEILT AN").IsVisible);
     }
 
     [AvaloniaFact]
