@@ -185,6 +185,29 @@ public class OverlayKeyboardTests
         Dispatcher.UIThread.RunJobs();
     }
 
+    // Contract 1: Enter on a fresh dialog runs its primary action. Focus used to start on the first
+    // section checkbox, where Enter toggles, so a reflex Enter left the Checkliste out of the
+    // Bericht instead of exporting it (found by #545's walkthrough).
+    [AvaloniaFact]
+    public void The_pdf_dialog_opens_on_EXPORTIEREN_so_Enter_exports_every_section()
+    {
+        IncidentPdfSections? exported = null;
+        var vm = new PdfExportOptionsViewModel(sections =>
+        {
+            exported = sections;
+            return Task.CompletedTask;
+        });
+        var view = new PdfExportOptionsView { DataContext = vm };
+        var window = new Window { Content = view, Width = 800, Height = 600 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        window.AssertFocused(view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ExportButton"));
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Equal(IncidentPdfSections.All, exported);
+    }
+
     private sealed record Minimal(Window Window, Border Root, TextBox Field, TextBox Notes, Button Opener, Panel Host);
 
     private static Minimal ShowMinimal(Action<Border> configure)
