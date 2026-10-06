@@ -10,7 +10,8 @@
        slot, so a wide window looks exactly as it did. The scrim inset drops 40 -> 16 for the
        same reason; on a desktop the card never comes near either. -->
   <Border Background="#B3070A10" Padding="16"
-          b:Overlay.CancelCommand="{Binding CancelCommand}">
+          b:Overlay.CancelCommand="{Binding CancelCommand}"
+          b:Overlay.InitialFocus="{Binding #ExportButton}">
     <Border MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Stretch"
             Background="{StaticResource SurfaceRaisedBrush}"
             BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"

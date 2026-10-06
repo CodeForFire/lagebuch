@@ -471,15 +471,6 @@ public class OverlayContractTests
     // on close when that is not the opener, because closing rebuilt it.
     private sealed record Opened(Window Window, Control Opener, Func<Control?> Overlay, Func<bool> IsCancelled, Action Cancel, Control? ReturnsTo = null);
 
-    // Lets EXPORTIEREN run: the default exporter is the Android one, which hides the button.
-    private sealed class ExportablePdf : IIncidentPdfExporter
-    {
-        public bool CanExport => true;
-
-        public byte[] Generate(Incident incident, DateTimeOffset asOf, IReadOnlyDictionary<Guid, byte[]> fileBytes, IReadOnlyDictionary<Guid, string> pdfAttachmentPaths, IncidentPdfSections sections = IncidentPdfSections.All) =>
-            Array.Empty<byte>();
-    }
-
     private sealed class StaticMasterData(MasterDataSet set) : IMasterDataProvider
     {
         public MasterDataSet Get() => set;
