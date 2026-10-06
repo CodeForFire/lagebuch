@@ -696,6 +696,13 @@
     <Setter Property="Foreground" Value="#FFFFFF" />
   </Style>
 
+  <!-- In a ghost button (the command bar's shortcut entry) the key is the label, so it takes the
+       button's grey and size like the labels beside it; the glyph inherits that grey already. -->
+  <Style Selector="Button.ghost TextBlock.key-hint">
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
   <Style Selector="TabItem:pointerover /template/ Border#Root">
     <Setter Property="Background" Value="#161E2A" />
   </Style>

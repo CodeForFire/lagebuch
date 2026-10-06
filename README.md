@@ -76,8 +76,9 @@ Markdown.
 
 ## Mit der Tastatur
 
-Lagebuch lässt sich ohne Maus bedienen. **F1** zeigt alle Tastenkürzel, auf dem
-Tablet die Schaltfläche **TASTENKÜRZEL**. Die wichtigsten:
+Lagebuch lässt sich ohne Maus bedienen. **F1** zeigt alle Tastenkürzel, ebenso
+das **?**-Symbol in der Kopfleiste (auf dem Telefon **MEHR → TASTENKÜRZEL**).
+Die wichtigsten:
 
 | Taste | Wirkung |
 |---|---|

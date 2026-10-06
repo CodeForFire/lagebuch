@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -249,6 +250,24 @@ public class GlobalShortcutTests
 
         PressAndSettle(window, PhysicalKey.Escape);
         Assert.Null(shell.PendingShortcutOverview);
+    }
+
+    // A reference aid, not a destination: the command bar gives it a glyph and its key, never a
+    // word as wide as ÜBERSICHT. Screen readers still hear what it is.
+    [AvaloniaFact]
+    public void The_shortcuts_button_is_a_named_glyph_that_opens_the_overview()
+    {
+        var (window, shell, _) = ShowShell();
+        var button = Named<Button>(window, "ShortcutsButton");
+
+        Assert.Equal("Tastenkürzel (F1)", AutomationProperties.GetName(button));
+        Assert.DoesNotContain(button.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "TASTENKÜRZEL");
+        Assert.True(button.Bounds.Width < 2 * Named<Button>(window, "AboutButton").Bounds.Width, $"the button is {button.Bounds.Width}px wide");
+
+        FocusByTab(button);
+        PressAndSettle(window, PhysicalKey.Space);
+
+        Assert.NotNull(shell.PendingShortcutOverview);
     }
 
     [AvaloniaFact]
