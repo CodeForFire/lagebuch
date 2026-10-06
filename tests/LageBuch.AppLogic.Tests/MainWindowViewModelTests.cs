@@ -27,6 +27,37 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void F1_opens_the_shortcut_overview_from_any_view_and_its_close_removes_it()
+    {
+        var vm = New();
+
+        Assert.True(vm.TryRunShortcut(new KeyChord(ShortcutKey.F1)));
+        Assert.NotNull(vm.PendingShortcutOverview);
+        Assert.Equal(ShortcutRegistry.All.Count, vm.PendingShortcutOverview!.Rows.Count);
+
+        vm.PendingShortcutOverview.CloseCommand.Execute(null);
+        Assert.Null(vm.PendingShortcutOverview);
+    }
+
+    [Fact]
+    public void No_shortcut_runs_while_a_shell_overlay_is_open()
+    {
+        var vm = New();
+        vm.ShowAboutCommand.Execute(null);
+
+        Assert.False(vm.TryRunShortcut(new KeyChord(ShortcutKey.F1)));
+        Assert.Null(vm.PendingShortcutOverview);
+    }
+
+    [Fact]
+    public void A_module_shortcut_without_an_open_einsatz_does_nothing()
+    {
+        var vm = New();
+
+        Assert.False(vm.TryRunShortcut(new KeyChord(ShortcutKey.D1, Ctrl: true)));
+    }
+
+    [Fact]
     public void Starts_on_home()
     {
         var vm = New();

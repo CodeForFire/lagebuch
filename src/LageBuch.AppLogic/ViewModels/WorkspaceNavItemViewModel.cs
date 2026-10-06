@@ -50,6 +50,12 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
     public string ModuleKey { get; }
 
     /// <summary>
+    /// The global shortcut that opens this entry, shown on its rail tab (#544): a keyboard user
+    /// never hovers, so a tooltip would not tell them. Null for a Checkliste, which has none.
+    /// </summary>
+    public string? ShortcutHint { get; init; }
+
+    /// <summary>
     /// Whether this is the entry currently open. The wide rail gets this from
     /// <c>TabItem:selected</c>, but the narrow bottom bar is an <c>ItemsControl</c> of buttons
     /// rather than a selector, so it needs the flag on the item itself.

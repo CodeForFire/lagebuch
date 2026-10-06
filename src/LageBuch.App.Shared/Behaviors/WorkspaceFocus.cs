@@ -191,7 +191,7 @@ public static class WorkspaceFocus
             visual.GetSelfAndVisualAncestors().OfType<TabItem>()
                 .FirstOrDefault(tab => rail.IndexFromContainer(tab) >= 0);
 
-        public void OnModuleFocusRequested(object? sender, EventArgs e) => FocusStart();
+        public void OnModuleFocusRequested(object? sender, ModuleFocusRequestedEventArgs e) => FocusStart(e.ToStartField);
 
         // Reconnected: the module area is enabled again.
         public void OnWorkspaceChanged(object? sender, PropertyChangedEventArgs e)
@@ -214,7 +214,9 @@ public static class WorkspaceFocus
 
         // ContextIdle: after the new module is laid out, and after the Background-priority focus a
         // module places itself (a warning bar's Druck field, #539), which is left where it is.
-        public void FocusStart() =>
+        // toStartField (Ctrl+N, #544) moves the caret even from elsewhere in the module, but never
+        // out of an overlay.
+        public void FocusStart(bool toStartField = false) =>
             Dispatcher.UIThread.Post(
                 () =>
                 {
@@ -224,7 +226,7 @@ public static class WorkspaceFocus
                     }
 
                     if (focusManager.GetFocusedElement() is Visual focused
-                        && (content.IsVisualAncestorOf(focused) || Overlay.IsInOverlay(focused)))
+                        && ((!toStartField && content.IsVisualAncestorOf(focused)) || Overlay.IsInOverlay(focused)))
                     {
                         return;
                     }

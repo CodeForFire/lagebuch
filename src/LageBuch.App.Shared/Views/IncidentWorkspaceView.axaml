@@ -294,7 +294,11 @@
                   </Border>
                   <TextBlock Grid.Column="1" x:Name="ScbaAlarmText" Classes="meldung-text"
                              Text="{Binding AlarmDisplay}" />
-                  <PathIcon Grid.Column="2" Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock x:Name="ScbaAlarmShortcutHint" Classes="key-hint" Text="F9"
+                               IsVisible="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).ShowsWarningHintOnRetreat}" />
+                    <PathIcon Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                  </StackPanel>
                 </Grid>
               </Button>
               <StackPanel Grid.Column="1" Classes="meldung-actions">
@@ -464,7 +468,11 @@
                 </Border>
                 <TextBlock Grid.Column="1" x:Name="ScbaControlText" Classes="meldung-text"
                            Text="{Binding NextControlDisplay}" />
-                <PathIcon Grid.Column="2" Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <TextBlock x:Name="ScbaControlShortcutHint" Classes="key-hint" Text="F9"
+                             IsVisible="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).ShowsWarningHintOnPressureCheck}" />
+                  <PathIcon Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                </StackPanel>
               </Grid>
             </Button>
           </Border>
@@ -491,7 +499,11 @@
                   </Border>
                   <TextBlock Grid.Column="1" x:Name="TaskDueText" Classes="meldung-text"
                              Text="{Binding DueTaskDisplay}" />
-                  <PathIcon Grid.Column="2" Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock x:Name="TaskDueShortcutHint" Classes="key-hint" Text="F9"
+                               IsVisible="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).ShowsWarningHintOnTaskDue}" />
+                    <PathIcon Classes="meldung-chevron" Data="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                  </StackPanel>
                 </Grid>
               </Button>
               <StackPanel Grid.Column="1" Classes="meldung-actions">
@@ -528,6 +540,10 @@
                 <Button x:Name="ReminderSnoozeButton" Content="+5 MIN"
                         ToolTip.Tip="{Binding DispatchCentreName, StringFormat='Noch nichts zu melden — in 5 Minuten erneut fällig, ohne Rückmeldung an {0} zu protokollieren'}"
                         Command="{Binding SnoozeFiveMinutesCommand}" />
+                <!-- F9 has nothing to jump to here, so it puts focus on ERLEDIGT (#544): the
+                     Rückmeldung is confirmed by a second, deliberate key. -->
+                <TextBlock x:Name="ReminderShortcutHint" Classes="key-hint" Text="F9"
+                           IsVisible="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).ShowsWarningHintOnReminder}" />
                 <Button x:Name="ReminderAckButton" Content="ERLEDIGT" Command="{Binding AcknowledgeCommand}" />
               </StackPanel>
             </Grid>
@@ -796,14 +812,22 @@
             <SolidColorBrush Color="Transparent" />
           </TabControl.Background>
           <TabControl.ItemTemplate>
+            <!-- The module's shortcut sits at the tab's right edge (#544); a Checkliste has none.
+                 It reaches 12px into the tab's right padding: ATEMSCHUTZ and CO-MESSUNG leave the
+                 172px tab no room for it otherwise. -->
             <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
-              <StackPanel Orientation="Horizontal" Spacing="7">
-                <TextBlock Text="{Binding Header}" />
-                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource ActiveBrush}" IsVisible="{Binding IsComplete}" />
-                <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                         Fill="{StaticResource SignalBrush}" IsVisible="{Binding IsIncomplete}" />
-              </StackPanel>
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7">
+                  <TextBlock Text="{Binding Header}" />
+                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                           Fill="{StaticResource ActiveBrush}" IsVisible="{Binding IsComplete}" />
+                  <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                           Fill="{StaticResource SignalBrush}" IsVisible="{Binding IsIncomplete}" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" x:Name="RailShortcutHint" Classes="key-hint" Margin="8,0,-12,0"
+                           Text="{Binding ShortcutHint}"
+                           IsVisible="{Binding ShortcutHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </Grid>
             </DataTemplate>
           </TabControl.ItemTemplate>
           <TabControl.ContentTemplate>

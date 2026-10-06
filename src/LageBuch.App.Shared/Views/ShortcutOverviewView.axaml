@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             x:Class="LageBuch.App.Shared.Views.ShortcutOverviewView"
+             x:DataType="vm:ShortcutOverviewViewModel">
+  <!-- The shortcut overview (#544), on F1 or the command bar's TASTENKÜRZEL. Every row comes from
+       ShortcutRegistry, the table the key handler dispatches on. Sized like the About card:
+       MaxWidth and Stretch, so it shrinks on a phone instead of clipping. -->
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CloseCommand}" b:Overlay.InitialFocus="{Binding #CloseButton}">
+    <Border MaxWidth="460" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="26,22,26,24" Spacing="10">
+            <TextBlock Text="TASTENKÜRZEL" Classes="overline" />
+
+            <!-- One shared Auto column for the keys, so the descriptions start on one edge. -->
+            <ItemsControl x:Name="ShortcutRows" ItemsSource="{Binding Rows}" Grid.IsSharedSizeScope="True">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ShortcutRow">
+                  <Grid Margin="0,3">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="ShortcutKeys" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Classes="mono" Margin="0,0,18,0" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextPrimaryBrush}" Text="{Binding Keys}" />
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}" Text="{Binding Description}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Separator Margin="0,4,0,4" />
+
+            <TextBlock Classes="secondary" TextWrapping="Wrap"
+                       Text="Checklisten haben kein festes Kürzel: Strg+Tab erreicht sie. Solange ein Dialog offen ist, wirkt kein Kürzel." />
+
+            <Button x:Name="CloseButton" Content="SCHLIESSEN" Command="{Binding CloseCommand}"
+                    HorizontalAlignment="Right" Margin="0,10,0,0" />
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

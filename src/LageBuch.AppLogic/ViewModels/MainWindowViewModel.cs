@@ -82,6 +82,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private AboutViewModel? _pendingAbout;
 
+    [ObservableProperty]
+    private ShortcutOverviewViewModel? _pendingShortcutOverview;
+
     // Every path that leaves the editor or an open workspace goes through here. Unsaved Stammdaten
     // edits prompt first. Leaving an open, editable incident asks first (#463) -- a stray tap on the
     // command bar mid-Einsatz must not throw the Lagebuchführer out of it; a read-only one has
@@ -318,6 +321,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var about = new AboutViewModel(_dialogs, _appVersion);
         about.Closed += (_, _) => PendingAbout = null;
         PendingAbout = about;
+    }
+
+    // Like About: an overlay over whatever is current, navigating nowhere (#544).
+    [RelayCommand]
+    private void ShowShortcutOverview()
+    {
+        var overview = new ShortcutOverviewViewModel();
+        overview.Closed += (_, _) => PendingShortcutOverview = null;
+        PendingShortcutOverview = overview;
+    }
+
+    /// <summary>
+    /// Runs a global shortcut (#544); false when it does not apply, so the key goes on to the
+    /// focused control. No shortcut runs while an overlay is open, the overview's own included:
+    /// the overlay owns the keyboard until Esc closes it. F1 works on every view; everything else
+    /// is the open Einsatz's.
+    /// </summary>
+    public bool TryRunShortcut(KeyChord chord)
+    {
+        ArgumentNullException.ThrowIfNull(chord);
+        if (PendingPrompt is not null || PendingAbout is not null || PendingShortcutOverview is not null
+            || _editor.PendingConfirm is not null || ShortcutRegistry.Find(chord) is not { } shortcut)
+        {
+            return false;
+        }
+
+        if (shortcut.Action == ShortcutAction.ShowOverview)
+        {
+            ShowShortcutOverview();
+            return true;
+        }
+
+        return CurrentView is IncidentWorkspaceViewModel ws && ws.TryRunShortcut(chord);
     }
 
     public Task OpenRecent(string path) => NavigateAwayAsync(() => _home.OpenRecentCommand.Execute(path));
