@@ -3,6 +3,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -194,6 +195,24 @@ public class HomeOpenErrorTests
         // BrokenStore fails to load any path, so a successful invocation is observable the same
         // way the existing double-click-driven failure is (see A_failed_open_shows_the_banner...).
         Assert.NotNull(vm.OpenError);
+    }
+
+    // #543: Enter on the selected row opens it, as a double-click and its ÖFFNEN button do.
+    [AvaloniaFact]
+    public void Enter_on_a_selected_recent_file_opens_it()
+    {
+        var (window, vm) = ShowHome(triggerError: false);
+        var list = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "RecentList");
+        list.SelectedIndex = 1;
+        Dispatcher.UIThread.RunJobs();
+        Assert.IsAssignableFrom<Control>(list.ContainerFromIndex(1)).Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+
+        window.Press(PhysicalKey.Enter);
+
+        // BrokenStore fails every load, so the open is observable as its banner.
+        Assert.NotNull(vm.OpenError);
+        Assert.Contains("Einsatz-6666", vm.OpenError, StringComparison.Ordinal);
     }
 
     [AvaloniaFact]

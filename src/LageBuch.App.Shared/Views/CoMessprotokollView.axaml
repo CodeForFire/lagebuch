@@ -520,7 +520,9 @@
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                   AllowAutoHide="False"
                   IsVisible="{Binding ShowMatrix}">
-      <ItemsControl x:Name="MatrixRowsList" ItemsSource="{Binding MatrixRows}">
+      <!-- Arrow keys walk the tiles (#543): ← → within a floor, ↑ ↓ between floors. -->
+      <ItemsControl x:Name="MatrixRowsList" ItemsSource="{Binding MatrixRows}"
+                    b:GridArrowNavigation.IsEnabled="True">
         <!-- Esc from a floor's Wohnungen spinner cancels the removal it raised (#538); see
              ApartmentRemovalPanel for why focus stays here instead of moving into the panel. -->
         <ItemsControl.KeyBindings>
