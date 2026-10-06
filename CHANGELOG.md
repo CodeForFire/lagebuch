@@ -16,6 +16,40 @@ cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see 
 
 <!-- towncrier release notes start -->
 
+## [0.8.0] - 2026-10-06
+
+Keyboard control. A Lagebuchführer at the ELW laptop can now run an Einsatz without reaching
+for the mouse: every dialog and inline panel takes focus, keeps Tab inside, closes on Esc and
+gives focus back; Enter submits every entry form and returns to its first field; the suggestion
+fields follow one keyboard model; a Druckkontrolle is recorded from the keyboard; the lists answer
+to row keys; global shortcuts open modules and jump to the most urgent warning, with F1 listing
+them all; and keyboard focus is visible everywhere. An Aufgabe can now be edited after it was
+created. That edit travels over sync, so the sync protocol rises to 7 and every device in a shared
+Einsatz needs 0.8.0.
+
+### Added
+
+- [#558](https://github.com/CodeForFire/lagebuch/pull/558) - A Druckkontrolle can now be recorded from the keyboard: the Druckabfrage and Rückzugsalarm bars put the caret in that Trupp's Druck field, Enter records the value and moves on to the next due Trupp, an empty field says so instead of recording the last reading again, and a Druck that rises or falls faster than air can (27 typed for 270) is asked about once before it is recorded (#539).
+- [#564](https://github.com/CodeForFire/lagebuch/pull/564) - The ETB, Kräfte, Funktionen and Aufgaben lists now answer to row keys: Enter or F2 opens a row's edit, Stärke or transfer, Del asks before removing a Kräfte unit and does nothing on an ETB entry, and Space ticks an Aufgabe off, which a RÜCKGÄNGIG notice or Ctrl+Z takes back for a few seconds (#543).
+- [#565](https://github.com/CodeForFire/lagebuch/pull/565) - Enter now opens the selected recent file on the start screen, and the arrow keys move across the CO-Messung matrix — left and right between the Wohnungen of a floor, up and down between floors — so a Wohnung is reached and opened without tabbing through every tile before it (#543).
+- [#567](https://github.com/CodeForFire/lagebuch/pull/567) - Global keyboard shortcuts: Ctrl+1 … Ctrl+0 open a module whatever its place on the rail, Ctrl+Tab and Ctrl+Shift+Tab walk the rail, Ctrl+N starts an ETB entry in VON, F9 goes to the most urgent warning (Rückzugsalarm, Druckabfrage, Aufgabe, ILS Rückmeldung), and F1 or the ? button in the command bar lists them all, with each module's key shown on the rail (#544).
+- [#569](https://github.com/CodeForFire/lagebuch/pull/569) - An Aufgabe can now be corrected after it was created — Wichtigkeit, Dringlichkeit, Zugeteilt an and the text, in a panel below the list opened with the pencil, Enter or F2, while the list keeps its priority colours — and +5 MIN, in that panel and on the Aufgabe-fällig bar, puts a task off by five minutes; Wichtigkeit and Dringlichkeit are now picked on a coloured Niedrig | Mittel | Hoch scale everywhere, and because a joined device can send these edits the sync protocol rises to 7, so every device in a shared Einsatz needs this version (#246).
+
+### Changed
+
+- [#554](https://github.com/CodeForFire/lagebuch/pull/554) - Keyboard focus is now visible on every control as a cyan edge of its own, shown only when moving by keyboard, and text fields no longer use the emergency red for focus (#541).
+- [#559](https://github.com/CodeForFire/lagebuch/pull/559) - Enter now submits every entry form from any of its fields, including Kräfte with a FAHRZEUG picked; after the entry is added, focus goes back to the form's first field (VON in the ETB, WICHTIGKEIT in Aufgaben), and when an entry is refused, it goes to the first field that is missing; Kräfte keeps FEUERWEHR for the next unit (#540).
+- [#562](https://github.com/CodeForFire/lagebuch/pull/562) - Suggestion boxes follow one keyboard model: Enter submits in one press while the list is open with nothing picked, a single match that starts with what was typed is completed inline with the added text selected so Tab or Enter takes it and Backspace drops it, and Shift+Tab never takes a match (#466).
+
+### Fixed
+
+- [#555](https://github.com/CodeForFire/lagebuch/pull/555) - Every dialog now takes keyboard focus when it opens, keeps Tab inside, closes on Esc and returns focus to where it was opened; the task dialog no longer leaves typing going into the ETB field behind it, and Enter on a remove confirmation cancels instead of confirming (#538).
+- [#557](https://github.com/CodeForFire/lagebuch/pull/557) - The ETB edit panel, the Funktionen handover and the CO-Messung panels (add or remove a Haus, remove a Geschoss, the Wohnung editor) now take keyboard focus when they open, close on Esc and return focus to the button that opened them, and Esc on a Wohnungen spinner cancels the removal it asked about (#538).
+- [#563](https://github.com/CodeForFire/lagebuch/pull/563) - Focus now stays where the Lagebuchführer left it: the rail can be arrowed through without a module taking the caret, a module's first field is focused only when it is opened by click or from a warning bar (now also in Aufgaben, Beteiligte and Links), a read-only flip keeps the open module, focus returns after a reconnect, and the ETB filter keeps the selected row (#542).
+- [#566](https://github.com/CodeForFire/lagebuch/pull/566) - In the Stammdaten editor, Entfernen now asks before removing a filled row, as every other remove in the app does, and "+ HINZUFÜGEN" puts the caret in the row it adds instead of leaving focus on the button (#543).
+- [#568](https://github.com/CodeForFire/lagebuch/pull/568) - The PDF export dialog opens with focus on EXPORTIEREN, so Enter exports instead of unticking the first section (#545).
+
+
 ## [0.7.1] - 2026-10-02
 
 A patch release so the 0.7 line can be published on Google Play: Play automatic protection
@@ -440,7 +474,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/CodeForFire/lagebuch/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/CodeForFire/lagebuch/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/CodeForFire/lagebuch/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/CodeForFire/lagebuch/compare/v0.5.0...v0.6.0

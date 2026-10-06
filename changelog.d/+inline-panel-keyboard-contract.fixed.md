@@ -1,1 +1,0 @@
-The ETB edit panel, the Funktionen handover and the CO-Messung panels (add or remove a Haus, remove a Geschoss, the Wohnung editor) now take keyboard focus when they open, close on Esc and return focus to the button that opened them, and Esc on a Wohnungen spinner cancels the removal it asked about (#538).

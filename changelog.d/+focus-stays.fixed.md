@@ -1,1 +1,0 @@
-Focus now stays where the Lagebuchführer left it: the rail can be arrowed through without a module taking the caret, a module's first field is focused only when it is opened by click or from a warning bar (now also in Aufgaben, Beteiligte and Links), a read-only flip keeps the open module, focus returns after a reconnect, and the ETB filter keeps the selected row (#542).

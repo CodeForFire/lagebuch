@@ -1,1 +1,0 @@
-Suggestion boxes follow one keyboard model: Enter submits in one press while the list is open with nothing picked, a single match that starts with what was typed is completed inline with the added text selected so Tab or Enter takes it and Backspace drops it, and Shift+Tab never takes a match (#466).

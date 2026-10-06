@@ -1,1 +1,0 @@
-The ETB, Kräfte, Funktionen and Aufgaben lists now answer to row keys: Enter or F2 opens a row's edit, Stärke or transfer, Del asks before removing a Kräfte unit and does nothing on an ETB entry, and Space ticks an Aufgabe off, which a RÜCKGÄNGIG notice or Ctrl+Z takes back for a few seconds (#543).

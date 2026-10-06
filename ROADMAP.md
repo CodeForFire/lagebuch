@@ -11,7 +11,7 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.7.1, with a release every one to two weeks. The app is in real use,
+Version 0.8.0, with a release every one to two weeks. The app is in real use,
 but the `.fwincident` file format can still change between versions. That caveat
 is what 1.0 removes.
 
@@ -60,30 +60,24 @@ Issues: #241, #288, #290, #291, #292, #293, #294, #295, #383, #414, #415, #425,
 Play automatic protection refuses a bundle below Android 7.0 (API 24), which is
 now the app's floor (#550).
 
-## v0.8 — Keyboard control
+## v0.8 — Keyboard control — **released**
 
-A Lagebuchführer at the ELW laptop types far more than they click, and under
-pressure every trip to the mouse costs time. The field feedback said it directly
-(#466), and an audit of the app showed how far there is still to go: no
-shortcuts at all, dialogs that neither take focus nor give it back — the
-Aufgabe dialog even leaves the typing in the hidden ETB field behind it — Enter
-that submits some forms but not others, grids without row keys, and a focus
-position you can only see in text fields.
+Shipped 2026-10-06. A Lagebuchführer at the ELW laptop types far more than they
+click, and the field said so directly (#466). The app now keeps one keyboard
+contract (#545) everywhere: dialogs and inline panels take focus, keep Tab
+inside, close on Esc and give focus back; Enter submits every entry form and
+returns to its first field; the suggestion fields share one keyboard model; a
+Druckkontrolle is recorded without the mouse; the lists answer to row keys;
+global shortcuts open modules and jump to the most urgent warning, with an
+overview on F1; and keyboard focus is visible on every control. All of it is
+pinned by headless tests, including a keyboard-only Übung walkthrough with a
+keystroke budget for the everyday flows.
 
-This milestone writes down one keyboard contract (#545) and makes every part of
-the app keep it: dialogs and inline panels, Enter-submit with focus back on the
-first field, one keyboard model for the suggestion fields, Druckkontrolle without
-the mouse, row keys in the lists, global shortcuts with an overview, and a
-visible focus edge. All of it lands as headless tests, so it stays that way. But
-reachable is not the same as fast: the milestone closes only after the key
-presses for the everyday flows are counted before and after, and Lagebuchführer
-have run an Übung keyboard-only.
+#246, editing an Aufgabe, shipped in the same release. Because a joined device
+can send that edit, the sync protocol rose to 7, so every device in a shared
+Einsatz needs 0.8.0.
 
-It comes before the security work because it is what the field asked for next,
-and because it changes no file format.
-
-#246, editing an Aufgabe, ships in the same release. It is a field bug of its
-own, not keyboard work, but the row keys need it.
+See [CHANGELOG.md](CHANGELOG.md#080---2026-10-06) for the full list.
 
 Issues: #545, #537, #541, #538, #539, #540, #466, #542, #543, #544, #246
 
