@@ -274,8 +274,9 @@ request either.
 
 A maintainer task rather than a contributor one, and written up in
 [`docs/releasing.md`](docs/releasing.md): `towncrier build` folds `changelog.d/`
-into `CHANGELOG.md` under the new version heading, that goes up as its own pull
-request, and pushing the tag once it merges is what triggers the release.
+into `CHANGELOG.md` under the new version heading, `make screenshots demo-gif`
+refreshes the README images, that goes up as its own pull request, and pushing
+the tag once it merges is what triggers the release.
 
 ## Master data and PII
 

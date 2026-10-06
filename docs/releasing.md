@@ -42,7 +42,7 @@ cutting a release with one entry silently unlinked.
 
 `title_format` in [`towncrier.toml`](../towncrier.toml) renders the heading as
 `## [0.6.0] - <Datum>`, and the version in it has to match the tag exactly minus
-the `v` — that is what the workflow looks for. Three things go with the build,
+the `v` — that is what the workflow looks for. A few things go with the build,
 none of which towncrier does for you:
 
 - **The summary paragraph** under the new heading, if the release deserves one.
@@ -61,6 +61,17 @@ none of which towncrier does for you:
   see [AGENTS.md](../AGENTS.md#sync-protocol-version) for which of the two cases
   applies. Getting this wrong is silent until two devices fail to talk during an
   Einsatz.
+- **The screenshots and the demo GIF.** Once everything for the release has
+  merged, run `make screenshots demo-gif` on the release branch and commit what
+  changed. A pull request is meant to re-render the views it touches, but only
+  the ones it touches, so without this the README grid, the GIF and
+  codeforfire.github.io (which copies them nightly for its landing page and
+  Rundgang) show whatever the last re-render saw — 0.8.0 shipped with 11 of 13
+  images from before 0.7.0 (#571). It needs the .NET SDK for the headless
+  harness and ImageMagick and ffmpeg for the GIF. A file that differs by a few
+  hundred pixels has only had its clock move; commit or revert it, either is
+  fine. If a view's layout *moved*, the hotspot coordinates in the website's
+  `src/data/rundgang.ts` have to follow in a pull request there.
 - **The milestone.** Close the milestone the release corresponds to, and move
   anything still open in it to the next one before closing — an issue that
   silently loses its milestone is an issue nobody plans again. Nothing in CI

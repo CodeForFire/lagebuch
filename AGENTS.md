@@ -55,7 +55,10 @@ diagnostic-only and should not be committed unless they double as a real test.
 The README's screenshots and demo GIF come from one such test,
 `DemoFlowRenderTests` — regenerate them with `make screenshots` and
 `make demo-gif` whenever a view they show changes; `make samples` refreshes
-the fictional `docs/samples/uebung.fwincident` after a schema change.
+the fictional `docs/samples/uebung.fwincident` after a schema change. Cutting a
+release re-renders them all anyway ([docs/releasing.md](docs/releasing.md#cutting-a-release)),
+so a pull request that forgets one is caught at the next tag rather than shipped
+for weeks.
 
 ## Schema migrations
 
