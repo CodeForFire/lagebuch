@@ -26,46 +26,46 @@ public class StammdatenRowRemovalTests
         switch (kind)
         {
             case "Liste":
-            {
-                var s = new EditableListSection("Einheiten-Status", "STATUS", Array.Empty<string>(), () => { }, requestConfirm);
-                return new(s, () => s.AddCommand.Execute(null), () => s.Items[^1].Value = "Im Einsatz", () => s.Items.Count, () => s.RemoveCommand.Execute(s.Items[^1]));
-            }
+                {
+                    var s = new EditableListSection("Einheiten-Status", "STATUS", Array.Empty<string>(), () => { }, requestConfirm);
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Items[^1].Value = "Im Einsatz", () => s.Items.Count, () => s.RemoveCommand.Execute(s.Items[^1]));
+                }
 
             case "Checkliste":
-            {
-                var s = new ChecklistTemplateSection(Guid.NewGuid(), "Aufbau", Array.Empty<ChecklistTemplateItem>(), () => { }, requestConfirm);
-                return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Text = "Wasser", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
-            }
+                {
+                    var s = new ChecklistTemplateSection(Guid.NewGuid(), "Aufbau", Array.Empty<ChecklistTemplateItem>(), () => { }, requestConfirm);
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Text = "Wasser", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
+                }
 
             case "Links":
-            {
-                var s = new LinksSection("Links", Array.Empty<Link>(), () => { }, requestConfirm);
-                return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Url = "https://example.org", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
-            }
+                {
+                    var s = new LinksSection("Links", Array.Empty<Link>(), () => { }, requestConfirm);
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Url = "https://example.org", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
+                }
 
             case "Fahrzeuge":
-            {
-                var s = new VehiclesSection("Fahrzeuge", Array.Empty<Vehicle>(), Array.Empty<string>(), Array.Empty<string>(), () => { }, requestConfirm);
-                return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Wache = "FFB Wache 1", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
-            }
+                {
+                    var s = new VehiclesSection("Fahrzeuge", Array.Empty<Vehicle>(), Array.Empty<string>(), Array.Empty<string>(), () => { }, requestConfirm);
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Wache = "FFB Wache 1", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
+                }
 
             case "Trupp-Typen":
-            {
-                var s = new TruppTypesSection("Trupp-Typen", Array.Empty<TruppType>(), () => { }, requestConfirm);
-                return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Name = "Angriffstrupp", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
-            }
+                {
+                    var s = new TruppTypesSection("Trupp-Typen", Array.Empty<TruppType>(), () => { }, requestConfirm);
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Name = "Angriffstrupp", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
+                }
 
             case "Rollen":
-            {
-                var s = new RolesSection("Rollen", Array.Empty<Role>(), () => { }, requestConfirm);
-                return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Name = "EL", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
-            }
+                {
+                    var s = new RolesSection("Rollen", Array.Empty<Role>(), () => { }, requestConfirm);
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Name = "EL", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
+                }
 
             default:
-            {
-                var s = new PersonnelSection("Personal", Array.Empty<Person>(), () => { }, requestConfirm);
-                return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Phone = "0170 0000000", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
-            }
+                {
+                    var s = new PersonnelSection("Personal", Array.Empty<Person>(), () => { }, requestConfirm);
+                    return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Phone = "0170 0000000", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
+                }
         }
     }
 

@@ -95,7 +95,7 @@ public class StammdatenKeyboardTests
         var (window, vm) = ShowSection("Rollen");
         var roles = vm.Sections.OfType<RolesSection>().Single();
         var remove = window.GetVisualDescendants().OfType<Button>()
-            .First(b => (ToolTip.GetTip(b) as string) == "Entfernen" && b.DataContext == roles.Rows[0]);
+            .First(b => (ToolTip.GetTip(b) as string) == "Entfernen" && ReferenceEquals(b.DataContext, roles.Rows[0]));
 
         Press(window, remove);
 
