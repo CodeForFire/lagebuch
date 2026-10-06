@@ -114,7 +114,8 @@ The plan, in order of what is actually achievable:
 
 - **winget and the Microsoft Store** on Windows. A silent MSI install through
   winget does not raise the SmartScreen dialog, which makes it the recommended
-  Windows path even before a certificate exists.
+  Windows path even before a certificate exists. winget ships as of 0.8
+  (`winget install CodeForFire.Lagebuch`); the Microsoft Store is still open.
 - **SHA-256 checksums and Sigstore-backed build attestations** on every release.
   Not recognised by the operating system, but verifiable, and they are the
   artefacts a Datenschutzbeauftragter can actually check. These ship as of 0.6.
