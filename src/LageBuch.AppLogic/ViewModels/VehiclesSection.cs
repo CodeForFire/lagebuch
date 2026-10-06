@@ -55,7 +55,7 @@ public sealed partial class VehiclesSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row.CallSign, AllBlank(row.Wache, row.CallSign), () =>
+        RemoveAfterConfirm(row, row.CallSign, AllBlank(row.Wache, row.CallSign), () =>
         {
             if (Rows.Remove(row))
             {

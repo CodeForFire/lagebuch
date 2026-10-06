@@ -61,7 +61,7 @@ public sealed partial class ChecklistTemplateSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row.Text, AllBlank(row.Text), () =>
+        RemoveAfterConfirm(row, row.Text, AllBlank(row.Text), () =>
         {
             if (Rows.Remove(row))
             {

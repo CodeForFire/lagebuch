@@ -49,7 +49,7 @@ public sealed partial class LinksSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row.Name, AllBlank(row.Name, row.Url, row.Group), () =>
+        RemoveAfterConfirm(row, row.Name, AllBlank(row.Name, row.Url, row.Group), () =>
         {
             if (Rows.Remove(row))
             {

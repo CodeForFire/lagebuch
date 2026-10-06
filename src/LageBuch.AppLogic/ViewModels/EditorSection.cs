@@ -7,6 +7,9 @@ public abstract partial class EditorSection : ObservableObject
 {
     private readonly Action<string, Action> _requestConfirm;
 
+    // The rows "+ HINZUFÜGEN" made in this editor, by reference: they hold nothing stored yet.
+    private readonly HashSet<object> _added = new(ReferenceEqualityComparer.Instance);
+
     /// <param name="title">The rail label.</param>
     /// <param name="requestConfirm">
     /// Asks before a filled row is removed (#543): the question, then what to run on confirm. When
@@ -28,21 +31,31 @@ public abstract partial class EditorSection : ObservableObject
     /// <summary>Raised after "+ HINZUFÜGEN" appended a row, so the view can put the caret in it (#543).</summary>
     public event EventHandler<RowAddedEventArgs>? RowAdded;
 
-    protected void OnRowAdded(object row) => RowAdded?.Invoke(this, new RowAddedEventArgs(row));
+    protected void OnRowAdded(object row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        _added.Add(row);
+        RowAdded?.Invoke(this, new RowAddedEventArgs(row));
+    }
 
     /// <summary>
-    /// Removes a row after asking, like every other remove in the app (#543). A row still blank
-    /// goes at once: there is nothing in it to lose, and asking would only get in the way of
-    /// taking back a "+ HINZUFÜGEN" pressed once too often.
+    /// Removes a row after asking, like every other remove in the app (#543). Only a row that
+    /// "+ HINZUFÜGEN" made in this editor and that is still blank goes at once: nothing in it was
+    /// ever stored, and asking would only get in the way of taking back an add pressed once too
+    /// often. A stored row asks even after it was emptied, because SPEICHERN would drop what the
+    /// Stammdaten hold.
     /// </summary>
+    /// <param name="row">The row, as it sits in the section's collection.</param>
     /// <param name="name">What the row is called, for the question; blank when it has no name yet.</param>
     /// <param name="isBlank">True when every field the row offers for typing is empty.</param>
     /// <param name="remove">Takes the row out of the section.</param>
-    protected void RemoveAfterConfirm(string? name, bool isBlank, Action remove)
+    protected void RemoveAfterConfirm(object row, string? name, bool isBlank, Action remove)
     {
+        ArgumentNullException.ThrowIfNull(row);
         ArgumentNullException.ThrowIfNull(remove);
-        if (isBlank)
+        if (isBlank && _added.Contains(row))
         {
+            _added.Remove(row);
             remove();
             return;
         }
@@ -50,7 +63,11 @@ public abstract partial class EditorSection : ObservableObject
         var question = string.IsNullOrWhiteSpace(name)
             ? $"Diesen Eintrag aus {Title} entfernen?"
             : $"„{name.Trim()}“ aus {Title} entfernen?";
-        _requestConfirm(question, remove);
+        _requestConfirm(question, () =>
+        {
+            _added.Remove(row);
+            remove();
+        });
     }
 
     /// <summary>True when every one of a row's typed fields is empty or whitespace.</summary>

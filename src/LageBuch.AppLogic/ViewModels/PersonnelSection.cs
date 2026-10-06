@@ -39,7 +39,7 @@ public sealed partial class PersonnelSection : EditorSection
 
         var name = string.Join(", ", new[] { row.LastName, row.FirstName }.Where(n => !string.IsNullOrWhiteSpace(n)));
         var isBlank = AllBlank(row.LastName, row.FirstName, row.Role, row.CallSign, row.Phone, row.Email, row.Note);
-        RemoveAfterConfirm(name, isBlank, () =>
+        RemoveAfterConfirm(row, name, isBlank, () =>
         {
             if (Rows.Remove(row))
             {

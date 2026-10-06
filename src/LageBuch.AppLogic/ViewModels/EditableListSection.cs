@@ -37,7 +37,7 @@ public sealed partial class EditableListSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(item.Value, AllBlank(item.Value), () =>
+        RemoveAfterConfirm(item, item.Value, AllBlank(item.Value), () =>
         {
             if (Items.Remove(item))
             {

@@ -67,7 +67,7 @@ public sealed partial class RolesSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row.Name, AllBlank(row.Name), () =>
+        RemoveAfterConfirm(row, row.Name, AllBlank(row.Name), () =>
         {
             if (Rows.Remove(row))
             {

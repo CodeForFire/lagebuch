@@ -46,7 +46,7 @@ public sealed partial class TruppTypesSection : EditorSection
             return;
         }
 
-        RemoveAfterConfirm(row.Name, AllBlank(row.Name), () =>
+        RemoveAfterConfirm(row, row.Name, AllBlank(row.Name), () =>
         {
             if (Rows.Remove(row))
             {

@@ -6,9 +6,9 @@ namespace LageBuch.AppLogic.Tests;
 
 /// <summary>
 /// #543: every Stammdaten Entfernen asks first, as deleting a Checkliste and an import always have,
-/// except for a row still blank -- there is nothing to lose there, and asking would only get in the
-/// way of taking back a "+ HINZUFÜGEN" pressed once too often. "+ HINZUFÜGEN" announces its row,
-/// so the view can put the caret in it.
+/// except for a row "+ HINZUFÜGEN" just made that is still blank -- nothing in it was ever stored,
+/// and asking would only get in the way of taking back an add pressed once too often. A stored row
+/// asks even once emptied. "+ HINZUFÜGEN" announces its row, so the view can put the caret in it.
 /// </summary>
 public class StammdatenRowRemovalTests
 {
@@ -67,6 +67,117 @@ public class StammdatenRowRemovalTests
                     return new(s, () => s.AddCommand.Execute(null), () => s.Rows[^1].Phone = "0170 0000000", () => s.Rows.Count, () => s.RemoveCommand.Execute(s.Rows[^1]));
                 }
         }
+    }
+
+    // One section of each kind holding one row as the Stammdaten stored it, and an action that
+    // empties every field of that row a user can type into, then presses its Entfernen.
+    private static (Func<int> Count, Action EmptyThenRemove) BuildStored(string kind, Action<string, Action> requestConfirm)
+    {
+        switch (kind)
+        {
+            case "Liste":
+                {
+                    var s = new EditableListSection("Einheiten-Status", "STATUS", new[] { "Alarmiert" }, () => { }, requestConfirm);
+                    void EmptyThenRemove()
+                    {
+                        s.Items[0].Value = string.Empty;
+                        s.RemoveCommand.Execute(s.Items[0]);
+                    }
+
+                    return (() => s.Items.Count, EmptyThenRemove);
+                }
+
+            case "Checkliste":
+                {
+                    var s = new ChecklistTemplateSection(Guid.NewGuid(), "Aufbau", new[] { new ChecklistTemplateItem("Wasser", false) }, () => { }, requestConfirm);
+                    void EmptyThenRemove()
+                    {
+                        s.Rows[0].Text = string.Empty;
+                        s.RemoveCommand.Execute(s.Rows[0]);
+                    }
+
+                    return (() => s.Rows.Count, EmptyThenRemove);
+                }
+
+            case "Links":
+                {
+                    var s = new LinksSection("Links", new[] { new Link("Wetter", "https://example.org", "Info") }, () => { }, requestConfirm);
+                    void EmptyThenRemove()
+                    {
+                        s.Rows[0].Name = string.Empty;
+                        s.Rows[0].Url = string.Empty;
+                        s.Rows[0].Group = string.Empty;
+                        s.RemoveCommand.Execute(s.Rows[0]);
+                    }
+
+                    return (() => s.Rows.Count, EmptyThenRemove);
+                }
+
+            case "Fahrzeuge":
+                {
+                    var s = new VehiclesSection("Fahrzeuge", new[] { new Vehicle("FFB Wache 1", "FFB 1/44/1", 6) }, Array.Empty<string>(), Array.Empty<string>(), () => { }, requestConfirm);
+                    void EmptyThenRemove()
+                    {
+                        s.Rows[0].Wache = string.Empty;
+                        s.Rows[0].CallSign = string.Empty;
+                        s.RemoveCommand.Execute(s.Rows[0]);
+                    }
+
+                    return (() => s.Rows.Count, EmptyThenRemove);
+                }
+
+            case "Trupp-Typen":
+                {
+                    var s = new TruppTypesSection("Trupp-Typen", new[] { new TruppType("Angriffstrupp", 2, 30) }, () => { }, requestConfirm);
+                    void EmptyThenRemove()
+                    {
+                        s.Rows[0].Name = string.Empty;
+                        s.RemoveCommand.Execute(s.Rows[0]);
+                    }
+
+                    return (() => s.Rows.Count, EmptyThenRemove);
+                }
+
+            case "Rollen":
+                {
+                    var s = new RolesSection("Rollen", new[] { new Role("EL") }, () => { }, requestConfirm);
+                    void EmptyThenRemove()
+                    {
+                        s.Rows[0].Name = string.Empty;
+                        s.RemoveCommand.Execute(s.Rows[0]);
+                    }
+
+                    return (() => s.Rows.Count, EmptyThenRemove);
+                }
+
+            default:
+                {
+                    var s = new PersonnelSection("Personal", new[] { new Person("Mustermann", "Max", null, null, null) }, () => { }, requestConfirm);
+                    void EmptyThenRemove()
+                    {
+                        s.Rows[0].LastName = string.Empty;
+                        s.Rows[0].FirstName = string.Empty;
+                        s.RemoveCommand.Execute(s.Rows[0]);
+                    }
+
+                    return (() => s.Rows.Count, EmptyThenRemove);
+                }
+        }
+    }
+
+    // A stored row someone empties first is still a stored row: SPEICHERN would drop what the
+    // Stammdaten hold, so Entfernen has to ask. Only a row "+ HINZUFÜGEN" made goes without asking.
+    [Theory]
+    [MemberData(nameof(Kinds))]
+    public void Removing_a_stored_row_emptied_first_still_asks(string kind)
+    {
+        var asked = 0;
+        var (count, emptyThenRemove) = BuildStored(kind, (_, _) => asked++);
+
+        emptyThenRemove();
+
+        Assert.Equal(1, asked);
+        Assert.Equal(1, count());
     }
 
     [Theory]
