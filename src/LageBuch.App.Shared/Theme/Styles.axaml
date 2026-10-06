@@ -473,8 +473,9 @@
 
        The item template is a Border.seg carrying .high / .medium / .low from the option's flags
        (ImportanceOption, UrgencyOption); everything below keys off those. The list and its items
-       get bare templates of their own: Fluent's carry a scroll viewer, item margins and a
-       selection pipe, and each of those drew a box or a sliver of accent between the segments. -->
+       get bare templates of their own: the app's recent-files ListBoxItem style (LISTBOX, below)
+       draws each item as a bordered card with a signal-red tick when selected, and Fluent's list
+       adds a scroll viewer; each drew a box or a sliver of red between the segments. -->
   <Style Selector="ListBox.triage">
     <Setter Property="Background" Value="#0C1119" />
     <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
@@ -501,7 +502,10 @@
     </Setter>
   </Style>
   <Style Selector="ListBox.triage ListBoxItem">
-    <!-- Fluent's item minimum would make the scale taller than the fields beside it. -->
+    <!-- The recent-files ListBoxItem style below spaces its cards 7dp apart and Fluent sets an
+         item minimum; either would make the scale taller than the 36dp fields beside it, and the
+         dock's bottom-aligned buttons drop with it. -->
+    <Setter Property="Margin" Value="0" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="Cursor" Value="Hand" />

@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -129,6 +130,36 @@ public class TasksTabRenderTests
         window.Height = 915;
         Dispatcher.UIThread.RunJobs();
         Capture(window, "aufgaben-bearbeiten-phone.png");
+    }
+
+    // The triage scale stands in a row of 36dp fields with SPEICHERN bottom-aligned beside them; a
+    // taller scale pushed both buttons below the fields' line. The recent-files ListBoxItem style
+    // gives every item a 7dp bottom margin, which the segments must not inherit.
+    [AvaloniaFact]
+    public void The_triage_scale_is_as_tall_as_the_fields_beside_it()
+    {
+        var (window, vm, session, _, _) = ShowWorkspace();
+        session.AddTask("Presse-Info vorbereiten", null, TaskImportance.High, TaskUrgency.Medium, 15);
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        vm.Tasks.Rows.Single().BeginEditCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var text = Named<TextBox>(window, "EditTextBox");
+        var save = Named<Button>(window, "SaveEditButton");
+        var top = text.TranslatePoint(default, window)!.Value.Y;
+
+        foreach (var name in new[] { "EditImportanceBox", "EditUrgencyBox", "ImportanceBox", "UrgencyBox" })
+        {
+            var scale = Named<ListBox>(window, name);
+            if (scale.IsEffectivelyVisible)
+            {
+                Assert.Equal(text.Bounds.Height, scale.Bounds.Height, precision: 0);
+            }
+        }
+
+        // Within the 1dp every dock button is lifted by (Margin="0,0,0,1"), as HINZUFÜGEN always was.
+        var saveTop = save.TranslatePoint(default, window)!.Value.Y;
+        Assert.True(Math.Abs(top - saveTop) <= 1.0, $"SPEICHERN starts at y={saveTop:0.#}, the fields at y={top:0.#}");
     }
 
     private static T Named<T>(Window window, string name)
