@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -49,6 +50,11 @@ public class TasksTabRenderTests
         }
 
         Directory.CreateDirectory(dir);
+
+        // Brush transitions (the triage segments' fill) run on the wall clock, not the dispatcher;
+        // only a screenshot needs them finished.
+        Thread.Sleep(250);
+        Dispatcher.UIThread.RunJobs();
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, name));
     }
@@ -91,4 +97,41 @@ public class TasksTabRenderTests
         Assert.NotNull(vm.PendingTaskDialog);
         Capture(window, "aufgaben-dialog.png");
     }
+
+    // #246: editing opens a panel in the dock's place; the grid above keeps reading as triage, and
+    // the chosen segments fill in the colour the grid uses for that level.
+    [AvaloniaFact]
+    public void Editing_an_aufgabe_shows_the_panel_with_filled_segments_in_the_docks_place()
+    {
+        var (window, vm, session, ticker, clock) = ShowWorkspace();
+        session.AddTask("Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
+        session.AddTask("Presse-Info vorbereiten", null, TaskImportance.Low, TaskUrgency.Medium, 15);
+        session.AddTask("Gerät nachlegen", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        clock.Now = clock.Now.AddMinutes(6); // Tür sichern overdue: the fällig bar shows +5 MIN
+        ticker.Pulse();
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        var row = vm.Tasks.Rows.Single(r => r.Text == "Presse-Info vorbereiten");
+
+        row.BeginEditCommand.Execute(null);
+        vm.Tasks.EditImportance = TaskImportance.High;
+        Dispatcher.UIThread.RunJobs();
+
+        var panel = Named<Border>(window, "TaskEditPanel");
+        Assert.True(panel.IsEffectivelyVisible);
+        Assert.False(Named<StackPanel>(window, "DockFields").IsEffectivelyVisible);
+        Assert.True(Named<Button>(window, "TaskDueExtendButton").IsEffectivelyVisible);
+        var importance = Named<ListBox>(window, "EditImportanceBox");
+        Assert.Equal(2, importance.SelectedIndex); // Hoch
+        Assert.Equal(1, Named<ListBox>(window, "EditUrgencyBox").SelectedIndex); // Mittel
+        Capture(window, "aufgaben-bearbeiten.png");
+
+        window.Width = 412;
+        window.Height = 915;
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "aufgaben-bearbeiten-phone.png");
+    }
+
+    private static T Named<T>(Window window, string name)
+        where T : Control =>
+        window.GetVisualDescendants().OfType<T>().First(c => c.Name == name);
 }

@@ -45,15 +45,19 @@ public static class SyncProtocol
     /// 6: the Stammdaten payload's <c>settings</c> carry <c>dispatchCentreName</c> (#400). A peer at
     /// 4 or 5 skips the key, and a payload without it reads as "ILS", so the floor stays at 4.
     /// </para>
+    /// <para>
+    /// 7: a client may send <c>updateTask</c> and <c>extendTaskTimer</c> (#246). A host at 6 would
+    /// reject both commands, so the floor rises to 7.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 6;
+    public const int ProtocolVersion = 7;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 4;
+    public const int MinimumProtocolVersion = 7;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

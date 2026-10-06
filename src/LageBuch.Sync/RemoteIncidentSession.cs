@@ -452,6 +452,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void RemoveInvolvedParty(Guid partyId) =>
         Send(new RemoveInvolvedPartyCommand(partyId));
 
+    public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
+        Send(new UpdateTaskCommand(taskId, text, assignee ?? string.Empty, importance, urgency));
+
+    public void ExtendTaskTimer(Guid taskId, int minutes) =>
+        Send(new ExtendTaskTimerCommand(taskId, minutes));
+
     public void AddScbaTrupp(
         string designation,
         IEnumerable<TruppMember> members,

@@ -67,6 +67,8 @@ public class CommandSerializationTests
         new AddInvolvedPartyCommand(Op, "POK Mustermann", null, null),
         new UpdateInvolvedPartyCommand(Guid.NewGuid(), "Erika Beispiel", null, "Schlüssel übergeben"),
         new RemoveInvolvedPartyCommand(Guid.NewGuid()),
+        new UpdateTaskCommand(Guid.NewGuid(), "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium),
+        new ExtendTaskTimerCommand(Guid.NewGuid(), 5),
     }.Select(c => new object[] { c });
 
     [Theory]

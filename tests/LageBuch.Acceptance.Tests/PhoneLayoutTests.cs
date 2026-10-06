@@ -210,6 +210,26 @@ public class PhoneLayoutTests
         Assert.True(open.IsEffectivelyVisible);
     }
 
+    // #246: the Aufgabe edit panel stacks like the dock's sheet, its triage segments shared out
+    // across the width rather than running off it, and the add button steps aside while it is open.
+    [AvaloniaFact]
+    public void The_aufgabe_edit_panel_fits_a_phone()
+    {
+        var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars(withOverdueTask: true);
+        var view = new IncidentWorkspaceView { DataContext = vm };
+        var window = PhoneWindow(view);
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        Dispatcher.UIThread.RunJobs();
+
+        vm.Tasks.Rows[0].BeginEditCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        Assert.True(Named<Border>(content, "TaskEditPanel").IsEffectivelyVisible);
+        Assert.False(Named<Button>(content, "OpenComposerButton").IsEffectivelyVisible);
+        AssertNothingOverflows(window, view);
+    }
+
     [AvaloniaFact]
     public void Adding_an_etb_entry_closes_the_sheet_again()
     {

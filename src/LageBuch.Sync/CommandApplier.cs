@@ -157,6 +157,12 @@ public static class CommandApplier
             case RemoveInvolvedPartyCommand c:
                 incident.RemoveInvolvedParty(c.PartyId);
                 break;
+            case UpdateTaskCommand c:
+                incident.UpdateTask(c.TaskId, c.Text, c.Assignee, c.Importance, c.Urgency);
+                break;
+            case ExtendTaskTimerCommand c:
+                incident.ExtendTaskTimer(c.TaskId, c.Minutes, clock);
+                break;
             case AddCoBuildingCommand c:
                 incident.AddCoBuilding(clock, Operator(c.Operator), c.Name, c.FloorCount, c.ApartmentsPerFloor, c.UndergroundFloorCount);
                 break;

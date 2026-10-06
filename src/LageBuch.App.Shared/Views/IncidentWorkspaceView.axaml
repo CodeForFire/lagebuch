@@ -477,7 +477,8 @@
             </Button>
           </Border>
 
-          <!-- Aufgabe due (#460): the row is the jump to the task; ERLEDIGT ticks it off. -->
+          <!-- Aufgabe due (#460): the row is the jump to the task; ERLEDIGT ticks it off, +5 MIN
+               puts it off (#246). -->
           <Border x:Name="TaskDueBar" Classes="meldung due" IsVisible="{Binding Tasks.HasDueTask}">
             <Grid ColumnDefinitions="*,Auto" DataContext="{Binding Tasks}">
               <Button Grid.Column="0" x:Name="TaskDueJumpButton" Classes="bar"
@@ -507,6 +508,11 @@
                 </Grid>
               </Button>
               <StackPanel Grid.Column="1" Classes="meldung-actions">
+                <!-- #246: put the task off where its alarm is heard, as +5 MIN does for the
+                     Rückmeldung below; from now, not from the due time already passed. -->
+                <Button x:Name="TaskDueExtendButton" Content="+5 MIN"
+                        ToolTip.Tip="Aufgabe in 5 Minuten erneut fällig"
+                        Command="{Binding ExtendMostOverdueTaskCommand}" />
                 <Button x:Name="TaskDueDoneButton" Content="ERLEDIGT"
                         Command="{Binding CompleteMostOverdueTaskCommand}"
                         AutomationProperties.Name="Fällige Aufgabe als erledigt markieren" />

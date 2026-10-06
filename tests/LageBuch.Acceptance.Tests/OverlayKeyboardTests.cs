@@ -11,6 +11,7 @@ using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -119,6 +120,50 @@ public class OverlayKeyboardTests
         Assert.False(vm.Etb.IsEditing);
         Assert.Contains(vm.Etb.Entries, e => e.Text == "Lagemeldung an ILS übermittelt");
         window.AssertFocused(edit);
+    }
+
+    // #246 end to end: Enter on an Aufgabe's row opens the edit panel on WICHTIGKEIT, Right steps
+    // the triage scale, Enter saves, and focus goes back to that row's pencil.
+    [AvaloniaFact]
+    public void An_Aufgabe_is_reprioritised_by_keyboard_and_focus_returns_to_its_row()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AddTask("Presse-Info vorbereiten", null, TaskImportance.Low, TaskUrgency.Medium, 15));
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        var edit = Named<DataGrid>(window, "TasksGrid").GetVisualDescendants().OfType<Button>()
+            .First(b => b.IsEffectivelyVisible && b.Name == "TaskEditButton");
+        edit.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+
+        window.Press(PhysicalKey.Enter);
+
+        Assert.True(vm.Tasks.IsEditing);
+        window.AssertFocusWithin(Named<ListBox>(window, "EditImportanceBox"));
+
+        window.Press(PhysicalKey.ArrowRight);
+        window.Press(PhysicalKey.ArrowRight);
+        window.Press(PhysicalKey.Enter);
+
+        Assert.False(vm.Tasks.IsEditing);
+        Assert.Equal(TaskImportance.High, vm.Tasks.Rows.Single().Importance);
+        window.AssertFocused(edit);
+    }
+
+    // Why #246 is a panel and not live cells: the grid reads Wichtigkeit and Dringlichkeit by colour,
+    // and must still do so while a task is being edited.
+    [AvaloniaFact]
+    public void The_grid_keeps_its_priority_colours_while_a_task_is_edited()
+    {
+        var (window, vm) = ShowWorkspace(s => s.AddTask("Tür sichern", null, TaskImportance.High, TaskUrgency.Low, 5));
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        vm.Tasks.Rows.Single().BeginEditCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var cells = Named<DataGrid>(window, "TasksGrid").GetVisualDescendants().OfType<TextBlock>().ToList();
+        Assert.Contains(cells, c => c.Text == "Hoch" && c.Classes.Contains("prio-high"));
+        Assert.Contains(cells, c => c.Text == "Niedrig" && c.Classes.Contains("prio-low"));
+        Assert.DoesNotContain(
+            Named<DataGrid>(window, "TasksGrid").GetVisualDescendants(),
+            v => v is ComboBox or ListBox or TextBox or AutoCompleteBox);
     }
 
     // Contract 1 on an inline confirm: HAUS ENTFERNEN, then a reflex Enter, keeps the house.
