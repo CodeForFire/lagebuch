@@ -54,6 +54,7 @@ public class OverlayContractTests
         new("Workspace.IncidentDataDialog", typeof(IncidentWorkspaceViewModel), typeof(IncidentDataDialogViewModel), OpenWorkspaceIncidentDataDialog),
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
         new("Main.About", typeof(MainWindowViewModel), typeof(AboutViewModel), OpenMainAbout),
+        new("Main.ShortcutOverview", typeof(MainWindowViewModel), typeof(ShortcutOverviewViewModel), OpenMainShortcutOverview),
         new("MasterDataEditor.Confirm", typeof(MasterDataEditorViewModel), typeof(ConfirmDialogViewModel), OpenMasterDataEditorConfirm),
     ];
 
@@ -443,6 +444,14 @@ public class OverlayContractTests
         var opener = Named<Button>(window, "AboutButton");
         Activate(opener);
         return new(window, opener, ViewOf<AboutView>(window), () => vm.PendingAbout is null, () => vm.PendingAbout?.CloseCommand.Execute(null));
+    }
+
+    private static Opened OpenMainShortcutOverview()
+    {
+        var (window, vm) = ShowMain();
+        var opener = Named<Button>(window, "ShortcutsButton");
+        Activate(opener);
+        return new(window, opener, ViewOf<ShortcutOverviewView>(window), () => vm.PendingShortcutOverview is null, () => vm.PendingShortcutOverview?.CloseCommand.Execute(null));
     }
 
     private static Opened OpenMasterDataEditorConfirm()

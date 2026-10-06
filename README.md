@@ -74,6 +74,21 @@ Markdown.
 | **PDF-Bericht** | Ein Klick, Abschnitte wählbar, Anhänge eingebettet – fertig für Akte und Kreisbrandinspektion |
 | **Mehrere Geräte** | Einsatz auf dem ELW-Laptop hosten, mit Tablet oder zweitem Laptop im LAN/Tailscale mitschreiben; Android-App als Begleitgerät |
 
+## Mit der Tastatur
+
+Lagebuch lässt sich ohne Maus bedienen. **F1** zeigt alle Tastenkürzel, auf dem
+Tablet die Schaltfläche **TASTENKÜRZEL**. Die wichtigsten:
+
+| Taste | Wirkung |
+|---|---|
+| **Strg+1** … **Strg+0** | Modul öffnen – fest je Modul, egal wie die Seitenleiste sortiert ist (Strg+1 ETB, Strg+4 Kräfte, Strg+6 Atemschutz) |
+| **Strg+Tab** / **Strg+Umschalt+Tab** | nächstes / vorheriges Modul der Seitenleiste, auch Checklisten |
+| **Strg+N** | neuer ETB-Eintrag, Cursor im Feld VON |
+| **F9** | zur dringendsten Meldung: Rückzugsalarm, dann Druckabfrage, fällige Aufgabe, Rückmeldung an die ILS |
+
+Die Kürzel stehen auch in der Seitenleiste und an der Meldung, zu der F9
+springt. Solange ein Dialog offen ist, wirkt keines.
+
 ## Lagebuch im Vergleich
 
 Alle Angaben laut Herstellerseiten, Stand September 2026. Fehler oder

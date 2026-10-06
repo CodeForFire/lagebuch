@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Input;
 using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.App.Shared.Views;
@@ -37,6 +38,7 @@ public partial class IncidentWorkspaceView : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnViewModelPropertyChanged;
+            _vm.ReminderFocusRequested -= OnReminderFocusRequested;
         }
 
         // The outgoing workspace's prompt must let go of this view too. Its handlers read _vm,
@@ -48,6 +50,7 @@ public partial class IncidentWorkspaceView : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged += OnViewModelPropertyChanged;
+            _vm.ReminderFocusRequested += OnReminderFocusRequested;
 
             // The view is already laid out by the time a workspace is attached, and SizeChanged
             // will not fire again for a size that has not changed.
@@ -55,6 +58,10 @@ public partial class IncidentWorkspaceView : UserControl
             AttachPrompt();
         }
     }
+
+    // F9 on a due ILS Rückmeldung (#544): focus only, so the Rückmeldung takes a second key.
+    private void OnReminderFocusRequested(object? sender, EventArgs e) =>
+        ReminderAckButton.Focus(NavigationMethod.Tab);
 
     // When an operator prompt appears (Weiter bearbeiten or a handover), watch it for confirmation (Result set),
     // then let the workspace VM apply it. Mirrors MainView's operator-prompt wiring.

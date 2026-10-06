@@ -676,6 +676,26 @@
       </Transitions>
     </Setter>
   </Style>
+  <!-- A global shortcut written next to what it opens (#544): the rail tabs, the warning bar F9
+       goes to, the command bar's help. Shown inline, never only as a tooltip — a keyboard user
+       never hovers. Muted, so it reads as a margin note to the label and not as a second one. -->
+  <Style Selector="TextBlock.key-hint">
+    <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- On a Meldung the hint takes the chevron's colour: the muted grey all but vanishes on the
+       lit Rückzugsalarm row. Declared after key-hint, because the later style wins. -->
+  <Style Selector="Border.meldung TextBlock.key-hint">
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.meldung.alarm TextBlock.key-hint">
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
   <Style Selector="TabItem:pointerover /template/ Border#Root">
     <Setter Property="Background" Value="#161E2A" />
   </Style>

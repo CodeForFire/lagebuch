@@ -52,24 +52,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly List<ChecklistViewModel> _checklists = new();
     private bool _disposed;
 
-    // The rail labels, which have always been authored upper-case in the XAML. Kept beside the
-    // module keys rather than in NavModules: the keys are persisted Stammdaten, these are German
-    // display strings, and the two should not be able to drift into each other.
-    private static readonly Dictionary<string, string> ModuleHeaders =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [NavModules.Etb] = "ETB",
-            [NavModules.Tasks] = "AUFGABEN",
-            [NavModules.Roles] = "FUNKTIONEN",
-            [NavModules.Forces] = "KRÄFTE",
-            [NavModules.InvolvedParties] = "BETEILIGTE",
-            [NavModules.Scba] = "ATEMSCHUTZ",
-            [NavModules.Co] = "CO-MESSUNG",
-            [NavModules.Files] = "DATEIEN",
-            [NavModules.Links] = "LINKS",
-            [NavModules.Contacts] = "KONTAKTE",
-        };
-
     public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -376,7 +358,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// rebuild or the phone's bottom bar: a module that takes focus whenever it appears is one the
     /// rail cannot be arrowed past.
     /// </summary>
-    public event EventHandler? ModuleFocusRequested;
+    public event EventHandler<ModuleFocusRequestedEventArgs>? ModuleFocusRequested;
 
     /// <summary>
     /// The rail entries the narrow bottom bar shows directly, and the ones behind its MEHR button.
@@ -533,12 +515,144 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public bool ShowsCountdownStrip =>
         (Reminder?.IsCountingDown ?? false) || (Scba?.IsControlCountingDown ?? false);
 
-    private void OnCountdownChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnHeaderSourceChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ReminderViewModel.IsCountingDown)
             or nameof(ScbaViewModel.IsControlCountingDown))
         {
             OnPropertyChanged(nameof(ShowsCountdownStrip));
+        }
+
+        if (e.PropertyName is null
+            or nameof(ScbaViewModel.IsAnyAlarm)
+            or nameof(ScbaViewModel.HasControlReminder)
+            or nameof(ScbaViewModel.IsAnyControlDue)
+            or nameof(TasksViewModel.HasDueTask)
+            or nameof(ReminderViewModel.IsDue))
+        {
+            UpdateMostUrgentWarning();
+        }
+    }
+
+    /// <summary>
+    /// The open warning F9 goes to (#544), in the order the header bars run: Rückzugsalarm, a due
+    /// Druckabfrage, a due Aufgabe, the ILS Rückmeldung. Each condition is the one that shows its
+    /// bar, so F9 never goes somewhere the header does not name.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsWarningHintOnRetreat))]
+    [NotifyPropertyChangedFor(nameof(ShowsWarningHintOnPressureCheck))]
+    [NotifyPropertyChangedFor(nameof(ShowsWarningHintOnTaskDue))]
+    [NotifyPropertyChangedFor(nameof(ShowsWarningHintOnReminder))]
+    private WarningKind _mostUrgentWarning;
+
+    // The F9 key hint sits on the one bar F9 acts on, so it never names a bar F9 would skip.
+    public bool ShowsWarningHintOnRetreat => MostUrgentWarning == WarningKind.Retreat;
+
+    /// <inheritdoc cref="ShowsWarningHintOnRetreat"/>
+    public bool ShowsWarningHintOnPressureCheck => MostUrgentWarning == WarningKind.PressureCheck;
+
+    /// <inheritdoc cref="ShowsWarningHintOnRetreat"/>
+    public bool ShowsWarningHintOnTaskDue => MostUrgentWarning == WarningKind.TaskDue;
+
+    /// <inheritdoc cref="ShowsWarningHintOnRetreat"/>
+    public bool ShowsWarningHintOnReminder => MostUrgentWarning == WarningKind.IlsReminder;
+
+    private void UpdateMostUrgentWarning() =>
+        MostUrgentWarning =
+            Scba is null ? WarningKind.None
+            : Scba.IsAnyAlarm ? WarningKind.Retreat
+            : Scba.HasControlReminder && Scba.IsAnyControlDue ? WarningKind.PressureCheck
+            : Tasks?.HasDueTask == true ? WarningKind.TaskDue
+            : Reminder?.IsDue == true ? WarningKind.IlsReminder
+            : WarningKind.None;
+
+    /// <summary>
+    /// F9 found the ILS Rückmeldung most urgent (#544). It has nothing to jump to, so the view
+    /// puts focus on its ERLEDIGT button: the Rückmeldung is confirmed by a deliberate second key,
+    /// never by the shortcut alone.
+    /// </summary>
+    public event EventHandler? ReminderFocusRequested;
+
+    /// <summary>
+    /// Runs a global shortcut against this workspace (#544); false when it does not apply here, so
+    /// the key goes on to the focused control. Nothing runs while one of the workspace's overlays
+    /// is open: the overlay owns the keyboard until it closes.
+    /// </summary>
+    public bool TryRunShortcut(KeyChord chord)
+    {
+        ArgumentNullException.ThrowIfNull(chord);
+        if (ShortcutRegistry.Find(chord) is not { } shortcut || IsOverlayOpen)
+        {
+            return false;
+        }
+
+        switch (shortcut.Action)
+        {
+            case ShortcutAction.ShowModule:
+                return NavItems.FirstOrDefault(item => string.Equals(item.ModuleKey, shortcut.ModuleKey, StringComparison.Ordinal)) is { } module
+                    && ShowNavItem(module);
+            case ShortcutAction.NextModule:
+                return StepRail(+1);
+            case ShortcutAction.PreviousModule:
+                return StepRail(-1);
+            case ShortcutAction.NewEtbEntry:
+                if (!ShowNavItem(NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, Etb)), toStartField: true))
+                {
+                    return false;
+                }
+
+                // On a phone the composer is a sheet that starts closed; the request for focus is
+                // skipped there, as everywhere on a phone.
+                if (IsNarrow)
+                {
+                    Etb.OpenComposerCommand.Execute(null);
+                }
+
+                return true;
+            case ShortcutAction.MostUrgentWarning:
+                return RunMostUrgentWarning();
+            default:
+                return false;
+        }
+    }
+
+    private bool IsOverlayOpen =>
+        PendingPrompt is not null || PendingConfirm is not null || PendingTaskDialog is not null
+        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null;
+
+    private bool StepRail(int step)
+    {
+        if (NavItems.Count == 0)
+        {
+            return false;
+        }
+
+        var current = SelectedNavItem is { } open ? NavItems.IndexOf(open) : -1;
+        var next = current < 0 ? 0 : (current + step + NavItems.Count) % NavItems.Count;
+        return ShowNavItem(NavItems[next]);
+    }
+
+    // Each goes through the bar's own command, so F9 and a click on the bar cannot disagree.
+    private bool RunMostUrgentWarning()
+    {
+        UpdateMostUrgentWarning();
+        switch (MostUrgentWarning)
+        {
+            case WarningKind.Retreat:
+                Scba.ShowAlarmingTruppCommand.Execute(null);
+                return true;
+            case WarningKind.PressureCheck:
+                Scba.ShowMostUrgentControlCommand.Execute(null);
+                return true;
+            case WarningKind.TaskDue:
+                Tasks.ShowMostOverdueTaskCommand.Execute(null);
+                return true;
+            case WarningKind.IlsReminder:
+                ReminderFocusRequested?.Invoke(this, EventArgs.Empty);
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -756,7 +870,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             // Atemschutz view model must not go on steering the rail of the workspace that
             // replaced it.
             Scba.RevealRequested -= OnScbaRevealRequested;
-            Scba.PropertyChanged -= OnCountdownChanged;
+            Scba.PropertyChanged -= OnHeaderSourceChanged;
         }
 
         Scba?.Dispose();
@@ -766,12 +880,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         {
             // Same reason as Atemschutz above (#460).
             Tasks.RevealRequested -= OnTasksRevealRequested;
+            Tasks.PropertyChanged -= OnHeaderSourceChanged;
         }
 
         Tasks?.Dispose();
         if (Reminder is not null)
         {
-            Reminder.PropertyChanged -= OnCountdownChanged;
+            Reminder.PropertyChanged -= OnHeaderSourceChanged;
         }
 
         Reminder?.Dispose();
@@ -806,7 +921,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Scba = new ScbaViewModel(_session, _masterData, _clock, _ticker, _alarm, OnChanged);
         Scba.RevealRequested += OnScbaRevealRequested;
-        Scba.PropertyChanged += OnCountdownChanged;
+        Scba.PropertyChanged += OnHeaderSourceChanged;
 
         Files = new FilesViewModel(_session, _dialogs, OnChanged, RequestConfirm);
 
@@ -817,6 +932,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         Tasks = new TasksViewModel(_session, _clock, _ticker, _alarm, _masterData, OnChanged, OfferUndo);
         Tasks.RevealRequested += OnTasksRevealRequested;
+        Tasks.PropertyChanged += OnHeaderSourceChanged;
 
         // The ILS reminder is autonomous, time-driven host-side logging (§ IsRemote) — a joined
         // client must not run its own, or the host's journal would be double-logged.
@@ -834,7 +950,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         if (Reminder is not null)
         {
-            Reminder.PropertyChanged += OnCountdownChanged;
+            Reminder.PropertyChanged += OnHeaderSourceChanged;
         }
 
         BuildNavItems();
@@ -858,6 +974,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Contacts));
         OnPropertyChanged(nameof(Tasks));
         OnPropertyChanged(nameof(Reminder));
+        UpdateMostUrgentWarning();
         OnPropertyChanged(nameof(HasReminder));
         OnPropertyChanged(nameof(ShowsCountdownStrip));
     }
@@ -900,7 +1017,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             if (modules.TryGetValue(spec.ModuleKey, out var content))
             {
                 NavItems.Add(new WorkspaceNavItemViewModel(
-                    ModuleHeaders[spec.ModuleKey], content, moduleKey: spec.ModuleKey));
+                    ModuleLabels.Header(spec.ModuleKey), content, moduleKey: spec.ModuleKey)
+                {
+                    ShortcutHint = ShortcutRegistry.HintFor(spec.ModuleKey),
+                });
             }
         }
 
@@ -929,18 +1049,28 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// </summary>
     private void OnTasksRevealRequested(object? sender, EventArgs e) => ShowModule(Tasks);
 
-    private void ShowModule(object module)
-    {
-        if (NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, module)) is { } navItem)
-        {
-            SelectedNavItem = navItem;
+    private void ShowModule(object module) =>
+        ShowNavItem(NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, module)));
 
-            // Not on a phone: there focus pops the soft keyboard over half the module.
-            if (!IsNarrow)
-            {
-                ModuleFocusRequested?.Invoke(this, EventArgs.Empty);
-            }
+    // The path for "the user asked for this module" (#542): a warning bar or a shortcut (#544),
+    // never arrowing the rail. toStartField sends the caret to the first field even when focus is
+    // already somewhere in the module — Ctrl+N from an ETB row has to land in VON.
+    private bool ShowNavItem(WorkspaceNavItemViewModel? navItem, bool toStartField = false)
+    {
+        if (navItem is null)
+        {
+            return false;
         }
+
+        SelectedNavItem = navItem;
+
+        // Not on a phone: there focus pops the soft keyboard over half the module.
+        if (!IsNarrow)
+        {
+            ModuleFocusRequested?.Invoke(this, new ModuleFocusRequestedEventArgs(toStartField));
+        }
+
+        return true;
     }
 
     /// <summary>
