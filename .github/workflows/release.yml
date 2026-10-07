@@ -249,8 +249,12 @@ jobs:
       attestations: write # and write the signed attestation back to the repo
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Only the packages a user installs. Without a pattern this pulls every artifact of the
+      # run, and the CI-debug-signed .aab ended up on the 0.7.0-0.8.1 releases; it is a build
+      # artifact for inspection only (docs/releasing.md).
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
+          pattern: '{msi,deb,apk}'
           path: dist
       # download-artifact nests each artifact in its own directory (dist/msi/...),
       # but on the release page the assets sit side by side. Flatten first, so the
@@ -260,6 +264,13 @@ jobs:
         run: |
           find dist -mindepth 2 -type f -exec mv -t dist {} +
           find dist -mindepth 1 -type d -empty -delete
+          # Exactly one of each and nothing else, so a pattern that matches too much or too
+          # little fails here instead of publishing a release with a missing or stray file.
+          ls -l dist
+          for ext in msi deb apk; do
+            test "$(find dist -maxdepth 1 -type f -name "*.$ext" | wc -l)" -eq 1 || { echo "::error::Expected exactly one .$ext in dist/"; exit 1; }
+          done
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 3 || { echo "::error::Unexpected files in dist/ - only .msi, .deb and .apk belong on the release"; exit 1; }
           cd dist
           sha256sum -- * > "${RUNNER_TEMP}/SHA256SUMS.txt"
           mv "${RUNNER_TEMP}/SHA256SUMS.txt" SHA256SUMS.txt
