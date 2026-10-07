@@ -1,0 +1,1 @@
+The Windows installer is now a 64-bit package and installs into `C:\Program Files\Lagebuch`. Up to 0.8.0 it was built as a 32-bit package despite its `-x64` name and landed in `C:\Program Files (x86)\Lagebuch`; installing the new version over it removes the old one.
