@@ -149,10 +149,24 @@ Ein Paket pro Plattform liegt bei jedem [Release](../../releases):
 | macOS (Apple Silicon) | `lagebuch-<version>-macos-arm64.dmg` |
 
 Alle Pakete bringen die .NET-Laufzeit mit; es muss nichts weiter installiert
-werden. Die Pakete sind **noch nicht signiert**, deshalb warnt das
-Betriebssystem beim ersten Start einmal:
+werden.
 
-- **Windows** – `.msi` ausführen; erscheint SmartScreen, *Weitere
+Unter Windows geht es auch ohne Download über den Windows-Paket-Manager:
+
+```powershell
+winget install CodeForFire.Lagebuch    # aktualisieren: winget upgrade CodeForFire.Lagebuch
+```
+
+winget installiert dasselbe `.msi` aus dem Release, geprüft gegen die im
+Paketkatalog hinterlegte SHA-256-Prüfsumme, für alle Benutzer (einmal
+Administratorrechte) und ohne SmartScreen-Warnung. Neue Versionen erscheinen
+dort erst Stunden bis Wochen nach dem Release.
+
+Die Pakete sind **noch nicht signiert**, deshalb warnt das Betriebssystem beim
+ersten Start einmal:
+
+- **Windows** – am einfachsten mit winget (siehe oben), dann gibt es keine
+  Warnung. Sonst `.msi` ausführen; erscheint SmartScreen, *Weitere
   Informationen → Trotzdem ausführen*.
 - **macOS** – `.dmg` öffnen, Lagebuch nach *Programme* ziehen, dann einmalig
   **Rechtsklick → Öffnen** (oder `xattr -dr com.apple.quarantine /Applications/Lagebuch.app`).
