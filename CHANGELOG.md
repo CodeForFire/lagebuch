@@ -16,6 +16,16 @@ cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see 
 
 <!-- towncrier release notes start -->
 
+## [0.8.1] - 2026-10-07
+
+A patch release for Windows: the 0.8.0 installer was a 32-bit package and installed into
+`Program Files (x86)`. 0.8.1 is a real 64-bit package; installing it over 0.8.0 moves Lagebuch
+to `Program Files`. Nothing else changes from 0.8.0.
+
+### Fixed
+
+- [#574](https://github.com/CodeForFire/lagebuch/pull/574) - The Windows installer is now a 64-bit package and installs into `C:\Program Files\Lagebuch`. Up to 0.8.0 it was built as a 32-bit package despite its `-x64` name and landed in `C:\Program Files (x86)\Lagebuch`; installing the new version over it removes the old one.
+
 ## [0.8.0] - 2026-10-06
 
 Keyboard control. A Lagebuchführer at the ELW laptop can now run an Einsatz without reaching
@@ -474,7 +484,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/CodeForFire/lagebuch/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/CodeForFire/lagebuch/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/CodeForFire/lagebuch/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/CodeForFire/lagebuch/compare/v0.6.0...v0.7.0

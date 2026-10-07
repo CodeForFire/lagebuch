@@ -81,6 +81,10 @@ See [CHANGELOG.md](CHANGELOG.md#080---2026-10-06) for the full list.
 
 Issues: #545, #537, #541, #538, #539, #540, #466, #542, #543, #544, #246
 
+0.8.1 followed on 2026-10-07 as a patch for Windows: the MSI had been built as a
+32-bit package and installed into `Program Files (x86)`; it is now a real x64
+package (#574).
+
 ## v0.9 — Security and trust
 
 Two halves. Harden the parts that face the network and the file system: the
