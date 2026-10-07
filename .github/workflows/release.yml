@@ -130,8 +130,10 @@ jobs:
         # not the working directory, so a bare "publish" would look under packaging/windows.
         # msi_version, not version: a ProductVersion must be numeric, so the MSI inside a
         # v0.6.0-beta.1 release identifies itself as 0.6.0. The file name keeps the full version.
+        # -arch x64: WiX defaults to an x86 package, which installs ProgramFiles64Folder into
+        # "Program Files (x86)" and registers under WOW6432Node — wrong for a win-x64 publish.
         run: >
-          wix build packaging/windows/Lagebuch.wxs
+          wix build packaging/windows/Lagebuch.wxs -arch x64
           -d Version=${{ needs.version.outputs.msi_version }}
           -d "PublishDir=${{ github.workspace }}\publish"
           -d "IconFile=${{ github.workspace }}\src\LageBuch.App\Assets\icon.ico"

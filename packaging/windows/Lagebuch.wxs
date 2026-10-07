@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   WiX v5 authoring for the Lagebuch MSI. Built in CI with:
-    wix build packaging/windows/Lagebuch.wxs -d Version=<v> -d PublishDir=<dir> -d IconFile=<ico> -o out.msi
+    wix build packaging/windows/Lagebuch.wxs -arch x64 -d Version=<v> -d PublishDir=<dir> -d IconFile=<ico> -o out.msi
 
   The UpgradeCode is fixed forever: it is what lets a new version replace the old one instead of
   installing side by side. The ProductCode is auto-generated per build (Package/@Id defaults to "*").
