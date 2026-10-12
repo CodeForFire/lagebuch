@@ -138,7 +138,7 @@ jobs:
           -d "PublishDir=${{ github.workspace }}\publish"
           -d "IconFile=${{ github.workspace }}\src\LageBuch.App\Assets\icon.ico"
           -o "lagebuch-${{ needs.version.outputs.version }}-x64.msi"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: msi
           path: '*.msi'
@@ -173,7 +173,7 @@ jobs:
             src/LageBuch.App.Shared/Assets/icon-1024.png \
             src/LageBuch.App/Assets/icon.svg \
             dist
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deb
           path: dist/*.deb
@@ -225,14 +225,14 @@ jobs:
           mkdir -p dist play
           cp "$apk" "dist/lagebuch-${VERSION}.apk"
           cp "$aab" "play/lagebuch-${VERSION}.aab"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: apk
           path: dist/*.apk
           if-no-files-found: error
       # Deliberately not a release asset: it is signed with the CI debug key, so it is only good
       # for inspection. The bundle that goes to Play is built on a laptop with the upload key.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aab
           path: play/*.aab
@@ -388,7 +388,7 @@ jobs:
             src/LageBuch.App.Shared/Assets/icon-1024.png \
             dist
       # Always downloadable from the run; also attach to the matching release if one exists.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dmg
           path: dist/*.dmg
