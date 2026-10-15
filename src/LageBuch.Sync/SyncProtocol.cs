@@ -81,15 +81,20 @@ public static class SyncProtocol
     /// the Aufgabe is simply not linked -- and a client at 12 drops the snapshot's, so the floor
     /// stays at 12.
     /// </para>
+    /// <para>
+    /// 14: the Lagemeldungen (#592) — <c>addSituationReport</c>, <c>updateSituationReport</c>,
+    /// <c>removeSituationReport</c> and <c>sendSituationReport</c> commands and the snapshot's
+    /// <c>situationReports</c>. A host at 13 would reject those commands, so the floor rises to 14.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 13;
+    public const int ProtocolVersion = 14;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 12;
+    public const int MinimumProtocolVersion = 14;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

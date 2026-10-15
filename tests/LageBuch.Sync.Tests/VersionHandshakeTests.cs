@@ -129,7 +129,16 @@ public class VersionHandshakeTests
     {
         // 13 adds entryId to addJournalEntry and sourceEntryId to addTask and the snapshot's tasks.
         // A peer at 12 ignores both and the Aufgabe is simply unlinked, so it stays joinable.
-        Assert.Equal(13, SyncProtocol.ProtocolVersion);
-        Assert.Equal(12, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 13, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 12, int.MaxValue);
+    }
+
+    [Fact]
+    public void Sending_a_Lagemeldung_raises_the_floor_to_protocol_fourteen()
+    {
+        // 14 lets a client send the four Lagemeldung commands (#592). A host at 13 has none of them in
+        // its command allowlist and would reject the report, so a 13 and a 14 must not connect.
+        Assert.Equal(14, SyncProtocol.ProtocolVersion);
+        Assert.Equal(14, SyncProtocol.MinimumProtocolVersion);
     }
 }

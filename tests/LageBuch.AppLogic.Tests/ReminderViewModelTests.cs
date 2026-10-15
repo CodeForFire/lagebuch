@@ -24,6 +24,51 @@ public class ReminderViewModelTests
     }
 
     [Fact]
+    public void Sending_a_Lagemeldung_restarts_the_reminder_without_a_second_etb_entry()
+    {
+        var (session, clock) = NewSession();
+        var ticker = new FakeTicker();
+        using var vm = new ReminderViewModel(session, clock, ticker, new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        session.AddSituationReport("FFB 12/1", "Blumenstraße 13", "Schuppen im Vollbrand", null, null, null);
+        clock.Now = T0.AddMinutes(16);
+        ticker.Fire();
+        Assert.True(vm.IsDue);
+        var journalBefore = session.Incident.Journal.Count;
+
+        session.SendSituationReport(session.Incident.SituationReports[0].Id, "ILS");
+
+        Assert.False(vm.IsDue);
+        Assert.Equal("30:00", vm.RemainingDisplay);
+        Assert.Equal(journalBefore + 1, session.Incident.Journal.Count);
+    }
+
+    [Fact]
+    public void Drafting_a_Lagemeldung_leaves_the_reminder_alone()
+    {
+        var (session, clock) = NewSession();
+        using var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        clock.Now = T0.AddMinutes(10);
+
+        session.AddSituationReport("FFB 12/1", null, "Lage", null, null, null);
+
+        Assert.Equal("05:00", vm.RemainingDisplay);
+    }
+
+    [Fact]
+    public void A_Lagemeldung_sent_before_the_workspace_opened_does_not_restart_the_reminder_again()
+    {
+        var (session, clock) = NewSession();
+        session.AddSituationReport("FFB 12/1", null, "Lage", null, null, null);
+        session.SendSituationReport(session.Incident.SituationReports[0].Id, "ILS");
+        using var vm = new ReminderViewModel(session, clock, new FakeTicker(), new FakeAlarmService(), () => { }, firstIntervalMinutes: 15, recurringIntervalMinutes: 30);
+        clock.Now = T0.AddMinutes(10);
+
+        session.AddJournalEntry(EtbDirection.Internal, "Notiz");
+
+        Assert.Equal("05:00", vm.RemainingDisplay);
+    }
+
+    [Fact]
     public void Reminder_auto_starts_running_at_the_first_interval()
     {
         var (session, clock) = NewSession();
