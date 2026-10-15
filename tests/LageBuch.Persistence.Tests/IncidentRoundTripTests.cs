@@ -636,4 +636,42 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(entry.Id, loaded.Tasks[0].SourceEntryId);
         Assert.Null(loaded.Tasks[1].SourceEntryId);
     }
+
+    [Fact]
+    public void Situation_reports_survive_a_round_trip_as_drafts_and_sent_ones()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster", "ELW 1");
+        var incident = Incident.Start(clock, op, "Brand");
+        var first = incident.AddSituationReport(
+            clock, op, "ELW 1", "Blumenstraße 13", "Schuppen im Vollbrand", "C-Rohr vor", "LF 1 0/1/8/9", "1 DLK");
+        clock.Now = clock.Now.AddMinutes(3);
+        incident.SendSituationReport(clock, op, first.Id, "ILS");
+        incident.AddSituationReport(clock, op, "ELW 1", null, "Feuer aus", null, null, null);
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Equal(incident.SituationReports, loaded.SituationReports);
+        Assert.Equal(1, loaded.SituationReports[0].Number);
+        Assert.Equal(clock.Now, loaded.SituationReports[0].SentAt);
+        Assert.Null(loaded.SituationReports[1].Number);
+        Assert.Null(loaded.SituationReports[1].Location);
+        Assert.Null(loaded.SituationReports[1].SentAt);
+    }
+
+    [Fact]
+    public void A_discarded_situation_report_draft_is_gone_after_the_next_save()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op);
+        var draft = incident.AddSituationReport(clock, op, null, null, "Lage", null, null, null);
+        IncidentRepository.Save(_path, incident);
+
+        incident.RemoveSituationReport(draft.Id);
+        IncidentRepository.Save(_path, incident);
+
+        Assert.Empty(IncidentRepository.Load(_path).SituationReports);
+    }
 }
