@@ -422,7 +422,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // without anyone having to remember this list. Null while the workspace is between
         // sessions — DisposeChildren clears them and BuildNavItems has not run yet — which OfType
         // also drops.
-        object?[] modules = [Etb, SituationReports, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
+        object?[] modules = [Etb, Tasks, Roles, Forces, InvolvedParties, Scba, CoMessprotokoll, Files, Links, Contacts];
         return modules.OfType<INarrowAware>();
     }
 
@@ -490,8 +490,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     public ForcesViewModel Forces { get; private set; } = null!;
 
     public InvolvedPartiesViewModel InvolvedParties { get; private set; } = null!;
-
-    public SituationReportsViewModel SituationReports { get; private set; } = null!;
 
     public ScbaViewModel Scba { get; private set; } = null!;
 
@@ -616,6 +614,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 }
 
                 return true;
+            case ShortcutAction.OpenSituationReport:
+                return ShowSituationReport();
             case ShortcutAction.MostUrgentWarning:
                 return RunMostUrgentWarning();
             default:
@@ -871,7 +871,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         Roles?.Dispose();
         Forces?.Dispose();
         InvolvedParties?.Dispose();
-        SituationReports?.Dispose();
         if (Scba is not null)
         {
             // Not covered by Dispose: the workspace owns this subscription, and an outgoing
@@ -920,10 +919,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             OnChanged,
             OpenTaskDialog,
             OfferReminderReset,
-            OpenSpellingHelper);
-
-        SituationReports = new SituationReportsViewModel(
-            _session, OnChanged, _masterData.Settings.DispatchCentreName, RequestConfirmAs);
+            OpenSpellingHelper,
+            RequestConfirmAs);
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
@@ -979,7 +976,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         OnPropertyChanged(nameof(Roles));
         OnPropertyChanged(nameof(Forces));
         OnPropertyChanged(nameof(InvolvedParties));
-        OnPropertyChanged(nameof(SituationReports));
         OnPropertyChanged(nameof(Scba));
         OnPropertyChanged(nameof(CoMessprotokoll));
         OnPropertyChanged(nameof(Files));
@@ -1009,7 +1005,6 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             [NavModules.Roles] = Roles,
             [NavModules.Forces] = Forces,
             [NavModules.InvolvedParties] = InvolvedParties,
-            [NavModules.SituationReports] = SituationReports,
             [NavModules.Scba] = Scba,
             [NavModules.Co] = CoMessprotokoll,
             [NavModules.Files] = Files,
@@ -1224,6 +1219,29 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // Clear the overlay on either outcome; Save has already added the task on confirm.
         dialog.Closed += (_, _) => PendingTaskDialog = null;
         PendingTaskDialog = dialog;
+    }
+
+    /// <summary>
+    /// Opens the Lagemeldung beside the ETB (#592): from Ctrl+L, and from the Rückmeldung row the
+    /// moment the ILS is due — the report is what that row is asking for.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanWriteSituationReport))]
+    private void OpenSituationReport() => ShowSituationReport();
+
+    private bool CanWriteSituationReport => !IsReadOnly;
+
+    private bool ShowSituationReport()
+    {
+        if (IsReadOnly || NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, Etb)) is not { } etb)
+        {
+            return false;
+        }
+
+        // Selected directly, without ShowNavItem's request for the ETB's first field: the panel
+        // takes focus itself as it opens, on its Lage field.
+        SelectedNavItem = etb;
+        Etb.SituationReport.OpenCommand.Execute(null);
+        return true;
     }
 
     /// <summary>Opens the Buchstabier-Helfer over the ETB (#592).</summary>

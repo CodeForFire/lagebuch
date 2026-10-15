@@ -35,14 +35,12 @@ public class ShortcutRegistryTests
     }
 
     [Fact]
-    public void The_lagemeldung_added_after_the_digits_ran_out_is_ctrl_l()
+    public void Ctrl_l_writes_a_lagemeldung()
     {
-        // The eleventh module gets a letter rather than moving any digit a Lagebuchführer has
-        // learned (#592).
-        Assert.Equal("Strg+L", ShortcutRegistry.HintFor(NavModules.SituationReports));
         var shortcut = ShortcutRegistry.Find(new KeyChord(ShortcutKey.L, Ctrl: true));
-        Assert.Equal(ShortcutAction.ShowModule, shortcut?.Action);
-        Assert.Equal(NavModules.SituationReports, shortcut?.ModuleKey);
+
+        Assert.Equal(ShortcutAction.OpenSituationReport, shortcut?.Action);
+        Assert.Equal("Lagemeldung schreiben", shortcut?.Description);
     }
 
     [Fact]

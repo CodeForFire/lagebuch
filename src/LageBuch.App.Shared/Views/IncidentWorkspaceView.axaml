@@ -520,8 +520,9 @@
             </Grid>
           </Border>
 
-          <!-- ILS Rückmeldung due. Nothing to jump to: the Rückmeldung is made by radio, and the
-               row is where it gets confirmed. +5 MIN puts it off without logging a report. -->
+          <!-- ILS Rückmeldung due. The Rückmeldung is made by radio: LAGEMELDUNG writes it out
+               beside the ETB, ERLEDIGT confirms one made without it, +5 MIN puts it off without
+               logging a report. -->
           <Border x:Name="ReminderDueBar" Classes="meldung due"
                   IsVisible="{Binding Reminder.IsDue, FallbackValue=False}">
             <Grid DataContext="{Binding Reminder}">
@@ -546,6 +547,11 @@
                 <Button x:Name="ReminderSnoozeButton" Content="+5 MIN"
                         ToolTip.Tip="{Binding DispatchCentreName, StringFormat='Noch nichts zu melden — in 5 Minuten erneut fällig, ohne Rückmeldung an {0} zu protokollieren'}"
                         Command="{Binding SnoozeFiveMinutesCommand}" />
+                <!-- The report the row is asking for (#592): opens the Lagemeldung beside the
+                     ETB; sending it restarts this timer, so ERLEDIGT is then not needed. -->
+                <Button x:Name="ReminderSituationReportButton" Content="LAGEMELDUNG"
+                        ToolTip.Tip="Lagemeldung schreiben (Strg+L)"
+                        Command="{Binding $parent[UserControl].((vm:IncidentWorkspaceViewModel)DataContext).OpenSituationReportCommand}" />
                 <!-- F9 has nothing to jump to here, so it puts focus on ERLEDIGT (#544): the
                      Rückmeldung is confirmed by a second, deliberate key. -->
                 <TextBlock x:Name="ReminderShortcutHint" Classes="key-hint" Text="F9"

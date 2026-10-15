@@ -24,7 +24,7 @@
                      ToolTip.Tip="Internationales ICAO/NATO-Alphabet" />
       </WrapPanel>
       <Border x:Name="SpelledCard" Classes="row-card" IsVisible="{Binding HasSpelling}">
-        <SelectableTextBlock x:Name="SpelledText" Text="{Binding Spelled}" FontSize="17" FontWeight="SemiBold"
+        <SelectableTextBlock x:Name="SpelledText" Text="{Binding Spelled}" FontFamily="{StaticResource BodyFont}" FontSize="17" FontWeight="SemiBold"
                              TextWrapping="Wrap" AutomationProperties.Name="Buchstabiert" />
       </Border>
       <TextBlock Text="TAFEL" Classes="overline" FontSize="10" Margin="0,4,0,0" />

@@ -1148,14 +1148,14 @@ public sealed class Incident
         }
 
         var number = _situationReports.Select(r => r.Number ?? 0).DefaultIfEmpty(0).Max() + 1;
-        var sent = draft.AsSent(number, clock.Now, op);
-        AddJournalEntry(
+        var entry = AddJournalEntry(
             clock,
             op,
             EtbDirection.Outgoing,
-            $"Lagemeldung Nr. {number}: {sent.Funkspruch}",
-            from: sent.Reporter,
+            $"Lagemeldung Nr. {number}: {draft.Funkspruch}",
+            from: draft.Reporter,
             to: dispatchCentreName.Trim());
+        var sent = draft.AsSent(number, clock.Now, op, entry.Id);
         _situationReports[index] = sent;
         return sent;
     }

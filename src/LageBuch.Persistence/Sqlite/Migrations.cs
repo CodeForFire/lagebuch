@@ -816,7 +816,8 @@ public static class Migrations
                 created_by TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 sent_at TEXT,
-                sent_by TEXT
+                sent_by TEXT,
+                etb_entry_id TEXT
             );
             """;
         Exec(cn, tx, sql26);

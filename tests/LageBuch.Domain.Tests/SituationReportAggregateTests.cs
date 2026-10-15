@@ -50,6 +50,7 @@ public class SituationReportAggregateTests
         Assert.Equal(
             "Lagemeldung Nr. 1: Blumenstraße 13 · Schuppen im Vollbrand · Brandbekämpfung mit einem C-Hohlstrahlrohr · 1 Trupp unter PA im Einsatz",
             entry.Text);
+        Assert.Equal(entry.Id, sent.EtbEntryId);
     }
 
     [Fact]
