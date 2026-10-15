@@ -54,6 +54,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         IsReadOnly = session.IsReadOnly;
 
         AssigneeOptions = AssigneeSuggestions(masterData);
+        TextSnippets = masterData.TaskSnippets;
         Rows = new ObservableCollection<TaskRow>();
         _subscription = IsReadOnly ? null : ticker.Subscribe(OnTick);
         _session.Changed += Sync;
@@ -65,6 +66,9 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     public ObservableCollection<TaskRow> Rows { get; }
 
     public IReadOnlyList<string> AssigneeOptions { get; }
+
+    /// <summary>The Aufgaben-Textbausteine the Aufgabe fields offer on <c>::</c> -- never the ETB's.</summary>
+    public IReadOnlyList<TextSnippet> TextSnippets { get; }
 
     // Callsigns and personnel names suggest; anything else stays free text. Funktionen are not
     // who a task goes to (#468). Shared with TaskDialogViewModel so both offer the same list.

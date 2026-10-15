@@ -34,6 +34,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     private NavigationSection _navigation = null!;
     private LinksSection _links = null!;
+    private TextSnippetsSection _textSnippets = null!;
+    private TextSnippetsSection _taskSnippets = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
     private SettingsSection _settings = null!;
@@ -203,6 +205,11 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty, RequestConfirm),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty, RequestConfirm),
             _links = new LinksSection("Links", set.Links, MarkDirty, RequestConfirm),
+
+            // Two lists, never one with a kind per row: a Rückmeldung is not an Aufgabe, and each
+            // field offers only its own. A Kürzel is unique within its list, not across both.
+            _textSnippets = new TextSnippetsSection("Textbausteine ETB", set.TextSnippets, MarkDirty, RequestConfirm),
+            _taskSnippets = new TextSnippetsSection("Textbausteine Aufgaben", set.TaskSnippets, MarkDirty, RequestConfirm),
             _personnel = new PersonnelSection("Personal", set.Personnel, OnPersonnelChanged, RequestConfirm),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
@@ -288,6 +295,8 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         UnitStatus = _unitStatus.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),
+        TextSnippets = _textSnippets.ToValues(),
+        TaskSnippets = _taskSnippets.ToValues(),
         ChecklistTemplates = ChecklistTemplatesFromSections(),
         Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),

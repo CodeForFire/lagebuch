@@ -76,7 +76,16 @@ public class VersionHandshakeTests
     {
         // 7 lets a client send updateTask and extendTaskTimer (#246). A host at 6 has neither in its
         // command allowlist and would reject the edit, so a 6 and a 7 must not connect.
-        Assert.Equal(7, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 7, int.MaxValue);
+        Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
+    }
+
+    [Fact]
+    public void Textbausteine_raise_the_protocol_to_eight_but_not_the_floor()
+    {
+        // 8 adds textSnippets and taskSnippets to the Stammdaten payload. A peer at 7 skips both
+        // keys and simply offers no :: suggestions, so it stays joinable.
+        Assert.Equal(8, SyncProtocol.ProtocolVersion);
         Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
     }
 }

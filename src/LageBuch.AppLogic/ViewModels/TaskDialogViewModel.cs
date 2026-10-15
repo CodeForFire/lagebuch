@@ -29,6 +29,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         _onChanged = onChanged;
         Text = prefilledText;
         AssigneeOptions = TasksViewModel.AssigneeSuggestions(masterData);
+        TextSnippets = masterData.TaskSnippets;
         ImportanceOptions = TasksViewModel.ImportanceLevels();
         UrgencyOptions = TasksViewModel.UrgencyLevels();
         _timerMinutes = IncidentTask.DefaultTimerMinutes(Urgency);
@@ -44,6 +45,9 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     private string? _assignee;
 
     public IReadOnlyList<string> AssigneeOptions { get; }
+
+    /// <summary>The Aufgaben-Textbausteine the Aufgabe fields offer on <c>::</c> -- never the ETB's.</summary>
+    public IReadOnlyList<TextSnippet> TextSnippets { get; }
 
     [ObservableProperty]
     private TaskImportance _importance = TaskImportance.Medium;
