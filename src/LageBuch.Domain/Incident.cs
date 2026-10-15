@@ -381,13 +381,20 @@ public sealed class Incident
     private static bool AllMandatoryDone(IReadOnlyList<ChecklistItem> items) =>
         items.Where(i => i.IsMandatory).All(i => i.IsDone);
 
+    /// <remarks>
+    /// <c>id</c> is the id a joined device minted for the entry, so it can link an Aufgabe to the
+    /// entry before the host has answered. It is honoured only when it is not empty and not already
+    /// in the journal; otherwise the entry gets a fresh one, and an Aufgabe pointing at the minted
+    /// id links to nothing, which every reader shows as no link (see <see cref="AddTask"/>).
+    /// </remarks>
     public EtbEntry AddJournalEntry(
         IClock clock,
         SessionOperator op,
         EtbDirection direction,
         string text,
         string? from = null,
-        string? to = null)
+        string? to = null,
+        Guid? id = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -404,7 +411,8 @@ public sealed class Incident
             throw new ArgumentException("Ungültige Richtung für einen ETB-Eintrag.", nameof(direction));
         }
 
-        var entry = EtbEntry.Create(clock.Now, direction, text, op, from, to);
+        var unused = id is { } given && given != Guid.Empty && _journal.All(e => e.Id != given) ? id : null;
+        var entry = EtbEntry.Create(clock.Now, direction, text, op, from, to, unused);
         _journal.Add(entry);
         return entry;
     }
@@ -998,6 +1006,14 @@ public sealed class Incident
     /// an ETB entry would just duplicate that entry. The PDF export reports tasks instead.
     /// Importance/Urgency ride the wire as integers, so out-of-range values are rejected here the
     /// same way <see cref="AddJournalEntry"/> rejects malformed directions.
+    /// <para>
+    /// <paramref name="sourceEntryId"/> links the task to the ETB entry it was given out from. It is
+    /// kept even when that entry is not in the journal yet: a joined device sends the entry and then
+    /// the task as two fire-and-forget commands, which may reach the host in either order, and
+    /// requiring the entry first would drop the link whenever the task overtook it. A link to an
+    /// entry that never arrives costs nothing -- every reader looks the entry up and shows nothing
+    /// when it is not there. Only an empty id is treated as no link.
+    /// </para>
     /// </summary>
     public IncidentTask AddTask(
         IClock clock,
@@ -1006,7 +1022,8 @@ public sealed class Incident
         string? assignee,
         TaskImportance importance,
         TaskUrgency urgency,
-        int timerMinutes)
+        int timerMinutes,
+        Guid? sourceEntryId = null)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
@@ -1021,7 +1038,8 @@ public sealed class Incident
             throw new ArgumentException("Unbekannte Dringlichkeit.", nameof(urgency));
         }
 
-        var task = IncidentTask.Create(clock.Now, text, assignee, importance, urgency, timerMinutes, op);
+        var source = sourceEntryId is { } entryId && entryId != Guid.Empty ? sourceEntryId : null;
+        var task = IncidentTask.Create(clock.Now, text, assignee, importance, urgency, timerMinutes, op, source);
         _tasks.Add(task);
         return task;
     }

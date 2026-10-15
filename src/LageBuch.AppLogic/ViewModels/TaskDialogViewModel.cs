@@ -18,15 +18,20 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
 
+    // The ETB entry the dialog was opened from. Every Aufgabe it saves -- SPEICHERN and each
+    // SPEICHERN & WEITEREN TASK -- is linked to it, however much the text was changed.
+    private readonly Guid? _sourceEntryId;
+
     // Quiet until the first press: a dialog that opens already scolding teaches nothing.
     private bool _errorsShown;
 
     public TaskDialogViewModel(
-        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged)
+        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged, Guid? sourceEntryId = null)
     {
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _onChanged = onChanged;
+        _sourceEntryId = sourceEntryId;
         Text = prefilledText;
         AssigneeOptions = TasksViewModel.AssigneeSuggestions(masterData);
         ImportanceOptions = TasksViewModel.ImportanceLevels();
@@ -89,7 +94,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
             return;
         }
 
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _sourceEntryId);
         _onChanged();
         Closed?.Invoke(this, EventArgs.Empty);
     }
@@ -102,7 +107,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
             return;
         }
 
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _sourceEntryId);
         _onChanged();
         Text = string.Empty; // fields besides the text stay sticky for the next entry
         TimerMinutes = IncidentTask.DefaultTimerMinutes(Urgency); // ...except a typed timer (#658)

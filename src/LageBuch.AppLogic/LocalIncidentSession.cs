@@ -147,8 +147,12 @@ public sealed class LocalIncidentSession : IIncidentSession
     }
 
     // --- IIncidentSession mutation surface: apply → persist → notify. ---
-    public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
-        Mutate(() => Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to));
+    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null)
+    {
+        var id = Guid.Empty;
+        Mutate(() => id = Incident.AddJournalEntry(_clock, RequireOperator(), direction, text, from, to).Id);
+        return id;
+    }
 
     public void EditJournalEntry(Guid entryId, string text) =>
         Mutate(() => Incident.EditJournalEntry(_clock, RequireOperator(), entryId, text));
@@ -191,8 +195,8 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void RemoveForceUnit(Guid unitId) =>
         Mutate(() => Incident.RemoveForceUnit(_clock, RequireOperator(), unitId));
 
-    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
-        Mutate(() => Incident.AddTask(_clock, RequireOperator(), text, assignee, importance, urgency, timerMinutes));
+    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes, Guid? sourceEntryId = null) =>
+        Mutate(() => Incident.AddTask(_clock, RequireOperator(), text, assignee, importance, urgency, timerMinutes, sourceEntryId));
 
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Mutate(() => Incident.SetTaskCompleted(taskId, isDone, _clock, RequireOperator()));

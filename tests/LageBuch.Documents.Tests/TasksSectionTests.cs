@@ -120,4 +120,25 @@ public class TasksSectionTests
     {
         public DateTimeOffset Now { get; set; } = now;
     }
+
+    [Fact]
+    public void An_aufgabe_given_out_from_an_etb_entry_names_it_in_the_bericht()
+    {
+        // "aus ETB 09:00" joins the small line under the Aufgabe, so the linked rendering of an
+        // otherwise identical incident is the longer one.
+        static Incident WithTask(bool linked)
+        {
+            var clock = new FixedClock(Started);
+            var op = new SessionOperator("Müller");
+            var incident = Incident.Start(clock, op, "Brand");
+            var entry = incident.AddJournalEntry(clock, op, Domain.Etb.EtbDirection.Incoming, "Stromleitung hängt tief");
+            incident.AddTask(clock, op, "EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, linked ? entry.Id : null);
+            return incident;
+        }
+
+        var linked = IncidentPdf.Generate(WithTask(linked: true), BeforeItIsDue, new Dictionary<Guid, byte[]>());
+        var unlinked = IncidentPdf.Generate(WithTask(linked: false), BeforeItIsDue, new Dictionary<Guid, byte[]>());
+
+        Assert.True(linked.Length > unlinked.Length, $"Expected the linked rendering to be longer; got {linked.Length} vs {unlinked.Length}.");
+    }
 }

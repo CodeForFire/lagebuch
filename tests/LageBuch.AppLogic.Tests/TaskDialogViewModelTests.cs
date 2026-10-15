@@ -259,4 +259,31 @@ public class TaskDialogViewModelTests
         dialog.Text = "Jetzt erst recht"; // text alone must not re-enable on a closed Einsatz
         Assert.False(dialog.SaveCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void Every_task_the_dialog_saves_is_linked_to_the_etb_entry_it_was_opened_from()
+    {
+        var (session, _) = NewSession();
+        var entryId = session.AddJournalEntry(Domain.Etb.EtbDirection.Incoming, "Stromleitung hängt tief");
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Stromleitung hängt tief", () => { }, entryId);
+
+        dialog.Text = "EVU informieren";
+        dialog.SaveAndCreateAnotherCommand.Execute(null);
+        dialog.Text = "Bereich absperren";
+        dialog.SaveCommand.Execute(null);
+
+        Assert.All(session.Incident.Tasks, t => Assert.Equal(entryId, t.SourceEntryId));
+        Assert.Equal(2, session.Incident.Tasks.Count);
+    }
+
+    [Fact]
+    public void A_dialog_opened_without_an_entry_saves_an_unlinked_task()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Tür sichern", () => { });
+
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Null(Assert.Single(session.Incident.Tasks).SourceEntryId);
+    }
 }

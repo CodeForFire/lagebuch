@@ -151,6 +151,29 @@
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
+  <!-- Badge: the Aufgaben given out from an ETB entry, counted on its row. A small pill in body
+       font, so it reads as a note about the entry rather than one of the form's action buttons;
+       amber while one is still open, the colour the app uses for work due. -->
+  <Style Selector="Button.badge">
+    <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="Padding" Value="9,0" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Button.badge:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="Button.badge.open">
+    <Setter Property="Background" Value="{StaticResource AmberWashBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AmberDeepBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+  </Style>
+
   <!-- Bar button: a whole header banner made tappable (#422), keeping the banner's own colours.
        The default button sets a fixed ControlHeight and a 16px side padding, neither of which
        suits a full-width bar, and any background of its own would cover the banner behind it.

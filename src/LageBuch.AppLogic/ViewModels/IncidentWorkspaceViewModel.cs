@@ -928,7 +928,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             _masterData,
             OnChanged,
             OpenTaskDialog,
-            OfferReminderReset);
+            OfferReminderReset,
+            entryId => Tasks.RevealTasksFrom(entryId));
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
@@ -1220,9 +1221,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// <summary>Opens the create-task overlay pre-filled from an ETB entry's text, either from the
     /// input dock's "add &amp; create task" button or an existing row's create-task icon (#88, #247).
     /// </summary>
-    private void OpenTaskDialog(string text)
+    private void OpenTaskDialog(string text, Guid? sourceEntryId)
     {
-        var dialog = new TaskDialogViewModel(_session, _masterData, text, OnChanged);
+        var dialog = new TaskDialogViewModel(_session, _masterData, text, OnChanged, sourceEntryId);
 
         // Clear the overlay on either outcome; Save has already added the task on confirm.
         dialog.Closed += (_, _) => PendingTaskDialog = null;

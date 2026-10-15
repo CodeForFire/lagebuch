@@ -869,4 +869,54 @@ public class TasksViewModelTests
             alarm ?? new FakeAlarmService(),
             MasterData(),
             () => { });
+
+    [Fact]
+    public void A_task_from_an_etb_entry_says_so_on_its_row()
+    {
+        var (session, _, _) = NewSession();
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        session.AddTask("EVU informieren", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        session.AddTask("Ohne Herkunft", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        using var vm = new TasksViewModel(
+            session, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
+
+        Assert.EndsWith("· aus ETB 09:00", vm.Rows.Single(r => r.Text == "EVU informieren").CreatedDisplay, StringComparison.Ordinal);
+        Assert.DoesNotContain("aus ETB", vm.Rows.Single(r => r.Text == "Ohne Herkunft").CreatedDisplay, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Revealing_an_entrys_aufgaben_selects_the_first_open_one_and_raises_reveal()
+    {
+        var (session, _, _) = NewSession();
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        session.AddTask("Schon erledigt", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        session.SetTaskCompleted(session.Incident.Tasks[0].Id, true);
+        session.AddTask("Noch offen", null, TaskImportance.Low, TaskUrgency.Low, 30, entryId);
+        using var vm = new TasksViewModel(
+            session, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
+        var revealed = 0;
+        vm.RevealRequested += (_, _) => revealed++;
+
+        vm.RevealTasksFrom(entryId);
+
+        Assert.Equal("Noch offen", vm.SelectedTask?.Text);
+        Assert.Equal(1, revealed);
+    }
+
+    [Fact]
+    public void Revealing_only_done_aufgaben_moves_the_filter_to_alle()
+    {
+        // OFFEN would hide the very row asked for.
+        var (session, _, _) = NewSession();
+        var entryId = session.AddJournalEntry(EtbDirection.Incoming, "Stromleitung hängt tief");
+        session.AddTask("Schon erledigt", null, TaskImportance.High, TaskUrgency.High, 5, entryId);
+        session.SetTaskCompleted(session.Incident.Tasks[0].Id, true);
+        using var vm = new TasksViewModel(
+            session, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), MasterData(), () => { });
+
+        vm.RevealTasksFrom(entryId);
+
+        Assert.Equal(TaskFilterKind.All, vm.Filter);
+        Assert.Equal("Schon erledigt", vm.SelectedTask?.Text);
+    }
 }
