@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 25;
+    public const int CurrentVersion = 26;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -163,6 +163,11 @@ public static class Migrations
         if (version < 25)
         {
             ApplyV25(cn, tx);
+        }
+
+        if (version < 26)
+        {
+            ApplyV26(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -792,6 +797,11 @@ public static class Migrations
             """;
         Exec(cn, tx, sql25);
     }
+
+    // The ETB entry an Aufgabe was given out from. Additive and nullable: an older file's tasks
+    // read back unlinked, which is what they were. No FOREIGN KEY, for the reason ApplyV22 gives.
+    private static void ApplyV26(SqliteConnection cn, SqliteTransaction tx) =>
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_tasks", "source_entry_id", "TEXT");
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
     {

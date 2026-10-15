@@ -393,8 +393,12 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         Operator = op;
     }
 
-    public void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null) =>
-        Send(new AddJournalEntryCommand(Op(), direction, text, from, to));
+    public Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null)
+    {
+        var id = Guid.NewGuid();
+        Send(new AddJournalEntryCommand(Op(), direction, text, from, to, id));
+        return id;
+    }
 
     public void EditJournalEntry(Guid entryId, string text) =>
         Send(new EditJournalEntryCommand(Op(), entryId, text));
@@ -437,8 +441,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void RemoveForceUnit(Guid unitId) =>
         Send(new RemoveForceUnitCommand(Op(), unitId));
 
-    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes) =>
-        Send(new AddTaskCommand(Op(), text, assignee ?? string.Empty, importance, urgency, timerMinutes));
+    public void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes, Guid? sourceEntryId = null) =>
+        Send(new AddTaskCommand(Op(), text, assignee ?? string.Empty, importance, urgency, timerMinutes, sourceEntryId));
 
     public void SetTaskCompleted(Guid taskId, bool isDone) =>
         Send(new SetTaskCompletedCommand(Op(), taskId, isDone));

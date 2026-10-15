@@ -248,7 +248,16 @@
             <DataGridTemplateColumn Header="EINTRAG" Width="*">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate x:DataType="vm:EtbEntryRow">
-                  <TextBlock Text="{Binding Text}" VerticalAlignment="Center" Margin="6,4" />
+                  <!-- The Aufgaben given out from this entry, counted, beside the text that made
+                       them necessary; a tap brings them up on the Aufgaben tab. Amber while one is
+                       still open. Off the Tab path: the grid's keys are RowKeys'. -->
+                  <DockPanel Margin="6,4">
+                    <Button DockPanel.Dock="Right" Margin="8,0,0,0" Classes="chip badge" Classes.open="{Binding HasOpenTasks}"
+                          IsVisible="{Binding HasTasks}" IsTabStop="False"
+                          Content="{Binding TaskBadge}" Command="{Binding ShowTasksCommand}"
+                          ToolTip.Tip="Die Aufgaben zu diesem Eintrag zeigen" />
+                    <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                  </DockPanel>
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
@@ -313,6 +322,10 @@
                     </TextBlock>
                     <TextBlock Text="{Binding Text}" TextWrapping="Wrap"
                                Foreground="{StaticResource TextPrimaryBrush}" />
+                    <Button Classes="chip badge" Classes.open="{Binding HasOpenTasks}"
+                            IsVisible="{Binding HasTasks}" IsTabStop="False" HorizontalAlignment="Left"
+                            Content="{Binding TaskBadge}" Command="{Binding ShowTasksCommand}"
+                            ToolTip.Tip="Die Aufgaben zu diesem Eintrag zeigen" />
                     <Grid ColumnDefinitions="*,Auto">
                       <TextBlock Grid.Column="0" Classes="mono" FontSize="11" VerticalAlignment="Center"
                                  TextTrimming="CharacterEllipsis" Text="{Binding EnteredBy}" />

@@ -78,7 +78,7 @@ public static class TasksSection
                     table.Cell().Element(BodyCell).Column(col =>
                     {
                         col.Item().Text(task.Text);
-                        col.Item().Text($"erstellt {Formatting.Timestamp(task.CreatedAt)} von {task.CreatedBy}")
+                        col.Item().Text($"erstellt {Formatting.Timestamp(task.CreatedAt)} von {task.CreatedBy}{FromEtb(incident, task)}")
                             .FontSize(8).Italic().FontColor(Colors.Grey.Medium);
                     });
                     table.Cell().Element(BodyCell).Text(
@@ -87,6 +87,14 @@ public static class TasksSection
             });
         });
     }
+
+    // ", aus ETB 09:42" when the Aufgabe was given out from an ETB entry: the reader of the Bericht
+    // finds the Rückmeldung that made it necessary at that time in the ETB section. Looked up in the
+    // incident itself, so the Bericht still renders from the incident alone.
+    private static string FromEtb(Incident incident, Domain.Tasks.IncidentTask task) =>
+        task.SourceEntryId is { } id && incident.Journal.FirstOrDefault(e => e.Id == id) is { } entry
+            ? $", aus ETB {Formatting.TimeOfDay(entry.Timestamp)}"
+            : string.Empty;
 
     private static IContainer HeaderCell(IContainer c) =>
         c.Background(Colors.Grey.Lighten3).PaddingVertical(3).PaddingHorizontal(4).BorderBottom(1).BorderColor(Colors.Grey.Medium);

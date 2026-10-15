@@ -359,7 +359,7 @@ public sealed class IncidentRepository
             var t = incident.Tasks[i];
             Run(
                 inserts,
-                "INSERT INTO incident_tasks (id, ordinal, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by) " + "VALUES ($id,$o,$txt,$asg,$imp,$urg,$by,$cat,$due,$coat,$coby);",
+                "INSERT INTO incident_tasks (id, ordinal, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by, source_entry_id) " + "VALUES ($id,$o,$txt,$asg,$imp,$urg,$by,$cat,$due,$coat,$coby,$src);",
                 p =>
                 {
                     p("$id", t.Id.ToString());
@@ -373,6 +373,7 @@ public sealed class IncidentRepository
                     p("$due", t.DueAt.ToString(Iso));
                     p("$coat", (object?)t.CompletedAt?.ToString(Iso) ?? DBNull.Value);
                     p("$coby", (object?)t.CompletedBy ?? DBNull.Value);
+                    p("$src", (object?)t.SourceEntryId?.ToString() ?? DBNull.Value);
                 });
         }
 
@@ -727,7 +728,7 @@ public sealed class IncidentRepository
 
         var tasks = ReadAll(
             cn,
-            "SELECT id, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by FROM incident_tasks ORDER BY ordinal;",
+            "SELECT id, text, assignee, importance, urgency, created_by, created_at, due_at, completed_at, completed_by, source_entry_id FROM incident_tasks ORDER BY ordinal;",
             r => Domain.Tasks.IncidentTask.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 ParseDate(r.GetString(6)),
@@ -738,7 +739,8 @@ public sealed class IncidentRepository
                 r.GetString(5),
                 ParseDate(r.GetString(7)),
                 NullableDate(r, 8),
-                Str(r, 9)));
+                Str(r, 9),
+                NullableGuid(r, 10)));
 
         var involvedParties = ReadAll(
             cn,

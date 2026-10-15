@@ -72,7 +72,8 @@ public static class SnapshotMapper
                 t.CreatedAt,
                 t.DueAt,
                 t.CompletedAt,
-                t.CompletedBy)).ToList(),
+                t.CompletedBy,
+                t.SourceEntryId)).ToList(),
             incident.Buildings.Select(b => new BuildingDto(
                 b.Id,
                 b.Name,
@@ -149,7 +150,8 @@ public static class SnapshotMapper
                 t.CreatedBy,
                 t.DueAt,
                 t.CompletedAt,
-                t.CompletedBy)),
+                t.CompletedBy,
+                t.SourceEntryId)),
             snapshot.Buildings.Select(b => Building.Rehydrate(
                 b.Id,
                 b.Name,
