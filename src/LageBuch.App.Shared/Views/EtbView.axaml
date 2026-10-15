@@ -85,9 +85,15 @@
   </UserControl.Styles>
 
   <DockPanel>
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,14">
       <TextBlock Grid.Column="0" x:Name="EtbTitle" Text="EINSATZTAGEBUCH" Classes="overline" VerticalAlignment="Top" />
-      <CheckBox Grid.Column="1" x:Name="HideSystemCheckBox"
+      <!-- The Buchstabier-Helfer (#592), for a name that has to be spelled over the radio. Up here
+           rather than in the dock: it is wanted while reading the journal too, and the dock's row
+           is already as wide as a desktop window allows. -->
+      <Button Grid.Column="1" x:Name="OpenSpellingHelperButton" Classes="ghost" Content="BUCHSTABIEREN"
+              VerticalAlignment="Center"
+              Command="{Binding OpenSpellingHelperCommand}" />
+      <CheckBox Grid.Column="2" x:Name="HideSystemCheckBox"
                 Content="Systemmeldungen ausblenden"
                 IsChecked="{Binding HideSystemEntries}" />
     </Grid>

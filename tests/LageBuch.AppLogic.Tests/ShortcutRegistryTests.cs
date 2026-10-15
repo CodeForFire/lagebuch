@@ -35,6 +35,17 @@ public class ShortcutRegistryTests
     }
 
     [Fact]
+    public void The_lagemeldung_added_after_the_digits_ran_out_is_ctrl_l()
+    {
+        // The eleventh module gets a letter rather than moving any digit a Lagebuchführer has
+        // learned (#592).
+        Assert.Equal("Strg+L", ShortcutRegistry.HintFor(NavModules.SituationReports));
+        var shortcut = ShortcutRegistry.Find(new KeyChord(ShortcutKey.L, Ctrl: true));
+        Assert.Equal(ShortcutAction.ShowModule, shortcut?.Action);
+        Assert.Equal(NavModules.SituationReports, shortcut?.ModuleKey);
+    }
+
+    [Fact]
     public void No_shortcut_takes_a_text_editing_key()
     {
         // Ctrl+A/C/V/X/Z/Y belong to the text boxes. The enum cannot even name them, so this

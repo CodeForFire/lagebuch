@@ -53,6 +53,7 @@ public class OverlayContractTests
         new("Workspace.TaskDialog", typeof(IncidentWorkspaceViewModel), typeof(TaskDialogViewModel), OpenWorkspaceTaskDialog),
         new("Workspace.PdfExportOptions", typeof(IncidentWorkspaceViewModel), typeof(PdfExportOptionsViewModel), OpenWorkspacePdfExportOptions),
         new("Workspace.IncidentDataDialog", typeof(IncidentWorkspaceViewModel), typeof(IncidentDataDialogViewModel), OpenWorkspaceIncidentDataDialog),
+        new("Workspace.SpellingHelper", typeof(IncidentWorkspaceViewModel), typeof(SpellingHelperDialogViewModel), OpenWorkspaceSpellingHelper),
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
         new("Main.About", typeof(MainWindowViewModel), typeof(AboutViewModel), OpenMainAbout),
         new("Main.ShortcutOverview", typeof(MainWindowViewModel), typeof(ShortcutOverviewViewModel), OpenMainShortcutOverview),
@@ -323,6 +324,15 @@ public class OverlayContractTests
         var opener = Named<Button>(window, "AddIncidentDataButton");
         Activate(opener);
         return new(window, opener, ViewOf<IncidentDataDialogView>(window), () => vm.PendingIncidentDataDialog is null, () => vm.PendingIncidentDataDialog?.CancelCommand.Execute(null));
+    }
+
+    private static Opened OpenWorkspaceSpellingHelper()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        var opener = Named<Button>(window, "OpenSpellingHelperButton");
+        Activate(opener);
+        return new(window, opener, ViewOf<SpellingHelperDialogView>(window), () => vm.PendingSpellingHelper is null, () => vm.PendingSpellingHelper?.CloseCommand.Execute(null));
     }
 
     // A row's own button, the way a keyboard user reaches it: Tab into the grid, then to the row.

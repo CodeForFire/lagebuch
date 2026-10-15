@@ -21,6 +21,11 @@ public class NavigationLayoutTests
 
     private static NavEntry Checklist(Guid id, bool visible = true) => new(NavModules.Checklist, id, visible);
 
+    // The entries a sparse test layout names, in rail order. The modules it leaves out are placed
+    // beside their neighbours in the default rail, so they may sit between the named ones.
+    private static List<string> Named(IEnumerable<string> keys, params string[] named) =>
+        keys.Where(k => named.Contains(k, StringComparer.Ordinal)).ToList();
+
     private static List<string> Keys(IEnumerable<NavItemSpec> specs) =>
         specs.Select(s => s.List is { } l ? $"checklist:{l.Title}" : s.ModuleKey).ToList();
 
@@ -34,23 +39,53 @@ public class NavigationLayoutTests
         Assert.Equal(
             new[]
             {
-                "checklist:Aufbau", "etb", "tasks", "roles", "forces", "involved",
+                "checklist:Aufbau", "etb", "lagemeldung", "tasks", "roles", "forces", "involved",
                 "scba", "co", "files", "links", "contacts", "checklist:Abbau",
             },
             Keys(specs));
     }
 
     [Fact]
-    public void A_layout_saved_before_beteiligte_existed_still_shows_it_at_the_end()
+    public void A_layout_saved_before_beteiligte_existed_shows_it_beside_kraefte()
     {
         var saved = NavModules.All
             .Where(k => !string.Equals(k, NavModules.InvolvedParties, StringComparison.Ordinal))
             .Select(k => Module(k))
             .ToArray();
 
-        var specs = NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>());
+        var keys = Keys(NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>()));
 
-        Assert.Equal(NavModules.InvolvedParties, Keys(specs)[^1]);
+        Assert.Equal(keys.IndexOf(NavModules.Forces) + 1, keys.IndexOf(NavModules.InvolvedParties));
+    }
+
+    // A brigade that saved its own Navigation list before #592 must still find the Lagemeldung
+    // under the ETB, where it belongs, and not at the bottom of the rail below the Abbau list.
+    [Fact]
+    public void A_layout_saved_before_the_lagemeldung_existed_shows_it_right_under_the_etb()
+    {
+        var saved = new[]
+        {
+            Checklist(Aufbau), Module(NavModules.Etb), Module(NavModules.Tasks), Module(NavModules.Files),
+            Checklist(Abbau),
+        };
+
+        var keys = Keys(NavigationLayout.Resolve(saved, new[] { List(Aufbau, "Aufbau"), List(Abbau, "Abbau") }));
+
+        Assert.Equal(new[] { "checklist:Aufbau", "etb", "lagemeldung", "tasks" }, keys.Take(4));
+        Assert.Equal("checklist:Abbau", keys[^1]);
+    }
+
+    [Fact]
+    public void Placing_unmentioned_modules_keeps_the_stored_order_of_the_named_ones()
+    {
+        var saved = new[] { Module(NavModules.Contacts), Module(NavModules.Etb) };
+
+        var keys = Keys(NavigationLayout.Resolve(saved, Array.Empty<ChecklistList>()));
+
+        // Every unmentioned module finds a spot beside a neighbour, and none of them reorders the
+        // two the brigade did name.
+        Assert.True(keys.IndexOf(NavModules.Contacts) < keys.IndexOf(NavModules.Etb));
+        Assert.Equal(NavModules.All.Count, keys.Count);
     }
 
     [Fact]
@@ -60,7 +95,7 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Module(NavModules.Scba, visible: false), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal(new[] { "etb", "files" }, Keys(specs).Take(2));
+        Assert.Equal(new[] { "etb", "files" }, Named(Keys(specs), "etb", "files"));
         Assert.DoesNotContain("scba", Keys(specs));
     }
 
@@ -74,7 +109,7 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb, visible: false), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal(new[] { "etb", "files" }, Keys(specs).Take(2));
+        Assert.Equal(new[] { "etb", "files" }, Named(Keys(specs), "etb", "files"));
     }
 
     // Omitting an entry is not how a module is hidden -- `visible: false` is. Omission only
@@ -160,7 +195,7 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Module("zeitschiene"), Module(NavModules.Files) },
             Array.Empty<ChecklistList>());
 
-        Assert.Equal(new[] { "etb", "files" }, Keys(specs).Take(2));
+        Assert.Equal(new[] { "etb", "files" }, Named(Keys(specs), "etb", "files"));
         Assert.DoesNotContain("zeitschiene", Keys(specs));
     }
 
@@ -183,7 +218,11 @@ public class NavigationLayoutTests
     {
         var specs = NavigationLayout.Resolve(Array.Empty<NavEntry>(), Array.Empty<ChecklistList>());
 
-        Assert.Equal(NavModules.All, Keys(specs));
+        // The default rail's own order, which puts the Lagemeldung beside the ETB rather than at the
+        // end of NavModules.All, where it was appended to keep the Ctrl+digit shortcuts in place.
+        Assert.Equal(
+            NavLayout.Default.Where(e => !e.IsChecklist).Select(e => e.ModuleKey),
+            Keys(specs));
     }
 
     [Fact]
@@ -193,7 +232,7 @@ public class NavigationLayoutTests
             new[] { Module(NavModules.Etb), Checklist(Nachbereitung), Module(NavModules.Files) },
             new[] { List(Nachbereitung, "Nachbereitung") });
 
-        Assert.Equal(new[] { "etb", "checklist:Nachbereitung", "files" }, Keys(specs).Take(3));
+        Assert.Equal(new[] { "etb", "checklist:Nachbereitung", "files" }, Named(Keys(specs), "etb", "checklist:Nachbereitung", "files"));
     }
 
     [Fact]

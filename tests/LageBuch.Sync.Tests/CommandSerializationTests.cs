@@ -67,6 +67,11 @@ public class CommandSerializationTests
         new AddInvolvedPartyCommand(Op, "POK Mustermann", null, null),
         new UpdateInvolvedPartyCommand(Guid.NewGuid(), "Erika Beispiel", null, "Schlüssel übergeben"),
         new RemoveInvolvedPartyCommand(Guid.NewGuid()),
+        new AddSituationReportCommand(Op, "ELW 1", "Blumenstraße 13", "Schuppen im Vollbrand", "C-Rohr vor", "LF 1", "1 DLK"),
+        new AddSituationReportCommand(Op, null, null, null, null, null, null),
+        new UpdateSituationReportCommand(Guid.NewGuid(), "ELW 1", null, "Feuer aus", null, null, null),
+        new RemoveSituationReportCommand(Guid.NewGuid()),
+        new SendSituationReportCommand(Op, Guid.NewGuid(), "ILS"),
         new UpdateTaskCommand(Guid.NewGuid(), "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.Medium),
         new ExtendTaskTimerCommand(Guid.NewGuid(), 5),
     }.Select(c => new object[] { c });
@@ -206,6 +211,29 @@ public class CommandSerializationTests
             "addInvolvedParty" => new AddInvolvedPartyCommand(Op, "Erika Beispiel", null, null),
             "updateInvolvedParty" => new UpdateInvolvedPartyCommand(id, "Erika Beispiel", "110", null),
             _ => new RemoveInvolvedPartyCommand(id),
+        };
+
+        var json = SyncJson.Serialize(command);
+
+        Assert.Contains($"\"$type\":\"{discriminator}\"", json, StringComparison.Ordinal);
+        Assert.Equal(command.GetType(), SyncJson.Deserialize<SyncCommand>(json).GetType());
+    }
+
+    // The Lagemeldung discriminators are a wire contract between joined devices (#592).
+    [Theory]
+    [InlineData("addSituationReport")]
+    [InlineData("updateSituationReport")]
+    [InlineData("removeSituationReport")]
+    [InlineData("sendSituationReport")]
+    public void Situation_report_commands_use_their_discriminators(string discriminator)
+    {
+        var id = Guid.NewGuid();
+        SyncCommand command = discriminator switch
+        {
+            "addSituationReport" => new AddSituationReportCommand(Op, "ELW 1", null, "Lage", null, null, null),
+            "updateSituationReport" => new UpdateSituationReportCommand(id, "ELW 1", null, "Lage", null, null, null),
+            "removeSituationReport" => new RemoveSituationReportCommand(id),
+            _ => new SendSituationReportCommand(Op, id, "ILS"),
         };
 
         var json = SyncJson.Serialize(command);

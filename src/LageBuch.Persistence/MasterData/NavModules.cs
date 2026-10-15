@@ -44,15 +44,21 @@ public static class NavModules
     /// <summary>Kontakte.</summary>
     public const string Contacts = "contacts";
 
+    /// <summary>Lagemeldung: the numbered situation reports to the Leitstelle (#592).</summary>
+    public const string SituationReports = "lagemeldung";
+
     /// <summary>
     /// Not a module of its own: the marker for an entry that names one of the Einsatz's
     /// Checklisten through <see cref="NavEntry.ChecklistId"/>.
     /// </summary>
     public const string Checklist = "checklist";
 
-    /// <summary>Every built-in module, in the order the rail shipped with.</summary>
+    /// <summary>
+    /// Every built-in module, in the order the rail shipped with; a new one is appended, because
+    /// this order is also what the Ctrl+digit shortcuts follow.
+    /// </summary>
     public static IReadOnlyList<string> All { get; } =
-        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links, Contacts };
+        new[] { Etb, Tasks, Roles, Forces, InvolvedParties, Scba, Co, Files, Links, Contacts, SituationReports };
 
     /// <summary>
     /// Whether this build knows the key. A layout written by a newer build may name a module that
@@ -84,8 +90,8 @@ public static class NavLayout
 {
     /// <summary>
     /// The rail as it shipped before it was configurable — Aufbau, the modules in their original
-    /// order, then Abbau — plus the modules added since: Beteiligte beside Kräfte, Kontakte after
-    /// Links.
+    /// order, then Abbau — plus the modules added since: Lagemeldung after the ETB, Beteiligte
+    /// beside Kräfte, Kontakte after Links.
     /// </summary>
     /// <remarks>
     /// Stored as "no layout" rather than written into a fresh Stammdaten set on purpose. An empty
@@ -97,6 +103,7 @@ public static class NavLayout
     {
         new NavEntry(NavModules.Checklist, ChecklistDefaults.AufbauListId, true),
         new NavEntry(NavModules.Etb, null, true),
+        new NavEntry(NavModules.SituationReports, null, true),
         new NavEntry(NavModules.Tasks, null, true),
         new NavEntry(NavModules.Roles, null, true),
         new NavEntry(NavModules.Forces, null, true),
@@ -108,4 +115,33 @@ public static class NavLayout
         new NavEntry(NavModules.Contacts, null, true),
         new NavEntry(NavModules.Checklist, ChecklistDefaults.AbbauListId, true),
     };
+
+    private static readonly string[] DefaultModuleOrder =
+        Default.Where(e => !e.IsChecklist).Select(e => e.ModuleKey).ToArray();
+
+    /// <summary>
+    /// Where a module that a stored layout never mentions goes: right after the nearest module it
+    /// follows in <see cref="Default"/> that the layout does show, so a new module lands where it
+    /// belongs — the Lagemeldung under the ETB (#592) — rather than at the bottom of the rail.
+    /// The end of the list when none of its predecessors is there.
+    /// </summary>
+    /// <param name="moduleKeys">The rail or editor list so far, top to bottom; a Checkliste's
+    /// entry carries <see cref="NavModules.Checklist"/>.</param>
+    /// <param name="moduleKey">The module to place.</param>
+    public static int PlacementOf(IReadOnlyList<string> moduleKeys, string moduleKey)
+    {
+        ArgumentNullException.ThrowIfNull(moduleKeys);
+        for (var i = Array.IndexOf(DefaultModuleOrder, moduleKey) - 1; i >= 0; i--)
+        {
+            for (var at = moduleKeys.Count - 1; at >= 0; at--)
+            {
+                if (string.Equals(moduleKeys[at], DefaultModuleOrder[i], StringComparison.Ordinal))
+                {
+                    return at + 1;
+                }
+            }
+        }
+
+        return moduleKeys.Count;
+    }
 }

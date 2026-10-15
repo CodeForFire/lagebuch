@@ -79,10 +79,11 @@ public static class NavigationLayout
 
         // Same idea for a module this build has but the stored layout predates: without it, a
         // module added in a later release would stay invisible to everyone who ever saved a
-        // layout.
+        // layout. It goes where the default rail has it, after its nearest neighbour there.
         foreach (var key in NavModules.All.Where(k => !seenModules.Contains(k)))
         {
-            result.Add(new NavItemSpec(key, null));
+            var at = NavLayout.PlacementOf(result.Select(s => s.ModuleKey).ToList(), key);
+            result.Insert(at, new NavItemSpec(key, null));
         }
 
         // Unreachable while NavModules.All contains the ETB -- the pass above already appends it

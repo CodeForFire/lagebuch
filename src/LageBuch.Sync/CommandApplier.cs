@@ -157,6 +157,19 @@ public static class CommandApplier
             case RemoveInvolvedPartyCommand c:
                 incident.RemoveInvolvedParty(c.PartyId);
                 break;
+            case AddSituationReportCommand c:
+                incident.AddSituationReport(
+                    clock, Operator(c.Operator), c.Reporter, c.Location, c.Situation, c.Measures, c.Units, c.Requests);
+                break;
+            case UpdateSituationReportCommand c:
+                incident.UpdateSituationReport(c.ReportId, c.Reporter, c.Location, c.Situation, c.Measures, c.Units, c.Requests);
+                break;
+            case RemoveSituationReportCommand c:
+                incident.RemoveSituationReport(c.ReportId);
+                break;
+            case SendSituationReportCommand c:
+                incident.SendSituationReport(clock, Operator(c.Operator), c.ReportId, c.DispatchCentreName);
+                break;
             case UpdateTaskCommand c:
                 incident.UpdateTask(c.TaskId, c.Text, c.Assignee, c.Importance, c.Urgency);
                 break;

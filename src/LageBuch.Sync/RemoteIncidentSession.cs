@@ -452,6 +452,20 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void RemoveInvolvedParty(Guid partyId) =>
         Send(new RemoveInvolvedPartyCommand(partyId));
 
+    public void AddSituationReport(
+        string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        Send(new AddSituationReportCommand(Op(), reporter, location, situation, measures, units, requests));
+
+    public void UpdateSituationReport(
+        Guid reportId, string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        Send(new UpdateSituationReportCommand(reportId, reporter, location, situation, measures, units, requests));
+
+    public void RemoveSituationReport(Guid reportId) =>
+        Send(new RemoveSituationReportCommand(reportId));
+
+    public void SendSituationReport(Guid reportId, string dispatchCentreName) =>
+        Send(new SendSituationReportCommand(Op(), reportId, dispatchCentreName));
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Send(new UpdateTaskCommand(taskId, text, assignee ?? string.Empty, importance, urgency));
 

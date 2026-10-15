@@ -76,7 +76,16 @@ public class VersionHandshakeTests
     {
         // 7 lets a client send updateTask and extendTaskTimer (#246). A host at 6 has neither in its
         // command allowlist and would reject the edit, so a 6 and a 7 must not connect.
-        Assert.Equal(7, SyncProtocol.ProtocolVersion);
-        Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 7, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 7, SyncProtocol.ProtocolVersion);
+    }
+
+    [Fact]
+    public void Sending_a_Lagemeldung_raises_the_floor_to_protocol_eight()
+    {
+        // 8 lets a client send the four Lagemeldung commands (#592). A host at 7 has none of them in
+        // its command allowlist and would reject the report, so a 7 and an 8 must not connect.
+        Assert.Equal(8, SyncProtocol.ProtocolVersion);
+        Assert.Equal(8, SyncProtocol.MinimumProtocolVersion);
     }
 }

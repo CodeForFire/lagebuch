@@ -45,6 +45,10 @@ public sealed class ModuleIconConverter : IValueConverter
     private const string InvolvedPartiesPath =
         "M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z";
 
+    // Lagemeldung: a person speaking — the report is read out over the radio.
+    private const string SituationReportsPath =
+        "M9 13c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zm7.76-9.64-1.68 1.69c.84 1.18.84 2.71 0 3.89l1.68 1.69c2.02-2.02 2.02-5.07 0-7.27zM20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z";
+
     // Atemschutz: the stopwatch from ScbaControlBar — the Druckabfrage clock.
     private const string ScbaPath =
         "M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0 0 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9a9 9 0 0 0 7.03-14.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z";
@@ -74,6 +78,7 @@ public sealed class ModuleIconConverter : IValueConverter
             NavModules.Roles => RolesPath,
             NavModules.Forces => ForcesPath,
             NavModules.InvolvedParties => InvolvedPartiesPath,
+            NavModules.SituationReports => SituationReportsPath,
             NavModules.Scba => ScbaPath,
             NavModules.Co => CoPath,
             NavModules.Files => FilesPath,

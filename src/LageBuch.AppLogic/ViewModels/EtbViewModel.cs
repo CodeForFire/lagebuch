@@ -32,6 +32,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // #415: an entry addressed to the Leitstelle is usually the Rückmeldung itself, so adding one
     // offers to restart the reminder. Not automatic: not every message to the Leitstelle is one.
     private readonly Action? _offerReminderReset;
+    private readonly Action? _openSpellingHelper;
     private readonly string _dispatchCentreName;
 
     // Every rendered row, oldest-first like the journal, regardless of the filter. Entries is the
@@ -48,7 +49,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         MasterDataSet masterData,
         Action onChanged,
         Action<string>? createTaskFromEntry = null,
-        Action? offerReminderReset = null)
+        Action? offerReminderReset = null,
+        Action? openSpellingHelper = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
@@ -57,6 +59,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         _onChanged = onChanged;
         _createTaskFromEntry = createTaskFromEntry;
         _offerReminderReset = offerReminderReset;
+        _openSpellingHelper = openSpellingHelper;
         _dispatchCentreName = masterData.Settings.DispatchCentreName;
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
@@ -386,6 +389,12 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // pre-filled from the row's text; the timer still starts from "now", same as the dock button,
     // since anchoring it to a possibly much older entry's timestamp would be misleading.
     private void CreateTaskFromRow(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text);
+
+    /// <summary>Opens the Buchstabier-Helfer (#592), for a name that has to be spelled over the radio.</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenSpellingHelper))]
+    private void OpenSpellingHelper() => _openSpellingHelper?.Invoke();
+
+    private bool CanOpenSpellingHelper => _openSpellingHelper is not null;
 
     private bool CanCreateTaskFromRow(EtbEntryRow row) => !IsReadOnly && _createTaskFromEntry is not null;
 

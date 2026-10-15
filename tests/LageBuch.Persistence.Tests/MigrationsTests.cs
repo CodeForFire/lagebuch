@@ -187,12 +187,37 @@ public class MigrationsTests : IDisposable
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
         Migrations.Migrate(cn2);
-        Assert.Equal(25, Migrations.GetVersion(cn2));
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
 
         using var check = cn2.CreateCommand();
         check.CommandText =
             "SELECT count(*) FROM pragma_table_info('involved_parties') " +
             "WHERE name IN ('id','ordinal','name','phone','notes','created_by','created_at');";
         Assert.Equal(7L, (long)check.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void V25_database_upgrades_to_v26_and_gains_the_situation_reports_table()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (25);";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(26, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText =
+            "SELECT count(*) FROM pragma_table_info('situation_reports') " +
+            "WHERE name IN ('id','ordinal','number','reporter','location','situation','measures','units','requests'," +
+            "'created_by','created_at','sent_at','sent_by');";
+        Assert.Equal(13L, (long)check.ExecuteScalar()!);
     }
 }
