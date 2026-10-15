@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Persistence.Tests;
@@ -746,5 +747,74 @@ public class MasterDataJsonTests
 
         Assert.Contains("name", ex.Message, StringComparison.Ordinal);
         Assert.Contains("null", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Serialize_round_trips_standardaufgaben_in_order_with_their_priorities()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TaskTemplates = new[]
+            {
+                new TaskTemplate("Rettungsdienst nachfordern", TaskImportance.High, TaskUrgency.High),
+                new TaskTemplate("THW anfordern", TaskImportance.Low, TaskUrgency.Low),
+                new TaskTemplate("Polizei verständigen"),
+            },
+        };
+
+        var reparsed = Parse(MasterDataJson.Serialize(original));
+
+        Assert.Equal(original.TaskTemplates, reparsed.TaskTemplates);
+    }
+
+    [Theory]
+    [InlineData("""{ "taskTemplates": [{ "text": " Polizei verständigen " }] }""")]
+    [InlineData("""{ "taskTemplates": [{ "text": "Polizei verständigen", "importance": null, "urgency": 2 }] }""")]
+    [InlineData("""{ "taskTemplates": [{ "text": "Polizei verständigen", "importance": "dringend", "urgency": "sofort" }] }""")]
+    public void Parse_reads_a_missing_or_unknown_level_as_medium(string json)
+    {
+        // An imported file or a sync host's payload may carry anything. A Standardaufgabe with a
+        // middling priority is better than a refused import or a failed join.
+        Assert.Equal(new TaskTemplate("Polizei verständigen"), Assert.Single(Parse(json).TaskTemplates));
+    }
+
+    [Fact]
+    public void Parse_reads_levels_regardless_of_case()
+    {
+        var set = Parse("""{ "taskTemplates": [{ "text": "RD nachfordern", "importance": "HIGH", "urgency": "Low" }] }""");
+
+        Assert.Equal(new TaskTemplate("RD nachfordern", TaskImportance.High, TaskUrgency.Low), Assert.Single(set.TaskTemplates));
+    }
+
+    [Fact]
+    public void Parse_refuses_a_standardaufgabe_whose_text_is_null()
+    {
+        // JsonException is what the join and the import already turn into a German message;
+        // a NullReferenceException would escape both (see RequiredName).
+        Assert.Throws<JsonException>(() => Parse("""{ "taskTemplates": [{ "text": null }] }"""));
+    }
+
+    [Fact]
+    public void A_file_without_standardaufgaben_reads_as_none()
+    {
+        Assert.Empty(Parse("""{ "unitStatus": ["Alarmiert"] }""").TaskTemplates);
+    }
+
+    [Fact]
+    public void Parse_cuts_an_oversized_standardaufgabe_to_what_an_aufgabe_may_hold()
+    {
+        // Replays a hostile sync host or a doctored import: the chip would hand this text to the
+        // Aufgabe form, and IncidentTask.Create refuses anything longer than MaxTextLength.
+        var huge = new string('x', IncidentTask.MaxTextLength * 5);
+
+        var set = Parse($$"""{ "taskTemplates": [{ "text": "{{huge}}" }] }""");
+
+        Assert.Equal(IncidentTask.MaxTextLength, Assert.Single(set.TaskTemplates).Text.Length);
+    }
+
+    [Fact]
+    public void Parse_drops_a_blank_standardaufgabe()
+    {
+        Assert.Empty(Parse("""{ "taskTemplates": [{ "text": "   " }] }""").TaskTemplates);
     }
 }

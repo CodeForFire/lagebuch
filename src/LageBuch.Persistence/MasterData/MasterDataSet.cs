@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Persistence.MasterData;
 
@@ -29,6 +30,11 @@ public sealed record MasterDataSet(
     // Vehicles per Wache with their seat count (#76).
     IReadOnlyList<Vehicle> Vehicles,
 
+    // Standardaufgaben: the Aufgaben a brigade gives out again and again, offered as one-tap
+    // chips. A chip copies its text and priorities into a new Aufgabe (#337); nothing in an
+    // incident points back here.
+    IReadOnlyList<TaskTemplate> TaskTemplates,
+
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
     IncidentSettings Settings)
@@ -47,6 +53,7 @@ public sealed record MasterDataSet(
         Array.Empty<TruppType>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
+        Array.Empty<TaskTemplate>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -64,7 +71,8 @@ public sealed record MasterDataSet(
         && Links.Count == 0 && ChecklistTemplates.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0
-        && Vehicles.Count == 0;
+        && Vehicles.Count == 0
+        && TaskTemplates.Count == 0;
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -102,6 +110,58 @@ public sealed record MasterDataSet(
 [SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 [SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 public sealed record Link(string Name, string Url, string Group = "");
+
+/// <summary>
+/// A Standardaufgabe: an Aufgabe the brigade gives out often enough to want it one tap away, with
+/// the priorities it usually carries. Using one copies these values into the incident's own task.
+/// </summary>
+public sealed record TaskTemplate(
+    string Text,
+    TaskImportance Importance = TaskImportance.Medium,
+    TaskUrgency Urgency = TaskUrgency.Medium)
+{
+    /// <summary>
+    /// Trims the text and cuts it to what an Aufgabe may hold. Every way in -- the editor, an
+    /// imported file, a sync host's payload, the store -- goes through this, because a chip hands
+    /// the text straight to the Aufgabe form and an over-long one would only fail there, mid-Einsatz.
+    /// </summary>
+    public static string CapText(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var trimmed = text.Trim();
+        return trimmed.Length > IncidentTask.MaxTextLength ? trimmed[..IncidentTask.MaxTextLength].TrimEnd() : trimmed;
+    }
+
+    /// <summary>The invariant name a level is stored and exchanged under: low, medium or high.</summary>
+    public static string LevelName(TaskImportance level) => LevelName((int)level);
+
+    /// <inheritdoc cref="LevelName(TaskImportance)"/>
+    public static string LevelName(TaskUrgency level) => LevelName((int)level);
+
+    /// <summary>
+    /// Reads a stored level back. Anything unknown -- absent, misspelt, from a newer build -- is
+    /// Medium rather than an error: this runs on imported files and a sync host's payload, and
+    /// a Standardaufgabe with a middling priority is better than a failed join.
+    /// </summary>
+    public static TaskImportance ImportanceFrom(string? name) => (TaskImportance)LevelFrom(name);
+
+    /// <inheritdoc cref="ImportanceFrom"/>
+    public static TaskUrgency UrgencyFrom(string? name) => (TaskUrgency)LevelFrom(name);
+
+    private static string LevelName(int level) => level switch
+    {
+        0 => "low",
+        2 => "high",
+        _ => "medium",
+    };
+
+    private static int LevelFrom(string? name) => name?.Trim().ToUpperInvariant() switch
+    {
+        "LOW" => 0,
+        "HIGH" => 2,
+        _ => 1,
+    };
+}
 
 /// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's
 /// Checklisten are seeded from at start.</summary>
@@ -703,6 +763,7 @@ public static class MasterDataJson
             ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
+            ParseTaskTemplates(root),
             ParseSettings(root));
     }
 
@@ -846,6 +907,31 @@ public static class MasterDataJson
     }
 
     /// <summary>
+    /// Reads <c>taskTemplates</c>: one object per Standardaufgabe with a required <c>text</c> and
+    /// optional <c>importance</c>/<c>urgency</c> (low, medium, high). The levels degrade to medium
+    /// instead of throwing, for the reason <see cref="ParseTruppTypes"/> clamps.
+    /// </summary>
+    private static IReadOnlyList<TaskTemplate> ParseTaskTemplates(JsonElement root)
+    {
+        if (!root.TryGetProperty("taskTemplates", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<TaskTemplate>();
+        }
+
+        return arr.EnumerateArray()
+            .Select(x => new TaskTemplate(
+                TaskTemplate.CapText(x.GetProperty("text").GetString()
+                    ?? throw new JsonException("Standardaufgabe: \"text\" darf nicht null sein.")),
+                TaskTemplate.ImportanceFrom(Level(x, "importance")),
+                TaskTemplate.UrgencyFrom(Level(x, "urgency"))))
+            .Where(t => t.Text.Length > 0) // a chip with no text would only be a dead button
+            .ToList();
+
+        static string? Level(JsonElement e, string prop) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+    }
+
+    /// <summary>
     /// Reads the optional <c>navigation</c> array. A missing key yields an empty layout, which
     /// means "this build's default" — never a materialized copy of it, see <see cref="NavLayout"/>.
     /// A row without <c>visible</c> is visible: a hand-written file that lists modules means
@@ -974,6 +1060,12 @@ public static class MasterDataJson
                 isOwn = p.IsOwn,
                 email = p.Email,
                 note = p.Note,
+            }),
+            taskTemplates = set.TaskTemplates.Select(t => new
+            {
+                text = t.Text,
+                importance = TaskTemplate.LevelName(t.Importance),
+                urgency = TaskTemplate.LevelName(t.Urgency),
             }),
             settings = new
             {

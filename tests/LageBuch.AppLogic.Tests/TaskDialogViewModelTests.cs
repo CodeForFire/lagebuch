@@ -206,4 +206,40 @@ public class TaskDialogViewModelTests
         dialog.Text = "Jetzt erst recht"; // text alone must not re-enable on a closed Einsatz
         Assert.False(dialog.SaveCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void Chip_replaces_the_etb_text_and_sets_the_priorities_without_saving()
+    {
+        var (session, _) = NewSession();
+        var template = new TaskTemplate("Energieversorger informieren", TaskImportance.High, TaskUrgency.Low);
+        var dialog = new TaskDialogViewModel(
+            session, MasterData() with { TaskTemplates = new[] { template } }, "Stromleitung hängt tief", () => { });
+
+        dialog.ApplyTemplateCommand.Execute(template);
+
+        Assert.Equal("Energieversorger informieren", dialog.Text);
+        Assert.Equal(TaskImportance.High, dialog.Importance);
+        Assert.Equal(TaskUrgency.Low, dialog.Urgency);
+        Assert.Equal(IncidentTask.DefaultTimerMinutes(TaskUrgency.Low), dialog.TimerMinutes);
+        Assert.Empty(session.Incident.Tasks);
+    }
+
+    [Fact]
+    public void Two_chips_and_save_and_another_give_two_tasks_from_one_rueckmeldung()
+    {
+        var (session, _) = NewSession();
+        var police = new TaskTemplate("Polizei verständigen", TaskImportance.High, TaskUrgency.High);
+        var power = new TaskTemplate("Energieversorger informieren");
+        var dialog = new TaskDialogViewModel(
+            session, MasterData() with { TaskTemplates = new[] { police, power } }, "Stromleitung hängt tief", () => { });
+
+        dialog.ApplyTemplateCommand.Execute(police);
+        dialog.SaveAndCreateAnotherCommand.Execute(null);
+        dialog.ApplyTemplateCommand.Execute(power);
+        dialog.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            new[] { ("Polizei verständigen", TaskUrgency.High), ("Energieversorger informieren", TaskUrgency.Medium) },
+            session.Incident.Tasks.Select(t => (t.Text, t.Urgency)));
+    }
 }

@@ -151,6 +151,23 @@
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
+  <!-- Chip: a Standardaufgabe one tap away. Body font in its own case, because the label is the
+       brigade's own sentence ("Polizei verständigen"), not a command word; a pill so it does not
+       read as one of the form's action buttons. -->
+  <Style Selector="Button.chip">
+    <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Button.chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource SurfaceTopBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+
   <!-- Bar button: a whole header banner made tappable (#422), keeping the banner's own colours.
        The default button sets a fixed ControlHeight and a 16px side padding, neither of which
        suits a full-width bar, and any background of its own would cover the banner behind it.

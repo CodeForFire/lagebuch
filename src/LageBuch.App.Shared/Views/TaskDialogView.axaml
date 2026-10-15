@@ -24,6 +24,24 @@
                 CornerRadius="12,12,0,0" />
         <StackPanel Margin="26,22,26,24" Spacing="12">
           <TextBlock Text="TASK ERSTELLEN" Classes="display" FontSize="20" />
+          <!-- Standardaufgaben: a chip fills the fields, as on the Aufgaben tab. Off the Tab path
+               so the dialog's focus cycle stays the form's. -->
+          <ItemsControl x:Name="TaskDialogTemplateChips" ItemsSource="{Binding TaskTemplates}"
+                        IsVisible="{Binding HasTaskTemplates}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="md:TaskTemplate">
+                <!-- ReflectionBinding: see the Aufgaben tab's chips. -->
+                <Button Classes="chip" Content="{Binding Text}" IsTabStop="False"
+                        Command="{ReflectionBinding $parent[ItemsControl].DataContext.ApplyTemplateCommand}"
+                        CommandParameter="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
           <HeaderedContentControl Classes="field required" Header="AUFGABE" ctrl:Field.Error="{Binding TextError}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
             <TextBox x:Name="TaskDialogText" Text="{Binding Text}" AcceptsReturn="False" />

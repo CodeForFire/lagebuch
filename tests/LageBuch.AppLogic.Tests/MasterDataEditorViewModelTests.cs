@@ -189,7 +189,7 @@ public class MasterDataEditorViewModelTests
             new[]
             {
                 "Einstellungen", "Navigation", "Einheiten-Status",
-                "Fahrzeuge", "Links", "Personal", "Rollen", "Trupp-Typen",
+                "Fahrzeuge", "Links", "Personal", "Rollen", "Standardaufgaben", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
     }

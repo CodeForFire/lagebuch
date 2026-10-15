@@ -1,6 +1,7 @@
 using System.Net;
 using LageBuch.AppLogic;
 using LageBuch.Domain;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Sync.Hosting.Tests;
@@ -51,6 +52,22 @@ public class MasterDataSyncTests
         Assert.Equal(new[] { "Löschzug Fürstenfeldbruck" }, set.Brigades);
         Assert.Equal(new Vehicle("Löschzug Fürstenfeldbruck", "FFB 1/40/1", 9), Assert.Single(set.Vehicles));
         Assert.Equal(60, set.Settings.ReturnPressureBar);
+    }
+
+    [Fact]
+    public async Task Host_serves_its_standardaufgaben()
+    {
+        var clock = new FixedClock();
+        var template = new TaskTemplate("Polizei verständigen", TaskImportance.High, TaskUrgency.Low);
+        var hostSet = SetWith("Löschzug Fürstenfeldbruck", 60) with { TaskTemplates = new[] { template } };
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
+        await using var _ = host;
+
+        using var http = Client(port, TestHost.DefaultPin);
+        var set = MasterDataJson.Parse(
+            await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
+
+        Assert.Equal(template, Assert.Single(set.TaskTemplates));
     }
 
     // #400: a joined client labels its Rückmeldung header with the host's Leitstelle, not "ILS".

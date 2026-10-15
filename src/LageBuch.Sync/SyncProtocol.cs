@@ -49,8 +49,13 @@ public static class SyncProtocol
     /// 7: a client may send <c>updateTask</c> and <c>extendTaskTimer</c> (#246). A host at 6 would
     /// reject both commands, so the floor rises to 7.
     /// </para>
+    /// <para>
+    /// 8: the Stammdaten payload carries <c>taskTemplates</c>, the Standardaufgaben. A peer at 7
+    /// skips the key and offers no chips, and a payload without it reads as none, so the floor
+    /// stays at 7.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 7;
+    public const int ProtocolVersion = 8;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

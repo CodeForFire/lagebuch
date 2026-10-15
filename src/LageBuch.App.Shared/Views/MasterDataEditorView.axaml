@@ -736,6 +736,74 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Standardaufgaben editor: the text of an Aufgabe given out often, with the
+                   priorities it usually carries. Order here is the chips' order in the Einsatz. -->
+              <DataTemplate x:DataType="vm:TaskTemplatesSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- Fixed trailing widths matching the row's icon-btn buttons, as in the
+                       Funktionen template above. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,120,120,28,32,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="AUFGABE" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="WICHTIGKEIT" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="2" Text="DRINGLICHKEIT" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Bestimmt auch den Timer der Aufgabe" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TaskTemplateRow">
+                          <Grid ColumnDefinitions="*,120,120,28,32,32" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Text}"
+                                     PlaceholderText="z. B. Polizei verständigen" />
+                            <!-- Options, not ComboBoxItems: see the Funktionen template. -->
+                            <ComboBox Grid.Column="1" Margin="0,0,6,0" ItemsSource="{Binding ImportanceOptions}"
+                                      SelectedValue="{Binding Importance}"
+                                      SelectedValueBinding="{Binding Value}"
+                                      HorizontalAlignment="Stretch"
+                                      AutomationProperties.Name="Wichtigkeit">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ImportanceOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <ComboBox Grid.Column="2" Margin="0,0,6,0" ItemsSource="{Binding UrgencyOptions}"
+                                      SelectedValue="{Binding Urgency}"
+                                      SelectedValueBinding="{Binding Value}"
+                                      HorizontalAlignment="Stretch"
+                                      AutomationProperties.Name="Dringlichkeit">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:UrgencyOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
+                                 $parent path cannot resolve here. -->
+                            <Button Grid.Column="3" Classes="icon-btn" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            </Button>
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Button>
+                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Personnel editor -->
               <DataTemplate x:DataType="vm:PersonnelSection">
                 <DockPanel>

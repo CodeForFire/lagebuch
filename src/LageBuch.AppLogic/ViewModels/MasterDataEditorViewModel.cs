@@ -34,6 +34,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
 
     private NavigationSection _navigation = null!;
     private LinksSection _links = null!;
+    private TaskTemplatesSection _taskTemplates = null!;
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
     private SettingsSection _settings = null!;
@@ -203,6 +204,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             _unitStatus = new EditableListSection("Einheiten-Status", "STATUS", set.UnitStatus, MarkDirty, RequestConfirm),
             _truppTypes = new TruppTypesSection("Trupp-Typen", set.TruppTypes, MarkDirty, RequestConfirm),
             _links = new LinksSection("Links", set.Links, MarkDirty, RequestConfirm),
+            _taskTemplates = new TaskTemplatesSection("Standardaufgaben", set.TaskTemplates, MarkDirty, RequestConfirm),
             _personnel = new PersonnelSection("Personal", set.Personnel, OnPersonnelChanged, RequestConfirm),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these
@@ -288,6 +290,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         UnitStatus = _unitStatus.ToValues(),
         TruppTypes = _truppTypes.ToValues(),
         Links = _links.ToValues(),
+        TaskTemplates = _taskTemplates.ToValues(),
         ChecklistTemplates = ChecklistTemplatesFromSections(),
         Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),

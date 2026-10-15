@@ -24,6 +24,18 @@ person's call sign) becomes a call-sign suggestion. Maintaining the vehicle
 list is all that is needed; every field still accepts free text for anything
 not in it (a Leitstelle, a mutual-aid unit).
 
+## Standardaufgaben
+
+`taskTemplates` lists the Aufgaben a brigade gives out again and again —
+`Polizei verständigen`, `Rettungsdienst nachfordern` — each with an optional
+`importance` and `urgency` of `low`, `medium` (the default) or `high`. The
+Aufgaben tab and the Aufgabe dialog behind an ETB entry show them as chips: a
+tap fills the text, both priorities and the timer that Dringlichkeit stands
+for, and HINZUFÜGEN or SPEICHERN still adds the Aufgabe. The values are copied
+into the Einsatz, so renaming or deleting a Standardaufgabe later changes no
+Aufgabe already given out. An unknown level reads as `medium` rather than
+failing the import.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the

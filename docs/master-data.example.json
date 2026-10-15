@@ -59,6 +59,12 @@
     { "name": "ERICard", "url": "https://example.org/ericard", "group": "Gefahrgut" },
     { "name": "Kartendienst", "url": "https://example.org/karte", "group": "Karten" }
   ],
+  "taskTemplates": [
+    { "text": "Rettungsdienst nachfordern", "importance": "high", "urgency": "high" },
+    { "text": "Polizei verständigen", "importance": "high", "urgency": "medium" },
+    { "text": "Energieversorger informieren", "importance": "medium", "urgency": "medium" },
+    { "text": "THW anfordern", "importance": "medium", "urgency": "low" }
+  ],
   "vehicles": [
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false, "isOwn": true },
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true },

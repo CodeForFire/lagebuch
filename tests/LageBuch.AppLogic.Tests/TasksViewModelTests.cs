@@ -726,4 +726,86 @@ public class TasksViewModelTests
             alarm ?? new FakeAlarmService(),
             MasterData(),
             () => { });
+
+    private static TasksViewModel ChipVm(LocalIncidentSession session, MasterDataSet masterData, Action onChanged) =>
+        new(session, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), masterData, onChanged);
+
+    [Fact]
+    public void Chip_prefills_text_and_priorities_without_adding_a_task()
+    {
+        var (session, _, _) = NewSession();
+        var changed = 0;
+        var template = new TaskTemplate("Rettungsdienst nachfordern", TaskImportance.High, TaskUrgency.High);
+        using var vm = ChipVm(session, MasterData() with { TaskTemplates = new[] { template } }, () => changed++);
+
+        vm.ApplyTemplateCommand.Execute(template);
+
+        Assert.Equal("Rettungsdienst nachfordern", vm.NewText);
+        Assert.Equal(TaskImportance.High, vm.NewImportance);
+        Assert.Equal(TaskUrgency.High, vm.NewUrgency);
+        Assert.Equal(IncidentTask.DefaultTimerMinutes(TaskUrgency.High), vm.NewTimerMinutes);
+        Assert.Empty(session.Incident.Tasks);
+        Assert.Equal(0, changed);
+    }
+
+    [Fact]
+    public void Chip_resets_a_timer_override_even_when_the_urgency_is_unchanged()
+    {
+        var (session, _, _) = NewSession();
+        var template = new TaskTemplate("Polizei verständigen");
+        using var vm = ChipVm(session, MasterData() with { TaskTemplates = new[] { template } }, () => { });
+        vm.NewTimerMinutes = 42;
+
+        vm.ApplyTemplateCommand.Execute(template);
+
+        Assert.Equal(IncidentTask.DefaultTimerMinutes(TaskUrgency.Medium), vm.NewTimerMinutes);
+    }
+
+    [Fact]
+    public void A_task_added_from_a_chip_keeps_its_text_when_the_standardaufgabe_is_renamed()
+    {
+        var (session, _, _) = NewSession();
+        var template = new TaskTemplate("Polizei verständigen", TaskImportance.High);
+        using var vm = ChipVm(session, MasterData() with { TaskTemplates = new[] { template } }, () => { });
+
+        vm.ApplyTemplateCommand.Execute(template);
+        vm.AddTaskCommand.Execute(null);
+
+        // #337: the Aufgabe holds the value, not a reference -- there is nothing to rename it with.
+        var task = Assert.Single(session.Incident.Tasks);
+        Assert.Equal("Polizei verständigen", task.Text);
+        Assert.Equal(TaskImportance.High, task.Importance);
+    }
+
+    [Fact]
+    public void Chips_are_offered_in_stammdaten_order_and_hidden_when_there_are_none()
+    {
+        var (session, _, _) = NewSession();
+        var templates = new[] { new TaskTemplate("THW anfordern"), new TaskTemplate("Polizei verständigen") };
+        using var withChips = ChipVm(session, MasterData() with { TaskTemplates = templates }, () => { });
+        using var without = ChipVm(session, MasterData(), () => { });
+
+        Assert.Equal(templates, withChips.TaskTemplates);
+        Assert.True(withChips.HasTaskTemplates);
+        Assert.False(without.HasTaskTemplates);
+    }
+
+    [Fact]
+    public void An_oversized_standardaufgabe_from_a_host_still_adds_an_aufgabe()
+    {
+        // The whole path a hostile host's payload takes: parse, chip, HINZUFÜGEN. Without the cap
+        // the last step threw out of IncidentTask.Create mid-Einsatz.
+        var (session, _, _) = NewSession();
+        var huge = new string('x', IncidentTask.MaxTextLength + 500);
+        var fromHost = MasterDataJson.Parse(MasterDataJson.Serialize(MasterDataSet.Empty with
+        {
+            TaskTemplates = new[] { new TaskTemplate(huge) },
+        }));
+        using var vm = ChipVm(session, MasterData() with { TaskTemplates = fromHost.TaskTemplates }, () => { });
+
+        vm.ApplyTemplateCommand.Execute(Assert.Single(vm.TaskTemplates));
+        vm.AddTaskCommand.Execute(null);
+
+        Assert.Equal(IncidentTask.MaxTextLength, Assert.Single(session.Incident.Tasks).Text.Length);
+    }
 }

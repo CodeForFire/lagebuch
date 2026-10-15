@@ -48,6 +48,12 @@
     { "name": "Hydrantenplan", "url": "https://example.org/hydranten", "group": "Karten" },
     { "name": "ILS Musterstadt", "url": "https://example.org/ils" }
   ],
+  "taskTemplates": [
+    { "text": "Rettungsdienst nachfordern", "importance": "high", "urgency": "high" },
+    { "text": "Polizei verständigen", "importance": "high", "urgency": "medium" },
+    { "text": "Energieversorger informieren", "importance": "medium", "urgency": "medium" },
+    { "text": "THW anfordern", "importance": "medium", "urgency": "low" }
+  ],
   "vehicles": [
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 3, "hasZugfuehrer": true },
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 40/1", "seats": 9, "hasZugfuehrer": false },

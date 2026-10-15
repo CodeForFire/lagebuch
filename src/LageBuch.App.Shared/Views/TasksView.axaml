@@ -131,6 +131,26 @@
                       Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
           </Button>
         </Grid>
+        <!-- Standardaufgaben: a chip fills the fields below, HINZUFÜGEN still adds. Off the Tab
+             path, which stays WICHTIGKEIT to AUFGABE (#540): the chips are the pointer's and the
+             finger's shortcut, the keyboard has the text box. -->
+        <ItemsControl x:Name="TaskTemplateChips" ItemsSource="{Binding TaskTemplates}"
+                      IsVisible="{Binding HasTaskTemplates}" Margin="0,0,0,6">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="md:TaskTemplate">
+              <!-- ReflectionBinding: the command lives on the ItemsControl's DataContext, whose
+                   static type is object under compiled bindings. -->
+              <Button Classes="chip" Content="{Binding Text}" IsTabStop="False"
+                      Command="{ReflectionBinding $parent[ItemsControl].DataContext.ApplyTemplateCommand}"
+                      CommandParameter="{Binding}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
         <StackPanel x:Name="DockFields" Spacing="12">
           <HeaderedContentControl Classes="field" Header="WICHTIGKEIT">
             <ListBox x:Name="ImportanceBox" Classes="triage" ItemsSource="{Binding ImportanceOptions}"
