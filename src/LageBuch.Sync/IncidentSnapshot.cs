@@ -50,7 +50,11 @@ public sealed record IncidentSnapshot(
     // Defaulted like DwellingDto.Readings: a snapshot without the key reads as "no Beteiligte".
     IReadOnlyList<InvolvedPartyDto>? InvolvedParties = null,
     long Revision = 0,
-    Guid Epoch = default);
+    Guid Epoch = default,
+
+    // Defaulted after Epoch so every existing positional construction keeps compiling; a snapshot
+    // without the key reads as "no Lagemeldungen" (#592).
+    IReadOnlyList<SituationReportDto>? SituationReports = null);
 
 public sealed record TimerDto(
     string Key,
@@ -156,6 +160,21 @@ public sealed record TaskDto(
     DateTimeOffset DueAt,
     DateTimeOffset? CompletedAt,
     string? CompletedBy);
+
+/// <summary>One Lagemeldung on the wire; mirrors <see cref="LageBuch.Domain.SituationReports.SituationReport"/>.</summary>
+public sealed record SituationReportDto(
+    Guid Id,
+    int? Number,
+    string? Reporter,
+    string? Location,
+    string? Situation,
+    string? Measures,
+    string? Units,
+    string? Requests,
+    string CreatedBy,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? SentAt,
+    string? SentBy);
 
 /// <summary>One Beteiligte/r on the wire; mirrors <see cref="LageBuch.Domain.Involved.InvolvedParty"/>.</summary>
 public sealed record InvolvedPartyDto(
