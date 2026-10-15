@@ -22,7 +22,6 @@ public static class ModuleLabels
             [NavModules.Files] = "DATEIEN",
             [NavModules.Links] = "LINKS",
             [NavModules.Contacts] = "KONTAKTE",
-            [NavModules.SituationReports] = "LAGEMELDUNG",
         };
 
     /// <summary>The rail label of a built-in module.</summary>

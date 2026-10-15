@@ -5,6 +5,7 @@
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              xmlns:etb="clr-namespace:LageBuch.Domain.Etb;assembly=LageBuch.Domain"
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
+             xmlns:views="clr-namespace:LageBuch.App.Shared.Views"
              x:Class="LageBuch.App.Shared.Views.EtbView"
              x:DataType="vm:EtbViewModel">
   <!-- The narrow layout, keyed off the "narrow" class on IncidentWorkspaceView's root Panel
@@ -23,6 +24,27 @@
          and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
     <Style Selector="StackPanel#DockFields">
       <Setter Property="Orientation" Value="Horizontal" />
+    </Style>
+    <Style Selector="Border#SituationReportPanel">
+      <Setter Property="DockPanel.Dock" Value="Right" />
+      <Setter Property="Width" Value="440" />
+      <Setter Property="Margin" Value="16,0,0,0" />
+    </Style>
+    <!-- The Lagemeldung's Nr. on its ETB row: quiet, outlined, the same weight as a time. -->
+    <Style Selector="ScrollViewer#FunkspruchScroll">
+      <Setter Property="MaxHeight" Value="360" />
+    </Style>
+    <Style Selector="Border.lm-badge">
+      <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="5,1" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.lm-badge > TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
     </Style>
     <Style Selector="StackPanel#EditFields">
       <Setter Property="Orientation" Value="Horizontal" />
@@ -45,6 +67,16 @@
     </Style>
     <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#EditFields">
       <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <!-- A phone has no room beside the journal: the Lagemeldung takes the screen, the way the
+         entry sheet does, and the journal comes back when it closes. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow ScrollViewer#FunkspruchScroll">
+      <Setter Property="MaxHeight" Value="200" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#SituationReportPanel">
+      <Setter Property="DockPanel.Dock" Value="Top" />
+      <Setter Property="Width" Value="NaN" />
+      <Setter Property="Margin" Value="0" />
     </Style>
     <!-- The bottom bar already says ETB; the heading would only cost the checkbox its width. -->
     <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#EtbTitle">
@@ -88,19 +120,164 @@
        back up to the row buttons at the list's right edge. Each child is its own tab group, ranked
        by TabIndex in the order it appears on screen. -->
   <DockPanel KeyboardNavigation.TabNavigation="Local">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,14"
+    <!-- WrapPanel rather than fixed columns: on a phone the four controls take two lines instead
+         of squeezing the title out. -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="0,0,0,14"
           KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
       <TextBlock Grid.Column="0" x:Name="EtbTitle" Text="EINSATZTAGEBUCH" Classes="overline" VerticalAlignment="Top" />
-      <!-- The Buchstabier-Helfer (#592), for a name that has to be spelled over the radio. Up here
-           rather than in the dock: it is wanted while reading the journal too, and the dock's row
-           is already as wide as a desktop window allows. -->
-      <Button Grid.Column="1" x:Name="OpenSpellingHelperButton" Classes="ghost" Content="BUCHSTABIEREN"
-              VerticalAlignment="Center"
-              Command="{Binding OpenSpellingHelperCommand}" />
-      <CheckBox Grid.Column="2" x:Name="HideSystemCheckBox"
-                Content="Systemmeldungen ausblenden"
-                IsChecked="{Binding HideSystemEntries}" />
+      <WrapPanel Grid.Column="1" x:Name="EtbHeaderActions" Orientation="Horizontal" HorizontalAlignment="Right"
+                 ItemSpacing="12" LineSpacing="6">
+        <!-- The Lagemeldung (#592) lives here, beside the journal it is written from. -->
+        <Button x:Name="OpenSituationReportButton" Content="LAGEMELDUNG"
+                VerticalAlignment="Center"
+                ToolTip.Tip="Lagemeldung an die Leitstelle schreiben (Strg+L)"
+                IsVisible="{Binding !IsReadOnly}"
+                Command="{Binding SituationReport.OpenCommand}" />
+        <!-- The Buchstabier-Helfer on its own, for a name in an ordinary ETB entry. -->
+        <Button x:Name="OpenSpellingHelperButton" Classes="ghost" Content="BUCHSTABIEREN"
+                VerticalAlignment="Center"
+                Command="{Binding OpenSpellingHelperCommand}" />
+        <CheckBox x:Name="OnlySituationReportsCheckBox"
+                  Content="Nur Lagemeldungen"
+                  IsChecked="{Binding ShowOnlySituationReports}" />
+        <CheckBox x:Name="HideSystemCheckBox"
+                  Content="Systemmeldungen ausblenden"
+                  IsChecked="{Binding HideSystemEntries}" />
+      </WrapPanel>
     </Grid>
+
+    <!-- The Lagemeldung (#592), beside the journal it is written from: the grid stays readable on
+         the left, so Lage and Maßnahmen can be taken from what happened. Docked before the input
+         dock so it runs the full height on the right and a quick ETB line can still be written
+         below the journal mid-report. On SENDEN it becomes an ETB row and the panel closes; there
+         is no list of reports of its own. An inline panel under the overlay contract (#538):
+         focus lands on LAGE, Escape folds it away and keeps the draft. -->
+    <Border x:Name="SituationReportPanel"
+            KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="6"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="16,14"
+            IsVisible="{Binding SituationReport.IsOpen}"
+            b:Overlay.IsInline="True"
+            b:Overlay.CancelCommand="{Binding SituationReport.CloseCommand}"
+            b:Overlay.InitialFocus="{Binding #SrSituationBox}"
+            b:Overlay.FallbackFocus="{Binding #OpenSituationReportButton}">
+      <DockPanel DataContext="{Binding SituationReport}" x:DataType="vm:SituationReportComposerViewModel">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+          <TextBlock Grid.Column="0" Text="Lagemeldung" Classes="display" FontSize="18" VerticalAlignment="Center" />
+          <Button Grid.Column="1" x:Name="CloseSituationReportButton" Classes="ghost"
+                  AutomationProperties.Name="Lagemeldung schließen (Entwurf bleibt)"
+                  ToolTip.Tip="Schließen – der Entwurf bleibt erhalten"
+                  Command="{Binding CloseCommand}">
+            <PathIcon Width="13" Height="13"
+                      Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+          </Button>
+        </Grid>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right"
+                    Margin="0,12,0,0">
+          <Button x:Name="DiscardSituationReportButton" Classes="ghost dock-action" Content="VERWERFEN"
+                  Command="{Binding DiscardCommand}" />
+          <Button x:Name="SendSituationReportButton" Classes="signal dock-action" Content="{Binding SendLabel}"
+                  Command="{Binding SendCommand}" />
+        </StackPanel>
+
+        <!-- The Funkspruch as a script: what is said, top to bottom, in speaking order, one part
+             per line, so the Lagebuchführer reads down it into the radio. The street is the part
+             the ILS asks to have spelled, so its spelling sits right under it. Docked right above
+             SENDEN, so reading it out and sending it are one glance; the fields scroll above. -->
+        <Border DockPanel.Dock="Bottom" x:Name="FunkspruchScript" Margin="0,12,0,0" Padding="14,12"
+                Background="{StaticResource SurfaceRaisedBrush}"
+                BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="3,0,0,0"
+                CornerRadius="{StaticResource RadiusMd}">
+          <ScrollViewer x:Name="FunkspruchScroll"
+                        HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="10" Margin="0,0,6,0">
+              <TextBlock Text="Funkspruch" Classes="secondary" FontSize="12" />
+              <ItemsControl x:Name="FunkspruchLinesList" ItemsSource="{Binding FunkspruchLines}"
+                            IsVisible="{Binding HasFunkspruch}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="10" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <!-- SelectableTextBlock, so a line can be copied; it is not a TextBlock to the
+                       global text style, hence the body font set here. -->
+                  <DataTemplate x:DataType="vm:FunkspruchLine">
+                    <StackPanel Spacing="2">
+                      <SelectableTextBlock Text="{Binding Text}" FontFamily="{StaticResource BodyFont}"
+                                           FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                      <SelectableTextBlock Text="{Binding Spelling}" FontFamily="{StaticResource BodyFont}"
+                                           FontSize="13" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           IsVisible="{Binding Spelling, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="Noch leer. Was hier steht, wird vorgelesen und ins ETB geschrieben."
+                         TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
+                         IsVisible="{Binding !HasFunkspruch}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+
+        <ScrollViewer x:Name="SituationReportScroll"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="8" Margin="0,0,6,0">
+            <HeaderedContentControl Classes="field" Header="MELDENDER">
+              <TextBox x:Name="SrReporterBox" Text="{Binding Reporter}" IsReadOnly="{Binding !IsEditable}"
+                       MaxLength="{x:Static vm:SituationReportComposerViewModel.MaxReporterLength}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="EINSATZSTELLE">
+              <TextBox x:Name="SrLocationBox" Text="{Binding Location}" IsReadOnly="{Binding !IsEditable}"
+                       TextWrapping="Wrap"
+                       MaxLength="{x:Static vm:SituationReportComposerViewModel.MaxLocationLength}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="LAGE">
+              <TextBox x:Name="SrSituationBox" Text="{Binding Situation}" IsReadOnly="{Binding !IsEditable}"
+                       TextWrapping="Wrap"
+                       MaxLength="{x:Static vm:SituationReportComposerViewModel.MaxFieldLength}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="DURCHGEFÜHRTE MASSNAHMEN">
+              <TextBox x:Name="SrMeasuresBox" Text="{Binding Measures}" IsReadOnly="{Binding !IsEditable}"
+                       TextWrapping="Wrap"
+                       MaxLength="{x:Static vm:SituationReportComposerViewModel.MaxFieldLength}" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="EINGESETZTE EINHEITEN">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBox Grid.Column="0" x:Name="SrUnitsBox" Text="{Binding Units}" IsReadOnly="{Binding !IsEditable}"
+                         TextWrapping="Wrap"
+                         MaxLength="{x:Static vm:SituationReportComposerViewModel.MaxFieldLength}" />
+                <Button Grid.Column="1" x:Name="SrRefreshUnitsButton" Classes="ghost" VerticalAlignment="Top"
+                        ToolTip.Tip="Aus den Kräften neu übernehmen"
+                        AutomationProperties.Name="Einheiten aus den Kräften neu übernehmen"
+                        Command="{Binding RefreshUnitsCommand}">
+                  <PathIcon Width="14" Height="14"
+                            Data="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                </Button>
+              </Grid>
+            </HeaderedContentControl>
+            <HeaderedContentControl Classes="field" Header="NACHFORDERUNGEN">
+              <TextBox x:Name="SrRequestsBox" Text="{Binding Requests}" IsReadOnly="{Binding !IsEditable}"
+                       TextWrapping="Wrap"
+                       MaxLength="{x:Static vm:SituationReportComposerViewModel.MaxFieldLength}" />
+            </HeaderedContentControl>
+            <TextBlock x:Name="SrError" Classes="field-error" Text="{Binding Error}"
+                       IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <!-- The whole Buchstabier-Helfer, folded away: the Einsatzstelle above is spelled
+                 already, this is for any other word. -->
+            <Expander x:Name="SrHelperExpander" Header="Buchstabieren" Margin="0,6,0,0"
+                      HorizontalAlignment="Stretch"
+                      IsExpanded="{Binding IsHelperExpanded}">
+              <views:SpellingHelperView x:Name="SrHelper" DataContext="{Binding Helper}" MaxHeight="420" />
+            </Expander>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
 
     <!-- The phone's way in to the dock. Full width and at the bottom edge of the list, where the
          thumb already is; on a wide window the dock is simply always open and this never shows. -->
@@ -251,8 +428,10 @@
       </StackPanel>
     </Border>
 
-    <!-- The wide layout: one row per entry, every column at once. -->
-    <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
+    <!-- The wide layout: one row per entry, every column at once. Hidden on a phone while the
+         Lagemeldung takes the screen. -->
+    <Panel x:Name="EtbJournal" IsVisible="{Binding ShowJournal}"
+           KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
       <Border x:Name="EtbGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
         <DataGrid x:Name="EtbGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
@@ -265,13 +444,20 @@
                 <DataTemplate x:DataType="vm:EtbEntryRow">
                   <!-- The Aufgaben given out from this entry, counted, beside the text that made
                        them necessary; a tap brings them up on the Aufgaben tab. Amber while one is
-                       still open. Off the Tab path: the grid's keys are RowKeys'. -->
+                       still open. Off the Tab path: the grid's keys are RowKeys'. A sent Lagemeldung
+                       carries its Nr. (#592), so "Nur Lagemeldungen" is not the only way to tell it
+                       from the rest of the traffic to the Leitstelle. -->
                   <DockPanel Margin="6,4">
                     <Button DockPanel.Dock="Right" Margin="8,0,0,0" Classes="badge" Classes.open="{Binding HasOpenTasks}"
                           IsVisible="{Binding HasTasks}" IsTabStop="False"
                           Content="{Binding TaskBadge}" Command="{Binding ShowTasksCommand}"
                           ToolTip.Tip="Die Aufgaben zu diesem Eintrag zeigen" />
-                    <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Border Classes="lm-badge" IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <TextBlock Text="{Binding SituationReportLabel}" />
+                      </Border>
+                      <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                    </StackPanel>
                   </DockPanel>
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
@@ -335,6 +521,10 @@
                         </MultiBinding>
                       </TextBlock.Text>
                     </TextBlock>
+                    <Border Classes="lm-badge" HorizontalAlignment="Left"
+                            IsVisible="{Binding SituationReportLabel, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <TextBlock Text="{Binding SituationReportLabel}" />
+                    </Border>
                     <TextBlock Text="{Binding Text}" TextWrapping="Wrap"
                                Foreground="{StaticResource TextPrimaryBrush}" />
                     <Button Classes="badge" Classes.open="{Binding HasOpenTasks}"

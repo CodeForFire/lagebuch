@@ -68,7 +68,7 @@ Markdown.
 | **Beteiligte** | Eigentümer, Fahrzeughalter, Polizei, Evakuierte: Name, Telefon, Notiz und Aufenthaltsort je Person – synchronisiert, im PDF, bewusst ohne ETB-Eintrag |
 | **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene; Sicherheitstrupp je Trupp zugeordnet und im ETB protokolliert |
 | **Rückmeldung an ILS** | Erinnerung nach konfigurierbarer Zeit, danach im Intervall, mit ERLEDIGT-Quittierung; überlebt Neustart und Absturz |
-| **Lagemeldung** | Meldender, Einsatzstelle, Lage, Maßnahmen, Einheiten und Nachforderungen – vorbefüllt aus dem Einsatz, als Funkspruch zum Vorlesen; SENDEN schreibt sie ins ETB, startet die Rückmeldung an die ILS neu und nummeriert sie für den PDF-Bericht. Dazu ein Buchstabier-Helfer (Anton/Berta, DIN 5009, NATO), auch aus dem ETB erreichbar |
+| **Lagemeldung** | Im ETB, neben dem Tagebuch: Meldender, Einsatzstelle, Lage, Maßnahmen, Einheiten und Nachforderungen – vorbefüllt aus dem Einsatz, als Funkspruch zum Vorlesen, die Einsatzstelle gleich buchstabiert; SENDEN schreibt sie als nummerierten Eintrag ins ETB und startet die Rückmeldung an die ILS neu. Dazu ein Buchstabier-Helfer (Anton/Berta, DIN 5009, NATO) für jedes andere Wort |
 | **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), Messreihe je Wohnung mit Uhrzeit und ppm-Wert in Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort; der Verlauf steht im ETB und im PDF |
 | **Checklisten** | Beliebig viele eigene Checklisten aus den Stammdaten – benannt, in frei wählbarer Reihenfolge in der Seitenleiste, Pflichtpunkte markiert, Abschluss im ETB protokolliert |
 | **Dateien & Links** | Fotos und PDFs an den Einsatz hängen (landen im Bericht); Schnellzugriff auf Wetter, Karten, Hydrantenplan |
@@ -85,6 +85,7 @@ Die wichtigsten:
 |---|---|
 | **Strg+1** … **Strg+0** | Eintrag der Seitenleiste öffnen, von oben gezählt – auch Checklisten; die Ziffer steht am Eintrag |
 | **Strg+Tab** / **Strg+Umschalt+Tab** | nächstes / vorheriges Modul der Seitenleiste, auch Checklisten |
+| **Strg+L** | Lagemeldung schreiben – öffnet sie neben dem ETB |
 | **Strg+N** | neuer ETB-Eintrag, Cursor im Feld VON |
 | **F9** | zur dringendsten Meldung: Rückzugsalarm, dann Druckabfrage, fällige Aufgabe, Rückmeldung an die ILS |
 

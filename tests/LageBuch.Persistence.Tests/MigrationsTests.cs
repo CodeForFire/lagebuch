@@ -334,7 +334,7 @@ public class MigrationsTests : IDisposable
         check.CommandText =
             "SELECT count(*) FROM pragma_table_info('situation_reports') " +
             "WHERE name IN ('id','ordinal','number','reporter','location','situation','measures','units','requests'," +
-            "'created_by','created_at','sent_at','sent_by');";
-        Assert.Equal(13L, (long)check.ExecuteScalar()!);
+            "'created_by','created_at','sent_at','sent_by','etb_entry_id');";
+        Assert.Equal(14L, (long)check.ExecuteScalar()!);
     }
 }

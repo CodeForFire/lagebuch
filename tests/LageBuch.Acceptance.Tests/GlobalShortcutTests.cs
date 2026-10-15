@@ -122,7 +122,7 @@ public class GlobalShortcutTests
     }
 
     [AvaloniaFact]
-    public void Ctrl_L_opens_the_Lagemeldung_even_from_a_text_box()
+    public void Ctrl_L_opens_the_Lagemeldung_beside_the_ETB_even_from_a_text_box()
     {
         var (window, _, vm) = ShowShell();
         PressAndSettle(window, PhysicalKey.N, RawInputModifiers.Control);
@@ -130,7 +130,8 @@ public class GlobalShortcutTests
 
         PressAndSettle(window, PhysicalKey.L, RawInputModifiers.Control);
 
-        Assert.Equal("LAGEMELDUNG", vm.SelectedNavItem?.Header);
+        Assert.Equal("ETB", vm.SelectedNavItem?.Header);
+        Assert.True(vm.Etb.SituationReport.IsOpen);
     }
 
     [AvaloniaFact]
