@@ -46,7 +46,11 @@ public interface IIncidentSession
     /// </summary>
     void ChangeOperator(SessionOperator op);
 
-    void AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
+    /// <returns>
+    /// The new entry's id, known at once even on a joined device: it mints the id and the host
+    /// keeps it, so an Aufgabe can be linked to the entry before the host's snapshot arrives.
+    /// </returns>
+    Guid AddJournalEntry(EtbDirection direction, string text, string? from = null, string? to = null);
 
     void EditJournalEntry(Guid entryId, string text);
 
@@ -89,7 +93,8 @@ public interface IIncidentSession
 
     /// <summary>Records a task (#88). The timer's minutes land as DueAt relative to the owning
     /// device's/host's clock — never sent as an absolute time over the wire.</summary>
-    void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes);
+    // sourceEntryId: the ETB entry the Aufgabe was given out from, if any.
+    void AddTask(string text, string? assignee, TaskImportance importance, TaskUrgency urgency, int timerMinutes, Guid? sourceEntryId = null);
 
     /// <summary>Stamps/clears a task's completion (#88).</summary>
     void SetTaskCompleted(Guid taskId, bool isDone);

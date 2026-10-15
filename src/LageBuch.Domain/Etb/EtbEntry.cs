@@ -32,7 +32,8 @@ public sealed record EtbEntry
         string text,
         SessionOperator @operator,
         string? from = null,
-        string? to = null)
+        string? to = null,
+        Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -48,7 +49,7 @@ public sealed record EtbEntry
 
         return new EtbEntry
         {
-            Id = Guid.NewGuid(),
+            Id = id is { } given && given != Guid.Empty ? given : Guid.NewGuid(),
             Timestamp = timestamp,
             Direction = direction,
             Text = text.Trim(),

@@ -27,7 +27,11 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // Opens the create-task overlay pre-filled with an entry's text (#88, #247); null where the
     // host offers no task feature, which disables the "add & create task" dock button and hides
     // every row's create-task icon too.
-    private readonly Action<string>? _createTaskFromEntry;
+    private readonly Action<string, Guid?>? _createTaskFromEntry;
+
+    // Brings the Aufgaben given out from an entry forward, from the row's badge; null where the
+    // host has no Aufgaben tab to show them in.
+    private readonly Action<Guid>? _showTasksFrom;
 
     // #415: an entry addressed to the Leitstelle is usually the Rückmeldung itself, so adding one
     // offers to restart the reminder. Not automatic: not every message to the Leitstelle is one.
@@ -47,8 +51,9 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         IClock clock,
         MasterDataSet masterData,
         Action onChanged,
-        Action<string>? createTaskFromEntry = null,
-        Action? offerReminderReset = null)
+        Action<string, Guid?>? createTaskFromEntry = null,
+        Action? offerReminderReset = null,
+        Action<Guid>? showTasksFrom = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
@@ -57,6 +62,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         _onChanged = onChanged;
         _createTaskFromEntry = createTaskFromEntry;
         _offerReminderReset = offerReminderReset;
+        _showTasksFrom = showTasksFrom;
         _dispatchCentreName = masterData.Settings.DispatchCentreName;
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
@@ -116,6 +122,24 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             {
                 CancelEdit(); // the entry being edited changed underneath us (another device saved first)
             }
+        }
+
+        RefreshTaskBadges();
+    }
+
+    // Every change can add, complete or reopen an Aufgabe given out from any entry, here or on
+    // another device, so every row's count is brought up to date -- one pass over the tasks and
+    // one over the rows, and a row whose count did not move raises nothing.
+    private void RefreshTaskBadges()
+    {
+        var bySource = _session.Incident.Tasks
+            .Where(t => t.SourceEntryId is not null)
+            .GroupBy(t => t.SourceEntryId!.Value)
+            .ToDictionary(g => g.Key, g => (Total: g.Count(), Open: g.Count(t => !t.IsCompleted)));
+        foreach (var row in _all)
+        {
+            var (total, open) = bySource.TryGetValue(row.Id, out var counts) ? counts : (0, 0);
+            row.SetTaskCounts(total, open);
         }
     }
 
@@ -253,13 +277,13 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
             return;
         }
 
-        _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo);
+        var entryId = _session.AddJournalEntry(ManualDirection, NewText, NewFrom, NewTo);
         var text = NewText;
         var toDispatchCentre = IsToDispatchCentre(NewTo);
         ClearNewEntry();
         _onChanged();
         OfferReminderResetIf(toDispatchCentre);
-        _createTaskFromEntry?.Invoke(text);
+        _createTaskFromEntry?.Invoke(text, entryId);
     }
 
     // An "An" field is free text: match the configured name exactly, ignoring case and padding.
@@ -389,12 +413,14 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // Reopens the same overlay #88 wired to the input dock's "add & create task" button (#247),
     // pre-filled from the row's text; the timer still starts from "now", same as the dock button,
     // since anchoring it to a possibly much older entry's timestamp would be misleading.
-    private void CreateTaskFromRow(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text);
+    private void CreateTaskFromRow(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text, row.Id);
 
     private bool CanCreateTaskFromRow(EtbEntryRow row) => !IsReadOnly && _createTaskFromEntry is not null;
 
+    private void ShowTasksFromRow(EtbEntryRow row) => _showTasksFrom?.Invoke(row.Id);
+
     private EtbEntryRow ToRow(EtbEntry e) =>
-        new(e, BeginEdit, CanEdit, ShowHistory, CreateTaskFromRow, CanCreateTaskFromRow);
+        new(e, BeginEdit, CanEdit, ShowHistory, CreateTaskFromRow, CanCreateTaskFromRow, ShowTasksFromRow);
 }
 
 /// <summary>
@@ -413,7 +439,8 @@ public sealed class EtbEntryRow : ObservableObject
         Func<EtbEntryRow, bool> canEdit,
         Action<EtbEntryRow> showHistory,
         Action<EtbEntryRow> createTask,
-        Func<EtbEntryRow, bool> canCreateTask)
+        Func<EtbEntryRow, bool> canCreateTask,
+        Action<EtbEntryRow>? showTasks = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(canCreateTask);
@@ -439,6 +466,7 @@ public sealed class EtbEntryRow : ObservableObject
         // task feature at all has nowhere to send it either.
         CanCreateTask = canCreateTask(this);
         CreateTaskCommand = new RelayCommand(() => createTask(this), () => canCreateTask(this));
+        ShowTasksCommand = new RelayCommand(() => showTasks?.Invoke(this), () => showTasks is not null && TaskCount > 0);
     }
 
     public Guid Id { get; }
@@ -468,6 +496,45 @@ public sealed class EtbEntryRow : ObservableObject
     public IRelayCommand ShowHistoryCommand { get; }
 
     public ICommand CreateTaskCommand { get; }
+
+    /// <summary>The badge's tap: brings the Aufgaben given out from this entry forward.</summary>
+    public IRelayCommand ShowTasksCommand { get; }
+
+    /// <summary>How many Aufgaben were given out from this entry.</summary>
+    public int TaskCount { get; private set; }
+
+    /// <summary>How many of them are still open.</summary>
+    public int OpenTaskCount { get; private set; }
+
+    public bool HasTasks => TaskCount > 0;
+
+    /// <summary>"2 Aufgaben · 1 offen", "1 Aufgabe · erledigt", or empty while there is none.</summary>
+    public string TaskBadge => TaskCount switch
+    {
+        0 => string.Empty,
+        _ => $"{(TaskCount == 1 ? "1 Aufgabe" : $"{TaskCount} Aufgaben")} · {(OpenTaskCount == 0 ? "erledigt" : $"{OpenTaskCount} offen")}",
+    };
+
+    /// <summary>Whether any of them is still open: the badge reads as work outstanding then.</summary>
+    public bool HasOpenTasks => OpenTaskCount > 0;
+
+    /// <summary>Updates the counts; raises nothing when they did not move.</summary>
+    public void SetTaskCounts(int total, int open)
+    {
+        if (total == TaskCount && open == OpenTaskCount)
+        {
+            return;
+        }
+
+        TaskCount = total;
+        OpenTaskCount = open;
+        OnPropertyChanged(nameof(TaskCount));
+        OnPropertyChanged(nameof(OpenTaskCount));
+        OnPropertyChanged(nameof(HasTasks));
+        OnPropertyChanged(nameof(HasOpenTasks));
+        OnPropertyChanged(nameof(TaskBadge));
+        ShowTasksCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>
     /// Re-points this row at the current version of its entry, instead of the view model replacing

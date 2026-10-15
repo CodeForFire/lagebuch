@@ -322,6 +322,45 @@ public class WorkspaceCollaborationTests
         Assert.Equal("Client (RUF 1)", done.CompletedBy);
     }
 
+    // The dock's HINZUFÜGEN & AUFGABE on a joined device: the host mints nothing the client has to
+    // wait for, so the dialog opened at once already carries the entry's id, and the Aufgabe saved
+    // from it arrives linked on the host -- whichever of the two commands gets there first.
+    [Fact]
+    public async Task A_joined_clients_hinzufuegen_und_aufgabe_links_the_aufgabe_on_the_host()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        var (host, port) = await TestHost.StartAsync(hostSession, clock);
+        await using var _ = host;
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
+            TestHost.DefaultPin,
+            port);
+        using var workspace = Workspace(client, clock);
+
+        workspace.Etb.NewText = "Stromleitung hängt tief";
+        workspace.Etb.AddEntryAndCreateTaskCommand.Execute(null);
+        var dialog = Assert.IsType<TaskDialogViewModel>(workspace.PendingTaskDialog);
+        dialog.Text = "EVU informieren";
+        dialog.SaveCommand.Execute(null);
+
+        await WaitForClient(
+            client,
+            () => client.Incident.Tasks.Count == 1
+                && client.Incident.Journal.Any(e => e.Text == "Stromleitung hängt tief"),
+            "the entry and the Aufgabe to reach the client");
+
+        var entry = hostSession.Incident.Journal.Single(e => e.Text == "Stromleitung hängt tief");
+        Assert.Equal(entry.Id, Assert.Single(hostSession.Incident.Tasks).SourceEntryId);
+        Assert.Equal(entry.Id, Assert.Single(client.Incident.Tasks).SourceEntryId);
+        Assert.Equal("1 Aufgabe · 1 offen", workspace.Etb.Entries.Single(r => r.Id == entry.Id).TaskBadge);
+    }
+
     [Fact]
     public async Task Involved_parties_converge_between_host_and_client()
     {
