@@ -1209,6 +1209,12 @@ public sealed class Incident
         ArgumentNullException.ThrowIfNull(op);
         ArgumentException.ThrowIfNullOrWhiteSpace(dispatchCentreName);
 
+        // The name may come from a sync peer; cap it like the Meldender it stands opposite.
+        if (dispatchCentreName.Trim().Length > SituationReport.MaxReporterLength)
+        {
+            throw new ArgumentException("Der Name der Leitstelle ist zu lang.", nameof(dispatchCentreName));
+        }
+
         var index = FindDraftSituationReportIndex(reportId);
         var draft = _situationReports[index];
         if (draft.Funkspruch.Length == 0)

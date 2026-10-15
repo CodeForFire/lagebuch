@@ -5,6 +5,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
+using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -96,7 +97,20 @@ public static class SnapshotMapper
             incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel, p.Whereabouts, p.WhereaboutsAt)).ToList(),
             HouseNumber: incident.HouseNumber,
             PostalCode: incident.PostalCode,
-            Place: incident.Place);
+            Place: incident.Place,
+            SituationReports: incident.SituationReports.Select(r => new SituationReportDto(
+                r.Id,
+                r.Number,
+                r.Reporter,
+                r.Location,
+                r.Situation,
+                r.Measures,
+                r.Units,
+                r.Requests,
+                r.CreatedBy,
+                r.CreatedAt,
+                r.SentAt,
+                r.SentBy)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -176,7 +190,20 @@ public static class SnapshotMapper
             (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel, p.Whereabouts, p.WhereaboutsAt)),
             snapshot.HouseNumber,
             snapshot.PostalCode,
-            snapshot.Place);
+            snapshot.Place,
+            (snapshot.SituationReports ?? []).Select(r => SituationReport.Rehydrate(
+                r.Id,
+                r.Number,
+                r.Reporter,
+                r.Location,
+                r.Situation,
+                r.Measures,
+                r.Units,
+                r.Requests,
+                r.CreatedBy,
+                r.CreatedAt,
+                r.SentAt,
+                r.SentBy)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

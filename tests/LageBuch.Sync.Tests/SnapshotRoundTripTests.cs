@@ -382,6 +382,34 @@ public class SnapshotRoundTripTests
             new[] { KeyAvailability.Available, KeyAvailability.NotAvailable, KeyAvailability.Unknown },
             restored.Dwellings.Where(d => d.FloorOrdinal == 0).OrderBy(d => d.ApartmentNumber).Select(d => d.KeyAvailable));
     }
+
+    [Fact]
+    public void Situation_reports_round_trip_through_the_snapshot_over_the_wire()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Muster", "ELW 1");
+        var incident = Incident.Start(clock, op);
+        var first = incident.AddSituationReport(clock, op, "ELW 1", "Blumenstraße 13", "Schuppen im Vollbrand", null, null, null);
+        incident.SendSituationReport(clock, op, first.Id, "ILS");
+        incident.AddSituationReport(clock, op, "ELW 1", null, "Feuer aus", null, null, "1 RTW");
+
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(SnapshotMapper.ToSnapshot(incident))));
+
+        Assert.Equal(incident.SituationReports, restored.SituationReports);
+    }
+
+    [Fact]
+    public void A_snapshot_without_situation_reports_reads_as_none()
+    {
+        var clock = new FixedClock();
+        var incident = Incident.Start(clock, new SessionOperator("Muster"));
+        var snapshot = SnapshotMapper.ToSnapshot(incident) with { SituationReports = null };
+
+        var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(snapshot)));
+
+        Assert.Empty(restored.SituationReports);
+    }
 }
 
 internal sealed class FixedClock : IClock

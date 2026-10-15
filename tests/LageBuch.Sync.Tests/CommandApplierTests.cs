@@ -578,4 +578,74 @@ public class CommandApplierTests
 
         Assert.Equal(expected, incident.Dwellings[0].KeyAvailable);
     }
+
+    [Fact]
+    public void Situation_report_commands_draft_correct_and_send_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var journalBefore = incident.Journal.Count;
+
+        ApplyOverWire(new AddSituationReportCommand(new OperatorDto("Client", "ELW 1"), "ELW 1", "Blumenstraße 13", null, null, null, null), incident, clock);
+        var draft = Assert.Single(incident.SituationReports);
+        Assert.Equal("Client (ELW 1)", draft.CreatedBy);
+
+        ApplyOverWire(new UpdateSituationReportCommand(draft.Id, "ELW 1", "Blumenstraße 13", "Schuppen im Vollbrand", null, null, null), incident, clock);
+        Assert.Equal(journalBefore, incident.Journal.Count);
+
+        ApplyOverWire(new SendSituationReportCommand(new OperatorDto("Client", "ELW 1"), draft.Id, "ILS"), incident, clock);
+
+        var sent = Assert.Single(incident.SituationReports);
+        Assert.Equal(1, sent.Number);
+        var entry = incident.Journal[^1];
+        Assert.Equal(Domain.Etb.EtbDirection.Outgoing, entry.Direction);
+        Assert.Equal("ELW 1", entry.From);
+        Assert.Equal("ILS", entry.To);
+        Assert.Equal("Lagemeldung Nr. 1: Blumenstraße 13 · Schuppen im Vollbrand", entry.Text);
+    }
+
+    [Fact]
+    public void An_oversized_situation_report_field_from_a_peer_is_refused_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var oversized = new string('x', Domain.SituationReports.SituationReport.MaxFieldLength + 1);
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(new AddSituationReportCommand(new OperatorDto("Client", null), null, null, oversized, null, null, null), incident, clock));
+
+        Assert.Empty(incident.SituationReports);
+    }
+
+    [Fact]
+    public void An_oversized_leitstelle_name_from_a_peer_leaves_the_draft_unsent()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var draft = incident.AddSituationReport(clock, new SessionOperator("Host"), null, null, "Lage", null, null, null);
+        var journalBefore = incident.Journal.Count;
+
+        Assert.Throws<ArgumentException>(() =>
+            ApplyOverWire(new SendSituationReportCommand(new OperatorDto("Client", null), draft.Id, new string('I', 5000)), incident, clock));
+
+        Assert.False(Assert.Single(incident.SituationReports).IsSent);
+        Assert.Equal(journalBefore, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void A_peer_cannot_rewrite_a_sent_situation_report()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Host");
+        var sent = incident.SendSituationReport(
+            clock, op, incident.AddSituationReport(clock, op, null, null, "Lage", null, null, null).Id, "ILS");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ApplyOverWire(new UpdateSituationReportCommand(sent.Id, null, null, "anders", null, null, null), incident, clock));
+        Assert.Throws<InvalidOperationException>(() =>
+            ApplyOverWire(new RemoveSituationReportCommand(sent.Id), incident, clock));
+
+        Assert.Equal("Lage", Assert.Single(incident.SituationReports).Situation);
+    }
 }
