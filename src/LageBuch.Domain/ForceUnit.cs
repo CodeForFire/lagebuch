@@ -25,6 +25,9 @@ public sealed record ForceUnit(
     /// <summary>The German Stärke notation: Zugführer / Führungskraft / Mannschaft / Gesamt ("1/1/1/3").</summary>
     public string StrengthText => $"{ZugfuehrerCount}/{OfficerCount}/{MannschaftCount}/{PersonnelCount}";
 
+    /// <summary>How the ETB and a Lagemeldung name the unit: the Feuerwehr, with its Funkrufname when known.</summary>
+    public string Label => CallSign is null ? Brigade : $"{Brigade} ({CallSign})";
+
     public static ForceUnit Create(
         string brigade,
         int personnelCount,

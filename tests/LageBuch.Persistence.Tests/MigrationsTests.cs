@@ -284,4 +284,29 @@ public class MigrationsTests : IDisposable
         Assert.True(r.IsDBNull(1));
         Assert.True(r.IsDBNull(2));
     }
+
+    [Fact]
+    public void V28_database_upgrades_to_v29_and_gains_the_situation_reports_table()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (28);";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(29, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText =
+            "SELECT count(*) FROM pragma_table_info('situation_reports') " +
+            "WHERE name IN ('id','ordinal','number','reporter','location','situation','measures','units','requests'," +
+            "'created_by','created_at','sent_at','sent_by');";
+        Assert.Equal(13L, (long)check.ExecuteScalar()!);
+    }
 }
