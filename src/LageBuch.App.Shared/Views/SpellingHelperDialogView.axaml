@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
+             xmlns:views="clr-namespace:LageBuch.App.Shared.Views"
+             x:Class="LageBuch.App.Shared.Views.SpellingHelperDialogView"
+             x:DataType="vm:SpellingHelperDialogViewModel">
+  <!-- The Buchstabier-Helfer over the ETB (#592). Same scrim and card as TaskDialogView: MaxWidth
+       and Stretch so it shrinks on a phone instead of clipping. Enter and Escape both close it,
+       since there is nothing to save. SCHLIESSEN sits below the helper so the word field is the
+       first tab stop, which is where the overlay puts focus. -->
+  <Border Background="#B3070A10" Padding="16"
+          b:Overlay.CancelCommand="{Binding CloseCommand}" b:Overlay.PrimaryCommand="{Binding CloseCommand}">
+    <Border x:Name="SpellingHelperCard" MaxWidth="520" MaxHeight="640"
+            VerticalAlignment="Center" HorizontalAlignment="Stretch"
+            Background="{StaticResource SurfaceRaisedBrush}"
+            BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusLg}"
+            BoxShadow="{StaticResource OverlayShadow}">
+      <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Border Grid.Row="0" Height="4" Background="{StaticResource SignalGradientBrush}"
+                CornerRadius="12,12,0,0" />
+        <TextBlock Grid.Row="1" Text="BUCHSTABIEREN" Classes="display" FontSize="20" Margin="26,22,26,12" />
+        <views:SpellingHelperView Grid.Row="2" x:Name="DialogHelper" DataContext="{Binding Helper}" Margin="26,0,26,16" />
+        <Button Grid.Row="3" x:Name="SpellingHelperCloseButton" Content="SCHLIESSEN"
+                HorizontalAlignment="Right" Margin="26,0,26,24"
+                Command="{Binding CloseCommand}" />
+      </Grid>
+    </Border>
+  </Border>
+</UserControl>

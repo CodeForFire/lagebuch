@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:sp="clr-namespace:LageBuch.Domain.Spelling;assembly=LageBuch.Domain"
+             x:Class="LageBuch.App.Shared.Views.SpellingHelperView"
+             x:DataType="vm:SpellingHelperViewModel">
+  <!-- The Buchstabier-Helfer (#592): docked in the Lagemeldung tab and shown in the ETB's overlay.
+       The radio buttons carry no GroupName on purpose: both copies can be alive at once, and a
+       shared name would group them across the two, so each group is its own panel instead. -->
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Spacing="10">
+      <HeaderedContentControl Classes="field" Header="WORT">
+        <!-- Freitext: kein Platzhalter, siehe #137 -->
+        <TextBox x:Name="SpellInput" Text="{Binding Input}"
+                 MaxLength="{x:Static vm:SpellingHelperViewModel.MaxInputLength}"
+                 AutomationProperties.Name="Zu buchstabierendes Wort" />
+      </HeaderedContentControl>
+      <WrapPanel x:Name="AlphabetChoice" Orientation="Horizontal" ItemSpacing="4" LineSpacing="4">
+        <RadioButton x:Name="AlphabetTraditional" Content="ANTON" IsChecked="{Binding IsTraditional, Mode=TwoWay}"
+                     ToolTip.Tip="Herkömmliche Buchstabiertafel, im BOS-Funk üblich" />
+        <RadioButton x:Name="AlphabetDin" Content="DIN 5009" IsChecked="{Binding IsDin5009, Mode=TwoWay}"
+                     ToolTip.Tip="DIN 5009:2022 mit Städtenamen" />
+        <RadioButton x:Name="AlphabetNato" Content="NATO" IsChecked="{Binding IsNato, Mode=TwoWay}"
+                     ToolTip.Tip="Internationales ICAO/NATO-Alphabet" />
+      </WrapPanel>
+      <Border x:Name="SpelledCard" Classes="row-card" IsVisible="{Binding HasSpelling}">
+        <SelectableTextBlock x:Name="SpelledText" Text="{Binding Spelled}" FontFamily="{StaticResource BodyFont}" FontSize="17" FontWeight="SemiBold"
+                             TextWrapping="Wrap" AutomationProperties.Name="Buchstabiert" />
+      </Border>
+      <TextBlock Text="TAFEL" Classes="overline" FontSize="10" Margin="0,4,0,0" />
+    </StackPanel>
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <ItemsControl x:Name="AlphabetTable" ItemsSource="{Binding TableRows}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="sp:SpelledLetter">
+            <Grid Width="146" ColumnDefinitions="34,*" Margin="0,2">
+              <TextBlock Grid.Column="0" Text="{Binding Source}" Classes="mono" FontWeight="SemiBold" />
+              <TextBlock Grid.Column="1" Text="{Binding Word}" TextTrimming="CharacterEllipsis"
+                         Foreground="{StaticResource TextMutedBrush}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

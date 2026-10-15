@@ -49,15 +49,20 @@ public static class SyncProtocol
     /// 7: a client may send <c>updateTask</c> and <c>extendTaskTimer</c> (#246). A host at 6 would
     /// reject both commands, so the floor rises to 7.
     /// </para>
+    /// <para>
+    /// 8: the Lagemeldungen (#592) — <c>addSituationReport</c>, <c>updateSituationReport</c>,
+    /// <c>removeSituationReport</c> and <c>sendSituationReport</c> commands and the snapshot's
+    /// <c>situationReports</c>. A host at 7 would reject those commands, so the floor rises to 8.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 7;
+    public const int ProtocolVersion = 8;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 7;
+    public const int MinimumProtocolVersion = 8;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

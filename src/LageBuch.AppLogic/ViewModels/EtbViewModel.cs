@@ -32,6 +32,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // #415: an entry addressed to the Leitstelle is usually the Rückmeldung itself, so adding one
     // offers to restart the reminder. Not automatic: not every message to the Leitstelle is one.
     private readonly Action? _offerReminderReset;
+    private readonly Action? _openSpellingHelper;
     private readonly string _dispatchCentreName;
 
     // Every rendered row, oldest-first like the journal, regardless of the filter. Entries is the
@@ -48,7 +49,9 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         MasterDataSet masterData,
         Action onChanged,
         Action<string>? createTaskFromEntry = null,
-        Action? offerReminderReset = null)
+        Action? offerReminderReset = null,
+        Action? openSpellingHelper = null,
+        Action<string, string, Action>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
@@ -57,10 +60,13 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         _onChanged = onChanged;
         _createTaskFromEntry = createTaskFromEntry;
         _offerReminderReset = offerReminderReset;
+        _openSpellingHelper = openSpellingHelper;
         _dispatchCentreName = masterData.Settings.DispatchCentreName;
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
         Entries = new ObservableCollection<EtbEntryRow>();
+        SituationReport = new SituationReportComposerViewModel(session, onChanged, _dispatchCentreName, requestConfirm);
+        SituationReport.PropertyChanged += OnSituationReportChanged;
 
         // Any change to the incident — from this tab, another tab, or (when joined) another device —
         // brings the journal up to date through the same path.
@@ -68,7 +74,31 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         Sync();
     }
 
-    public void Dispose() => _session.Changed -= Sync;
+    public void Dispose()
+    {
+        _session.Changed -= Sync;
+        SituationReport.PropertyChanged -= OnSituationReportChanged;
+        SituationReport.Dispose();
+    }
+
+    /// <summary>The Lagemeldung panel beside the journal (#592).</summary>
+    public SituationReportComposerViewModel SituationReport { get; }
+
+    /// <summary>
+    /// Whether the journal is on screen: always on a wide window, where the Lagemeldung sits beside
+    /// it; on a phone the open panel takes the screen, as the entry sheet does.
+    /// </summary>
+    public bool ShowJournal => !IsNarrow || !SituationReport.IsOpen;
+
+    private void OnSituationReportChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SituationReportComposerViewModel.IsOpen))
+        {
+            OnPropertyChanged(nameof(ShowJournal));
+            OnPropertyChanged(nameof(ShowComposer));
+            OnPropertyChanged(nameof(ShowComposerButton));
+        }
+    }
 
     /// <summary>
     /// Brings the list up to date with the journal. Entries reach the journal from every module --
@@ -91,9 +121,11 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     public void Sync()
     {
         var journal = _session.Incident.Journal;
+        var reportNumbers = SituationReportNumbers();
         for (var i = _all.Count; i < journal.Count; i++)
         {
             var row = ToRow(journal[i]);
+            row.SituationReportNumber = reportNumbers.TryGetValue(row.Id, out var number) ? number : null;
             _all.Add(row);
             _byId[row.Id] = row;
             if (IsVisible(row))
@@ -116,6 +148,38 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
                 CancelEdit(); // the entry being edited changed underneath us (another device saved first)
             }
         }
+
+        // A Lagemeldung's entry is written in the same change that numbers it, so the marker is
+        // normally set on the first pass; a snapshot that lands in two steps catches up here.
+        var marked = false;
+        foreach (var (entryId, number) in reportNumbers)
+        {
+            if (_byId.TryGetValue(entryId, out var row) && row.SituationReportNumber != number)
+            {
+                row.SituationReportNumber = number;
+                marked = true;
+            }
+        }
+
+        if (marked && ShowOnlySituationReports)
+        {
+            ReconcileVisible();
+        }
+    }
+
+    // ETB entry id -> Lagemeldung Nr., for every report that has been sent.
+    private Dictionary<Guid, int> SituationReportNumbers()
+    {
+        var numbers = new Dictionary<Guid, int>();
+        foreach (var report in _session.Incident.SituationReports)
+        {
+            if (report is { EtbEntryId: { } entryId, Number: { } number })
+            {
+                numbers[entryId] = number;
+            }
+        }
+
+        return numbers;
     }
 
     public bool IsReadOnly { get; }
@@ -135,8 +199,16 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     [ObservableProperty]
     private bool _hideSystemEntries = true;
 
+    /// <summary>Only the Lagemeldungen sent to the Leitstelle (#592), to find the last one quickly.</summary>
+    [ObservableProperty]
+    private bool _showOnlySituationReports;
+
+    partial void OnHideSystemEntriesChanged(bool value) => ReconcileVisible();
+
+    partial void OnShowOnlySituationReportsChanged(bool value) => ReconcileVisible();
+
     // In place, never Clear()+re-add: a Reset takes the grid's selected row and focus with it (#542).
-    partial void OnHideSystemEntriesChanged(bool value) =>
+    private void ReconcileVisible() =>
         RowReconciler.Reconcile(Entries, VisibleNewestFirst(), r => r.Id, r => r.Id, r => r, (_, _) => { });
 
     private List<EtbEntryRow> VisibleNewestFirst()
@@ -155,7 +227,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     }
 
     private bool IsVisible(EtbEntryRow row) =>
-        !HideSystemEntries || row.DirectionValue != EtbDirection.System;
+        (!HideSystemEntries || row.DirectionValue != EtbDirection.System)
+        && (!ShowOnlySituationReports || row.SituationReportNumber is not null);
 
     // The dock and the edit panel below the grid are two separate forms, so each keeps its own
     // "the operator has asked" state: pressing one must not light up a field in the other (#412).
@@ -189,6 +262,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowComposer))]
     [NotifyPropertyChangedFor(nameof(ShowComposerButton))]
+    [NotifyPropertyChangedFor(nameof(ShowJournal))]
     private bool _isNarrow;
 
     /// <summary>
@@ -207,10 +281,10 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     /// a phone. One property rather than two bindings, because a XAML binding is a local value and
     /// would win over any container query trying to restore the dock on the desktop.
     /// </summary>
-    public bool ShowComposer => !IsNarrow || IsComposerOpen;
+    public bool ShowComposer => (!IsNarrow || IsComposerOpen) && ShowJournal;
 
     /// <summary>The phone's "add an entry" affordance, shown exactly when the dock is not.</summary>
-    public bool ShowComposerButton => IsNarrow && !IsComposerOpen;
+    public bool ShowComposerButton => IsNarrow && !IsComposerOpen && ShowJournal;
 
     [RelayCommand(CanExecute = nameof(CanAddEntry))]
     private void OpenComposer() => IsComposerOpen = true;
@@ -387,6 +461,12 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     // since anchoring it to a possibly much older entry's timestamp would be misleading.
     private void CreateTaskFromRow(EtbEntryRow row) => _createTaskFromEntry?.Invoke(row.Text);
 
+    /// <summary>Opens the Buchstabier-Helfer (#592), for a name that has to be spelled over the radio.</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenSpellingHelper))]
+    private void OpenSpellingHelper() => _openSpellingHelper?.Invoke();
+
+    private bool CanOpenSpellingHelper => _openSpellingHelper is not null;
+
     private bool CanCreateTaskFromRow(EtbEntryRow row) => !IsReadOnly && _createTaskFromEntry is not null;
 
     private EtbEntryRow ToRow(EtbEntry e) =>
@@ -403,6 +483,8 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
 /// </summary>
 public sealed class EtbEntryRow : ObservableObject
 {
+    private int? _situationReportNumber;
+
     public EtbEntryRow(
         EtbEntry entry,
         Action<EtbEntryRow> beginEdit,
@@ -464,6 +546,22 @@ public sealed class EtbEntryRow : ObservableObject
     public IRelayCommand ShowHistoryCommand { get; }
 
     public ICommand CreateTaskCommand { get; }
+
+    /// <summary>The Nr. of the Lagemeldung this entry was sent as (#592), or null for any other entry.</summary>
+    public int? SituationReportNumber
+    {
+        get => _situationReportNumber;
+        set
+        {
+            if (SetProperty(ref _situationReportNumber, value))
+            {
+                OnPropertyChanged(nameof(SituationReportLabel));
+            }
+        }
+    }
+
+    /// <summary>"LM 2" for the row's marker; null when the entry is not a Lagemeldung.</summary>
+    public string? SituationReportLabel => SituationReportNumber is { } n ? $"LM {n}" : null;
 
     /// <summary>
     /// Re-points this row at the current version of its entry, instead of the view model replacing

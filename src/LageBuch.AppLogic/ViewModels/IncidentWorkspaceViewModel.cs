@@ -236,6 +236,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [ObservableProperty]
     private TaskDialogViewModel? _pendingTaskDialog;
 
+    // The Buchstabier-Helfer opened from the ETB (#592); null while it is closed.
+    [ObservableProperty]
+    private SpellingHelperDialogViewModel? _pendingSpellingHelper;
+
     // The PDF section-selection overlay (#262); null while no export is in flight.
     [ObservableProperty]
     private PdfExportOptionsViewModel? _pendingPdfExportOptions;
@@ -610,6 +614,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 }
 
                 return true;
+            case ShortcutAction.OpenSituationReport:
+                return ShowSituationReport();
             case ShortcutAction.MostUrgentWarning:
                 return RunMostUrgentWarning();
             default:
@@ -619,7 +625,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     private bool IsOverlayOpen =>
         PendingPrompt is not null || PendingConfirm is not null || PendingTaskDialog is not null
-        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null;
+        || PendingPdfExportOptions is not null || PendingIncidentDataDialog is not null
+        || PendingSpellingHelper is not null;
 
     private bool StepRail(int step)
     {
@@ -911,7 +918,9 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
             _masterData,
             OnChanged,
             OpenTaskDialog,
-            OfferReminderReset);
+            OfferReminderReset,
+            OpenSpellingHelper,
+            RequestConfirmAs);
 
         Roles = new RolesViewModel(_session, _clock, _masterData, OnChanged);
 
@@ -1078,9 +1087,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// need the same destructive-action guard as <see cref="CloseIncident"/> without each owning
     /// its own ConfirmDialogViewModel wiring.
     /// </summary>
-    private void RequestConfirm(string message, Action onConfirmed)
+    private void RequestConfirm(string message, Action onConfirmed) =>
+        RequestConfirmAs(message, "ENTFERNEN", onConfirmed);
+
+    /// <summary>The same guard with a button that says what happens, such as SENDEN (#592).</summary>
+    private void RequestConfirmAs(string message, string confirmLabel, Action onConfirmed)
     {
-        var dialog = new ConfirmDialogViewModel("Bestätigen", message, "ENTFERNEN", onConfirmed);
+        var dialog = new ConfirmDialogViewModel("Bestätigen", message, confirmLabel, onConfirmed);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }
@@ -1206,6 +1219,37 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // Clear the overlay on either outcome; Save has already added the task on confirm.
         dialog.Closed += (_, _) => PendingTaskDialog = null;
         PendingTaskDialog = dialog;
+    }
+
+    /// <summary>
+    /// Opens the Lagemeldung beside the ETB (#592): from Ctrl+L, and from the Rückmeldung row the
+    /// moment the ILS is due — the report is what that row is asking for.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanWriteSituationReport))]
+    private void OpenSituationReport() => ShowSituationReport();
+
+    private bool CanWriteSituationReport => !IsReadOnly;
+
+    private bool ShowSituationReport()
+    {
+        if (IsReadOnly || NavItems.FirstOrDefault(item => ReferenceEquals(item.Content, Etb)) is not { } etb)
+        {
+            return false;
+        }
+
+        // Selected directly, without ShowNavItem's request for the ETB's first field: the panel
+        // takes focus itself as it opens, on its Lage field.
+        SelectedNavItem = etb;
+        Etb.SituationReport.OpenCommand.Execute(null);
+        return true;
+    }
+
+    /// <summary>Opens the Buchstabier-Helfer over the ETB (#592).</summary>
+    private void OpenSpellingHelper()
+    {
+        var dialog = new SpellingHelperDialogViewModel();
+        dialog.Closed += (_, _) => PendingSpellingHelper = null;
+        PendingSpellingHelper = dialog;
     }
 
     private void PerformClose()

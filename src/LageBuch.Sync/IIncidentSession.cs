@@ -103,6 +103,21 @@ public interface IIncidentSession
     /// <summary>Takes a Beteiligte/n back completely. No ETB line.</summary>
     void RemoveInvolvedParty(Guid partyId);
 
+    /// <summary>Starts a Lagemeldung as a draft (#592). No ETB line until it is sent.</summary>
+    void AddSituationReport(
+        string? reporter, string? location, string? situation, string? measures, string? units, string? requests);
+
+    /// <summary>Corrects a draft Lagemeldung in place. No ETB line.</summary>
+    void UpdateSituationReport(
+        Guid reportId, string? reporter, string? location, string? situation, string? measures, string? units, string? requests);
+
+    /// <summary>Discards a draft Lagemeldung. No ETB line.</summary>
+    void RemoveSituationReport(Guid reportId);
+
+    /// <summary>Sends a draft Lagemeldung: numbers it and writes its Funkspruch to the ETB as an
+    /// outgoing entry to <paramref name="dispatchCentreName"/>.</summary>
+    void SendSituationReport(Guid reportId, string dispatchCentreName);
+
     /// <summary>Corrects a task's fields (#246): typo fixes, reassignment, re-prioritizing.</summary>
     void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency);
 

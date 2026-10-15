@@ -53,6 +53,7 @@ internal static class SchemaGuard
         "scba_pressure_readings",
         "scba_trupp_members",
         "scba_trupps",
+        "situation_reports",
     ];
 
     private static readonly ExpectedColumn[] Columns =
@@ -105,6 +106,16 @@ internal static class SchemaGuard
         new("scba_trupps", "withdraw_time", "TEXT", false, null),
         new("scba_trupps", "exit_time", "TEXT", false, null),
         new("scba_trupps", "safety_trupp_id", "TEXT", false, null),
+        new("situation_reports", "number", "INTEGER", false, null),
+        new("situation_reports", "reporter", "TEXT", false, null),
+        new("situation_reports", "location", "TEXT", false, null),
+        new("situation_reports", "situation", "TEXT", false, null),
+        new("situation_reports", "measures", "TEXT", false, null),
+        new("situation_reports", "units", "TEXT", false, null),
+        new("situation_reports", "requests", "TEXT", false, null),
+        new("situation_reports", "sent_at", "TEXT", false, null),
+        new("situation_reports", "sent_by", "TEXT", false, null),
+        new("situation_reports", "etb_entry_id", "TEXT", false, null),
     ];
 
     /// <summary>Every column this build can repair, in the order it is declared above.</summary>

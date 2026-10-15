@@ -10,8 +10,8 @@ namespace LageBuch.AppLogic.Services;
 /// A module's shortcut is bound to its key, never to its rail position: the rail comes from the
 /// Stammdaten Navigation and the Einsatz's own Checklisten, so "the fourth tab" differs between
 /// Feuerwehren and incidents. The digits follow the order the rail shipped with
-/// (<see cref="NavModules.All"/>), Ctrl+0 being the tenth. Checklisten are user-named and have no
-/// fixed key; Ctrl+Tab reaches them.
+/// (<see cref="NavModules.All"/>), Ctrl+0 being the tenth; only the first ten get one. Checklisten
+/// are user-named and have no fixed key; Ctrl+Tab reaches them.
 /// </remarks>
 public static class ShortcutRegistry
 {
@@ -34,6 +34,7 @@ public static class ShortcutRegistry
     private static List<Shortcut> Build()
     {
         var shortcuts = NavModules.All
+            .Take(Digits.Length)
             .Select((module, i) => new Shortcut(
                 new KeyChord(Digits[i], Ctrl: true),
                 ShortcutAction.ShowModule,
@@ -44,6 +45,7 @@ public static class ShortcutRegistry
         shortcuts.Add(new Shortcut(new KeyChord(ShortcutKey.Tab, Ctrl: true), ShortcutAction.NextModule, "Nächstes Modul"));
         shortcuts.Add(new Shortcut(new KeyChord(ShortcutKey.Tab, Ctrl: true, Shift: true), ShortcutAction.PreviousModule, "Vorheriges Modul"));
         shortcuts.Add(new Shortcut(new KeyChord(ShortcutKey.N, Ctrl: true), ShortcutAction.NewEtbEntry, "Neuer ETB-Eintrag"));
+        shortcuts.Add(new Shortcut(new KeyChord(ShortcutKey.L, Ctrl: true), ShortcutAction.OpenSituationReport, "Lagemeldung schreiben"));
         shortcuts.Add(new Shortcut(new KeyChord(ShortcutKey.F9), ShortcutAction.MostUrgentWarning, "Zur dringendsten Meldung"));
         shortcuts.Add(new Shortcut(new KeyChord(ShortcutKey.F1), ShortcutAction.ShowOverview, "Tastenkürzel anzeigen"));
         return shortcuts;
@@ -67,6 +69,7 @@ public enum ShortcutKey
     D7,
     D8,
     D9,
+    L,
     N,
     Tab,
     F1,
@@ -101,6 +104,9 @@ public enum ShortcutAction
 
     /// <summary>Open the ETB with the caret in VON.</summary>
     NewEtbEntry,
+
+    /// <summary>Open the ETB with the Lagemeldung beside it (#592).</summary>
+    OpenSituationReport,
 
     /// <summary>Go to the most urgent open warning (<see cref="WarningKind"/>).</summary>
     MostUrgentWarning,

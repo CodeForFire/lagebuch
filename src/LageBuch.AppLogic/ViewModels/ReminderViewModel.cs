@@ -40,6 +40,11 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
     private static readonly TimeSpan RepeatInterval = TimeSpan.FromSeconds(60);
     private DateTimeOffset? _lastAnnouncedAt;
 
+    // How many Lagemeldungen had been sent when this reminder last looked (#592). A send is a
+    // Rückmeldung, wherever it was made: on this device or applied from a joined client, so the
+    // reminder watches the incident rather than waiting for a call from the Lagemeldung module.
+    private int _sentReportCount;
+
     public ReminderViewModel(
         IIncidentSession session,
         IClock clock,
@@ -72,7 +77,24 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
             PersistTimer();
         }
 
+        _sentReportCount = SentReportCount();
         _subscription = ticker.Subscribe(OnTick);
+        _session.Changed += OnSessionChanged;
+    }
+
+    private int SentReportCount() => _session.Incident.SituationReports.Count(r => r.IsSent);
+
+    private void OnSessionChanged()
+    {
+        var sent = SentReportCount();
+        if (sent <= _sentReportCount)
+        {
+            return;
+        }
+
+        // Recorded before restarting: persisting the new cycle raises Changed again.
+        _sentReportCount = sent;
+        AcknowledgeWithoutEntry();
     }
 
     private void PersistTimer() =>
@@ -176,5 +198,9 @@ public sealed partial class ReminderViewModel : ObservableObject, IDisposable
         SnoozeFiveMinutesCommand.NotifyCanExecuteChanged();
     }
 
-    public void Dispose() => _subscription.Dispose();
+    public void Dispose()
+    {
+        _session.Changed -= OnSessionChanged;
+        _subscription.Dispose();
+    }
 }

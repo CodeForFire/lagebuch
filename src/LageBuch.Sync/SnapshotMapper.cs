@@ -5,6 +5,7 @@ using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
+using LageBuch.Domain.SituationReports;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -93,7 +94,21 @@ public static class SnapshotMapper
                 d.KeyAvailable,
                 d.CoValue,
                 d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList())).ToList(),
-            incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)).ToList());
+            incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)).ToList(),
+            SituationReports: incident.SituationReports.Select(r => new SituationReportDto(
+                r.Id,
+                r.Number,
+                r.Reporter,
+                r.Location,
+                r.Situation,
+                r.Measures,
+                r.Units,
+                r.Requests,
+                r.CreatedBy,
+                r.CreatedAt,
+                r.SentAt,
+                r.SentBy,
+                r.EtbEntryId)).ToList());
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -170,7 +185,21 @@ public static class SnapshotMapper
                 d.KeyAvailable,
                 d.CoValue,
                 d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)))),
-            (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)));
+            (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)),
+            (snapshot.SituationReports ?? []).Select(r => SituationReport.Rehydrate(
+                r.Id,
+                r.Number,
+                r.Reporter,
+                r.Location,
+                r.Situation,
+                r.Measures,
+                r.Units,
+                r.Requests,
+                r.CreatedBy,
+                r.CreatedAt,
+                r.SentAt,
+                r.SentBy,
+                r.EtbEntryId)));
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

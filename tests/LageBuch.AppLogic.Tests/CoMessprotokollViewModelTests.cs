@@ -956,6 +956,19 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void RemoveInvolvedParty(Guid partyId) => _inner.RemoveInvolvedParty(partyId);
 
+    public void AddSituationReport(
+        string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        _inner.AddSituationReport(reporter, location, situation, measures, units, requests);
+
+    public void UpdateSituationReport(
+        Guid reportId, string? reporter, string? location, string? situation, string? measures, string? units, string? requests) =>
+        _inner.UpdateSituationReport(reportId, reporter, location, situation, measures, units, requests);
+
+    public void RemoveSituationReport(Guid reportId) => _inner.RemoveSituationReport(reportId);
+
+    public void SendSituationReport(Guid reportId, string dispatchCentreName) =>
+        _inner.SendSituationReport(reportId, dispatchCentreName);
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         _inner.UpdateTask(taskId, text, assignee, importance, urgency);
 

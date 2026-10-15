@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 25;
+    public const int CurrentVersion = 26;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -163,6 +163,11 @@ public static class Migrations
         if (version < 25)
         {
             ApplyV25(cn, tx);
+        }
+
+        if (version < 26)
+        {
+            ApplyV26(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -791,6 +796,31 @@ public static class Migrations
             );
             """;
         Exec(cn, tx, sql25);
+    }
+
+    // The Lagemeldungen (#592): drafts and sent reports. number, sent_at and sent_by stay NULL
+    // while a report is a draft. Ordinal keeps the creation order, as involved_parties does.
+    private static void ApplyV26(SqliteConnection cn, SqliteTransaction tx)
+    {
+        const string sql26 = """
+            CREATE TABLE IF NOT EXISTS situation_reports (
+                id TEXT PRIMARY KEY,
+                ordinal INTEGER NOT NULL,
+                number INTEGER,
+                reporter TEXT,
+                location TEXT,
+                situation TEXT,
+                measures TEXT,
+                units TEXT,
+                requests TEXT,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                sent_at TEXT,
+                sent_by TEXT,
+                etb_entry_id TEXT
+            );
+            """;
+        Exec(cn, tx, sql26);
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

@@ -53,6 +53,7 @@ public class OverlayContractTests
         new("Workspace.TaskDialog", typeof(IncidentWorkspaceViewModel), typeof(TaskDialogViewModel), OpenWorkspaceTaskDialog),
         new("Workspace.PdfExportOptions", typeof(IncidentWorkspaceViewModel), typeof(PdfExportOptionsViewModel), OpenWorkspacePdfExportOptions),
         new("Workspace.IncidentDataDialog", typeof(IncidentWorkspaceViewModel), typeof(IncidentDataDialogViewModel), OpenWorkspaceIncidentDataDialog),
+        new("Workspace.SpellingHelper", typeof(IncidentWorkspaceViewModel), typeof(SpellingHelperDialogViewModel), OpenWorkspaceSpellingHelper),
         new("Main.OperatorPrompt", typeof(MainWindowViewModel), typeof(OperatorPromptViewModel), OpenMainOperatorPrompt),
         new("Main.About", typeof(MainWindowViewModel), typeof(AboutViewModel), OpenMainAbout),
         new("Main.ShortcutOverview", typeof(MainWindowViewModel), typeof(ShortcutOverviewViewModel), OpenMainShortcutOverview),
@@ -62,6 +63,7 @@ public class OverlayContractTests
     private static readonly OverlayScenario[] InlinePanelScenarios =
     [
         new("Etb.EditPanel", typeof(EtbViewModel), typeof(EtbEntryRow), OpenEtbEditPanel),
+        new("Etb.SituationReportPanel", typeof(EtbViewModel), typeof(SituationReportComposerViewModel), OpenEtbSituationReportPanel),
         new("Tasks.EditPanel", typeof(TasksViewModel), typeof(TaskRow), OpenTasksEditPanel),
         new("Roles.TransferPanel", typeof(RolesViewModel), typeof(RoleAssignmentRow), OpenRolesTransferPanel),
         new("Co.AddBuildingPanel", typeof(CoMessprotokollViewModel), typeof(Building), OpenCoAddBuildingPanel),
@@ -325,10 +327,29 @@ public class OverlayContractTests
         return new(window, opener, ViewOf<IncidentDataDialogView>(window), () => vm.PendingIncidentDataDialog is null, () => vm.PendingIncidentDataDialog?.CancelCommand.Execute(null));
     }
 
+    private static Opened OpenWorkspaceSpellingHelper()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        var opener = Named<Button>(window, "OpenSpellingHelperButton");
+        Activate(opener);
+        return new(window, opener, ViewOf<SpellingHelperDialogView>(window), () => vm.PendingSpellingHelper is null, () => vm.PendingSpellingHelper?.CloseCommand.Execute(null));
+    }
+
     // A row's own button, the way a keyboard user reaches it: Tab into the grid, then to the row.
     private static Button RowButton(Window window, string grid, Func<Button, bool> match) =>
         Named<DataGrid>(window, grid).GetVisualDescendants().OfType<Button>()
             .First(b => b.IsEffectivelyVisible && match(b));
+
+    // Escape folds the Lagemeldung away and keeps the draft (#592): the next open carries on.
+    private static Opened OpenEtbSituationReportPanel()
+    {
+        var (window, vm) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        var opener = Named<Button>(window, "OpenSituationReportButton");
+        Activate(opener);
+        return new(window, opener, PanelOf(window, "SituationReportPanel"), () => !vm.Etb.SituationReport.IsOpen, () => vm.Etb.SituationReport.CloseCommand.Execute(null));
+    }
 
     private static Opened OpenEtbEditPanel()
     {
