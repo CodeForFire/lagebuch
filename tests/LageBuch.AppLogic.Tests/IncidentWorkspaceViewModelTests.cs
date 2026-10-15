@@ -1483,7 +1483,9 @@ public class IncidentWorkspaceViewModelTests
         vm.PendingConfirm!.ConfirmCommand.Execute(null);
         var afterSecondRebuild = ChangedSubscriberCount(session);
 
-        Assert.Equal(afterFirstRebuild, afterSecondRebuild);
+        // One fewer, not equal: closing goes read-only, and a read-only workspace builds no ILS
+        // reminder, so the reminder's own subscription (#592) is rightly gone. A leak only adds.
+        Assert.Equal(afterFirstRebuild - 1, afterSecondRebuild);
     }
 
     private static int ChangedSubscriberCount(LocalIncidentSession session)

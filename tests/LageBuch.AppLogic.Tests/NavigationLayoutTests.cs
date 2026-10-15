@@ -34,7 +34,7 @@ public class NavigationLayoutTests
         Assert.Equal(
             new[]
             {
-                "checklist:Aufbau", "etb", "tasks", "roles", "forces", "involved",
+                "checklist:Aufbau", "etb", "lagemeldung", "tasks", "roles", "forces", "involved",
                 "scba", "co", "files", "links", "contacts", "checklist:Abbau",
             },
             Keys(specs));
@@ -183,7 +183,11 @@ public class NavigationLayoutTests
     {
         var specs = NavigationLayout.Resolve(Array.Empty<NavEntry>(), Array.Empty<ChecklistList>());
 
-        Assert.Equal(NavModules.All, Keys(specs));
+        // The default rail's own order, which puts the Lagemeldung beside the ETB rather than at the
+        // end of NavModules.All, where it was appended to keep the Ctrl+digit shortcuts in place.
+        Assert.Equal(
+            NavLayout.Default.Where(e => !e.IsChecklist).Select(e => e.ModuleKey),
+            Keys(specs));
     }
 
     [Fact]

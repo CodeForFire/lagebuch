@@ -60,7 +60,7 @@ public class FilesTabRenderTests
     {
         var (window, _, _) = ShowWorkspace();
 
-        Assert.Equal(12, WorkspaceRenderHelper.RailHeaders(window).Count);
+        Assert.Equal(13, WorkspaceRenderHelper.RailHeaders(window).Count);
         Capture(window, "files-before.png");
     }
 

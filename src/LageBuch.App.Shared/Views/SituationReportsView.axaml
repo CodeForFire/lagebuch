@@ -1,0 +1,220 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:LageBuch.AppLogic.ViewModels;assembly=LageBuch.AppLogic"
+             xmlns:views="clr-namespace:LageBuch.App.Shared.Views"
+             x:Class="LageBuch.App.Shared.Views.SituationReportsView"
+             x:DataType="vm:SituationReportsViewModel">
+  <!-- Three panes on a wide window: the Lagemeldungen, the one being written with its Funkspruch,
+       and the Buchstabier-Helfer. On a phone the list goes on top and the helper becomes a sheet at
+       the bottom. Dock and widths are Style setters rather than attributes, because a local value
+       in XAML outranks a Style setter and the narrow styles could never change them. -->
+  <UserControl.Styles>
+    <Style Selector="Border#ReportListPanel">
+      <Setter Property="DockPanel.Dock" Value="Left" />
+      <Setter Property="Width" Value="250" />
+      <Setter Property="Margin" Value="0,0,16,0" />
+    </Style>
+    <Style Selector="Border#HelperPanel">
+      <Setter Property="DockPanel.Dock" Value="Right" />
+      <Setter Property="Width" Value="320" />
+      <Setter Property="Margin" Value="16,0,0,0" />
+    </Style>
+
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#SituationReportsTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#ReportListPanel">
+      <Setter Property="DockPanel.Dock" Value="Top" />
+      <Setter Property="Width" Value="NaN" />
+      <Setter Property="MaxHeight" Value="150" />
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#HelperPanel">
+      <Setter Property="DockPanel.Dock" Value="Bottom" />
+      <Setter Property="Width" Value="NaN" />
+      <Setter Property="MaxHeight" Value="380" />
+      <Setter Property="Margin" Value="0,12,0,0" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" x:Name="SituationReportsTitle" Text="LAGEMELDUNG" Classes="overline"
+               Margin="0,0,0,14" />
+
+    <!-- The phone's way in to the helper, at the bottom edge where the thumb already is. -->
+    <Button DockPanel.Dock="Bottom" x:Name="OpenHelperButton" Classes="ghost"
+            Margin="0,12,0,0" HorizontalAlignment="Stretch"
+            Height="{StaticResource ControlHeightTouch}"
+            Content="BUCHSTABIEREN"
+            IsVisible="{Binding ShowHelperButton}"
+            Command="{Binding OpenHelperCommand}" />
+
+    <Border x:Name="ReportListPanel"
+            Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
+      <DockPanel>
+        <Button DockPanel.Dock="Top" x:Name="NewReportButton" Classes="signal dock-action"
+                Margin="8" HorizontalAlignment="Stretch"
+                Content="+ NEUE LAGEMELDUNG"
+                IsVisible="{Binding !IsReadOnly}"
+                Command="{Binding NewReportCommand}" />
+        <TextBlock DockPanel.Dock="Top" x:Name="EmptyText" Margin="12,8" TextWrapping="Wrap"
+                   Text="Noch keine Lagemeldung."
+                   Foreground="{StaticResource TextMutedBrush}"
+                   IsVisible="{Binding !HasReports}" />
+        <!-- A handful of reports per Einsatz: a plain StackPanel, so every row is realized and
+             can be brought into view, as in the Stammdaten editor's category list. -->
+        <ListBox x:Name="ReportList" ItemsSource="{Binding Reports}"
+                 SelectedItem="{Binding SelectedReport, Mode=TwoWay}"
+                 AutomationProperties.Name="Lagemeldungen"
+                 IsVisible="{Binding HasReports}">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:SituationReportRow">
+              <StackPanel Spacing="2" Margin="0,2">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="{Binding Title}" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="1" Text="{Binding TimeText}" Classes="mono"
+                             Foreground="{StaticResource TextMutedBrush}" />
+                </Grid>
+                <TextBlock Text="{Binding Summary}" FontSize="12" TextTrimming="CharacterEllipsis"
+                           Foreground="{StaticResource TextMutedBrush}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <Border x:Name="HelperPanel" IsVisible="{Binding ShowHelper}"
+            Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
+            CornerRadius="{StaticResource RadiusMd}" Padding="14">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+          <TextBlock Grid.Column="0" Text="BUCHSTABIEREN" Classes="overline" VerticalAlignment="Center" />
+          <Button Grid.Column="1" x:Name="CloseHelperButton" Classes="ghost"
+                  IsVisible="{Binding IsNarrow}"
+                  AutomationProperties.Name="Buchstabier-Helfer schließen"
+                  ToolTip.Tip="Buchstabier-Helfer schließen"
+                  Command="{Binding CloseHelperCommand}">
+            <PathIcon Width="13" Height="13"
+                      Data="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z" />
+          </Button>
+        </Grid>
+        <views:SpellingHelperView x:Name="ModuleHelper" DataContext="{Binding Helper}" />
+      </DockPanel>
+    </Border>
+
+    <TextBlock x:Name="NoSelectionText" TextWrapping="Wrap" Margin="4,0"
+               Text="NEUE LAGEMELDUNG beginnt eine Meldung an die Leitstelle, vorbefüllt mit Funkrufname, Einsatzstelle und Kräften."
+               Foreground="{StaticResource TextMutedBrush}"
+               IsVisible="{Binding !HasSelection}" />
+
+    <!-- The editor. Every field follows each keystroke so the Funkspruch below does too; the
+         code-behind commits on LostFocus, so the Einsatzdatei is written once per correction. A
+         sent report stays readable and selectable, but no longer editable. -->
+    <ScrollViewer x:Name="EditorPanel" IsVisible="{Binding HasSelection}"
+                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="10" Margin="0,0,4,0">
+        <StackPanel Spacing="2">
+          <TextBlock x:Name="EditorHeaderText" Text="{Binding EditorHeader}" Classes="display" FontSize="18" />
+          <TextBlock x:Name="SentInfoText" Text="{Binding SentInfo}" Foreground="{StaticResource TextMutedBrush}"
+                     IsVisible="{Binding SentInfo, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+
+        <HeaderedContentControl Classes="field" Header="MELDENDER">
+          <TextBox x:Name="ReporterBox" Text="{Binding Reporter}" IsReadOnly="{Binding !IsEditable}"
+                   MaxLength="{x:Static vm:SituationReportsViewModel.MaxReporterLength}" />
+        </HeaderedContentControl>
+
+        <HeaderedContentControl Classes="field" Header="EINSATZSTELLE">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox Grid.Column="0" x:Name="LocationBox" Text="{Binding Location}" IsReadOnly="{Binding !IsEditable}"
+                     TextWrapping="Wrap"
+                     MaxLength="{x:Static vm:SituationReportsViewModel.MaxLocationLength}" />
+            <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Top"
+                    ToolTip.Tip="Einsatzstelle buchstabieren" AutomationProperties.Name="Einsatzstelle buchstabieren"
+                    Command="{Binding SpellFieldCommand}" CommandParameter="{Binding Location}" />
+          </Grid>
+        </HeaderedContentControl>
+
+        <HeaderedContentControl Classes="field" Header="LAGE">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox Grid.Column="0" x:Name="SituationBox" Text="{Binding Situation}" IsReadOnly="{Binding !IsEditable}"
+                     TextWrapping="Wrap"
+                     MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
+            <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Top"
+                    ToolTip.Tip="Lage buchstabieren" AutomationProperties.Name="Lage buchstabieren"
+                    Command="{Binding SpellFieldCommand}" CommandParameter="{Binding Situation}" />
+          </Grid>
+        </HeaderedContentControl>
+
+        <HeaderedContentControl Classes="field" Header="DURCHGEFÜHRTE MASSNAHMEN">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox Grid.Column="0" x:Name="MeasuresBox" Text="{Binding Measures}" IsReadOnly="{Binding !IsEditable}"
+                     TextWrapping="Wrap"
+                     MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
+            <Button Grid.Column="1" Classes="ghost" Content="ABC" VerticalAlignment="Top"
+                    ToolTip.Tip="Maßnahmen buchstabieren" AutomationProperties.Name="Maßnahmen buchstabieren"
+                    Command="{Binding SpellFieldCommand}" CommandParameter="{Binding Measures}" />
+          </Grid>
+        </HeaderedContentControl>
+
+        <HeaderedContentControl Classes="field" Header="EINGESETZTE EINHEITEN">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox Grid.Column="0" x:Name="UnitsBox" Text="{Binding Units}" IsReadOnly="{Binding !IsEditable}"
+                     TextWrapping="Wrap"
+                     MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
+            <Button Grid.Column="1" x:Name="RefreshUnitsButton" Classes="ghost" VerticalAlignment="Top"
+                    IsVisible="{Binding IsEditable}"
+                    ToolTip.Tip="Aus den Kräften neu übernehmen"
+                    AutomationProperties.Name="Einheiten aus den Kräften neu übernehmen"
+                    Command="{Binding RefreshUnitsCommand}">
+              <PathIcon Width="14" Height="14"
+                        Data="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+            </Button>
+          </Grid>
+        </HeaderedContentControl>
+
+        <HeaderedContentControl Classes="field" Header="NACHFORDERUNGEN">
+          <TextBox x:Name="RequestsBox" Text="{Binding Requests}" IsReadOnly="{Binding !IsEditable}"
+                   TextWrapping="Wrap"
+                   MaxLength="{x:Static vm:SituationReportsViewModel.MaxFieldLength}" />
+        </HeaderedContentControl>
+
+        <TextBlock x:Name="EditorError" Classes="field-error"
+                   Text="{Binding Error}"
+                   IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <!-- What is read out over the radio, in the order it is said. -->
+        <Border x:Name="FunkspruchCard" Classes="row-card">
+          <StackPanel Spacing="6">
+            <TextBlock Text="FUNKSPRUCH" Classes="overline" FontSize="10" />
+            <SelectableTextBlock x:Name="FunkspruchText" Text="{Binding FunkspruchPreview}"
+                                 FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"
+                                 AutomationProperties.Name="Funkspruch" />
+            <TextBlock Text="Noch leer: Einsatzstelle, Lage, Maßnahmen, Einheiten oder Nachforderungen eintragen."
+                       TextWrapping="Wrap" Foreground="{StaticResource TextMutedBrush}"
+                       IsVisible="{Binding !FunkspruchPreview.Length}" />
+          </StackPanel>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right"
+                    IsVisible="{Binding IsEditable}">
+          <Button x:Name="DeleteDraftButton" Classes="ghost dock-action" Content="VERWERFEN"
+                  Command="{Binding DeleteDraftCommand}" />
+          <Button x:Name="SendReportButton" Classes="signal dock-action" Content="{Binding SendLabel}"
+                  Command="{Binding SendCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>
