@@ -94,7 +94,16 @@ public class VersionHandshakeTests
     {
         // 9 adds textSnippets to the Stammdaten payload. A peer at 7 or 8 skips the key and simply
         // offers no :: suggestions, so it stays joinable.
-        Assert.Equal(9, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 9, int.MaxValue);
+        Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
+    }
+
+    [Fact]
+    public void Linking_an_aufgabe_to_its_etb_entry_raises_the_protocol_to_ten_but_not_the_floor()
+    {
+        // 10 adds entryId to addJournalEntry and sourceEntryId to addTask and the snapshot's tasks.
+        // An older peer ignores both and the Aufgabe is simply unlinked, so it stays joinable.
+        Assert.Equal(10, SyncProtocol.ProtocolVersion);
         Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
     }
 }

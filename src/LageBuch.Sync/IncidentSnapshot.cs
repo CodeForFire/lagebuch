@@ -155,7 +155,10 @@ public sealed record TaskDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset DueAt,
     DateTimeOffset? CompletedAt,
-    string? CompletedBy);
+    string? CompletedBy,
+
+    // Last and defaulted, so a snapshot from a host that predates the link still reads: unlinked.
+    Guid? SourceEntryId = null);
 
 /// <summary>One Beteiligte/r on the wire; mirrors <see cref="LageBuch.Domain.Involved.InvolvedParty"/>.</summary>
 public sealed record InvolvedPartyDto(

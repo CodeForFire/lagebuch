@@ -187,12 +187,40 @@ public class MigrationsTests : IDisposable
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
         Migrations.Migrate(cn2);
-        Assert.Equal(25, Migrations.GetVersion(cn2));
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
 
         using var check = cn2.CreateCommand();
         check.CommandText =
             "SELECT count(*) FROM pragma_table_info('involved_parties') " +
             "WHERE name IN ('id','ordinal','name','phone','notes','created_by','created_at');";
         Assert.Equal(7L, (long)check.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void V25_database_upgrades_to_v26_and_its_tasks_gain_a_source_entry_column()
+    {
+        // A V25 file: today's schema minus the column, with a task already in it.
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                ALTER TABLE incident_tasks DROP COLUMN source_entry_id;
+                INSERT INTO incident_tasks (id, ordinal, text, assignee, importance, urgency, created_by, created_at, due_at)
+                    VALUES ('7d1c4c1e-1f2a-4b3c-9d4e-5f6a7b8c9d0e', 0, 'Alt', '', 1, 1, 'Müller', '2026-08-24T09:00:00.0000000+02:00', '2026-08-24T09:15:00.0000000+02:00');
+                DELETE FROM schema_version; INSERT INTO schema_version (version) VALUES (25);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT source_entry_id FROM incident_tasks WHERE text = 'Alt';";
+        Assert.Equal(DBNull.Value, check.ExecuteScalar()); // an old task reads back unlinked
     }
 }

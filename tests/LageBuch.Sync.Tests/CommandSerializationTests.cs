@@ -213,4 +213,34 @@ public class CommandSerializationTests
         Assert.Contains($"\"$type\":\"{discriminator}\"", json, StringComparison.Ordinal);
         Assert.Equal(command.GetType(), SyncJson.Deserialize<SyncCommand>(json).GetType());
     }
+
+    // A client at 7 to 9 sends both commands without the new ids: they still read, unlinked.
+    [Fact]
+    public void Legacy_addJournalEntry_and_addTask_without_the_new_ids_deserialize_as_null()
+    {
+        const string entryJson = """
+            {"$type":"addJournalEntry","operator":{"name":"Müller","callSign":null},
+             "direction":"Incoming","text":"Lage","from":"ILS","to":null}
+            """;
+        const string taskJson = """
+            {"$type":"addTask","operator":{"name":"Müller","callSign":null},"text":"EVU informieren",
+             "assignee":"","importance":"High","urgency":"High","timerMinutes":5}
+            """;
+
+        Assert.Null(Assert.IsType<AddJournalEntryCommand>(SyncJson.Deserialize<SyncCommand>(entryJson)).EntryId);
+        Assert.Null(Assert.IsType<AddTaskCommand>(SyncJson.Deserialize<SyncCommand>(taskJson)).SourceEntryId);
+    }
+
+    [Fact]
+    public void The_new_ids_survive_the_wire()
+    {
+        var entryId = Guid.NewGuid();
+        var entry = SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize<SyncCommand>(
+            new AddJournalEntryCommand(Op, EtbDirection.Incoming, "Lage", "ILS", null, entryId)));
+        var task = SyncJson.Deserialize<SyncCommand>(SyncJson.Serialize<SyncCommand>(
+            new AddTaskCommand(Op, "EVU informieren", string.Empty, TaskImportance.High, TaskUrgency.High, 5, entryId)));
+
+        Assert.Equal(entryId, Assert.IsType<AddJournalEntryCommand>(entry).EntryId);
+        Assert.Equal(entryId, Assert.IsType<AddTaskCommand>(task).SourceEntryId);
+    }
 }

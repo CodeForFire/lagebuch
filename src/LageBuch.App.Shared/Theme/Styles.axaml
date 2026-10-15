@@ -168,6 +168,21 @@
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
   </Style>
 
+  <!-- A chip as a counter on an ETB row: the Aufgaben given out from that entry. Smaller so the
+       row keeps its height; amber while one is still open, the colour the app uses for work due. -->
+  <Style Selector="Button.chip.badge">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="Padding" Value="9,0" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.chip.badge.open">
+    <Setter Property="Background" Value="{StaticResource AmberWashBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource AmberDeepBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+  </Style>
+
   <!-- Bar button: a whole header banner made tappable (#422), keeping the banner's own colours.
        The default button sets a fixed ControlHeight and a 16px side padding, neither of which
        suits a full-width bar, and any background of its own would cover the banner behind it.

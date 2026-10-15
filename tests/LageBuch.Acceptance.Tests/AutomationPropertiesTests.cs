@@ -152,7 +152,7 @@ public class AutomationPropertiesTests
             new FixedClock(),
             MasterDataSet.Empty,
             () => { },
-            createTaskFromEntry: _ => { });
+            createTaskFromEntry: (_, _) => { });
         return (vm, session);
     }
 

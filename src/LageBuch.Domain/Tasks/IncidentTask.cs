@@ -54,6 +54,13 @@ public sealed record IncidentTask
 
     public string? CompletedBy { get; private init; }
 
+    /// <summary>
+    /// The ETB entry this Aufgabe was given out from, when it came from one -- the Rückmeldung
+    /// that made it necessary. Null for an Aufgabe typed on the Aufgaben tab. An id, not a copy:
+    /// both live in the same incident, which carries the entry for as long as it carries the task.
+    /// </summary>
+    public Guid? SourceEntryId { get; private init; }
+
     public bool IsCompleted => CompletedAt is not null;
 
     public static IncidentTask Create(
@@ -63,7 +70,8 @@ public sealed record IncidentTask
         TaskImportance importance,
         TaskUrgency urgency,
         int timerMinutes,
-        SessionOperator @operator)
+        SessionOperator @operator,
+        Guid? sourceEntryId = null)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -92,6 +100,7 @@ public sealed record IncidentTask
             CreatedBy = @operator.Display,
             CreatedAt = createdAt,
             DueAt = timerMinutes == 0 ? DateTimeOffset.MaxValue : createdAt.AddMinutes(timerMinutes),
+            SourceEntryId = sourceEntryId,
         };
     }
 
@@ -105,7 +114,8 @@ public sealed record IncidentTask
         string createdBy,
         DateTimeOffset dueAt,
         DateTimeOffset? completedAt,
-        string? completedBy)
+        string? completedBy,
+        Guid? sourceEntryId = null)
         => new()
         {
             Id = id,
@@ -118,6 +128,7 @@ public sealed record IncidentTask
             DueAt = dueAt,
             CompletedAt = completedAt,
             CompletedBy = completedBy,
+            SourceEntryId = sourceEntryId,
         };
 
     public IncidentTask WithCompletion(bool isDone, SessionOperator @operator, DateTimeOffset at)

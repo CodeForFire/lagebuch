@@ -36,7 +36,7 @@ public static class CommandApplier
         switch (command)
         {
             case AddJournalEntryCommand c:
-                incident.AddJournalEntry(clock, Operator(c.Operator), c.Direction, c.Text, c.From, c.To);
+                incident.AddJournalEntry(clock, Operator(c.Operator), c.Direction, c.Text, c.From, c.To, c.EntryId);
                 break;
             case EditJournalEntryCommand c:
                 incident.EditJournalEntry(clock, Operator(c.Operator), c.EntryId, c.Text);
@@ -143,7 +143,8 @@ public static class CommandApplier
                     c.Assignee,
                     c.Importance,
                     c.Urgency,
-                    c.TimerMinutes);
+                    c.TimerMinutes,
+                    c.SourceEntryId);
                 break;
             case SetTaskCompletedCommand c:
                 incident.SetTaskCompleted(c.TaskId, c.IsDone, clock, Operator(c.Operator));

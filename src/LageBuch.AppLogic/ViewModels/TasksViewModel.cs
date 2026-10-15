@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
+using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
@@ -527,6 +528,34 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         RevealRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// An ETB row's Aufgaben badge was tapped: select the first Aufgabe given out from that entry --
+    /// the first still open, else the first at all -- and bring it forward. A done one is only in
+    /// view under ALLE, so the filter moves there when it has to, as the bar's reveal does for OFFEN.
+    /// </summary>
+    public void RevealTasksFrom(Guid entryId)
+    {
+        var linked = SortForDisplay(_session.Incident.Tasks.Where(t => t.SourceEntryId == entryId)).ToList();
+        if (linked.Count == 0)
+        {
+            return;
+        }
+
+        var target = linked.FirstOrDefault(t => !t.IsCompleted) ?? linked[0];
+        if (!IsVisible(target))
+        {
+            Filter = TaskFilterKind.All;
+        }
+
+        if (Rows.FirstOrDefault(r => r.Id == target.Id) is not { } row)
+        {
+            return;
+        }
+
+        SelectedTask = row;
+        RevealRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>The bar's ERLEDIGT: ticks off the task the bar names, as the grid's checkbox would.</summary>
     [RelayCommand]
     private void CompleteMostOverdueTask()
@@ -630,6 +659,7 @@ public sealed partial class TaskRow : ObservableObject
         Func<TaskRow, bool> canEdit,
         Action<string, Action>? offerUndo = null)
     {
+        ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(task);
         ArgumentNullException.ThrowIfNull(beginEdit);
         ArgumentNullException.ThrowIfNull(canEdit);
@@ -638,7 +668,9 @@ public sealed partial class TaskRow : ObservableObject
         _onChanged = onChanged;
         _offerUndo = offerUndo;
         IsReadOnly = isReadOnly;
-        CreatedDisplay = $"{Formatting.Timestamp(task.CreatedAt)} · {task.CreatedBy}";
+        CreatedDisplay = SourceOf(session, task) is { } source
+            ? $"{Formatting.Timestamp(task.CreatedAt)} · {task.CreatedBy} · aus ETB {Formatting.TimeOfDay(source.Timestamp)}"
+            : $"{Formatting.Timestamp(task.CreatedAt)} · {task.CreatedBy}";
         HasTimer = task.DueAt != DateTimeOffset.MaxValue;
         _text = task.Text;
         _assignee = task.Assignee;
@@ -684,6 +716,10 @@ public sealed partial class TaskRow : ObservableObject
         OnPropertyChanged(nameof(IsOverdue));
         _beginEditCommand.NotifyCanExecuteChanged();
     }
+
+    // The ETB entry the task was given out from, if it is (still) in the journal.
+    private static EtbEntry? SourceOf(IIncidentSession session, IncidentTask task) =>
+        task.SourceEntryId is { } id ? session.Incident.Journal.FirstOrDefault(e => e.Id == id) : null;
 
     // German short stamp for completed rows. Empty while open — the view hides the label then.
     private static string CompletedDisplayOf(IncidentTask task) =>
