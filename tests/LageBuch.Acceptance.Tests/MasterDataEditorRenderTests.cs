@@ -64,6 +64,12 @@ public class MasterDataEditorRenderTests
                 new TaskTemplate("Polizei verständigen", TaskImportance.High, TaskUrgency.High),
                 new TaskTemplate("Energieversorger informieren"),
             },
+            TextSnippets = new[]
+            {
+                new TextSnippet("stl", "Stromleitung beschädigt, Bereich abgesperrt, EVU alarmiert", "Sonderfall"),
+                new TextSnippet("lgb", "Lage bestätigt: [X]", "Erkundung"),
+                new TextSnippet("lga", "Abweichende Lage zur Meldung: [X]", "Erkundung"),
+            },
             Personnel = new[]
             {
                 new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
@@ -95,8 +101,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 7 data categories, and this fixture's 2.
-        Assert.Equal(9, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 8 data categories, and this fixture's 2.
+        Assert.Equal(10, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -260,6 +266,35 @@ public class MasterDataEditorRenderTests
         Assert.Equal(
             new[] { "Wichtigkeit", "Dringlichkeit", "Wichtigkeit", "Dringlichkeit" },
             pickers.Select(AutomationProperties.GetName));
+    }
+
+    [AvaloniaFact]
+    public void Textbausteine_section_renders_and_names_a_duplicate_kuerzel()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = Assert.IsType<TextSnippetsSection>(vm.Sections.Single(s => s.Title == "Textbausteine"));
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var conflicts = view.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "TextSnippetConflicts");
+        Assert.False(conflicts.IsVisible);
+
+        // A second row typed with a Kürzel already in use: named on screen, not dropped silently.
+        section.Rows[2].Shortcut = "LGB";
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-textbausteine.png"));
+        }
+
+        Assert.True(conflicts.IsVisible);
+        Assert.Equal("Doppelte Kürzel: lgb", conflicts.Text);
     }
 
     // #470: a Funktion carries how often it may be held, so the Rollen editor is a typed section
@@ -540,7 +575,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(9, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(10, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -600,7 +635,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(9, rows.Length);
+        Assert.Equal(10, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";

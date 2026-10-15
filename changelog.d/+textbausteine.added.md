@@ -1,0 +1,1 @@
+Textbausteine, a new Stammdaten category, are offered by typing ::kürzel in the ETB and Aufgabe text fields, insert their text with Enter or a tap and select the first [...] gap so it can be typed over.

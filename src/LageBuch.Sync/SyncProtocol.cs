@@ -54,8 +54,12 @@ public static class SyncProtocol
     /// skips the key and offers no chips, and a payload without it reads as none, so the floor
     /// stays at 7.
     /// </para>
+    /// <para>
+    /// 9: the Stammdaten payload carries <c>textSnippets</c>, the Textbausteine. A peer at 7 or 8
+    /// skips the key and offers no <c>::</c> suggestions, so the floor stays at 7.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 8;
+    public const int ProtocolVersion = 9;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

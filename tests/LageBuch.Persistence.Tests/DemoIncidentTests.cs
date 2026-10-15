@@ -240,6 +240,7 @@ public class DemoIncidentTests : IDisposable
         Assert.NotEmpty(set.Vehicles);
         Assert.NotEmpty(set.Personnel);
         Assert.NotEmpty(set.TaskTemplates);
+        Assert.NotEmpty(set.TextSnippets);
         Assert.NotEmpty(set.Brigades);
         Assert.NotEmpty(set.RadioCallSigns);
         Assert.Equal(15, set.Settings.IlsReminderIntervalMinutes);

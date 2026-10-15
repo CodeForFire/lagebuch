@@ -149,7 +149,7 @@ public class DemoFlowRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // The two rail groups: the app's own categories, then the brigade's own Checklisten.
-        Assert.Equal(9, vm.Sections.Count);
+        Assert.Equal(10, vm.Sections.Count);
         Assert.Equal(2, vm.Checklists.Count);
         Capture(window, "stammdaten-editor.png");
     }

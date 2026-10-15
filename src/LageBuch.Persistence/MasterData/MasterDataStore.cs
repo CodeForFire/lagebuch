@@ -99,6 +99,21 @@ public sealed class MasterDataStore
                 });
         }
 
+        Run(cn, tx, "DELETE FROM md_text_snippets;", _ => { });
+        foreach (var t in set.TextSnippets)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_text_snippets (shortcut, text, category) VALUES ($s,$t,$c);",
+                p =>
+                {
+                    p("$s", t.Shortcut);
+                    p("$t", t.Text);
+                    p("$c", t.Category);
+                });
+        }
+
         Run(cn, tx, "DELETE FROM md_vehicles;", _ => { });
         foreach (var v in set.Vehicles)
         {
@@ -290,6 +305,11 @@ public sealed class MasterDataStore
                 importance TEXT NOT NULL DEFAULT 'medium',
                 urgency TEXT NOT NULL DEFAULT 'medium'
             );
+            CREATE TABLE IF NOT EXISTS md_text_snippets (
+                shortcut TEXT NOT NULL,
+                text TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT ''
+            );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS md_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """;
@@ -326,6 +346,7 @@ public sealed class MasterDataStore
         // because #397's sweep holds every repairable column to the same rule.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_task_templates", "importance", "TEXT NOT NULL DEFAULT 'medium'");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_task_templates", "urgency", "TEXT NOT NULL DEFAULT 'medium'");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "category", "TEXT NOT NULL DEFAULT ''");
 
         // Widen an md_links that predates link groups (#518): every link already there is ungrouped.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_links", "group_name", "TEXT NOT NULL DEFAULT ''");
@@ -514,6 +535,7 @@ public sealed class MasterDataStore
             ReadPersonnel(cn),
             ReadVehicles(cn),
             ReadTaskTemplates(cn),
+            ReadTextSnippets(cn),
             ReadSettings(cn));
     }
 
@@ -684,6 +706,22 @@ public sealed class MasterDataStore
         }
 
         return list;
+    }
+
+    // Normalized on the way out too, like the Trupp-Typen: the columns are only typed, so a store
+    // edited outside the app could otherwise hold a Kürzel nobody can type or a duplicate one.
+    private static IReadOnlyList<TextSnippet> ReadTextSnippets(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT shortcut, text, category FROM md_text_snippets ORDER BY rowid;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<TextSnippet>();
+        while (r.Read())
+        {
+            list.Add(new TextSnippet(r.GetString(0), r.GetString(1), r.GetString(2)));
+        }
+
+        return TextSnippet.Normalize(list);
     }
 
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)
