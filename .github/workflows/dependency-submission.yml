@@ -1,0 +1,50 @@
+name: Dependency submission
+
+# GitHub's static dependency graph cannot read this repository's NuGet
+# dependencies: it does not resolve versions from central package management
+# (Directory.Packages.props lists every package as ">= 0") and it never sees
+# transitive packages. Without a resolved version there is no Dependabot alert,
+# and without an alert there is no security update -- which is how
+# GHSA-334f-vvp4-7g6p in the transitive Microsoft.AspNetCore.SignalR.Common
+# broke restore on main before Dependabot noticed (#582).
+#
+# This job restores the solution and submits the resolved tree, transitive
+# packages included, from the generated project.assets.json files.
+#
+# The Android head is not restored: that needs the Android workload (~minutes
+# per push). Its own packages -- Avalonia.Android and the Xamarin.AndroidX
+# bindings -- stay on the static graph and the weekly Dependabot run; the
+# shared projects it references are covered here.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required by the dependency submission API.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # Audit is what this job feeds; a vulnerable package must not stop the
+      # submission that raises the alert for it.
+      - name: Restore
+        run: dotnet restore LageBuch.Desktop.slnf -p:NuGetAudit=false
+
+      - name: Submit dependencies
+        uses: advanced-security/component-detection-dependency-submission-action@a02aeda7a175ad4dd38a13c4d3ff2df9da8f2cf0 # v0.2.0
+        with:
+          detectorsCategories: NuGet
