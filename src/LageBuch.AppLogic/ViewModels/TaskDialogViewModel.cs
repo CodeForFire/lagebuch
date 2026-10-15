@@ -18,17 +18,23 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
 
+    // The ETB entry the dialog was opened from. Every Aufgabe it saves -- SPEICHERN and each
+    // SPEICHERN & WEITEREN TASK -- is linked to it, however much the text was changed.
+    private readonly Guid? _sourceEntryId;
+
     // Quiet until the first press: a dialog that opens already scolding teaches nothing.
     private bool _errorsShown;
 
     public TaskDialogViewModel(
-        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged)
+        IIncidentSession session, MasterDataSet masterData, string prefilledText, Action onChanged, Guid? sourceEntryId = null)
     {
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _onChanged = onChanged;
+        _sourceEntryId = sourceEntryId;
         Text = prefilledText;
         AssigneeOptions = TasksViewModel.AssigneeSuggestions(masterData);
+        TextSnippets = masterData.TaskSnippets;
         ImportanceOptions = TasksViewModel.ImportanceLevels();
         UrgencyOptions = TasksViewModel.UrgencyLevels();
         _timerMinutes = IncidentTask.DefaultTimerMinutes(Urgency);
@@ -44,6 +50,9 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     private string? _assignee;
 
     public IReadOnlyList<string> AssigneeOptions { get; }
+
+    /// <summary>The Aufgaben-Textbausteine the Aufgabe fields offer on <c>::</c> -- never the ETB's.</summary>
+    public IReadOnlyList<TextSnippet> TextSnippets { get; }
 
     [ObservableProperty]
     private TaskImportance _importance = TaskImportance.Medium;
@@ -82,7 +91,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
             return;
         }
 
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _sourceEntryId);
         _onChanged();
         Closed?.Invoke(this, EventArgs.Empty);
     }
@@ -95,7 +104,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
             return;
         }
 
-        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
+        _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value, _sourceEntryId);
         _onChanged();
         Text = string.Empty; // fields besides the text stay sticky for the next entry
         ShowErrors(false); // ...and the cleared text must not read as a fresh complaint
@@ -116,6 +125,19 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         _errorsShown = shown;
         OnPropertyChanged(nameof(TextError));
         OnPropertyChanged(nameof(TimerMinutesError));
+    }
+
+    /// <summary>
+    /// An Aufgaben-Textbaustein was inserted: the dialog takes its priorities and the timer that
+    /// Dringlichkeit stands for, as the Aufgaben dock does.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private void ApplySnippetPriorities(TextSnippet snippet)
+    {
+        ArgumentNullException.ThrowIfNull(snippet);
+        Importance = snippet.Importance;
+        Urgency = snippet.Urgency;
+        TimerMinutes = IncidentTask.DefaultTimerMinutes(snippet.Urgency);
     }
 
     [RelayCommand]

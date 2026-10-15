@@ -158,7 +158,8 @@
           <HeaderedContentControl Classes="field required" Header="AUFGABE"
                                     Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}" />
+            <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
+                     b:SnippetCompletion.InsertedCommand="{Binding ApplySnippetPrioritiesCommand}" />
           </HeaderedContentControl>
           <Button x:Name="TaskAddButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />
@@ -222,11 +223,10 @@
           <HeaderedContentControl Classes="field required" Header="AUFGABE"
                                     Classes.invalid="{Binding EditTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="EditTextBox" Text="{Binding EditText}">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding SaveEditCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
+            <!-- EnterSubmit rather than a KeyBinding: a KeyBinding fires ahead of the field's own key
+                 handling, so it saved the correction while the Textbaustein list still claimed Enter. -->
+            <TextBox x:Name="EditTextBox" Text="{Binding EditText}" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
+                     b:EnterSubmit.Command="{Binding SaveEditCommand}" />
           </HeaderedContentControl>
           <Button x:Name="SaveEditButton" Classes="signal dock-action" Content="SPEICHERN" Command="{Binding SaveEditCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />

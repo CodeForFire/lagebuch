@@ -49,8 +49,19 @@ public static class SyncProtocol
     /// 7: a client may send <c>updateTask</c> and <c>extendTaskTimer</c> (#246). A host at 6 would
     /// reject both commands, so the floor rises to 7.
     /// </para>
+    /// <para>
+    /// 8: the Stammdaten payload carries the Textbausteine, <c>textSnippets</c> for the ETB and
+    /// <c>taskSnippets</c> for Aufgaben. A peer at 7 skips both keys and offers no <c>::</c>
+    /// suggestions, so the floor stays at 7.
+    /// </para>
+    /// <para>
+    /// 9: <c>addJournalEntry</c> may carry the <c>entryId</c> the client minted, <c>addTask</c> a
+    /// <c>sourceEntryId</c>, and the snapshot's tasks the same. A host at 7 or 8 ignores both
+    /// fields -- the Aufgabe is simply not linked -- and a client at 7 or 8 drops the snapshot's,
+    /// so the floor stays at 7.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 7;
+    public const int ProtocolVersion = 9;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

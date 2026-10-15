@@ -84,6 +84,38 @@ public sealed class MasterDataStore
                 });
         }
 
+        Run(cn, tx, "DELETE FROM md_text_snippets;", _ => { });
+        foreach (var t in set.TextSnippets)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_text_snippets (shortcut, text, category) VALUES ($s,$t,$c);",
+                p =>
+                {
+                    p("$s", t.Shortcut);
+                    p("$t", t.Text);
+                    p("$c", t.Category);
+                });
+        }
+
+        Run(cn, tx, "DELETE FROM md_task_snippets;", _ => { });
+        foreach (var t in set.TaskSnippets)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_task_snippets (shortcut, text, category, importance, urgency) VALUES ($s,$t,$c,$i,$u);",
+                p =>
+                {
+                    p("$s", t.Shortcut);
+                    p("$t", t.Text);
+                    p("$c", t.Category);
+                    p("$i", TextSnippet.LevelName(t.Importance));
+                    p("$u", TextSnippet.LevelName(t.Urgency));
+                });
+        }
+
         Run(cn, tx, "DELETE FROM md_vehicles;", _ => { });
         foreach (var v in set.Vehicles)
         {
@@ -270,6 +302,18 @@ public sealed class MasterDataStore
                 email TEXT,
                 note TEXT
             );
+            CREATE TABLE IF NOT EXISTS md_text_snippets (
+                shortcut TEXT NOT NULL,
+                text TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS md_task_snippets (
+                shortcut TEXT NOT NULL,
+                text TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT '',
+                importance TEXT NOT NULL DEFAULT 'medium',
+                urgency TEXT NOT NULL DEFAULT 'medium'
+            );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS md_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """;
@@ -301,6 +345,16 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "phone", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "email", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "note", "TEXT");
+
+        // Both Textbaustein tables arrived complete, so these repair nothing a release wrote; they
+        // are here because #397's sweep holds every repairable column to the same rule.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_text_snippets", "category", "TEXT NOT NULL DEFAULT ''");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_task_snippets", "category", "TEXT NOT NULL DEFAULT ''");
+
+        // The Aufgaben-Textbausteine' priorities came after the table did: an existing store gains
+        // them as Mittel, which is what an Aufgabe without a preset gets anyway.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_task_snippets", "importance", "TEXT NOT NULL DEFAULT 'medium'");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_task_snippets", "urgency", "TEXT NOT NULL DEFAULT 'medium'");
 
         // Widen an md_links that predates link groups (#518): every link already there is ungrouped.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_links", "group_name", "TEXT NOT NULL DEFAULT ''");
@@ -488,6 +542,10 @@ public sealed class MasterDataStore
             ReadTruppTypes(cn),
             ReadPersonnel(cn),
             ReadVehicles(cn),
+
+            // The ETB list has no priorities; a constant 'medium' keeps one reader for both tables.
+            ReadTextSnippets(cn, "SELECT shortcut, text, category, 'medium', 'medium' FROM md_text_snippets ORDER BY rowid;"),
+            ReadTextSnippets(cn, "SELECT shortcut, text, category, importance, urgency FROM md_task_snippets ORDER BY rowid;"),
             ReadSettings(cn));
     }
 
@@ -639,6 +697,32 @@ public sealed class MasterDataStore
         }
 
         return list;
+    }
+
+    // Normalized on the way out too, like the Trupp-Typen: the columns are only typed, so a store
+    // edited outside the app could otherwise hold a Kürzel nobody can type or a duplicate one.
+    // One reader for both tables; the query is one of the two literals in Read, never input.
+    [SuppressMessage(
+        "Security",
+        "CA2100",
+        Justification = "Audited: the only callers pass one of two compile-time SELECT literals naming md_text_snippets or md_task_snippets.")]
+    private static IReadOnlyList<TextSnippet> ReadTextSnippets(SqliteConnection cn, string select)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = select;
+        using var r = cmd.ExecuteReader();
+        var list = new List<TextSnippet>();
+        while (r.Read())
+        {
+            list.Add(new TextSnippet(
+                r.GetString(0),
+                r.GetString(1),
+                r.GetString(2),
+                TextSnippet.ImportanceFrom(r.GetString(3)),
+                TextSnippet.UrgencyFrom(r.GetString(4))));
+        }
+
+        return TextSnippet.Normalize(list);
     }
 
     private static List<TruppType> ReadTruppTypes(SqliteConnection cn)

@@ -1,0 +1,1 @@
+An Aufgabe given out from an ETB entry stays linked to it, so the ETB row counts its Aufgaben ("2 Aufgaben · 1 offen") and leads to them, and the Aufgabe and the Bericht show which entry it came from.

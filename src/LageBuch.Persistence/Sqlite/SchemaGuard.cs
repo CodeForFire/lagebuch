@@ -91,6 +91,7 @@ internal static class SchemaGuard
         new("incident_meta", "closed_by", "TEXT", false, null),
         new("incident_tasks", "completed_at", "TEXT", false, null),
         new("incident_tasks", "completed_by", "TEXT", false, null),
+        new("incident_tasks", "source_entry_id", "TEXT", false, null),
         new("involved_parties", "phone", "TEXT", false, null),
         new("involved_parties", "notes", "TEXT", false, null),
         new("role_assignments", "call_sign", "TEXT", false, null),

@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Persistence.MasterData;
 
@@ -29,6 +30,15 @@ public sealed record MasterDataSet(
     // Vehicles per Wache with their seat count (#76).
     IReadOnlyList<Vehicle> Vehicles,
 
+    // Textbausteine for the ETB: what the Funker reports, called up by typing ::kürzel in an ETB
+    // field. Inserting one copies its text into the entry (#337); nothing points back here.
+    IReadOnlyList<TextSnippet> TextSnippets,
+
+    // Textbausteine for Aufgaben: what the Lagebuchführer gives out, offered only in the Aufgabe
+    // fields. Kept apart from the ETB's on purpose -- a Rückmeldung is not an Aufgabe, and a list
+    // that offered both would hand the wrong kind of sentence to the wrong field.
+    IReadOnlyList<TextSnippet> TaskSnippets,
+
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
     IncidentSettings Settings)
@@ -47,6 +57,8 @@ public sealed record MasterDataSet(
         Array.Empty<TruppType>(),
         Array.Empty<Person>(),
         Array.Empty<Vehicle>(),
+        Array.Empty<TextSnippet>(),
+        Array.Empty<TextSnippet>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -64,7 +76,9 @@ public sealed record MasterDataSet(
         && Links.Count == 0 && ChecklistTemplates.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0
-        && Vehicles.Count == 0;
+        && Vehicles.Count == 0
+        && TextSnippets.Count == 0
+        && TaskSnippets.Count == 0;
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -102,6 +116,110 @@ public sealed record MasterDataSet(
 [SuppressMessage("Design", "CA1054", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 [SuppressMessage("Design", "CA1056", Justification = "Link URLs are free-form display data in persisted master data; System.Uri would make non-parseable values (relay or relative links) fail to load.")]
 public sealed record Link(string Name, string Url, string Group = "");
+
+/// <summary>
+/// A Textbaustein: a phrase called up by typing <c>::</c> and its <see cref="Shortcut"/> in a text
+/// field, e.g. <c>::stl</c> for "Stromleitung beschädigt, Bereich abgesperrt, EVU alarmiert". The
+/// same record serves both lists, <see cref="MasterDataSet.TextSnippets"/> for the ETB and
+/// <see cref="MasterDataSet.TaskSnippets"/> for Aufgaben; which list it sits in is what it is for.
+/// <c>[…]</c> in the text marks a gap the Funker fills in; the field selects the first one.
+/// <see cref="Category"/> is a free-text heading shown beside the suggestion.
+/// <para>
+/// <see cref="Importance"/> and <see cref="Urgency"/> mean something only in the Aufgaben list: the
+/// priorities a new Aufgabe takes when the Textbaustein is inserted into it. An ETB entry has no
+/// priorities, so the ETB list leaves them at Mittel and never stores or sends them.
+/// </para>
+/// </summary>
+public sealed record TextSnippet(
+    string Shortcut,
+    string Text,
+    string Category = "",
+    TaskImportance Importance = TaskImportance.Medium,
+    TaskUrgency Urgency = TaskUrgency.Medium)
+{
+    /// <summary>The invariant name a level is stored and exchanged under: low, medium or high.</summary>
+    public static string LevelName(TaskImportance level) => LevelName((int)level);
+
+    /// <inheritdoc cref="LevelName(TaskImportance)"/>
+    public static string LevelName(TaskUrgency level) => LevelName((int)level);
+
+    /// <summary>
+    /// Reads a stored level back. Anything unknown -- absent, misspelt, from a newer build -- is
+    /// Mittel rather than an error: this runs on imported files and a sync host's payload, and a
+    /// Textbaustein with a middling priority is better than a failed join.
+    /// </summary>
+    public static TaskImportance ImportanceFrom(string? name) => (TaskImportance)LevelFrom(name);
+
+    /// <inheritdoc cref="ImportanceFrom"/>
+    public static TaskUrgency UrgencyFrom(string? name) => (TaskUrgency)LevelFrom(name);
+
+    /// <summary>
+    /// The longest text a Textbaustein may carry: what an Aufgabe may hold, the shorter of the two
+    /// fields it is typed into. Anything longer only fails when the entry is saved.
+    /// </summary>
+    public const int MaxTextLength = IncidentTask.MaxTextLength;
+
+    /// <summary>The longest Kürzel; it is typed, so it is short by nature.</summary>
+    public const int MaxShortcutLength = 12;
+
+    /// <summary>
+    /// The Kürzel as it is matched: lower case, letters and digits only, at most
+    /// <see cref="MaxShortcutLength"/>. "::STL", " stl " and "s-t-l" all become "stl", so a
+    /// hand-edited file cannot hold a Kürzel nobody can type.
+    /// </summary>
+    public static string NormalizeShortcut(string? shortcut)
+    {
+        var letters = new string((shortcut ?? string.Empty)
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+        return letters.Length > MaxShortcutLength ? letters[..MaxShortcutLength] : letters;
+    }
+
+    /// <summary>Trims the text and cuts it to <see cref="MaxTextLength"/>.</summary>
+    public static string CapText(string? text)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        return trimmed.Length > MaxTextLength ? trimmed[..MaxTextLength].TrimEnd() : trimmed;
+    }
+
+    /// <summary>
+    /// Brings a list to the shape every consumer may rely on: Kürzel normalized, text capped,
+    /// entries without either dropped, and each Kürzel once -- the first wins, as it would in the
+    /// suggestion list. The import, a sync host's payload and the store all go through this.
+    /// </summary>
+    public static IReadOnlyList<TextSnippet> Normalize(IEnumerable<TextSnippet> snippets)
+    {
+        ArgumentNullException.ThrowIfNull(snippets);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<TextSnippet>();
+        foreach (var s in snippets)
+        {
+            var shortcut = NormalizeShortcut(s.Shortcut);
+            var text = CapText(s.Text);
+            if (shortcut.Length > 0 && text.Length > 0 && seen.Add(shortcut))
+            {
+                result.Add(s with { Shortcut = shortcut, Text = text, Category = (s.Category ?? string.Empty).Trim() });
+            }
+        }
+
+        return result;
+    }
+
+    private static string LevelName(int level) => level switch
+    {
+        0 => "low",
+        2 => "high",
+        _ => "medium",
+    };
+
+    private static int LevelFrom(string? name) => name?.Trim().ToUpperInvariant() switch
+    {
+        "LOW" => 0,
+        "HIGH" => 2,
+        _ => 1,
+    };
+}
 
 /// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's
 /// Checklisten are seeded from at start.</summary>
@@ -703,6 +821,8 @@ public static class MasterDataJson
             ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
+            ParseTextSnippets(root, "textSnippets", withLevels: false),
+            ParseTextSnippets(root, "taskSnippets", withLevels: true),
             ParseSettings(root));
     }
 
@@ -846,6 +966,38 @@ public static class MasterDataJson
     }
 
     /// <summary>
+    /// Reads one list of Textbausteine -- <c>textSnippets</c> for the ETB, <c>taskSnippets</c> for
+    /// Aufgaben: one object per Textbaustein with <c>shortcut</c>, <c>text</c> and an optional
+    /// <c>category</c>. Normalized like everything else that crosses this boundary, see
+    /// <see cref="TextSnippet.Normalize"/>; a null shortcut or text is a malformed document.
+    /// </summary>
+    /// <remarks>
+    /// Only the Aufgaben list reads <c>importance</c>/<c>urgency</c> (low, medium, high), and an
+    /// unknown or missing level is Mittel rather than an error, for the reason ParseTruppTypes clamps.
+    /// </remarks>
+    private static IReadOnlyList<TextSnippet> ParseTextSnippets(JsonElement root, string key, bool withLevels)
+    {
+        if (!root.TryGetProperty(key, out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<TextSnippet>();
+        }
+
+        return TextSnippet.Normalize(arr.EnumerateArray().Select(x => new TextSnippet(
+            Required(x, "shortcut"),
+            Required(x, "text"),
+            x.TryGetProperty("category", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() ?? string.Empty : string.Empty,
+            withLevels ? TextSnippet.ImportanceFrom(Level(x, "importance")) : TaskImportance.Medium,
+            withLevels ? TextSnippet.UrgencyFrom(Level(x, "urgency")) : TaskUrgency.Medium)));
+
+        static string? Level(JsonElement e, string prop) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+        static string Required(JsonElement e, string prop) =>
+            e.GetProperty(prop).GetString()
+            ?? throw new JsonException($"Textbaustein: \"{prop}\" darf nicht null sein.");
+    }
+
+    /// <summary>
     /// Reads the optional <c>navigation</c> array. A missing key yields an empty layout, which
     /// means "this build's default" — never a materialized copy of it, see <see cref="NavLayout"/>.
     /// A row without <c>visible</c> is visible: a hand-written file that lists modules means
@@ -974,6 +1126,20 @@ public static class MasterDataJson
                 isOwn = p.IsOwn,
                 email = p.Email,
                 note = p.Note,
+            }),
+            textSnippets = set.TextSnippets.Select(t => new
+            {
+                shortcut = t.Shortcut,
+                text = t.Text,
+                category = t.Category,
+            }),
+            taskSnippets = set.TaskSnippets.Select(t => new
+            {
+                shortcut = t.Shortcut,
+                text = t.Text,
+                category = t.Category,
+                importance = TextSnippet.LevelName(t.Importance),
+                urgency = TextSnippet.LevelName(t.Urgency),
             }),
             settings = new
             {

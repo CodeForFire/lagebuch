@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Persistence.Tests;
@@ -747,4 +748,119 @@ public class MasterDataJsonTests
         Assert.Contains("name", ex.Message, StringComparison.Ordinal);
         Assert.Contains("null", ex.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Serialize_round_trips_both_lists_of_textbausteine_in_order_and_apart()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TextSnippets = new[]
+            {
+                new TextSnippet("stl", "Stromleitung beschädigt, EVU alarmiert", "Sonderfall"),
+                new TextSnippet("lgb", "Lage bestätigt: [X]"),
+            },
+            TaskSnippets = new[]
+            {
+                new TextSnippet("evu", "Energieversorger informieren"),
+                new TextSnippet("kon", "[X] kontrollieren", "Erkundung"),
+            },
+        };
+
+        var reparsed = Parse(MasterDataJson.Serialize(original));
+
+        Assert.Equal(original.TextSnippets, reparsed.TextSnippets);
+        Assert.Equal(original.TaskSnippets, reparsed.TaskSnippets);
+    }
+
+    [Fact]
+    public void The_same_kuerzel_may_stand_for_one_thing_in_the_etb_and_another_in_aufgaben()
+    {
+        // Unique within a list, not across both: ::evu reports in the ETB and gives out in Aufgaben.
+        var set = Parse("""
+            {
+              "textSnippets": [{ "shortcut": "evu", "text": "EVU vor Ort" }],
+              "taskSnippets": [{ "shortcut": "evu", "text": "Energieversorger informieren" }]
+            }
+            """);
+
+        Assert.Equal("EVU vor Ort", Assert.Single(set.TextSnippets).Text);
+        Assert.Equal("Energieversorger informieren", Assert.Single(set.TaskSnippets).Text);
+    }
+
+    [Fact]
+    public void Parse_normalizes_and_caps_aufgaben_textbausteine_like_the_etbs()
+    {
+        var huge = new string('x', TextSnippet.MaxTextLength * 2);
+        var set = Parse($$"""{ "taskSnippets": [{ "shortcut": " ::EVU ", "text": "{{huge}}" }, { "shortcut": "", "text": "Ohne" }] }""");
+
+        var snippet = Assert.Single(set.TaskSnippets);
+        Assert.Equal("evu", snippet.Shortcut);
+        Assert.Equal(TextSnippet.MaxTextLength, snippet.Text.Length);
+    }
+
+    [Fact]
+    public void Parse_normalizes_a_kuerzel_nobody_could_type()
+    {
+        var set = Parse("""{ "textSnippets": [{ "shortcut": " ::S-T-L ", "text": " Stromleitung beschädigt " }] }""");
+
+        Assert.Equal(new TextSnippet("stl", "Stromleitung beschädigt"), Assert.Single(set.TextSnippets));
+    }
+
+    [Fact]
+    public void Parse_drops_incomplete_textbausteine_and_keeps_the_first_of_a_duplicate_kuerzel()
+    {
+        var set = Parse("""
+            {
+              "textSnippets": [
+                { "shortcut": "stl", "text": "Erste" },
+                { "shortcut": "", "text": "Ohne Kürzel" },
+                { "shortcut": "--", "text": "Kürzel ohne Buchstaben" },
+                { "shortcut": "leer", "text": "  " },
+                { "shortcut": "STL", "text": "Zweite" }
+              ]
+            }
+            """);
+
+        Assert.Equal(new TextSnippet("stl", "Erste"), Assert.Single(set.TextSnippets));
+    }
+
+    [Fact]
+    public void Parse_cuts_an_oversized_textbaustein_and_kuerzel()
+    {
+        // A hostile sync host or a doctored import: the text lands in an Aufgabe field, which
+        // refuses anything longer than IncidentTask.MaxTextLength when it is saved.
+        var huge = new string('x', TextSnippet.MaxTextLength * 4);
+        var set = Parse($$"""{ "textSnippets": [{ "shortcut": "abcdefghijklmnopqrstuvwxyz", "text": "{{huge}}" }] }""");
+
+        var snippet = Assert.Single(set.TextSnippets);
+        Assert.Equal(TextSnippet.MaxShortcutLength, snippet.Shortcut.Length);
+        Assert.Equal(TextSnippet.MaxTextLength, snippet.Text.Length);
+    }
+
+    [Theory]
+    [InlineData("""{ "textSnippets": [{ "shortcut": null, "text": "x" }] }""")]
+    [InlineData("""{ "textSnippets": [{ "shortcut": "x", "text": null }] }""")]
+    public void Parse_refuses_a_textbaustein_with_a_null_field(string json) =>
+        Assert.Throws<JsonException>(() => Parse(json));
+
+    [Fact]
+    public void Aufgaben_textbausteine_keep_their_priorities_and_etb_ones_never_carry_any()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TaskSnippets = new[] { new TextSnippet("rd", "Rettungsdienst nachfordern", "Nachforderung", TaskImportance.High, TaskUrgency.High) },
+        };
+        var reparsed = Parse(MasterDataJson.Serialize(original));
+        Assert.Equal(original.TaskSnippets, reparsed.TaskSnippets);
+
+        // An ETB entry has no priorities: levels in the ETB list are ignored, not imported.
+        var etb = Parse("""{ "textSnippets": [{ "shortcut": "stl", "text": "Stromleitung", "importance": "high", "urgency": "high" }] }""");
+        Assert.Equal(new TextSnippet("stl", "Stromleitung"), Assert.Single(etb.TextSnippets));
+    }
+
+    [Theory]
+    [InlineData("""{ "taskSnippets": [{ "shortcut": "rd", "text": "RD nachfordern" }] }""")]
+    [InlineData("""{ "taskSnippets": [{ "shortcut": "rd", "text": "RD nachfordern", "importance": "dringend", "urgency": 2 }] }""")]
+    public void A_missing_or_unknown_level_on_an_aufgaben_textbaustein_reads_as_mittel(string json) =>
+        Assert.Equal(new TextSnippet("rd", "RD nachfordern"), Assert.Single(Parse(json).TaskSnippets));
 }

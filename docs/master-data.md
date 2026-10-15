@@ -24,6 +24,41 @@ person's call sign) becomes a call-sign suggestion. Maintaining the vehicle
 list is all that is needed; every field still accepts free text for anything
 not in it (a Leitstelle, a mutual-aid unit).
 
+## Textbausteine
+
+There are two lists, and they never mix. `textSnippets` are the ETB's: what a
+Funker reports ("Einsatzstelle erreicht, Erkundung läuft"). `taskSnippets` are
+the Aufgaben's: what the Lagebuchführer gives out ("Energieversorger
+informieren"). A Rückmeldung is not an Aufgabe, so the ETB entry and the ETB
+edit panel offer only the first list, and the Aufgaben dock, the Aufgabe dialog
+and the Aufgabe edit panel only the second. In the Stammdaten editor they are
+**Textbausteine ETB** and **Textbausteine Aufgaben**.
+
+Each entry has a `shortcut` (the Kürzel), a `text` and an optional `category`.
+An Aufgaben-Textbaustein also carries an `importance` and an `urgency` (`low`,
+`medium` — the default — or `high`): inserting it into a **new** Aufgabe, in the
+Aufgaben dock or the dialog behind an ETB entry, sets the Wichtigkeit, the
+Dringlichkeit and the timer that Dringlichkeit stands for. The Aufgabe edit
+panel inserts the text only, so correcting an Aufgabe never re-prioritizes it.
+An unknown level reads as `medium` rather than failing the import.
+Typing `::` in a field lists that field's Textbausteine; the letters
+after `::` narrow the list — Kürzel first, then any whose text or Kategorie
+contains them. ↑/↓ choose, Enter or Tab insert, Esc closes the list and leaves
+the typed text alone. A tap inserts on a phone.
+
+`[…]` in a text marks a gap: after inserting, the first one is selected, so
+`::lgb` followed by `Zimmerbrand 2. OG` reads `Lage bestätigt: Zimmerbrand 2. OG`.
+(On Android the caret simply follows the text, because the soft keyboard and
+a programmatic selection do not get along.)
+
+A Kürzel is stored lower case, letters and digits only, at most 12 characters;
+`::STL`, `stl` and `s-t-l` are the same Kürzel. Each Kürzel exists once per
+list — the editor names a duplicate instead of saving it, and an import keeps
+the first — but the same Kürzel may mean one thing in the ETB and another in
+Aufgaben.
+A text is cut to 1000 characters, what an Aufgabe may hold. The inserted text
+is plain text in the entry: changing a Textbaustein later changes no entry.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the
