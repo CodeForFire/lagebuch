@@ -158,7 +158,8 @@
           <HeaderedContentControl Classes="field required" Header="AUFGABE"
                                     Classes.invalid="{Binding NewTextError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
-            <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}" b:SnippetCompletion.Snippets="{Binding TextSnippets}" />
+            <TextBox x:Name="TaskNewTextBox" Text="{Binding NewText}" b:SnippetCompletion.Snippets="{Binding TextSnippets}"
+                     b:SnippetCompletion.InsertedCommand="{Binding ApplySnippetPrioritiesCommand}" />
           </HeaderedContentControl>
           <Button x:Name="TaskAddButton" Classes="signal dock-action" Content="HINZUFÜGEN" Command="{Binding AddTaskCommand}"
                   VerticalAlignment="Bottom" Margin="0,0,0,1" />

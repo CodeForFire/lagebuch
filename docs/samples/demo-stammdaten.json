@@ -57,12 +57,12 @@
     { "shortcut": "abg", "text": "Einsatzstelle abgearbeitet, an Eigentümer übergeben", "category": "Abgeschlossen" }
   ],
   "taskSnippets": [
-    { "shortcut": "rd", "text": "Rettungsdienst nachfordern", "category": "Nachforderung" },
-    { "shortcut": "pol", "text": "Polizei verständigen", "category": "Nachforderung" },
-    { "shortcut": "evu", "text": "Energieversorger informieren", "category": "Versorger" },
-    { "shortcut": "thw", "text": "THW anfordern", "category": "Nachforderung" },
-    { "shortcut": "kon", "text": "[X] kontrollieren", "category": "Erkundung" },
-    { "shortcut": "spe", "text": "Bereich [X] absperren", "category": "Sicherung" }
+    { "shortcut": "rd", "text": "Rettungsdienst nachfordern", "category": "Nachforderung", "importance": "high", "urgency": "high" },
+    { "shortcut": "pol", "text": "Polizei verständigen", "category": "Nachforderung", "importance": "high", "urgency": "medium" },
+    { "shortcut": "evu", "text": "Energieversorger informieren", "category": "Versorger", "importance": "medium", "urgency": "medium" },
+    { "shortcut": "thw", "text": "THW anfordern", "category": "Nachforderung", "importance": "medium", "urgency": "low" },
+    { "shortcut": "kon", "text": "[X] kontrollieren", "category": "Erkundung", "importance": "high", "urgency": "medium" },
+    { "shortcut": "spe", "text": "Bereich [X] absperren", "category": "Sicherung", "importance": "high", "urgency": "high" }
   ],
   "vehicles": [
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 3, "hasZugfuehrer": true },

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -38,6 +39,14 @@ public static class SnippetCompletion
     public static readonly AttachedProperty<IReadOnlyList<TextSnippet>?> SnippetsProperty =
         AvaloniaProperty.RegisterAttached<TextBox, IReadOnlyList<TextSnippet>?>("Snippets", typeof(SnippetCompletion));
 
+    /// <summary>
+    /// Run with the Textbaustein after it was inserted. The Aufgabe form for a new Aufgabe binds it
+    /// to take the Textbaustein's priorities; a field without it -- the ETB, an edit panel -- only
+    /// ever gains text.
+    /// </summary>
+    public static readonly AttachedProperty<ICommand?> InsertedCommandProperty =
+        AvaloniaProperty.RegisterAttached<TextBox, ICommand?>("InsertedCommand", typeof(SnippetCompletion));
+
     private static readonly ConditionalWeakTable<TextBox, Session> Sessions = new();
 
     static SnippetCompletion()
@@ -72,6 +81,18 @@ public static class SnippetCompletion
     {
         ArgumentNullException.ThrowIfNull(target);
         return target.GetValue(SnippetsProperty);
+    }
+
+    public static void SetInsertedCommand(TextBox target, ICommand? value)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        target.SetValue(InsertedCommandProperty, value);
+    }
+
+    public static ICommand? GetInsertedCommand(TextBox target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return target.GetValue(InsertedCommandProperty);
     }
 
     /// <summary>
@@ -198,6 +219,11 @@ public static class SnippetCompletion
         finally
         {
             session.Applying = false;
+        }
+
+        if (GetInsertedCommand(box) is { } inserted && inserted.CanExecute(snippet))
+        {
+            inserted.Execute(snippet);
         }
 
         box.Focus();

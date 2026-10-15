@@ -233,4 +233,18 @@ public class TaskDialogViewModelTests
 
         Assert.Null(Assert.Single(session.Incident.Tasks).SourceEntryId);
     }
+
+    [Fact]
+    public void An_aufgaben_textbaustein_gives_the_dialog_its_priorities_and_timer()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Stromleitung hängt tief", () => { });
+
+        dialog.ApplySnippetPrioritiesCommand.Execute(
+            new TextSnippet("thw", "THW anfordern", Importance: TaskImportance.Low, Urgency: TaskUrgency.Low));
+
+        Assert.Equal(TaskImportance.Low, dialog.Importance);
+        Assert.Equal(TaskUrgency.Low, dialog.Urgency);
+        Assert.Equal(IncidentTask.DefaultTimerMinutes(TaskUrgency.Low), dialog.TimerMinutes);
+    }
 }

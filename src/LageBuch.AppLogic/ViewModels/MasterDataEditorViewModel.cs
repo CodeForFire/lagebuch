@@ -209,7 +209,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             // Two lists, never one with a kind per row: a Rückmeldung is not an Aufgabe, and each
             // field offers only its own. A Kürzel is unique within its list, not across both.
             _textSnippets = new TextSnippetsSection("Textbausteine ETB", set.TextSnippets, MarkDirty, RequestConfirm),
-            _taskSnippets = new TextSnippetsSection("Textbausteine Aufgaben", set.TaskSnippets, MarkDirty, RequestConfirm),
+            _taskSnippets = new TextSnippetsSection("Textbausteine Aufgaben", set.TaskSnippets, MarkDirty, RequestConfirm, withPriorities: true),
             _personnel = new PersonnelSection("Personal", set.Personnel, OnPersonnelChanged, RequestConfirm),
 
             // Wachen and Funkrufnamen have no section of their own: they are derived from these

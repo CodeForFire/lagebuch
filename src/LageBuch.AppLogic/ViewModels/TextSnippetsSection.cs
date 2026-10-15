@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -15,11 +16,18 @@ public sealed partial class TextSnippetsSection : EditorSection
     private readonly Action _onChanged;
     private readonly IReadOnlyList<string> _categoryOptions;
 
+    // withPriorities is true for the Aufgaben list: its rows carry the Wichtigkeit and Dringlichkeit
+    // a new Aufgabe takes from them. The ETB list has none, and saves every row at Mittel.
     public TextSnippetsSection(
-        string title, IReadOnlyList<TextSnippet> snippets, Action onChanged, Action<string, Action>? requestConfirm = null)
+        string title,
+        IReadOnlyList<TextSnippet> snippets,
+        Action onChanged,
+        Action<string, Action>? requestConfirm = null,
+        bool withPriorities = false)
         : base(title, requestConfirm)
     {
         ArgumentNullException.ThrowIfNull(snippets);
+        HasPriorities = withPriorities;
         _onChanged = () =>
         {
             RefreshConflicts();
@@ -31,9 +39,19 @@ public sealed partial class TextSnippetsSection : EditorSection
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         Rows = new ObservableCollection<TextSnippetRow>(
-            snippets.Select(s => new TextSnippetRow(s.Shortcut, s.Text, s.Category, _categoryOptions, _onChanged)));
+            snippets.Select(s => new TextSnippetRow(
+                s.Shortcut, s.Text, s.Category, _categoryOptions, _onChanged, withPriorities, s.Importance, s.Urgency)));
         RefreshConflicts();
     }
+
+    /// <summary>Shared by every row: one list, not a copy each.</summary>
+    internal static IReadOnlyList<ImportanceOption> ImportanceChoices { get; } = TasksViewModel.ImportanceLevels();
+
+    /// <inheritdoc cref="ImportanceChoices"/>
+    internal static IReadOnlyList<UrgencyOption> UrgencyChoices { get; } = TasksViewModel.UrgencyLevels();
+
+    /// <summary>Whether the rows carry priorities -- the Aufgaben list does, the ETB list does not.</summary>
+    public bool HasPriorities { get; }
 
     public ObservableCollection<TextSnippetRow> Rows { get; }
 
@@ -44,7 +62,7 @@ public sealed partial class TextSnippetsSection : EditorSection
     [RelayCommand]
     private void Add()
     {
-        var row = new TextSnippetRow(string.Empty, string.Empty, string.Empty, _categoryOptions, _onChanged);
+        var row = new TextSnippetRow(string.Empty, string.Empty, string.Empty, _categoryOptions, _onChanged, HasPriorities);
         Rows.Add(row);
         _onChanged();
         OnRowAdded(row);
@@ -94,7 +112,12 @@ public sealed partial class TextSnippetsSection : EditorSection
     /// Kürzel lower case and letters/digits only, text capped, incomplete rows dropped.
     /// </summary>
     public IReadOnlyList<TextSnippet> ToValues() =>
-        TextSnippet.Normalize(Rows.Select(r => new TextSnippet(r.Shortcut ?? string.Empty, r.Text ?? string.Empty, r.Category ?? string.Empty)));
+        TextSnippet.Normalize(Rows.Select(r => new TextSnippet(
+            r.Shortcut ?? string.Empty,
+            r.Text ?? string.Empty,
+            r.Category ?? string.Empty,
+            HasPriorities ? r.Importance : TaskImportance.Medium,
+            HasPriorities ? r.Urgency : TaskUrgency.Medium)));
 
     private void RefreshConflicts()
     {

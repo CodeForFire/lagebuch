@@ -35,6 +35,12 @@ and the Aufgabe edit panel only the second. In the Stammdaten editor they are
 **Textbausteine ETB** and **Textbausteine Aufgaben**.
 
 Each entry has a `shortcut` (the Kürzel), a `text` and an optional `category`.
+An Aufgaben-Textbaustein also carries an `importance` and an `urgency` (`low`,
+`medium` — the default — or `high`): inserting it into a **new** Aufgabe, in the
+Aufgaben dock or the dialog behind an ETB entry, sets the Wichtigkeit, the
+Dringlichkeit and the timer that Dringlichkeit stands for. The Aufgabe edit
+panel inserts the text only, so correcting an Aufgabe never re-prioritizes it.
+An unknown level reads as `medium` rather than failing the import.
 Typing `::` in a field lists that field's Textbausteine; the letters
 after `::` narrow the list — Kürzel first, then any whose text or Kategorie
 contains them. ↑/↓ choose, Enter or Tab insert, Esc closes the list and leaves

@@ -124,9 +124,35 @@ public sealed record Link(string Name, string Url, string Group = "");
 /// <see cref="MasterDataSet.TaskSnippets"/> for Aufgaben; which list it sits in is what it is for.
 /// <c>[…]</c> in the text marks a gap the Funker fills in; the field selects the first one.
 /// <see cref="Category"/> is a free-text heading shown beside the suggestion.
+/// <para>
+/// <see cref="Importance"/> and <see cref="Urgency"/> mean something only in the Aufgaben list: the
+/// priorities a new Aufgabe takes when the Textbaustein is inserted into it. An ETB entry has no
+/// priorities, so the ETB list leaves them at Mittel and never stores or sends them.
+/// </para>
 /// </summary>
-public sealed record TextSnippet(string Shortcut, string Text, string Category = "")
+public sealed record TextSnippet(
+    string Shortcut,
+    string Text,
+    string Category = "",
+    TaskImportance Importance = TaskImportance.Medium,
+    TaskUrgency Urgency = TaskUrgency.Medium)
 {
+    /// <summary>The invariant name a level is stored and exchanged under: low, medium or high.</summary>
+    public static string LevelName(TaskImportance level) => LevelName((int)level);
+
+    /// <inheritdoc cref="LevelName(TaskImportance)"/>
+    public static string LevelName(TaskUrgency level) => LevelName((int)level);
+
+    /// <summary>
+    /// Reads a stored level back. Anything unknown -- absent, misspelt, from a newer build -- is
+    /// Mittel rather than an error: this runs on imported files and a sync host's payload, and a
+    /// Textbaustein with a middling priority is better than a failed join.
+    /// </summary>
+    public static TaskImportance ImportanceFrom(string? name) => (TaskImportance)LevelFrom(name);
+
+    /// <inheritdoc cref="ImportanceFrom"/>
+    public static TaskUrgency UrgencyFrom(string? name) => (TaskUrgency)LevelFrom(name);
+
     /// <summary>
     /// The longest text a Textbaustein may carry: what an Aufgabe may hold, the shorter of the two
     /// fields it is typed into. Anything longer only fails when the entry is saved.
@@ -173,12 +199,26 @@ public sealed record TextSnippet(string Shortcut, string Text, string Category =
             var text = CapText(s.Text);
             if (shortcut.Length > 0 && text.Length > 0 && seen.Add(shortcut))
             {
-                result.Add(new TextSnippet(shortcut, text, (s.Category ?? string.Empty).Trim()));
+                result.Add(s with { Shortcut = shortcut, Text = text, Category = (s.Category ?? string.Empty).Trim() });
             }
         }
 
         return result;
     }
+
+    private static string LevelName(int level) => level switch
+    {
+        0 => "low",
+        2 => "high",
+        _ => "medium",
+    };
+
+    private static int LevelFrom(string? name) => name?.Trim().ToUpperInvariant() switch
+    {
+        "LOW" => 0,
+        "HIGH" => 2,
+        _ => 1,
+    };
 }
 
 /// <summary>One Checkliste template entry — the Stammdaten-editable source an incident's
@@ -781,8 +821,8 @@ public static class MasterDataJson
             ParseTruppTypes(root),
             ParsePersonnel(root),
             vehicles,
-            ParseTextSnippets(root, "textSnippets"),
-            ParseTextSnippets(root, "taskSnippets"),
+            ParseTextSnippets(root, "textSnippets", withLevels: false),
+            ParseTextSnippets(root, "taskSnippets", withLevels: true),
             ParseSettings(root));
     }
 
@@ -931,7 +971,11 @@ public static class MasterDataJson
     /// <c>category</c>. Normalized like everything else that crosses this boundary, see
     /// <see cref="TextSnippet.Normalize"/>; a null shortcut or text is a malformed document.
     /// </summary>
-    private static IReadOnlyList<TextSnippet> ParseTextSnippets(JsonElement root, string key)
+    /// <remarks>
+    /// Only the Aufgaben list reads <c>importance</c>/<c>urgency</c> (low, medium, high), and an
+    /// unknown or missing level is Mittel rather than an error, for the reason ParseTruppTypes clamps.
+    /// </remarks>
+    private static IReadOnlyList<TextSnippet> ParseTextSnippets(JsonElement root, string key, bool withLevels)
     {
         if (!root.TryGetProperty(key, out var arr) || arr.ValueKind != JsonValueKind.Array)
         {
@@ -941,7 +985,12 @@ public static class MasterDataJson
         return TextSnippet.Normalize(arr.EnumerateArray().Select(x => new TextSnippet(
             Required(x, "shortcut"),
             Required(x, "text"),
-            x.TryGetProperty("category", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() ?? string.Empty : string.Empty)));
+            x.TryGetProperty("category", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() ?? string.Empty : string.Empty,
+            withLevels ? TextSnippet.ImportanceFrom(Level(x, "importance")) : TaskImportance.Medium,
+            withLevels ? TextSnippet.UrgencyFrom(Level(x, "urgency")) : TaskUrgency.Medium)));
+
+        static string? Level(JsonElement e, string prop) =>
+            e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
         static string Required(JsonElement e, string prop) =>
             e.GetProperty(prop).GetString()
@@ -1089,6 +1138,8 @@ public static class MasterDataJson
                 shortcut = t.Shortcut,
                 text = t.Text,
                 category = t.Category,
+                importance = TextSnippet.LevelName(t.Importance),
+                urgency = TextSnippet.LevelName(t.Urgency),
             }),
             settings = new
             {

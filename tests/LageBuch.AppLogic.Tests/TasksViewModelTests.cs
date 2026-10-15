@@ -776,4 +776,20 @@ public class TasksViewModelTests
         Assert.Equal(TaskFilterKind.All, vm.Filter);
         Assert.Equal("Schon erledigt", vm.SelectedTask?.Text);
     }
+
+    [Fact]
+    public void An_aufgaben_textbaustein_gives_the_new_aufgabe_its_priorities_and_timer()
+    {
+        var (session, _, _) = NewSession();
+        using var vm = Vm(session, MasterData(), () => { });
+        vm.NewTimerMinutes = 42; // an override the Textbaustein's Dringlichkeit replaces
+
+        vm.ApplySnippetPrioritiesCommand.Execute(
+            new TextSnippet("rd", "Rettungsdienst nachfordern", Importance: TaskImportance.High, Urgency: TaskUrgency.High));
+
+        Assert.Equal(TaskImportance.High, vm.NewImportance);
+        Assert.Equal(TaskUrgency.High, vm.NewUrgency);
+        Assert.Equal(IncidentTask.DefaultTimerMinutes(TaskUrgency.High), vm.NewTimerMinutes);
+        Assert.Empty(session.Incident.Tasks);
+    }
 }

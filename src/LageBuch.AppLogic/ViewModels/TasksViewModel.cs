@@ -275,6 +275,21 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         return NewTextError is null && NewTimerMinutesError is null;
     }
 
+    /// <summary>
+    /// An Aufgaben-Textbaustein was inserted into the new Aufgabe's text: it brings the Wichtigkeit
+    /// and Dringlichkeit it usually carries, and the timer follows the Dringlichkeit -- set even
+    /// when the Dringlichkeit did not change, so an earlier override does not linger. Not wired to
+    /// the edit panel: correcting an Aufgabe must not re-prioritize it behind the operator's back.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanAddTask))]
+    private void ApplySnippetPriorities(TextSnippet snippet)
+    {
+        ArgumentNullException.ThrowIfNull(snippet);
+        NewImportance = snippet.Importance;
+        NewUrgency = snippet.Urgency;
+        NewTimerMinutes = IncidentTask.DefaultTimerMinutes(snippet.Urgency);
+    }
+
     private void ShowErrors(bool shown)
     {
         _errorsShown = shown;

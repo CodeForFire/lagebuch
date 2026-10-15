@@ -11,6 +11,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -32,7 +33,7 @@ public class SnippetCompletionKeyboardTests
     private static readonly TextSnippet[] AufgabenSnippets =
     {
         new("stw", "Stadtwerke verständigen", "Versorger"),
-        new("spe", "Bereich [X] absperren", "Sicherung"),
+        new("spe", "Bereich [X] absperren", "Sicherung", TaskImportance.High, TaskUrgency.High),
     };
 
     private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) ShowWorkspace()
@@ -278,5 +279,47 @@ public class SnippetCompletionKeyboardTests
         window.Type("::stw");
 
         Assert.Empty(SnippetCompletion.OfferedSnippets(box));
+    }
+
+    [AvaloniaFact]
+    public void An_aufgaben_textbaustein_sets_the_new_aufgabes_priorities_in_the_dock()
+    {
+        var (window, vm, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        var box = Named<TextBox>(window, "TaskNewTextBox");
+        box.Focus(NavigationMethod.Tab);
+        Dispatcher.UIThread.RunJobs();
+
+        window.Type("::spe");
+        window.Press(PhysicalKey.Enter);
+        Capture(window, "textbausteine-aufgaben-prioritaet.png");
+
+        Assert.Equal(TaskImportance.High, vm.Tasks.NewImportance);
+        Assert.Equal(TaskUrgency.High, vm.Tasks.NewUrgency);
+        Assert.Equal(IncidentTask.DefaultTimerMinutes(TaskUrgency.High), vm.Tasks.NewTimerMinutes);
+        Assert.Equal("[X]", box.SelectedText);
+    }
+
+    [AvaloniaFact]
+    public void Correcting_an_aufgabe_with_a_textbaustein_does_not_reprioritize_it()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        session.AddTask("Tür sichern", null, TaskImportance.Low, TaskUrgency.Low, 30);
+        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        vm.Tasks.Rows.Single().BeginEditCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        var box = window.GetVisualDescendants().OfType<TextBox>()
+            .Single(t => t.Name == "EditTextBox" && t.IsEffectivelyVisible);
+        box.Focus(NavigationMethod.Tab);
+        box.CaretIndex = box.Text!.Length;
+        Dispatcher.UIThread.RunJobs();
+
+        window.Type(", ::spe");
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Equal("Tür sichern, Bereich [X] absperren ", box.Text);
+        Assert.Equal(TaskImportance.Low, vm.Tasks.EditImportance);
+        Assert.Equal(TaskUrgency.Low, vm.Tasks.EditUrgency);
     }
 }

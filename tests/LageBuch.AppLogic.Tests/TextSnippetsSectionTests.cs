@@ -1,4 +1,5 @@
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -79,5 +80,18 @@ public class TextSnippetsSectionTests
         Assert.Same(etb, etbVm.TextSnippets);
         Assert.Same(aufgaben, tasksVm.TextSnippets);
         Assert.Same(aufgaben, dialog.TextSnippets);
+    }
+
+    [Fact]
+    public void The_aufgaben_list_saves_its_priorities_and_the_etb_list_never_does()
+    {
+        var withLevels = new TextSnippet("rd", "RD nachfordern", Importance: TaskImportance.High, Urgency: TaskUrgency.High);
+        var aufgaben = new TextSnippetsSection("Textbausteine Aufgaben", new[] { withLevels }, () => { }, withPriorities: true);
+        var etb = new TextSnippetsSection("Textbausteine ETB", new[] { withLevels }, () => { });
+
+        Assert.True(aufgaben.Rows[0].ShowsPriorities);
+        Assert.False(etb.Rows[0].ShowsPriorities);
+        Assert.Equal(withLevels, Assert.Single(aufgaben.ToValues()));
+        Assert.Equal(new TextSnippet("rd", "RD nachfordern"), Assert.Single(etb.ToValues()));
     }
 }

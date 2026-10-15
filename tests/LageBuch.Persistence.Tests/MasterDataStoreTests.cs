@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 using Microsoft.Data.Sqlite;
 
@@ -808,5 +809,40 @@ public class MasterDataStoreTests : IDisposable
         SqliteConnection.ClearAllPools();
 
         Assert.Equal(new TextSnippet("stl", "Erste"), Assert.Single(MasterDataStore.GetOrCreate(_path).TextSnippets));
+    }
+
+    [Fact]
+    public void Aufgaben_textbausteine_round_trip_with_their_priorities()
+    {
+        var forAufgaben = new[]
+        {
+            new TextSnippet("rd", "Rettungsdienst nachfordern", "Nachforderung", TaskImportance.High, TaskUrgency.High),
+            new TextSnippet("thw", "THW anfordern", Urgency: TaskUrgency.Low),
+        };
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { TaskSnippets = forAufgaben });
+
+        Assert.Equal(forAufgaben, MasterDataStore.GetOrCreate(_path).TaskSnippets);
+    }
+
+    [Fact]
+    public void A_store_whose_aufgaben_textbausteine_predate_priorities_widens_and_reads_them_as_mittel()
+    {
+        // A store written before the priorities existed: the table, its rows, and no level columns.
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE md_task_snippets (shortcut TEXT NOT NULL, text TEXT NOT NULL, category TEXT NOT NULL DEFAULT '');
+                INSERT INTO md_task_snippets (shortcut, text, category) VALUES ('evu', 'Energieversorger informieren', 'Versorger');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(
+            new TextSnippet("evu", "Energieversorger informieren", "Versorger"),
+            Assert.Single(MasterDataStore.GetOrCreate(_path).TaskSnippets));
     }
 }

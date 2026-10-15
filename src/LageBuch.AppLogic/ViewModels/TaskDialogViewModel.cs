@@ -127,6 +127,19 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         OnPropertyChanged(nameof(TimerMinutesError));
     }
 
+    /// <summary>
+    /// An Aufgaben-Textbaustein was inserted: the dialog takes its priorities and the timer that
+    /// Dringlichkeit stands for, as the Aufgaben dock does.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private void ApplySnippetPriorities(TextSnippet snippet)
+    {
+        ArgumentNullException.ThrowIfNull(snippet);
+        Importance = snippet.Importance;
+        Urgency = snippet.Urgency;
+        TimerMinutes = IncidentTask.DefaultTimerMinutes(snippet.Urgency);
+    }
+
     [RelayCommand]
     private void Cancel() => Closed?.Invoke(this, EventArgs.Empty);
 }

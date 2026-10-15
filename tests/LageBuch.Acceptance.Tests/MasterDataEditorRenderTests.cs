@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -61,7 +62,7 @@ public class MasterDataEditorRenderTests
             TaskSnippets = new[]
             {
                 new TextSnippet("evu", "Energieversorger informieren"),
-                new TextSnippet("kon", "[X] kontrollieren", "Erkundung"),
+                new TextSnippet("kon", "[X] kontrollieren", "Erkundung", TaskImportance.High, TaskUrgency.Medium),
             },
             TextSnippets = new[]
             {
@@ -230,6 +231,36 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-trupp-typen.png"));
+    }
+
+    [AvaloniaFact]
+    public void Only_the_aufgaben_textbausteine_show_priority_pickers()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Textbausteine ETB");
+        Dispatcher.UIThread.RunJobs();
+        Assert.DoesNotContain(view.GetVisualDescendants().OfType<ComboBox>(), c => c.IsEffectivelyVisible);
+
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Textbausteine Aufgaben");
+        Dispatcher.UIThread.RunJobs();
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-textbausteine-aufgaben.png"));
+        }
+
+        var pickers = view.GetVisualDescendants().OfType<ComboBox>().Where(c => c.IsEffectivelyVisible).ToList();
+        Assert.Equal(
+            new object?[] { TaskImportance.Medium, TaskUrgency.Medium, TaskImportance.High, TaskUrgency.Medium },
+            pickers.Select(p => p.SelectedValue));
+        Assert.Equal(
+            new[] { "Wichtigkeit", "Dringlichkeit", "Wichtigkeit", "Dringlichkeit" },
+            pickers.Select(AutomationProperties.GetName));
     }
 
     [AvaloniaFact]

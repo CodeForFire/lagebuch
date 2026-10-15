@@ -1,1 +1,1 @@
-Textbausteine, in two new Stammdaten lists kept apart for the ETB and for Aufgaben, are offered by typing ::kürzel in the matching text fields, insert their text with Enter or a tap and select the first [...] gap so it can be typed over.
+Textbausteine, in two new Stammdaten lists kept apart for the ETB and for Aufgaben, are offered by typing ::kürzel in the matching text fields, insert their text with Enter or a tap and select the first [...] gap so it can be typed over, and an Aufgaben-Textbaustein also gives a new Aufgabe its usual Wichtigkeit and Dringlichkeit.

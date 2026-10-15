@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Persistence.Tests;
@@ -841,4 +842,25 @@ public class MasterDataJsonTests
     [InlineData("""{ "textSnippets": [{ "shortcut": "x", "text": null }] }""")]
     public void Parse_refuses_a_textbaustein_with_a_null_field(string json) =>
         Assert.Throws<JsonException>(() => Parse(json));
+
+    [Fact]
+    public void Aufgaben_textbausteine_keep_their_priorities_and_etb_ones_never_carry_any()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TaskSnippets = new[] { new TextSnippet("rd", "Rettungsdienst nachfordern", "Nachforderung", TaskImportance.High, TaskUrgency.High) },
+        };
+        var reparsed = Parse(MasterDataJson.Serialize(original));
+        Assert.Equal(original.TaskSnippets, reparsed.TaskSnippets);
+
+        // An ETB entry has no priorities: levels in the ETB list are ignored, not imported.
+        var etb = Parse("""{ "textSnippets": [{ "shortcut": "stl", "text": "Stromleitung", "importance": "high", "urgency": "high" }] }""");
+        Assert.Equal(new TextSnippet("stl", "Stromleitung"), Assert.Single(etb.TextSnippets));
+    }
+
+    [Theory]
+    [InlineData("""{ "taskSnippets": [{ "shortcut": "rd", "text": "RD nachfordern" }] }""")]
+    [InlineData("""{ "taskSnippets": [{ "shortcut": "rd", "text": "RD nachfordern", "importance": "dringend", "urgency": 2 }] }""")]
+    public void A_missing_or_unknown_level_on_an_aufgaben_textbaustein_reads_as_mittel(string json) =>
+        Assert.Equal(new TextSnippet("rd", "RD nachfordern"), Assert.Single(Parse(json).TaskSnippets));
 }
