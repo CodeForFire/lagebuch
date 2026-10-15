@@ -859,6 +859,10 @@
     <ContentControl Content="{Binding PendingTaskDialog}"
                     IsVisible="{Binding PendingTaskDialog, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
+    <!-- Buchstabier-Helfer overlay, opened from the ETB (#592) -->
+    <ContentControl Content="{Binding PendingSpellingHelper}"
+                    IsVisible="{Binding PendingSpellingHelper, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
     <!-- PDF export section-selection overlay (#262) -->
     <ContentControl Content="{Binding PendingPdfExportOptions}"
                     IsVisible="{Binding PendingPdfExportOptions, Converter={x:Static ObjectConverters.IsNotNull}}" />
