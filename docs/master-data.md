@@ -36,6 +36,26 @@ into the Einsatz, so renaming or deleting a Standardaufgabe later changes no
 Aufgabe already given out. An unknown level reads as `medium` rather than
 failing the import.
 
+## Textbausteine
+
+`textSnippets` lists the phrases a Funker calls up while typing: each has a
+`shortcut` (the Kürzel), a `text` and an optional `category`. Typing `::` in
+the ETB entry, the Aufgabe field or either edit panel lists them; the letters
+after `::` narrow the list — Kürzel first, then any whose text or Kategorie
+contains them. ↑/↓ choose, Enter or Tab insert, Esc closes the list and leaves
+the typed text alone. A tap inserts on a phone.
+
+`[…]` in a text marks a gap: after inserting, the first one is selected, so
+`::lgb` followed by `Zimmerbrand 2. OG` reads `Lage bestätigt: Zimmerbrand 2. OG`.
+(On Android the caret simply follows the text, because the soft keyboard and
+a programmatic selection do not get along.)
+
+A Kürzel is stored lower case, letters and digits only, at most 12 characters;
+`::STL`, `stl` and `s-t-l` are the same Kürzel. Each Kürzel exists once — the
+editor names a duplicate instead of saving it, and an import keeps the first.
+A text is cut to 1000 characters, what an Aufgabe may hold. The inserted text
+is plain text in the entry: changing a Textbaustein later changes no entry.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the

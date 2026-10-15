@@ -30,6 +30,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         Text = prefilledText;
         AssigneeOptions = TasksViewModel.AssigneeSuggestions(masterData);
         TaskTemplates = masterData.TaskTemplates;
+        TextSnippets = masterData.TextSnippets;
         ImportanceOptions = TasksViewModel.ImportanceLevels();
         UrgencyOptions = TasksViewModel.UrgencyLevels();
         _timerMinutes = IncidentTask.DefaultTimerMinutes(Urgency);
@@ -50,6 +51,9 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     public IReadOnlyList<TaskTemplate> TaskTemplates { get; }
 
     public bool HasTaskTemplates => TaskTemplates.Count > 0;
+
+    /// <summary>The Textbausteine the Aufgabe field offers on <c>::</c>.</summary>
+    public IReadOnlyList<TextSnippet> TextSnippets { get; }
 
     [ObservableProperty]
     private TaskImportance _importance = TaskImportance.Medium;

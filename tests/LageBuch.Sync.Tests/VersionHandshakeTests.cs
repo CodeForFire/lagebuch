@@ -85,7 +85,16 @@ public class VersionHandshakeTests
     {
         // 8 adds taskTemplates to the Stammdaten payload. A peer at 7 skips the key and simply
         // offers no chips, so it stays joinable.
-        Assert.Equal(8, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 8, int.MaxValue);
+        Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
+    }
+
+    [Fact]
+    public void Textbausteine_raise_the_protocol_to_nine_but_not_the_floor()
+    {
+        // 9 adds textSnippets to the Stammdaten payload. A peer at 7 or 8 skips the key and simply
+        // offers no :: suggestions, so it stays joinable.
+        Assert.Equal(9, SyncProtocol.ProtocolVersion);
         Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
     }
 }

@@ -70,6 +70,22 @@ public class MasterDataSyncTests
         Assert.Equal(template, Assert.Single(set.TaskTemplates));
     }
 
+    [Fact]
+    public async Task Host_serves_its_textbausteine()
+    {
+        var clock = new FixedClock();
+        var snippet = new TextSnippet("stl", "Stromleitung beschädigt, EVU alarmiert", "Sonderfall");
+        var hostSet = SetWith("Löschzug Fürstenfeldbruck", 60) with { TextSnippets = new[] { snippet } };
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, masterData: hostSet);
+        await using var _ = host;
+
+        using var http = Client(port, TestHost.DefaultPin);
+        var set = MasterDataJson.Parse(
+            await http.GetStringAsync(new Uri(SyncProtocol.MasterDataPath, UriKind.RelativeOrAbsolute)));
+
+        Assert.Equal(snippet, Assert.Single(set.TextSnippets));
+    }
+
     // #400: a joined client labels its Rückmeldung header with the host's Leitstelle, not "ILS".
     [Fact]
     public async Task Host_serves_its_dispatch_centre_name()

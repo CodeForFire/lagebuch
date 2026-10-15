@@ -817,4 +817,64 @@ public class MasterDataJsonTests
     {
         Assert.Empty(Parse("""{ "taskTemplates": [{ "text": "   " }] }""").TaskTemplates);
     }
+
+    [Fact]
+    public void Serialize_round_trips_textbausteine_in_order()
+    {
+        var original = MasterDataSet.Empty with
+        {
+            TextSnippets = new[]
+            {
+                new TextSnippet("stl", "Stromleitung beschädigt, EVU alarmiert", "Sonderfall"),
+                new TextSnippet("lgb", "Lage bestätigt: [X]"),
+            },
+        };
+
+        Assert.Equal(original.TextSnippets, Parse(MasterDataJson.Serialize(original)).TextSnippets);
+    }
+
+    [Fact]
+    public void Parse_normalizes_a_kuerzel_nobody_could_type()
+    {
+        var set = Parse("""{ "textSnippets": [{ "shortcut": " ::S-T-L ", "text": " Stromleitung beschädigt " }] }""");
+
+        Assert.Equal(new TextSnippet("stl", "Stromleitung beschädigt"), Assert.Single(set.TextSnippets));
+    }
+
+    [Fact]
+    public void Parse_drops_incomplete_textbausteine_and_keeps_the_first_of_a_duplicate_kuerzel()
+    {
+        var set = Parse("""
+            {
+              "textSnippets": [
+                { "shortcut": "stl", "text": "Erste" },
+                { "shortcut": "", "text": "Ohne Kürzel" },
+                { "shortcut": "--", "text": "Kürzel ohne Buchstaben" },
+                { "shortcut": "leer", "text": "  " },
+                { "shortcut": "STL", "text": "Zweite" }
+              ]
+            }
+            """);
+
+        Assert.Equal(new TextSnippet("stl", "Erste"), Assert.Single(set.TextSnippets));
+    }
+
+    [Fact]
+    public void Parse_cuts_an_oversized_textbaustein_and_kuerzel()
+    {
+        // A hostile sync host or a doctored import: the text lands in an Aufgabe field, which
+        // refuses anything longer than IncidentTask.MaxTextLength when it is saved.
+        var huge = new string('x', TextSnippet.MaxTextLength * 4);
+        var set = Parse($$"""{ "textSnippets": [{ "shortcut": "abcdefghijklmnopqrstuvwxyz", "text": "{{huge}}" }] }""");
+
+        var snippet = Assert.Single(set.TextSnippets);
+        Assert.Equal(TextSnippet.MaxShortcutLength, snippet.Shortcut.Length);
+        Assert.Equal(TextSnippet.MaxTextLength, snippet.Text.Length);
+    }
+
+    [Theory]
+    [InlineData("""{ "textSnippets": [{ "shortcut": null, "text": "x" }] }""")]
+    [InlineData("""{ "textSnippets": [{ "shortcut": "x", "text": null }] }""")]
+    public void Parse_refuses_a_textbaustein_with_a_null_field(string json) =>
+        Assert.Throws<JsonException>(() => Parse(json));
 }

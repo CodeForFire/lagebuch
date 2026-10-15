@@ -60,6 +60,7 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
         _dispatchCentreName = masterData.Settings.DispatchCentreName;
         IsReadOnly = session.IsReadOnly;
         CallSignOptions = masterData.RadioCallSigns;
+        TextSnippets = masterData.TextSnippets;
         Entries = new ObservableCollection<EtbEntryRow>();
 
         // Any change to the incident — from this tab, another tab, or (when joined) another device —
@@ -121,6 +122,9 @@ public sealed partial class EtbViewModel : ObservableObject, INarrowAware, IEntr
     public bool IsReadOnly { get; }
 
     public IReadOnlyList<string> CallSignOptions { get; }
+
+    /// <summary>The Textbausteine the entry and edit fields offer on <c>::</c>.</summary>
+    public IReadOnlyList<TextSnippet> TextSnippets { get; }
 
     public ObservableCollection<EtbEntryRow> Entries { get; }
 

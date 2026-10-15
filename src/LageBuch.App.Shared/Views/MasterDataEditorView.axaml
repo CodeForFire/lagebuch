@@ -804,6 +804,75 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Textbausteine editor: the Kürzel typed after "::", the text it stands for, and a
+                   Kategorie shown beside the suggestion. Order here is the suggestions' order. -->
+              <DataTemplate x:DataType="vm:TextSnippetsSection">
+                <DockPanel>
+                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- Named rather than dropped on save: only the operator knows which was meant. -->
+                  <TextBlock DockPanel.Dock="Bottom" x:Name="TextSnippetConflicts" Classes="field-error"
+                             Margin="0,8,0,0" Text="{Binding Conflicts}"
+                             IsVisible="{Binding Conflicts, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <!-- Fixed trailing widths matching the row's icon-btn buttons, as in the
+                       Funktionen template above. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="110,*,170,28,32,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="KÜRZEL" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Im Text „::“ und das Kürzel tippen, z. B. ::stl" />
+                    <TextBlock Grid.Column="1" Text="TEXT" Classes="overline" FontSize="10"
+                               ToolTip.Tip="[…] markiert eine Lücke, die nach dem Einfügen markiert ist" />
+                    <TextBlock Grid.Column="2" Text="KATEGORIE" Classes="overline" FontSize="10" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TextSnippetRow">
+                          <Grid ColumnDefinitions="110,*,170,28,32,32" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Shortcut}"
+                                     MaxLength="{x:Static md:TextSnippet.MaxShortcutLength}"
+                                     PlaceholderText="z. B. stl" />
+                            <TextBox Grid.Column="1" Margin="0,0,6,0" Text="{Binding Text}"
+                                     MaxLength="{x:Static md:TextSnippet.MaxTextLength}"
+                                     PlaceholderText="z. B. Stromleitung beschädigt, EVU alarmiert" />
+                            <!-- Free text with the known Kategorien as suggestions, like the Links' group. -->
+                            <Grid Grid.Column="2" Margin="0,0,6,0">
+                              <AutoCompleteBox ItemsSource="{Binding CategoryOptions}"
+                                               PlaceholderText="z. B. Sonderfall"
+                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                               Text="{Binding Category}" />
+                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,9,0" IsHitTestVisible="False"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Grid>
+                            <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
+                                 $parent path cannot resolve here. -->
+                            <Button Grid.Column="3" Classes="icon-btn" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            </Button>
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Button>
+                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Personnel editor -->
               <DataTemplate x:DataType="vm:PersonnelSection">
                 <DockPanel>
