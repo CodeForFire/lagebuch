@@ -115,4 +115,33 @@ public static class NavLayout
         new NavEntry(NavModules.Contacts, null, true),
         new NavEntry(NavModules.Checklist, ChecklistDefaults.AbbauListId, true),
     };
+
+    private static readonly string[] DefaultModuleOrder =
+        Default.Where(e => !e.IsChecklist).Select(e => e.ModuleKey).ToArray();
+
+    /// <summary>
+    /// Where a module that a stored layout never mentions goes: right after the nearest module it
+    /// follows in <see cref="Default"/> that the layout does show, so a new module lands where it
+    /// belongs — the Lagemeldung under the ETB (#592) — rather than at the bottom of the rail.
+    /// The end of the list when none of its predecessors is there.
+    /// </summary>
+    /// <param name="moduleKeys">The rail or editor list so far, top to bottom; a Checkliste's
+    /// entry carries <see cref="NavModules.Checklist"/>.</param>
+    /// <param name="moduleKey">The module to place.</param>
+    public static int PlacementOf(IReadOnlyList<string> moduleKeys, string moduleKey)
+    {
+        ArgumentNullException.ThrowIfNull(moduleKeys);
+        for (var i = Array.IndexOf(DefaultModuleOrder, moduleKey) - 1; i >= 0; i--)
+        {
+            for (var at = moduleKeys.Count - 1; at >= 0; at--)
+            {
+                if (string.Equals(moduleKeys[at], DefaultModuleOrder[i], StringComparison.Ordinal))
+                {
+                    return at + 1;
+                }
+            }
+        }
+
+        return moduleKeys.Count;
+    }
 }

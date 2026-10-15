@@ -30,7 +30,8 @@ public sealed partial class NavigationSection : EditorSection
 
     /// <summary>
     /// Rebuilds the rows from a stored layout plus the Checklisten that currently exist, keeping
-    /// the layout's order and visibility and appending anything it does not mention.
+    /// the layout's order and visibility, appending a Checkliste it does not mention and placing a
+    /// module it does not mention where the default rail has it.
     /// </summary>
     /// <remarks>
     /// The same reconciliation <c>NavigationLayout.Resolve</c> performs for the workspace, over
@@ -74,9 +75,11 @@ public sealed partial class NavigationSection : EditorSection
             Rows.Add(NavRow.ForChecklist(section, isVisible: true, _onChanged));
         }
 
+        // Placed where the workspace rail shows it, so the editor lists what the rail does.
         foreach (var key in NavModules.All.Where(k => !seenModules.Contains(k)))
         {
-            Rows.Add(NavRow.ForModule(key, isVisible: true, _onChanged));
+            var at = NavLayout.PlacementOf(Rows.Select(r => r.ModuleKey).ToList(), key);
+            Rows.Insert(at, NavRow.ForModule(key, isVisible: true, _onChanged));
         }
     }
 
