@@ -93,11 +93,7 @@ public class WorkspaceNavItemsTests
                 new NavEntry(NavModules.Files, null, true),
             });
 
-        // Modules the layout leaves out sit beside their default neighbours; the named three keep
-        // the order the layout gives them.
-        Assert.Equal(
-            new[] { "ETB", "NACHBEREITUNG", "DATEIEN" },
-            Headers(vm).Where(h => h is "ETB" or "NACHBEREITUNG" or "DATEIEN"));
+        Assert.Equal(new[] { "ETB", "NACHBEREITUNG", "DATEIEN" }, Headers(vm).Take(3));
     }
 
     [Fact]

@@ -280,14 +280,11 @@ public class MasterDataChecklistEditingTests
             },
         };
 
-        var keys = Nav(Vm(set)).Rows.Select(r => r.ModuleKey).ToList();
+        var rows = Nav(Vm(set)).Rows;
 
-        // The two named rows keep their order; the modules the layout never mentions go where the
-        // default rail has them, each after its nearest neighbour.
-        Assert.Equal(NavModules.Files, keys[0]);
-        Assert.True(keys.IndexOf(NavModules.Files) < keys.IndexOf(NavModules.Etb));
-        Assert.Equal(keys.IndexOf(NavModules.Etb) + 1, keys.IndexOf(NavModules.SituationReports));
-        Assert.Equal(NavModules.All.Count, keys.Count);
+        Assert.Equal(NavModules.Files, rows[0].ModuleKey);
+        Assert.Equal(NavModules.Etb, rows[1].ModuleKey);
+        Assert.Equal(NavModules.All.Count, rows.Count);
     }
 
     [Fact]
