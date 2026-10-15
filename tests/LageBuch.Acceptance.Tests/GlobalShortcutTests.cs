@@ -122,6 +122,18 @@ public class GlobalShortcutTests
     }
 
     [AvaloniaFact]
+    public void Ctrl_L_opens_the_Lagemeldung_even_from_a_text_box()
+    {
+        var (window, _, vm) = ShowShell();
+        PressAndSettle(window, PhysicalKey.N, RawInputModifiers.Control);
+        window.AssertFocused(Named<Control>(window, "FromBox"));
+
+        PressAndSettle(window, PhysicalKey.L, RawInputModifiers.Control);
+
+        Assert.Equal("LAGEMELDUNG", vm.SelectedNavItem?.Header);
+    }
+
+    [AvaloniaFact]
     public void Ctrl_N_from_Kraefte_focuses_VON()
     {
         var (window, _, vm) = ShowShell(masterData: WorkspaceRenderHelper.MasterData() with { Navigation = ReorderedNavigation });

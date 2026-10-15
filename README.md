@@ -68,6 +68,7 @@ Markdown.
 | **Beteiligte** | Eigentümer, Fahrzeughalter, Polizei, Evakuierte: Name, Telefon, Notiz und Aufenthaltsort je Person – synchronisiert, im PDF, bewusst ohne ETB-Eintrag |
 | **Atemschutzüberwachung** | Trupps mit Einstiegsdruck, Einsatzzeit-Countdown, Druckabfrage-Intervall, Rückzugsdruck und Rückzugsalarm – mit Sprachansage und Sirene; Sicherheitstrupp je Trupp zugeordnet und im ETB protokolliert |
 | **Rückmeldung an ILS** | Erinnerung nach konfigurierbarer Zeit, danach im Intervall, mit ERLEDIGT-Quittierung; überlebt Neustart und Absturz |
+| **Lagemeldung** | Meldender, Einsatzstelle, Lage, Maßnahmen, Einheiten und Nachforderungen – vorbefüllt aus dem Einsatz, als Funkspruch zum Vorlesen; SENDEN schreibt sie ins ETB, startet die Rückmeldung an die ILS neu und nummeriert sie für den PDF-Bericht. Dazu ein Buchstabier-Helfer (Anton/Berta, DIN 5009, NATO), auch aus dem ETB erreichbar |
 | **CO-Messprotokoll** | Haus, Stockwerk, Wohnung: Status (offen / durchsucht / betroffen), Messreihe je Wohnung mit Uhrzeit und ppm-Wert in Gefahrenfarbe, Bewohnername, Schlüssel vorhanden – wie die Türmarkierung vor Ort; der Verlauf steht im ETB und im PDF |
 | **Checklisten** | Beliebig viele eigene Checklisten aus den Stammdaten – benannt, in frei wählbarer Reihenfolge in der Seitenleiste, Pflichtpunkte markiert, Abschluss im ETB protokolliert |
 | **Dateien & Links** | Fotos und PDFs an den Einsatz hängen (landen im Bericht); Schnellzugriff auf Wetter, Karten, Hydrantenplan |

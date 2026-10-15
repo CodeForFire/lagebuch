@@ -1,0 +1,1 @@
+A Lagemeldung module drafts the periodic situation report to the ILS with Meldender, Einsatzstelle and Eingesetzte Einheiten prefilled, composes it into one Funkspruch, and on sending writes it to the ETB, restarts the Rückmeldung timer and lists it in the PDF Bericht, with a Buchstabier-Helfer (traditional, DIN 5009:2022 and NATO) beside it and in the ETB (#592).
