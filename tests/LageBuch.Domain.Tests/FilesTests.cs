@@ -159,6 +159,20 @@ public class FilesTests
         var ex = Assert.Throws<ArgumentException>(() =>
             IncidentFile.Create("x.pdf", "application/pdf", IncidentFile.MaxSizeBytes + 1, T0, "Müller"));
         Assert.Equal("sizeBytes", ex.ParamName);
+        Assert.StartsWith(IncidentFile.TooLargeMessage, ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Size_cap_in_megabytes_matches_the_byte_cap()
+    {
+        Assert.Equal(25, IncidentFile.MaxSizeMegabytes);
+        Assert.Equal(IncidentFile.MaxSizeMegabytes * 1024 * 1024, IncidentFile.MaxSizeBytes);
+    }
+
+    [Fact]
+    public void Too_large_message_keeps_its_wording()
+    {
+        Assert.Equal("Datei ist größer als das Limit von 25 MB.", IncidentFile.TooLargeMessage);
     }
 
     // A joined sync client picks the file name (AddFileCommand), and every peer later writes those

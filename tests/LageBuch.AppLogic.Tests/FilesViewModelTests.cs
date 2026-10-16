@@ -119,7 +119,7 @@ public class FilesViewModelTests
             var allocatedDuring = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
 
             Assert.Empty(session.Incident.Files);
-            Assert.NotNull(vm.ErrorMessage);
+            Assert.Equal(IncidentFile.TooLargeMessage, vm.ErrorMessage);
             Assert.True(
                 allocatedDuring < 10 * 1024 * 1024,
                 $"expected the oversized file to be rejected without reading it into memory, but the call allocated {allocatedDuring} bytes");
@@ -357,7 +357,7 @@ public class FilesViewModelTests
     [Fact]
     public void MaxFileSizeHint_reflects_the_domain_cap()
     {
-        Assert.Equal($"Max. {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB pro Datei", FilesViewModel.MaxFileSizeHint);
+        Assert.Equal("Max. 25 MB pro Datei", FilesViewModel.MaxFileSizeHint);
     }
 
     [Fact]
