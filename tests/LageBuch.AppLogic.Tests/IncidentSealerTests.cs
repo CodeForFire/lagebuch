@@ -323,9 +323,9 @@ public sealed class IncidentSealerTests : IDisposable
 
         var dwellings = new List<Dwelling>
         {
-            Dwelling.Rehydrate(Guid.Parse("66666666-6666-6666-6666-666666666661"), HouseA, 0, 1, "Muster", DwellingStatus.Searched, true, 12),
-            Dwelling.Rehydrate(Guid.Parse("66666666-6666-6666-6666-666666666662"), HouseB, 0, 1, null, DwellingStatus.NotSearched, null, null),
-            Dwelling.Rehydrate(Guid.Parse("66666666-6666-6666-6666-666666666663"), HouseA, 1, 1, null, DwellingStatus.Affected, false, 30),
+            Dwelling.Rehydrate(Guid.Parse("66666666-6666-6666-6666-666666666661"), HouseA, 0, 1, "Muster", DwellingStatus.Searched, KeyAvailability.Available, 12),
+            Dwelling.Rehydrate(Guid.Parse("66666666-6666-6666-6666-666666666662"), HouseB, 0, 1, null, DwellingStatus.NotSearched, KeyAvailability.Unknown, null),
+            Dwelling.Rehydrate(Guid.Parse("66666666-6666-6666-6666-666666666663"), HouseA, 1, 1, null, DwellingStatus.Affected, KeyAvailability.NotAvailable, 30),
         };
         if (dwellingsReversed)
         {
