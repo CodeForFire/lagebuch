@@ -53,7 +53,7 @@ public static class CoMessprotokollSection
                     {
                         var label = CoMeasurementLabels.ApartmentLabel(building, floor, unit.ApartmentNumber);
                         var co = unit.CoValue is { } v ? $"{v} ppm" : "kein Messwert";
-                        var key = unit.KeyAvailable switch { true => "ja", false => "nein", null => "—" };
+                        var key = unit.KeyAvailable is true ? "ja" : unit.KeyAvailable is false ? "nein" : "—";
                         var resident = string.IsNullOrWhiteSpace(unit.ResidentName) ? null : $", {unit.ResidentName}";
 
                         // ppm severity is its own span, colored independently of Status (search
@@ -103,7 +103,7 @@ public static class CoMessprotokollSection
 
                     var location = CoMeasurementLabels.DwellingLocation(building, d.FloorOrdinal, d.ApartmentNumber);
                     var resident = d.ResidentName ?? "—";
-                    var key = d.KeyAvailable switch { true => "ja", false => "nein", null => "—" };
+                    var key = d.KeyAvailable is true ? "ja" : d.KeyAvailable is false ? "nein" : "—";
                     var co = d.CoValue is { } v ? $"{v} ppm" : "—";
                     column.Item().Text($"• {location}, Bewohner: {resident}, Schlüssel: {key}, CO: {co}");
                 }

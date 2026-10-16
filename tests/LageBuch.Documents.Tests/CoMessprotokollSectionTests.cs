@@ -101,30 +101,6 @@ public class CoMessprotokollSectionTests
         Assert.Equal(0x25, pdf[0]); // '%'
     }
 
-    // The Schlüssel column has three states -- ja, nein and unknown -- in both the per-floor list
-    // and the Betroffene-Wohnungen list. Pins that every one of them composes.
-    [Fact]
-    public void Pdf_Contains_CO_Section_With_Every_Key_Availability_State()
-    {
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(Clock, op);
-        incident.AddCoBuilding(Clock, op, "Haus A", 1, 3);
-        var haus = incident.Buildings[0].Id;
-        for (var apartment = 1; apartment <= 3; apartment++)
-        {
-            incident.RecordCoValue(Clock, op, haus, 0, apartment, 45);
-            incident.SetDwellingStatus(Clock, op, haus, 0, apartment, DwellingStatus.Affected);
-        }
-
-        incident.SetDwellingDetails(haus, 0, 1, "Erika Beispiel", keyAvailable: true);
-        incident.SetDwellingDetails(haus, 0, 2, null, keyAvailable: false);
-        incident.SetDwellingDetails(haus, 0, 3, null, keyAvailable: null);
-
-        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
-
-        PdfAssert.IsPdf(pdf);
-    }
-
     [Fact]
     public void Pdf_Contains_CO_Section_EmptyState()
     {

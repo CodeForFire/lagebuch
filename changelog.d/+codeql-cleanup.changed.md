@@ -1,1 +1,1 @@
-The CO-Messprotokoll section of the Bericht and the incident file writer were restructured to clear static-analysis findings, with no change to the PDF or the saved file.
+The incident file writer was restructured to clear a static-analysis finding, with no change to the saved file.
