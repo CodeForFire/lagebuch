@@ -48,6 +48,19 @@ Every PR that touches the UI must include screenshots. The flow is:
    - New PR: `gh pr create --attach './before.png#Before' --attach './after.png#After'`
    - Existing PR body: `gh pr edit <number> --attach './screenshot.png#Alt text'`
    - PR comment: `gh pr comment <number> --attach './screenshot.png#Alt text'`
+3. Link each image to its own asset URL. GitHub renders a bare
+   `![alt](https://github.com/user-attachments/assets/<id>)` with a
+   click-through link to `private-user-images.githubusercontent.com` whose
+   token expires five minutes after the page loads, so opening a screenshot
+   full size later shows a 404. Wrapped as `[![alt](U)](U)`, the link stays on
+   `github.com/user-attachments/assets/<id>`, which signs a fresh URL on
+   every click:
+
+   ```bash
+   gh pr view <number> --json body --jq .body \
+     | perl -0pe 's{(?<!\[)!\[([^\]]*)\]\((https://github\.com/user-attachments/assets/[0-9a-f-]+)\)}{[![$1]($2)]($2)}g' \
+     > body.md && gh pr edit <number> --body-file body.md
+   ```
 
 For UI changes, provide a before/after pair. The render harness files are
 diagnostic-only and should not be committed unless they double as a real test.
