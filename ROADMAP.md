@@ -100,6 +100,15 @@ is something to send us afterwards.
 
 Issues: #289, #296, #300, #382, #384, #406, #407
 
+Then the part someone checking the app can see. The first connection to a host
+asks for the Kennung to be compared, the way a changed key already does, instead
+of trusting whoever answers first. A host shares on the one network the
+Lagebuchführer picks rather than on every interface. And closing an Einsatz
+seals it: a hash over the content and every attachment, printed in the Bericht,
+so a printout and a file can be checked against each other years later.
+
+Issues: #597, #598, #599
+
 The OpenSSF Scorecard badge in the README reports two checks as weak, and both
 readings are correct. Branch-Protection and Code-Review score low because `main`
 requires zero approving reviews. With one maintainer there is nobody to approve,

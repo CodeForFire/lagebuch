@@ -380,7 +380,7 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
   Kennung erst, wenn sie sich ändert; beim ersten Mal fragt das Programm nicht
   danach. Wer in diesem Moment im selben Netz mitliest, könnte sich
   dazwischenschalten. Verbesserung ist geplant
-  ([Issue #288](https://github.com/CodeForFire/lagebuch/issues/288)).
+  ([Issue #597](https://github.com/CodeForFire/lagebuch/issues/597)).
 - **Die PIN hat vier Stellen.** Das genügt, weil nach zehn Fehlversuchen der
   Beitritt gesperrt bleibt, bis jemand eine neue PIN erzeugt: Ein Angreifer
   hat so höchstens zehn Versuche unter 10.000 je Erneuerung. Er kann den
