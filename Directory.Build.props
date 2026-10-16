@@ -22,6 +22,12 @@
          XML-doc-comment warnings that GenerateDocumentationFile turns on. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Every project records its resolved package graph, content hashes included, in a
+         packages.lock.json. CI restores in locked mode, so a restore that would resolve
+         anything other than the committed graph fails instead of building. Dependabot updates
+         the lock files alongside Directory.Packages.props. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
