@@ -302,13 +302,13 @@ public class DemoFlowRenderTests
         var haus = session.Incident.Buildings[0].Id;
         session.RecordCoValue(haus, 2, 1, 120);
         session.SetDwellingStatus(haus, 2, 1, DwellingStatus.Affected);
-        session.SetDwellingDetails(haus, 2, 1, "Musterfrau", true);
+        session.SetDwellingDetails(haus, 2, 1, "Musterfrau", KeyAvailability.Available);
         session.RecordCoValue(haus, 2, 2, 35);
         session.SetDwellingStatus(haus, 2, 2, DwellingStatus.Searched);
         session.RecordCoValue(haus, 1, 1, 8);
         session.SetDwellingStatus(haus, 1, 1, DwellingStatus.Searched);
         session.SetDwellingStatus(haus, 1, 2, DwellingStatus.Searched);
-        session.SetDwellingDetails(haus, 0, 1, "Mustermann", false);
+        session.SetDwellingDetails(haus, 0, 1, "Mustermann", KeyAvailability.NotAvailable);
         SelectTab(window, "CO-MESSUNG");
         Assert.NotNull(vm.CoMessprotokoll.SelectedBuilding);
         Assert.NotEmpty(vm.CoMessprotokoll.MatrixRows);

@@ -375,7 +375,7 @@ public class CommandApplierTests
         var op = new SessionOperator("Test", null);
         incident.AddCoBuilding(clock, op, "Haus A", 1, 4);
         var buildingId = incident.Buildings[0].Id;
-        incident.SetDwellingDetails(buildingId, 0, 3, "Müller", null);
+        incident.SetDwellingDetails(buildingId, 0, 3, "Müller", KeyAvailability.Unknown);
 
         var cmd = new RemoveDwellingsCommand(new OperatorDto("Test", null), buildingId, 0, new[] { 1, 2 });
         ApplyOverWire(cmd, incident, clock);
@@ -513,5 +513,24 @@ public class CommandApplierTests
         var incident = NewIncident(clock);
 
         Assert.Throws<KeyNotFoundException>(() => ApplyOverWire(new RemoveInvolvedPartyCommand(Guid.NewGuid()), incident, clock));
+    }
+
+    [Theory]
+    [InlineData(true, KeyAvailability.Available)]
+    [InlineData(false, KeyAvailability.NotAvailable)]
+    [InlineData(null, KeyAvailability.Unknown)]
+    public void Apply_UpdateDwellingDetails_maps_the_wire_bool_onto_the_key_availability(
+        bool? onTheWire, KeyAvailability expected)
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Test", null);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        var buildingId = incident.Buildings[0].Id;
+        incident.SetDwellingDetails(buildingId, 0, 1, null, KeyAvailability.Available);
+
+        ApplyOverWire(new UpdateDwellingDetailsCommand(buildingId, 0, 1, "Müller", onTheWire), incident, clock);
+
+        Assert.Equal(expected, incident.Dwellings[0].KeyAvailable);
     }
 }

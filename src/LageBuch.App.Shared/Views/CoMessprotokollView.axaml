@@ -396,9 +396,21 @@
                        PlaceholderText="{x:Static md:AnonymizedExampleData.PersonDisplayNamePlaceholder}" />
             </StackPanel>
 
-            <!-- Key Available: label lives on the CheckBox itself (Content), matching RolesView's
-                 "Alle Funktionen" checkbox, so the label and glyph share one baseline. -->
-            <CheckBox Content="Schlüssel vorhanden" IsChecked="{Binding Editor.KeyAvailable}" />
+            <!-- Key Available: three radios, not a CheckBox. A two-state CheckBox over the old bool?
+                 could never return to "unbekannt" once clicked, and unchecked looked the same as
+                 "kein Schlüssel". Same TwoWay radio pattern as TasksView's filter. Stacked, not in a
+                 row: three labels side by side clip "Unbekannt" in the 320px sidebar. -->
+            <StackPanel Spacing="2">
+              <TextBlock Text="SCHLÜSSEL" Classes="overline" FontSize="10" />
+              <StackPanel>
+                <RadioButton x:Name="KeyAvailableRadio" GroupName="dwellingKey" Content="Vorhanden"
+                             IsChecked="{Binding Editor.IsKeyAvailable, Mode=TwoWay}" />
+                <RadioButton x:Name="KeyNotAvailableRadio" GroupName="dwellingKey" Content="Keiner"
+                             IsChecked="{Binding Editor.IsKeyNotAvailable, Mode=TwoWay}" />
+                <RadioButton x:Name="KeyUnknownRadio" GroupName="dwellingKey" Content="Unbekannt"
+                             IsChecked="{Binding Editor.IsKeyUnknown, Mode=TwoWay}" />
+              </StackPanel>
+            </StackPanel>
 
           </StackPanel>
         </ScrollViewer>

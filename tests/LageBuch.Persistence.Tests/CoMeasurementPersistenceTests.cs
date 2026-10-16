@@ -31,7 +31,7 @@ public class CoMeasurementPersistenceTests : IDisposable
         incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
         incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
         incident.SetDwellingStatus(clock, op, incident.Buildings[0].Id, 0, 2, DwellingStatus.Searched);
-        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, "Müller", true);
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, "Müller", KeyAvailability.Available);
         incident.SetFloorDescription(incident.Buildings[0].Id, 1, "rechts");
         return incident;
     }
@@ -157,7 +157,7 @@ public class CoMeasurementPersistenceTests : IDisposable
             d.FloorOrdinal == 0 && d.ApartmentNumber == 1);
         Assert.Equal(45, dwelling.CoValue);
         Assert.Equal("Müller", dwelling.ResidentName);
-        Assert.True(dwelling.KeyAvailable);
+        Assert.Equal(KeyAvailability.Available, dwelling.KeyAvailable);
 
         var searched = loaded.Dwellings.First(d =>
             d.FloorOrdinal == 0 && d.ApartmentNumber == 2);
@@ -181,6 +181,55 @@ public class CoMeasurementPersistenceTests : IDisposable
         var dwelling = loaded.Dwellings[0];
         Assert.Null(dwelling.CoValue);
         Assert.Null(dwelling.ResidentName);
-        Assert.Null(dwelling.KeyAvailable);
+        Assert.Equal(KeyAvailability.Unknown, dwelling.KeyAvailable);
+    }
+
+    private static Incident CreateIncidentWithEveryKeyState()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 3);
+        var haus = incident.Buildings[0].Id;
+        incident.SetDwellingDetails(haus, 0, 1, null, KeyAvailability.Available);
+        incident.SetDwellingDetails(haus, 0, 2, null, KeyAvailability.NotAvailable);
+        incident.SetDwellingDetails(haus, 0, 3, null, KeyAvailability.Unknown);
+        return incident;
+    }
+
+    [Fact]
+    public void SaveLoad_round_trip_keeps_every_key_availability_state()
+    {
+        IncidentRepository.Save(_path, CreateIncidentWithEveryKeyState());
+
+        var loaded = IncidentRepository.Load(_path);
+
+        var keys = loaded.Dwellings.Where(d => d.FloorOrdinal == 0).OrderBy(d => d.ApartmentNumber).Select(d => d.KeyAvailable);
+        Assert.Equal(
+            new[] { KeyAvailability.Available, KeyAvailability.NotAvailable, KeyAvailability.Unknown },
+            keys);
+    }
+
+    // The enum is not what lands on disk: key_available stays NULL/1/0, so a file written by
+    // this build still opens in an older one, and an older file needs no migration.
+    [Fact]
+    public void Key_availability_is_stored_as_the_pre_enum_null_one_zero_encoding()
+    {
+        IncidentRepository.Save(_path, CreateIncidentWithEveryKeyState());
+
+        var stored = new List<long?>();
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "SELECT key_available FROM co_dwellings WHERE floor_ordinal = 0 ORDER BY apartment_number;";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                stored.Add(reader.IsDBNull(0) ? null : reader.GetInt64(0));
+            }
+        }
+
+        Assert.Equal(new long?[] { 1, 0, null }, stored);
     }
 }

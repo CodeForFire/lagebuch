@@ -1,3 +1,5 @@
+using LageBuch.Domain.CoMeasurement;
+
 namespace LageBuch.Domain.Tests;
 
 /// <summary>#443: OG/UG ENTFERNEN shrink a building by one floor through
@@ -47,7 +49,7 @@ public class CoFloorRemovalTests
     {
         var (incident, clock, op, buildingId) = Scene();
         incident.RecordCoValue(clock, op, buildingId, 3, 2, 120);
-        incident.SetDwellingDetails(buildingId, 3, 3, "Müller", null);
+        incident.SetDwellingDetails(buildingId, 3, 3, "Müller", KeyAvailability.Unknown);
 
         incident.UpdateCoBuildingStructure(clock, op, buildingId, 2, 3, 1);
 

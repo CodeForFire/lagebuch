@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.CoMeasurement;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -48,7 +49,7 @@ public class CoApartmentRemovalViewModelTests
     public void Growing_CommitsWithoutAsking()
     {
         var (session, vm) = CreateVm();
-        session.SetDwellingDetails(session.Incident.Buildings[0].Id, 0, 4, "Müller", null);
+        session.SetDwellingDetails(session.Incident.Buildings[0].Id, 0, 4, "Müller", KeyAvailability.Unknown);
 
         Row(vm, 0).ApartmentCount = 6;
 
@@ -134,7 +135,7 @@ public class CoApartmentRemovalViewModelTests
     {
         var (session, vm) = CreateVm();
         var buildingId = session.Incident.Buildings[0].Id;
-        session.SetDwellingDetails(buildingId, 0, 1, "Müller", null);
+        session.SetDwellingDetails(buildingId, 0, 1, "Müller", KeyAvailability.Unknown);
         session.RecordCoValue(buildingId, 0, 4, 120);
 
         Row(vm, 0).ApartmentCount = 3;
@@ -268,7 +269,7 @@ public class CoApartmentRemovalViewModelTests
         var (session, vm) = CreateVm();
         var buildingId = session.Incident.Buildings[0].Id;
         session.RecordCoValue(buildingId, 0, 4, 120);
-        session.SetDwellingDetails(buildingId, 0, 3, "Müller", null);
+        session.SetDwellingDetails(buildingId, 0, 3, "Müller", KeyAvailability.Unknown);
 
         Row(vm, 0).ApartmentCount = 1;
 

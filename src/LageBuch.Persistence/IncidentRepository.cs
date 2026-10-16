@@ -332,7 +332,7 @@ public sealed class IncidentRepository
                     p("$an", d.ApartmentNumber);
                     p("$rn", (object?)d.ResidentName ?? DBNull.Value);
                     p("$st", (int)d.Status);
-                    p("$kv", d.KeyAvailable is { } k ? (object)(k ? 1 : 0) : DBNull.Value);
+                    p("$kv", Domain.CoMeasurement.KeyAvailabilityEncoding.ToNullableBool(d.KeyAvailable) is { } k ? (object)(k ? 1 : 0) : DBNull.Value);
                     p("$cv", (object?)d.CoValue ?? DBNull.Value);
                 });
 
@@ -720,7 +720,7 @@ public sealed class IncidentRepository
                     r.GetInt32(3),
                     Str(r, 4),
                     (Domain.CoMeasurement.DwellingStatus)r.GetInt32(5),
-                    r.IsDBNull(6) ? null : r.GetInt32(6) == 1,
+                    Domain.CoMeasurement.KeyAvailabilityEncoding.FromNullableBool(r.IsDBNull(6) ? null : r.GetInt32(6) == 1),
                     NullableInt(r, 7),
                     readingsByDwelling.TryGetValue(id, out var rs) ? rs : null);
             });

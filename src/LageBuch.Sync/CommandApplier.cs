@@ -1,5 +1,6 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -179,7 +180,7 @@ public static class CommandApplier
                 incident.SetDwellingStatus(clock, Operator(c.Operator), c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.Status);
                 break;
             case UpdateDwellingDetailsCommand c:
-                incident.SetDwellingDetails(c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.ResidentName, c.KeyAvailable);
+                incident.SetDwellingDetails(c.BuildingId, c.FloorOrdinal, c.ApartmentNumber, c.ResidentName, KeyAvailabilityEncoding.FromNullableBool(c.KeyAvailable));
                 break;
             case SetFloorDescriptionCommand c:
                 incident.SetFloorDescription(c.BuildingId, c.FloorOrdinal, c.Description);
