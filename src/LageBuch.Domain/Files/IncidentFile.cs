@@ -8,7 +8,16 @@ public sealed record IncidentFile
     // (RemoteIncidentSession.GetFileBytesAsync) — so this cap bounds that client-side allocation,
     // not wire-transfer size. 25 MB keeps that a one-shot, few-second transfer on the app's
     // Tailscale-LAN sync path while comfortably covering a phone photo or a scanned PDF.
-    public const long MaxSizeBytes = 25 * 1024 * 1024;
+    public const long MaxSizeMegabytes = 25;
+
+    public const long MaxSizeBytes = MaxSizeMegabytes * 1024 * 1024;
+
+    /// <summary>
+    /// The one wording for a file over <see cref="MaxSizeBytes"/> — shared by the domain guard, the
+    /// view model's pre-read size check and the joined client's upload guard, so the user reads the
+    /// same number whether the file came from disk or over the sync connection.
+    /// </summary>
+    public static readonly string TooLargeMessage = $"Datei ist größer als das Limit von {MaxSizeMegabytes} MB.";
 
     /// <summary>
     /// The single extension→MIME table every allowlist and every path-to-content-type mapping in
@@ -89,7 +98,7 @@ public sealed record IncidentFile
 
         if (sizeBytes > MaxSizeBytes)
         {
-            throw new ArgumentException($"Datei ist größer als das Limit von {MaxSizeBytes / (1024 * 1024)} MB.", nameof(sizeBytes));
+            throw new ArgumentException(TooLargeMessage, nameof(sizeBytes));
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(addedBy);

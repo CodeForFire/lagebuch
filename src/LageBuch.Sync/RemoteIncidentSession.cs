@@ -521,8 +521,7 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(bytes);
         if (bytes.LongLength > IncidentFile.MaxSizeBytes)
         {
-            throw new ArgumentException(
-                $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB.", nameof(bytes));
+            throw new ArgumentException(IncidentFile.TooLargeMessage, nameof(bytes));
         }
 
         var fileId = Guid.NewGuid();

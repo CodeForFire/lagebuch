@@ -119,7 +119,7 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
 
     public bool IsReadOnly { get; }
 
-    public static string MaxFileSizeHint => $"Max. {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB pro Datei";
+    public static string MaxFileSizeHint => $"Max. {IncidentFile.MaxSizeMegabytes} MB pro Datei";
 
     public ObservableCollection<IncidentFileRow> Files { get; }
 
@@ -218,7 +218,7 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
                 var sizeBytes = new FileInfo(path).Length;
                 if (sizeBytes > IncidentFile.MaxSizeBytes)
                 {
-                    failures.Add((Path.GetFileName(path), $"Datei ist größer als das Limit von {IncidentFile.MaxSizeBytes / (1024 * 1024)} MB."));
+                    failures.Add((Path.GetFileName(path), IncidentFile.TooLargeMessage));
                     continue;
                 }
 
