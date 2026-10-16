@@ -30,8 +30,8 @@ internal static class AndroidAppPaths
 
     /// <summary>
     /// One of the two subtrees the <c>FileProvider</c> grants a URI into (see
-    /// <c>file_paths.xml</c>'s "shared" entry; the other is the attachments root a sibling PR
-    /// writes into). PDF/JSON export write straight here. <see cref="AndroidFileDialogService"/>'s
+    /// <c>file_paths.xml</c>'s "shared" entry; the other is the attachments root,
+    /// <c>AttachmentTempPaths.Root</c>). PDF/JSON export write straight here. <see cref="AndroidFileDialogService"/>'s
     /// private <c>EnsureShareable</c> is the structural guarantee behind that: it is the sole
     /// path <see cref="AndroidFileDialogService.ShareFileAsync"/> and
     /// <see cref="AndroidFileDialogService.OpenFileAsync"/> hand a file to the provider through,

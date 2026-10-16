@@ -50,6 +50,11 @@ public class MainActivity : AvaloniaMainActivity
     // IActivityApplicationLifetime.MainViewFactory (see App.axaml.cs), same ordering as before.
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
+        // Every ÖFFNEN leaves a copy under the attachment temp root; nothing else removes it (#289).
+        // Off the UI thread like the desktop's sweep, but with an age grace: OnCreate also runs on
+        // rotation, while a viewer may still be reading a fresh copy through its content:// grant.
+        _ = Task.Run(() => AttachmentTempPaths.SweepStaleOpenDirectories(TimeProvider.System));
+
         _importLauncher = RegisterForActivityResult(
             new ActivityResultContracts.GetContent(),
             new ImportCallback(uri => _dialogs?.CompleteImport(uri)));
