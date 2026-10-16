@@ -8,9 +8,10 @@ namespace LageBuch.App.Services;
 /// background thread — so cues that become due close together play sequentially instead of
 /// overlapping. <see cref="Enqueue"/> itself never blocks the caller.
 ///
-/// Each action gets a bounded time to finish (see constructor); if it hangs (e.g. a stuck OS
-/// audio player process that never exits), the queue moves on to the next item anyway so one
-/// stuck cue can't permanently silence later ones.
+/// Each action gets a bounded time to finish (see constructor). If it overruns (e.g. a stuck OS
+/// audio player process that never exits), its <see cref="CancellationToken"/> is cancelled so
+/// the player can be stopped, and the queue waits a short grace for that before moving on — so
+/// one stuck cue can neither permanently silence later ones nor keep its thread for good.
 /// </summary>
 [SuppressMessage(
     "Design",
@@ -18,18 +19,30 @@ namespace LageBuch.App.Services;
     Justification = "App-lifetime singleton: its worker thread drains until process shutdown, so the owning BlockingCollection is intentionally never disposed.")]
 internal sealed class SerialAudioQueue
 {
-    private readonly BlockingCollection<Action> _queue = new();
+    private readonly BlockingCollection<Action<CancellationToken>> _queue = new();
     private readonly TimeSpan _perItemTimeout;
+    private readonly TimeSpan _cancelGrace;
 
-    public SerialAudioQueue(TimeSpan? perItemTimeout = null)
+    /// <param name="perItemTimeout">How long a cue may play before it is told to stop.</param>
+    /// <param name="cancelGrace">
+    /// How long a cue that was told to stop may take to end before the queue serves the next one
+    /// anyway. A cue that ignores its token (Windows' <c>PlaySound</c> cannot be interrupted) is
+    /// then abandoned on its background thread.
+    /// </param>
+    public SerialAudioQueue(TimeSpan? perItemTimeout = null, TimeSpan? cancelGrace = null)
     {
         _perItemTimeout = perItemTimeout ?? TimeSpan.FromSeconds(10);
+        _cancelGrace = cancelGrace ?? TimeSpan.FromSeconds(2);
         var worker = new Thread(Run) { IsBackground = true, Name = nameof(SerialAudioQueue) };
         worker.Start();
     }
 
-    /// <summary>Queues <paramref name="play"/> to run after everything already queued.</summary>
-    public void Enqueue(Action play) => _queue.Add(play);
+    /// <summary>
+    /// Queues <paramref name="play"/> to run after everything already queued. The token it is
+    /// handed is cancelled once the cue overruns its time; <paramref name="play"/> should then stop
+    /// playback and return.
+    /// </summary>
+    public void Enqueue(Action<CancellationToken> play) => _queue.Add(play);
 
     [SuppressMessage(
         "Design",
@@ -39,6 +52,9 @@ internal sealed class SerialAudioQueue
     {
         foreach (var play in _queue.GetConsumingEnumerable())
         {
+            using var cts = new CancellationTokenSource();
+            var token = cts.Token;
+
             // A dedicated thread per cue rather than Task.Run: the cue has to run somewhere the
             // watchdog below can abandon, and the thread pool is the wrong somewhere. Cues are
             // driven by alarms, which fire exactly when the app is busiest -- and a pool saturated
@@ -50,7 +66,7 @@ internal sealed class SerialAudioQueue
             {
                 try
                 {
-                    play();
+                    play(token);
                 }
                 catch
                 {
@@ -64,10 +80,15 @@ internal sealed class SerialAudioQueue
 
             worker.Start();
 
-            // Bounded wait, not a join: if the cue hangs (a stuck OS player that never exits) the
-            // thread is abandoned -- background, so it cannot hold up shutdown -- and the next cue
-            // is served anyway.
-            worker.Join(_perItemTimeout);
+            if (!worker.Join(_perItemTimeout))
+            {
+                // The cue overran (a stuck OS player that never exits): tell it to stop, and give
+                // it a moment to do so, so the next cue does not talk over it. One that still does
+                // not end is abandoned -- background, so it cannot hold up shutdown -- and the next
+                // cue is served anyway.
+                cts.Cancel();
+                worker.Join(_cancelGrace);
+            }
         }
     }
 }
