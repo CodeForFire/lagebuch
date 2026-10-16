@@ -1,0 +1,79 @@
+name: Mutation testing
+
+# Stryker.NET mutates the production code (flips a comparison, drops a
+# statement, swaps a return) and re-runs the tests: a mutant no test notices
+# marks code the suite executes without really checking. This is a report for
+# finding weak tests, not a gate -- thresholds.break is 0 in every
+# stryker-config.json, it never runs on a pull request, and the result is the
+# HTML report uploaded below. See CONTRIBUTING.md#mutation-testing.
+
+on:
+  schedule:
+    - cron: '13 3 * * 6'
+  workflow_dispatch:
+    inputs:
+      project:
+        description: Project to mutate
+        type: choice
+        default: all
+        options:
+          - all
+          - Domain
+          - Sync
+          - Documents
+          - Persistence
+          - AppLogic
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    name: mutate (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    # Locally (12 cores) the slowest project, Persistence, takes ~6 minutes.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # A scheduled run has no inputs and mutates everything; a manual run
+        # can pick one project. Keep this list in step with MUTATE_PROJECTS in
+        # the Makefile.
+        project: ${{ fromJSON((inputs.project == '' || inputs.project == 'all') && '["Domain","Sync","Documents","Persistence","AppLogic"]' || format('["{0}"]', inputs.project)) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Mutate
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: make mutate PROJECT="$PROJECT"
+
+      - name: Summary
+        if: always()
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: |
+          report="StrykerOutput/$PROJECT/reports/mutation-report.md"
+          if [ -f "$report" ]; then
+            echo "## $PROJECT" >> "$GITHUB_STEP_SUMMARY"
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-report-${{ matrix.project }}
+          path: StrykerOutput/${{ matrix.project }}/reports/
+          if-no-files-found: ignore
+          retention-days: 30
