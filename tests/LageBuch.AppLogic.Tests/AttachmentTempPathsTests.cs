@@ -340,4 +340,168 @@ public class AttachmentTempPathsTests
             Directory.Delete(outside, recursive: true);
         }
     }
+
+    [Fact]
+    public void StaleAfter_is_one_day()
+    {
+        Assert.Equal(TimeSpan.FromDays(1), AttachmentTempPaths.StaleAfter);
+    }
+
+    // The Android janitor runs on every Activity start, including a rotation while a viewer still
+    // holds a content:// grant into a fresh copy, so only what is older than the cutoff goes.
+    [Fact]
+    public void SweepOpenDirectories_with_a_cutoff_keeps_a_newer_directory_and_removes_an_older_one()
+    {
+        var root = NewSweepRoot();
+        var cutoff = new DateTime(2026, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        try
+        {
+            var older = NewOpenDirectory(root);
+            var newer = NewOpenDirectory(root);
+            Directory.SetLastWriteTimeUtc(older, cutoff.AddHours(-1));
+            Directory.SetLastWriteTimeUtc(newer, cutoff.AddHours(1));
+
+            AttachmentTempPaths.SweepOpenDirectories(root, modifiedBefore: cutoff);
+
+            Assert.False(Directory.Exists(older));
+            Assert.True(Directory.Exists(newer));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void IsInsideRoot_accepts_a_path_below_the_root()
+    {
+        Assert.True(AttachmentTempPaths.IsInsideRoot(Path.Join(AttachmentTempPaths.Root, Guid.NewGuid().ToString("N"), "brand.jpg")));
+    }
+
+    [Fact]
+    public void IsInsideRoot_refuses_a_traversal_out_of_the_root()
+    {
+        Assert.False(AttachmentTempPaths.IsInsideRoot(Path.Join(AttachmentTempPaths.Root, "..", "shared", "bericht.pdf")));
+    }
+
+    [Fact]
+    public void IsInsideRoot_refuses_a_sibling_directory_with_the_roots_name_as_a_prefix()
+    {
+        Assert.False(AttachmentTempPaths.IsInsideRoot(Path.Join(AttachmentTempPaths.Root + "-evil", "brand.jpg")));
+    }
+
+    // Where Android's PDF/JSON exports land (<cache>/shared): sharing one must not be gated.
+    [Fact]
+    public void IsInsideRoot_refuses_an_export_path_next_to_the_root()
+    {
+        Assert.False(AttachmentTempPaths.IsInsideRoot(Path.Join(Path.GetTempPath(), "shared", "einsatz.pdf")));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\0evil.png")]
+    public void IsInsideRoot_refuses_a_blank_or_unresolvable_path(string? path)
+    {
+        Assert.False(AttachmentTempPaths.IsInsideRoot(path));
+    }
+
+    [Fact]
+    public void IsInsideRoot_refuses_the_root_itself()
+    {
+        Assert.False(AttachmentTempPaths.IsInsideRoot(AttachmentTempPaths.Root));
+    }
+
+    private const UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
+    [Fact]
+    public void CreateOpenDirectory_creates_the_root_and_the_open_directory_owner_only()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // the per-user temp directory's ACL does this job on Windows; there is no Unix mode to check
+        }
+
+        var root = NewSweepRoot();
+        try
+        {
+            var directory = AttachmentTempPaths.CreateOpenDirectory(root);
+
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(root));
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(directory));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // A root left behind by an older build, or loosened by hand, is tightened on its next use.
+    [Fact]
+    public void CreateOpenDirectory_repairs_a_root_readable_by_others()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // the per-user temp directory's ACL does this job on Windows; there is no Unix mode to check
+        }
+
+        var root = NewSweepRoot();
+        try
+        {
+            Directory.CreateDirectory(root);
+            File.SetUnixFileMode(root, OwnerOnly | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+
+            AttachmentTempPaths.CreateOpenDirectory(root);
+
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // A root planted as a link would put the copies, and the mode repair, wherever it points.
+    [Fact]
+    public void CreateOpenDirectory_refuses_a_root_that_is_a_symlink()
+    {
+        var root = NewSweepRoot();
+        var outside = Path.Join(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outside);
+        try
+        {
+            Directory.CreateSymbolicLink(root, outside);
+
+            Assert.Throws<IOException>(() => AttachmentTempPaths.CreateOpenDirectory(root));
+            Assert.Empty(Directory.GetFileSystemEntries(outside));
+        }
+        finally
+        {
+            Directory.Delete(root);
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    // The real root, which every Öffnen uses. Only reads its mode; never loosens or deletes the
+    // shared root that other tests are writing into at the same time.
+    [Fact]
+    public void CreateOpenDirectory_leaves_the_real_root_owner_only()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // the per-user temp directory's ACL does this job on Windows; there is no Unix mode to check
+        }
+
+        var directory = AttachmentTempPaths.CreateOpenDirectory();
+        try
+        {
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(AttachmentTempPaths.Root));
+            Assert.Equal(OwnerOnly, File.GetUnixFileMode(directory));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

@@ -1,0 +1,1 @@
+On Android, ÖFFNEN and sharing now refuse an attachment copy that is not an allow-listed regular file inside the app's private temp folder, opened copies older than a day are removed at startup, and on desktop Linux and macOS that temp folder is now readable by its owner only (#289).

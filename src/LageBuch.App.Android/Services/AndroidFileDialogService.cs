@@ -199,8 +199,16 @@ public sealed class AndroidFileDialogService : IFileDialogService
         return SafeFileName.DefaultFallback;
     }
 
+    // Exports (PDF, Stammdaten JSON) live in SharedDir and share as they are. Anything inside the
+    // attachment temp root is an attachment copy, and leaves the device only if it passes the same
+    // gate OpenFileAsync applies.
     public Task ShareFileAsync(string path, string mimeType)
     {
+        if (AttachmentTempPaths.IsInsideRoot(path) && !AttachmentTempPaths.IsOpenableAttachment(path))
+        {
+            return Task.CompletedTask;
+        }
+
         var shareablePath = EnsureShareable(path);
         if (shareablePath is null)
         {
@@ -218,9 +226,16 @@ public sealed class AndroidFileDialogService : IFileDialogService
     }
 
     // View-in-place (not a share sheet): opens whatever app the device has registered for the
-    // type, exactly like a desktop double-click.
+    // type, exactly like a desktop double-click. The same gate as the desktop head: only an
+    // existing regular file with an allow-listed extension inside the attachment temp root, so a
+    // hostile name can never pick the viewer through an unexpected MIME type or a link.
     public Task OpenFileAsync(string path)
     {
+        if (!AttachmentTempPaths.IsOpenableAttachment(path))
+        {
+            return Task.CompletedTask;
+        }
+
         var shareablePath = EnsureShareable(path);
         if (shareablePath is null)
         {
@@ -240,10 +255,9 @@ public sealed class AndroidFileDialogService : IFileDialogService
     // guarantee, not caller convention. Neither ShareFileAsync nor OpenFileAsync ever calls
     // FileProvider.GetUriForFile directly on a caller-supplied path -- both route through here
     // first. A path already under SharedDir (every export writes straight there) or under the
-    // "lagebuch" attachments root a sibling PR writes into (see file_paths.xml's "attachments"
-    // entry) passes through untouched -- no second copy. Anything else (e.g. today,
-    // FilesViewModel.OpenFileAsync's tempPath under the bare cache root, until that sibling PR
-    // relocates it) is copied into a fresh SharedDir subfolder first, so
+    // "lagebuch" attachments root FilesViewModel.OpenFileAsync writes into through
+    // AttachmentTempPaths (see file_paths.xml's "attachments" entry) passes through untouched --
+    // no second copy. Anything else is copied into a fresh SharedDir subfolder first, so
     // FileProvider.GetUriForFile can never throw IllegalArgumentException for an unconfigured
     // root no matter what a caller passes in. Returns null (callers then no-op rather than
     // launch anything) when the source is not an existing regular file.

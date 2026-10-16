@@ -5,10 +5,10 @@ namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// The private temp area "Öffnen" copies an attachment into before handing it to the OS, and the
-/// gate the desktop head's <see cref="IFileDialogService.OpenFileAsync"/> checks before launching.
-/// Both halves live here so the writer and the launcher can never disagree on what counts as
-/// "one of our own temp files". The Android head hands its copy to a <c>FileProvider</c> and does
-/// not consult this gate yet — hardening it is separate work.
+/// gate both heads' <see cref="IFileDialogService.OpenFileAsync"/> check before launching. Both
+/// halves live here so the writer and the launcher can never disagree on what counts as "one of
+/// our own temp files". The Android head checks the gate before it hands its copy to a
+/// <c>FileProvider</c>, and refuses to share anything inside <see cref="Root"/> that fails it.
 /// <para>
 /// It exists because attachment names are attacker-controlled: a joined sync client picks the name
 /// in <c>AddFileCommand</c> and every peer writes those bytes to disk under it. The domain strips
@@ -31,21 +31,61 @@ public static class AttachmentTempPaths
     /// </summary>
     public const string RootFolderName = "lagebuch";
 
+    // Owner-only on Unix: the copies are decrypted attachment bytes, and the system temp directory
+    // is shared with every other local user.
+    private const UnixFileMode OwnerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
     /// <summary>The one directory attachment copies may live in.</summary>
     public static string Root { get; } = Path.Join(Path.GetTempPath(), RootFolderName);
 
     /// <summary>
-    /// Creates and returns a fresh, empty directory under <see cref="Root"/> for a single "Öffnen".
+    /// How long a directory under <see cref="Root"/> must have gone unwritten before
+    /// <see cref="SweepStaleOpenDirectories"/> removes it.
     /// </summary>
-    public static string CreateOpenDirectory()
+    public static TimeSpan StaleAfter { get; } = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Creates and returns a fresh, empty directory under <see cref="Root"/> for a single "Öffnen".
+    /// On Unix the root and the new directory are owner-only (0700), and a root found wider than
+    /// that is tightened. A root that is a symbolic link is refused with an
+    /// <see cref="IOException"/>, because the copies would land wherever it points.
+    /// </summary>
+    public static string CreateOpenDirectory() => CreateOpenDirectory(Root);
+
+    internal static string CreateOpenDirectory(string root)
     {
-        var directory = Path.Join(Root, Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
+        CreatePrivateDirectory(root);
+
+        if (new DirectoryInfo(root).LinkTarget is not null)
+        {
+            throw new IOException("Der Ordner für geöffnete Anhänge ist eine Verknüpfung und wird nicht verwendet.");
+        }
+
+        if (!OperatingSystem.IsWindows() && File.GetUnixFileMode(root) != OwnerOnly)
+        {
+            File.SetUnixFileMode(root, OwnerOnly);
+        }
+
+        var directory = Path.Join(root, Guid.NewGuid().ToString("N"));
+        CreatePrivateDirectory(directory);
         return directory;
     }
 
+    // On Windows the per-user temp directory's ACL already keeps other users out.
+    private static void CreatePrivateDirectory(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(path);
+        }
+        else
+        {
+            Directory.CreateDirectory(path, OwnerOnly);
+        }
+    }
+
     /// <summary>
-    /// Deletes every directory <see cref="CreateOpenDirectory"/> ever left under <see cref="Root"/>.
+    /// Deletes every directory <see cref="CreateOpenDirectory()"/> ever left under <see cref="Root"/>.
     /// Nothing else removes them, and Windows never empties its temp directory on its own, so
     /// without this every attachment ever opened would stay behind as an unencrypted copy (#383).
     /// <para>
@@ -58,7 +98,19 @@ public static class AttachmentTempPaths
     /// </summary>
     public static void SweepOpenDirectories() => SweepOpenDirectories(Root);
 
-    internal static void SweepOpenDirectories(string root)
+    /// <summary>
+    /// <see cref="SweepOpenDirectories()"/> with an age grace: only directories last written more
+    /// than <see cref="StaleAfter"/> ago go. For Android, whose Activity is created again on every
+    /// rotation while a viewer may still be reading a fresh copy through a <c>content://</c> grant;
+    /// nothing locks that copy, so without the grace it would be deleted under the viewer.
+    /// </summary>
+    public static void SweepStaleOpenDirectories(TimeProvider timeProvider)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        SweepOpenDirectories(Root, timeProvider.GetUtcNow().UtcDateTime - StaleAfter);
+    }
+
+    internal static void SweepOpenDirectories(string root, DateTime? modifiedBefore = null)
     {
         string[] directories;
         try
@@ -81,6 +133,11 @@ public static class AttachmentTempPaths
 
             try
             {
+                if (modifiedBefore is { } cutoff && Directory.GetLastWriteTimeUtc(directory) >= cutoff)
+                {
+                    continue;
+                }
+
                 Directory.Delete(directory, recursive: true);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -89,6 +146,13 @@ public static class AttachmentTempPaths
             }
         }
     }
+
+    /// <summary>
+    /// True when <paramref name="path"/> resolves to a location strictly below <see cref="Root"/>,
+    /// whether or not anything exists there. The Android share sheet uses it to tell an attachment
+    /// copy, which has to pass <see cref="IsOpenableAttachment"/>, from an export it shares as is.
+    /// </summary>
+    public static bool IsInsideRoot(string? path) => TryResolveInsideRoot(path, out _);
 
     /// <summary>
     /// True only for an existing regular file (no symlink, no directory) that resolves to a location
@@ -102,29 +166,9 @@ public static class AttachmentTempPaths
     /// write access to the user's own temp directory.
     /// </para>
     /// </summary>
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "A gate answers yes/no: an unresolvable path (NUL byte, over-long, permission) is simply not one of ours.")]
     public static bool IsOpenableAttachment(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return false;
-        }
-
-        string full;
-        try
-        {
-            full = Path.GetFullPath(path);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-
-        var rootPrefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Root)) + Path.DirectorySeparatorChar;
-        if (!full.StartsWith(rootPrefix, PathComparison))
+        if (!TryResolveInsideRoot(path, out var full))
         {
             return false;
         }
@@ -136,6 +180,38 @@ public static class AttachmentTempPaths
 
         var file = new FileInfo(full);
         return file.Exists && file.LinkTarget is null;
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A gate answers yes/no: an unresolvable path (NUL byte, over-long, permission) is simply not one of ours.")]
+    private static bool TryResolveInsideRoot(string? path, [NotNullWhen(true)] out string? full)
+    {
+        full = null;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        string resolved;
+        try
+        {
+            resolved = Path.GetFullPath(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        var rootPrefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Root)) + Path.DirectorySeparatorChar;
+        if (!resolved.StartsWith(rootPrefix, PathComparison))
+        {
+            return false;
+        }
+
+        full = resolved;
+        return true;
     }
 
     // Windows and macOS resolve paths case-insensitively; Linux does not.
