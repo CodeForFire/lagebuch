@@ -19,7 +19,9 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
     private const uint SndMemory = 0x0004;  // pszSound points to in-memory WAV
 
     // No SND_ASYNC: playback must block the queue's worker thread until the clip finishes,
-    // so cues play one after another instead of overlapping (see SerialAudioQueue).
+    // so cues play one after another instead of overlapping (see SerialAudioQueue). The price is
+    // that a Windows cue cannot be stopped once it has started: PlaySound ignores the queue's
+    // cancellation, so a wedged audio device there can only be abandoned, not ended.
 
     // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent,
     // which is why SystemAlarmServiceTests checks that every file named here is in Assets/.
@@ -66,18 +68,16 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
             return; // no clip bundled for this cue yet
         }
 
-        _queue.Enqueue(() => PlayBlocking(sound, bytes));
+        _queue.Enqueue(cancellationToken => PlayBlocking(sound, bytes, cancellationToken));
     }
 
-    // Runs on the SerialAudioQueue's worker thread; blocks until the clip finishes playing.
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "Player binary missing (e.g. a headless Linux host without ALSA) — stay silent.")]
-    private void PlayBlocking(AlarmSound sound, byte[] bytes)
+    // Runs on the SerialAudioQueue's worker thread; blocks until the clip finishes playing, or
+    // until the queue cancels a cue that overran its time.
+    private void PlayBlocking(AlarmSound sound, byte[] bytes, CancellationToken cancellationToken)
     {
         if (OperatingSystem.IsWindows())
         {
+            // Not cancellable; see the note on SND_ASYNC above.
             PlaySound(bytes, IntPtr.Zero, SndMemory | SndNodefault);
             return;
         }
@@ -89,18 +89,68 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
         }
 
         var player = OperatingSystem.IsMacOS() ? "afplay" : "aplay";
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo(player, $"\"{path}\"")
+        _ = RunPlayer(
+            new ProcessStartInfo(player, $"\"{path}\"")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
-            });
-            process?.WaitForExit();
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs a CLI audio player to its end, killing it as soon as
+    /// <paramref name="cancellationToken"/> is cancelled — a hung <c>aplay</c> on a blocked audio
+    /// device would otherwise hold its thread for good.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when the player ran to its end; <see langword="false"/> when it was
+    /// killed, or could not be started at all (e.g. the binary is missing), which stays silent.
+    /// </returns>
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Player binary missing (e.g. a headless Linux host without ALSA) — stay silent; the false return is the documented outcome.")]
+    internal static bool RunPlayer(ProcessStartInfo startInfo, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(startInfo);
+
+        try
+        {
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return false;
+            }
+
+            using (cancellationToken.Register(() => TryKill(process)))
+            {
+                process.WaitForExit();
+            }
+
+            return !cancellationToken.IsCancellationRequested;
         }
         catch
         {
-            // Player binary missing (e.g. a headless Linux host without ALSA) — stay silent.
+            return false;
+        }
+    }
+
+    // Runs as the cancellation callback, so it must never throw: an exception here would surface
+    // from the queue's Cancel() call instead. The usual failure is a player that has just exited.
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A player that already exited, or cannot be killed, is left alone; RunPlayer's WaitForExit is the outcome either way.")]
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            process.Kill();
+        }
+        catch
+        {
+            // Already exited, or no longer ours to kill.
         }
     }
 

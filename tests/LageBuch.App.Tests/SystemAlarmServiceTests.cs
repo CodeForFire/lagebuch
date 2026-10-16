@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LageBuch.App.Services;
 using LageBuch.AppLogic.Services;
 
@@ -50,5 +51,50 @@ public class SystemAlarmServiceTests
         service.Dispose();
 
         Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void RunPlayer_kills_a_player_once_playback_is_cancelled()
+    {
+        // The desktop players are CLI processes only off Windows; PlaySound cannot be killed.
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var sw = Stopwatch.StartNew();
+
+        // A hung player stands in as a process that would run for 30 s unless it is killed.
+        var completed = SystemAlarmService.RunPlayer(new ProcessStartInfo("sleep", "30"), cts.Token);
+
+        sw.Stop();
+        Assert.False(completed);
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10), $"the player was not killed (took {sw.Elapsed})");
+    }
+
+    [Fact]
+    public void RunPlayer_reports_a_player_that_ran_to_its_end()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        Assert.True(SystemAlarmService.RunPlayer(new ProcessStartInfo("true"), CancellationToken.None));
+    }
+
+    [Fact]
+    public void RunPlayer_stays_silent_when_the_player_binary_is_missing()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        Assert.False(SystemAlarmService.RunPlayer(
+            new ProcessStartInfo("lagebuch-no-such-audio-player") { UseShellExecute = false },
+            CancellationToken.None));
     }
 }
