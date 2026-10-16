@@ -187,14 +187,15 @@ Einen Schlüssel mit derselben Kennung zu errechnen, würde Jahre dauern; stimmt
 die Kennung, der Schlüssel aber nicht, weist das Programm die Verbindung ohne
 Rückfrage ab.
 
-**Vertrauen.** Beim ersten Verbinden merkt sich das beitretende Gerät den
-SHA-256-Fingerabdruck des Schlüssels der Gegenstelle in `trust.json`. Meldet
-sich unter derselben Adresse später ein anderer Schlüssel – ein anderer
+**Vertrauen.** Beim ersten Verbinden bricht die Verbindung ab, und die Meldung
+nennt die Kennung der Gegenstelle. Erst wenn sie mit der Anzeige am Gastgeber
+übereinstimmt, vertraut „Kennung stimmt – vertrauen“ genau diesem Schlüssel:
+Das beitretende Gerät merkt sich dessen SHA-256-Fingerabdruck in `trust.json`.
+Meldet sich unter derselben Adresse später ein anderer Schlüssel – ein anderer
 Rechner, ein verlorener `host-key.pem` oder jemand, der sich dazwischenschaltet
-–, bricht die Verbindung ab und die Meldung nennt dessen Kennung. Erst wenn sie
-mit der Anzeige am Gastgeber übereinstimmt, vertraut „Kennung stimmt –
-vertrauen“ genau diesem Schlüssel. Zeigt der Gastgeber keine Kennung, läuft
-dort eine ältere Version; die Meldung sagt das. Fingerabdrücke aus älteren
+–, bricht die Verbindung wieder ab und die Meldung nennt dessen Kennung zum
+Abgleich. Zeigt der Gastgeber keine Kennung, läuft dort eine ältere Version;
+die Meldung sagt das und fragt trotzdem nach. Fingerabdrücke aus älteren
 Versionen werden beim nächsten Verbinden nur dann still übernommen, wenn die
 Gegenstelle noch dasselbe Zertifikat vorlegt, sonst fragt das Programm nach
 der Kennung. Eine Möglichkeit, ein beliebiges Zertifikat zu akzeptieren, gibt
@@ -375,12 +376,13 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
   ein Mindestalter von sechs Monaten vorausgesetzt wird. Bis dahin sind
   Prüfsumme und Herkunftsnachweis der belastbare Ersatz. Einzelheiten in der
   [Roadmap](../ROADMAP.md).
-- **Die erste Verbindung zu einer Gegenstelle ist ungeprüft.** Der Fingerabdruck
-  wird beim ersten Kontakt übernommen und ab dann erzwungen. Abgeglichen wird die
-  Kennung erst, wenn sie sich ändert; beim ersten Mal fragt das Programm nicht
-  danach. Wer in diesem Moment im selben Netz mitliest, könnte sich
-  dazwischenschalten. Verbesserung ist geplant
-  ([Issue #597](https://github.com/CodeForFire/lagebuch/issues/597)).
+- **Die erste Verbindung ist nur so sicher wie der Abgleich der Kennung.** Das
+  Programm übernimmt den Schlüssel einer Gegenstelle erst, wenn jemand ihre
+  Kennung bestätigt hat. Wer bestätigt, ohne sie mit der Anzeige am Gastgeber
+  verglichen zu haben, vertraut womöglich einem fremden Gerät, das sich in
+  diesem Moment im selben Netz dazwischenschaltet. Ein Gastgeber mit älterer
+  Version zeigt keine Kennung; dort ist der Abgleich erst nach dem
+  Aktualisieren möglich.
 - **Die PIN hat vier Stellen.** Das genügt, weil nach zehn Fehlversuchen der
   Beitritt gesperrt bleibt, bis jemand eine neue PIN erzeugt: Ein Angreifer
   hat so höchstens zehn Versuche unter 10.000 je Erneuerung. Er kann den

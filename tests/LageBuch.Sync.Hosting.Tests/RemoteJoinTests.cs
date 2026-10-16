@@ -33,7 +33,7 @@ public class RemoteJoinTests
         await using var _ = host;
 
         await using var join = await RemoteJoin.OpenAsync(
-            "127.0.0.1", "1.0.0", new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", "1.0.0", await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         Assert.Equal(new[] { "Host-Wache" }, MasterDataJson.Parse(join.HostMasterDataJson).Brigades);
         Assert.Equal("B3 Wohnung", join.Incident.Keyword);
@@ -46,7 +46,7 @@ public class RemoteJoinTests
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
 
         await using var join = await RemoteJoin.OpenAsync(
-            "127.0.0.1", "1.0.0", new InMemoryTrustStore(), port: host.Port);
+            "127.0.0.1", "1.0.0", await TestHost.TrustingStoreAsync(host.Port), port: host.Port);
 
         // Written on the host while this device's dialog still asked for a name: no hub was up to
         // carry a broadcast, and the poll is set past the end of the test, so only the catch-up
@@ -66,7 +66,7 @@ public class RemoteJoinTests
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
 
         await using var join = await RemoteJoin.OpenAsync(
-            "127.0.0.1", "1.0.0", new InMemoryTrustStore(), port: host.Port);
+            "127.0.0.1", "1.0.0", await TestHost.TrustingStoreAsync(host.Port), port: host.Port);
         await using var session = await join.ConnectAsync(
             new SessionOperator("Client"), new ImmediateUiDispatcher(), reconcileInterval: Never);
 
@@ -80,7 +80,7 @@ public class RemoteJoinTests
         var basis = SnapshotFixture.BaseSnapshot();
         await using var host = await ScriptedSnapshotHost.StartAsync(basis);
 
-        var join = await RemoteJoin.OpenAsync("127.0.0.1", "1.0.0", new InMemoryTrustStore(), port: host.Port);
+        var join = await RemoteJoin.OpenAsync("127.0.0.1", "1.0.0", await TestHost.TrustingStoreAsync(host.Port), port: host.Port);
         await join.DisposeAsync();
         await join.DisposeAsync(); // idempotent: the dialog's cancel and its teardown may both get here
 

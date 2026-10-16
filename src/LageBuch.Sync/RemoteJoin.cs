@@ -72,9 +72,10 @@ public sealed class RemoteJoin : IAsyncDisposable
         var baseUri = new Uri($"https://{host}:{port}");
 
         // A single handler backs both the HttpClient and the SignalR hub connection, so they agree on
-        // TLS validation: pin the presented cert via Trust-on-First-Use. A certificate that differs
-        // from the previously-trusted one throws CertificateChangedException from inside the callback;
-        // the connect await surfaces it (§ P0 #2).
+        // TLS validation: only the key pinned for this address is accepted. A key that differs from
+        // it, or any key while none is pinned yet (#597), throws CertificateChangedException from
+        // inside the callback; the connect await surfaces it (§ P0 #2), and the Lagebuchführer
+        // compares the Kennung before that key is trusted.
         var handler = new HttpClientHandler { CheckCertificateRevocationList = true };
         handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
         {
@@ -89,8 +90,12 @@ public sealed class RemoteJoin : IAsyncDisposable
             var known = trustStore.GetThumbprint(host);
             if (known is null)
             {
-                trustStore.SaveThumbprint(host, presented);
-                return true;
+                // First contact pins nothing (#597): whoever answers first on the LAN would be
+                // trusted unasked, and every later connect would then look correct. The Kennung is
+                // shown to compare, and only the key that was shown can be trusted from it. Asked
+                // of an older host without a Kennung too: that is read from the certificate
+                // subject, which whoever answers chooses.
+                throw CertificateChangedException.FirstContact(host, presented, HostKennung.FromPin(presented), HostKennung.ShowsKennung(cert));
             }
 
             if (!known.StartsWith(HostKennung.PinPrefix, StringComparison.Ordinal))
@@ -210,7 +215,7 @@ public sealed class RemoteJoin : IAsyncDisposable
             }
 
             // The host is the Stammdaten master (#183). Pulled on the same HttpClient as everything
-            // else, so the PIN header and the Trust-on-First-Use certificate pin apply unchanged.
+            // else, so the PIN header and the certificate pin apply unchanged.
             // Deliberately not re-fetched on reconnect: the host caches its serialized set at
             // StartAsync, and both that cached copy and this client's workspace hold the same
             // MasterDataSet as an immutable value fixed at open — the Stammdaten editor stays

@@ -52,19 +52,19 @@ internal static class SnapshotFixture
     public static string[] JournalOf(RemoteIncidentSession client) =>
         client.Incident.Journal.Select(e => e.Text).ToArray();
 
-    public static Task<RemoteIncidentSession> ConnectAsync(
+    public static async Task<RemoteIncidentSession> ConnectAsync(
         ScriptedSnapshotHost host,
         TimeSpan? reconcileInterval = null,
         TimeProvider? timeProvider = null,
         IRetryPolicy? reconnectPolicy = null,
         IUiDispatcher? ui = null,
         FaultyRelay? via = null) =>
-        RemoteIncidentSession.ConnectAsync(
+        await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1",
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             ui ?? new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(host.Port),
             port: via?.Port ?? host.Port,
             reconnectPolicy: reconnectPolicy,
             reconcileInterval: reconcileInterval,

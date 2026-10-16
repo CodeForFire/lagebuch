@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -34,6 +35,16 @@ public class JoinPromptRenderTests
         if (string.IsNullOrWhiteSpace(dir))
         {
             return;
+        }
+
+        // Let the buttons' brush transitions finish: they run on the wall clock, not on render
+        // ticks, so a frame captured at once shows a background halfway through. Screenshot path
+        // only: no assertion waits.
+        var settle = Stopwatch.StartNew();
+        while (settle.ElapsedMilliseconds < 250)
+        {
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Dispatcher.UIThread.RunJobs();
         }
 
         Directory.CreateDirectory(dir);
@@ -127,6 +138,48 @@ public class JoinPromptRenderTests
         Assert.True(resetTrustButton.IsVisible);
         Assert.Equal("KENNUNG STIMMT – VERTRAUEN", resetTrustButton.Content);
         Capture(window, "join-prompt-cert-changed.png");
+    }
+
+    // #597: the first contact with a host is no longer trusted silently. The prompt shows the
+    // host's Kennung to compare and offers to trust exactly that key -- and keeps the PIN, which
+    // TLS never got far enough to check.
+    [AvaloniaFact]
+    public void Join_prompt_asks_to_compare_the_kennung_on_first_contact()
+    {
+        var (window, vm) = ShowJoinPrompt();
+
+        var firstContact = LageBuch.Sync.CertificateChangedException.FirstContact("elw-1", "SPKI:00", "7K2Q-M9XD-4HPA", hostShowsKennung: true);
+        vm.ReportJoinFailure(firstContact.Message, certificateChanged: true);
+        Dispatcher.UIThread.RunJobs();
+
+        var errorText = window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(t => t.Name == "PromptErrorMessage");
+        Assert.StartsWith("Erste Verbindung zu elw-1", errorText.Text, StringComparison.Ordinal);
+        Assert.Contains("\n7K2Q-M9XD-4HPA\n", errorText.Text, StringComparison.Ordinal);
+        var resetTrustButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "PromptResetTrustButton");
+        Assert.True(resetTrustButton.IsVisible);
+        var pinBox = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "PinBox");
+        Assert.Equal("1234", pinBox.Text);
+        Capture(window, "join-prompt-first-contact.png");
+    }
+
+    [AvaloniaFact]
+    public void Join_prompt_still_asks_on_first_contact_with_a_host_without_a_kennung()
+    {
+        var (window, vm) = ShowJoinPrompt();
+
+        var firstContact = LageBuch.Sync.CertificateChangedException.FirstContact("elw-1", "SPKI:00", "7K2Q-M9XD-4HPA", hostShowsKennung: false);
+        vm.ReportJoinFailure(firstContact.Message, certificateChanged: true);
+        Dispatcher.UIThread.RunJobs();
+
+        var errorText = window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(t => t.Name == "PromptErrorMessage");
+        Assert.Contains("ältere Lagebuch-Version", errorText.Text, StringComparison.Ordinal);
+        var resetTrustButton = window.GetVisualDescendants().OfType<Button>()
+            .Single(b => b.Name == "PromptResetTrustButton");
+        Assert.True(resetTrustButton.IsVisible);
+        Capture(window, "join-prompt-first-contact-older-host.png");
     }
 
     // #196: the capability to cancel a connection attempt lives in this dialog now, not in a

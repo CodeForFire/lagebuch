@@ -55,8 +55,9 @@ public sealed partial class HomeViewModel : ObservableObject
     // Null (most tests) just means "no caching" -- correct, only not free -- not an error.
     private readonly string? _attachmentCacheRoot;
 
-    // Remembers the TLS thumbprint of each host a device first joined (Trust-on-First-Use), so a
-    // re-join that presents a different certificate can be flagged as a potential MITM/duplicate.
+    // Remembers the key pin of each host whose Kennung the Lagebuchführer confirmed, on the first
+    // join (#597) or after a change, so a re-join that presents a different key can be flagged as a
+    // potential MITM/duplicate.
     // Null (most tests, which never join a device) just means "join is unavailable" -- ReachDeviceAsync
     // refuses to connect rather than falling back to an unpinned connection (there is no accept-any
     // path any more, see RemoteIncidentSession.ConnectAsync).
@@ -231,9 +232,9 @@ public sealed partial class HomeViewModel : ObservableObject
     private string? _joinError;
 
     /// <summary>
-    /// The dialed address a TOFU certificate-changed failure was just reported for, or null. Drives
-    /// <see cref="CanResetTrustedCertificate"/> — set only for that one failure kind (#181), since a
-    /// wrong PIN or an unreachable host has nothing to reset.
+    /// The dialed address a certificate failure with a key to trust was just reported for — a changed
+    /// key (#181) or a first contact (#597) — or null. Drives <see cref="CanResetTrustedCertificate"/>;
+    /// a wrong PIN or an unreachable host has nothing to trust.
     /// </summary>
     private string? _certificateChangedHost;
 
@@ -525,12 +526,13 @@ public sealed partial class HomeViewModel : ObservableObject
         switch (ex)
         {
             case CertificateChangedException changed:
-                // The host presented a different key than the one previously trusted for this
-                // address (Trust-on-First-Use violation, § P0 #2). Hosts keep their key across
-                // shares and restarts, so this is another device: a different laptop, a lost key
-                // file, or a man-in-the-middle. Show its Kennung to compare, and remember the
-                // address and key so the dialog can offer to trust exactly that key (#181) instead
-                // of leaving the user stuck on a warning nobody can act on.
+                // The host presented a key not trusted for this address: either a different one
+                // than before (§ P0 #2) — hosts keep their key across shares and restarts, so this
+                // is another device: a different laptop, a lost key file, or a man-in-the-middle —
+                // or a first contact, where nothing was trusted yet (#597). Either way, show its
+                // Kennung to compare, and remember the address and key so the dialog can offer to
+                // trust exactly that key (#181) instead of leaving the user stuck on a warning
+                // nobody can act on.
                 JoinError = ex.Message;
                 _certificateChangedHost = host;
                 _certificateChangedPin = changed.PresentedPin;
@@ -612,8 +614,8 @@ public sealed partial class HomeViewModel : ObservableObject
 
     /// <summary>
     /// Trusts the key the host just presented, once the Lagebuchführer has compared its Kennung with
-    /// the host's screen (#181). It pins that key rather than forgetting the old pin: forgetting
-    /// would let the retry pin whatever answers next, unchecked.
+    /// the host's screen — after a key change (#181) or on first contact (#597). It pins that key
+    /// rather than forgetting the old pin: the retry must not accept whatever answers next.
     /// </summary>
     [RelayCommand]
     private void ResetTrustedCertificate()

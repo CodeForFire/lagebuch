@@ -334,6 +334,18 @@ public class OperatorPromptViewModelTests
     }
 
     [Fact]
+    public void Reporting_a_certificate_failure_keeps_the_pin()
+    {
+        // TLS fails before the PIN header is ever sent, so the PIN is still unchecked, not wrong:
+        // after comparing the Kennung and trusting, VERBINDEN alone retries (#597).
+        var vm = new OperatorPromptViewModel(collectHost: true) { Host = "elw-1", Pin = "1234" };
+
+        vm.ReportJoinFailure("Erste Verbindung zu elw-1.", certificateChanged: true);
+
+        Assert.Equal("1234", vm.Pin);
+    }
+
+    [Fact]
     public void Reporting_a_join_failure_resets_result_so_confirm_can_fire_again()
     {
         var vm = new OperatorPromptViewModel(collectHost: true) { OperatorName = "Müller", Host = "elw-1", Pin = "1234" };

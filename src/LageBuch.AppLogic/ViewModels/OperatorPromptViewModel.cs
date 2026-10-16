@@ -128,8 +128,9 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     [ObservableProperty]
     private string? _errorMessage;
 
-    // True only when the last join failure was a TOFU certificate-changed rejection; drives the
-    // in-dialog "reset trust" button (mirrors HomeViewModel.CanResetTrustedCertificate from #181).
+    // True only when the last join failure offers a key to trust -- a changed key, or a first
+    // contact (#597); drives the in-dialog "reset trust" button (mirrors
+    // HomeViewModel.CanResetTrustedCertificate from #181).
     [ObservableProperty]
     private bool _certificateChanged;
 
@@ -213,11 +214,17 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
     // produces a fresh non-null value and re-triggers the host's existing Result-changed handler.
     // A failure after the host was reached spent that connection, so the prompt goes back to asking
     // for host and PIN, where the error is shown (#459).
+    // A Kennung to compare keeps the PIN, though (#597): TLS fails before the PIN is ever sent, so
+    // it is unchecked rather than wrong, and after trusting, VERBINDEN alone retries.
     public void ReportJoinFailure(string message, bool certificateChanged)
     {
         ErrorMessage = message;
         CertificateChanged = certificateChanged;
-        Pin = string.Empty;
+        if (!certificateChanged)
+        {
+            Pin = string.Empty;
+        }
+
         Result = null;
         IsOperatorStage = false;
         JoinedIncidentDisplay = null;

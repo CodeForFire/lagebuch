@@ -50,7 +50,7 @@ public class CommandRejectionTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             "1234",
             port,
             reconcileInterval: Never);
@@ -84,7 +84,7 @@ public class CommandRejectionTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             "1234",
             port,
             reconcileInterval: Never);
@@ -113,7 +113,7 @@ public class CommandRejectionTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             "1234",
             port,
             reconcileInterval: Never);

@@ -72,10 +72,11 @@ one note on why the trust model around the middle two is where it is.
   release's `SHA256SUMS.txt` and its Sigstore-backed build attestation
   (`gh attestation verify <file> --repo CodeForFire/lagebuch`). See the
   [roadmap](ROADMAP.md).
-- **The first connection to a host is unauthenticated.** Sync pins the host's
-  key Trust-on-First-Use: the joining device records the SHA-256 of the
-  certificate's public key (SPKI) in `trust.json` on first contact and from
-  then on accepts only that key. The host issues a new self-signed certificate
+- **The first connection to a host is only as good as the Kennung comparison.**
+  Sync pins the host's key: the joining device records the SHA-256 of the
+  certificate's public key (SPKI) in `trust.json` once the Lagebuchführer has
+  compared the host's Kennung and trusted it, and from then on accepts only
+  that key. The host issues a new self-signed certificate
   per share but keeps one ECDSA P-256 key per install (`host-key.pem` in the
   app-data folder, owner-only on Unix), so a restarted share, app or laptop is
   still the same pin. A different key aborts the connection and the error shows
@@ -94,10 +95,14 @@ one note on why the trust model around the middle two is where it is.
   client-side trust decision — the certificate is self-signed and its SAN
   covers only `localhost` and loopback while the host binds every interface, so
   chain and hostname validation are replaced outright rather than layered on.
-  The first exchange is not compared, though: nothing asks for the Kennung on
-  first contact, so an attacker already positioned on the LAN at that moment
-  can get themselves pinned instead, and every later connection will then look
-  correct. Anyone who can read `host-key.pem` can impersonate that host, which
+  First contact is handled like a change: nothing is pinned, the connection is
+  aborted and the error shows the presented key's Kennung to compare. That
+  includes an older host showing no Kennung — the fixed subject is chosen by
+  whoever answers, so it earns no silent pass — where the message says there
+  is nothing to compare and the host should be updated. What remains is the
+  human step: someone who trusts without comparing pins whoever answered at
+  that moment, an attacker already positioned on the LAN included, and every
+  later connection will then look correct. Anyone who can read `host-key.pem` can impersonate that host, which
   is the same user-profile boundary that already guards the Einsatzdaten: the
   app-data folder is created with the default umask, and on Windows it is the
   roaming `%AppData%`, so a roaming profile carries the key to the profile

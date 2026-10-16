@@ -107,7 +107,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         var change = NextChange(client);
@@ -127,7 +127,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var change = NextChange(client);
         client.AddJournalEntry(EtbDirection.Outgoing, "Rückmeldung an ILS", "ELW", "Leitstelle");
@@ -155,7 +155,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
         Assert.Contains(clientWs.Etb.Entries, e => e.Text == "Lage erkundet");
 
@@ -176,7 +176,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
         Assert.False(clientWs.IsReadOnly);
 
@@ -198,7 +198,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
         clientWs.SelectedNavItem = clientWs.NavItems.Single(i => i.ModuleKey == NavModules.Scba);
 
@@ -219,7 +219,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
         Assert.Equal("Unbenannter Einsatz", clientWs.HeroText);
 
@@ -245,7 +245,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         clientWs.EditIncidentDataCommand.Execute(null);
@@ -282,7 +282,7 @@ public class WorkspaceCollaborationTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             TestHost.DefaultPin,
             port);
 
@@ -335,7 +335,7 @@ public class WorkspaceCollaborationTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             TestHost.DefaultPin,
             port);
         var journalBefore = hostSession.Incident.Journal.Count;
@@ -374,7 +374,7 @@ public class WorkspaceCollaborationTests
         // Reconnect once quickly then give up, so "host gone" resolves in the test rather than after
         // the production two-minute window — while still exercising the transient-drop banner first.
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
         var clientWs = Workspace(client, clock);
 
         var disconnected = new TaskCompletionSource();
@@ -404,7 +404,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         clientWs.Dispose();
@@ -440,7 +440,7 @@ public class WorkspaceCollaborationTests
 
         using var ui = new SingleThreadUiDispatcher();
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", ui, new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", ui, await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         int? mutatedOnThread = null;
@@ -468,7 +468,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         int? mutatedOnThread = null;
         hostWs.Etb.Entries.CollectionChanged += (_, _) => mutatedOnThread = Environment.CurrentManagedThreadId;
@@ -505,7 +505,7 @@ public class WorkspaceCollaborationTests
         var hostWs = Workspace(hostSession, clock);
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         Assert.Equal(WorkspaceSyncState.Local, hostWs.SyncState);
@@ -527,7 +527,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         // Wait on the workspace's own notification, subscribed before anything is triggered. Waiting
@@ -561,7 +561,7 @@ public class WorkspaceCollaborationTests
         var (host, port) = await TestHost.StartAsync(hostSession, clock);
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port, new GiveUpAfterOneRetry());
         var clientWs = Workspace(client, clock);
 
         Assert.Equal(WorkspaceSyncState.Current, clientWs.SyncState);
@@ -589,7 +589,7 @@ public class WorkspaceCollaborationTests
         await using var _ = host;
 
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         var clientWs = Workspace(client, clock);
 
         Assert.Null(clientWs.CommandRejected);

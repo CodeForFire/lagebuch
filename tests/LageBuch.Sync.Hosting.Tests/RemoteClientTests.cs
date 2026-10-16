@@ -45,7 +45,7 @@ public class RemoteClientTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             TestHost.DefaultPin,
             port);
 
@@ -66,7 +66,7 @@ public class RemoteClientTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             TestHost.DefaultPin,
             port);
 
@@ -96,7 +96,7 @@ public class RemoteClientTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             TestHost.DefaultPin,
             port);
 
@@ -124,8 +124,8 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
 
-        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
-        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+        await using var a = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
+        await using var b = await RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var aChange = NextChange(a);
         var bChange = NextChange(b);
@@ -144,9 +144,9 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var uploader = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         await using var observer = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var uploaderChange = NextChange(uploader);
         var observerChange = NextChange(observer);
@@ -171,9 +171,9 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var renamer = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         await using var observer = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var renamerAdded = NextChange(renamer);
         var observerAdded = NextChange(observer);
@@ -202,9 +202,9 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var attacker = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
         await using var observer = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("B"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var attackerChange = NextChange(attacker);
         var observerChange = NextChange(observer);
@@ -234,7 +234,7 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var attacker = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("A", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var rejected = await Assert.ThrowsAsync<CommandRejectedException>(() => attacker.SendAsync(new AddFileCommand(
             new OperatorDto("A", "RUF 1"),
@@ -257,7 +257,7 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         Assert.Null(await client.GetFileBytesAsync(Guid.NewGuid()));
     }
@@ -269,7 +269,7 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var tooBig = new byte[LageBuch.Domain.Files.IncidentFile.MaxSizeBytes + 1];
         await Assert.ThrowsAsync<ArgumentException>(() => client.AddFileAsync("huge.pdf", "application/pdf", tooBig));
@@ -286,7 +286,7 @@ public class RemoteClientTests
         try
         {
             await using var uploader = await RemoteIncidentSession.ConnectAsync(
-                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
             var bytes = new byte[] { 1, 2, 3 };
             var uploaderChange = NextChange(uploader);
             await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
@@ -298,7 +298,7 @@ public class RemoteClientTests
                 new SessionOperator("B"),
                 "1.0.0",
                 new ImmediateUiDispatcher(),
-                new InMemoryTrustStore(),
+                await TestHost.TrustingStoreAsync(port),
                 TestHost.DefaultPin,
                 port,
                 cacheRoot: cacheRoot);
@@ -334,7 +334,7 @@ public class RemoteClientTests
             File.SetLastWriteTimeUtc(staleFile, DateTime.UtcNow.AddDays(-1));
 
             await using var uploader = await RemoteIncidentSession.ConnectAsync(
-                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
             var bytes = new byte[] { 1, 2, 3 };
             var uploaderChange = NextChange(uploader);
             await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
@@ -346,7 +346,7 @@ public class RemoteClientTests
                 new SessionOperator("B"),
                 "1.0.0",
                 new ImmediateUiDispatcher(),
-                new InMemoryTrustStore(),
+                await TestHost.TrustingStoreAsync(port),
                 TestHost.DefaultPin,
                 port,
                 cacheRoot: cacheRoot,
@@ -379,7 +379,7 @@ public class RemoteClientTests
         try
         {
             await using var uploader = await RemoteIncidentSession.ConnectAsync(
-                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
             var bytes = new byte[] { 1, 2, 3 };
             var uploaderChange = NextChange(uploader);
             await uploader.AddFileAsync("brand.jpg", "image/jpeg", bytes);
@@ -391,7 +391,7 @@ public class RemoteClientTests
                 new SessionOperator("B"),
                 "1.0.0",
                 new ImmediateUiDispatcher(),
-                new InMemoryTrustStore(),
+                await TestHost.TrustingStoreAsync(port),
                 TestHost.DefaultPin,
                 port,
                 cacheRoot: cacheRoot);
@@ -420,7 +420,7 @@ public class RemoteClientTests
         // — an Android release waits on Play review — still connects as long as the wire contract is
         // the same. This pair used to be refused purely for disagreeing about a number on the About screen.
         await using var session = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         Assert.NotNull(session.Incident);
     }
@@ -437,8 +437,9 @@ public class RemoteClientTests
             minimumProtocolVersion: SyncProtocol.ProtocolVersion + 5);
         await using var _ = host;
 
+        var trust = await TestHost.TrustingStoreAsync(port);
         var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
 
         // Names this device as the one to update, not the host.
         Assert.Contains("Dieses Gerät ist zu alt", ex.Message, StringComparison.Ordinal);
@@ -462,8 +463,9 @@ public class RemoteClientTests
             minimumProtocolVersion: -1);
         await using var _ = host;
 
+        var trust = await TestHost.TrustingStoreAsync(port);
         var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
 
         Assert.Contains("Der Host ist zu alt", ex.Message, StringComparison.Ordinal);
     }
@@ -479,7 +481,7 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(hostSession, clock);
         await using var _ = host;
         await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client", "RUF 1"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         var changes = 0;
         client.Changed += () => Interlocked.Increment(ref changes);
@@ -513,8 +515,9 @@ public class RemoteClientTests
             minimumProtocolVersion: 3);
         await using var _ = host;
 
+        var trust = await TestHost.TrustingStoreAsync(port);
         var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
 
         Assert.Contains("Der Host ist zu alt", ex.Message, StringComparison.Ordinal);
     }
@@ -533,9 +536,10 @@ public class RemoteClientTests
             masterDataBody: MasterDataJson.Serialize(MasterDataSet.Empty),
             legacyVersion: true);
 
+        var trust = await TestHost.TrustingStoreAsync(host.Port);
         var ex = await Assert.ThrowsAsync<VersionMismatchException>(() =>
             RemoteIncidentSession.ConnectAsync(
-                "127.0.0.1", new SessionOperator("Client"), "9.9.9", new ImmediateUiDispatcher(), new InMemoryTrustStore(), port: host.Port));
+                "127.0.0.1", new SessionOperator("Client"), "9.9.9", new ImmediateUiDispatcher(), trust, port: host.Port));
 
         Assert.Contains("Der Host ist zu alt", ex.Message, StringComparison.Ordinal);
     }
@@ -558,7 +562,7 @@ public class RemoteClientTests
         await using var _ = host;
 
         await using var session = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), await TestHost.TrustingStoreAsync(port), TestHost.DefaultPin, port);
 
         Assert.NotNull(session.Incident);
     }
@@ -571,8 +575,9 @@ public class RemoteClientTests
         await using var _ = host;
 
         // A wrong PIN is refused at the first request, before the version compare — auth precedes content.
+        var trust = await TestHost.TrustingStoreAsync(port);
         await Assert.ThrowsAsync<PinRejectedException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), "9999", port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, "9999", port));
     }
 
     [Fact]
@@ -582,29 +587,66 @@ public class RemoteClientTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
         await using var _ = host;
 
+        var trust = await TestHost.TrustingStoreAsync(port);
         await Assert.ThrowsAsync<PinRejectedException>(() =>
-            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), pin: null, port));
+            RemoteIncidentSession.ConnectAsync("127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, pin: null, port));
     }
 
     [Fact]
-    public async Task Connect_trusts_a_cert_on_first_use_and_caches_the_thumbprint()
+    public async Task Connect_refuses_a_first_contact_and_offers_exactly_the_presented_key()
+    {
+        // The attack #597 closes: whoever answers first on the LAN used to be pinned silently, and
+        // every later connect then looked correct. First contact now pins nothing and asks for the
+        // Kennung to be compared, offering exactly the key that was presented.
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        using var presented = await TestHost.PresentedCertificateAsync(port);
+
+        var trust = new InMemoryTrustStore();
+        var ex = await Assert.ThrowsAsync<CertificateChangedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
+
+        Assert.True(ex.IsFirstContact);
+        Assert.Equal(HostKennung.Pin(presented), ex.PresentedPin);
+        Assert.Equal(host.Kennung, ex.Kennung);
+        Assert.Contains(host.Kennung!, ex.Message, StringComparison.Ordinal);
+        Assert.Empty(trust.Thumbprints); // nothing trusted until someone compared
+    }
+
+    [Fact]
+    public async Task Connect_succeeds_once_the_first_contact_key_is_trusted()
     {
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
-
         var trust = new InMemoryTrustStore();
-        await using var client = await RemoteIncidentSession.ConnectAsync(
-            "127.0.0.1",
-            new SessionOperator("Client"),
-            "1.0.0",
-            new ImmediateUiDispatcher(),
-            trust,
-            TestHost.DefaultPin,
-            port);
+        var firstContact = await Assert.ThrowsAsync<CertificateChangedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
 
-        Assert.NotNull(client);
-        Assert.Single(trust.Thumbprints); // first use captured it
+        trust.SaveThumbprint("127.0.0.1", firstContact.PresentedPin!);
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port);
+
+        Assert.NotNull(client.Incident);
+    }
+
+    [Fact]
+    public async Task A_key_changed_since_the_last_join_is_not_reported_as_first_contact()
+    {
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", HostKennung.PinPrefix + "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var ex = await Assert.ThrowsAsync<CertificateChangedException>(() =>
+            RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, TestHost.DefaultPin, port));
+
+        Assert.False(ex.IsFirstContact);
     }
 
     [Fact]
@@ -635,10 +677,10 @@ public class RemoteClientTests
         // "Duplikat oder man-in-the-middle?" after any restart of the share, the app or the laptop.
         using var keyDir = new TempDirectory();
         var keyPath = Path.Join(keyDir.Path, "host-key.pem");
-        var trust = new InMemoryTrustStore();
         var clock = new FixedClock();
 
         var (first, firstPort) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", identityKeyPath: keyPath);
+        var trust = await TestHost.TrustingStoreAsync(firstPort);
         await using (first)
         {
             await using var client = await RemoteIncidentSession.ConnectAsync(
@@ -658,11 +700,11 @@ public class RemoteClientTests
     public async Task A_host_with_a_different_key_raises_certificate_changed_with_its_kennung()
     {
         using var keyDir = new TempDirectory();
-        var trust = new InMemoryTrustStore();
         var clock = new FixedClock();
 
         var (first, firstPort) = await TestHost.StartAsync(
             HostSession(clock), clock, "1.0.0", identityKeyPath: Path.Join(keyDir.Path, "a.pem"));
+        var trust = await TestHost.TrustingStoreAsync(firstPort);
         await using (first)
         {
             await using var client = await RemoteIncidentSession.ConnectAsync(
@@ -750,9 +792,10 @@ public class RemoteClientTests
         var clock = new FixedClock();
         await using var host = await StubHost.StartAsync(HostSession(clock).Incident, throttleRetryAfterSeconds: 30);
 
+        var trust = await TestHost.TrustingStoreAsync(host.Port);
         var ex = await Assert.ThrowsAsync<PinRejectedException>(() =>
             RemoteIncidentSession.ConnectAsync(
-                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), "wrong", host.Port));
+                "127.0.0.1", new SessionOperator("Client"), "1.0.0", new ImmediateUiDispatcher(), trust, "wrong", host.Port));
 
         Assert.Equal("Zu viele Fehlversuche. Bitte 30s warten.", ex.Message);
     }

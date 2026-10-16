@@ -1,0 +1,1 @@
+Joining a sync host for the first time no longer trusts its key silently: the join dialog shows the host's Kennung to compare and pins exactly that key only once the Lagebuchführer confirms it, older hosts without a Kennung included (#597).

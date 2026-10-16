@@ -15,8 +15,8 @@ namespace LageBuch.Sync.Hosting.Tests;
 public class HomeViewModelJoinTests
 {
     // trust defaults to a fresh InMemoryTrustStore rather than null: RemoteIncidentSession.ConnectAsync
-    // requires a trust store (there is no accept-any fallback any more), so every join test needs a
-    // real one -- passing an explicit instance is only necessary for tests asserting on its contents.
+    // requires a trust store (there is no accept-any fallback any more). An empty one refuses the
+    // first contact (#597), so a test that means to get past it passes TestHost.TrustingStoreAsync.
     private static HomeViewModel Home(ITrustStore? trust = null, IMasterDataProvider? masterData = null, ILastConnectionStore? lastConnection = null, FixedClock? clock = null) =>
         new(
             new InMemoryStore(),
@@ -61,7 +61,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
 
-        var vm = Home();
+        var vm = Home(await TestHost.TrustingStoreAsync(port));
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -84,7 +84,7 @@ public class HomeViewModelJoinTests
 
         // This device's own Stammdaten says something different, including a different Rückzugsdruck.
         var local = new FixedMasterData(MasterDataSyncTests.SetWith("Client-Wache", 50));
-        var vm = Home(masterData: local);
+        var vm = Home(await TestHost.TrustingStoreAsync(port), masterData: local);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -113,7 +113,7 @@ public class HomeViewModelJoinTests
         await using var _ = host;
 
         var local = new FixedMasterData(MasterDataSyncTests.SetWith("Client-Wache", 50));
-        var vm = Home(masterData: local);
+        var vm = Home(await TestHost.TrustingStoreAsync(port), masterData: local);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -128,7 +128,31 @@ public class HomeViewModelJoinTests
     }
 
     [Fact]
-    public async Task Successful_first_join_trusts_and_caches_the_host_certificate()
+    public async Task First_join_asks_to_compare_the_kennung_and_trusts_nothing_yet()
+    {
+        // The silent trust-on-first-use #597 removes: whoever answered first was pinned unasked.
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var trust = new InMemoryTrustStore();
+        var vm = Home(trust);
+        var opened = false;
+        vm.WorkspaceOpened = _ => opened = true;
+
+        await vm.ReachDeviceCommand.ExecuteAsync(new DeviceRequest($"127.0.0.1:{port}", TestHost.DefaultPin));
+
+        Assert.False(opened);
+        Assert.Null(vm.PendingJoinIncident); // not reached: no Stammdaten, no incident read yet
+        Assert.NotNull(vm.JoinError);
+        Assert.StartsWith("Erste Verbindung", vm.JoinError, StringComparison.Ordinal);
+        Assert.Contains(host.Kennung!, vm.JoinError, StringComparison.Ordinal);
+        Assert.True(vm.CanResetTrustedCertificate);
+        Assert.Empty(trust.Thumbprints);
+    }
+
+    [Fact]
+    public async Task Trusting_the_kennung_on_first_contact_pins_exactly_that_key_and_lets_a_retry_join()
     {
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
@@ -136,15 +160,54 @@ public class HomeViewModelJoinTests
 
         var trust = new InMemoryTrustStore();
         var vm = Home(trust);
+        var request = (new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
+        await JoinAsync(vm, request);
+        Assert.True(vm.CanResetTrustedCertificate);
+
+        vm.ResetTrustedCertificateCommand.Execute(null);
+
+        Assert.Null(vm.JoinError);
+        Assert.Equal(host.Kennung, HostKennung.FromPin(trust.GetThumbprint("127.0.0.1")!));
+
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
-
-        await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
+        await JoinAsync(vm, request);
 
         Assert.Null(vm.JoinError);
         Assert.NotNull(opened);
-        Assert.Single(trust.Thumbprints); // TOFU: first use recorded the host's cert
         await opened!.LeaveAsync();
+    }
+
+    [Fact]
+    public async Task Another_device_answering_the_retry_after_a_first_contact_is_refused()
+    {
+        // The Lagebuchführer compared the Kennung the real host shows and trusted it; by the retry a
+        // different device answers at the same address. It must not ride in on that confirmation.
+        var clock = new FixedClock();
+        var trust = new InMemoryTrustStore();
+        var vm = Home(trust);
+        vm.WorkspaceOpened = _ => { };
+
+        var (shown, shownPort) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        var shownKennung = shown.Kennung;
+        await using (shown)
+        {
+            await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{shownPort}", TestHost.DefaultPin);
+            Assert.True(vm.CanResetTrustedCertificate);
+            vm.ResetTrustedCertificateCommand.Execute(null);
+        }
+
+        var (swapped, swappedPort) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = swapped;
+        var opened = false;
+        vm.WorkspaceOpened = _ => opened = true;
+
+        await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{swappedPort}", TestHost.DefaultPin);
+
+        Assert.False(opened);
+        Assert.Contains(swapped.Kennung!, vm.JoinError, StringComparison.Ordinal);
+        Assert.DoesNotContain("Erste Verbindung", vm.JoinError, StringComparison.Ordinal);
+        Assert.Equal(shownKennung, HostKennung.FromPin(trust.GetThumbprint("127.0.0.1")!));
     }
 
     [Fact]
@@ -241,7 +304,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
         await using var _ = host;
 
-        var vm = Home(new InMemoryTrustStore());
+        var vm = Home(await TestHost.TrustingStoreAsync(port));
         await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", "9999");
 
         Assert.NotNull(vm.JoinError);
@@ -255,7 +318,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "2.0.0"); // host newer
         await using var _ = host;
 
-        var vm = Home(); // this device is "1.0.0"
+        var vm = Home(await TestHost.TrustingStoreAsync(port)); // this device is "1.0.0"
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
@@ -278,7 +341,7 @@ public class HomeViewModelJoinTests
             minimumProtocolVersion: SyncProtocol.ProtocolVersion + 5);
         await using var _ = host;
 
-        var vm = Home(); // this device is "1.0.0"
+        var vm = Home(await TestHost.TrustingStoreAsync(port)); // this device is "1.0.0"
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
@@ -301,7 +364,7 @@ public class HomeViewModelJoinTests
 
         var lastConnection = new InMemoryLastConnectionStore();
         var clientClock = new FixedClock { Now = new DateTimeOffset(2026, 9, 24, 14, 5, 0, TimeSpan.FromHours(2)) };
-        var vm = Home(lastConnection: lastConnection, clock: clientClock);
+        var vm = Home(await TestHost.TrustingStoreAsync(port), lastConnection: lastConnection, clock: clientClock);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -325,7 +388,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
 
-        var vm = Home(lastConnection: new FailingLastConnectionStore());
+        var vm = Home(await TestHost.TrustingStoreAsync(port), lastConnection: new FailingLastConnectionStore());
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -347,7 +410,7 @@ public class HomeViewModelJoinTests
         await using var _ = host;
 
         var lastConnection = new InMemoryLastConnectionStore();
-        var vm = Home(lastConnection: lastConnection);
+        var vm = Home(await TestHost.TrustingStoreAsync(port), lastConnection: lastConnection);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
         await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
@@ -377,7 +440,7 @@ public class HomeViewModelJoinTests
         await using var _ = host;
 
         var lastConnection = new InMemoryLastConnectionStore();
-        var vm = Home(lastConnection: lastConnection);
+        var vm = Home(await TestHost.TrustingStoreAsync(port), lastConnection: lastConnection);
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
         await JoinAsync(vm, new SessionOperator("Client", "RUF 1"), $"127.0.0.1:{port}", TestHost.DefaultPin);
@@ -409,7 +472,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
         await using var _ = host;
 
-        var vm = Home();
+        var vm = Home(await TestHost.TrustingStoreAsync(port));
         var opened = false;
         vm.WorkspaceOpened = _ => opened = true;
 
@@ -427,7 +490,7 @@ public class HomeViewModelJoinTests
         await using var _ = host;
 
         var lastConnection = new InMemoryLastConnectionStore();
-        var vm = Home(lastConnection: lastConnection);
+        var vm = Home(await TestHost.TrustingStoreAsync(port), lastConnection: lastConnection);
 
         await JoinAsync(vm, new SessionOperator("Client"), $"127.0.0.1:{port}", "9999");
 
@@ -460,7 +523,7 @@ public class HomeViewModelJoinTests
         var clock = new FixedClock();
         await using var host = await StubHost.StartAsync(HostSession(clock).Incident, masterDataBody: masterDataBody);
 
-        var vm = Home();
+        var vm = Home(await TestHost.TrustingStoreAsync(host.Port));
         IncidentWorkspaceViewModel? opened = null;
         vm.WorkspaceOpened = ws => opened = ws;
 
@@ -517,7 +580,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0", pin: "1234");
         await using var _ = host;
 
-        var home = Home();
+        var home = Home(await TestHost.TrustingStoreAsync(port));
         var vm = MainWindowVm(home);
         vm.RequestJoinDeviceCommand.Execute(null);
         var prompt = vm.PendingPrompt!;
@@ -558,7 +621,7 @@ public class HomeViewModelJoinTests
 
         var lastConnection = new InMemoryLastConnectionStore();
         lastConnection.SetLast(new LastConnection($"127.0.0.1:{port}", "B3 Wohnung", clock.Now, "5393"));
-        var vm = MainWindowVm(Home(lastConnection: lastConnection));
+        var vm = MainWindowVm(Home(await TestHost.TrustingStoreAsync(port), lastConnection: lastConnection));
         vm.RequestJoinDeviceCommand.Execute(null);
         var prompt = vm.PendingPrompt!;
 
@@ -603,7 +666,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
 
-        var vm = MainWindowVm(Home());
+        var vm = MainWindowVm(Home(await TestHost.TrustingStoreAsync(port)));
         vm.RequestJoinDeviceCommand.Execute(null);
         var prompt = vm.PendingPrompt!;
         prompt.Host = $"127.0.0.1:{port}";
@@ -638,7 +701,7 @@ public class HomeViewModelJoinTests
         await using var _ = host;
 
         var local = MasterDataSet.Empty with { Personnel = new[] { new Person("Lokal", "Lena", null, "Lokal 1", null) } };
-        var vm = MainWindowVm(Home(masterData: new FixedMasterData(local)));
+        var vm = MainWindowVm(Home(await TestHost.TrustingStoreAsync(port), masterData: new FixedMasterData(local)));
         vm.RequestJoinDeviceCommand.Execute(null);
         var prompt = vm.PendingPrompt!;
         Assert.True(prompt.IsHostStage);
@@ -673,7 +736,7 @@ public class HomeViewModelJoinTests
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
         await using var _ = host;
 
-        var home = Home();
+        var home = Home(await TestHost.TrustingStoreAsync(port));
         var vm = MainWindowVm(home);
         vm.RequestJoinDeviceCommand.Execute(null);
         var prompt = vm.PendingPrompt!;
@@ -698,7 +761,7 @@ public class HomeViewModelJoinTests
         var clock = new FixedClock();
         var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
 
-        var home = Home();
+        var home = Home(await TestHost.TrustingStoreAsync(port));
         var vm = MainWindowVm(home);
         vm.RequestJoinDeviceCommand.Execute(null);
         var prompt = vm.PendingPrompt!;
@@ -746,7 +809,37 @@ public class HomeViewModelJoinTests
         Assert.False(prompt.CertificateChanged);
         Assert.Same(prompt, vm.PendingPrompt); // dialog still open, ready for a retry
 
-        prompt.Pin = TestHost.DefaultPin; // ReportJoinFailure cleared it
+        Assert.Equal(TestHost.DefaultPin, prompt.Pin); // never checked: TLS failed first (#597)
+        await ReachAsync(vm, prompt);
+        await ConfirmOperatorAsync(vm, prompt, "Client");
+
+        Assert.Null(vm.PendingPrompt);
+        Assert.IsType<IncidentWorkspaceViewModel>(vm.CurrentView);
+        await ((IncidentWorkspaceViewModel)vm.CurrentView!).LeaveAsync();
+    }
+
+    [Fact]
+    public async Task First_contact_in_the_dialog_shows_the_kennung_and_joins_after_trusting_it()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+
+        var trust = new InMemoryTrustStore();
+        var home = Home(trust);
+        var vm = MainWindowVm(home);
+        vm.RequestJoinDeviceCommand.Execute(null);
+        var prompt = vm.PendingPrompt!;
+        prompt.Host = $"127.0.0.1:{port}";
+        prompt.Pin = TestHost.DefaultPin;
+        await ReachAsync(vm, prompt);
+
+        Assert.True(prompt.IsHostStage);
+        Assert.True(prompt.CertificateChanged);
+        Assert.Contains(host.Kennung!, prompt.ErrorMessage, StringComparison.Ordinal);
+        Assert.Empty(trust.Thumbprints);
+
+        vm.ResetTrustCommand.Execute(null);
         await ReachAsync(vm, prompt);
         await ConfirmOperatorAsync(vm, prompt, "Client");
 

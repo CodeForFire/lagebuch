@@ -335,6 +335,20 @@ internal static class TestHost
     }
 
     /// <summary>
+    /// A trust store that already trusts the host on <paramref name="port"/>, as if the Lagebuchführer
+    /// had compared its Kennung on an earlier join. First contact is refused until someone does that
+    /// (#597), so every test about what happens <em>after</em> a join starts from one of these; a
+    /// test about first contact itself starts from an empty <see cref="InMemoryTrustStore"/>.
+    /// </summary>
+    public static async Task<InMemoryTrustStore> TrustingStoreAsync(int port)
+    {
+        using var presented = await PresentedCertificateAsync(port);
+        var trust = new InMemoryTrustStore();
+        trust.SaveThumbprint("127.0.0.1", HostKennung.Pin(presented));
+        return trust;
+    }
+
+    /// <summary>
     /// Starts <paramref name="host"/> on a port the OS picks as part of the bind and returns it. Never
     /// pick a port with <see cref="FreeTcpPort"/> and bind it afterwards: between the two a parallel
     /// test's socket can take it, and the bind fails with "address already in use".

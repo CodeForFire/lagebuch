@@ -25,13 +25,15 @@ public class LinkFailureTests
 
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(10);
 
-    private static Task<RemoteIncidentSession> ConnectAsync(FaultyRelay relay, TimeProvider? time = null) =>
-        RemoteIncidentSession.ConnectAsync(
+    // Trusted at the host's own port, not through the relay: the relay's traffic is what the tests
+    // watch, and the key it forwards is the host's either way.
+    private static async Task<RemoteIncidentSession> ConnectAsync(FaultyRelay relay, int hostPort, TimeProvider? time = null) =>
+        await RemoteIncidentSession.ConnectAsync(
             "127.0.0.1",
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(hostPort),
             TestHost.DefaultPin,
             relay.Port,
             new ReconnectImmediately(),
@@ -85,7 +87,7 @@ public class LinkFailureTests
             new SessionOperator("Client", "RUF 1"),
             "1.0.0",
             new ImmediateUiDispatcher(),
-            new InMemoryTrustStore(),
+            await TestHost.TrustingStoreAsync(port),
             TestHost.DefaultPin,
             relay.Port,
             new ReconnectImmediately(),
@@ -115,7 +117,7 @@ public class LinkFailureTests
         var (host, port) = await TestHost.StartAsync(hostSession, clock);
         await using var _ = host;
         await using var relay = FaultyRelay.Start(port);
-        await using var client = await ConnectAsync(relay, time);
+        await using var client = await ConnectAsync(relay, port, time);
         var workspace = Workspace(client, clock);
 
         Assert.Equal(WorkspaceSyncState.Current, workspace.SyncState);
@@ -145,7 +147,7 @@ public class LinkFailureTests
         var (host, port) = await TestHost.StartAsync(hostSession, clock);
         await using var _ = host;
         await using var relay = FaultyRelay.Start(port);
-        await using var client = await ConnectAsync(relay);
+        await using var client = await ConnectAsync(relay, port);
 
         var disconnected = new TaskCompletionSource();
         client.Disconnected += () => disconnected.TrySetResult();
