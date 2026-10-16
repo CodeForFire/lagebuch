@@ -92,6 +92,23 @@ public sealed class IncidentRepository
             WriteChecklist(inserts, incident.Checklists[i], ordinal: i);
         }
 
+        WriteJournal(inserts, incident);
+        WriteRoles(inserts, incident);
+        WriteForces(inserts, incident);
+        WriteScbaTrupps(inserts, incident);
+        WriteAudit(inserts, incident);
+        WriteTimers(inserts, incident);
+        WriteFiles(inserts, incident);
+        WriteCoBuildings(inserts, incident);
+        WriteCoDwellings(inserts, incident);
+        WriteTasks(inserts, incident);
+        WriteInvolvedParties(inserts, incident);
+
+        tx.Commit();
+    }
+
+    private static void WriteJournal(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Journal.Count; i++)
         {
             var e = incident.Journal[i];
@@ -127,7 +144,10 @@ public sealed class IncidentRepository
                     });
             }
         }
+    }
 
+    private static void WriteRoles(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Roles.Count; i++)
         {
             var r = incident.Roles[i];
@@ -147,7 +167,10 @@ public sealed class IncidentRepository
                     p("$ph", (object?)r.Phone ?? DBNull.Value);
                 });
         }
+    }
 
+    private static void WriteForces(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Forces.Count; i++)
         {
             var f = incident.Forces[i];
@@ -188,7 +211,10 @@ public sealed class IncidentRepository
                     });
             }
         }
+    }
 
+    private static void WriteScbaTrupps(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.ScbaTrupps.Count; i++)
         {
             var t = incident.ScbaTrupps[i];
@@ -245,7 +271,10 @@ public sealed class IncidentRepository
                     });
             }
         }
+    }
 
+    private static void WriteAudit(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Audit.Count; i++)
         {
             var a = incident.Audit[i];
@@ -260,7 +289,10 @@ public sealed class IncidentRepository
                     p("$by", a.By);
                 });
         }
+    }
 
+    private static void WriteTimers(InsertCommands inserts, Incident incident)
+    {
         foreach (var t in incident.Timers)
         {
             Run(
@@ -275,7 +307,10 @@ public sealed class IncidentRepository
                     p("$run", t.IsRunning ? 1 : 0);
                 });
         }
+    }
 
+    private static void WriteFiles(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Files.Count; i++)
         {
             var f = incident.Files[i];
@@ -294,7 +329,10 @@ public sealed class IncidentRepository
                     p("$dn", f.DisplayName);
                 });
         }
+    }
 
+    private static void WriteCoBuildings(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Buildings.Count; i++)
         {
             var b = incident.Buildings[i];
@@ -317,7 +355,10 @@ public sealed class IncidentRepository
                     p("$ac", apartmentCountsJson);
                 });
         }
+    }
 
+    private static void WriteCoDwellings(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Dwellings.Count; i++)
         {
             var d = incident.Dwellings[i];
@@ -353,7 +394,10 @@ public sealed class IncidentRepository
                     });
             }
         }
+    }
 
+    private static void WriteTasks(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.Tasks.Count; i++)
         {
             var t = incident.Tasks[i];
@@ -375,7 +419,10 @@ public sealed class IncidentRepository
                     p("$coby", (object?)t.CompletedBy ?? DBNull.Value);
                 });
         }
+    }
 
+    private static void WriteInvolvedParties(InsertCommands inserts, Incident incident)
+    {
         for (var i = 0; i < incident.InvolvedParties.Count; i++)
         {
             var party = incident.InvolvedParties[i];
@@ -393,8 +440,6 @@ public sealed class IncidentRepository
                     p("$cat", party.CreatedAt.ToString(Iso));
                 });
         }
-
-        tx.Commit();
     }
 
     private static void WriteChecklist(InsertCommands inserts, Domain.ChecklistList list, int ordinal)
