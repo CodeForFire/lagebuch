@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 25;
+    public const int CurrentVersion = 26;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -163,6 +163,11 @@ public static class Migrations
         if (version < 25)
         {
             ApplyV25(cn, tx);
+        }
+
+        if (version < 26)
+        {
+            ApplyV26(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -791,6 +796,16 @@ public static class Migrations
             );
             """;
         Exec(cn, tx, sql25);
+    }
+
+    // The seal of a closed Einsatz (#598): the hash on incident_meta as "version:hash", and each
+    // attachment's SHA-256 at sealing time on its own row. Both stay null on an open incident and
+    // on one closed before this version -- nothing is backfilled, because a seal computed now
+    // would vouch for whatever the file holds today, which is exactly what it must not do.
+    private static void ApplyV26(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "seal", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_files", "sha256", "TEXT");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)

@@ -111,7 +111,9 @@ public sealed class IncidentReportDocument : IDocument
                 }
             });
 
-            var interimMarker = InterimMarker(_incident, _asOf);
+            // An open incident's Zwischenstand and a closed one's seal never meet, so they share
+            // the left of the footer.
+            var footerMarker = InterimMarker(_incident, _asOf) ?? SealMarker(_incident);
             page.Footer().Layers(layers =>
             {
                 // Layered rather than split into columns, so the page count stays centred and the
@@ -123,9 +125,9 @@ public sealed class IncidentReportDocument : IDocument
                     t.Span(" / ");
                     t.TotalPages();
                 });
-                if (interimMarker is not null)
+                if (footerMarker is not null)
                 {
-                    layers.Layer().AlignLeft().Text(interimMarker);
+                    layers.Layer().AlignLeft().Text(footerMarker);
                 }
             });
         });
@@ -141,6 +143,19 @@ public sealed class IncidentReportDocument : IDocument
         ArgumentNullException.ThrowIfNull(incident);
         return incident.State == IncidentState.Open
             ? $"Zwischenstand – Stand {Formatting.Timestamp(asOf)}"
+            : null;
+    }
+
+    /// <summary>
+    /// The footer line on every page of a sealed, closed incident's report (#598), e.g.
+    /// <c>Siegel: 7K2Q-M9XD-4HPA</c>, or <c>null</c> when there is no seal to print. The short
+    /// form is enough to match a page to its file; the header carries the full hash.
+    /// </summary>
+    public static string? SealMarker(Incident incident)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        return incident.State == IncidentState.Closed && incident.Seal is { } seal
+            ? $"Siegel: {seal.ShortForm}"
             : null;
     }
 }

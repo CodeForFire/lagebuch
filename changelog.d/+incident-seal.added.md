@@ -1,0 +1,1 @@
+Closing an Einsatz now seals it with a SHA-256 over its content and attachments, prints the seal in the Bericht's header and footer, and checks it again whenever the closed incident is opened, warning when the file no longer matches (#598).

@@ -344,9 +344,75 @@ public sealed class LocalIncidentSession : IIncidentSession
         }
 
         Incident.Close(_clock, RequireOperator());
+
+        // Sealed here, synchronously and before the save, so the file never holds a closed incident
+        // without its seal and the PDF offered right after closing already prints it (#598).
+        Incident.ApplySeal(IncidentSealer.Compute(Incident, HashAttachments()));
         Save();
         Changed?.Invoke();
     }
+
+    /// <summary>
+    /// Checks a closed incident's seal against its content and the attachment bytes on disk now.
+    /// An attachment that exists but cannot be read makes the check
+    /// <see cref="SealCheckStatus.Unverifiable"/> rather than throwing.
+    /// </summary>
+    public async Task<SealCheck> VerifySealAsync(CancellationToken cancellationToken = default)
+    {
+        if (Incident.Seal is null)
+        {
+            return new SealCheck(SealCheckStatus.NotSealed, null);
+        }
+
+        var current = new Dictionary<Guid, string?>();
+        foreach (var file in Incident.Files)
+        {
+            var diskPath = _store.ResolveFileDiskPath(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
+            try
+            {
+                current[file.Id] = await IncidentSealer.HashFileAsync(diskPath, cancellationToken);
+            }
+            catch (IOException)
+            {
+                return Unreadable(file);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unreadable(file);
+            }
+        }
+
+        return IncidentSealer.Verify(Incident, current);
+    }
+
+    // Every attachment's SHA-256 as it is on disk at close. One that is missing or cannot be read
+    // is sealed as missing (null): closing must not fail mid-Einsatz, and the seal then honestly
+    // vouches for nothing it did not read.
+    private Dictionary<Guid, string?> HashAttachments()
+    {
+        var hashes = new Dictionary<Guid, string?>();
+        foreach (var file in Incident.Files)
+        {
+            var diskPath = _store.ResolveFileDiskPath(Path, IncidentFile.StorageFileName(file.Id, file.FileName));
+            try
+            {
+                hashes[file.Id] = IncidentSealer.HashFile(diskPath);
+            }
+            catch (IOException)
+            {
+                hashes[file.Id] = null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                hashes[file.Id] = null;
+            }
+        }
+
+        return hashes;
+    }
+
+    private static SealCheck Unreadable(IncidentFile file) =>
+        new(SealCheckStatus.Unverifiable, $"Anhang nicht lesbar: {file.DisplayName}");
 
     public void ChangeOperator(SessionOperator op)
     {

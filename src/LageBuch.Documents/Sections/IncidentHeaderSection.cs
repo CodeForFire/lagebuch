@@ -18,6 +18,13 @@ public static class IncidentHeaderSection
         });
     }
 
+    /// <summary>The full seal hash of a sealed, closed incident, or <c>null</c> when it has none.</summary>
+    public static string? SealText(Incident incident)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        return incident.State == IncidentState.Closed ? incident.Seal?.Hash : null;
+    }
+
     private static void ComposeTitleBlock(IContainer container, Incident incident)
     {
         container.Column(column =>
@@ -68,6 +75,17 @@ public static class IncidentHeaderSection
                     t.Span(incident.ClosedAt is { } closed ? Formatting.Timestamp(closed) : "—");
                 });
             });
+
+            // The full hash, beside the short form in the footer: what someone comparing a printout
+            // with a file years later checks against (#598).
+            if (SealText(incident) is { } seal)
+            {
+                column.Item().Text(t =>
+                {
+                    t.Span("Siegel: ").SemiBold();
+                    t.Span(seal).FontSize(8);
+                });
+            }
         });
     }
 }

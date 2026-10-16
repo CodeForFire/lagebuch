@@ -579,6 +579,28 @@
             </Grid>
           </Border>
 
+          <!-- The closed file no longer matches its seal (#598). A finding to read, not a demand to
+               act, so it wraps like the save error and offers no button; the incident stays open
+               for viewing underneath it. -->
+          <Border x:Name="SealWarningBanner" Classes="meldung due"
+                  IsVisible="{Binding SealWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border Grid.Column="0" Classes="meldung-tile">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <PathIcon Classes="meldung-icon" Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                  <TextBlock Classes="meldung-label" Text="SIEGEL" />
+                </StackPanel>
+              </Border>
+              <TextBlock Grid.Column="1" x:Name="SealWarningText" Classes="meldung-text"
+                         Margin="14,10" TextWrapping="Wrap" TextTrimming="None"
+                         Text="{Binding SealWarning}" />
+            </Grid>
+          </Border>
+
           <!-- The quiet strip: countdowns that are running, not yet due. The time is the only
                bright thing on it; each readout leaves for a row above when its time is up. -->
           <Border x:Name="MeldungStrip" Classes="meldung-strip" IsVisible="{Binding ShowsCountdownStrip}">

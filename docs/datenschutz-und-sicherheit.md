@@ -103,6 +103,36 @@ mitnehmen. Wer einen Einsatz löscht, muss beides löschen. Die Dateien im
 `.files`-Ordner tragen technische Namen, nicht die ursprünglichen Dateinamen;
 der Originalname steht in der Einsatzdatei.
 
+#### Das Siegel eines abgeschlossenen Einsatzes
+
+Beim Abschließen berechnet Lagebuch ein **Siegel**: eine SHA-256-Prüfsumme über
+den gesamten Inhalt des Einsatzes und über die Bytes jedes Anhangs im
+`.files`-Ordner. Das Siegel wird in der Einsatzdatei gespeichert und im Bericht
+gedruckt – kurz in der Fußzeile jeder Seite (`Siegel: XXXX-XXXX-XXXX`), voll
+im Kopf. Bei jedem Öffnen eines abgeschlossenen Einsatzes rechnet Lagebuch es
+neu nach. Passt es nicht mehr, weil Inhalt oder ein Anhang verändert wurde oder
+ein Anhang fehlt, erscheint ein Warnhinweis; der Einsatz bleibt lesbar.
+Einsätze, die vor dieser Funktion abgeschlossen wurden, zeigen „kein Siegel“ –
+das ist keine Warnung.
+
+Was das Siegel leistet und was nicht:
+
+- Es ist ein **Manipulationsnachweis, keine Signatur**. Wer Lagebuch und die
+  Datei hat, kann die Datenbank ändern und neu versiegeln. Das Siegel belegt
+  nicht, wer etwas geschrieben hat, und nicht, dass seit dem Abschluss niemand
+  die Datei in der Hand hatte.
+- Es belegt, dass **eine Datei und ein gedruckter Bericht zusammenpassen**:
+  Stimmt das Siegel im Bericht mit dem überein, das Lagebuch beim Öffnen der
+  Datei anzeigt, sagen beide dasselbe. Das ist die Frage, die bei einer Kopie
+  gestellt wird.
+- Ein gedrucktes Siegel ohne passendes Siegel in der Datei ist selbst eine
+  Abweichung – ebenso eine Datei ohne Siegel zu einem Bericht, der eines trägt.
+- Ein Gerät, das per Mehrgeräte-Verbindung beigetreten ist, kennt das Siegel
+  noch nicht; der dort erstellte Bericht trägt keines. Maßgeblich ist der
+  Bericht des Geräts, auf dem die Einsatzdatei liegt.
+- Wer einen Einsatz archiviert, muss den `.files`-Ordner mitnehmen – sonst
+  meldet das Siegel jeden Anhang als fehlend.
+
 ### Die Programmdaten auf dem Gerät
 
 Alles Weitere liegt in einem einzigen Ordner:

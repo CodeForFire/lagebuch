@@ -187,12 +187,38 @@ public class MigrationsTests : IDisposable
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
         Migrations.Migrate(cn2);
-        Assert.Equal(25, Migrations.GetVersion(cn2));
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
 
         using var check = cn2.CreateCommand();
         check.CommandText =
             "SELECT count(*) FROM pragma_table_info('involved_parties') " +
             "WHERE name IN ('id','ordinal','name','phone','notes','created_by','created_at');";
         Assert.Equal(7L, (long)check.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void V25_database_upgrades_to_v26_and_gains_the_seal_columns()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        {
+            Migrations.Migrate(cn);
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText =
+                "ALTER TABLE incident_meta DROP COLUMN seal; ALTER TABLE incident_files DROP COLUMN sha256; " +
+                "UPDATE schema_version SET version = 25;";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText =
+            "SELECT (SELECT count(*) FROM pragma_table_info('incident_meta') WHERE name = 'seal') + " +
+            "(SELECT count(*) FROM pragma_table_info('incident_files') WHERE name = 'sha256');";
+        Assert.Equal(2L, (long)check.ExecuteScalar()!);
     }
 }

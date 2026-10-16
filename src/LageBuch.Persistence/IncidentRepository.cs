@@ -68,7 +68,7 @@ public sealed class IncidentRepository
 
         Run(
             inserts,
-            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy);",
+            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, seal) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$seal);",
             p =>
             {
                 p("$id", incident.Id.ToString());
@@ -85,6 +85,7 @@ public sealed class IncidentRepository
                 p("$status", (object?)incident.Status ?? DBNull.Value);
                 p("$closedAt", (object?)incident.ClosedAt?.ToString(Iso) ?? DBNull.Value);
                 p("$closedBy", (object?)incident.ClosedBy ?? DBNull.Value);
+                p("$seal", (object?)incident.Seal?.StoredForm ?? DBNull.Value);
             });
 
         for (var i = 0; i < incident.Checklists.Count; i++)
@@ -316,7 +317,7 @@ public sealed class IncidentRepository
             var f = incident.Files[i];
             Run(
                 inserts,
-                "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by, display_name) VALUES ($id,$o,$fn,$ct,$sz,$at,$by,$dn);",
+                "INSERT INTO incident_files (id, ordinal, file_name, content_type, size_bytes, added_at, added_by, display_name, sha256) VALUES ($id,$o,$fn,$ct,$sz,$at,$by,$dn,$sha);",
                 p =>
                 {
                     p("$id", f.Id.ToString());
@@ -327,6 +328,10 @@ public sealed class IncidentRepository
                     p("$at", f.AddedAt.ToString(Iso));
                     p("$by", f.AddedBy);
                     p("$dn", f.DisplayName);
+
+                    // Null both before the incident is sealed and for an attachment whose bytes
+                    // were missing when it was; incident_meta.seal tells the two apart.
+                    p("$sha", (object?)FileSha256(incident, f.Id) ?? DBNull.Value);
                 });
         }
     }
@@ -547,7 +552,7 @@ public sealed class IncidentRepository
 
         var meta = ReadRow(
             cn,
-            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by FROM incident_meta LIMIT 1;");
+            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, seal FROM incident_meta LIMIT 1;");
 
         // One query per table, grouped in C# -- the same shape as editsByEntry below. Items whose
         // list_id matches no list row are dropped: V23 fills list_id for every row it finds, so a
@@ -690,17 +695,25 @@ public sealed class IncidentRepository
 
         // display_name is null on rows written before this column existed -- fall back to
         // file_name, same idiom as the Einsatznummer legacy fallback just below.
-        var files = ReadAll(
+        var fileRows = ReadAll(
             cn,
-            "SELECT id, file_name, content_type, size_bytes, added_at, added_by, display_name FROM incident_files ORDER BY ordinal;",
-            r => Domain.Files.IncidentFile.Rehydrate(
-                Guid.Parse(r.GetString(0)),
-                r.GetString(1),
-                Str(r, 6) ?? r.GetString(1),
-                r.GetString(2),
-                r.GetInt64(3),
-                ParseDate(r.GetString(4)),
-                r.GetString(5)));
+            "SELECT id, file_name, content_type, size_bytes, added_at, added_by, display_name, sha256 FROM incident_files ORDER BY ordinal;",
+            r => (File: Domain.Files.IncidentFile.Rehydrate(
+                      Guid.Parse(r.GetString(0)),
+                      r.GetString(1),
+                      Str(r, 6) ?? r.GetString(1),
+                      r.GetString(2),
+                      r.GetInt64(3),
+                      ParseDate(r.GetString(4)),
+                      r.GetString(5)),
+                  Sha256: Str(r, 7)));
+        var files = fileRows.Select(x => x.File).ToList();
+
+        // Every attachment row enters the seal, a null hash included: that is how the seal says
+        // the bytes were already missing when the incident was closed.
+        var seal = meta[11] is string storedSeal
+            ? IncidentSeal.FromStoredForm(storedSeal, fileRows.ToDictionary(x => x.File.Id, x => x.Sha256))
+            : null;
 
         var buildings = ReadAll(
             cn,
@@ -826,8 +839,12 @@ public sealed class IncidentRepository
             tasks,
             buildings,
             dwellings,
-            involvedParties);
+            involvedParties,
+            seal);
     }
+
+    private static string? FileSha256(Incident incident, Guid fileId) =>
+        incident.Seal is { } seal && seal.FileSha256.TryGetValue(fileId, out var sha) ? sha : null;
 
     private static DateTimeOffset ParseDate(string s) =>
         DateTimeOffset.Parse(s, null, System.Globalization.DateTimeStyles.RoundtripKind);

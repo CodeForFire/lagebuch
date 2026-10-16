@@ -119,6 +119,13 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // A joined client mirrors; it never saves. Which of the two the footer may claim is fixed here,
         // at construction, from the session it was handed.
         SyncState = session.IsRemote ? WorkspaceSyncState.Current : WorkspaceSyncState.Local;
+
+        // A closed file is checked against its seal every time it is opened (#598). Hashing the
+        // attachments is real I/O, so it runs alongside the view rather than in front of it.
+        if (_local is { Incident.State: IncidentState.Closed })
+        {
+            SealCheckCompleted = RunSealCheckAsync(_local);
+        }
     }
 
     private void OnRemoteDisconnected()
@@ -501,9 +508,52 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public string StatusDisplay => Formatting.State(_session.Incident.State);
 
-    public string ReadOnlyReason => _session.Incident.State == IncidentState.Closed
-        ? "Abgeschlossen — schreibgeschützt"
-        : "Schreibgeschützt geöffnet";
+    // The seal (#598) is shown where the closing is. A joined client says nothing about it: the
+    // seal does not travel over the wire yet, so "kein Siegel" there would be untrue.
+    public string ReadOnlyReason => _session.Incident.State switch
+    {
+        IncidentState.Closed when _session.IsRemote => "Abgeschlossen — schreibgeschützt",
+        IncidentState.Closed => _session.Incident.Seal is { } seal
+            ? $"Abgeschlossen — schreibgeschützt · Siegel: {seal.ShortForm}"
+            : "Abgeschlossen — schreibgeschützt · kein Siegel",
+        _ => "Schreibgeschützt geöffnet",
+    };
+
+    /// <summary>
+    /// Null = nothing to report. Set when a closed incident's file no longer matches its seal, or
+    /// the seal could not be checked (#598). The incident stays viewable either way.
+    /// </summary>
+    [ObservableProperty]
+    private string? _sealWarning;
+
+    /// <summary>Completes once the seal check started on open has finished; lets a test wait for it.</summary>
+    internal Task SealCheckCompleted { get; private set; } = Task.CompletedTask;
+
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Fire-and-forget from the constructor: any failure is surfaced as the bound SealWarning instead of being lost on an unobserved task.")]
+    private async Task RunSealCheckAsync(LocalIncidentSession local)
+    {
+        string? warning;
+        try
+        {
+            var check = await local.VerifySealAsync();
+            warning = check.Status switch
+            {
+                SealCheckStatus.Broken =>
+                    $"Siegel verletzt: {check.Detail}. Die Datei stimmt nicht mehr mit dem versiegelten Stand überein.",
+                SealCheckStatus.Unverifiable => $"Siegel nicht prüfbar: {check.Detail}.",
+                _ => null,
+            };
+        }
+        catch (Exception ex)
+        {
+            warning = $"Siegel nicht prüfbar: {ex.Message}";
+        }
+
+        _uiDispatcher.Post(() => SealWarning = warning);
+    }
 
     public bool HasReminder => Reminder is not null;
 
@@ -1215,6 +1265,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         LastSavedAt = _clock.Now;
         BuildChildren();
         OnPropertyChanged(nameof(StatusDisplay));
+        OnPropertyChanged(nameof(ReadOnlyReason));
     }
 
     // Editable only when read-only AND not finished — a closed incident stays read-only. Resuming a

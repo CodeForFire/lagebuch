@@ -48,6 +48,12 @@ public sealed class Incident
 
     public string? ClosedBy { get; private set; }
 
+    /// <summary>
+    /// The seal taken when the incident was closed (#598), or <c>null</c>: still open, closed
+    /// before seals existed, or a joined client's copy (the seal does not travel over the wire).
+    /// </summary>
+    public IncidentSeal? Seal { get; private set; }
+
     /// <summary>The Einsatz's Checklisten, in order — 0..n of them, each its own copy of a template.</summary>
     public IReadOnlyList<ChecklistList> Checklists => _checklists;
 
@@ -144,7 +150,8 @@ public sealed class Incident
         IEnumerable<IncidentTask> tasks,
         IEnumerable<Building> buildings,
         IEnumerable<Dwelling> dwellings,
-        IEnumerable<InvolvedParty> involvedParties)
+        IEnumerable<InvolvedParty> involvedParties,
+        IncidentSeal? seal = null)
     {
         var incident = new Incident
         {
@@ -158,6 +165,10 @@ public sealed class Incident
             Status = status,
             ClosedAt = closedAt,
             ClosedBy = closedBy,
+
+            // Only a closed incident is sealed. A seal on an open one means nothing, so it is not
+            // carried into an aggregate that will go on changing.
+            Seal = state == IncidentState.Closed ? seal : null,
         };
         incident._checklists.AddRange(checklists);
         incident._journal.AddRange(journal);
@@ -271,6 +282,26 @@ public sealed class Incident
         ClosedAt = clock.Now;
         ClosedBy = closedBy.Display;
         _audit.Add(new AuditEvent(clock.Now, "closed", closedBy.Display));
+    }
+
+    /// <summary>
+    /// Attaches the seal computed right after <see cref="Close"/>. A closed incident is frozen, so
+    /// its seal is taken once and never replaced.
+    /// </summary>
+    public void ApplySeal(IncidentSeal seal)
+    {
+        ArgumentNullException.ThrowIfNull(seal);
+        if (State != IncidentState.Closed)
+        {
+            throw new InvalidOperationException("Nur ein abgeschlossener Einsatz kann versiegelt werden.");
+        }
+
+        if (Seal is not null)
+        {
+            throw new InvalidOperationException("Der Einsatz ist bereits versiegelt.");
+        }
+
+        Seal = seal;
     }
 
     public void SetIncidentNumber(IncidentNumber? number)

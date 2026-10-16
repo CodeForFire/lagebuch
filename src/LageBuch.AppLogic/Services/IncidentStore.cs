@@ -24,7 +24,10 @@ public sealed class IncidentStore : IIncidentStore
     private readonly IncidentFileStore _fileStore = new IncidentFileStore();
     private readonly Action<string, Incident> _write;
     private readonly BlockingCollection<Action> _writeQueue = new();
-    private readonly ConcurrentDictionary<string, IncidentSnapshot> _latest = new(StringComparer.Ordinal);
+
+    // The seal rides beside the snapshot: IncidentSnapshot is the wire type and does not carry it
+    // (#598), so the round trip below would otherwise write every closed incident unsealed.
+    private readonly ConcurrentDictionary<string, (IncidentSnapshot Snapshot, IncidentSeal? Seal)> _latest = new(StringComparer.Ordinal);
 
     public IncidentStore()
         : this(IncidentRepository.Save)
@@ -49,21 +52,29 @@ public sealed class IncidentStore : IIncidentStore
         Justification = "A failed write must reach SaveFailed, not crash the background writer thread or its caller.")]
     public void Save(string path, Incident incident)
     {
+        ArgumentNullException.ThrowIfNull(incident);
+
         // Publish before enqueueing: the work item below, or an earlier one for the same path that
         // runs first, is then guaranteed to find this snapshot or a newer one. A work item that
         // finds nothing was beaten to it and has nothing left to write. That also keeps FlushAsync
         // honest -- its marker queues behind the work item of every snapshot saved before it.
-        _latest[path] = SnapshotMapper.ToSnapshot(incident);
+        _latest[path] = (SnapshotMapper.ToSnapshot(incident), incident.Seal);
         _writeQueue.Add(() =>
         {
-            if (!_latest.TryRemove(path, out var snapshot))
+            if (!_latest.TryRemove(path, out var latest))
             {
                 return;
             }
 
             try
             {
-                _write(path, SnapshotMapper.FromSnapshot(snapshot));
+                var copy = SnapshotMapper.FromSnapshot(latest.Snapshot);
+                if (latest.Seal is not null)
+                {
+                    copy.ApplySeal(latest.Seal);
+                }
+
+                _write(path, copy);
                 SaveSucceeded?.Invoke();
             }
             catch (Exception ex)
