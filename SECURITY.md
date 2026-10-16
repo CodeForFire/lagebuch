@@ -102,7 +102,7 @@ one note on why the trust model around the middle two is where it is.
   app-data folder is created with the default umask, and on Windows it is the
   roaming `%AppData%`, so a roaming profile carries the key to the profile
   server along with everything else stored there.
-  ([#288](../../issues/288))
+  ([#597](../../issues/597))
 - **The share PIN is four digits, and the host budgets wrong guesses.** It is
   drawn per share from `RandomNumberGenerator` and held in memory only on the
   host; a joined device keeps it in `last-connection.json` so it can reconnect
@@ -127,7 +127,8 @@ one note on why the trust model around the middle two is where it is.
   edits to a different operator, but it could just as easily make those
   edits under its own name — the trust decision has already been made by
   that point. The host also listens on every interface (`ListenAnyIP`), with
-  no restriction to particular address ranges.
+  no restriction to particular address ranges
+  ([#599](../../issues/599)).
 - **Operator identity is self-asserted per device, not verified.** The
   "Wer dokumentiert?" name/call sign attached to each sync command travels
   with that command and is trusted by the host as-is — there is no
