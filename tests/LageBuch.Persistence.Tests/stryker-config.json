@@ -1,0 +1,9 @@
+{
+  "stryker-config": {
+    "project": "LageBuch.Persistence.csproj",
+    "mutation-level": "Standard",
+    "reporters": ["html", "markdown", "progress"],
+    "thresholds": { "high": 80, "low": 60, "break": 0 },
+    "ignore-methods": ["*ThrowIfNull", "*ThrowIfNullOrEmpty", "*ThrowIfNullOrWhiteSpace"]
+  }
+}

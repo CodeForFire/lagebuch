@@ -122,6 +122,35 @@ The repo's `Makefile` wraps these and the Android/packaging commands — run
 on machines whose JDK is too new to build it; `make build-all` covers
 everything.
 
+## Mutation testing
+
+Coverage tells you a line ran during the tests; it cannot tell you a test would
+notice if that line were wrong. [Stryker.NET](https://stryker-mutator.io/docs/stryker-net/introduction/)
+answers that: it makes small changes to the code — flips a `<`, drops a
+statement, returns `false` — and re-runs the tests. A *killed* mutant made a
+test fail; a *survived* one is a change the suite let through.
+
+```bash
+make mutate PROJECT=Domain   # or Sync, Documents, Persistence, AppLogic
+```
+
+The HTML report lands in `StrykerOutput/<project>/reports/`. Sync.Hosting and
+the Avalonia projects are not covered: their tests open real sockets or render
+headless UI, which is too slow and too flaky to repeat once per mutant.
+
+The [Mutation testing](.github/workflows/mutation.yml) workflow runs every
+project weekly and on demand (*Actions → Mutation testing → Run workflow*); each
+run's summary lists the scores, and the report is attached as an artifact. It
+never fails on a low score and never runs on a pull request — it is for
+finding weak tests, not for gating changes.
+
+To act on a survivor, open it in the report, decide whether the change it shows
+would be a real bug, and if so write the test that kills it — failing first, as
+for any [bug fix](AGENTS.md#tests). Some survivors are noise: an equivalent
+mutant (one that cannot change behaviour), or a branch only another test
+project exercises — each config mutates one source project against one test
+project. Leave those alone.
+
 ## Workflow
 
 - **Feature branches only** — open a pull request against `main`; direct

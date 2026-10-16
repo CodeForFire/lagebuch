@@ -70,7 +70,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 
 .DEFAULT_GOAL := help
 
-.PHONY: help restore build build-all test test-all run format format-check ci clean \
+.PHONY: help restore build build-all test test-all mutate run format format-check ci clean \
         android-image android-image-rebuild apk aab emulator install run-android \
         logcat uninstall package-linux logo-assets samples screenshots demo-gif \
         play-listing-check play-screenshots phone-screenshots emulator-phone
@@ -99,6 +99,18 @@ test: ## Run tests (PROJECT=path and/or FILTER=Name~Foo to narrow)
 
 test-all: ## Run tests over the full solution (needs JDK <= 21)
 	$(DOTNET) test $(SLN) -c $(CONFIG) $(TEST_FILTER)
+
+# Projects with a tests/LageBuch.<name>.Tests/stryker-config.json. Sync.Hosting
+# and the Avalonia projects are left out: their tests open real sockets or run
+# headless UI, which is too slow and too flaky to repeat once per mutant.
+MUTATE_PROJECTS := Domain Sync Documents Persistence AppLogic
+
+mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|AppLogic)
+	@if [ -z "$(filter $(PROJECT),$(MUTATE_PROJECTS))" ]; then \
+	  echo "Usage: make mutate PROJECT=<one of: $(MUTATE_PROJECTS)>"; exit 2; fi
+	cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker \
+	  --output $(CURDIR)/StrykerOutput/$(PROJECT)
+	@echo "Report: $(CURDIR)/StrykerOutput/$(PROJECT)/reports/mutation-report.html"
 
 run: ## Run the desktop app
 	$(DOTNET) run --project $(APP)
