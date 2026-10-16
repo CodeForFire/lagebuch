@@ -321,7 +321,7 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
         Mutate(() => Incident.SetDwellingStatus(_clock, RequireOperator(), buildingId, floorOrdinal, apartmentNumber, status));
 
-    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable) =>
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable) =>
         Mutate(() => Incident.SetDwellingDetails(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable));
 
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>

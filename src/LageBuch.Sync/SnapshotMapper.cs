@@ -90,7 +90,7 @@ public static class SnapshotMapper
                 d.ApartmentNumber,
                 d.ResidentName,
                 d.Status,
-                d.KeyAvailable,
+                d.KeyAvailable.ToNullableBool(),
                 d.CoValue,
                 d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList())).ToList(),
             incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)).ToList());
@@ -167,7 +167,7 @@ public static class SnapshotMapper
                 d.ApartmentNumber,
                 d.ResidentName,
                 d.Status,
-                d.KeyAvailable,
+                KeyAvailabilityEncoding.FromNullableBool(d.KeyAvailable),
                 d.CoValue,
                 d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)))),
             (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)));

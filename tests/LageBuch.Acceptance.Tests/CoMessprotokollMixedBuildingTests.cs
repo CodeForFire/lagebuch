@@ -88,8 +88,8 @@ public class CoMessprotokollMixedBuildingTests
 
         // Who lives there: the optional free-text note beside the unit's Bezeichnung. Fictional
         // names per CONTRIBUTING — screenshots must never carry real personnel data.
-        session.SetDwellingDetails(id, 2, 2, "Fam. Bergmann", true);
-        session.SetDwellingDetails(id, 3, 1, "Fam. Kellner", null);
+        session.SetDwellingDetails(id, 2, 2, "Fam. Bergmann", KeyAvailability.Available);
+        session.SetDwellingDetails(id, 3, 1, "Fam. Kellner", KeyAvailability.Unknown);
         Dispatcher.UIThread.RunJobs();
 
         WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");

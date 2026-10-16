@@ -1306,9 +1306,14 @@ public sealed class Incident
         AppendSystemEntry(clock, op, $"Whg.-Status {location}: {CoMeasurementLabels.StatusText(status)}");
     }
 
-    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable)
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable)
     {
         EnsureOpen();
+        if (!Enum.IsDefined(keyAvailable))
+        {
+            throw new ArgumentException("Unbekannte Schlüsselangabe.", nameof(keyAvailable));
+        }
+
         var dwelling = FindDwelling(buildingId, floorOrdinal, apartmentNumber);
         var index = _dwellings.IndexOf(dwelling);
         _dwellings[index] = dwelling.WithDetails(residentName, keyAvailable);
@@ -1493,7 +1498,7 @@ public sealed class Incident
             carried.Add("Messreihe");
         }
 
-        if (dwelling.KeyAvailable is true)
+        if (dwelling.KeyAvailable == KeyAvailability.Available)
         {
             carried.Add("Schlüssel vorhanden");
         }

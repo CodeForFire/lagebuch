@@ -1,5 +1,6 @@
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
@@ -315,6 +316,31 @@ public class SnapshotRoundTripTests
         var restored = SnapshotMapper.FromSnapshot(SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(snapshot)));
 
         Assert.Empty(restored.InvolvedParties);
+    }
+
+    // The wire still carries the Schlüssel as bool? (KeyAvailabilityEncoding), so a peer from
+    // before the enum and one after agree on every state -- "kein Schlüssel" included.
+    [Fact]
+    public void Snapshot_round_trip_over_the_wire_keeps_every_key_availability_state()
+    {
+        var clock = new FixedClock();
+        var op = new SessionOperator("Test", null);
+        var original = Incident.Start(clock, op);
+        original.AddCoBuilding(clock, op, "Haus A", 1, 3);
+        var haus = original.Buildings[0].Id;
+        original.SetDwellingDetails(haus, 0, 1, null, KeyAvailability.Available);
+        original.SetDwellingDetails(haus, 0, 2, null, KeyAvailability.NotAvailable);
+
+        var snapshot = SnapshotMapper.ToSnapshot(original);
+        var restored = SnapshotMapper.FromSnapshot(
+            SyncJson.Deserialize<IncidentSnapshot>(SyncJson.Serialize(snapshot)));
+
+        Assert.Equal(
+            new bool?[] { true, false, null },
+            snapshot.Dwellings.Where(d => d.FloorOrdinal == 0).OrderBy(d => d.ApartmentNumber).Select(d => d.KeyAvailable));
+        Assert.Equal(
+            new[] { KeyAvailability.Available, KeyAvailability.NotAvailable, KeyAvailability.Unknown },
+            restored.Dwellings.Where(d => d.FloorOrdinal == 0).OrderBy(d => d.ApartmentNumber).Select(d => d.KeyAvailable));
     }
 }
 

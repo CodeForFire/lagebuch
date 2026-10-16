@@ -53,7 +53,7 @@ public static class CoMessprotokollSection
                     {
                         var label = CoMeasurementLabels.ApartmentLabel(building, floor, unit.ApartmentNumber);
                         var co = unit.CoValue is { } v ? $"{v} ppm" : "kein Messwert";
-                        var key = unit.KeyAvailable is true ? "ja" : unit.KeyAvailable is false ? "nein" : "—";
+                        var key = KeyText(unit.KeyAvailable);
                         var resident = string.IsNullOrWhiteSpace(unit.ResidentName) ? null : $", {unit.ResidentName}";
 
                         // ppm severity is its own span, colored independently of Status (search
@@ -103,7 +103,7 @@ public static class CoMessprotokollSection
 
                     var location = CoMeasurementLabels.DwellingLocation(building, d.FloorOrdinal, d.ApartmentNumber);
                     var resident = d.ResidentName ?? "—";
-                    var key = d.KeyAvailable is true ? "ja" : d.KeyAvailable is false ? "nein" : "—";
+                    var key = KeyText(d.KeyAvailable);
                     var co = d.CoValue is { } v ? $"{v} ppm" : "—";
                     column.Item().Text($"• {location}, Bewohner: {resident}, Schlüssel: {key}, CO: {co}");
                 }
@@ -134,6 +134,13 @@ public static class CoMessprotokollSection
         DwellingStatus.Searched => HexColor("#92D050"),
         DwellingStatus.Affected => HexColor("#FF0000"),
         _ => Colors.White,
+    };
+
+    private static string KeyText(KeyAvailability key) => key switch
+    {
+        KeyAvailability.Available => "ja",
+        KeyAvailability.NotAvailable => "nein",
+        _ => "—",
     };
 
     // Same hex values as the AXAML AmberBrush/SignalHotBrush/SignalBrush resources, kept in sync

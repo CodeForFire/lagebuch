@@ -118,13 +118,13 @@ public class DemoIncidentTests : IDisposable
         var haus = incident.Buildings[0].Id;
         incident.RecordCoValue(c, elw, haus, 2, 1, 120);
         incident.SetDwellingStatus(c, elw, haus, 2, 1, DwellingStatus.Affected);
-        incident.SetDwellingDetails(haus, 2, 1, "Musterfrau", true);
+        incident.SetDwellingDetails(haus, 2, 1, "Musterfrau", KeyAvailability.Available);
         incident.RecordCoValue(c, elw, haus, 2, 2, 35);
         incident.SetDwellingStatus(c, elw, haus, 2, 2, DwellingStatus.Searched);
         incident.RecordCoValue(c, elw, haus, 1, 1, 8);
         incident.SetDwellingStatus(c, elw, haus, 1, 1, DwellingStatus.Searched);
         incident.SetDwellingStatus(c, elw, haus, 1, 2, DwellingStatus.Searched);
-        incident.SetDwellingDetails(haus, 0, 1, "Mustermann", false);
+        incident.SetDwellingDetails(haus, 0, 1, "Mustermann", KeyAvailability.NotAvailable);
         incident.AddJournalEntry(c, elw, EtbDirection.Internal, "CO-Messung im Treppenhaus begonnen, 2. OG rechts 120 ppm", from: "Florian Musterstadt 41/1");
 
         // Re-measured after the flat was ventilated (#424). Two readings on the same Wohnung are

@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
+using LageBuch.Domain.CoMeasurement;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -57,7 +58,7 @@ public class CoFloorRemovalViewModelTests
     {
         var (session, vm, buildingId) = CreateVm();
         session.RecordCoValue(buildingId, 3, 2, 120);
-        session.SetDwellingDetails(buildingId, 3, 5, "Müller", null);
+        session.SetDwellingDetails(buildingId, 3, 5, "Müller", KeyAvailability.Unknown);
         var before = session.Incident.Dwellings.Count;
 
         vm.RemoveObergeschossCommand.Execute(null);

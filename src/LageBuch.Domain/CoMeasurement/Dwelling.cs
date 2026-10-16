@@ -14,7 +14,7 @@ public sealed record Dwelling
 
     public DwellingStatus Status { get; private init; }
 
-    public bool? KeyAvailable { get; private init; }
+    public KeyAvailability KeyAvailable { get; private init; }
 
     public int? CoValue { get; private init; }
 
@@ -44,7 +44,7 @@ public sealed record Dwelling
         int apartmentNumber,
         string? residentName,
         DwellingStatus status,
-        bool? keyAvailable,
+        KeyAvailability keyAvailable,
         int? coValue,
         IEnumerable<CoReading>? readings = null)
         => new()
@@ -80,7 +80,7 @@ public sealed record Dwelling
     public bool HasData =>
         ResidentName is not null
         || Status != DwellingStatus.NotSearched
-        || KeyAvailable is not null
+        || KeyAvailable != KeyAvailability.Unknown
         || CoValue is not null
         || Readings.Count > 0;
 
@@ -93,7 +93,7 @@ public sealed record Dwelling
     public Dwelling WithApartmentNumber(int apartmentNumber) =>
         this with { ApartmentNumber = apartmentNumber };
 
-    public Dwelling WithDetails(string? residentName, bool? keyAvailable) => this with
+    public Dwelling WithDetails(string? residentName, KeyAvailability keyAvailable) => this with
     {
         ResidentName = string.IsNullOrWhiteSpace(residentName) ? null : residentName.Trim(),
         KeyAvailable = keyAvailable,

@@ -69,7 +69,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
     private string? _residentName;
 
     [ObservableProperty]
-    private bool? _keyAvailable;
+    private KeyAvailability _keyAvailable;
 
     [ObservableProperty]
     private string _statusBrush;
@@ -123,8 +123,8 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 
             parts.Add(KeyAvailable switch
             {
-                true => "Schlüssel vorhanden",
-                false => "Kein Schlüssel",
+                KeyAvailability.Available => "Schlüssel vorhanden",
+                KeyAvailability.NotAvailable => "Kein Schlüssel",
                 _ => "Schlüssel unbekannt",
             });
 
@@ -139,8 +139,8 @@ public sealed partial class DwellingCellViewModel : ObservableObject
 
     public string KeyDisplay => KeyAvailable switch
     {
-        true => "\uD83D\uDD11",
-        false => "\u2716",
+        KeyAvailability.Available => "\uD83D\uDD11",
+        KeyAvailability.NotAvailable => "\u2716",
         _ => string.Empty,
     };
 
@@ -180,7 +180,7 @@ public sealed partial class DwellingCellViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCoLethal));
     }
 
-    partial void OnKeyAvailableChanged(bool? value)
+    partial void OnKeyAvailableChanged(KeyAvailability value)
     {
         OnPropertyChanged(nameof(KeyDisplay));
         OnPropertyChanged(nameof(TileTooltip));
@@ -269,10 +269,51 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
     private string? _residentName;
 
     [ObservableProperty]
-    private bool? _keyAvailable;
+    [NotifyPropertyChangedFor(nameof(IsKeyAvailable))]
+    [NotifyPropertyChangedFor(nameof(IsKeyNotAvailable))]
+    [NotifyPropertyChangedFor(nameof(IsKeyUnknown))]
+    private KeyAvailability _keyAvailable;
 
     [ObservableProperty]
     private string _label;
+
+    // TwoWay radio bindings, as TasksViewModel's filter does: checking writes through to
+    // KeyAvailable; writing false (the binding engine syncing the unchecked radios) is a no-op.
+    public bool IsKeyAvailable
+    {
+        get => KeyAvailable == KeyAvailability.Available;
+        set
+        {
+            if (value)
+            {
+                KeyAvailable = KeyAvailability.Available;
+            }
+        }
+    }
+
+    public bool IsKeyNotAvailable
+    {
+        get => KeyAvailable == KeyAvailability.NotAvailable;
+        set
+        {
+            if (value)
+            {
+                KeyAvailable = KeyAvailability.NotAvailable;
+            }
+        }
+    }
+
+    public bool IsKeyUnknown
+    {
+        get => KeyAvailable == KeyAvailability.Unknown;
+        set
+        {
+            if (value)
+            {
+                KeyAvailable = KeyAvailability.Unknown;
+            }
+        }
+    }
 
     public DwellingStatus OriginalStatus { get; }
 
@@ -280,7 +321,7 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     public string? OriginalResidentName { get; }
 
-    public bool? OriginalKeyAvailable { get; }
+    public KeyAvailability OriginalKeyAvailable { get; }
 
     public string OriginalLabel { get; }
 
@@ -1063,7 +1104,7 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
             parts.Add("betroffen");
         }
 
-        if (dwelling.KeyAvailable is true)
+        if (dwelling.KeyAvailable == KeyAvailability.Available)
         {
             parts.Add("Schlüssel vorhanden");
         }

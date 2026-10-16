@@ -37,13 +37,13 @@ public class CoDwellingRemovalTests
     {
         var (incident, clock, op, buildingId) = Scene();
 
-        incident.SetDwellingDetails(buildingId, 0, 1, "Müller", null);
+        incident.SetDwellingDetails(buildingId, 0, 1, "Müller", KeyAvailability.Unknown);
         Assert.True(Unit(incident, buildingId, 0, 1).HasData);
 
         incident.SetDwellingStatus(clock, op, buildingId, 0, 2, DwellingStatus.Searched);
         Assert.True(Unit(incident, buildingId, 0, 2).HasData);
 
-        incident.SetDwellingDetails(buildingId, 0, 3, null, true);
+        incident.SetDwellingDetails(buildingId, 0, 3, null, KeyAvailability.Available);
         Assert.True(Unit(incident, buildingId, 0, 3).HasData);
 
         incident.RecordCoValue(clock, op, buildingId, 1, 1, 120);
@@ -72,7 +72,7 @@ public class CoDwellingRemovalTests
     {
         var (incident, clock, op, buildingId) = Scene(apartmentsPerFloor: 4);
         incident.RecordCoValue(clock, op, buildingId, 0, 3, 120);
-        incident.SetDwellingDetails(buildingId, 0, 4, "Schmidt", null);
+        incident.SetDwellingDetails(buildingId, 0, 4, "Schmidt", KeyAvailability.Unknown);
         var thirdId = Unit(incident, buildingId, 0, 3).Id;
         var fourthId = Unit(incident, buildingId, 0, 4).Id;
 
@@ -159,7 +159,7 @@ public class CoDwellingRemovalTests
     public void RemoveDwellings_NamesWhatEachRemovedUnitCarried()
     {
         var (incident, clock, op, buildingId) = Scene(apartmentsPerFloor: 4);
-        incident.SetDwellingDetails(buildingId, 0, 4, "Müller", true);
+        incident.SetDwellingDetails(buildingId, 0, 4, "Müller", KeyAvailability.Available);
 
         incident.RemoveDwellings(clock, op, buildingId, 0, new[] { 4 });
 
@@ -206,7 +206,7 @@ public class CoDwellingRemovalTests
         var (incident, clock, op, buildingId) = Scene(floorCount: 2, apartmentsPerFloor: 3);
         incident.SetApartmentCount(clock, op, buildingId, 0, 14);
         incident.RecordCoValue(clock, op, buildingId, 0, 12, 120);
-        incident.SetDwellingDetails(buildingId, 0, 14, "Müller", null);
+        incident.SetDwellingDetails(buildingId, 0, 14, "Müller", KeyAvailability.Unknown);
 
         // "OG HINZUFÜGEN": grows the building, passing the unchanged default of 3.
         incident.UpdateCoBuildingStructure(clock, op, buildingId, 3, 3, 0);

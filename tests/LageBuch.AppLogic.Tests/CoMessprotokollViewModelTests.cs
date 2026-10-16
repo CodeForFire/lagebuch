@@ -674,7 +674,7 @@ public class CoMessprotokollViewModelTests
         vm.SetEditorStatusAffectedCommand.Execute(null);
         editor.CoValue = 120;
         editor.ResidentName = "Musterfrau";
-        editor.KeyAvailable = true;
+        editor.KeyAvailable = KeyAvailability.Available;
         editor.Label = "Hinterhaus";
 
         vm.CloseEditorCommand.Execute(null);
@@ -683,7 +683,7 @@ public class CoMessprotokollViewModelTests
         Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
         Assert.Null(dwelling.CoValue);
         Assert.Null(dwelling.ResidentName);
-        Assert.Null(dwelling.KeyAvailable);
+        Assert.Equal(KeyAvailability.Unknown, dwelling.KeyAvailable);
         Assert.Equal("Links", CoMeasurementLabels.ApartmentLabel(session.Incident.Buildings[0], 0, 1));
         Assert.False(vm.IsEditorOpen);
         Assert.Null(vm.Editor);
@@ -713,7 +713,7 @@ public class CoMessprotokollViewModelTests
         vm.SetEditorStatusAffectedCommand.Execute(null);
         editor.CoValue = 120;
         editor.ResidentName = "Musterfrau";
-        editor.KeyAvailable = true;
+        editor.KeyAvailable = KeyAvailability.Available;
         editor.Label = "Hinterhaus";
 
         vm.ConfirmEditorCommand.Execute(null);
@@ -722,10 +722,47 @@ public class CoMessprotokollViewModelTests
         Assert.Equal(DwellingStatus.Affected, dwelling.Status);
         Assert.Equal(120, dwelling.CoValue);
         Assert.Equal("Musterfrau", dwelling.ResidentName);
-        Assert.True(dwelling.KeyAvailable);
+        Assert.Equal(KeyAvailability.Available, dwelling.KeyAvailable);
         Assert.Equal("Hinterhaus", CoMeasurementLabels.ApartmentLabel(session.Incident.Buildings[0], 0, 1));
         Assert.False(vm.IsEditorOpen);
         Assert.Null(vm.Editor);
+    }
+
+    // The CheckBox this replaced could never get back to "unbekannt" once clicked.
+    [Fact]
+    public void The_key_can_be_set_back_to_unknown_and_that_commits()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        session.SetDwellingDetails(buildingId, 0, 1, null, KeyAvailability.Available);
+        var editor = OpenEditor(vm, 0, 1);
+        Assert.True(editor.IsKeyAvailable);
+
+        editor.IsKeyUnknown = true;
+
+        Assert.Equal(KeyAvailability.Unknown, editor.KeyAvailable);
+        Assert.False(editor.IsKeyAvailable);
+        Assert.True(editor.HasDetailChange);
+
+        vm.ConfirmEditorCommand.Execute(null);
+
+        Assert.Equal(KeyAvailability.Unknown, DwellingOf(session, buildingId, 0, 1).KeyAvailable);
+    }
+
+    // The radios bind TwoWay, so the binding engine writes false into the ones being unchecked;
+    // that must never move the value.
+    [Fact]
+    public void Unchecking_a_key_radio_does_not_change_the_key()
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+        editor.IsKeyNotAvailable = true;
+
+        editor.IsKeyNotAvailable = false;
+        editor.IsKeyAvailable = false;
+
+        Assert.Equal(KeyAvailability.NotAvailable, editor.KeyAvailable);
+        Assert.True(editor.IsKeyNotAvailable);
     }
 
     // The reason the buffer exists: the journal records the reading the crew settled on, once,
@@ -1031,7 +1068,7 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
     public void SetDwellingStatus(Guid buildingId, int floorOrdinal, int apartmentNumber, DwellingStatus status) =>
         _inner.SetDwellingStatus(buildingId, floorOrdinal, apartmentNumber, status);
 
-    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, bool? keyAvailable) =>
+    public void SetDwellingDetails(Guid buildingId, int floorOrdinal, int apartmentNumber, string? residentName, KeyAvailability keyAvailable) =>
         _inner.SetDwellingDetails(buildingId, floorOrdinal, apartmentNumber, residentName, keyAvailable);
 
     public void SetFloorDescription(Guid buildingId, int floorOrdinal, string? description) =>

@@ -59,7 +59,7 @@ public class CoMeasurementTests
         Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
         Assert.Null(dwelling.CoValue);
         Assert.Null(dwelling.ResidentName);
-        Assert.Null(dwelling.KeyAvailable);
+        Assert.Equal(KeyAvailability.Unknown, dwelling.KeyAvailable);
     }
 
     [Fact]
@@ -310,7 +310,7 @@ public class CoMeasurementTests
     public void Dwelling_Rehydrate_WithoutReadings_HasAnEmptySeries()
     {
         var dwelling = Dwelling.Rehydrate(
-            Guid.NewGuid(), Guid.NewGuid(), 0, 1, null, DwellingStatus.NotSearched, null, 45);
+            Guid.NewGuid(), Guid.NewGuid(), 0, 1, null, DwellingStatus.NotSearched, KeyAvailability.Unknown, 45);
 
         Assert.Empty(dwelling.Readings);
         Assert.Equal(45, dwelling.CoValue);
@@ -542,9 +542,38 @@ public class CoMeasurementTests
         incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
         var journalCountBefore = incident.Journal.Count;
 
-        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, "Müller", true);
+        incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, "Müller", KeyAvailability.Available);
 
         Assert.Equal(journalCountBefore, incident.Journal.Count);
+    }
+
+    [Fact]
+    public void SetDwellingDetails_rejects_an_undefined_key_availability()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+
+        Assert.Throws<ArgumentException>(() =>
+            incident.SetDwellingDetails(incident.Buildings[0].Id, 0, 1, null, (KeyAvailability)99));
+        Assert.Equal(KeyAvailability.Unknown, incident.Dwellings[0].KeyAvailable);
+    }
+
+    [Fact]
+    public void Clearing_the_key_back_to_unknown_leaves_the_dwelling_without_data()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
+        var op = new SessionOperator("Test", null);
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 1);
+        var haus = incident.Buildings[0].Id;
+
+        incident.SetDwellingDetails(haus, 0, 1, null, KeyAvailability.NotAvailable);
+        Assert.True(incident.Dwellings[0].HasData);
+
+        incident.SetDwellingDetails(haus, 0, 1, null, KeyAvailability.Unknown);
+        Assert.False(incident.Dwellings[0].HasData);
     }
 
     // --- Issue #265: per-floor Wohnungen counts and labels (Option B) -------------------------
