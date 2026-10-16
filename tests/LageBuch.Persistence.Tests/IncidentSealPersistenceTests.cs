@@ -48,8 +48,8 @@ public class IncidentSealPersistenceTests : IDisposable
         Assert.Equal(IncidentSeal.CurrentVersion, seal.Version);
         Assert.Equal(Hash, seal.Hash);
         Assert.Equal(PhotoSha, seal.FileSha256[photo.Id]);
-        Assert.True(seal.FileSha256.ContainsKey(lost.Id));
-        Assert.Null(seal.FileSha256[lost.Id]);
+        Assert.True(seal.FileSha256.TryGetValue(lost.Id, out var lostSha));
+        Assert.Null(lostSha);
     }
 
     [Fact]
