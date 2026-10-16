@@ -17,6 +17,11 @@
          for them. Play splits the .aab per ABI, so arm64 devices download no extra bytes; only the
          universal sideload .apk grows. release.yml fails if one of these ABIs goes missing. -->
     <RuntimeIdentifiers>android-arm;android-arm64;android-x64</RuntimeIdentifiers>
+    <!-- No packages.lock.json for this head (see Directory.Build.props). The Android SDK injects
+         Microsoft.NET.ILLink.Tasks at the version of whichever SDK runs the restore, so a lock
+         file here would fail CI's locked restore on every SDK patch release, and Dependabot
+         cannot regenerate it. Its explicit packages are still pinned in Directory.Packages.props. -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
     <!-- Both formats out of one build. Google Play has not accepted an APK for a new app since
          2021, so the upload is the .aab; the GitHub release keeps its .apk. The SDK builds the
          bundle, then runs bundletool `build-apks` in universal mode over that same signed bundle

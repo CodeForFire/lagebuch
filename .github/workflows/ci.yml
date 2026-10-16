@@ -70,8 +70,11 @@ jobs:
         if: matrix.android
         run: scripts/android-version-code.sh --self-test
 
+      # --locked-mode: restore exactly the graph and content hashes in the committed
+      # packages.lock.json files, or fail. A package change that forgot to commit its
+      # regenerated lock file fails here with NU1004 instead of building something else.
       - name: Restore
-        run: dotnet restore ${{ matrix.solution }}
+        run: dotnet restore ${{ matrix.solution }} --locked-mode
 
       # One command per step, deliberately. Both of these used to share a single
       # `run: |` block, which on the Windows leg runs under pwsh -- where a native
@@ -137,7 +140,7 @@ jobs:
           python-version: '3.x'
 
       - name: Install towncrier
-        run: pip install -r .github/requirements-changelog.txt
+        run: pip install --require-hashes -r .github/requirements-changelog.txt
 
       - name: Require a changelog fragment for src/ changes
         env:

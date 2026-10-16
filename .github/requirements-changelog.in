@@ -1,0 +1,5 @@
+# towncrier assembles changelog.d/ into CHANGELOG.md and backs the changelog
+# check in ci.yml. This is the input; requirements-changelog.txt is compiled
+# from it with hashes (pip-compile --generate-hashes), so CI installs with
+# --require-hashes. Dependabot recompiles the .txt when it bumps a version.
+towncrier==26.9.0

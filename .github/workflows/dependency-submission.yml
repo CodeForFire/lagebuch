@@ -42,7 +42,7 @@ jobs:
       # Audit is what this job feeds; a vulnerable package must not stop the
       # submission that raises the alert for it.
       - name: Restore
-        run: dotnet restore LageBuch.Desktop.slnf -p:NuGetAudit=false
+        run: dotnet restore LageBuch.Desktop.slnf --locked-mode -p:NuGetAudit=false
 
       - name: Submit dependencies
         uses: advanced-security/component-detection-dependency-submission-action@a02aeda7a175ad4dd38a13c4d3ff2df9da8f2cf0 # v0.2.0
