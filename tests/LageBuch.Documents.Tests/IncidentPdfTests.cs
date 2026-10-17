@@ -227,6 +227,54 @@ public class IncidentPdfTests
             $"Expected an empty section selection to produce a smaller PDF (all={withAll.Length}, none={withNone.Length}).");
     }
 
+    // #262: each checkbox in the export dialog adds exactly its own section, and only that one.
+    [Theory]
+    [InlineData(IncidentPdfSections.Checklist, "Checkliste")]
+    [InlineData(IncidentPdfSections.Etb, "Einsatztagebuch (ETB)")]
+    [InlineData(IncidentPdfSections.Roles, "Funktionszuweisung")]
+    [InlineData(IncidentPdfSections.Forces, "Kräfteübersicht")]
+    [InlineData(IncidentPdfSections.InvolvedParties, "Beteiligte")]
+    [InlineData(IncidentPdfSections.Tasks, "Aufgaben")]
+    [InlineData(IncidentPdfSections.Atemschutz, "Atemschutzüberwachung")]
+    [InlineData(IncidentPdfSections.CoMessprotokoll, "CO-Messprotokoll")]
+    [InlineData(IncidentPdfSections.Files, "Angehängte Dateien")]
+    public void Each_section_is_printed_exactly_when_it_is_selected(IncidentPdfSections section, string heading)
+    {
+        var incident = Incident.Start(new Clock(), new SessionOperator("Müller"));
+
+        var only = PdfText.Of(incident, ExportedAt, section);
+        var allBut = PdfText.Of(incident, ExportedAt, IncidentPdfSections.All & ~section);
+
+        Assert.Contains(heading, only, StringComparison.Ordinal);
+        Assert.DoesNotContain(heading, allBut, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Every_page_of_an_open_incident_carries_its_page_count_and_the_Zwischenstand_marker()
+    {
+        var text = PdfText.Of(BuildFullIncident(), ExportedAt, IncidentPdfSections.All);
+        var pages = text.Split('\n');
+
+        Assert.Equal(2, pages.Length);
+        Assert.Contains("Seite 1 / 2", pages[0], StringComparison.Ordinal);
+        Assert.Contains("Seite 2 / 2", pages[1], StringComparison.Ordinal);
+        Assert.All(pages, page => Assert.Contains("Zwischenstand – Stand 22.06.2026 12:00", page, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_closed_incidents_pages_carry_no_Zwischenstand_marker()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        incident.Close(clock, op);
+
+        var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.All);
+
+        Assert.Contains("Seite 1 / 1", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Zwischenstand", text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Generate_defaults_to_all_sections_when_none_specified()
     {
