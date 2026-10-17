@@ -13,41 +13,48 @@ public class TasksSectionTests
     private static readonly DateTimeOffset AfterItIsDue = Started.AddMinutes(40);
 
     [Fact]
-    public void Pdf_contains_tasks_section_when_tasks_exist()
+    public void Each_task_prints_its_row_and_who_created_it()
     {
-        var pdf = IncidentPdf.Generate(IncidentWithOneCompletedAndOneOpenTask(), AfterItIsDue, new Dictionary<Guid, byte[]>());
+        var text = PdfText.Of(IncidentWithOneCompletedAndOneOpenTask(), BeforeItIsDue, IncidentPdfSections.Tasks);
 
-        PdfAssert.IsPdf(pdf);
-        Assert.True(pdf.Length > 1000);
+        PdfText.AssertInOrder(
+            text,
+            "Aufgaben",
+            "Fällig Zugeteilt Aufgabe Erledigt",
+            "○ Niedrig Niedrig 24.08.2026 09:30 — Nachfordern erstellt 24.08.2026 09:00 von Müller —",
+            "● Hoch Hoch 24.08.2026 09:05 FFB 1/44/1 Tür sichern erstellt 24.08.2026 09:00 von Müller 24.08.2026 09:00");
+        Assert.DoesNotContain("FÄLLIG", text, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void An_open_task_renders_differently_once_the_export_timestamp_passes_its_due_date()
+    public void An_open_task_is_marked_overdue_once_the_export_timestamp_passes_its_due_date()
     {
-        var incident = IncidentWithOneCompletedAndOneOpenTask();
+        var text = PdfText.Of(IncidentWithOneCompletedAndOneOpenTask(), AfterItIsDue, IncidentPdfSections.Tasks);
 
-        var notYetDue = IncidentPdf.Generate(incident, BeforeItIsDue, new Dictionary<Guid, byte[]>());
-        var overdue = IncidentPdf.Generate(incident, AfterItIsDue, new Dictionary<Guid, byte[]>());
-
-        // Overdue swaps the due timestamp for "FÄLLIG" and adds a small italic "fällig <Zeit>" line
-        // underneath, so the overdue rendering is the longer of the two.
-        Assert.True(
-            overdue.Length > notYetDue.Length,
-            $"Expected the overdue rendering to be longer; got {overdue.Length} vs {notYetDue.Length}.");
+        Assert.Contains("○ Niedrig Niedrig FÄLLIG fällig 24.08.2026 09:30 — Nachfordern", text, StringComparison.Ordinal);
+        Assert.Equal(1, PdfText.Count(text, "FÄLLIG"));
     }
 
     [Fact]
-    public void The_same_incident_and_timestamp_render_the_same_length_however_late_the_export_runs()
+    public void A_task_is_overdue_from_the_very_minute_it_falls_due()
+    {
+        var text = PdfText.Of(IncidentWithOneCompletedAndOneOpenTask(), Started.AddMinutes(30), IncidentPdfSections.Tasks);
+
+        Assert.Contains("FÄLLIG fällig 24.08.2026 09:30", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_same_incident_and_timestamp_render_the_same_however_late_the_export_runs()
     {
         // The point of #302's item: TasksSection used DateTimeOffset.Now, so this incident exported
         // differently depending on the wall clock -- including across a test suite run. Two exports
         // asking for the same "as of" must agree no matter when they happen.
         var incident = IncidentWithOneCompletedAndOneOpenTask();
 
-        var first = IncidentPdf.Generate(incident, AfterItIsDue, new Dictionary<Guid, byte[]>());
-        var second = IncidentPdf.Generate(incident, AfterItIsDue, new Dictionary<Guid, byte[]>());
+        var first = PdfText.Of(incident, AfterItIsDue, IncidentPdfSections.Tasks);
+        var second = PdfText.Of(incident, AfterItIsDue, IncidentPdfSections.Tasks);
 
-        Assert.Equal(first.Length, second.Length);
+        Assert.Equal(first, second);
     }
 
     [Fact]
@@ -59,14 +66,43 @@ public class TasksSectionTests
         incident.AddTask(clock, op, "Tür sichern", "FFB 1/44/1", TaskImportance.High, TaskUrgency.High, 5);
         incident.SetTaskCompleted(incident.Tasks[0].Id, true, clock, op);
 
-        // Closed, so the footer's Zwischenstand line (which prints the export time) stays out of
-        // the comparison -- only the task's overdue marking may depend on asOf here.
-        incident.Close(clock, op);
+        var text = PdfText.Of(incident, Started.AddDays(3), IncidentPdfSections.Tasks);
 
-        var shortlyAfter = IncidentPdf.Generate(incident, Started.AddMinutes(10), new Dictionary<Guid, byte[]>());
-        var daysLater = IncidentPdf.Generate(incident, Started.AddDays(3), new Dictionary<Guid, byte[]>());
+        Assert.Contains("● Hoch Hoch 24.08.2026 09:05", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("FÄLLIG", text, StringComparison.Ordinal);
+    }
 
-        Assert.Equal(shortlyAfter.Length, daysLater.Length);
+    // Open before done, then the most urgent, then the most important, then the oldest. Each
+    // neighbouring pair below differs in exactly one of those keys, so each one is pinned.
+    [Fact]
+    public void Tasks_are_listed_open_first_then_by_urgency_importance_and_age()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Müller");
+        var incident = Incident.Start(clock, op);
+        var done = incident.AddTask(clock, op, "Erledigt", null, TaskImportance.High, TaskUrgency.High, 5);
+        incident.SetTaskCompleted(done.Id, true, clock, op);
+        incident.AddTask(clock, op, "Wenig dringlich", null, TaskImportance.High, TaskUrgency.Low, 5);
+        clock.Now = Started.AddMinutes(1);
+        incident.AddTask(clock, op, "Wenig wichtig", null, TaskImportance.Low, TaskUrgency.High, 5);
+        incident.AddTask(clock, op, "Älter", null, TaskImportance.High, TaskUrgency.High, 5);
+        clock.Now = Started.AddMinutes(2);
+        incident.AddTask(clock, op, "Jünger", null, TaskImportance.High, TaskUrgency.High, 5);
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Tasks);
+
+        PdfText.AssertInOrder(text, "Älter", "Jünger", "Wenig wichtig", "Wenig dringlich", "Erledigt");
+    }
+
+    [Fact]
+    public void Without_tasks_the_section_says_so_instead_of_an_empty_table()
+    {
+        var incident = Incident.Start(new FixedClock(Started), new SessionOperator("Müller"));
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Tasks);
+
+        Assert.Contains("Aufgaben — keine Aufgaben —", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Zugeteilt", text, StringComparison.Ordinal);
     }
 
     private static Incident IncidentWithOneCompletedAndOneOpenTask()
