@@ -347,6 +347,44 @@ public class ScbaViewModelTests
         Assert.Contains(session.Incident.Journal, e => e.Text.Contains("abgenommen", StringComparison.Ordinal));
     }
 
+    // #601: ABGENOMMEN appears in the very slot RÜCKZUG just left, so the second click of a
+    // double-click on RÜCKZUG lands on it.
+    [Fact]
+    public void A_double_click_on_Rueckzug_does_not_also_mark_the_trupp_removed()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        using var vm = Vm(clock, session);
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(10);
+        row.WithdrawCommand.Execute(null);
+        clock.Now = T0.AddMinutes(10).AddMilliseconds(300);
+        row.MarkRemovedCommand.Execute(null);
+
+        Assert.True(row.IsWithdrawing);
+        Assert.True(vm.HasControlReminder);
+        Assert.DoesNotContain(session.Incident.Journal, e => e.Text.Contains("abgenommen", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Abgenommen_works_once_the_double_click_window_has_passed()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        using var vm = Vm(clock, session);
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(10);
+        row.WithdrawCommand.Execute(null);
+        clock.Now = T0.AddMinutes(10).AddSeconds(1);
+        row.MarkRemovedCommand.Execute(null);
+
+        Assert.True(row.IsReturned);
+    }
+
     [Fact]
     public void Readonly_session_disables_actions()
     {
@@ -492,6 +530,7 @@ public class ScbaViewModelTests
         row.WithdrawCommand.Execute(null);
         Assert.True(vm.IsAnyAlarm);
 
+        clock.Now = T0.AddMinutes(33);
         var countBeforeRemoval = alarm.Played.Count;
         row.MarkRemovedCommand.Execute(null);
 

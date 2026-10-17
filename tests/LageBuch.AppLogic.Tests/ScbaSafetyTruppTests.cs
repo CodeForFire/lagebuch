@@ -261,6 +261,7 @@ public class ScbaSafetyTruppTests
         Assign(vm, angriff.Id, sicherheit.Id);
         Row(vm, angriff.Id).StartCommand.Execute(null);
         Row(vm, angriff.Id).WithdrawCommand.Execute(null);
+        clock.Now = T0.AddMinutes(5);
         Row(vm, angriff.Id).MarkRemovedCommand.Execute(null);
 
         Row(vm, sicherheit.Id).StartCommand.Execute(null);
