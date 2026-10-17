@@ -1,0 +1,1 @@
+The Bericht's Gesamtstärke now counts Zugführer separately, in the same Zugführer/Führungskraft/Mannschaft/Gesamt notation as each unit's row and the Kräfte view, instead of leaving them out and adding them to Mannschaft (#621).

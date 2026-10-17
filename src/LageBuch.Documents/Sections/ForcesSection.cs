@@ -60,7 +60,11 @@ public static class ForcesSection
             column.Item().PaddingTop(4).Text(t =>
             {
                 t.Span("Gesamtstärke: ").SemiBold();
-                t.Span($"{incident.TotalOfficer}/{incident.TotalPersonnel - incident.TotalOfficer}/{incident.TotalPersonnel}");
+
+                // The rows' notation, Zugführer/Führungskraft/Mannschaft/Gesamt (#216, #621), as
+                // the Kräfte view totals it in ForcesViewModel.TotalStrengthText.
+                var mannschaft = incident.TotalPersonnel - incident.TotalOfficer - incident.TotalZugfuehrer;
+                t.Span($"{incident.TotalZugfuehrer}/{incident.TotalOfficer}/{mannschaft}/{incident.TotalPersonnel}");
                 t.Span("   davon Atemschutzgeräteträger: ").SemiBold();
                 t.Span(incident.TotalScba.ToString(CultureInfo.InvariantCulture));
             });
