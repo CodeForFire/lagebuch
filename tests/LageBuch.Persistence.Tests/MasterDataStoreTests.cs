@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 using Microsoft.Data.Sqlite;
 
@@ -770,5 +771,36 @@ public class MasterDataStoreTests : IDisposable
         }
 
         return list;
+    }
+
+    [Fact]
+    public void Save_round_trips_standardaufgaben_in_stammdaten_order()
+    {
+        var templates = new[]
+        {
+            new TaskTemplate("Rettungsdienst nachfordern", TaskImportance.High, TaskUrgency.High),
+            new TaskTemplate("Polizei verständigen", TaskImportance.High),
+            new TaskTemplate("THW anfordern", TaskImportance.Medium, TaskUrgency.Low),
+        };
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { TaskTemplates = templates });
+
+        Assert.Equal(templates, MasterDataStore.GetOrCreate(_path).TaskTemplates);
+    }
+
+    [Fact]
+    public void A_stored_level_it_does_not_know_reads_as_medium()
+    {
+        MasterDataStore.GetOrCreate(_path);
+        using (var cn = new SqliteConnection($"Data Source={_path}"))
+        {
+            cn.Open();
+            using var cmd = cn.CreateCommand();
+            cmd.CommandText = "INSERT INTO md_task_templates (text, importance, urgency) VALUES ('Polizei verständigen', 'critical', '');";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        Assert.Equal(new TaskTemplate("Polizei verständigen"), Assert.Single(MasterDataStore.GetOrCreate(_path).TaskTemplates));
     }
 }

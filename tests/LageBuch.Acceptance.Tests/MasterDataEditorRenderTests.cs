@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain.Tasks;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
@@ -58,6 +59,11 @@ public class MasterDataEditorRenderTests
                 new Link("Wetterdienst", "https://dwd.de"),
                 new Link("Kartendienst", "https://example.org/karte", "Karten"),
             },
+            TaskTemplates = new[]
+            {
+                new TaskTemplate("Polizei verständigen", TaskImportance.High, TaskUrgency.High),
+                new TaskTemplate("Energieversorger informieren"),
+            },
             Personnel = new[]
             {
                 new Person("Mustermann", "Max", "ZF", "Land 1", "01 71 / 1 23 45 67"),
@@ -89,8 +95,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 6 data categories, and this fixture's 2.
-        Assert.Equal(8, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 7 data categories, and this fixture's 2.
+        Assert.Equal(9, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -219,6 +225,41 @@ public class MasterDataEditorRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, "master-data-editor-trupp-typen.png"));
+    }
+
+    [AvaloniaFact]
+    public void Standardaufgaben_section_renders_both_priorities_per_row()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Standardaufgaben");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        // Captured before the assertions, as the Funktionen render does.
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-standardaufgaben.png"));
+        }
+
+        var rowTexts = view.GetVisualDescendants()
+            .OfType<TextBox>()
+            .Where(t => t.GetVisualAncestors().All(a => a is not ComboBox))
+            .Select(t => t.Text);
+        Assert.Equal(new[] { "Polizei verständigen", "Energieversorger informieren" }, rowTexts);
+
+        // Two pickers per row, Wichtigkeit then Dringlichkeit, each showing the row's own level.
+        var pickers = view.GetVisualDescendants().OfType<ComboBox>().ToList();
+        Assert.Equal(4, pickers.Count);
+        Assert.Equal(
+            new object?[] { TaskImportance.High, TaskUrgency.High, TaskImportance.Medium, TaskUrgency.Medium },
+            pickers.Select(p => p.SelectedValue));
+        Assert.Equal(
+            new[] { "Wichtigkeit", "Dringlichkeit", "Wichtigkeit", "Dringlichkeit" },
+            pickers.Select(AutomationProperties.GetName));
     }
 
     // #470: a Funktion carries how often it may be held, so the Rollen editor is a typed section
@@ -499,7 +540,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(8, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(9, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -559,7 +600,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(8, rows.Length);
+        Assert.Equal(9, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";

@@ -84,6 +84,21 @@ public sealed class MasterDataStore
                 });
         }
 
+        Run(cn, tx, "DELETE FROM md_task_templates;", _ => { });
+        foreach (var t in set.TaskTemplates)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_task_templates (text, importance, urgency) VALUES ($t,$i,$u);",
+                p =>
+                {
+                    p("$t", t.Text);
+                    p("$i", TaskTemplate.LevelName(t.Importance));
+                    p("$u", TaskTemplate.LevelName(t.Urgency));
+                });
+        }
+
         Run(cn, tx, "DELETE FROM md_vehicles;", _ => { });
         foreach (var v in set.Vehicles)
         {
@@ -270,6 +285,11 @@ public sealed class MasterDataStore
                 email TEXT,
                 note TEXT
             );
+            CREATE TABLE IF NOT EXISTS md_task_templates (
+                text TEXT NOT NULL,
+                importance TEXT NOT NULL DEFAULT 'medium',
+                urgency TEXT NOT NULL DEFAULT 'medium'
+            );
             CREATE TABLE IF NOT EXISTS md_settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS md_text_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """;
@@ -301,6 +321,11 @@ public sealed class MasterDataStore
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "phone", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "email", "TEXT");
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_personnel", "note", "TEXT");
+
+        // md_task_templates arrived complete, so these repair nothing a release wrote; they are here
+        // because #397's sweep holds every repairable column to the same rule.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_task_templates", "importance", "TEXT NOT NULL DEFAULT 'medium'");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_task_templates", "urgency", "TEXT NOT NULL DEFAULT 'medium'");
 
         // Widen an md_links that predates link groups (#518): every link already there is ungrouped.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_links", "group_name", "TEXT NOT NULL DEFAULT ''");
@@ -488,6 +513,7 @@ public sealed class MasterDataStore
             ReadTruppTypes(cn),
             ReadPersonnel(cn),
             ReadVehicles(cn),
+            ReadTaskTemplates(cn),
             ReadSettings(cn));
     }
 
@@ -636,6 +662,25 @@ public sealed class MasterDataStore
         while (r.Read())
         {
             list.Add(new Link(r.GetString(0), r.GetString(1), r.GetString(2)));
+        }
+
+        return list;
+    }
+
+    // Levels are stored by name and read back through TaskTemplate's tolerant parse, so a value a
+    // hand-edited store or a newer build left there reads as medium instead of failing the open.
+    private static List<TaskTemplate> ReadTaskTemplates(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT text, importance, urgency FROM md_task_templates ORDER BY rowid;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<TaskTemplate>();
+        while (r.Read())
+        {
+            list.Add(new TaskTemplate(
+                TaskTemplate.CapText(r.GetString(0)),
+                TaskTemplate.ImportanceFrom(r.GetString(1)),
+                TaskTemplate.UrgencyFrom(r.GetString(2))));
         }
 
         return list;

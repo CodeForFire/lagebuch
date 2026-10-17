@@ -10,6 +10,7 @@ using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.Tasks;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
@@ -17,7 +18,8 @@ namespace LageBuch.Acceptance.Tests;
 // same idiom as FilesTabRenderTests/ForcesTabRenderTests.
 public class TasksTabRenderTests
 {
-    private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session, ManualTicker Ticker, FixedClock Clock) ShowWorkspace()
+    private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session, ManualTicker Ticker, FixedClock Clock) ShowWorkspace(
+        MasterDataSet? masterData = null)
     {
         var clock = new FixedClock();
         var session = TestSession.StartNew(
@@ -32,7 +34,7 @@ public class TasksTabRenderTests
             session,
             clock,
             ticker,
-            WorkspaceRenderHelper.MasterData(),
+            masterData ?? WorkspaceRenderHelper.MasterData(),
             new FakeDialogs(),
             new NoopAlarmService(),
             new NoopIncidentHostController());
@@ -97,6 +99,72 @@ public class TasksTabRenderTests
         Dispatcher.UIThread.RunJobs();
         Assert.NotNull(vm.PendingTaskDialog);
         Capture(window, "aufgaben-dialog.png");
+    }
+
+    private static readonly TaskTemplate[] Standardaufgaben =
+    {
+        new("Rettungsdienst nachfordern", TaskImportance.High, TaskUrgency.High),
+        new("Polizei verständigen", TaskImportance.High, TaskUrgency.Medium),
+        new("Energieversorger informieren"),
+        new("THW anfordern", TaskImportance.Medium, TaskUrgency.Low),
+    };
+
+    private static Button[] Chips(Window window, string itemsControlName) =>
+        Named<ItemsControl>(window, itemsControlName)
+            .GetVisualDescendants().OfType<Button>().ToArray();
+
+    [AvaloniaFact]
+    public void A_standardaufgabe_chip_fills_the_dock_and_only_hinzufuegen_adds_it()
+    {
+        var (window, vm, session, _, _) = ShowWorkspace(
+            WorkspaceRenderHelper.MasterData() with { TaskTemplates = Standardaufgaben });
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+        Capture(window, "aufgaben-chips.png");
+
+        var chips = Chips(window, "TaskTemplateChips");
+        Assert.Equal(Standardaufgaben.Select(t => t.Text), chips.Select(c => c.Content as string));
+        Assert.All(chips, c => Assert.False(c.IsTabStop));
+
+        var police = chips[1];
+        police.Command!.Execute(police.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Polizei verständigen", Named<TextBox>(window, "TaskNewTextBox").Text);
+        Assert.Equal(TaskImportance.High, vm.Tasks.NewImportance);
+        Assert.Empty(session.Incident.Tasks);
+        Capture(window, "aufgaben-chip-gewaehlt.png");
+
+        vm.Tasks.AddTaskCommand.Execute(null);
+        Assert.Equal("Polizei verständigen", Assert.Single(session.Incident.Tasks).Text);
+    }
+
+    [AvaloniaFact]
+    public void The_aufgabe_dialog_offers_the_same_chips()
+    {
+        var (window, vm, _, _, _) = ShowWorkspace(
+            WorkspaceRenderHelper.MasterData() with { TaskTemplates = Standardaufgaben });
+        vm.Etb.NewText = "Stromleitung hängt tief über der Fahrbahn";
+        vm.Etb.NewFrom = "Florian Musterstadt 40/1";
+        vm.Etb.AddEntryAndCreateTaskCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotNull(vm.PendingTaskDialog);
+
+        var chips = Chips(window, "TaskDialogTemplateChips");
+        var power = chips[2];
+        power.Command!.Execute(power.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Energieversorger informieren", vm.PendingTaskDialog!.Text);
+        Capture(window, "aufgaben-dialog-chips.png");
+    }
+
+    [AvaloniaFact]
+    public void Without_standardaufgaben_the_dock_shows_no_chip_row()
+    {
+        var (window, _, _, _, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "AUFGABEN");
+
+        Assert.False(Named<ItemsControl>(window, "TaskTemplateChips").IsVisible);
     }
 
     // #246: editing opens a panel in the dock's place; the grid above keeps reading as triage, and

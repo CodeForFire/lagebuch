@@ -54,6 +54,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         IsReadOnly = session.IsReadOnly;
 
         AssigneeOptions = AssigneeSuggestions(masterData);
+        TaskTemplates = masterData.TaskTemplates;
         Rows = new ObservableCollection<TaskRow>();
         _subscription = IsReadOnly ? null : ticker.Subscribe(OnTick);
         _session.Changed += Sync;
@@ -65,6 +66,11 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     public ObservableCollection<TaskRow> Rows { get; }
 
     public IReadOnlyList<string> AssigneeOptions { get; }
+
+    /// <summary>The Standardaufgaben, offered as chips above the dock in Stammdaten order.</summary>
+    public IReadOnlyList<TaskTemplate> TaskTemplates { get; }
+
+    public bool HasTaskTemplates => TaskTemplates.Count > 0;
 
     // Callsigns and personnel names suggest; anything else stays free text. Funktionen are not
     // who a task goes to (#468). Shared with TaskDialogViewModel so both offer the same list.
@@ -268,6 +274,23 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     {
         ShowErrors(true);
         return NewTextError is null && NewTimerMinutesError is null;
+    }
+
+    /// <summary>
+    /// A Standardaufgabe chip: fills the dock with its text and priorities, and the timer with what
+    /// that Dringlichkeit stands for. It does not add the Aufgabe -- HINZUFÜGEN still does, so
+    /// a mistap costs nothing and an assignee can go with it. The values are copied (#337).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanAddTask))]
+    private void ApplyTemplate(TaskTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        NewText = template.Text;
+        NewImportance = template.Importance;
+        NewUrgency = template.Urgency;
+
+        // Set even when the Dringlichkeit did not change, so an earlier override does not linger.
+        NewTimerMinutes = IncidentTask.DefaultTimerMinutes(template.Urgency);
     }
 
     private void ShowErrors(bool shown)

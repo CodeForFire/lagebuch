@@ -29,6 +29,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         _onChanged = onChanged;
         Text = prefilledText;
         AssigneeOptions = TasksViewModel.AssigneeSuggestions(masterData);
+        TaskTemplates = masterData.TaskTemplates;
         ImportanceOptions = TasksViewModel.ImportanceLevels();
         UrgencyOptions = TasksViewModel.UrgencyLevels();
         _timerMinutes = IncidentTask.DefaultTimerMinutes(Urgency);
@@ -44,6 +45,11 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     private string? _assignee;
 
     public IReadOnlyList<string> AssigneeOptions { get; }
+
+    /// <summary>The Standardaufgaben, offered as chips above the text, as on the Aufgaben tab.</summary>
+    public IReadOnlyList<TaskTemplate> TaskTemplates { get; }
+
+    public bool HasTaskTemplates => TaskTemplates.Count > 0;
 
     [ObservableProperty]
     private TaskImportance _importance = TaskImportance.Medium;
@@ -116,6 +122,21 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         _errorsShown = shown;
         OnPropertyChanged(nameof(TextError));
         OnPropertyChanged(nameof(TimerMinutesError));
+    }
+
+    /// <summary>
+    /// A chip fills the dialog as it fills the Aufgaben dock: text, priorities and the timer that
+    /// Dringlichkeit stands for. Several Standardaufgaben from one Rückmeldung are a chip and
+    /// SPEICHERN &amp; WEITEREN TASK each; nothing is created by the tap itself.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private void ApplyTemplate(TaskTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        Text = template.Text;
+        Importance = template.Importance;
+        Urgency = template.Urgency;
+        TimerMinutes = IncidentTask.DefaultTimerMinutes(template.Urgency);
     }
 
     [RelayCommand]

@@ -1,0 +1,1 @@
+Standardaufgaben, a new Stammdaten category, appear as one-tap chips in the Aufgaben dock and the Aufgabe dialog behind an ETB entry, filling in the text, Wichtigkeit, Dringlichkeit and timer, while HINZUFÜGEN or SPEICHERN still adds the Aufgabe.
