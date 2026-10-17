@@ -21,6 +21,9 @@ namespace LageBuch.AppLogic.ViewModels;
 /// </summary>
 public sealed partial class ScbaTruppRow : ObservableObject
 {
+    /// <summary>How long after RÜCKZUG a click on ABGENOMMEN is taken as a double-click (#601).</summary>
+    public static readonly TimeSpan DoubleClickGuard = TimeSpan.FromSeconds(1);
+
     private readonly IClock _clock;
     private readonly bool _isReadOnly;
     private readonly Action _onStart;
@@ -31,6 +34,9 @@ public sealed partial class ScbaTruppRow : ObservableObject
 
     // Re-pointed by Update rather than replaced with a whole new row (#294) -- see Update's remarks.
     private AtemschutzTrupp _trupp;
+
+    // When this device last withdrew the Trupp; see MarkRemoved.
+    private DateTimeOffset? _withdrawnHereAt;
 
     public ScbaTruppRow(
         AtemschutzTrupp trupp,
@@ -229,12 +235,32 @@ public sealed partial class ScbaTruppRow : ObservableObject
     private bool CanWithdraw => !_isReadOnly && _trupp.IsActive;
 
     [RelayCommand(CanExecute = nameof(CanWithdraw))]
-    private void Withdraw() => _onWithdraw();
+    private void Withdraw()
+    {
+        _withdrawnHereAt = _clock.Now;
+        _onWithdraw();
+    }
 
     private bool CanMarkRemoved => !_isReadOnly && _trupp.IsWithdrawing;
 
+    /// <summary>
+    /// ABGENOMMEN takes the slot RÜCKZUG just left, so the second click of a double-click on
+    /// RÜCKZUG would end the Trupp's monitoring (#601). Nobody takes a crew off within a second of
+    /// calling it back, so a click that soon after this device's own Rückzug is that second click.
+    /// The local timestamp, not <see cref="AtemschutzTrupp.WithdrawTime"/>, because a Rückzug from
+    /// another device carries that device's clock.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanMarkRemoved))]
-    private void MarkRemoved() => _onMarkRemoved();
+    private void MarkRemoved()
+    {
+        // A negative gap is a wall clock set back, not a double-click; it must not hold the button shut.
+        if (_withdrawnHereAt is { } withdrawnAt && _clock.Now - withdrawnAt is var gap && gap >= TimeSpan.Zero && gap < DoubleClickGuard)
+        {
+            return;
+        }
+
+        _onMarkRemoved();
+    }
 
     /// <summary>
     /// Re-points this row at the current state of its Trupp, instead of the ViewModel replacing the
