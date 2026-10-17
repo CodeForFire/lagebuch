@@ -175,9 +175,11 @@ one note on why the trust model around the middle two is where it is.
   migrated forward on open, and the guarantee that a file stays readable
   indefinitely starts at 1.0, not now.
 - **There are no log files.** Good for data protection — no second place on
-  disk accumulates personal data — and bad for diagnosis: a crash leaves
-  nothing behind to attach to a report, including a crash in the sync or
-  export path that a reporter would want evidence for.
+  disk accumulates personal data — and bad for diagnosis. The one exception is
+  a crash report: an unhandled exception leaves a small file under `crashes/`
+  holding the app version, time, OS and each exception's type and stack trace,
+  never its message, since messages can carry names or file paths. The next
+  start points to it. It says where the app died, not what happened before.
 
 ## Non-security issues
 

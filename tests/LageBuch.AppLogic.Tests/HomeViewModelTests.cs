@@ -14,6 +14,28 @@ public class HomeViewModelTests
     private static ChecklistViewModel FirstChecklist(IncidentWorkspaceViewModel vm) =>
         (ChecklistViewModel)vm.NavItems.First(i => i.IsChecklist).Content;
 
+    // #300: the start after a crash says so, and where the report is, so it can go with a bug report.
+    [Fact]
+    public void The_start_after_a_crash_names_the_report_until_dismissed()
+    {
+        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", lastCrashReport: "/data/crashes/crash-1.txt");
+
+        Assert.Contains("unerwartet beendet", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.Contains("/data/crashes/crash-1.txt", vm.CrashNotice, StringComparison.Ordinal);
+
+        vm.DismissCrashNoticeCommand.Execute(null);
+
+        Assert.Null(vm.CrashNotice);
+    }
+
+    [Fact]
+    public void A_normal_start_shows_no_crash_notice()
+    {
+        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        Assert.Null(vm.CrashNotice);
+    }
+
     [Fact]
     public void NewIncident_opens_workspace_and_adds_to_recent()
     {

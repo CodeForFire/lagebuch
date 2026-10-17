@@ -91,7 +91,7 @@ public class HomeOpenErrorTests
         }
     }
 
-    private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null, double width = 1100)
+    private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null, double width = 1100, string? lastCrashReport = null)
     {
         var vm = new HomeViewModel(
             new BrokenStore(),
@@ -102,7 +102,8 @@ public class HomeOpenErrorTests
             new ManualTicker(),
             new NoopAlarmService(),
             new NoopIncidentHostController(),
-            "1.0.0");
+            "1.0.0",
+            lastCrashReport: lastCrashReport);
         if (triggerError)
         {
             vm.OpenRecentCommand.Execute("/home/operator/Einsaetze/Einsatz-1234.fwincident");
@@ -130,6 +131,28 @@ public class HomeOpenErrorTests
 
     private static Border Banner(Window window) =>
         window.GetVisualDescendants().OfType<Border>().First(b => b.Name == "OpenErrorBanner");
+
+    // #300: the start after a crash names the report; the path is long, so the notice has to wrap
+    // inside the column on a phone as well, and AUSBLENDEN takes it away.
+    [AvaloniaFact]
+    public void The_start_after_a_crash_shows_a_wrapping_notice_that_can_be_dismissed()
+    {
+        const string report = "/home/operator/.config/Lagebuch/crashes/crash-20261018-093000123.txt";
+        foreach (var (width, png) in new[] { (1100.0, "home-crash-notice.png"), (412.0, "home-crash-notice-phone.png") })
+        {
+            var (window, vm) = ShowHome(triggerError: false, renderTo: png, width: width, lastCrashReport: report);
+            var banner = window.GetVisualDescendants().OfType<Border>().First(b => b.Name == "CrashNoticeBanner");
+
+            Assert.True(banner.IsEffectivelyVisible);
+            Assert.True(banner.Bounds.Width <= width, $"the crash notice is {banner.Bounds.Width:F0}px wide in a {width:F0}px window");
+
+            window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "DismissCrashNoticeButton").Command!.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Null(vm.CrashNotice);
+            Assert.False(banner.IsVisible);
+        }
+    }
 
     [AvaloniaFact]
     public void No_banner_until_an_open_fails()

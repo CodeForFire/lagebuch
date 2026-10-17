@@ -13,6 +13,17 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // First, so it covers everything after it. An exception escaping the UI thread ends up here
+        // too, out of StartWithClassicDesktopLifetime. Unobserved tasks deliberately do not: .NET no
+        // longer ends the process for one, so it is not a crash (#300).
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception crash)
+            {
+                _ = CrashReports.TryWrite(AppPaths.Root, crash, AppVersion, TimeProvider.System.GetUtcNow());
+            }
+        };
+
         // At startup rather than exit, so a crashed run's copies go too; off the UI path because
         // nothing waits on it and the amount of file I/O is unknown (#383).
         _ = Task.Run(AttachmentTempPaths.SweepOpenDirectories);
@@ -32,7 +43,7 @@ internal static class Program
         var dialogs = new StorageProviderFileDialogService(() =>
             (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow);
         var clock = new SystemClock();
-        var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+        var version = AppVersion;
         var uiDispatcher = new LageBuch.App.Shared.Services.AvaloniaUiDispatcher();
         var store = new IncidentStore();
 
@@ -70,8 +81,11 @@ internal static class Program
             pdfExporter: new QuestPdfIncidentExporter(),
             lastPdfExport: new JsonLastPdfExportStore(AppPaths.LastPdfExportJsonPath),
             lastConnection: new JsonLastConnectionStore(AppPaths.LastConnectionJsonPath),
-            mailComposer: new OsMailComposer());
+            mailComposer: new OsMailComposer(),
+            lastCrashReport: CrashReports.TakePending(AppPaths.Root));
     }
+
+    private static string AppVersion => typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
 
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<LageBuch.App.Shared.App>()
