@@ -11,7 +11,7 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.8.0, with a release every one to two weeks. The app is in real use,
+Version 0.8.1, with a release every one to two weeks. The app is in real use,
 but the `.fwincident` file format can still change between versions. That caveat
 is what 1.0 removes.
 
@@ -117,43 +117,7 @@ a second maintainer exists, at which point the requirement goes to one. Force
 pushes, branch deletion and merging without green CI are already blocked, for
 administrators included.
 
-## v0.10 — Install without warnings
-
-Today every install path asks the user to click past a warning: SmartScreen on
-Windows, quarantine on macOS, unknown sources on Android. For a public-sector
-organisation that is a hard stop, and it undercuts the security work above.
-
-The plan, in order of what is actually achievable:
-
-- **winget and the Microsoft Store** on Windows. A silent MSI install through
-  winget does not raise the SmartScreen dialog, which makes it the recommended
-  Windows path even before a certificate exists. winget ships as of 0.8
-  (`winget install CodeForFire.Lagebuch`); the Microsoft Store is still open.
-- **SHA-256 checksums and Sigstore-backed build attestations** on every release.
-  Not recognised by the operating system, but verifiable, and they are the
-  artefacts a Datenschutzbeauftragter can actually check. These ship as of 0.6.
-- **Google Play** on Android. A bundle signed by Google installs without the
-  unknown-sources prompt and updates itself — for a public-sector organisation
-  the only Android path with no warning to click past, and a far shorter road
-  than a Windows certificate. The build already produces the bundle; what is
-  missing is the developer account and the listing. The APK on the GitHub
-  release stays alongside it.
-- **A published Android signing-key fingerprint** for that APK, and distribution
-  through Obtainium so updates do not mean re-downloading it by hand — the path
-  for anyone who does not want Play. This needs the release APK to be signed with
-  a stable key of its own first; today it carries the CI runner's throwaway debug
-  key, which is why a sideloaded install cannot be upgraded in place at all.
-
-On code signing, plainly: the SignPath Foundation reviewed this project and
-declined. OSSign requires six months of activity on the account, the
-organisation and the project; CodeForFire was founded in August 2026, so
-**February 2027** is the earliest a free Windows certificate is possible, and we
-plan to apply then. Apple's Developer ID is a paid membership and independent of
-both.
-
-Issues: #209, #308, #208
-
-## v0.11 — i18n and architecture
+## v0.10 — i18n and architecture
 
 Lagebuch is German software, and that is a strength. It should not also be an
 accident of implementation. Today the German wording is literal text inside
@@ -179,7 +143,7 @@ so picking them before the labels are translatable means picking them twice.
 
 Issues: #282, #297, #298, #299, #302, #304, #350, #400, #402, #403, #404, #462
 
-## v0.12 — New incident modules and Stammdaten
+## v0.11 — New incident modules and Stammdaten
 
 The feature wishes that came back from the field, as opposed to the corrections:
 a Dekon-Platz with its Platzführung, up to six freely named gases instead of CO
@@ -194,6 +158,21 @@ that can be done cheaply, because after the freeze below every one of them costs
 a forward migration that has to keep working for good.
 
 Issues: #401, #410, #420, #421, #423, #427, #428, #429, #461
+
+## v0.12 — Wasserförderung
+
+Wasserförderung über lange Wegstrecken, restarted in slices rather than as one
+large change: the FI 5.008 planner engine first, then the tab with persistence,
+sync and the PDF, the Einsatzauftrag per pump, the map mode salvaged from #164,
+and finally the execution mode in the field. The maps and elevation packs are
+already published in
+[lagebuch-regions](https://github.com/CodeForFire/lagebuch-regions).
+
+It used to sit beyond 1.0. It moved forward because it adds tables to the
+`.fwincident` file, and like the modules above that is cheap before the freeze
+and a permanent forward migration after it.
+
+Issues: #87, #150, #584, #585, #586, #587
 
 ## v1.0 — File format freeze
 
@@ -211,10 +190,14 @@ Issue: #351
 
 Listed so the direction is visible, deliberately not scheduled:
 
-- **Wasserförderung über lange Wegstrecken** — planning and execution modes,
-  using the map and elevation packs already published in
-  [lagebuch-regions](https://github.com/CodeForFire/lagebuch-regions).
-  Issues: #87, #150.
+- **Installs without a warning.** Most of what this used to be a milestone for
+  has shipped: winget installs on Windows without the SmartScreen dialog,
+  Android releases go out through Google Play, and every release carries SHA-256
+  checksums and Sigstore build attestations. The Microsoft Store was dropped
+  (#308). Code signing is what remains: the SignPath Foundation declined, and
+  OSSign requires six months of activity, so **February 2027** is the earliest a
+  free Windows certificate is possible. We plan to apply then (#208). Apple's
+  Developer ID is a paid membership and independent of both.
 - **The UX review backlog** — accumulated findings from using the app on real
   incidents. Issue: #262.
 
