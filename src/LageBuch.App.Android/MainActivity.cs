@@ -55,6 +55,11 @@ public class MainActivity : AvaloniaMainActivity
         // rotation, while a viewer may still be reading a fresh copy through its content:// grant.
         _ = Task.Run(() => AttachmentTempPaths.SweepStaleOpenDirectories(TimeProvider.System));
 
+        // The last file picked in a previous run (#407). On this thread, not Task.Run: a pick that
+        // completes right after this OnCreate copies into the same folder, and a clear still running
+        // in the background could delete that copy. It holds one file at most, so this is cheap.
+        AndroidAppPaths.ClearPickedDir(this);
+
         _importLauncher = RegisterForActivityResult(
             new ActivityResultContracts.GetContent(),
             new ImportCallback(uri => _dialogs?.CompleteImport(uri)));

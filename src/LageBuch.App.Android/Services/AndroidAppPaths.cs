@@ -58,6 +58,28 @@ internal static class AndroidAppPaths
         return dir;
     }
 
+    /// <summary>
+    /// Empties <see cref="PickedDir"/> (#407). Every file there is a copy the app already read --
+    /// the attachment itself is persisted into the incident -- so nothing is lost; without this
+    /// the folder keeps a copy of every file ever attached on the device. Run before each new pick,
+    /// which bounds it to the one copy in flight, and at startup for the last pick of a previous
+    /// run. Best-effort: a file that cannot be deleted now goes on a later pass.
+    /// </summary>
+    public static void ClearPickedDir(Context context)
+    {
+        foreach (var file in System.IO.Directory.EnumerateFiles(PickedDir(context)))
+        {
+            try
+            {
+                System.IO.File.Delete(file);
+            }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+            {
+                // Left for the next pass; see the summary.
+            }
+        }
+    }
+
     public static string TrustJsonPath(Context context) =>
         System.IO.Path.Join(context.FilesDir!.AbsolutePath, "trust.json");
 

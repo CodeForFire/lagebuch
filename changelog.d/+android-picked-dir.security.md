@@ -1,0 +1,1 @@
+On Android, a picked attachment over the 25 MB limit is now refused while it is being copied rather than after it is on the device, and the app no longer keeps a copy of every file ever attached (#407).

@@ -80,7 +80,9 @@ public sealed class AndroidFileDialogService : IFileDialogService
         var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), "import.json");
         try
         {
-            CopyTo(uri, destPath);
+            // Uncapped as before: the Stammdaten import has no size limit of its own yet, and
+            // picking one is a separate question from #407's attachments.
+            CopyTo(uri, destPath, long.MaxValue);
         }
         catch (Exception ex) when (IsPickFailure(ex))
         {
@@ -128,10 +130,16 @@ public sealed class AndroidFileDialogService : IFileDialogService
             return;
         }
 
+        // The previous pick was read by the time a new one completes; see ClearPickedDir. This also
+        // removes a partial copy a refused or broken pick left.
+        AndroidAppPaths.ClearPickedDir(_activity);
         var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), DisplayNameOf(uri));
         try
         {
-            CopyTo(uri, destPath);
+            // Capped while copying, not checked after: the provider's size column can be missing or
+            // wrong, and FilesViewModel's own check would only run once the whole file is on disk
+            // (#407). Over the cap this throws an IOException carrying IncidentFile.TooLargeMessage.
+            CopyTo(uri, destPath, IncidentFile.MaxSizeBytes);
         }
         catch (Exception ex) when (IsPickFailure(ex))
         {
@@ -144,16 +152,17 @@ public sealed class AndroidFileDialogService : IFileDialogService
     }
 
     /// <summary>
-    /// Streams a picked <c>content://</c> URI into <paramref name="destPath"/>. The null-forgiving
+    /// Streams a picked <c>content://</c> URI into <paramref name="destPath"/>, refusing past
+    /// <paramref name="maxBytes"/> (see <see cref="PickedFileCopy.CopyCapped"/>). The null-forgiving
     /// <c>!</c> on OpenInputStream is deliberate rather than checked: a provider that returns no
     /// stream is exactly the failure the callers catch, and an NRE here carries the same meaning as
     /// the IOException a broken stream would give.
     /// </summary>
-    private void CopyTo(global::Android.Net.Uri uri, string destPath)
+    private void CopyTo(global::Android.Net.Uri uri, string destPath, long maxBytes)
     {
         using var input = _activity.ContentResolver!.OpenInputStream(uri)!;
         using var output = System.IO.File.Create(destPath);
-        input.CopyTo(output);
+        PickedFileCopy.CopyCapped(input, output, maxBytes);
     }
 
     /// <summary>
