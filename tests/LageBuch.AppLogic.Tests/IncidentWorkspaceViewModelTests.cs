@@ -60,6 +60,7 @@ public class IncidentWorkspaceViewModelTests
 
         await vm.ToggleSharingCommand.ExecuteAsync(null);
         await vm.ToggleSharingCommand.ExecuteAsync(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
 
         Assert.False(vm.IsSharing);
         Assert.Null(vm.ShareAddress);
@@ -122,8 +123,46 @@ public class IncidentWorkspaceViewModelTests
         host.CloseJoins();
 
         await vm.ToggleSharingCommand.ExecuteAsync(null);
+        vm.PendingConfirm!.ConfirmCommand.Execute(null);
 
         Assert.False(vm.ShareJoinsClosed);
+    }
+
+    // #604: the ✕ beside the share info is a small target, and stopping cuts off every joined device
+    // mid-Einsatz -- the same blast radius as leaving, which already asks.
+    [Fact]
+    public async Task Stopping_sharing_asks_first_and_keeps_the_host_running_until_confirmed()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.Equal("Freigabe beenden?", vm.PendingConfirm!.Title);
+        Assert.False(host.StopCalled);
+        Assert.True(vm.IsSharing);
+
+        vm.PendingConfirm.ConfirmCommand.Execute(null);
+
+        Assert.True(host.StopCalled);
+        Assert.False(vm.IsSharing);
+        Assert.Null(vm.PendingConfirm);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_stop_keeps_sharing()
+    {
+        var host = new FakeHostController();
+        var vm = EditableWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        vm.PendingConfirm!.CancelCommand.Execute(null);
+
+        Assert.False(host.StopCalled);
+        Assert.True(vm.IsSharing);
+        Assert.Null(vm.PendingConfirm);
     }
 
     // The controller outlives the workspace; a disposed workspace must not keep listening to it.
