@@ -97,12 +97,19 @@ one note on why the trust model around the middle two is where it is.
   The first exchange is not compared, though: nothing asks for the Kennung on
   first contact, so an attacker already positioned on the LAN at that moment
   can get themselves pinned instead, and every later connection will then look
-  correct. Anyone who can read `host-key.pem` can impersonate that host, which
-  is the same user-profile boundary that already guards the Einsatzdaten: the
-  app-data folder is created with the default umask, and on Windows it is the
-  roaming `%AppData%`, so a roaming profile carries the key to the profile
-  server along with everything else stored there.
-  ([#597](../../issues/597))
+  correct. This is a deliberate trade-off, not a pending fix: sync runs on the
+  command vehicle's own network with a handful of known devices, a mandatory
+  comparison on every new device would be clicked through under the stress of
+  an Einsatz, and making that prompt routine would blunt the key-change prompt
+  that actually catches something. A 4-digit PIN cannot bind the key without a
+  PAKE, which this project will not hand-roll; a QR code carrying the full key
+  pin is the way to close the gap without adding a step. Deployments that need
+  the guarantee today should join new devices only on a network no foreign
+  device can be on. Anyone who can read `host-key.pem` can impersonate that
+  host, which is the same user-profile boundary that already guards the
+  Einsatzdaten: the app-data folder is created with the default umask, and on
+  Windows it is the roaming `%AppData%`, so a roaming profile carries the key to
+  the profile server along with everything else stored there.
 - **The share PIN is four digits, and the host budgets wrong guesses.** It is
   drawn per share from `RandomNumberGenerator` and held in memory only on the
   host; a joined device keeps it in `last-connection.json` so it can reconnect

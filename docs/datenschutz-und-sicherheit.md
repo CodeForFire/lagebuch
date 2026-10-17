@@ -378,9 +378,14 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
 - **Die erste Verbindung zu einer Gegenstelle ist ungeprüft.** Der Fingerabdruck
   wird beim ersten Kontakt übernommen und ab dann erzwungen. Abgeglichen wird die
   Kennung erst, wenn sie sich ändert; beim ersten Mal fragt das Programm nicht
-  danach. Wer in diesem Moment im selben Netz mitliest, könnte sich
-  dazwischenschalten. Verbesserung ist geplant
-  ([Issue #597](https://github.com/CodeForFire/lagebuch/issues/597)).
+  danach. Wer genau in diesem Moment im selben Netz sitzt und sich aktiv
+  dazwischenschaltet, würde statt des Gastgebers übernommen. Das ist eine
+  bewusste Entscheidung: Synchronisiert wird im eigenen Netz des ELW, mit
+  wenigen bekannten Geräten, und eine Pflichtabfrage bei jedem neuen Gerät
+  würde im Einsatz weggeklickt, statt verglichen – und damit auch die Warnung
+  bei einem geänderten Schlüssel entwerten, die wirklich etwas aufdeckt. Wer
+  das Risiko ausschließen will, verbindet neue Geräte nur in einem Netz, in
+  dem kein fremdes Gerät sein kann.
 - **Die PIN hat vier Stellen.** Das genügt, weil nach zehn Fehlversuchen der
   Beitritt gesperrt bleibt, bis jemand eine neue PIN erzeugt: Ein Angreifer
   hat so höchstens zehn Versuche unter 10.000 je Erneuerung. Er kann den
