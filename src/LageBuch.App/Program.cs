@@ -17,6 +17,10 @@ internal static class Program
         // nothing waits on it and the amount of file I/O is unknown (#383).
         _ = Task.Run(AttachmentTempPaths.SweepOpenDirectories);
 
+        // Likewise a joined session's copies of the host's attachments, which a crashed run never
+        // got to delete on leaving (#382).
+        _ = Task.Run(() => RemoteIncidentSession.ClearAttachmentCache(AppPaths.AttachmentCacheDir));
+
         LageBuch.App.Shared.App.CreateMainViewModel = CreateMainViewModel;
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

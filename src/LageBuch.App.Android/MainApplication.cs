@@ -22,6 +22,17 @@ public class MainApplication : AvaloniaAndroidApplication<SharedApp>
     {
     }
 
+    // Here rather than beside MainActivity's temp sweep: the Activity is created again on every
+    // rotation, possibly while a session is joined, and this runs once per process. A joined
+    // session's copies of the host's attachments are deleted when it ends; this clears what a
+    // killed process left (#382).
+    public override void OnCreate()
+    {
+        base.OnCreate();
+        var cacheRoot = Services.AndroidAppPaths.AttachmentCacheDir(this);
+        _ = Task.Run(() => LageBuch.Sync.RemoteIncidentSession.ClearAttachmentCache(cacheRoot));
+    }
+
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder) =>
         base.CustomizeAppBuilder(builder).WithInterFont();
 }
