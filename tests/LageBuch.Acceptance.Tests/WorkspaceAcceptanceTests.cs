@@ -192,6 +192,8 @@ internal sealed class NoopAlarmService : IAlarmService
     public void Play(AlarmSound sound)
     {
     }
+
+    public Task<bool> PlayTestAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
 }
 
 public class WorkspaceAcceptanceTests

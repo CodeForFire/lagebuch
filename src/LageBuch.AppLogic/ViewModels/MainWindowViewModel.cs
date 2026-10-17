@@ -17,6 +17,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly MasterDataEditorViewModel _editor;
     private readonly IFileDialogService _dialogs;
     private readonly string _appVersion;
+    private readonly IAlarmService? _alarm;
     private PendingAction _pending = PendingAction.None;
 
     // Set by CancelJoin() and consumed by ConfirmOperatorAsync (#196): a cancelled join leaves
@@ -25,12 +26,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // user-requested and must keep the dialog open, rather than closing it as if the join had won.
     private bool _joinCancelledByUser;
 
-    public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor, IFileDialogService dialogs, string appVersion)
+    public MainWindowViewModel(HomeViewModel home, MasterDataEditorViewModel editor, IFileDialogService dialogs, string appVersion, IAlarmService? alarm = null)
     {
         _home = home;
         _editor = editor;
         _dialogs = dialogs;
         _appVersion = appVersion;
+        _alarm = alarm;
         _home.WorkspaceOpened = ShowWorkspace;
         _home.ReconnectRequested = () => RequestJoinDeviceCommand.Execute(null);
         _currentView = home;
@@ -318,7 +320,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ShowAbout()
     {
-        var about = new AboutViewModel(_dialogs, _appVersion);
+        var about = new AboutViewModel(_dialogs, _appVersion, _alarm);
         about.Closed += (_, _) => PendingAbout = null;
         PendingAbout = about;
     }

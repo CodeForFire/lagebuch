@@ -68,28 +68,67 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
             return; // no clip bundled for this cue yet
         }
 
-        _queue.Enqueue(cancellationToken => PlayBlocking(sound, bytes, cancellationToken));
+        _queue.Enqueue(cancellationToken => _ = PlayBlocking(sound, bytes, cancellationToken));
+    }
+
+    /// <summary>
+    /// Long enough to cover the queue's per-cue limit plus its grace, with cues already queued
+    /// ahead; past it the test reports a failure rather than waiting on a cue the queue abandoned
+    /// (a wedged Windows device cannot be stopped, see SND_ASYNC above).
+    /// </summary>
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(30);
+
+    public async Task<bool> PlayTestAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_voiceBytes.TryGetValue(AlarmSound.RetreatAlarm, out var bytes))
+        {
+            return false;
+        }
+
+        // Through the queue like any cue, so a test never talks over a real alarm.
+        var played = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _queue.Enqueue(token =>
+        {
+            try
+            {
+                played.TrySetResult(PlayBlocking(AlarmSound.RetreatAlarm, bytes, token));
+            }
+            finally
+            {
+                // A cue that threw reports a failure instead of leaving the test waiting.
+                played.TrySetResult(false);
+            }
+        });
+
+        try
+        {
+            return await played.Task.WaitAsync(TestTimeout, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 
     // Runs on the SerialAudioQueue's worker thread; blocks until the clip finishes playing, or
-    // until the queue cancels a cue that overran its time.
-    private void PlayBlocking(AlarmSound sound, byte[] bytes, CancellationToken cancellationToken)
+    // until the queue cancels a cue that overran its time. True when a player ran it to its end.
+    private bool PlayBlocking(AlarmSound sound, byte[] bytes, CancellationToken cancellationToken)
     {
         if (OperatingSystem.IsWindows())
         {
-            // Not cancellable; see the note on SND_ASYNC above.
-            PlaySound(bytes, IntPtr.Zero, SndMemory | SndNodefault);
-            return;
+            // Not cancellable; see the note on SND_ASYNC above. False when winmm could not play it,
+            // e.g. no output device.
+            return PlaySound(bytes, IntPtr.Zero, SndMemory | SndNodefault);
         }
 
         var path = TempFileFor(sound, bytes);
         if (path is null)
         {
-            return;
+            return false;
         }
 
         var player = OperatingSystem.IsMacOS() ? "afplay" : "aplay";
-        _ = RunPlayer(
+        return RunPlayer(
             new ProcessStartInfo(player, $"\"{path}\"")
             {
                 UseShellExecute = false,
@@ -104,8 +143,9 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
     /// device would otherwise hold its thread for good.
     /// </summary>
     /// <returns>
-    /// <see langword="true"/> when the player ran to its end; <see langword="false"/> when it was
-    /// killed, or could not be started at all (e.g. the binary is missing), which stays silent.
+    /// <see langword="true"/> when the player ran to its end and exited 0; <see langword="false"/>
+    /// when it was killed, failed, or could not be started at all (e.g. the binary is missing),
+    /// which stays silent.
     /// </returns>
     [SuppressMessage(
         "Design",
@@ -128,7 +168,9 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
                 process.WaitForExit();
             }
 
-            return !cancellationToken.IsCancellationRequested;
+            // A player that exits non-zero, as aplay does without a usable sound device, played
+            // nothing (#603).
+            return !cancellationToken.IsCancellationRequested && process.ExitCode == 0;
         }
         catch
         {

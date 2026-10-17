@@ -418,6 +418,17 @@ internal sealed class FakeAlarmService : IAlarmService
     public List<AlarmSound> Played { get; } = new();
 
     public void Play(AlarmSound sound) => Played.Add(sound);
+
+    /// <summary>What <see cref="PlayTestAsync"/> reports: whether a player ran.</summary>
+    public bool TestPlays { get; init; } = true;
+
+    public int TestsPlayed { get; private set; }
+
+    public Task<bool> PlayTestAsync(CancellationToken cancellationToken = default)
+    {
+        TestsPlayed++;
+        return Task.FromResult(TestPlays);
+    }
 }
 
 // Synchronous fake ticker — tests call Fire() to advance a "tick".

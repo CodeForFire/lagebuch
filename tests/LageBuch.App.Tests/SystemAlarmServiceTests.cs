@@ -85,6 +85,19 @@ public class SystemAlarmServiceTests
         Assert.True(SystemAlarmService.RunPlayer(new ProcessStartInfo("true"), CancellationToken.None));
     }
 
+    // #603: aplay without a usable sound device exits non-zero at once; "Ton testen" must not
+    // report that as played.
+    [Fact]
+    public void RunPlayer_reports_a_player_that_failed_as_not_played()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        Assert.False(SystemAlarmService.RunPlayer(new ProcessStartInfo("false"), CancellationToken.None));
+    }
+
     [Fact]
     public void RunPlayer_stays_silent_when_the_player_binary_is_missing()
     {

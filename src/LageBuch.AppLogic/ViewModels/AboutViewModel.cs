@@ -7,20 +7,55 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// Content of the "Über" overlay: what the app is, who publishes it, and where its source lives.
-/// Pure display data plus two commands — the host clears the overlay via <see cref="Closed"/>,
+/// Display data plus a few commands — the host clears the overlay via <see cref="Closed"/>,
 /// and repository links go through <see cref="IFileDialogService.OpenUrlAsync"/> like every other
-/// link in the app (works on desktop and Android alike).
+/// link in the app (works on desktop and Android alike). It also hosts the sound check (#603).
 /// </summary>
 public sealed partial class AboutViewModel : ObservableObject
 {
     private const string RepoUrl = "https://github.com/CodeForFire/lagebuch";
 
     private readonly IFileDialogService _dialogs;
+    private readonly IAlarmService? _alarm;
 
-    public AboutViewModel(IFileDialogService dialogs, string version)
+    public AboutViewModel(IFileDialogService dialogs, string version, IAlarmService? alarm = null)
     {
         _dialogs = dialogs;
         Version = version;
+        _alarm = alarm;
+    }
+
+    /// <summary>Whether this device has an alarm service to test; the button is hidden otherwise.</summary>
+    public bool CanTestSound => _alarm is not null;
+
+    /// <summary>The outcome of the last sound check, in German, or null before the first.</summary>
+    [ObservableProperty]
+    private string? _soundTestResult;
+
+    /// <summary>True when the last sound check could not play anything at all.</summary>
+    [ObservableProperty]
+    private bool _soundTestFailed;
+
+    /// <summary>
+    /// Plays the Rückzugsalarm once (#603). Nothing in software can tell a muted laptop from a
+    /// working one, so a success hands the judgement to the listener; only a failure the device can
+    /// see — no player, no clip, no audio on this platform — is stated as fact.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanTestSound))]
+    private async Task TestSoundAsync()
+    {
+        if (_alarm is null)
+        {
+            return;
+        }
+
+        SoundTestFailed = false;
+        SoundTestResult = "Rückzugsalarm wird abgespielt …";
+        var played = await _alarm.PlayTestAsync();
+        SoundTestFailed = !played;
+        SoundTestResult = played
+            ? "Rückzugsalarm abgespielt. Nichts gehört? Lautstärke und Lautsprecher prüfen."
+            : "Auf diesem Gerät konnte kein Ton abgespielt werden. Alarme erscheinen nur auf dem Bildschirm.";
     }
 
     // No AppName/Descriptor here: the About card shows the project badge, which carries the

@@ -158,9 +158,12 @@ fi
 #   libxrandr2/libxcursor1  measured: window still maps without them (screen enumeration and
 #                           themed cursors fall back)
 #   libgl1                  measured: window still maps; Avalonia falls back to software rendering
-#   alsa-utils              aplay, the alarm cues — SystemAlarmService catches its absence and
-#                           stays silent
 #   xdg-utils               xdg-open, for attachments and links
+#
+# alsa-utils is a Depends although the app starts without it: it provides aplay, which plays the
+# Rückzugsalarm. An install with --no-install-recommends would otherwise ship a silent alarm that
+# nothing on screen announces — "Ton testen" in Über reports it, but only if someone presses it
+# (#603). A missing player is not a supported configuration.
 #
 # hicolor-icon-theme owns /usr/share/icons/hicolor/index.theme; without that file the theme has
 # no directory list and a lookup of Icon=lagebuch finds nothing at all. A normal GUI app gets it
@@ -183,8 +186,9 @@ Depends: libc6 (>= 2.34), libstdc++6 (>= 6), libgcc-s1, zlib1g,
  libicu76 | libicu74 | libicu72 | libicu70,
  libssl3 | libssl3t64,
  libx11-6, libxext6, libxi6, libice6, libsm6,
- hicolor-icon-theme
-Recommends: libxrandr2, libxcursor1, libgl1, alsa-utils, xdg-utils
+ hicolor-icon-theme,
+ alsa-utils
+Recommends: libxrandr2, libxcursor1, libgl1, xdg-utils
 Maintainer: CodeForFire <noreply@github.com>
 Installed-Size: $SIZE_KB
 Description: Lagebuch — Einsatzdokumentation

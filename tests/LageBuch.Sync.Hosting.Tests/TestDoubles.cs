@@ -225,6 +225,8 @@ internal sealed class NoAlarm : IAlarmService
     public void Play(AlarmSound sound)
     {
     }
+
+    public Task<bool> PlayTestAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
 }
 
 internal sealed class NoDialogs : IFileDialogService
