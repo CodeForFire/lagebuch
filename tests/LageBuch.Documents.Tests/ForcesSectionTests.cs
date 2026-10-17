@@ -32,16 +32,19 @@ public class ForcesSectionTests
             PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces));
     }
 
+    // #621: the total is in the same Zugführer/Führungskraft/Mannschaft/Gesamt notation as each
+    // row above it (#216), so a Zugführer is neither dropped nor counted as Mannschaft.
     [Fact]
-    public void Gesamtstaerke_sums_fuehrung_mannschaft_and_atemschutz_over_every_unit()
+    public void Gesamtstaerke_sums_zugfuehrer_fuehrung_mannschaft_and_atemschutz_over_every_unit()
     {
         var incident = Incident.Start(Clock, Op);
-        incident.AddForceUnit(Clock, Op, "Emmering", 6, scbaCount: 2, officerCount: 1);
+        incident.AddForceUnit(Clock, Op, "Emmering", 6, scbaCount: 2, officerCount: 1, zugfuehrerCount: 1);
         incident.AddForceUnit(Clock, Op, "Aich", 9, scbaCount: 4, officerCount: 2);
 
         var text = PdfText.Of(incident, Started, IncidentPdfSections.Forces);
 
-        Assert.Contains("Gesamtstärke: 3/12/15 davon Atemschutzgeräteträger: 6", text, StringComparison.Ordinal);
+        PdfText.AssertInOrder(text, "Emmering — 1/1/4/6", "Aich — 0/2/7/9");
+        Assert.Contains("Gesamtstärke: 1/3/11/15 davon Atemschutzgeräteträger: 6", text, StringComparison.Ordinal);
         Assert.DoesNotContain("keine Einträge", text, StringComparison.Ordinal);
     }
 
@@ -56,7 +59,7 @@ public class ForcesSectionTests
             text,
             "Kräfteübersicht",
             "— keine Einträge —",
-            "Gesamtstärke: 0/0/0 davon Atemschutzgeräteträger: 0");
+            "Gesamtstärke: 0/0/0/0 davon Atemschutzgeräteträger: 0");
         Assert.DoesNotContain("Funkrufname", text, StringComparison.Ordinal);
     }
 
