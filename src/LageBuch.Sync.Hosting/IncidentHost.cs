@@ -26,6 +26,13 @@ namespace LageBuch.Sync.Hosting;
 /// </summary>
 public sealed class IncidentHost : IAsyncDisposable
 {
+    /// <summary>
+    /// What a peer is told when its command names an id the incident does not hold (#602): most
+    /// often an entry another device removed a moment earlier. Fixed, so nothing the peer sent and
+    /// no exception text is echoed back.
+    /// </summary>
+    public const string UnknownIdReason = "Eintrag nicht gefunden – vermutlich wurde er gerade auf einem anderen Gerät entfernt.";
+
     private readonly LocalIncidentSession _session;
     private readonly IClock _clock;
     private readonly string _appVersion;
@@ -321,8 +328,10 @@ public sealed class IncidentHost : IAsyncDisposable
         {
             // The same domain guards a local edit hits — reject cleanly rather than 500. An unknown
             // id (KeyNotFoundException, e.g. EditJournalEntry/RenameFile/ToggleChecklistItem against
-            // a stale or forged id) belongs here too, not just the argument/state guards.
-            return Results.BadRequest(ex.Message);
+            // a stale or forged id) belongs here too, not just the argument/state guards. Its message
+            // only echoes the id the peer sent, so it gets one fixed sentence instead (#602); the
+            // other guards' messages are the German sentences the local UI shows for the same edit.
+            return Results.BadRequest(ex is KeyNotFoundException ? UnknownIdReason : ex.Message);
         }
     }
 
