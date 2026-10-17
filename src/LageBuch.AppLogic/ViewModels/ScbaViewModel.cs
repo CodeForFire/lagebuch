@@ -253,7 +253,8 @@ public sealed partial class ScbaTruppRow : ObservableObject
     [RelayCommand(CanExecute = nameof(CanMarkRemoved))]
     private void MarkRemoved()
     {
-        if (_withdrawnHereAt is { } withdrawnAt && _clock.Now - withdrawnAt < DoubleClickGuard)
+        // A negative gap is a wall clock set back, not a double-click; it must not hold the button shut.
+        if (_withdrawnHereAt is { } withdrawnAt && _clock.Now - withdrawnAt is var gap && gap >= TimeSpan.Zero && gap < DoubleClickGuard)
         {
             return;
         }

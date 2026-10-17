@@ -385,6 +385,24 @@ public class ScbaViewModelTests
         Assert.True(row.IsReturned);
     }
 
+    // A wall clock set back after RÜCKZUG must not hold ABGENOMMEN shut until it catches up.
+    [Fact]
+    public void Abgenommen_works_after_the_clock_is_set_back_past_the_rueckzug()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        using var vm = Vm(clock, session);
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(10);
+        row.WithdrawCommand.Execute(null);
+        clock.Now = T0.AddMinutes(5);
+        row.MarkRemovedCommand.Execute(null);
+
+        Assert.True(row.IsReturned);
+    }
+
     [Fact]
     public void Readonly_session_disables_actions()
     {
