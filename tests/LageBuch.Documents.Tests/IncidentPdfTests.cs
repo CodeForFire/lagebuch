@@ -125,7 +125,7 @@ public class IncidentPdfTests
     // A minimal valid 1x1 JPEG — small enough to inline, real enough for QuestPDF's Skia-backed
     // Image() to decode. No qpdf/native-merge dependency on this path (see PdfAttachmentMergerTests
     // for the parts of #62 that do need it).
-    private static readonly byte[] TinyJpeg = Convert.FromBase64String(
+    internal static readonly byte[] TinyJpeg = Convert.FromBase64String(
         "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=");
 
     [Fact]

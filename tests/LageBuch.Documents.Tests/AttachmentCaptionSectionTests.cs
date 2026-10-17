@@ -21,16 +21,28 @@ public class AttachmentCaptionSectionTests
         Assert.Equal(1, PdfAssert.CountPages(bytes));
     }
 
+    // The caption echoes the file's row in the Angehängte-Dateien list -- display name, added-by,
+    // date -- so an appendix can be traced back to its entry.
     [Fact]
-    public void GeneratePdf_bears_the_display_name_not_the_file_name()
+    public void The_caption_echoes_the_files_list_row()
     {
-        // The caption must echo the Files-list row's label, including a renamed one — the only
-        // input that differs is DisplayName (FileName stays "bericht.pdf" in both), so if the bytes
-        // change the label is what drove it. (A size-delta proxy is unusable here: QuestPDF compresses
-        // its content streams, so longer names do not reliably enlarge the output.)
-        var defaultLabel = AttachmentCaptionSection.GeneratePdf(File("bericht.pdf"));
-        var renamedLabel = AttachmentCaptionSection.GeneratePdf(File("Lagebericht Erdgeschoss"));
+        var text = PdfText.Of(AttachmentCaptionSection.GeneratePdf(File("Lagebericht Erdgeschoss")));
 
-        Assert.NotEqual(defaultLabel, renamedLabel);
+        PdfText.AssertInOrder(
+            text,
+            "Angehängte Datei",
+            "Lagebericht Erdgeschoss",
+            "Hinzugefügt von: Müller",
+            "Datum: 16.09.2026 08:30",
+            "Die folgenden Seiten gehören zu dieser angehängten Datei.");
+    }
+
+    [Fact]
+    public void The_caption_bears_the_display_name_not_the_file_name()
+    {
+        var text = PdfText.Of(AttachmentCaptionSection.GeneratePdf(File("Lagebericht Erdgeschoss")));
+
+        Assert.Contains("Lagebericht Erdgeschoss", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("bericht.pdf", text, StringComparison.Ordinal);
     }
 }

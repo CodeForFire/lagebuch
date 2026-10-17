@@ -8,25 +8,34 @@ public class InvolvedPartiesSectionTests
     private static readonly DateTimeOffset Started = new(2026, 9, 27, 14, 0, 0, TimeSpan.FromHours(2));
 
     [Fact]
-    public void The_pdf_renders_with_involved_parties_including_blank_phone_and_notes()
-    {
-        var pdf = IncidentPdf.Generate(IncidentWithTwoParties(), Started.AddHours(1), new Dictionary<Guid, byte[]>());
-
-        PdfAssert.IsPdf(pdf);
-    }
-
-    [Fact]
-    public void The_beteiligte_section_is_left_out_when_it_is_not_selected()
+    public void Each_party_prints_name_phone_and_note_in_the_order_they_were_added()
     {
         var incident = IncidentWithTwoParties();
 
-        var withSection = IncidentPdf.Generate(incident, Started, sections: IncidentPdfSections.All);
-        var withoutSection = IncidentPdf.Generate(
-            incident, Started, sections: IncidentPdfSections.All & ~IncidentPdfSections.InvolvedParties);
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.InvolvedParties);
 
-        Assert.True(
-            withSection.Length > withoutSection.Length,
-            $"Expected the export with Beteiligte to be longer; got {withSection.Length} vs {withoutSection.Length}.");
+        PdfText.AssertInOrder(
+            text,
+            "Beteiligte",
+            "Name Telefon Notiz",
+            "Erika Beispiel 0171 0000001 Schlüssel übergeben",
+            "POK Mustermann — —");
+
+        // All three cells on one line: a missing column definition would wrap the row.
+        Assert.Contains(
+            "Erika Beispiel 0171 0000001 Schlüssel übergeben",
+            PdfText.LinesOf(incident, Started, IncidentPdfSections.InvolvedParties));
+    }
+
+    [Fact]
+    public void Without_parties_the_section_says_so_instead_of_an_empty_table()
+    {
+        var incident = Incident.Start(new FixedClock(Started), new SessionOperator("Muster"));
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.InvolvedParties);
+
+        Assert.Contains("Beteiligte — keine Einträge —", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Telefon", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -40,11 +49,8 @@ public class InvolvedPartiesSectionTests
         var clock = new FixedClock(Started);
         var op = new SessionOperator("Muster");
         var incident = Incident.Start(clock, op, "Brand");
-        incident.AddInvolvedParty(clock, op, "Erika Beispiel", "0171 0000001", "Hauseigentümerin, Schlüssel übergeben");
+        incident.AddInvolvedParty(clock, op, "Erika Beispiel", "0171 0000001", "Schlüssel übergeben");
         incident.AddInvolvedParty(clock, op, "POK Mustermann", null, null);
-
-        // Closed, so the footer's Zwischenstand line stays out of the length comparison.
-        incident.Close(clock, op);
         return incident;
     }
 
