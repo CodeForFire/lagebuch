@@ -73,6 +73,36 @@ public class CommandRejectionTests
         Assert.DoesNotContain("400", reason, StringComparison.Ordinal);
     }
 
+    // #602: a peer that sends a stale or forged id gets one fixed German sentence back -- not the
+    // exception's own text, which echoed the id and, for a Checklistenpunkt, was English.
+    [Fact]
+    public async Task An_unknown_id_is_answered_with_a_fixed_reason_that_echoes_nothing()
+    {
+        var clock = new FixedClock();
+        var hostSession = HostSession(clock);
+        await using var host = new IncidentHost(hostSession, clock, "1.0.0", new ImmediateUiDispatcher(), "1234");
+        var port = await TestHost.StartOnFreePortAsync(host);
+
+        await using var client = await RemoteIncidentSession.ConnectAsync(
+            "127.0.0.1",
+            new SessionOperator("Client", "RUF 1"),
+            "1.0.0",
+            new ImmediateUiDispatcher(),
+            new InMemoryTrustStore(),
+            "1234",
+            port,
+            reconcileInterval: Never);
+
+        var forged = Guid.Parse("5d1c3a7e-0b6f-4e2a-9c81-2f7d6e5b1a39");
+        var rejection = NextRejection(client);
+        client.ToggleChecklistItem(forged);
+        var reason = await rejection;
+
+        Assert.Equal(IncidentHost.UnknownIdReason, reason);
+        Assert.DoesNotContain(forged.ToString(), reason, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("not found", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task A_command_against_a_closed_incident_is_reported_with_the_domain_guards_words()
     {

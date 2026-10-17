@@ -548,6 +548,30 @@ public class FilesViewModelTests
         }
     }
 
+    // #602: a removal that fails -- here the file went in the moment between the confirm opening and
+    // being accepted -- says what failed in German, the cause after it.
+    [Fact]
+    public async Task A_failed_removal_says_the_attachment_was_not_removed()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        var file = session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        Action? confirm = null;
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (_, onConfirmed) => confirm = onConfirmed);
+        Assert.Single(vm.Files).RemoveCommand.Execute(null);
+
+        await session.RemoveFileAsync(file.Id);
+        confirm!();
+
+        Assert.StartsWith("Anhang nicht entfernt: ", vm.ErrorMessage, StringComparison.Ordinal);
+    }
+
     // Copying to disk or launching the viewer can fail (full disk, no registered handler); like
     // AddFileAsync and RemoveFileAsync, that belongs in ErrorMessage rather than escaping an async
     // command as an unobserved exception.
@@ -571,7 +595,8 @@ public class FilesViewModelTests
 
         try
         {
-            Assert.Equal("kein Programm registriert", vm.ErrorMessage);
+            // #602: a German sentence saying what failed, the cause kept after it.
+            Assert.Equal("„brand.jpg“ konnte nicht geöffnet werden: kein Programm registriert", vm.ErrorMessage);
         }
         finally
         {
@@ -846,7 +871,7 @@ public class FilesViewModelTests
 
         await vm.AddFileCommand.ExecuteAsync(null);
 
-        Assert.Equal("Anhang konnte nicht gelesen werden.", vm.ErrorMessage);
+        Assert.Equal("Anhang nicht übernommen: Anhang konnte nicht gelesen werden.", vm.ErrorMessage);
         Assert.Empty(vm.Files);
     }
 

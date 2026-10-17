@@ -178,7 +178,9 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
+            // What failed in German, the cause after it (#602): a content provider's own text can
+            // be English, but it is often the only clue to what went wrong.
+            ErrorMessage = $"Anhang nicht übernommen: {ex.Message}";
             return;
         }
 
@@ -280,7 +282,7 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
+            ErrorMessage = $"Anhang nicht entfernt: {ex.Message}"; // German frame, cause kept (#602)
         }
     }
 
@@ -319,7 +321,9 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
+            // Same wording as UrlLauncher's, with the cause kept: "no registered handler" or "disk
+            // full" is what tells someone what to fix (#602).
+            ErrorMessage = $"„{row.DisplayName}“ konnte nicht geöffnet werden: {ex.Message}";
         }
     }
 

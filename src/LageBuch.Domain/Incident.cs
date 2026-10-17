@@ -355,7 +355,7 @@ public sealed class Incident
 
     private ChecklistList FindChecklistOwning(Guid itemId) =>
         _checklists.FirstOrDefault(l => l.Find(itemId) is not null)
-        ?? throw new KeyNotFoundException($"Checklist item {itemId} not found.");
+        ?? throw new KeyNotFoundException($"Checklistenpunkt {itemId} nicht gefunden.");
 
     private IReadOnlyList<ChecklistItem> ItemsOf(Guid listId) =>
         _checklists.FirstOrDefault(l => l.Id == listId)?.Items ?? Array.Empty<ChecklistItem>();
