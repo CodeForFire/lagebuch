@@ -6,134 +6,169 @@ namespace LageBuch.Documents.Tests;
 
 public class CoMessprotokollSectionTests
 {
-    // The moment the export is taken. Fixed so a task's "FÄLLIG" rendering does not depend on
-    // when the suite happens to run.
-    private static readonly DateTimeOffset ExportedAt = new(2026, 6, 22, 12, 0, 0, TimeSpan.FromHours(2));
+    private static readonly DateTimeOffset Started = new(2026, 8, 25, 10, 0, 0, TimeSpan.FromHours(2));
+    private static readonly DateTimeOffset ExportedAt = Started.AddHours(1);
 
-    private static readonly FixedClock Clock = new(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
-
-    private static Incident CreateIncidentWithBuilding()
+    // Haus A: 1. UG (described as Keller), EG and 1. OG with two Wohnungen each; Haus B: EG and
+    // 1. OG with one. Between them they hold every shape a unit line can take.
+    private static Incident TwoBuildings()
     {
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(Clock, op);
-        incident.AddCoBuilding(Clock, op, "Haus A", 2, 3);
-        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 1, 45);
-        incident.SetDwellingStatus(Clock, op, incident.Buildings[0].Id, 0, 2, DwellingStatus.Affected);
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Huber");
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 2, undergroundFloorCount: 1);
+        incident.AddCoBuilding(clock, op, "Haus B", 1, 1);
+        var a = incident.Buildings[0].Id;
+        var b = incident.Buildings[1].Id;
+        incident.SetFloorDescription(a, -1, "Keller");
+
+        // #424: a falling Messreihe, a single reading, and a reading that was cleared again.
+        incident.RecordCoValue(clock, op, a, 1, 2, 250);
+        clock.Now = Started.AddMinutes(5);
+        incident.RecordCoValue(clock, op, a, 1, 2, 40);
+        incident.RecordCoValue(clock, op, a, 1, 1, 8);
+        incident.RecordCoValue(clock, op, a, 0, 1, 120);
+        incident.RecordCoValue(clock, op, a, 0, 1, null);
+
+        incident.SetDwellingStatus(clock, op, a, 1, 2, DwellingStatus.Affected);
+        incident.SetDwellingStatus(clock, op, a, 1, 1, DwellingStatus.Searched);
+        incident.SetDwellingDetails(a, 1, 2, "Erika", KeyAvailability.Available);
+        incident.SetDwellingDetails(a, 1, 1, null, KeyAvailability.NotAvailable);
+        incident.SetDwellingStatus(clock, op, b, 0, 1, DwellingStatus.Affected);
         return incident;
     }
 
+    // #218, #265: every floor from the top down to the lowest Untergeschoss, each with its own
+    // Wohnungen in number order, and no Wohnung of another floor or Haus among them.
     [Fact]
-    public void Pdf_Contains_CO_Section_With_Buildings()
+    public void Each_building_lists_its_floors_top_down_with_their_own_units_in_order()
+    {
+        var text = PdfText.Of(TwoBuildings(), ExportedAt, IncidentPdfSections.CoMessprotokoll);
+
+        PdfText.AssertInOrder(
+            text,
+            "CO-Messprotokoll",
+            "Haus A: 1. UG–1. OG",
+            "1. OG • Whg. 1: 8 ppm, Schlüssel: nein, abgesucht – keine Personen betroffen",
+            "• Whg. 2, Erika: 40 ppm, Schlüssel: ja, Person(en) betroffen",
+            "EG • Whg. 1: kein Messwert, Schlüssel: —, noch nicht abgesucht",
+            "• Whg. 2: kein Messwert",
+            "1. UG — Keller • Whg. 1: kein Messwert",
+            "• Whg. 2: kein Messwert",
+            "Haus B: EG–1. OG",
+            "1. OG • Whg. 1: kein Messwert",
+            "EG • Whg. 1: kein Messwert, Schlüssel: —, Person(en) betroffen");
+        Assert.Equal(8, PdfText.Count(text, "• Whg."));
+        Assert.Equal(1, PdfText.Count(text, " — Keller"));
+        Assert.DoesNotContain("OG —", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("EG —", text, StringComparison.Ordinal);
+    }
+
+    // #424: the Verlauf only from two readings up -- with one it repeats the ppm above it.
+    [Fact]
+    public void A_messreihe_is_printed_under_a_unit_only_from_two_readings_up()
+    {
+        var text = PdfText.Of(TwoBuildings(), ExportedAt, IncidentPdfSections.CoMessprotokoll);
+
+        PdfText.AssertInOrder(
+            text,
+            "• Whg. 2, Erika: 40 ppm",
+            "Messreihe: 10:00 250 ppm · 10:05 40 ppm",
+            "EG • Whg. 1: kein Messwert",
+            "Messreihe: 10:05 120 ppm · 10:05 gelöscht");
+        Assert.Equal(2, PdfText.Count(text, "Messreihe:"));
+    }
+
+    [Fact]
+    public void Betroffene_Wohnungen_lists_exactly_the_affected_units_then_the_legend()
+    {
+        var text = PdfText.Of(TwoBuildings(), ExportedAt, IncidentPdfSections.CoMessprotokoll);
+
+        PdfText.AssertInOrder(
+            text,
+            "Betroffene Wohnungen",
+            "• Haus A, 1. OG, Whg. 2, Bewohner: Erika, Schlüssel: ja, CO: 40 ppm",
+            "• Haus B, EG, Whg. 1, Bewohner: —, Schlüssel: —, CO: —",
+            "Legende: Nicht abgesucht Abgesucht Betroffen");
+        Assert.Equal(2, PdfText.Count(text, "Bewohner:"));
+    }
+
+    [Fact]
+    public void Without_an_affected_unit_there_is_no_Betroffene_Wohnungen_list()
     {
         var incident = CreateIncidentWithBuilding();
-        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
 
-        Assert.True(pdf.Length > 1000);
-        Assert.Equal(0x25, pdf[0]); // '%'
+        var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
+
+        Assert.Contains("Haus A: EG–2. OG", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Betroffene Wohnungen", text, StringComparison.Ordinal);
+        Assert.Contains("Legende:", text, StringComparison.Ordinal);
     }
 
-    // #424: a Wohnung with a Messreihe renders the series line; one with a single reading omits
-    // it, and a cleared value prints as "gelöscht" rather than vanishing. Text is not extracted in
-    // this suite (see PdfAssert), so this pins that composing does not throw across those shapes --
-    // the wording was checked by eye on a generated PDF.
+    // An .fwincident from elsewhere is hostile input: a Wohnung naming a Haus the file does not
+    // hold must drop out of the list, not abort the export mid-Einsatz.
     [Fact]
-    public void Pdf_Contains_CO_Section_With_A_Measurement_Series()
+    public void An_affected_unit_of_a_missing_building_is_left_out_rather_than_failing_the_export()
     {
-        var clock = new FixedClock(new DateTimeOffset(2026, 8, 25, 10, 0, 0, TimeSpan.Zero));
-        var op = new SessionOperator("Huber", "FFB 12/1");
+        var haus = Building.Create("Haus A", 1, 1, 0);
+        Dwelling[] dwellings =
+        [
+            Dwelling.Rehydrate(Guid.NewGuid(), haus.Id, 0, 1, "Erika", DwellingStatus.Affected, KeyAvailability.Available, 40),
+            Dwelling.Rehydrate(Guid.NewGuid(), Guid.NewGuid(), 0, 1, "Max", DwellingStatus.Affected, KeyAvailability.Available, 90),
+        ];
+        var incident = Incident.Rehydrate(
+            Guid.NewGuid(), Started, IncidentState.Open, null, null, null, null, null, null, null, [], [], [], [], [], [], [], [], [], [haus], dwellings, []);
+
+        var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
+
+        Assert.Contains("Betroffene Wohnungen • Haus A, EG, Whg. 1, Bewohner: Erika", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Max", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Every_ppm_severity_band_prints_its_value()
+    {
+        // ppm severity colouring is a separate span from the status colour (see
+        // CoMessprotokollSection.GetSeverityColor), up to a value past the implausible threshold.
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Test");
         var incident = Incident.Start(clock, op);
-        incident.AddCoBuilding(clock, op, "Haus A", 1, 3);
+        incident.AddCoBuilding(clock, op, "Haus A", 1, 4);
         var haus = incident.Buildings[0].Id;
+        incident.RecordCoValue(clock, op, haus, 0, 1, 5); // Normal
+        incident.RecordCoValue(clock, op, haus, 0, 2, 30); // Elevated
+        incident.RecordCoValue(clock, op, haus, 0, 3, 200); // Dangerous
+        incident.RecordCoValue(clock, op, haus, 0, 4, 2001); // Lethal + implausible
 
-        // Three readings, falling.
-        incident.RecordCoValue(clock, op, haus, 0, 1, 250);
-        clock.Now = clock.Now.AddMinutes(27);
-        incident.RecordCoValue(clock, op, haus, 0, 1, 40);
-        clock.Now = clock.Now.AddMinutes(21);
-        incident.RecordCoValue(clock, op, haus, 0, 1, 5);
+        var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
 
-        // Two readings ending in a deletion.
-        incident.RecordCoValue(clock, op, haus, 0, 2, 120);
-        incident.RecordCoValue(clock, op, haus, 0, 2, null);
-
-        // A single reading: no series line.
-        incident.RecordCoValue(clock, op, haus, 1, 1, 8);
-
-        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
-
-        Assert.True(pdf.Length > 1000);
-        Assert.Equal(0x25, pdf[0]); // '%'
+        PdfText.AssertInOrder(
+            text,
+            "Whg. 1: 5 ppm, Schlüssel",
+            "Whg. 2: 30 ppm, Schlüssel",
+            "Whg. 3: 200 ppm, Schlüssel",
+            "Whg. 4: 2001 ppm, Schlüssel");
     }
 
     [Fact]
-    public void Pdf_Contains_CO_Section_With_Underground_Floors()
+    public void Without_buildings_the_section_says_so_and_prints_no_legend()
     {
-        // #218: a building with Untergeschosse must render without throwing, including the
-        // negative-ordinal rows and the extended floor-range label.
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(Clock, op);
-        incident.AddCoBuilding(Clock, op, "Haus A", 2, 3, undergroundFloorCount: 2);
-        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, -1, 1, 45);
+        var incident = Incident.Start(new FixedClock(Started), new SessionOperator("Test"));
 
-        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
+        var text = PdfText.Of(incident, ExportedAt, IncidentPdfSections.CoMessprotokoll);
 
-        Assert.True(pdf.Length > 1000);
-        Assert.Equal(0x25, pdf[0]); // '%'
+        Assert.Contains("CO-Messprotokoll — kein CO-Messprotokoll erfasst —", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Legende", text, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void Pdf_Contains_CO_Section_With_EveryPpmSeverityBand()
+    private static Incident CreateIncidentWithBuilding()
     {
-        // ppm severity coloring is a separate span from the status color (see
-        // CoMessprotokollSection.GetSeverityColor) -- must render without throwing across every
-        // band, including a value at/above the implausible-value threshold.
+        var clock = new FixedClock(Started);
         var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(Clock, op);
-        incident.AddCoBuilding(Clock, op, "Haus A", 1, 4);
-        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 1, 5); // Normal
-        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 2, 30); // Elevated
-        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 3, 200); // Dangerous
-        incident.RecordCoValue(Clock, op, incident.Buildings[0].Id, 0, 4, 2001); // Lethal + implausible
-
-        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
-
-        Assert.True(pdf.Length > 1000);
-        Assert.Equal(0x25, pdf[0]); // '%'
-    }
-
-    // The Schlüssel column has three states -- ja, nein and unknown -- in both the per-floor list
-    // and the Betroffene-Wohnungen list. Pins that every one of them composes.
-    [Fact]
-    public void Pdf_Contains_CO_Section_With_Every_Key_Availability_State()
-    {
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(Clock, op);
-        incident.AddCoBuilding(Clock, op, "Haus A", 1, 3);
-        var haus = incident.Buildings[0].Id;
-        for (var apartment = 1; apartment <= 3; apartment++)
-        {
-            incident.RecordCoValue(Clock, op, haus, 0, apartment, 45);
-            incident.SetDwellingStatus(Clock, op, haus, 0, apartment, DwellingStatus.Affected);
-        }
-
-        incident.SetDwellingDetails(haus, 0, 1, "Erika Beispiel", KeyAvailability.Available);
-        incident.SetDwellingDetails(haus, 0, 2, null, KeyAvailability.NotAvailable);
-        incident.SetDwellingDetails(haus, 0, 3, null, KeyAvailability.Unknown);
-
-        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
-
-        PdfAssert.IsPdf(pdf);
-    }
-
-    [Fact]
-    public void Pdf_Contains_CO_Section_EmptyState()
-    {
-        var op = new SessionOperator("Test", null);
-        var incident = Incident.Start(Clock, op);
-        var pdf = IncidentPdf.Generate(incident, ExportedAt, new Dictionary<Guid, byte[]>());
-
-        Assert.True(pdf.Length > 1000);
-        Assert.Equal(0x25, pdf[0]); // '%'
+        var incident = Incident.Start(clock, op);
+        incident.AddCoBuilding(clock, op, "Haus A", 2, 3);
+        incident.RecordCoValue(clock, op, incident.Buildings[0].Id, 0, 1, 45);
+        return incident;
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock
