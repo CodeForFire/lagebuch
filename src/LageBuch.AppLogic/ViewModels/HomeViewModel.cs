@@ -62,9 +62,12 @@ public sealed partial class HomeViewModel : ObservableObject
     // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
-    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null)
+    public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null, string? lastCrashReport = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
+        CrashNotice = lastCrashReport is null
+            ? null
+            : $"Lagebuch wurde zuletzt unerwartet beendet. Ein Fehlerbericht ohne Einsatzdaten liegt unter {lastCrashReport} – bitte einer Fehlermeldung beilegen.";
         _store = store;
         _masterData = masterData;
         _recent = recent;
@@ -165,6 +168,16 @@ public sealed partial class HomeViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private string? _lastConnectionError;
+
+    /// <summary>
+    /// Shown on the start after a crash (#300): that it happened and where its report is, so the
+    /// report can go with a bug report. Null otherwise, and once dismissed.
+    /// </summary>
+    [ObservableProperty]
+    private string? _crashNotice;
+
+    [RelayCommand]
+    private void DismissCrashNotice() => CrashNotice = null;
 
     /// <summary>
     /// "‹Stichwort› · ‹time›" under the host on the Home card; the Stichwort is left out while unset.

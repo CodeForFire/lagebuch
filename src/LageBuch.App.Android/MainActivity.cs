@@ -85,7 +85,8 @@ public class MainActivity : AvaloniaMainActivity
             attachmentCacheRoot: AndroidAppPaths.AttachmentCacheDir(this),
             trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)),
             pdfExporter: new NoopIncidentPdfExporter(),
-            lastConnection: new JsonLastConnectionStore(AndroidAppPaths.LastConnectionJsonPath(this)));
+            lastConnection: new JsonLastConnectionStore(AndroidAppPaths.LastConnectionJsonPath(this)),
+            lastCrashReport: CrashReports.TakePending(FilesDir!.AbsolutePath));
 
         base.OnCreate(savedInstanceState);
     }

@@ -68,6 +68,26 @@
                      Text="Dokumentation für den Einsatz. Lege einen neuen Einsatz an, öffne ein bestehendes Lagebuch oder verbinde dich wieder mit einem Einsatz auf einem anderen Gerät." />
         </StackPanel>
 
+        <!-- The start after a crash (#300): what happened and where the report is. Selectable, so the
+             path can be copied into a bug report; same shape as the open-failure banner below. -->
+        <Border x:Name="CrashNoticeBanner" Background="#241608"
+                BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
+                CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
+                IsVisible="{Binding CrashNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+            <PathIcon Grid.Row="0" Grid.Column="0" Width="15" Height="15" VerticalAlignment="Top" Margin="0,0,12,0"
+                      Foreground="{StaticResource AmberBrush}"
+                      Data="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+            <!-- FontFamily set here: the theme's TextBlock style does not reach a SelectableTextBlock. -->
+            <SelectableTextBlock Grid.Row="0" Grid.Column="1" x:Name="CrashNoticeMessage" Text="{Binding CrashNotice}"
+                                 FontFamily="{StaticResource BodyFont}" FontWeight="SemiBold" TextWrapping="Wrap"
+                                 Foreground="{StaticResource AmberBrush}" />
+            <Button Grid.Row="1" Grid.Column="1" x:Name="DismissCrashNoticeButton" Classes="ghost"
+                    Content="AUSBLENDEN" Margin="0,10,0,0" Padding="10,4" HorizontalAlignment="Left"
+                    Command="{Binding DismissCrashNoticeCommand}" />
+          </Grid>
+        </Border>
+
         <!-- Open-failure banner: matches the read-only banner in the workspace -->
         <Border x:Name="OpenErrorBanner" Background="#241608"
                 BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"

@@ -127,6 +127,7 @@ Anwendungsdaten.
 | `trust.json` | die gespeicherten Schlüssel-Fingerabdrücke der Gegenstellen |
 | `host-key.pem` | der private Schlüssel, mit dem dieses Gerät sich beim Freigeben ausweist; entsteht bei der ersten Freigabe, unter Linux und macOS nur für den eigenen Benutzer lesbar |
 | `attachment-cache/` | Kopien der Anhänge, die ein **verbundenes** Gerät vom Gastgeber geladen hat |
+| `crashes/` | Absturzberichte, höchstens fünf, ohne Fehlertexte und ohne Einsatzdaten (siehe unten) |
 
 Beim Öffnen eines Anhangs legt Lagebuch zusätzlich eine Arbeitskopie im
 temporären Verzeichnis des Systems an, unterhalb von `lagebuch/`. Diese
@@ -159,11 +160,18 @@ Nicht vorhanden sind: Nutzungsstatistiken, Absturzberichte, Updateprüfungen,
 Werbe- oder Analysebibliotheken sowie Schriftarten oder Karten von fremden
 Servern.
 
-**Lagebuch schreibt heute keine Protokolldateien.** Das ist für den Datenschutz
-von Vorteil – es entsteht kein zweiter Ort mit personenbezogenen Daten –, hat aber
-eine Kehrseite: Nach einem Absturz gibt es nichts, was man zur Fehlersuche
-einreichen könnte. Sollte sich das in einer späteren Version ändern, wird es
-hier beschrieben.
+**Lagebuch schreibt keine Protokolldateien.** Das ist für den Datenschutz von
+Vorteil – es entsteht kein zweiter Ort mit personenbezogenen Daten.
+
+Die eine Ausnahme ist ein **Absturzbericht**: Beendet ein unerwarteter Fehler
+das Programm, legt Lagebuch im Ordner `crashes/` im Programmordner (unter
+Android im app-eigenen Bereich) eine kleine Textdatei an. Sie enthält die
+Programmversion, den Zeitpunkt, das Betriebssystem und die Art des Fehlers mit
+der Stelle im Programmcode – **keine Fehlertexte und keine Einsatzdaten**, denn
+gerade Fehlertexte können Namen oder Dateipfade enthalten. Beim nächsten Start
+weist die Startseite auf den Bericht hin, damit er einer Fehlermeldung
+beigelegt werden kann. Lagebuch behält die fünf neuesten Berichte und löscht
+ältere selbst.
 
 ## Die Mehrgeräte-Verbindung im Detail
 
@@ -405,7 +413,8 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
   werden beim Öffnen migriert; ab 1.0 gilt die Zusage, dass eine Datei dauerhaft
   lesbar bleibt.
 - **Es gibt keine Protokolldateien** – zum Schutz der Daten gut, zur Fehlersuche
-  nach einem Absturz schlecht.
+  schlecht. Nach einem Absturz bleibt nur ein Absturzbericht ohne Fehlertexte
+  (siehe oben); was vor dem Absturz geschah, zeigt er nicht.
 
 Dieselben Punkte stehen – auf Englisch und aus der Sicht eines
 Sicherheitsforschers – auch in [SECURITY.md](../SECURITY.md).
