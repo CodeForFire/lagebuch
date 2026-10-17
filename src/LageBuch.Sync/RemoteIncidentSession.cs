@@ -584,18 +584,64 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         return bytes;
     }
 
+    /// <summary>
+    /// Deletes every incident's folder under <paramref name="cacheRoot"/> (#382). For startup: a
+    /// session that ends deletes its own folder in <see cref="DisposeAsync"/>, but a crash or a killed
+    /// app never gets there, and nothing re-reads a previous session's cache. Best-effort and never
+    /// throws. Only folders named by an incident id go; anything else under the root is not ours to
+    /// judge. A second instance started while a first one is joined clears the first one's cache too,
+    /// which only costs it a re-fetch (see <see cref="GetFileBytesAsync"/>'s cache-hit fallback).
+    /// </summary>
+    public static void ClearAttachmentCache(string cacheRoot)
+    {
+        ArgumentNullException.ThrowIfNull(cacheRoot);
+        string[] directories;
+        try
+        {
+            directories = Directory.GetDirectories(cacheRoot);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // No root yet (DirectoryNotFoundException is an IOException) or not ours to read.
+            return;
+        }
+
+        foreach (var directory in directories)
+        {
+            if (Guid.TryParse(Path.GetFileName(directory), out _))
+            {
+                DeleteCacheDirectory(directory);
+            }
+        }
+    }
+
+    private static void DeleteCacheDirectory(string directory)
+    {
+        try
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A file still held open, most likely; the next start clears it.
+        }
+    }
+
     // One subfolder per incident, so a stale cache entry from a previously joined incident can
     // never collide with this one's file ids.
-    private string? CachePathFor(Guid fileId, string fileName) => _cacheRoot is null
-        ? null
-        : Path.Join(_cacheRoot, _incident.Id.ToString(), IncidentFile.StorageFileName(fileId, fileName));
+    private string? IncidentCacheDir => _cacheRoot is null ? null : Path.Join(_cacheRoot, _incident.Id.ToString());
+
+    private string? CachePathFor(Guid fileId, string fileName) => IncidentCacheDir is { } dir
+        ? Path.Join(dir, IncidentFile.StorageFileName(fileId, fileName))
+        : null;
 
     /// <summary>
     /// Trims the cache back under <see cref="_cacheMaxBytes"/>, oldest by last-write time first.
     /// <para>
-    /// Scoped to the whole cache root, not just this incident's subfolder: the unbounded growth is
-    /// a device accumulating the attachments of every incident it has ever joined, and nothing
-    /// deletes a previous incident's folder when that session ends. Last-write rather than
+    /// Scoped to the whole cache root, not just this incident's subfolder: a second instance can be
+    /// joined at the same time, and a crashed run's folder survives until the next start's
+    /// <see cref="ClearAttachmentCache"/>. A backstop since #382, which deletes a session's folder
+    /// when it ends. Last-write rather than
     /// last-read, because reads do not touch mtime — so this is "oldest written", which for a cache
     /// that is written once and then read is the same thing often enough to be worth the simplicity.
     /// </para>
@@ -1022,6 +1068,13 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
         _handler.Dispose();
         _reconcileTimer.Dispose();
         _reconcileCts.Dispose();
+
+        // Last, once nothing can fetch into it any more: the host's files do not outlive the session
+        // on this device (#382).
+        if (IncidentCacheDir is { } cacheDir)
+        {
+            DeleteCacheDirectory(cacheDir);
+        }
     }
 
     /// <summary>

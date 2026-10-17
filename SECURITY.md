@@ -163,15 +163,14 @@ one note on why the trust model around the middle two is where it is.
   CO-Messprotokoll. PNG, WebP and GIF metadata chunks are equally untouched.
   Stripping on ingest is planned
   ([#384](../../issues/384)).
-- **Attachment copies outlive the session that created them.** A joining
-  device keeps every attachment it pulled in `attachment-cache/` after the
-  connection ends, and the cache is never cleared automatically
-  ([#382](../../issues/382)); opening an
-  attachment additionally leaves a working copy under `lagebuch/` in the
-  system temp directory, one fresh directory per open, also never cleaned up
-  ([#383](../../issues/383)). Both are
-  plaintext copies of personal data outside the incident file, so both are on
-  the German page's deletion checklist.
+- **Attachment copies exist outside the incident file for a while.** A
+  joining device caches the attachments it pulls in `attachment-cache/` and
+  deletes them when it leaves the incident ([#382](../../issues/382)); opening
+  an attachment leaves a working copy under `lagebuch/` in the system temp
+  directory ([#383](../../issues/383)). Whatever a crashed or killed run left
+  behind goes on the next start, except a copy still open in a viewer, which
+  waits for a later one. Until then both are plaintext copies of personal
+  data, so both stay on the German page's deletion checklist.
 - **The file format is not frozen before 1.0.** Older `.fwincident` files are
   migrated forward on open, and the guarantee that a file stays readable
   indefinitely starts at 1.0, not now.

@@ -227,10 +227,12 @@ Wichtig für die Bewertung: Die Personalliste ist ein dauerhafter Datenbestand
 der ganzen Wehr, kein einzelnes Ereignis – eine weitergegebene PIN öffnet also
 mehr als den Einsatz, für den sie ausgegeben wurde.
 
-**Anhänge auf dem beitretenden Gerät.** Geladene Anhänge bleiben im Ordner
-`attachment-cache/` liegen, auch nachdem die Verbindung beendet wurde. Er wird
-derzeit nicht automatisch geleert und gehört deshalb auf die Löschliste weiter
-unten.
+**Anhänge auf dem beitretenden Gerät.** Geladene Anhänge liegen im Ordner
+`attachment-cache/`, solange das Gerät mit dem Einsatz verbunden ist. Beim
+Verlassen des Einsatzes löscht Lagebuch sie. Endet das Programm vorher durch
+einen Absturz, löscht es sie beim nächsten Start. Wird es danach nicht mehr
+gestartet, bleiben sie liegen; deshalb steht der Ordner weiter auf der
+Löschliste unten.
 
 **Reichweite.** Der Gastgeber nimmt Verbindungen auf allen Netzwerkschnittstellen
 des Geräts an; eine Einschränkung auf bestimmte Adressbereiche findet nicht
@@ -399,10 +401,6 @@ Vollständigkeit ist hier wichtiger als ein guter Eindruck.
 - **EXIF-Daten in Fotos werden nicht entfernt** – siehe oben. Das Entfernen
   beim Anhängen ist geplant
   ([Issue #384](https://github.com/CodeForFire/lagebuch/issues/384)).
-- **Der Anhang-Zwischenspeicher eines beitretenden Geräts wird nicht
-  automatisch geleert**
-  ([Issue #382](https://github.com/CodeForFire/lagebuch/issues/382)) und
-  steht deshalb auf der Löschliste oben.
 - **Das Dateiformat ist vor Version 1.0 nicht eingefroren.** Ältere Dateien
   werden beim Öffnen migriert; ab 1.0 gilt die Zusage, dass eine Datei dauerhaft
   lesbar bleibt.

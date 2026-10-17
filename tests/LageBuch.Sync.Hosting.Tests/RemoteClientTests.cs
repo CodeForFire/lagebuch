@@ -317,6 +317,81 @@ public class RemoteClientTests
         }
     }
 
+    // #382: these are the host's files -- photos from the Einsatzstelle -- and nothing re-reads them
+    // once the session is over, so they must not outlive it on a borrowed tablet.
+    [Fact]
+    public async Task Leaving_the_incident_deletes_its_attachment_cache()
+    {
+        var clock = new FixedClock();
+        var (host, port) = await TestHost.StartAsync(HostSession(clock), clock, "1.0.0");
+        await using var _ = host;
+        var cacheRoot = Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        try
+        {
+            await using var uploader = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1", new SessionOperator("A"), "1.0.0", new ImmediateUiDispatcher(), new InMemoryTrustStore(), TestHost.DefaultPin, port);
+            var uploaderChange = NextChange(uploader);
+            await uploader.AddFileAsync("brand.jpg", "image/jpeg", new byte[] { 1, 2, 3 });
+            await uploaderChange;
+            var fileId = Assert.Single(uploader.Incident.Files).Id;
+
+            await using var puller = await RemoteIncidentSession.ConnectAsync(
+                "127.0.0.1",
+                new SessionOperator("B"),
+                "1.0.0",
+                new ImmediateUiDispatcher(),
+                new InMemoryTrustStore(),
+                TestHost.DefaultPin,
+                port,
+                cacheRoot: cacheRoot);
+            await puller.GetFileBytesAsync(fileId);
+            var incidentCache = Path.Join(cacheRoot, puller.Incident.Id.ToString());
+            Assert.True(Directory.Exists(incidentCache));
+
+            await puller.DisposeAsync();
+
+            Assert.False(Directory.Exists(incidentCache));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
+            }
+        }
+    }
+
+    // A crash or a killed app never reaches DisposeAsync, so startup clears what such a session left.
+    [Fact]
+    public void Clearing_the_attachment_cache_removes_every_incident_folder_and_nothing_else()
+    {
+        var cacheRoot = Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}");
+        try
+        {
+            var stale = Path.Join(cacheRoot, Guid.NewGuid().ToString());
+            Directory.CreateDirectory(stale);
+            File.WriteAllBytes(Path.Join(stale, "photo.jpg"), new byte[] { 1 });
+            var foreign = Path.Join(cacheRoot, "not-an-incident");
+            Directory.CreateDirectory(foreign);
+
+            RemoteIncidentSession.ClearAttachmentCache(cacheRoot);
+
+            Assert.False(Directory.Exists(stale));
+            Assert.True(Directory.Exists(foreign));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Clearing_an_attachment_cache_that_does_not_exist_yet_is_a_no_op() =>
+        RemoteIncidentSession.ClearAttachmentCache(Path.Join(Path.GetTempPath(), $"attachment-cache-{Guid.NewGuid():N}"));
+
     [Fact]
     public async Task GetFileBytesAsync_evicts_the_oldest_cached_files_once_the_cache_exceeds_its_cap()
     {
