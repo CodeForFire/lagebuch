@@ -1,5 +1,3 @@
-using LageBuch.Domain.Files;
-
 namespace LageBuch.AppLogic.Services;
 
 /// <summary>
@@ -16,13 +14,15 @@ public static class PickedFileCopy
     /// </summary>
     /// <exception cref="IOException">
     /// The input is larger than <paramref name="maxBytes"/>; the message is
-    /// <see cref="IncidentFile.TooLargeMessage"/>, the wording the desktop's size check shows.
-    /// What was already written stays in <paramref name="output"/> for the caller to discard.
+    /// <paramref name="tooLargeMessage"/>, so the user reads the same wording the desktop's own size
+    /// check for that kind of file shows. What was already written stays in
+    /// <paramref name="output"/> for the caller to discard.
     /// </exception>
-    public static void CopyCapped(Stream input, Stream output, long maxBytes)
+    public static void CopyCapped(Stream input, Stream output, long maxBytes, string tooLargeMessage)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(tooLargeMessage);
         var buffer = new byte[BufferSize];
         long total = 0;
         int read;
@@ -31,7 +31,7 @@ public static class PickedFileCopy
             total += read;
             if (total > maxBytes)
             {
-                throw new IOException(IncidentFile.TooLargeMessage);
+                throw new IOException(tooLargeMessage);
             }
 
             output.Write(buffer, 0, read);

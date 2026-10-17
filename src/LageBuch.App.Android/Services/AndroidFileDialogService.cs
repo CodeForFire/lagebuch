@@ -77,12 +77,15 @@ public sealed class AndroidFileDialogService : IFileDialogService
             return;
         }
 
-        var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), "import.json");
+        string destPath;
         try
         {
-            // Uncapped as before: the Stammdaten import has no size limit of its own yet, and
-            // picking one is a separate question from #407's attachments.
-            CopyTo(uri, destPath, long.MaxValue);
+            // Inside the try: even creating the folder can fail, and nothing above this catches.
+            destPath = System.IO.Path.Join(AndroidAppPaths.PickedImportDir(_activity), "import.json");
+
+            // Capped while copying, like an attachment; MasterDataFileService.Read checks the same
+            // limit on the other end.
+            CopyTo(uri, destPath, MasterDataFileService.MaxImportBytes, MasterDataFileService.TooLargeMessage);
         }
         catch (Exception ex) when (IsPickFailure(ex))
         {
@@ -130,16 +133,19 @@ public sealed class AndroidFileDialogService : IFileDialogService
             return;
         }
 
-        // The previous pick was read by the time a new one completes; see ClearPickedDir. This also
-        // removes a partial copy a refused or broken pick left.
-        AndroidAppPaths.ClearPickedDir(_activity);
-        var destPath = System.IO.Path.Join(AndroidAppPaths.PickedDir(_activity), DisplayNameOf(uri));
+        // The previous pick was read by the time a new one completes; see ClearPickedAttachments.
+        // It never throws, so it can stay ahead of the try.
+        AndroidAppPaths.ClearPickedAttachments(_activity);
+        string destPath;
         try
         {
+            // Inside the try: even creating the folder can fail, and nothing above this catches.
+            destPath = System.IO.Path.Join(AndroidAppPaths.PickedAttachmentDir(_activity), DisplayNameOf(uri));
+
             // Capped while copying, not checked after: the provider's size column can be missing or
             // wrong, and FilesViewModel's own check would only run once the whole file is on disk
             // (#407). Over the cap this throws an IOException carrying IncidentFile.TooLargeMessage.
-            CopyTo(uri, destPath, IncidentFile.MaxSizeBytes);
+            CopyTo(uri, destPath, IncidentFile.MaxSizeBytes, IncidentFile.TooLargeMessage);
         }
         catch (Exception ex) when (IsPickFailure(ex))
         {
@@ -153,16 +159,40 @@ public sealed class AndroidFileDialogService : IFileDialogService
 
     /// <summary>
     /// Streams a picked <c>content://</c> URI into <paramref name="destPath"/>, refusing past
-    /// <paramref name="maxBytes"/> (see <see cref="PickedFileCopy.CopyCapped"/>). The null-forgiving
-    /// <c>!</c> on OpenInputStream is deliberate rather than checked: a provider that returns no
-    /// stream is exactly the failure the callers catch, and an NRE here carries the same meaning as
-    /// the IOException a broken stream would give.
+    /// <paramref name="maxBytes"/> (see <see cref="PickedFileCopy.CopyCapped"/>). A copy that fails
+    /// -- over the cap, or a provider that breaks off -- is deleted rather than left in the cache
+    /// until the next pick. The null-forgiving <c>!</c> on OpenInputStream is deliberate rather than
+    /// checked: a provider that returns no stream is exactly the failure the callers catch, and an
+    /// NRE here carries the same meaning as the IOException a broken stream would give.
     /// </summary>
-    private void CopyTo(global::Android.Net.Uri uri, string destPath, long maxBytes)
+    private void CopyTo(global::Android.Net.Uri uri, string destPath, long maxBytes, string tooLargeMessage)
     {
-        using var input = _activity.ContentResolver!.OpenInputStream(uri)!;
-        using var output = System.IO.File.Create(destPath);
-        PickedFileCopy.CopyCapped(input, output, maxBytes);
+        try
+        {
+            // using declarations end with this block, so the file is closed before the catch deletes it.
+            using var input = _activity.ContentResolver!.OpenInputStream(uri)!;
+            using var output = System.IO.File.Create(destPath);
+            PickedFileCopy.CopyCapped(input, output, maxBytes, tooLargeMessage);
+        }
+        catch (Exception ex) when (IsPickFailure(ex))
+        {
+            DeletePartialCopy(destPath);
+            throw;
+        }
+    }
+
+    // Best-effort: the caller is already handling the copy's own failure, which this must not replace.
+    // Whatever stays behind is removed by the next pick or the next cold start.
+    private static void DeletePartialCopy(string path)
+    {
+        try
+        {
+            System.IO.File.Delete(path);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            // See above.
+        }
     }
 
     /// <summary>
@@ -183,7 +213,7 @@ public sealed class AndroidFileDialogService : IFileDialogService
             or Java.Lang.Throwable;
 
     // A content provider fully controls DISPLAY_NAME -- a hostile one can return "../../evil" to
-    // escape PickedDir, so SafeFileName.Sanitize reduces it to a bare, harmless file name before
+    // escape PickedAttachmentDir, so SafeFileName.Sanitize reduces it to a bare, harmless file name before
     // it ever reaches Path.Join.
     private string DisplayNameOf(global::Android.Net.Uri uri)
     {

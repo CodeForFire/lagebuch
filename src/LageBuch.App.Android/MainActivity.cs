@@ -55,10 +55,17 @@ public class MainActivity : AvaloniaMainActivity
         // rotation, while a viewer may still be reading a fresh copy through its content:// grant.
         _ = Task.Run(() => AttachmentTempPaths.SweepStaleOpenDirectories(TimeProvider.System));
 
-        // The last file picked in a previous run (#407). On this thread, not Task.Run: a pick that
-        // completes right after this OnCreate copies into the same folder, and a clear still running
-        // in the background could delete that copy. It holds one file at most, so this is cheap.
-        AndroidAppPaths.ClearPickedDir(this);
+        // The last file picked in a previous run (#407) -- a cold start only. OnCreate also runs when
+        // the Activity is recreated for a configuration change it does not handle (locale, font
+        // scale, a split-screen resize), and a pick that just completed may not have been read yet.
+        // A state restored after the process was killed skips this too; the next attachment pick
+        // clears that folder anyway. On this thread, not Task.Run: a pick that completes right after
+        // this OnCreate copies into the same folder, and a clear still running in the background
+        // could delete that copy. Each folder holds one file at most, so this is cheap.
+        if (savedInstanceState is null)
+        {
+            AndroidAppPaths.ClearPickedFiles(this);
+        }
 
         _importLauncher = RegisterForActivityResult(
             new ActivityResultContracts.GetContent(),
