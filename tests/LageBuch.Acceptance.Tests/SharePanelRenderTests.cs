@@ -166,6 +166,28 @@ public class SharePanelRenderTests
             $"PIN number '{pinValue.Text}' rendered at {pinValue.Bounds.Width:F0}px wide — it exists in the tree but is not laid out, so the number is invisible on first share.");
     }
 
+    // #604: the ✕ is a small target beside the PIN button, and it cuts off every joined device.
+    [AvaloniaFact]
+    public async Task Clicking_the_stop_button_asks_before_ending_the_share()
+    {
+        var host = new FakeHost();
+        var (window, vm) = ShowWorkspace(host);
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var stop = window.GetVisualDescendants().OfType<Button>()
+            .First(b => ReferenceEquals(b.Command, vm.ToggleSharingCommand));
+        stop.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "share-stop-clicked.png");
+
+        Assert.True(host.IsHosting);
+        Assert.True(vm.IsSharing);
+        Assert.Contains(
+            window.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.IsEffectivelyVisible && t.Text == "Verbundene Geräte werden getrennt.");
+    }
+
     private static Border JoinsClosedBanner(Window window) =>
         window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ShareJoinsClosedBanner");
 

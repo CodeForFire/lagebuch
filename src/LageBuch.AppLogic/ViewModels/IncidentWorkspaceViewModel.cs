@@ -1452,7 +1452,15 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         if (IsSharing)
         {
-            await StopSharingAsync();
+            // Stopping cuts off every joined device mid-Einsatz, the same as leaving, which already
+            // asks (ConfirmLeaveThen); the ✕ that triggers it is a small target beside another (#604).
+            var dialog = new ConfirmDialogViewModel(
+                "Freigabe beenden?",
+                "Verbundene Geräte werden getrennt.",
+                "BEENDEN",
+                () => _ = StopSharingAsync());
+            dialog.Closed += (_, _) => PendingConfirm = null;
+            PendingConfirm = dialog;
             return;
         }
 
