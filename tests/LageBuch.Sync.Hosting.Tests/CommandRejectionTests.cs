@@ -58,8 +58,10 @@ public class CommandRejectionTests
         var rejection = NextRejection(client);
 
         // Void, fire-and-forget, like the ~40 mutation methods on this class. An unknown entry id is a
-        // KeyNotFoundException at the host, i.e. a 400.
-        client.EditJournalEntry(Guid.NewGuid(), "geht nicht");
+        // KeyNotFoundException at the host, i.e. a 400. A fixed id rather than Guid.NewGuid(): the
+        // host's sentence names the id, so a random one containing "400" failed the status-text
+        // check below about once in 150 runs.
+        client.EditJournalEntry(Guid.Parse("5d1c3a7e-0b6f-4e2a-9c81-2f7d6e5b1a39"), "geht nicht");
 
         var reason = await rejection;
 
