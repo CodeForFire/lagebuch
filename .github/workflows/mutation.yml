@@ -2,12 +2,17 @@ name: Mutation testing
 
 # Stryker.NET mutates the production code (flips a comparison, drops a
 # statement, swaps a return) and re-runs the tests: a mutant no test notices
-# marks code the suite executes without really checking. This is a report for
-# finding weak tests, not a gate -- thresholds.break is 0 in every
-# stryker-config.json, it never runs on a pull request, and the result is the
-# HTML report uploaded below. See CONTRIBUTING.md#mutation-testing.
+# marks code the suite executes without really checking. It runs two ways:
+#
+# - mutate: every project, weekly and on demand. A report for finding weak
+#   tests, not a gate -- thresholds.break is 0 in every stryker-config.json.
+# - mutate-diff: on a pull request, only the files it changes, failing below
+#   60%. It judges new work, not the debt already in the weekly report.
+#
+# See CONTRIBUTING.md#mutation-testing.
 
 on:
+  pull_request:
   schedule:
     - cron: '13 3 * * 6'
   workflow_dispatch:
@@ -27,9 +32,15 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request supersedes the run on the previous one.
+concurrency:
+  group: mutation-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   mutate:
     name: mutate (${{ matrix.project }})
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # Locally (12 cores) the slowest project, Persistence, takes ~6 minutes.
     timeout-minutes: 60
@@ -77,3 +88,69 @@ jobs:
           path: StrykerOutput/${{ matrix.project }}/reports/
           if-no-files-found: ignore
           retention-days: 30
+
+  mutate-diff:
+    name: mutate-diff (${{ matrix.project }})
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Sync is left out: most of its code is exercised only by
+        # Sync.Hosting.Tests, which Stryker does not run, so a changed Sync
+        # file scores near zero however well it is tested.
+        project: [Domain, Documents, Persistence, AppLogic]
+    env:
+      PROJECT: ${{ matrix.project }}
+      BASE: origin/${{ github.base_ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # --since diffs against the base branch, so it needs the history.
+          fetch-depth: 0
+
+      # Skipping by step rather than by a paths filter keeps the job
+      # reporting success, which a required check needs.
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet "$BASE" -- "src/LageBuch.$PROJECT/" "tests/LageBuch.$PROJECT.Tests/"; then
+            echo "No changes to LageBuch.$PROJECT -- nothing to mutate."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup .NET
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore tools
+        if: steps.changes.outputs.changed == 'true'
+        run: dotnet tool restore
+
+      - name: Mutate changed files
+        if: steps.changes.outputs.changed == 'true'
+        run: make mutate PROJECT="$PROJECT" SINCE="$BASE" BREAK=60
+
+      - name: Summary
+        if: always() && steps.changes.outputs.changed == 'true'
+        run: |
+          report="StrykerOutput/$PROJECT/reports/mutation-report.md"
+          if [ -f "$report" ]; then
+            echo "## $PROJECT (changed files)" >> "$GITHUB_STEP_SUMMARY"
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report
+        if: always() && steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-diff-report-${{ matrix.project }}
+          path: StrykerOutput/${{ matrix.project }}/reports/
+          if-no-files-found: ignore
+          retention-days: 14

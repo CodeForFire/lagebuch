@@ -105,11 +105,22 @@ test-all: ## Run tests over the full solution (needs JDK <= 21)
 # headless UI, which is too slow and too flaky to repeat once per mutant.
 MUTATE_PROJECTS := Domain Sync Documents Persistence AppLogic
 
-mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|AppLogic)
+# SINCE=<committish> mutates only the files changed since it, and BREAK=<0-100>
+# fails below that score -- together they are the pull request gate in
+# .github/workflows/mutation.yml (SINCE=origin/main BREAK=60). Stryker's
+# --since finds no changes inside a git worktree and passes every file, so
+# SINCE is refused there rather than reporting a gate it never checked.
+SINCE ?=
+BREAK ?=
+MUTATE_FLAGS := $(if $(SINCE),--since:$(SINCE),) $(if $(BREAK),--break-at $(BREAK),)
+
+mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|AppLogic [SINCE= BREAK=])
 	@if [ -z "$(filter $(PROJECT),$(MUTATE_PROJECTS))" ]; then \
 	  echo "Usage: make mutate PROJECT=<one of: $(MUTATE_PROJECTS)>"; exit 2; fi
+	@if [ -n "$(SINCE)" ] && [ -f .git ]; then \
+	  echo "SINCE does not work in a git worktree (Stryker sees no changes); run it from a clone."; exit 2; fi
 	cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker \
-	  --output $(CURDIR)/StrykerOutput/$(PROJECT)
+	  --output $(CURDIR)/StrykerOutput/$(PROJECT) $(MUTATE_FLAGS)
 	@echo "Report: $(CURDIR)/StrykerOutput/$(PROJECT)/reports/mutation-report.html"
 
 run: ## Run the desktop app
