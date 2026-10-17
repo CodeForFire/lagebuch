@@ -74,6 +74,40 @@ public class AboutRenderTests
         Assert.True(icon.Bounds.Width > 0, "the error banner icon has zero width -- nothing is drawn");
     }
 
+    // #603: the sound check, through the real button. NoopAlarmService plays nothing, like an
+    // Android tablet or a Linux install without aplay, so the result has to say so in amber.
+    [AvaloniaFact]
+    public void A_sound_test_that_plays_nothing_says_so_in_the_dialog()
+    {
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", new NoopAlarmService());
+        var window = new Window { Content = new AboutView { DataContext = vm }, Width = 640, Height = 1000 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "about-sound-before-test.png");
+
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "TestSoundButton");
+        Assert.True(button.IsEffectivelyVisible);
+        button.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        var result = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "SoundTestResult");
+        Assert.True(result.IsEffectivelyVisible);
+        Assert.Contains("nur auf dem Bildschirm", result.Text, StringComparison.Ordinal);
+        Assert.Contains("failed", result.Classes);
+        Capture(window, "about-sound-failed.png");
+    }
+
+    [AvaloniaFact]
+    public void Without_an_alarm_service_the_sound_test_is_hidden()
+    {
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0");
+        var window = new Window { Content = new AboutView { DataContext = vm }, Width = 640, Height = 1000 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(window.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Name == "SoundTest").IsVisible);
+    }
+
     [AvaloniaFact]
     public void Command_bar_has_an_about_entry_point()
     {

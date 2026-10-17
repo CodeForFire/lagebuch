@@ -69,6 +69,44 @@ public class AboutViewModelTests
         Assert.Contains("github.com/CodeForFire/lagebuch", vm.ErrorMessage, StringComparison.Ordinal);
     }
 
+    // #603: a crew checks before an Einsatz that the Rückzugsalarm is audible. The app can only
+    // tell whether a player ran, so a success still asks the listener to judge.
+    [Fact]
+    public async Task Testing_the_sound_plays_the_alarm_and_asks_whether_it_was_heard()
+    {
+        var alarm = new FakeAlarmService();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", alarm);
+
+        await vm.TestSoundCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, alarm.TestsPlayed);
+        Assert.False(vm.SoundTestFailed);
+        Assert.Contains("Nichts gehört?", vm.SoundTestResult, StringComparison.Ordinal);
+    }
+
+    // What the device can see -- no player program, no clip, a platform without audio -- is said
+    // plainly, because the Lagebuchführer would otherwise count on an alarm that never sounds.
+    [Fact]
+    public async Task A_sound_test_that_plays_nothing_says_alarms_are_visual_only()
+    {
+        var alarm = new FakeAlarmService { TestPlays = false };
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", alarm);
+
+        await vm.TestSoundCommand.ExecuteAsync(null);
+
+        Assert.True(vm.SoundTestFailed);
+        Assert.Contains("nur auf dem Bildschirm", vm.SoundTestResult, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_an_alarm_service_there_is_nothing_to_test()
+    {
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0");
+
+        Assert.False(vm.CanTestSound);
+        Assert.False(vm.TestSoundCommand.CanExecute(null));
+    }
+
     private sealed class ThrowingUrlDialogs : IFileDialogService
     {
         public Task<string?> PickSaveAsync(string suggestedFileName, string? initialFolder = null) => Task.FromResult<string?>(null);

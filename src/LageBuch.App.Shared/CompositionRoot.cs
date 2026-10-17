@@ -35,6 +35,6 @@ public static class CompositionRoot
     {
         var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work));
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
-        return new MainWindowViewModel(home, editor, dialogs, appVersion);
+        return new MainWindowViewModel(home, editor, dialogs, appVersion, alarm);
     }
 }

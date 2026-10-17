@@ -1,0 +1,1 @@
+Über gains a "Ton testen" button that plays the Rückzugsalarm once and says plainly when this device cannot play any sound, and the Linux package now depends on alsa-utils instead of only recommending it (#603).

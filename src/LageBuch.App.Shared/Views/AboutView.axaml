@@ -62,6 +62,26 @@
               <TextBlock Text="{Binding CopyrightLine}" Classes="secondary" />
             </StackPanel>
 
+            <!-- Sound check (#603): the one way to know before an Einsatz that the Rückzugsalarm is
+                 audible. A failure the device can see is shown in amber; a success still asks the
+                 listener, since a muted device cannot be detected. -->
+            <StackPanel x:Name="SoundTest" Spacing="6" Margin="0,4,0,0" IsVisible="{Binding CanTestSound}">
+              <Separator Margin="0,2,0,4" />
+              <TextBlock Text="ALARMTON" Classes="overline" FontSize="10" />
+              <Button x:Name="TestSoundButton" Content="TON TESTEN" Command="{Binding TestSoundCommand}"
+                      HorizontalAlignment="Left" />
+              <TextBlock x:Name="SoundTestResult" Text="{Binding SoundTestResult}" TextWrapping="Wrap"
+                         Classes="secondary" Classes.failed="{Binding SoundTestFailed}"
+                         IsVisible="{Binding SoundTestResult, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock.Styles>
+                  <Style Selector="TextBlock.failed">
+                    <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                  </Style>
+                </TextBlock.Styles>
+              </TextBlock>
+            </StackPanel>
+
             <!-- Open failure banner: same shape as Links' ErrorBanner -->
             <Border Background="#241608" Margin="0,4,0,0"
                     BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"

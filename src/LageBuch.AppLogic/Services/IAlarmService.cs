@@ -29,4 +29,16 @@ public interface IAlarmService
 {
     /// <summary>Plays a spoken cue once. Fire-and-forget; safe to call from the UI thread.</summary>
     void Play(AlarmSound sound);
+
+    /// <summary>
+    /// Plays the <see cref="AlarmSound.RetreatAlarm"/> once so a crew can check before an Einsatz
+    /// that they hear it (#603), and completes when it has finished.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false"/> when this device could not play anything: no clip, no player
+    /// program, the OS refusing playback, or a platform without audio cues at all.
+    /// <see langword="true"/> only says a player ran; a muted device or unplugged speakers cannot
+    /// be detected, so whether it was heard is for the listener to judge.
+    /// </returns>
+    Task<bool> PlayTestAsync(CancellationToken cancellationToken = default);
 }
