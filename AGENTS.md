@@ -302,8 +302,15 @@ what they cannot see.
     Never put a `Version` on a `PackageReference` in a `.csproj`.
   - Android and `LageBuch.Acceptance.Tests` keep their own nested props file.
   - Every project except the Android head commits a `packages.lock.json`, and
-    CI restores with `--locked-mode`. A package change commits the lock files
-    a plain `dotnet restore` rewrote; CI fails with `NU1004` otherwise.
+    CI restores with `--locked-mode`. A package change commits every lock file
+    `dotnet restore --force-evaluate` rewrites; CI fails with `NU1004`
+    otherwise.
+  - A Dependabot NuGet bump needs that by hand. Dependabot rewrites only the
+    lock file of the project that references the package directly, while
+    every project that gets it through a project reference pins it as a
+    `CentralTransitive` entry too (#642). Run `dotnet restore LageBuch.sln
+    --force-evaluate` on its branch and push the result as a signed,
+    signed-off commit.
   - A new dependency must earn its place in the PR description: it is
     maintained, it is licence-compatible, and its transitive tree is small.
 
