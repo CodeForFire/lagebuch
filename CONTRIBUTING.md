@@ -140,16 +140,35 @@ headless UI, which is too slow and too flaky to repeat once per mutant.
 
 The [Mutation testing](.github/workflows/mutation.yml) workflow runs every
 project weekly and on demand (*Actions → Mutation testing → Run workflow*); each
-run's summary lists the scores, and the report is attached as an artifact. It
-never fails on a low score and never runs on a pull request — it is for
-finding weak tests, not for gating changes.
+run's summary lists the scores, and the report is attached as an artifact. That
+full run never fails on a low score: it is for finding weak tests.
+
+A pull request is gated, but only on what it changes. For each of Domain,
+Documents, Persistence and AppLogic that the PR touches, `mutate-diff` mutates
+the changed files alone and fails below 60%, the configured `low` threshold.
+Sync is exempt: most of its code is exercised only by Sync.Hosting.Tests,
+which Stryker does not run, so a changed Sync file would score near zero
+however well it is tested. Reproduce the gate locally with:
+
+```bash
+make mutate PROJECT=Domain SINCE=origin/main BREAK=60
+```
+
+It has to run in a plain clone with your branch committed: Stryker diffs commits,
+not the working tree, and inside a `git worktree` it sees no changes at all, so
+`make` refuses `SINCE` there.
+
+The score covers whole changed files, not changed lines, so a one-line edit to
+a file with old survivors can fail it. Kill them while you are there.
 
 To act on a survivor, open it in the report, decide whether the change it shows
 would be a real bug, and if so write the test that kills it — failing first, as
 for any [bug fix](AGENTS.md#tests). Some survivors are noise: an equivalent
 mutant (one that cannot change behaviour), or a branch only another test
 project exercises — each config mutates one source project against one test
-project. Leave those alone.
+project. Do not write a test for those. When one holds up the gate, silence that
+single mutant where it stands, with the reason:
+`// Stryker disable once Equality : the bound is checked again by the caller`.
 
 ## Workflow
 
