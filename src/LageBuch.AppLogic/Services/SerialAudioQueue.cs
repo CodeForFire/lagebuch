@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 
-namespace LageBuch.App.Services;
+namespace LageBuch.AppLogic.Services;
 
 /// <summary>
 /// Runs enqueued playback actions one at a time, in FIFO order, on a single dedicated
@@ -17,7 +17,11 @@ namespace LageBuch.App.Services;
     "Design",
     "CA1001",
     Justification = "App-lifetime singleton: its worker thread drains until process shutdown, so the owning BlockingCollection is intentionally never disposed.")]
-internal sealed class SerialAudioQueue
+[SuppressMessage(
+    "Naming",
+    "CA1711",
+    Justification = "It is a FIFO queue of playback actions, not a type posing as a collection; public only so both heads share it (#637).")]
+public sealed class SerialAudioQueue
 {
     private readonly BlockingCollection<Action<CancellationToken>> _queue = new();
     private readonly TimeSpan _perItemTimeout;

@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using LageBuch.App.Services;
+using LageBuch.AppLogic.Services;
 
-namespace LageBuch.App.Tests;
+namespace LageBuch.AppLogic.Tests;
 
 public class SerialAudioQueueTests
 {

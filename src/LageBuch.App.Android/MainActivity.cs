@@ -43,6 +43,9 @@ public class MainActivity : AvaloniaMainActivity
     private AndroidFileDialogService? _dialogs;
     private IncidentStore? _store;
 
+    // Per process, not per Activity: its playback thread outlives every rotation (#637).
+    private static AndroidAlarmService? _alarm;
+
     // Avalonia 12 removed AvaloniaMainActivity<TApp>/CustomizeAppBuilder(AppBuilder) — app/AppBuilder
     // setup moved to MainApplication, which runs before any Activity exists. This Activity-scoped
     // wiring (file pickers need a live Activity to register against) instead runs here, before
@@ -88,7 +91,7 @@ public class MainActivity : AvaloniaMainActivity
             _dialogs,
             new SystemClock(),
             new LageBuch.App.Shared.Services.DispatcherTimerTicker(),
-            new AndroidAlarmService(),
+            _alarm ??= new AndroidAlarmService(this),
             new MasterDataFileService(),
             new NoopIncidentHostController(),
             new LageBuch.App.Shared.Services.AvaloniaUiDispatcher(),
