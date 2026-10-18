@@ -637,5 +637,7 @@ internal sealed class OpenPathDialogs : IFileDialogService
 
     public Task OpenPhoneAsync(string number) => Task.CompletedTask;
 
+    public bool CanShareFiles => false;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }

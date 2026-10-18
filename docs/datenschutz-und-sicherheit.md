@@ -16,10 +16,11 @@ ausdrücklich **keine Rechtsberatung**.
   überträgt von sich aus nichts.
 - **Ein Einsatz ist eine Datei.** Die `.fwincident`-Datei liegt dort, wo sie
   gespeichert wurde, und gehört der Wehr.
-- **Keine Telemetrie, keine Absturzberichte, keine Updateprüfung.** Es gibt im
+- **Keine Telemetrie, keine automatisch versandten Absturzberichte, keine Updateprüfung.** Es gibt im
   gesamten Programm keinen Aufruf, der Nutzungsdaten irgendwohin sendet.
 - **Keine Logdateien.** Das Programm schreibt heute kein Protokoll auf die
-  Festplatte – ein Absturz hinterlässt nichts, was personenbezogene Daten enthält.
+  Festplatte – ein Absturz hinterlässt nur einen kurzen Bericht ohne Fehlertexte
+  und ohne Einsatzdaten (siehe unten).
 - **Die Stammdaten sind nach der Installation leer.** Namen und Telefonnummern
   kommen ausschließlich durch einen selbst ausgelösten Import ins Programm.
 - **Die Mehrgeräte-Verbindung ist optional** und richtet sich immer an genau das
@@ -143,8 +144,8 @@ Deinstallieren der App entfernt Android all diese Daten.**
 
 ## Was das Gerät verlässt
 
-Von selbst: nichts. Es gibt im gesamten Programm genau drei Wege, auf denen
-Daten das Gerät verlassen können, und alle drei werden von der Bedienerin oder
+Von selbst: nichts. Es gibt im gesamten Programm genau vier Wege, auf denen
+Daten das Gerät verlassen können, und alle vier werden von der Bedienerin oder
 dem Bediener ausgelöst:
 
 1. **Die Mehrgeräte-Verbindung.** Sie richtet sich an genau die Adresse, die im
@@ -155,8 +156,11 @@ dem Bediener ausgelöst:
 3. **Der PDF-Bericht.** Er wird dorthin geschrieben, wo er im Speicherdialog
    abgelegt wird. Was danach mit ihm geschieht, liegt bei der Wehr – er
    enthält den vollständigen Einsatz einschließlich der eingebetteten Anhänge.
+4. **Der Absturzbericht unter Android.** Erst wenn auf der Startseite TEILEN
+   angetippt wird, geht er an das Teilen-Menü von Android; wohin, bestimmt die
+   dort gewählte App. Er enthält keine Fehlertexte und keine Einsatzdaten.
 
-Nicht vorhanden sind: Nutzungsstatistiken, Absturzberichte, Updateprüfungen,
+Nicht vorhanden sind: Nutzungsstatistiken, automatisch versandte Absturzberichte, Updateprüfungen,
 Werbe- oder Analysebibliotheken sowie Schriftarten oder Karten von fremden
 Servern.
 
@@ -170,7 +174,9 @@ Programmversion, den Zeitpunkt, das Betriebssystem und die Art des Fehlers mit
 der Stelle im Programmcode – **keine Fehlertexte und keine Einsatzdaten**, denn
 gerade Fehlertexte können Namen oder Dateipfade enthalten. Beim nächsten Start
 weist die Startseite auf den Bericht hin, damit er einer Fehlermeldung
-beigelegt werden kann. Lagebuch behält die fünf neuesten Berichte und löscht
+beigelegt werden kann. Unter Android ist der app-eigene Bereich ohne Root nicht
+erreichbar; dort bietet die Startseite den Bericht stattdessen über TEILEN an.
+Lagebuch behält die fünf neuesten Berichte und löscht
 ältere selbst.
 
 ## Die Mehrgeräte-Verbindung im Detail

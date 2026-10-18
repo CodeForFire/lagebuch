@@ -1980,7 +1980,22 @@ internal sealed class FakeDialogs : IFileDialogService
         return Task.CompletedTask;
     }
 
-    public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
+    /// <summary>False, like the desktop; set to stand in for Android's share sheet.</summary>
+    public bool CanShareFiles { get; set; }
+
+    public string? SharedPath { get; private set; }
+
+    public string? SharedMimeType { get; private set; }
+
+    /// <summary>Set to make <see cref="ShareFileAsync"/> fail, standing in for a share sheet that throws.</summary>
+    public Exception? ShareFailure { get; set; }
+
+    public Task ShareFileAsync(string path, string mimeType)
+    {
+        SharedPath = path;
+        SharedMimeType = mimeType;
+        return ShareFailure is null ? Task.CompletedTask : Task.FromException(ShareFailure);
+    }
 }
 
 // Hostable controller double: unlike NoopIncidentHostController (CanHost=false, which hides the

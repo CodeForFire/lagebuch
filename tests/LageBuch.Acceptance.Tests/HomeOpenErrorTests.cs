@@ -91,13 +91,13 @@ public class HomeOpenErrorTests
         }
     }
 
-    private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null, double width = 1100, string? lastCrashReport = null)
+    private static (Window Window, HomeViewModel Vm) ShowHome(bool triggerError, string? renderTo = null, double width = 1100, string? lastCrashReport = null, bool canShareFiles = false)
     {
         var vm = new HomeViewModel(
             new BrokenStore(),
             new Md(),
             new SeededRecent(),
-            new FakeDialogs(),
+            new FakeDialogs { CanShareFiles = canShareFiles },
             new FixedClock(),
             new ManualTicker(),
             new NoopAlarmService(),
@@ -152,6 +152,35 @@ public class HomeOpenErrorTests
             Assert.Null(vm.CrashNotice);
             Assert.False(banner.IsVisible);
         }
+    }
+
+    // #636: on desktop the path is the way to the report, so there is nothing to share.
+    [AvaloniaFact]
+    public void The_crash_notice_on_desktop_offers_no_share_button()
+    {
+        var (window, _) = ShowHome(triggerError: false, lastCrashReport: "/home/operator/.config/Lagebuch/crashes/crash-1.txt");
+
+        Assert.False(window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ShareCrashReportButton").IsVisible);
+    }
+
+    // #636: on a phone the report sits where no file manager reaches it, so the notice drops the
+    // path and TEILEN sits beside AUSBLENDEN, both inside the banner.
+    [AvaloniaFact]
+    public void The_crash_notice_on_a_device_that_shares_files_offers_teilen_beside_ausblenden()
+    {
+        const string report = "/data/user/0/de.codeforfire.lagebuch/files/crashes/crash-20261018-093000123.txt";
+        var (window, vm) = ShowHome(triggerError: false, renderTo: "home-crash-notice-share-phone.png", width: 412, lastCrashReport: report, canShareFiles: true);
+        var banner = window.GetVisualDescendants().OfType<Border>().First(b => b.Name == "CrashNoticeBanner");
+        var share = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ShareCrashReportButton");
+        var dismiss = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "DismissCrashNoticeButton");
+
+        Assert.DoesNotContain(report, vm.CrashNotice, StringComparison.Ordinal);
+        Assert.True(share.IsEffectivelyVisible);
+        Assert.True(dismiss.IsEffectivelyVisible);
+        Assert.True(banner.Bounds.Width <= 412, $"the crash notice is {banner.Bounds.Width:F0}px wide in a 412px window");
+        var shareRight = share.TranslatePoint(new Point(share.Bounds.Width, 0), banner)?.X ?? double.MaxValue;
+        var dismissRight = dismiss.TranslatePoint(new Point(dismiss.Bounds.Width, 0), banner)?.X ?? double.MaxValue;
+        Assert.True(shareRight <= banner.Bounds.Width && dismissRight <= banner.Bounds.Width, "TEILEN and AUSBLENDEN fit inside the banner");
     }
 
     [AvaloniaFact]

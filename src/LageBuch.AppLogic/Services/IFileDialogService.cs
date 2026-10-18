@@ -60,6 +60,13 @@ public interface IFileDialogService
     Task OpenPhoneAsync(string number);
 
     /// <summary>
+    /// Whether <see cref="ShareFileAsync"/> actually hands a file on (Android's share sheet). False
+    /// where it is a no-op because every file the app writes is already reachable (desktop), so a
+    /// caller can say where a file is instead of offering a share that does nothing.
+    /// </summary>
+    bool CanShareFiles { get; }
+
+    /// <summary>
     /// Offers a written file to the user for hand-off (share sheet, "reveal in folder", or a no-op
     /// where the destination the user already picked via <see cref="PickExportPdfAsync"/>/
     /// <see cref="PickExportJsonAsync"/> is itself the final destination). Called once the file at

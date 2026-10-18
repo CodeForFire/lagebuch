@@ -28,6 +28,69 @@ public class HomeViewModelTests
         Assert.Null(vm.CrashNotice);
     }
 
+    // #636: on desktop the path is reachable, so it stays in the notice and nothing is shared.
+    [Fact]
+    public void On_desktop_the_crash_notice_still_names_the_path_and_offers_no_share()
+    {
+        var vm = HomeAfterCrash(new FakeDialogs());
+
+        Assert.Contains("/data/crashes/crash-1.txt", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.False(vm.CanShareCrashReport);
+    }
+
+    // #636: on Android the path sits in the app's own storage, where no file manager reaches it, so
+    // the notice offers the report through the share sheet instead of naming a path nobody can open.
+    [Fact]
+    public void On_a_device_that_shares_files_the_crash_notice_offers_the_report_instead_of_a_path()
+    {
+        var vm = HomeAfterCrash(new FakeDialogs { CanShareFiles = true });
+
+        Assert.Contains("unerwartet beendet", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.Contains("teilen", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("/data/crashes", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.True(vm.CanShareCrashReport);
+    }
+
+    [Fact]
+    public async Task Sharing_the_crash_report_hands_its_path_to_the_share_sheet()
+    {
+        var dialogs = new FakeDialogs { CanShareFiles = true };
+        var vm = HomeAfterCrash(dialogs);
+
+        await vm.ShareCrashReportCommand.ExecuteAsync(null);
+
+        Assert.Equal("/data/crashes/crash-1.txt", dialogs.SharedPath);
+        Assert.Equal("text/plain", dialogs.SharedMimeType);
+    }
+
+    [Fact]
+    public async Task A_crash_report_that_cannot_be_shared_says_so_in_the_notice()
+    {
+        var dialogs = new FakeDialogs { CanShareFiles = true, ShareFailure = new InvalidOperationException("no activity") };
+        var vm = HomeAfterCrash(dialogs);
+
+        await vm.ShareCrashReportCommand.ExecuteAsync(null);
+
+        Assert.Contains("konnte nicht geteilt werden", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("no activity", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.True(vm.CanShareCrashReport);
+    }
+
+    [Fact]
+    public async Task Sharing_after_a_normal_start_hands_nothing_to_the_share_sheet()
+    {
+        var dialogs = new FakeDialogs { CanShareFiles = true };
+        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        await vm.ShareCrashReportCommand.ExecuteAsync(null);
+
+        Assert.False(vm.CanShareCrashReport);
+        Assert.Null(dialogs.SharedPath);
+    }
+
+    private static HomeViewModel HomeAfterCrash(FakeDialogs dialogs) =>
+        new(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", lastCrashReport: "/data/crashes/crash-1.txt");
+
     [Fact]
     public void A_normal_start_shows_no_crash_notice()
     {
@@ -162,6 +225,30 @@ public class HomeViewModelTests
         Assert.Equal(
             new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" },
             vm.RecentFiles.Select(f => f.FileName));
+    }
+
+    [Fact]
+    public void Reopening_a_listed_incident_keeps_a_single_row_for_it()
+    {
+        var store = new FakeStore();
+        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/a.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent("/a.fwincident"), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        vm.OpenRecentCommand.Execute("/a.fwincident");
+
+        Assert.Equal(new[] { "/a.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+    }
+
+    [Fact]
+    public void Opening_a_closed_incident_lists_it_as_closed()
+    {
+        var store = new FakeStore();
+        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>()).Close();
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        vm.OpenRecentCommand.Execute("/closed.fwincident");
+
+        Assert.True(Assert.Single(vm.RecentFiles).IsClosed);
     }
 
     [Fact]
@@ -388,6 +475,20 @@ public class HomeViewModelTests
             new NoopIncidentHostController(),
             "1.0.0",
             runInBackground: runInBackground);
+
+    // The store may know an entry the list no longer shows (removed in the meantime); taking it out
+    // then just clears the store.
+    [Fact]
+    public void Removing_an_entry_the_list_no_longer_shows_leaves_the_list_alone()
+    {
+        var recent = new FakeRecent("/a.fwincident");
+        var vm = HomeWithRecent(recent);
+
+        vm.RemoveRecentCommand.Execute("/b.fwincident");
+
+        Assert.Equal(new[] { "/a.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+        Assert.Null(vm.RecentFilesError);
+    }
 
     [Fact]
     public void Removing_a_recent_entry_drops_it_from_the_list_and_the_store()
@@ -671,6 +772,8 @@ internal sealed class OpenReturningDialogs : IFileDialogService
 
     public Task OpenPhoneAsync(string number) => Task.CompletedTask;
 
+    public bool CanShareFiles => false;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -707,6 +810,8 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     public Task OpenMailAsync(string address) => Task.CompletedTask;
 
     public Task OpenPhoneAsync(string number) => Task.CompletedTask;
+
+    public bool CanShareFiles => false;
 
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }

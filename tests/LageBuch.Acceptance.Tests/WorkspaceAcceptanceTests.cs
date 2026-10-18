@@ -102,6 +102,9 @@ internal sealed class FakeDialogs : IFileDialogService
 
     public Task OpenPhoneAsync(string number) => Task.CompletedTask;
 
+    /// <summary>False, like the desktop; set to stand in for Android's share sheet.</summary>
+    public bool CanShareFiles { get; init; }
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -156,6 +159,8 @@ internal sealed class AttachmentDialogs : IFileDialogService
         LastPhoneNumber = number;
         return Task.CompletedTask;
     }
+
+    public bool CanShareFiles => false;
 
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
