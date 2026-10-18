@@ -1,3 +1,5 @@
+using LageBuch.Domain.Tasks;
+
 namespace LageBuch.Domain.Tests;
 
 public class FormattingTests
@@ -42,5 +44,47 @@ public class FormattingTests
     public void Address_joins_the_non_blank_parts_and_is_null_when_both_are_blank(string? street, string? district, string? expected)
     {
         Assert.Equal(expected, Formatting.Address(street, district));
+    }
+
+    public static TheoryData<TaskImportance, string> ImportanceLabels => new()
+    {
+        { TaskImportance.High, "Hoch" },
+        { TaskImportance.Medium, "Mittel" },
+        { TaskImportance.Low, "Niedrig" },
+    };
+
+    public static TheoryData<TaskUrgency, string> UrgencyLabels => new()
+    {
+        { TaskUrgency.High, "Hoch" },
+        { TaskUrgency.Medium, "Mittel" },
+        { TaskUrgency.Low, "Niedrig" },
+    };
+
+    [Theory]
+    [MemberData(nameof(ImportanceLabels))]
+    public void Level_importance_is_german(TaskImportance importance, string expected)
+    {
+        Assert.Equal(expected, Formatting.Level(importance));
+    }
+
+    [Fact]
+    public void Level_importance_rows_cover_every_enum_member()
+    {
+        var covered = ImportanceLabels.Select(row => (TaskImportance)row[0]);
+        Assert.Equal(Enum.GetValues<TaskImportance>().Order(), covered.Order());
+    }
+
+    [Theory]
+    [MemberData(nameof(UrgencyLabels))]
+    public void Level_urgency_is_german(TaskUrgency urgency, string expected)
+    {
+        Assert.Equal(expected, Formatting.Level(urgency));
+    }
+
+    [Fact]
+    public void Level_urgency_rows_cover_every_enum_member()
+    {
+        var covered = UrgencyLabels.Select(row => (TaskUrgency)row[0]);
+        Assert.Equal(Enum.GetValues<TaskUrgency>().Order(), covered.Order());
     }
 }
