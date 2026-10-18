@@ -76,6 +76,18 @@ public class HomeViewModelTests
         Assert.True(vm.CanShareCrashReport);
     }
 
+    [Fact]
+    public async Task Sharing_after_a_normal_start_hands_nothing_to_the_share_sheet()
+    {
+        var dialogs = new FakeDialogs { CanShareFiles = true };
+        var vm = new HomeViewModel(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        await vm.ShareCrashReportCommand.ExecuteAsync(null);
+
+        Assert.False(vm.CanShareCrashReport);
+        Assert.Null(dialogs.SharedPath);
+    }
+
     private static HomeViewModel HomeAfterCrash(FakeDialogs dialogs) =>
         new(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", lastCrashReport: "/data/crashes/crash-1.txt");
 
@@ -213,6 +225,30 @@ public class HomeViewModelTests
         Assert.Equal(
             new[] { "20260301-0900-B.fwincident", "20260201-0900-C.fwincident", "20260101-0900-A.fwincident" },
             vm.RecentFiles.Select(f => f.FileName));
+    }
+
+    [Fact]
+    public void Reopening_a_listed_incident_keeps_a_single_row_for_it()
+    {
+        var store = new FakeStore();
+        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/a.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>());
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent("/a.fwincident"), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        vm.OpenRecentCommand.Execute("/a.fwincident");
+
+        Assert.Equal(new[] { "/a.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+    }
+
+    [Fact]
+    public void Opening_a_closed_incident_lists_it_as_closed()
+    {
+        var store = new FakeStore();
+        TestSession.StartNew(store, new FixedClock(T0), new SessionOperator("Müller"), "/closed.fwincident", Array.Empty<(string, bool)>(), Array.Empty<(string, bool)>()).Close();
+        var vm = new HomeViewModel(store, new FakeMasterData(), new FakeRecent(), new FakeDialogs(), new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0");
+
+        vm.OpenRecentCommand.Execute("/closed.fwincident");
+
+        Assert.True(Assert.Single(vm.RecentFiles).IsClosed);
     }
 
     [Fact]
@@ -439,6 +475,20 @@ public class HomeViewModelTests
             new NoopIncidentHostController(),
             "1.0.0",
             runInBackground: runInBackground);
+
+    // The store may know an entry the list no longer shows (removed in the meantime); taking it out
+    // then just clears the store.
+    [Fact]
+    public void Removing_an_entry_the_list_no_longer_shows_leaves_the_list_alone()
+    {
+        var recent = new FakeRecent("/a.fwincident");
+        var vm = HomeWithRecent(recent);
+
+        vm.RemoveRecentCommand.Execute("/b.fwincident");
+
+        Assert.Equal(new[] { "/a.fwincident" }, vm.RecentFiles.Select(f => f.Path));
+        Assert.Null(vm.RecentFilesError);
+    }
 
     [Fact]
     public void Removing_a_recent_entry_drops_it_from_the_list_and_the_store()
