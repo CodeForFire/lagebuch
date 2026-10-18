@@ -1,0 +1,1 @@
+Atemschutz: a double-click on IM EINSATZ no longer also records an empty Druck or calls RÜCKZUG, because every Atemschutz action button now ignores the second press of a double-click or double-tap (#630).

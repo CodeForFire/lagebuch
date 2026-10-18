@@ -3,21 +3,56 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
+using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.Acceptance.Tests;
 
 /// <summary>
-/// ABGENOMMEN takes the slot RÜCKZUG just left, so a double-click on RÜCKZUG used to withdraw the
-/// Trupp and end its monitoring in one gesture (#601). Replayed through the real buttons, because
-/// the bug is the layout: the second click lands wherever the first one's button used to be.
+/// Each of a Trupp's states puts its next button in the slot the previous one just left, so the
+/// second click of a double-click lands on whatever the first one made appear: ABGENOMMEN after
+/// RÜCKZUG (#601), DRUCK or RÜCKZUG after IM EINSATZ (#630). Replayed through the real buttons,
+/// because the bug is the layout: the second click lands wherever the first one's button used to be.
 /// </summary>
 public class ScbaDoubleClickTests
 {
-    [AvaloniaFact]
-    public void A_double_click_on_Rueckzug_leaves_the_trupp_withdrawing()
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_double_click_on_Rueckzug_leaves_the_trupp_withdrawing(bool narrow)
+    {
+        var (scba, row, view, window) = ShowTrupp(narrow);
+        row.StartCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        DoubleClick(window, view, row, "RÜCKZUG", atRightEdge: false);
+
+        var after = scba.Trupps.Single(r => r.Id == row.Id);
+        Assert.True(after.IsWithdrawing);
+        Assert.False(after.IsReturned);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void A_double_click_on_Im_Einsatz_starts_the_trupp_and_nothing_else(bool narrow, bool atRightEdge)
+    {
+        var (scba, row, view, window) = ShowTrupp(narrow);
+
+        DoubleClick(window, view, row, "IM EINSATZ", atRightEdge);
+
+        var after = scba.Trupps.Single(r => r.Id == row.Id);
+        Assert.True(after.IsActive);
+        Assert.False(after.IsWithdrawing);
+        Assert.False(after.HasPressureError);
+    }
+
+    private static (ScbaViewModel Scba, ScbaTruppRow Row, ScbaView View, Window Window) ShowTrupp(bool narrow)
     {
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
         var scba = vm.Scba;
@@ -27,26 +62,32 @@ public class ScbaDoubleClickTests
         scba.NewZweiterTruppmann = string.Empty;
         scba.AddTruppCommand.Execute(null);
         var row = scba.Trupps[^1];
-        row.StartCommand.Execute(null);
 
+        // What IncidentWorkspaceView does at a phone's width: its code-behind folds the composer
+        // away, and its "Workspace" container query swaps the grid for the cards.
+        vm.IsNarrow = narrow;
         var view = new ScbaView { DataContext = scba };
-        var window = new Window { Content = view, Width = 1400, Height = 900 };
+        var workspace = new Panel { Children = { view } };
+        Container.SetName(workspace, "Workspace");
+        Container.SetSizing(workspace, ContainerSizing.Width);
+        var window = new Window { Content = workspace, Width = narrow ? 420 : 1400, Height = 900 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
+        return (scba, row, view, window);
+    }
 
-        var rueckzug = view.GetVisualDescendants().OfType<Button>()
-            .First(b => b.IsEffectivelyVisible && "RÜCKZUG".Equals(b.Content) && ReferenceEquals(b.DataContext, row));
-        var centre = rueckzug.TranslatePoint(new Point(rueckzug.Bounds.Width / 2, rueckzug.Bounds.Height / 2), window)!.Value;
+    private static void DoubleClick(Window window, ScbaView view, ScbaTruppRow row, string label, bool atRightEdge)
+    {
+        var button = view.GetVisualDescendants().OfType<Button>()
+            .First(b => b.IsEffectivelyVisible && label.Equals(b.Content) && ReferenceEquals(b.DataContext, row));
+        var x = atRightEdge ? button.Bounds.Width - 2 : button.Bounds.Width / 2;
+        var point = button.TranslatePoint(new Point(x, button.Bounds.Height / 2), window)!.Value;
 
         for (var click = 0; click < 2; click++)
         {
-            window.MouseDown(centre, MouseButton.Left);
-            window.MouseUp(centre, MouseButton.Left);
+            window.MouseDown(point, MouseButton.Left);
+            window.MouseUp(point, MouseButton.Left);
             Dispatcher.UIThread.RunJobs();
         }
-
-        var after = scba.Trupps.Single(r => r.Id == row.Id);
-        Assert.True(after.IsWithdrawing);
-        Assert.False(after.IsReturned);
     }
 }

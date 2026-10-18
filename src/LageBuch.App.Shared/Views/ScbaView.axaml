@@ -390,15 +390,17 @@
                                    Classes.invalid="{Binding HasPressureError}"
                                    b:EnterSubmit.Command="{Binding RecordPressureCommand}"
                                    IsEnabled="{Binding !IsReturned}" />
-                    <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}"
+                    <!-- Each state puts its next button where the last one was, so every one of them ignores
+                         the second press of a double-click (SinglePress, #601, #630). -->
+                    <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsWaiting}" />
-                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsActive}" />
-                    <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}"
+                    <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsActive}" />
-                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsWithdrawing}" />
-                    <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}"
+                    <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsWithdrawing}" />
                   </StackPanel>
                   <TextBlock Classes="pressureError" Text="{Binding PressureError}"
@@ -522,15 +524,17 @@
                                    Classes.invalid="{Binding HasPressureError}"
                                    b:EnterSubmit.Command="{Binding RecordPressureCommand}"
                                    IsEnabled="{Binding !IsReturned}" />
-                    <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}"
+                    <!-- Each state puts its next button where the last one was, so every one of them ignores
+                         the second press of a double-click (SinglePress, #601, #630). -->
+                    <Button Classes="signal" Content="IM EINSATZ" Command="{Binding StartCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsWaiting}" />
-                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsActive}" />
-                    <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}"
+                    <Button Classes="signal" Content="RÜCKZUG" Command="{Binding WithdrawCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsActive}" />
-                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}"
+                    <Button Content="DRUCK" Command="{Binding RecordPressureCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsWithdrawing}" />
-                    <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}"
+                    <Button Classes="signal" Content="ABGENOMMEN" Command="{Binding MarkRemovedCommand}" b:SinglePress.IsEnabled="True"
                             IsVisible="{Binding IsWithdrawing}" />
                   </WrapPanel>
                   <TextBlock Classes="pressureError" Text="{Binding PressureError}"
