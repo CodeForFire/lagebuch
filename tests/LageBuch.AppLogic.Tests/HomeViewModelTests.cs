@@ -28,6 +28,57 @@ public class HomeViewModelTests
         Assert.Null(vm.CrashNotice);
     }
 
+    // #636: on desktop the path is reachable, so it stays in the notice and nothing is shared.
+    [Fact]
+    public void On_desktop_the_crash_notice_still_names_the_path_and_offers_no_share()
+    {
+        var vm = HomeAfterCrash(new FakeDialogs());
+
+        Assert.Contains("/data/crashes/crash-1.txt", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.False(vm.CanShareCrashReport);
+    }
+
+    // #636: on Android the path sits in the app's own storage, where no file manager reaches it, so
+    // the notice offers the report through the share sheet instead of naming a path nobody can open.
+    [Fact]
+    public void On_a_device_that_shares_files_the_crash_notice_offers_the_report_instead_of_a_path()
+    {
+        var vm = HomeAfterCrash(new FakeDialogs { CanShareFiles = true });
+
+        Assert.Contains("unerwartet beendet", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.Contains("teilen", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("/data/crashes", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.True(vm.CanShareCrashReport);
+    }
+
+    [Fact]
+    public async Task Sharing_the_crash_report_hands_its_path_to_the_share_sheet()
+    {
+        var dialogs = new FakeDialogs { CanShareFiles = true };
+        var vm = HomeAfterCrash(dialogs);
+
+        await vm.ShareCrashReportCommand.ExecuteAsync(null);
+
+        Assert.Equal("/data/crashes/crash-1.txt", dialogs.SharedPath);
+        Assert.Equal("text/plain", dialogs.SharedMimeType);
+    }
+
+    [Fact]
+    public async Task A_crash_report_that_cannot_be_shared_says_so_in_the_notice()
+    {
+        var dialogs = new FakeDialogs { CanShareFiles = true, ShareFailure = new InvalidOperationException("no activity") };
+        var vm = HomeAfterCrash(dialogs);
+
+        await vm.ShareCrashReportCommand.ExecuteAsync(null);
+
+        Assert.Contains("konnte nicht geteilt werden", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("no activity", vm.CrashNotice, StringComparison.Ordinal);
+        Assert.True(vm.CanShareCrashReport);
+    }
+
+    private static HomeViewModel HomeAfterCrash(FakeDialogs dialogs) =>
+        new(new FakeStore(), new FakeMasterData(), new FakeRecent(), dialogs, new FixedClock(T0), new FakeTicker(), new FakeAlarmService(), new NoopIncidentHostController(), "1.0.0", lastCrashReport: "/data/crashes/crash-1.txt");
+
     [Fact]
     public void A_normal_start_shows_no_crash_notice()
     {
@@ -671,6 +722,8 @@ internal sealed class OpenReturningDialogs : IFileDialogService
 
     public Task OpenPhoneAsync(string number) => Task.CompletedTask;
 
+    public bool CanShareFiles => false;
+
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }
 
@@ -707,6 +760,8 @@ internal sealed class CapturingSaveDialogs : IFileDialogService
     public Task OpenMailAsync(string address) => Task.CompletedTask;
 
     public Task OpenPhoneAsync(string number) => Task.CompletedTask;
+
+    public bool CanShareFiles => false;
 
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
 }

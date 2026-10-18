@@ -226,6 +226,9 @@ internal sealed class StorageProviderFileDialogService : IFileDialogService
         }
     }
 
+    // Every file the app writes sits where the user can reach it, so there is nothing to hand out.
+    public bool CanShareFiles => false;
+
     // The user already chose the exact destination via the native save dialog above — there is
     // nothing further to hand off on desktop.
     public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;

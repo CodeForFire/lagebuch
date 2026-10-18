@@ -62,12 +62,23 @@ public sealed partial class HomeViewModel : ObservableObject
     // path any more, see RemoteIncidentSession.ConnectAsync).
     private readonly ITrustStore? _trustStore;
 
+    // The report the crash notice is about, or null after a normal start.
+    private readonly string? _crashReportPath;
+
     public HomeViewModel(IIncidentStore store, IMasterDataProvider masterData, IRecentFilesStore recent, IFileDialogService dialogs, IClock clock, ITicker ticker, IAlarmService alarm, IIncidentHostController hostController, string appVersion, IUiDispatcher? uiDispatcher = null, ILastSaveFolderStore? lastSaveFolder = null, string? attachmentCacheRoot = null, ITrustStore? trustStore = null, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, ILastConnectionStore? lastConnection = null, IMailComposer? mailComposer = null, Action<Action>? runInBackground = null, string? lastCrashReport = null)
     {
         ArgumentNullException.ThrowIfNull(recent);
+        ArgumentNullException.ThrowIfNull(dialogs);
+
+        // Where the files can be shared (Android), the report sits in the app's own storage, which
+        // no file manager reaches, so naming its path would ask for something nobody can do (#636).
+        _crashReportPath = lastCrashReport;
+        CanShareCrashReport = lastCrashReport is not null && dialogs.CanShareFiles;
         CrashNotice = lastCrashReport is null
             ? null
-            : $"Lagebuch wurde zuletzt unerwartet beendet. Ein Fehlerbericht ohne Einsatzdaten liegt unter {lastCrashReport} – bitte einer Fehlermeldung beilegen.";
+            : CanShareCrashReport
+                ? "Lagebuch wurde zuletzt unerwartet beendet. Ein Fehlerbericht ohne Einsatzdaten liegt bereit – Fehlerbericht teilen, um ihn einer Fehlermeldung beizulegen."
+                : $"Lagebuch wurde zuletzt unerwartet beendet. Ein Fehlerbericht ohne Einsatzdaten liegt unter {lastCrashReport} – bitte einer Fehlermeldung beilegen.";
         _store = store;
         _masterData = masterData;
         _recent = recent;
@@ -170,14 +181,40 @@ public sealed partial class HomeViewModel : ObservableObject
     private string? _lastConnectionError;
 
     /// <summary>
-    /// Shown on the start after a crash (#300): that it happened and where its report is, so the
-    /// report can go with a bug report. Null otherwise, and once dismissed.
+    /// Shown on the start after a crash (#300): that it happened and where its report is, or that it
+    /// can be shared (#636), so the report can go with a bug report. Null otherwise, and once dismissed.
     /// </summary>
     [ObservableProperty]
     private string? _crashNotice;
 
+    /// <summary>Whether the crash notice offers its report through the share sheet (Android, #636).</summary>
+    public bool CanShareCrashReport { get; }
+
     [RelayCommand]
     private void DismissCrashNotice() => CrashNotice = null;
+
+    // The share sheet's own failure text is not shown: it is English, and may name a path.
+    [SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A share sheet that fails to open must not end the start; surfaces in the bound CrashNotice.")]
+    [RelayCommand]
+    private async Task ShareCrashReportAsync()
+    {
+        if (_crashReportPath is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _dialogs.ShareFileAsync(_crashReportPath, "text/plain");
+        }
+        catch (Exception)
+        {
+            CrashNotice = "Lagebuch wurde zuletzt unerwartet beendet. Der Fehlerbericht konnte nicht geteilt werden – bitte erneut versuchen.";
+        }
+    }
 
     /// <summary>
     /// "‹Stichwort› · ‹time›" under the host on the Home card; the Stichwort is left out while unset.

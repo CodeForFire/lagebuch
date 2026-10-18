@@ -339,6 +339,8 @@ public class ContactsViewModelTests
             return Task.CompletedTask;
         }
 
+        public bool CanShareFiles => false;
+
         public Task ShareFileAsync(string path, string mimeType) => Task.CompletedTask;
     }
 }

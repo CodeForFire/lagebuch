@@ -69,7 +69,8 @@
         </StackPanel>
 
         <!-- The start after a crash (#300): what happened and where the report is. Selectable, so the
-             path can be copied into a bug report; same shape as the open-failure banner below. -->
+             path can be copied into a bug report; same shape as the open-failure banner below. On
+             Android the path is out of reach, so TEILEN hands the report on instead (#636). -->
         <Border x:Name="CrashNoticeBanner" Background="#241608"
                 BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
@@ -82,9 +83,15 @@
             <SelectableTextBlock Grid.Row="0" Grid.Column="1" x:Name="CrashNoticeMessage" Text="{Binding CrashNotice}"
                                  FontFamily="{StaticResource BodyFont}" FontWeight="SemiBold" TextWrapping="Wrap"
                                  Foreground="{StaticResource AmberBrush}" />
-            <Button Grid.Row="1" Grid.Column="1" x:Name="DismissCrashNoticeButton" Classes="ghost"
-                    Content="AUSBLENDEN" Margin="0,10,0,0" Padding="10,4" HorizontalAlignment="Left"
-                    Command="{Binding DismissCrashNoticeCommand}" />
+            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+              <Button x:Name="ShareCrashReportButton" Classes="ghost"
+                      Content="TEILEN" Padding="10,4"
+                      IsVisible="{Binding CanShareCrashReport}"
+                      Command="{Binding ShareCrashReportCommand}" />
+              <Button x:Name="DismissCrashNoticeButton" Classes="ghost"
+                      Content="AUSBLENDEN" Padding="10,4"
+                      Command="{Binding DismissCrashNoticeCommand}" />
+            </StackPanel>
           </Grid>
         </Border>
 

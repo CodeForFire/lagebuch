@@ -238,6 +238,8 @@ public sealed class AndroidFileDialogService : IFileDialogService
         return SafeFileName.DefaultFallback;
     }
 
+    public bool CanShareFiles => true;
+
     // Exports (PDF, Stammdaten JSON) live in SharedDir and share as they are. Anything inside the
     // attachment temp root is an attachment copy, and leaves the device only if it passes the same
     // gate OpenFileAsync applies.
