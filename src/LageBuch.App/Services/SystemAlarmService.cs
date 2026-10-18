@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using Avalonia.Platform;
+using LageBuch.App.Shared.Services;
 using LageBuch.AppLogic.Services;
 
 namespace LageBuch.App.Services;
@@ -15,31 +15,12 @@ namespace LageBuch.App.Services;
 /// </summary>
 internal sealed class SystemAlarmService : IAlarmService, IDisposable
 {
-    private const uint SndNodefault = 0x0002; // no default beep if it fails
-    private const uint SndMemory = 0x0004;  // pszSound points to in-memory WAV
-
     // No SND_ASYNC: playback must block the queue's worker thread until the clip finishes,
     // so cues play one after another instead of overlapping (see SerialAudioQueue). The price is
     // that a Windows cue cannot be stopped once it has started: PlaySound ignores the queue's
     // cancellation, so a wedged audio device there can only be abandoned, not ended.
-
-    // One voice clip per AlarmSound. A missing entry or missing file just means that cue is silent,
-    // which is why SystemAlarmServiceTests checks that every file named here is in Assets/.
-    internal static readonly IReadOnlyDictionary<AlarmSound, string> VoiceAssets =
-        new Dictionary<AlarmSound, string>
-        {
-            // Says „Rückmeldung an die Leitstelle", which fits whatever Leitstelle is configured
-            // (#400). Generated once with ElevenLabs (voice "Chris Norddeutscher"), levelled to
-            // the clip it replaced.
-            [AlarmSound.IlsReminderDue] = "voice-rueckmeldung-leitstelle.wav",
-
-            // Spoken since #460: a bare tone told an operator on another tab nothing about what
-            // had come due. Generated once with ElevenLabs (converted to 16-bit mono 22050 Hz, peak
-            // -3 dBFS like the other clips), not at run time.
-            [AlarmSound.TaskDue] = "voice-aufgabe-faellig.wav",
-            [AlarmSound.PressureCheckDue] = "voice-druckabfrage.wav",
-            [AlarmSound.RetreatAlarm] = "voice-rueckzugsalarm.wav",
-        };
+    private const uint SndNodefault = 0x0002; // no default beep if it fails
+    private const uint SndMemory = 0x0004;  // pszSound points to in-memory WAV
 
     private readonly Dictionary<AlarmSound, byte[]> _voiceBytes = new();
     private readonly Dictionary<AlarmSound, string> _voiceTempFiles = new();
@@ -48,9 +29,9 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
     public SystemAlarmService()
     {
         // Preload the voice clips (all platforms). Absent files are simply skipped.
-        foreach (var (sound, file) in VoiceAssets)
+        foreach (var sound in VoiceClips.Files.Keys)
         {
-            if (TryLoad(new Uri($"avares://LageBuch.App/Assets/{file}")) is { } bytes)
+            if (VoiceClips.TryLoad(sound) is { } bytes)
             {
                 _voiceBytes[sound] = bytes;
             }
@@ -218,25 +199,6 @@ internal sealed class SystemAlarmService : IAlarmService, IDisposable
         catch
         {
             return null;
-        }
-    }
-
-    [SuppressMessage(
-        "Design",
-        "CA1031",
-        Justification = "A missing bundled asset must stay silent (see comment).")]
-    private static byte[]? TryLoad(Uri asset)
-    {
-        try
-        {
-            using var stream = AssetLoader.Open(asset);
-            using var ms = new MemoryStream();
-            stream.CopyTo(ms);
-            return ms.ToArray();
-        }
-        catch
-        {
-            return null; // asset not bundled — that cue stays silent
         }
     }
 

@@ -16,6 +16,8 @@
     <AvaloniaResource Include="Assets\icon-1024.png" />
     <AvaloniaResource Include="Assets\codeforfire.png" />
     <AvaloniaResource Include="Assets\lagebuch-logo.png" />
+    <!-- The spoken voice-*.wav cues (see VoiceClips), shared so the Android head plays them too. -->
+    <AvaloniaResource Include="Assets\*.wav" />
   </ItemGroup>
 
   <ItemGroup>

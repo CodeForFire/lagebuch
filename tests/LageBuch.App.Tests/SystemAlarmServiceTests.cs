@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using LageBuch.App.Services;
+using LageBuch.App.Shared.Services;
 using LageBuch.AppLogic.Services;
 
 namespace LageBuch.App.Tests;
@@ -12,11 +13,11 @@ public class SystemAlarmServiceTests
     [Fact]
     public void Every_alarm_sound_has_a_bundled_voice_clip()
     {
-        var assets = Path.Join(RepoRoot(), "src", "LageBuch.App", "Assets");
+        var assets = Path.Join(RepoRoot(), "src", "LageBuch.App.Shared", "Assets");
 
         Assert.All(Enum.GetValues<AlarmSound>(), sound =>
         {
-            Assert.True(SystemAlarmService.VoiceAssets.TryGetValue(sound, out var file), $"no voice clip mapped for {sound}");
+            Assert.True(VoiceClips.Files.TryGetValue(sound, out var file), $"no voice clip mapped for {sound}");
             Assert.True(File.Exists(Path.Join(assets, file)), $"{file} for {sound} is not in {assets}");
         });
     }

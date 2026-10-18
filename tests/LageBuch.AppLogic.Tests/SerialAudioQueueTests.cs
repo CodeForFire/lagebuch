@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using LageBuch.App.Services;
+using LageBuch.AppLogic.Services;
 
-namespace LageBuch.App.Tests;
+namespace LageBuch.AppLogic.Tests;
 
 public class SerialAudioQueueTests
 {
@@ -169,6 +169,49 @@ public class SerialAudioQueueTests
 
         Assert.True(secondRan.Wait(TimeSpan.FromSeconds(5)), "the next action never ran");
         Assert.True(secondSawFirstEnded, "the next action started while the stopped one was still playing");
+    }
+
+    [Fact]
+    public void An_action_that_ignores_its_stop_is_abandoned_once_the_grace_runs_out()
+    {
+        // No grace at all, so the next action must not wait the default two seconds for a cue that
+        // ignores its token (Windows' PlaySound cannot be interrupted).
+        var queue = new SerialAudioQueue(perItemTimeout: TimeSpan.Zero, cancelGrace: TimeSpan.Zero);
+        using var release = new ManualResetEventSlim();
+        using var secondRan = new ManualResetEventSlim();
+
+        queue.Enqueue(_ => release.Wait(TimeSpan.FromSeconds(30), CancellationToken.None));
+        queue.Enqueue(_ => secondRan.Set());
+
+        try
+        {
+            Assert.True(secondRan.Wait(TimeSpan.FromSeconds(1)), "the next action waited longer than the configured grace");
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
+    [Fact]
+    public void Each_action_plays_on_its_own_named_background_thread()
+    {
+        // Background, so an abandoned cue can never hold up the app's exit.
+        var queue = new SerialAudioQueue();
+        var isBackground = false;
+        string? name = null;
+        using var ran = new ManualResetEventSlim();
+
+        queue.Enqueue(_ =>
+        {
+            isBackground = Thread.CurrentThread.IsBackground;
+            name = Thread.CurrentThread.Name;
+            ran.Set();
+        });
+
+        Assert.True(ran.Wait(TimeSpan.FromSeconds(5)), "the action never ran");
+        Assert.True(isBackground, "the action ran on a foreground thread");
+        Assert.Equal("SerialAudioQueue item", name);
     }
 
     private static void RecordTimedRun(
