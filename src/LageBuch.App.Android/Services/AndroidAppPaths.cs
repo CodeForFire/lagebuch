@@ -47,15 +47,77 @@ internal static class AndroidAppPaths
     }
 
     /// <summary>
-    /// Where picked attachments and imported master-data JSON land before this process reads
-    /// them off disk. Deliberately not exposed through the <c>FileProvider</c> (it never appears
-    /// in <c>file_paths.xml</c>) — nothing outside this app needs a URI into it.
+    /// Where a picked attachment lands before this process reads it off disk. Each picker has its
+    /// own folder under <c>picked</c>, so clearing one never deletes the other's file. Deliberately
+    /// not exposed through the <c>FileProvider</c> (it never appears in <c>file_paths.xml</c>) --
+    /// nothing outside this app needs a URI into it.
     /// </summary>
-    public static string PickedDir(Context context)
+    public static string PickedAttachmentDir(Context context)
     {
-        var dir = System.IO.Path.Join(CacheDir(context), "picked");
+        var dir = PickedAttachmentPath(context);
         System.IO.Directory.CreateDirectory(dir);
         return dir;
+    }
+
+    /// <summary>Where an imported Stammdaten JSON lands; see <see cref="PickedAttachmentDir"/>.</summary>
+    public static string PickedImportDir(Context context)
+    {
+        var dir = PickedImportPath(context);
+        System.IO.Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    /// <summary>
+    /// Empties <see cref="PickedAttachmentDir"/> before a new attachment is copied in (#407). Every
+    /// file there is a copy the app already read -- the attachment itself is persisted into the
+    /// incident -- so nothing is lost; without this the folder keeps a copy of every file ever
+    /// attached on the device.
+    /// </summary>
+    public static void ClearPickedAttachments(Context context) => ClearFiles(PickedAttachmentPath(context));
+
+    /// <summary>
+    /// Empties both picker folders, and <c>picked</c> itself, where builds before #407 copied every
+    /// pick. For a cold start only: a pick that completes after a configuration change still has to
+    /// find its copy.
+    /// </summary>
+    public static void ClearPickedFiles(Context context)
+    {
+        ClearFiles(PickedRootPath(context));
+        ClearFiles(PickedAttachmentPath(context));
+        ClearFiles(PickedImportPath(context));
+    }
+
+    private static string PickedRootPath(Context context) => System.IO.Path.Join(CacheDir(context), "picked");
+
+    private static string PickedAttachmentPath(Context context) =>
+        System.IO.Path.Join(PickedRootPath(context), "attachment");
+
+    private static string PickedImportPath(Context context) =>
+        System.IO.Path.Join(PickedRootPath(context), "import");
+
+    // Best-effort, and never throws: it runs in OnCreate and on the activity-result callback, where
+    // nothing above it catches. A file that cannot be deleted now -- or a folder that cannot even be
+    // listed, or does not exist yet -- goes on a later pass.
+    private static void ClearFiles(string dir)
+    {
+        try
+        {
+            foreach (var file in System.IO.Directory.EnumerateFiles(dir))
+            {
+                try
+                {
+                    System.IO.File.Delete(file);
+                }
+                catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+                {
+                    // Left for the next pass; see above.
+                }
+            }
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            // Left for the next pass; see above.
+        }
     }
 
     public static string TrustJsonPath(Context context) =>
