@@ -193,8 +193,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      # Manifest mode, so a half-published workload set cannot block a
+      # release; see the same step in ci.yml.
       - name: Install Android workload
-        run: dotnet workload install android
+        run: |
+          dotnet workload config --update-mode manifests
+          dotnet workload install android
       - name: Publish
         run: >
           dotnet publish src/LageBuch.App.Android/LageBuch.App.Android.csproj -c Release
