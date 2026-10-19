@@ -346,6 +346,9 @@ public sealed partial class DwellingEditorViewModel : ObservableObject
 
     public bool HasLabelChange => Normalize(Label) != Normalize(OriginalLabel);
 
+    /// <summary>Whether ABBRECHEN would throw anything away, so it has to ask first (#652).</summary>
+    public bool HasChanges => HasStatusChange || HasCoValueChange || HasDetailChange || HasLabelChange;
+
     // Same severity signal as the tile (DwellingCellViewModel), shown live while typing so the
     // operator sees danger coloring before committing, not only after FERTIG.
     public bool IsCoElevated => CoSeverityClassifier.SeverityOf(CoValue) == CoSeverity.Elevated;
@@ -924,6 +927,10 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
 
     partial void OnEditorChanged(DwellingEditorViewModel? oldValue, DwellingEditorViewModel? newValue)
     {
+        // Whatever replaced or closed the buffer (FERTIG, another tile, a removed floor) answered
+        // the question about the old one.
+        IsDiscardEditorConfirmOpen = false;
+
         if (oldValue is not null)
         {
             oldValue.PropertyChanged -= OnEditorFieldChanged;
@@ -1403,10 +1410,33 @@ public sealed partial class CoMessprotokollViewModel : ObservableObject, INarrow
         Refresh();
     }
 
-    /// <summary>ABBRECHEN. Drops the buffer without writing anything; the rebuild puts the tile back
-    /// to committed state, undoing the pending preview.</summary>
+    /// <summary>ABBRECHEN, and Esc. Drops the buffer without writing anything; the rebuild puts the
+    /// tile back to committed state, undoing the pending preview. A buffer holding a change asks
+    /// first (#652): a typed ppm value that never reaches FERTIG is a gap in the Messreihe, and
+    /// every removal in this view already asks. An untouched one closes at once, so the keyboard
+    /// flow costs no extra key.</summary>
     [RelayCommand]
     private void CloseEditor()
+    {
+        if (Editor is { HasChanges: true })
+        {
+            IsDiscardEditorConfirmOpen = true;
+            return;
+        }
+
+        DiscardEditor();
+    }
+
+    [ObservableProperty]
+    private bool _isDiscardEditorConfirmOpen;
+
+    [RelayCommand]
+    private void ConfirmDiscardEditor() => DiscardEditor();
+
+    [RelayCommand]
+    private void CancelDiscardEditor() => IsDiscardEditorConfirmOpen = false;
+
+    private void DiscardEditor()
     {
         Editor = null;
         BuildMatrix();

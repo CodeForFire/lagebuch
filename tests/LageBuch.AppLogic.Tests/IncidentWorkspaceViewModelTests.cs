@@ -573,6 +573,7 @@ public class IncidentWorkspaceViewModelTests
         vm.EditIncidentDataCommand.Execute(null);
         vm.PendingIncidentDataDialog!.Keyword = "B4";
         vm.PendingIncidentDataDialog!.CancelCommand.Execute(null);
+        vm.PendingIncidentDataDialog!.ConfirmDiscardCommand.Execute(null); // #652: typed fields ask first
 
         Assert.Null(vm.PendingIncidentDataDialog);
         Assert.Equal("B3P", vm.HeroText);

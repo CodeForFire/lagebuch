@@ -152,6 +152,7 @@ public class CoMessprotokollViewModelTests
         Assert.Equal("120 ppm", vm.Editor.Readings[0].Value);
 
         vm.CloseEditorCommand.Execute(null);
+        vm.ConfirmDiscardEditorCommand.Execute(null);
 
         vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
         Assert.Single(vm.Editor!.Readings);
@@ -678,6 +679,7 @@ public class CoMessprotokollViewModelTests
         editor.Label = "Hinterhaus";
 
         vm.CloseEditorCommand.Execute(null);
+        vm.ConfirmDiscardEditorCommand.Execute(null); // #652: a changed buffer asks first
 
         var dwelling = DwellingOf(session, buildingId, 0, 1);
         Assert.Equal(DwellingStatus.NotSearched, dwelling.Status);
@@ -699,8 +701,111 @@ public class CoMessprotokollViewModelTests
         vm.SetEditorStatusAffectedCommand.Execute(null);
         editor.CoValue = 120;
         vm.CloseEditorCommand.Execute(null);
+        vm.ConfirmDiscardEditorCommand.Execute(null);
 
         Assert.Equal(before, session.Incident.Journal.Count);
+    }
+
+    // #652: a typed ppm value that has not been recorded is a gap in the Messreihe, so ABBRECHEN
+    // and Esc (bound to the same command) ask before dropping it.
+    [Fact]
+    public void Cancelling_a_changed_editor_asks_first_and_keeps_it_open()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        var editor = OpenEditor(vm, 0, 1);
+        editor.CoValue = 120;
+
+        vm.CloseEditorCommand.Execute(null);
+
+        Assert.True(vm.IsDiscardEditorConfirmOpen);
+        Assert.True(vm.IsEditorOpen);
+        Assert.Same(editor, vm.Editor);
+        Assert.Null(DwellingOf(session, buildingId, 0, 1).CoValue);
+    }
+
+    [Fact]
+    public void Declining_the_discard_returns_to_the_edit_with_the_value_kept()
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+        editor.CoValue = 120;
+        vm.CloseEditorCommand.Execute(null);
+
+        vm.CancelDiscardEditorCommand.Execute(null);
+
+        Assert.False(vm.IsDiscardEditorConfirmOpen);
+        Assert.True(vm.IsEditorOpen);
+        Assert.Equal(120, vm.Editor!.CoValue);
+    }
+
+    [Fact]
+    public void Confirming_the_discard_closes_the_editor_without_writing()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        var editor = OpenEditor(vm, 0, 1);
+        editor.ResidentName = "Musterfrau";
+        vm.CloseEditorCommand.Execute(null);
+
+        vm.ConfirmDiscardEditorCommand.Execute(null);
+
+        Assert.False(vm.IsDiscardEditorConfirmOpen);
+        Assert.False(vm.IsEditorOpen);
+        Assert.Null(DwellingOf(session, buildingId, 0, 1).ResidentName);
+    }
+
+    [Theory]
+    [InlineData("status")]
+    [InlineData("co")]
+    [InlineData("detail")]
+    [InlineData("label")]
+    public void Every_kind_of_change_counts(string field)
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+        switch (field)
+        {
+            case "status": vm.SetEditorStatusAffectedCommand.Execute(null); break;
+            case "co": editor.CoValue = 35; break;
+            case "detail": editor.KeyAvailable = KeyAvailability.Available; break;
+            default: editor.Label = "Hinterhaus"; break;
+        }
+
+        vm.CloseEditorCommand.Execute(null);
+
+        Assert.True(vm.IsDiscardEditorConfirmOpen);
+        Assert.True(vm.IsEditorOpen);
+    }
+
+    // The keyboard flow stays fast: nothing typed, nothing to lose, no question.
+    [Fact]
+    public void Cancelling_an_unchanged_editor_closes_it_straight_away()
+    {
+        var (_, vm) = CreateVm();
+        var editor = OpenEditor(vm, 0, 1);
+        editor.ResidentName = "   "; // whitespace is no change, as FERTIG sees it
+
+        vm.CloseEditorCommand.Execute(null);
+
+        Assert.False(vm.IsDiscardEditorConfirmOpen);
+        Assert.False(vm.IsEditorOpen);
+    }
+
+    [Fact]
+    public void Committing_while_the_question_is_open_closes_it_too()
+    {
+        var (session, vm) = CreateVm();
+        var buildingId = session.Incident.Buildings[0].Id;
+        var editor = OpenEditor(vm, 0, 1);
+        editor.CoValue = 120;
+        vm.CloseEditorCommand.Execute(null);
+
+        vm.ConfirmEditorCommand.Execute(null);
+
+        Assert.False(vm.IsDiscardEditorConfirmOpen);
+        Assert.False(vm.IsEditorOpen);
+        Assert.Equal(120, DwellingOf(session, buildingId, 0, 1).CoValue);
     }
 
     [Fact]
@@ -836,6 +941,7 @@ public class CoMessprotokollViewModelTests
         Assert.Equal("120 ppm", pending.CoDisplay);
 
         vm.CloseEditorCommand.Execute(null);
+        vm.ConfirmDiscardEditorCommand.Execute(null);
 
         var reverted = Cell(vm, 0, 1);
         Assert.Equal(DwellingStatus.NotSearched, reverted.Status);

@@ -97,8 +97,27 @@ public class IncidentDataDialogViewModelTests
         Assert.Null(store.Load("/x.fwincident").Keyword);
     }
 
+    // #652: typed Einsatzdaten are not thrown away on a stray Esc; ABBRECHEN asks first.
     [Fact]
-    public void Cancel_discards_and_closes()
+    public void Cancel_with_typed_fields_asks_before_closing()
+    {
+        var store = new FakeStore();
+        var session = NewSession(store, keyword: "B3P");
+        var closed = 0;
+        var vm = new IncidentDataDialogViewModel(session, () => { });
+        vm.Closed += (_, _) => closed++;
+
+        vm.Keyword = "B4";
+        vm.CancelCommand.Execute(null);
+
+        Assert.Equal(0, closed);
+        Assert.True(vm.IsDiscardConfirmOpen);
+        Assert.Equal("B4", vm.Keyword);
+        Assert.False(vm.SaveCommand.CanExecute(null)); // Enter in a field must not save past the question
+    }
+
+    [Fact]
+    public void Confirming_the_discard_closes_without_saving()
     {
         var store = new FakeStore();
         var session = NewSession(store, keyword: "B3P");
@@ -106,13 +125,48 @@ public class IncidentDataDialogViewModelTests
         var vm = new IncidentDataDialogViewModel(session, () => { });
         vm.Closed += (_, _) => closed++;
         var before = store.SaveCount;
-
         vm.Keyword = "B4";
         vm.CancelCommand.Execute(null);
+
+        vm.ConfirmDiscardCommand.Execute(null);
 
         Assert.Equal(1, closed);
         Assert.Equal(before, store.SaveCount);
         Assert.Equal("B3P", store.Load("/x.fwincident").Keyword);
+    }
+
+    [Fact]
+    public void Declining_the_discard_keeps_editing()
+    {
+        var session = NewSession(new FakeStore(), keyword: "B3P");
+        var closed = 0;
+        var vm = new IncidentDataDialogViewModel(session, () => { });
+        vm.Closed += (_, _) => closed++;
+        vm.Street = "Hauptstr. 12";
+        vm.CancelCommand.Execute(null);
+
+        vm.CancelDiscardCommand.Execute(null);
+
+        Assert.Equal(0, closed);
+        Assert.False(vm.IsDiscardConfirmOpen);
+        Assert.Equal("Hauptstr. 12", vm.Street);
+        Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Cancel_with_nothing_changed_closes_straight_away()
+    {
+        var session = NewSession(new FakeStore(), keyword: "B3P");
+        var closed = 0;
+        var vm = new IncidentDataDialogViewModel(session, () => { });
+        vm.Closed += (_, _) => closed++;
+        vm.Keyword = " B3P "; // the same once trimmed, as SPEICHERN would see it
+        vm.District = string.Empty;
+
+        vm.CancelCommand.Execute(null);
+
+        Assert.Equal(1, closed);
+        Assert.False(vm.IsDiscardConfirmOpen);
     }
 
     [Fact]

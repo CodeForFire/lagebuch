@@ -42,11 +42,32 @@
               <TextBox x:Name="IncidentDataDistrictBox" Text="{Binding District}" PlaceholderText="z. B. Puch" />
             </HeaderedContentControl>
           </Grid>
-          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0"
+                      IsVisible="{Binding !IsDiscardConfirmOpen}">
             <Button x:Name="IncidentDataCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
             <Button x:Name="IncidentDataSaveButton" Classes="signal" Content="SPEICHERN"
                     Command="{Binding SaveCommand}" />
           </StackPanel>
+          <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. A
+               destructive confirm (#545): focus on ABBRECHEN, no primary command. Its own overlay
+               root inside the dialog's, so Esc closes the question rather than re-asking it. -->
+          <Border x:Name="IncidentDataDiscardPanel" Margin="0,8,0,0"
+                  IsVisible="{Binding IsDiscardConfirmOpen}"
+                  b:Overlay.IsInline="True"
+                  b:Overlay.CancelCommand="{Binding CancelDiscardCommand}"
+                  b:Overlay.InitialFocus="{Binding #IncidentDataKeepEditingButton}"
+                  BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+            <StackPanel Spacing="8">
+              <TextBlock Text="ÄNDERUNGEN VERWERFEN?" Classes="overline" />
+              <TextBlock Text="Die Eingaben sind noch nicht gespeichert." TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+                <Button x:Name="IncidentDataDiscardButton" Classes="signal" Content="VERWERFEN"
+                        Command="{Binding ConfirmDiscardCommand}" />
+                <Button x:Name="IncidentDataKeepEditingButton" Content="ABBRECHEN"
+                        Command="{Binding CancelDiscardCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
         </StackPanel>
       </DockPanel>
     </Border>

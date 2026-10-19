@@ -46,7 +46,31 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     [ObservableProperty]
     private string? _district;
 
-    private bool CanSave => !_session.IsReadOnly;
+    /// <summary>
+    /// Set while ABBRECHEN asks whether typed Einsatzdaten may go (#652). SPEICHERN waits for the
+    /// answer, so Enter in a field cannot save past the question.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    private bool _isDiscardConfirmOpen;
+
+    /// <summary>
+    /// Whether any field differs from the incident as SPEICHERN would see it, against the live
+    /// incident rather than the values the dialog opened with, as SPEICHERN does.
+    /// </summary>
+    public bool HasChanges
+    {
+        get
+        {
+            var incident = _session.Incident;
+            return Normalize(Keyword) != incident.Keyword
+                || Normalize(IncidentNumber) != incident.IncidentNumber?.Value
+                || Normalize(Street) != incident.Street
+                || Normalize(District) != incident.District;
+        }
+    }
+
+    private bool CanSave => !_session.IsReadOnly && !IsDiscardConfirmOpen;
 
     // Each setter is only invoked when its value actually changed: every call is a full save on a
     // local session and a broadcast command on a joined one, so a no-op SPEICHERN must not fan
@@ -87,8 +111,28 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         Closed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>ABBRECHEN, and Esc: closes at once when nothing was typed, asks first otherwise.</summary>
     [RelayCommand]
-    private void Cancel() => Closed?.Invoke(this, EventArgs.Empty);
+    private void Cancel()
+    {
+        if (HasChanges)
+        {
+            IsDiscardConfirmOpen = true;
+            return;
+        }
+
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void ConfirmDiscard()
+    {
+        IsDiscardConfirmOpen = false;
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void CancelDiscard() => IsDiscardConfirmOpen = false;
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
