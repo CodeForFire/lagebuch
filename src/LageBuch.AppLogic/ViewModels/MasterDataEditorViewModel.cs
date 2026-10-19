@@ -124,7 +124,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     [NotifyCanExecuteChangedFor(nameof(DiscardCommand))]
-    [NotifyCanExecuteChangedFor(nameof(ImportCommand))]
     private bool _isDirty;
 
     /// <summary>A message shown when an import or export fails; cleared when the next one starts.</summary>
@@ -177,7 +176,6 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         FileNotice = null;
         PopulateSections(_original);
         IsDirty = false;
-        ImportCommand.NotifyCanExecuteChanged();
     }
 
     private void PopulateSections(MasterDataSet set)
@@ -386,18 +384,23 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     [RelayCommand(CanExecute = nameof(IsDirty))]
     private void Discard() => Load();
 
-    private bool CanImport => !IsDirty;
-
     /// <summary>
     /// Loads a JSON file into the editor for review — nothing reaches the database until the user
     /// presses Save. When the editor already holds data, confirms first: the file replaces every
-    /// category, not just the ones it mentions.
+    /// category, not just the ones it mentions. With unsaved edits it imports nothing and says so:
+    /// the button stays live rather than going grey without a reason (#657, #412).
     /// </summary>
-    [RelayCommand(CanExecute = nameof(CanImport))]
+    [RelayCommand]
     private async Task Import()
     {
         FileError = null;
         FileNotice = null;
+
+        if (IsDirty)
+        {
+            FileError = "Erst SPEICHERN oder VERWERFEN, dann importieren.";
+            return;
+        }
 
         if (_originalIsEmpty)
         {

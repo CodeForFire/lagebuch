@@ -101,7 +101,8 @@
           <Border x:Name="VehicleConflictsBanner" VerticalAlignment="Center" CornerRadius="{StaticResource RadiusSm}"
                   Background="#2A1013" BorderBrush="#F87171" BorderThickness="1" Padding="8,3"
                   IsVisible="{Binding VehicleConflicts, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBlock Text="{Binding VehicleConflicts}" FontSize="11" FontWeight="SemiBold" Foreground="#F87171" />
+            <TextBlock x:Name="VehicleConflictsText" Text="{Binding VehicleConflicts}" FontSize="11"
+                       FontWeight="SemiBold" Foreground="#F87171" TextWrapping="Wrap" MaxWidth="520" />
           </Border>
           <!-- An address Lagebuch would refuse to open would be a dead button in the Kontakte tab.
                Same shape as the Funkrufname notice beside it: it names the person and blocks
