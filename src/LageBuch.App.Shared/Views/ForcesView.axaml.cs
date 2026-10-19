@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.App.Shared.Views;
 
@@ -13,6 +14,15 @@ public partial class ForcesView : UserControl
         if (sender is Flyout { Content: Control content })
         {
             content.Focus();
+        }
+    }
+
+    // Closing without ÜBERNEHMEN (Esc, a click outside) drops what was typed (#651).
+    private void OnStrengthFlyoutClosed(object? sender, EventArgs e)
+    {
+        if (sender is Flyout { Target.DataContext: ForceRow row })
+        {
+            row.RevertStrength();
         }
     }
 }

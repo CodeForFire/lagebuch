@@ -103,6 +103,51 @@ public class ForcesFlyoutKeyboardTests
         Assert.True(updated.HasHistory);
     }
 
+    // #651: the flyout's fields are the row's own counts, so a value typed and then dismissed
+    // used to stay in the grid while the session and the header total kept the old Stärke.
+    [AvaloniaFact]
+    public void Dismissing_the_strength_flyout_puts_the_stored_strength_back_in_the_row()
+    {
+        var (window, vm, flyoutButton) = OpenStrengthFlyout();
+        var row = Assert.Single(vm.Forces);
+        var shown = row.StrengthText;
+        var zfBox = window.GetVisualDescendants().OfType<HeaderedContentControl>()
+            .Single(h => (h.Header as string) == "ZUGFÜHRER (ZF)")
+            .GetVisualDescendants().OfType<TextBox>().Single();
+        zfBox.Focus();
+        zfBox.SelectAll();
+        window.KeyTextInput("4");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(4, row.ZugfuehrerCount);
+
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "forces-strength-dismissed.png");
+
+        Assert.False(flyoutButton.Flyout!.IsOpen);
+        Assert.Equal(0, row.ZugfuehrerCount);
+        Assert.Equal(shown, row.StrengthText);
+    }
+
+    [AvaloniaFact]
+    public void Dismissing_the_strength_flyout_after_enter_keeps_the_correction()
+    {
+        var (window, vm, flyoutButton) = OpenStrengthFlyout();
+        var zfBox = window.GetVisualDescendants().OfType<HeaderedContentControl>()
+            .Single(h => (h.Header as string) == "ZUGFÜHRER (ZF)")
+            .GetVisualDescendants().OfType<TextBox>().Single();
+        zfBox.Focus();
+        zfBox.SelectAll();
+        window.KeyTextInput("1");
+        window.Press(PhysicalKey.Enter);
+
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(flyoutButton.Flyout!.IsOpen);
+        Assert.Equal(1, Assert.Single(vm.Forces).ZugfuehrerCount);
+    }
+
     [AvaloniaFact]
     public void Escape_closes_the_history_flyout()
     {
@@ -166,5 +211,19 @@ public class ForcesFlyoutKeyboardTests
 
         Assert.False(flyout.IsOpen);
         window.AssertFocused(flyoutButton);
+    }
+
+    // Opt-in PNG capture for the PR's before/after pair; a plain test run writes nothing.
+    private static void Capture(Window window, string name)
+    {
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
+        if (string.IsNullOrWhiteSpace(dir))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, name));
     }
 }
