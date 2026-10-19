@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
@@ -263,23 +264,38 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             : $"Doppelte Funkrufnamen: {string.Join(", ", duplicates)}";
     }
 
-    /// <summary>Recomputes the list of people whose address Lagebuch could not open.</summary>
+    /// <summary>
+    /// Recomputes what keeps the roster from being saved: rows that would be dropped for lacking a
+    /// Nachname, and people whose address Lagebuch could not open.
+    /// </summary>
     /// <remarks>
-    /// Through <see cref="PersonnelSection.ToPeople"/> rather than the rows: that is what SPEICHERN
-    /// actually writes. Rows without a last name drop out there and a whitespace-only address
-    /// becomes null -- neither may raise a complaint about a value that never reaches the file.
-    /// The message names the person, never the address: it sits in a narrow strip, and the name
-    /// is what finds the row.
+    /// A row with anything in it but no Nachname is named by its number (#650): it has no name to
+    /// go by, and saving would otherwise drop it without a word. A wholly blank row is left alone.
+    /// Addresses are checked through <see cref="PersonnelSection.ToPeople"/> rather than the rows,
+    /// because that is what SPEICHERN actually writes: a whitespace-only address becomes null there
+    /// and must not raise a complaint. That message names the person, never the address: it sits
+    /// in a narrow strip, and the name is what finds the row.
     /// </remarks>
     private void RefreshPersonnelConflicts()
     {
+        var problems = new List<string>();
+        var unnamed = _personnel.RowsWithoutLastName();
+        if (unnamed.Count > 0)
+        {
+            var rows = string.Join(", ", unnamed.Select(n => n.ToString(CultureInfo.InvariantCulture)));
+            problems.Add(unnamed.Count == 1 ? $"Person ohne Nachname: Zeile {rows}" : $"Person ohne Nachname: Zeilen {rows}");
+        }
+
         var invalid = _personnel.ToPeople()
             .Where(p => p.HasEmail && !MailAddressValidator.TryGetMailtoUri(p.Email, out _))
             .Select(p => p.DisplayName)
             .ToArray();
-        PersonnelConflicts = invalid.Length == 0
-            ? null
-            : $"Ungültige E-Mail-Adresse: {string.Join(", ", invalid)}";
+        if (invalid.Length > 0)
+        {
+            problems.Add($"Ungültige E-Mail-Adresse: {string.Join(", ", invalid)}");
+        }
+
+        PersonnelConflicts = problems.Count == 0 ? null : string.Join("\n", problems);
     }
 
     private MasterDataSet BuildSet() => _original with

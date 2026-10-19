@@ -274,6 +274,32 @@ public class ContactsTabRenderTests
         Capture(window, "stammdaten-email-ungueltig.png");
     }
 
+    // #650: a row with a Vorname but no Nachname used to vanish on SPEICHERN.
+    [AvaloniaFact]
+    public void A_row_without_a_last_name_is_named_and_blocks_saving()
+    {
+        var vm = new MasterDataEditorViewModel(
+            new ContactsSampleProvider(), new FakeDialogs(), new ContactsNoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var categories = view.GetControl<ListBox>("CategoryList");
+        categories.SelectedIndex = Enumerable.Range(0, categories.ItemCount)
+            .First(i => vm.Sections[i].Title == "Personal");
+        Dispatcher.UIThread.RunJobs();
+
+        var section = vm.Sections.OfType<PersonnelSection>().Single();
+        section.AddCommand.Execute(null);
+        section.Rows[^1].FirstName = "Erika";
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "stammdaten-ohne-nachname.png");
+
+        Assert.True(view.GetControl<Border>("PersonnelConflictsBanner").IsEffectivelyVisible);
+        Assert.False(view.GetControl<Button>("SaveButton").IsEffectivelyEnabled);
+    }
+
     [AvaloniaFact]
     public void The_stammdaten_personnel_editor_renders_on_a_phone()
     {

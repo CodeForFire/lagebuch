@@ -848,10 +848,26 @@ public class MasterDataEditorViewModelTests
         Assert.True(vm.SaveCommand.CanExecute(null));
     }
 
-    // ToPeople drops rows without a last name; the editor must not complain about a value that
-    // never reaches the file.
+    // #650: ToPeople drops a row without a Nachname, so SPEICHERN used to lose a half-entered
+    // Einsatzkraft -- Vorname, phone and all -- without a word. Such a row now blocks saving and
+    // the banner says which one.
     [Fact]
-    public void A_row_without_a_last_name_is_dropped_and_its_address_raises_nothing()
+    public void A_row_with_only_a_first_name_blocks_saving_and_names_the_row()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, true, null))));
+
+        var section = Personnel(vm);
+        section.AddCommand.Execute(null);
+        section.Rows[1].FirstName = "Erika";
+
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.True(vm.HasPersonnelConflicts);
+        Assert.Contains("Person ohne Nachname: Zeile 2", vm.PersonnelConflicts, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_row_without_a_last_name_raises_that_rather_than_its_address()
     {
         var vm = Vm(new InMemoryProvider(SetWithPersonnel(
             new Person("Mustermann", "Max", "ZF", null, null, true, "max.mustermann@ff-musterstadt.example"))));
@@ -860,8 +876,39 @@ public class MasterDataEditorViewModelTests
         section.AddCommand.Execute(null);
         section.Rows[1].Email = "voellig@@kaputt.example"; // no Nachname on this row
 
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Assert.Contains("Zeile 2", vm.PersonnelConflicts, StringComparison.Ordinal);
+        Assert.DoesNotContain("E-Mail", vm.PersonnelConflicts, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Typing_the_last_name_re_enables_saving()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, true, null))));
+        var section = Personnel(vm);
+        section.AddCommand.Execute(null);
+        section.Rows[1].FirstName = "Erika";
+
+        section.Rows[1].LastName = "Musterfrau";
+
         Assert.Null(vm.PersonnelConflicts);
         Assert.True(vm.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Several_rows_without_a_last_name_are_named_together()
+    {
+        var vm = Vm(new InMemoryProvider(SetWithPersonnel(
+            new Person("Mustermann", "Max", "ZF", null, null, true, null))));
+        var section = Personnel(vm);
+        section.AddCommand.Execute(null);
+        section.AddCommand.Execute(null);
+        section.AddCommand.Execute(null);
+        section.Rows[1].Phone = "0171 1";
+        section.Rows[3].CallSign = "Land 3";
+
+        Assert.Contains("Person ohne Nachname: Zeilen 2, 4", vm.PersonnelConflicts, StringComparison.Ordinal);
     }
 
     [Fact]
