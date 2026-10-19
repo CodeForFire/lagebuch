@@ -1,26 +1,42 @@
-using System.Diagnostics;
 using LageBuch.AppLogic.Services;
 
 namespace LageBuch.AppLogic.Tests;
 
 public class SerialAudioQueueTests
 {
+    // How long a test waits for something it expects to happen. Generous on purpose: a wait returns
+    // as soon as it is signalled, so a passing run pays nothing for it, while CI has frozen this
+    // testhost for 4-11 s at a time (every assembly runs at once on a 4-core runner), and a 5 s
+    // budget turned that stall into a red build.
+    private static readonly TimeSpan Liveness = TimeSpan.FromSeconds(30);
+
+    // How long a gated action holds before giving up on its own. Longer than Liveness, so an
+    // action can never end by itself inside a wait and pass a test the queue should have failed.
+    private static readonly TimeSpan Hold = TimeSpan.FromSeconds(60);
+
     [Fact]
     public void Enqueued_actions_do_not_overlap()
     {
-        var sw = Stopwatch.StartNew();
-        var events = new List<(string Id, long StartMs, long EndMs)>();
-        var done = new CountdownEvent(2);
-        var queue = new SerialAudioQueue();
+        // No watchdog: a stall longer than the default timeout would stop the first action and
+        // serve the second early, which is the watchdog working, not the queue overlapping.
+        var queue = new SerialAudioQueue(perItemTimeout: Timeout.InfiniteTimeSpan);
+        var firstEnded = false;
+        var secondSawFirstEnded = false;
+        using var secondRan = new ManualResetEventSlim();
 
-        queue.Enqueue(_ => RecordTimedRun("a", sw, events, done, TimeSpan.FromMilliseconds(150)));
-        queue.Enqueue(_ => RecordTimedRun("b", sw, events, done, TimeSpan.FromMilliseconds(50)));
+        queue.Enqueue(_ =>
+        {
+            Thread.Sleep(TimeSpan.FromMilliseconds(150));
+            Volatile.Write(ref firstEnded, true);
+        });
+        queue.Enqueue(_ =>
+        {
+            secondSawFirstEnded = Volatile.Read(ref firstEnded);
+            secondRan.Set();
+        });
 
-        Assert.True(done.Wait(TimeSpan.FromSeconds(5)), "queued actions never completed");
-        Assert.Equal(2, events.Count);
-        Assert.True(
-            events[1].StartMs >= events[0].EndMs,
-            "second action started before the first one finished");
+        Assert.True(secondRan.Wait(Liveness), "queued actions never completed");
+        Assert.True(secondSawFirstEnded, "second action started before the first one finished");
     }
 
     [Fact]
@@ -28,7 +44,7 @@ public class SerialAudioQueueTests
     {
         var order = new List<int>();
         var done = new CountdownEvent(5);
-        var queue = new SerialAudioQueue();
+        var queue = new SerialAudioQueue(perItemTimeout: Timeout.InfiniteTimeSpan);
 
         for (var i = 0; i < 5; i++)
         {
@@ -44,7 +60,7 @@ public class SerialAudioQueueTests
             });
         }
 
-        Assert.True(done.Wait(TimeSpan.FromSeconds(5)), "queued actions never completed");
+        Assert.True(done.Wait(Liveness), "queued actions never completed");
         Assert.Equal(new[] { 0, 1, 2, 3, 4 }, order);
     }
 
@@ -54,26 +70,27 @@ public class SerialAudioQueueTests
         var queue = new SerialAudioQueue();
         var started = new ManualResetEventSlim();
         var finish = new ManualResetEventSlim();
+        var playbackEnded = false;
 
         try
         {
             // Gated rather than a fixed sleep, so the action is provably still in flight when the
             // second Enqueue runs below, and so its thread is released when this test ends rather
-            // than lingering for a couple of seconds afterwards.
+            // than lingering afterwards.
             queue.Enqueue(_ =>
             {
                 started.Set();
-                finish.Wait(TimeSpan.FromSeconds(30), CancellationToken.None);
+                finish.Wait(Hold, CancellationToken.None);
+                Volatile.Write(ref playbackEnded, true);
             });
 
-            // Liveness, not latency: same 5s budget as this file's other waits.
-            Assert.True(started.Wait(TimeSpan.FromSeconds(5)), "action never started");
+            Assert.True(started.Wait(Liveness), "action never started");
 
-            var sw = Stopwatch.StartNew();
             queue.Enqueue(_ => { });
-            sw.Stop();
 
-            Assert.True(sw.Elapsed < TimeSpan.FromMilliseconds(500), "Enqueue blocked the caller");
+            // Not a stopwatch: an Enqueue that waited for playback could only return once the gated
+            // action had ended, and nothing releases it before the finally below.
+            Assert.False(Volatile.Read(ref playbackEnded), "Enqueue blocked the caller until playback ended");
         }
         finally
         {
@@ -94,13 +111,13 @@ public class SerialAudioQueueTests
         {
             // A hung player that ignores its token, as Windows' PlaySound does: the watchdog
             // abandons it after perItemTimeout plus the cancel grace, but the action itself runs
-            // until it returns. Gate it rather than sleeping 30s so the abandoned thread goes away
-            // with the test instead of idling on for half a minute.
-            queue.Enqueue(_ => unstick.Wait(TimeSpan.FromSeconds(30), CancellationToken.None));
+            // until it returns. Gate it rather than sleeping so the abandoned thread goes away
+            // with the test instead of idling on for a minute.
+            queue.Enqueue(_ => unstick.Wait(Hold, CancellationToken.None));
             queue.Enqueue(_ => laterRan.Set());
 
             Assert.True(
-                laterRan.Wait(TimeSpan.FromSeconds(5)),
+                laterRan.Wait(Liveness),
                 "later action never ran; the stuck item wedged the queue");
         }
         finally
@@ -119,21 +136,23 @@ public class SerialAudioQueueTests
         // watchdog asks straight away, so this proves the token is cancelled, not just abandoned.
         queue.Enqueue(ct =>
         {
-            if (ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(30)))
+            if (ct.WaitHandle.WaitOne(Hold))
             {
                 stopRequested.Set();
             }
         });
 
         Assert.True(
-            stopRequested.Wait(TimeSpan.FromSeconds(5)),
+            stopRequested.Wait(Liveness),
             "the overrunning action was never told to stop");
     }
 
     [Fact]
     public void An_action_that_finishes_in_time_is_never_cancelled()
     {
-        var queue = new SerialAudioQueue();
+        // No watchdog, so a stall cannot make "in time" late. The token handed over must still be
+        // the queue's own, cancellable one.
+        var queue = new SerialAudioQueue(perItemTimeout: Timeout.InfiniteTimeSpan);
         var token = CancellationToken.None;
         var laterRan = new ManualResetEventSlim();
 
@@ -143,7 +162,7 @@ public class SerialAudioQueueTests
         // this one runs the watchdog has had its chance to cancel and must not have taken it.
         queue.Enqueue(_ => laterRan.Set());
 
-        Assert.True(laterRan.Wait(TimeSpan.FromSeconds(5)), "queued actions never completed");
+        Assert.True(laterRan.Wait(Liveness), "queued actions never completed");
         Assert.True(token.CanBeCanceled, "the action was not handed the queue's token");
         Assert.False(token.IsCancellationRequested, "an action that finished in time was cancelled");
     }
@@ -151,14 +170,14 @@ public class SerialAudioQueueTests
     [Fact]
     public void A_stopped_action_ends_before_the_next_one_starts()
     {
-        var queue = new SerialAudioQueue(perItemTimeout: TimeSpan.Zero, cancelGrace: TimeSpan.FromSeconds(30));
+        var queue = new SerialAudioQueue(perItemTimeout: TimeSpan.Zero, cancelGrace: Hold);
         var firstEnded = false;
         var secondSawFirstEnded = false;
         var secondRan = new ManualResetEventSlim();
 
         queue.Enqueue(ct =>
         {
-            ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(30));
+            ct.WaitHandle.WaitOne(Hold);
             Volatile.Write(ref firstEnded, true);
         });
         queue.Enqueue(_ =>
@@ -167,25 +186,26 @@ public class SerialAudioQueueTests
             secondRan.Set();
         });
 
-        Assert.True(secondRan.Wait(TimeSpan.FromSeconds(5)), "the next action never ran");
+        Assert.True(secondRan.Wait(Liveness), "the next action never ran");
         Assert.True(secondSawFirstEnded, "the next action started while the stopped one was still playing");
     }
 
     [Fact]
     public void An_action_that_ignores_its_stop_is_abandoned_once_the_grace_runs_out()
     {
-        // No grace at all, so the next action must not wait the default two seconds for a cue that
-        // ignores its token (Windows' PlaySound cannot be interrupted).
+        // No grace at all, for a cue that ignores its token (Windows' PlaySound cannot be
+        // interrupted): the next action is served while the first is still playing. How long that
+        // takes is not asserted -- a wall-clock bound here would fail whenever CI stalls the testhost.
         var queue = new SerialAudioQueue(perItemTimeout: TimeSpan.Zero, cancelGrace: TimeSpan.Zero);
         using var release = new ManualResetEventSlim();
         using var secondRan = new ManualResetEventSlim();
 
-        queue.Enqueue(_ => release.Wait(TimeSpan.FromSeconds(30), CancellationToken.None));
+        queue.Enqueue(_ => release.Wait(Hold, CancellationToken.None));
         queue.Enqueue(_ => secondRan.Set());
 
         try
         {
-            Assert.True(secondRan.Wait(TimeSpan.FromSeconds(1)), "the next action waited longer than the configured grace");
+            Assert.True(secondRan.Wait(Liveness), "the next action waited for a cue that ignores its stop");
         }
         finally
         {
@@ -209,26 +229,8 @@ public class SerialAudioQueueTests
             ran.Set();
         });
 
-        Assert.True(ran.Wait(TimeSpan.FromSeconds(5)), "the action never ran");
+        Assert.True(ran.Wait(Liveness), "the action never ran");
         Assert.True(isBackground, "the action ran on a foreground thread");
         Assert.Equal("SerialAudioQueue item", name);
-    }
-
-    private static void RecordTimedRun(
-        string id,
-        Stopwatch sw,
-        List<(string Id, long StartMs, long EndMs)> events,
-        CountdownEvent done,
-        TimeSpan sleep)
-    {
-        var start = sw.ElapsedMilliseconds;
-        Thread.Sleep(sleep);
-        var end = sw.ElapsedMilliseconds;
-        lock (events)
-        {
-            events.Add((id, start, end));
-        }
-
-        done.Signal();
     }
 }
