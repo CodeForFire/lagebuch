@@ -615,7 +615,7 @@
     <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
-    <!-- One keyboard model app-wide (#466): the list opens on focus/click (#259), a single prefix
+    <!-- One keyboard model app-wide (#466): the list opens on a click or ↓ (#259), a single prefix
          match completes inline, Shift+Tab never takes a match — see Behaviors/SuggestionBox.cs. -->
     <Setter Property="b:SuggestionBox.IsEnabled" Value="True" />
   </Style>
@@ -667,12 +667,15 @@
             <!-- Suggestion marker (#259): signals the input is backed by a suggestion list
                  (AutoCompleteBox), not free text. A non-hit-testable overlay rather than a template
                  override on AutoCompleteBox itself, which needs its own template intact for the
-                 popup wiring. Opt in per field with Classes="field suggest". -->
-            <PathIcon x:Name="SuggestChevron" Width="9" Height="9" IsVisible="False"
+                 popup wiring; a click on it lands in the box, which opens the list. Opt in per field
+                 with Classes="field suggest". Glyph, size, inset and brush are Fluent's ComboBox
+                 DropDownGlyph, so a suggestion field reads as the same dropdown as KRÄFTE's
+                 FAHRZEUG next to it. -->
+            <PathIcon x:Name="SuggestChevron" Width="12" Height="12" IsVisible="False"
                       HorizontalAlignment="Right" VerticalAlignment="Center"
-                      Margin="0,0,9,0" IsHitTestVisible="False"
-                      Foreground="{StaticResource TextMutedBrush}"
-                      Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                      Margin="0,0,10,0" IsHitTestVisible="False"
+                      Foreground="{DynamicResource ComboBoxDropDownGlyphForeground}"
+                      Data="M1939 486L2029 576L1024 1581L19 576L109 486L1024 1401L1939 486Z" />
           </Grid>
           <!-- Missing-input message (#412), bound per field with ctrl:Field.Error. Not a
                TemplateBinding: that takes a single property name and would bind nothing at all
@@ -688,6 +691,11 @@
 
   <Style Selector="HeaderedContentControl.field.suggest /template/ PathIcon#SuggestChevron">
     <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <!-- The text stops short of the chevron, so a long Funkrufname does not run under it: the
+       glyph's 10dp inset, its 12dp, and 10dp of air. -->
+  <Style Selector="HeaderedContentControl.field.suggest AutoCompleteBox">
+    <Setter Property="Padding" Value="11,7,32,7" />
   </Style>
 
   <!-- The asterisk is only seen. A screen reader lands on the input, not on the caption, so the
@@ -1011,6 +1019,32 @@
   </Style>
   <Style Selector="ListBoxItem:selected">
     <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+  </Style>
+
+  <!-- The suggestion list draws its rows the way a ComboBox list does. Without this the
+       recent-files ListBoxItem above reaches into the box's popup ListBox and turns
+       every suggestion into a spaced card with a signal-red tick. Fluent's own template is put
+       back, so its hover and selection fills, the ones ComboBoxItem uses, apply again. It has to
+       come after that style: Avalonia weighs styles by order, not by how specific a selector is. -->
+  <Style Selector="AutoCompleteBox /template/ ListBox ListBoxItem">
+    <Setter Property="FontFamily" Value="{StaticResource BodyFont}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="11,8" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ContentPresenter x:Name="PART_ContentPresenter" Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                          CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}"
+                          Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+      </ControlTemplate>
+    </Setter>
   </Style>
 
   <!-- A row that looks like a recent-file ListBoxItem but is not in a list: Home's last-connection

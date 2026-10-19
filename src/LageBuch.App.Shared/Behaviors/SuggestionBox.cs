@@ -11,9 +11,11 @@ namespace LageBuch.App.Shared.Behaviors;
 /// once by a Setter on the shared "AutoCompleteBox" style rather than per view.
 ///
 /// <list type="bullet">
-/// <item>The suggestion list opens on focus and on a click (#259), not only on the first
-/// keystroke. Every box has MinimumPrefixLength="0", so it is willing to show its full list for an
-/// empty string; Avalonia just never asks it to until the text changes.</item>
+/// <item>The suggestion list opens on a click (#259), not only on the first keystroke. Every box
+/// has MinimumPrefixLength="0", so it is willing to show its full list for an empty string;
+/// Avalonia just never asks it to until the text changes, or ↓ is pressed. Focus alone leaves it
+/// closed, as a ComboBox does: in the field test, the list that opened when a module was switched to
+/// covered the rows the Lagebuchführer had come to read.</item>
 /// <item>A single match that starts with what was typed is completed inline, the added text
 /// selected: typing on or Backspace drops it, Tab and Enter take it. Funkrufnamen are prefixes of
 /// each other ("Florian X 1/46" of "Florian X 1/46-1"), so a match is never taken unseen, never on a
@@ -73,14 +75,11 @@ public static class SuggestionBox
     {
         IsEnabledProperty.Changed.AddClassHandler<AutoCompleteBox>((box, e) =>
         {
-            box.RemoveHandler(InputElement.GotFocusEvent, OnGotFocus);
             box.RemoveHandler(InputElement.PointerPressedEvent, OnPointerPressed);
             box.RemoveHandler(InputElement.KeyDownEvent, OnPreviewKeyDown);
             box.TemplateApplied -= OnTemplateApplied;
             if (e.NewValue is true)
             {
-                box.AddHandler(InputElement.GotFocusEvent, OnGotFocus);
-
                 // Tunnel + handledEventsToo: the inner TextBox handles PointerPressed itself (to
                 // place the caret) and marks it handled, which would otherwise stop a bubbling
                 // handler from ever seeing the click.
@@ -101,11 +100,7 @@ public static class SuggestionBox
     private static bool HasPendingPick(AutoCompleteBox box) =>
         !string.Equals(box.Text ?? string.Empty, box.SearchText ?? string.Empty, StringComparison.Ordinal);
 
-    private static void OnGotFocus(object? sender, RoutedEventArgs e) => Open(sender);
-
-    private static void OnPointerPressed(object? sender, PointerPressedEventArgs e) => Open(sender);
-
-    private static void Open(object? sender)
+    private static void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is AutoCompleteBox { IsDropDownOpen: false } box)
         {

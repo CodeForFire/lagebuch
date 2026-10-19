@@ -172,8 +172,8 @@ public class SuggestionBoxKeyboardTests
         window.AssertFocused(from);
     }
 
-    // #259 keeps the list open from focus onwards, which made every submit from a suggestion box
-    // cost two presses of Enter.
+    // Typing keeps the list open, and a submit from a suggestion box must still cost one press of
+    // Enter. Back at VON for the next entry, the list stays closed over the entry just added.
     [AvaloniaFact]
     public void Enter_with_the_list_open_and_nothing_picked_submits_in_one_press()
     {
@@ -190,10 +190,11 @@ public class SuggestionBoxKeyboardTests
         Assert.Equal("Aich 42", Assert.Single(vm.Entries, e => e.Text == "Lagemeldung übermittelt").From);
         window.AssertFocused(from); // back at VON for the next entry
         Assert.True(string.IsNullOrEmpty(from.Text));
+        Assert.False(from.IsDropDownOpen);
     }
 
-    // A taken match is what the box holds now: coming back to it, the reopened list has nothing
-    // pending, and Enter submits in one press.
+    // A taken match is what the box holds now: coming back to it and opening the list again (a
+    // click, or ↓), nothing is pending, and Enter submits in one press.
     [AvaloniaFact]
     public void Enter_after_returning_to_a_box_whose_match_was_taken_submits_in_one_press()
     {
@@ -207,7 +208,9 @@ public class SuggestionBoxKeyboardTests
         window.Tab();
         window.ShiftTab();
         window.AssertFocused(from);
-        Assert.True(from.IsDropDownOpen);
+        Assert.False(from.IsDropDownOpen);
+        from.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
 
         window.Press(PhysicalKey.Enter);
 
