@@ -67,6 +67,59 @@ public class TaskDialogViewModelTests
     }
 
     [Fact]
+    public void An_untouched_timer_follows_the_urgency_default()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Auftrag", () => { });
+
+        dialog.Urgency = TaskUrgency.High;
+        Assert.Equal(5, dialog.TimerMinutes);
+        dialog.Urgency = TaskUrgency.Low;
+        Assert.Equal(30, dialog.TimerMinutes);
+    }
+
+    // #658: a timer the Lagebuchführer typed is a decision, not a default to overwrite.
+    [Fact]
+    public void A_typed_timer_survives_an_urgency_change()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Auftrag", () => { });
+
+        dialog.TimerMinutes = 7;
+        dialog.Urgency = TaskUrgency.High;
+
+        Assert.Equal(7, dialog.TimerMinutes);
+    }
+
+    [Fact]
+    public void An_emptied_timer_takes_the_new_urgency_default()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Auftrag", () => { });
+
+        dialog.TimerMinutes = null;
+        dialog.Urgency = TaskUrgency.High;
+
+        Assert.Equal(5, dialog.TimerMinutes);
+    }
+
+    // #658: the next task starts from the sticky urgency's default, not the last typed timer.
+    [Fact]
+    public void Save_and_create_another_resets_a_typed_timer_to_the_urgency_default()
+    {
+        var (session, _) = NewSession();
+        var dialog = new TaskDialogViewModel(session, MasterData(), "Erster Auftrag", () => { });
+        dialog.Urgency = TaskUrgency.High;
+        dialog.TimerMinutes = 42;
+
+        dialog.SaveAndCreateAnotherCommand.Execute(null);
+
+        Assert.Single(session.Incident.Tasks);
+        Assert.Equal(TaskUrgency.High, dialog.Urgency);
+        Assert.Equal(5, dialog.TimerMinutes);
+    }
+
+    [Fact]
     public void Save_and_create_another_keeps_dialog_open_with_cleared_text_and_sticky_fields()
     {
         var (session, _) = NewSession();

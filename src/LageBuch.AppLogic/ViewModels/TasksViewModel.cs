@@ -187,10 +187,15 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     [NotifyPropertyChangedFor(nameof(ErrorSummary))]
     private int? _newTimerMinutes = IncidentTask.DefaultTimerMinutes(TaskUrgency.Medium);
 
-    // The minutes field follows the urgency's default; an explicit override survives until the
-    // urgency selection itself changes again.
-    partial void OnNewUrgencyChanged(TaskUrgency value) =>
-        NewTimerMinutes = IncidentTask.DefaultTimerMinutes(value);
+    // The minutes field follows the urgency's default while it still holds it (or nothing); a
+    // typed timer survives an urgency change (#658).
+    partial void OnNewUrgencyChanged(TaskUrgency oldValue, TaskUrgency newValue)
+    {
+        if (NewTimerMinutes is null || NewTimerMinutes == IncidentTask.DefaultTimerMinutes(oldValue))
+        {
+            NewTimerMinutes = IncidentTask.DefaultTimerMinutes(newValue);
+        }
+    }
 
     /// <summary>Whether the Aufgabe is still missing, once the operator has asked (#412).</summary>
     /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
@@ -256,6 +261,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
 
         _session.AddTask(NewText, NewAssignee, NewImportance, NewUrgency, NewTimerMinutes!.Value);
         NewText = string.Empty; // priorities stay sticky for rapid follow-up entries
+        NewTimerMinutes = IncidentTask.DefaultTimerMinutes(NewUrgency); // a typed timer does not (#658)
         ShowErrors(false); // ...and the cleared text must not read as a fresh complaint
 
         // Reached only on success, so this is where the phone's form closes again.

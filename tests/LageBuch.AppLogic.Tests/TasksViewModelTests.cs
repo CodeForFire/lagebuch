@@ -82,16 +82,58 @@ public class TasksViewModelTests
     }
 
     [Fact]
-    public void Changing_urgency_resets_minutes_but_override_survives_until_next_change()
+    public void An_untouched_timer_follows_the_urgency_default()
+    {
+        var (session, clock, _) = NewSession();
+        var vm = NewVm(session, clock);
+        Assert.Equal(15, vm.NewTimerMinutes);
+
+        vm.NewUrgency = TaskUrgency.High;
+        Assert.Equal(5, vm.NewTimerMinutes);
+        vm.NewUrgency = TaskUrgency.Low;
+        Assert.Equal(30, vm.NewTimerMinutes);
+    }
+
+    // #658: a timer the Lagebuchführer typed is a decision, not a default to overwrite.
+    [Fact]
+    public void A_typed_timer_survives_an_urgency_change()
     {
         var (session, clock, _) = NewSession();
         var vm = NewVm(session, clock);
 
-        vm.NewUrgency = TaskUrgency.Low;
-        Assert.Equal(30, vm.NewTimerMinutes);
-        vm.NewTimerMinutes = 7;                         // operator override
-        vm.NewUrgency = TaskUrgency.Medium;             // changing urgency re-applies its default
-        Assert.Equal(15, vm.NewTimerMinutes);
+        vm.NewTimerMinutes = 7;
+        vm.NewUrgency = TaskUrgency.High;
+
+        Assert.Equal(7, vm.NewTimerMinutes);
+    }
+
+    [Fact]
+    public void An_emptied_timer_takes_the_new_urgency_default()
+    {
+        var (session, clock, _) = NewSession();
+        var vm = NewVm(session, clock);
+
+        vm.NewTimerMinutes = null;
+        vm.NewUrgency = TaskUrgency.High;
+
+        Assert.Equal(5, vm.NewTimerMinutes);
+    }
+
+    // #658: the next task starts from the sticky urgency's default, not the last typed timer.
+    [Fact]
+    public void Adding_a_task_resets_a_typed_timer_to_the_urgency_default()
+    {
+        var (session, clock, _) = NewSession();
+        var vm = NewVm(session, clock);
+        vm.NewUrgency = TaskUrgency.High;
+        vm.NewText = "Tür sichern";
+        vm.NewTimerMinutes = 42;
+
+        vm.AddTaskCommand.Execute(null);
+
+        Assert.Equal(T0.AddMinutes(42), Assert.Single(session.Incident.Tasks).DueAt);
+        Assert.Equal(TaskUrgency.High, vm.NewUrgency);
+        Assert.Equal(5, vm.NewTimerMinutes);
     }
 
     [Fact]

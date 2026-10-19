@@ -55,8 +55,15 @@ public sealed partial class TaskDialogViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(TimerMinutesError))]
     private int? _timerMinutes;
 
-    partial void OnUrgencyChanged(TaskUrgency value) =>
-        TimerMinutes = IncidentTask.DefaultTimerMinutes(value);
+    // Follows the urgency's default while it still holds it (or nothing); a typed timer
+    // survives an urgency change (#658).
+    partial void OnUrgencyChanged(TaskUrgency oldValue, TaskUrgency newValue)
+    {
+        if (TimerMinutes is null || TimerMinutes == IncidentTask.DefaultTimerMinutes(oldValue))
+        {
+            TimerMinutes = IncidentTask.DefaultTimerMinutes(newValue);
+        }
+    }
 
     public IReadOnlyList<ImportanceOption> ImportanceOptions { get; }
 
@@ -98,6 +105,7 @@ public sealed partial class TaskDialogViewModel : ObservableObject
         _session.AddTask(Text, Assignee, Importance, Urgency, TimerMinutes!.Value);
         _onChanged();
         Text = string.Empty; // fields besides the text stay sticky for the next entry
+        TimerMinutes = IncidentTask.DefaultTimerMinutes(Urgency); // ...except a typed timer (#658)
         ShowErrors(false); // ...and the cleared text must not read as a fresh complaint
     }
 
