@@ -271,7 +271,7 @@ public class TasksViewModelTests
     }
 
     [Fact]
-    public void Ticker_refreshes_countdown_and_plays_due_alarm_exactly_once()
+    public void Ticker_refreshes_countdown_and_plays_due_alarm_once_until_the_interval_passes()
     {
         var (session, clock, _) = NewSession();
         var ticker = new FakeTicker();
@@ -290,11 +290,112 @@ public class TasksViewModelTests
 
         Assert.True(row.IsOverdue);
         Assert.Equal("FÄLLIG", row.RemainingDisplay);
-        Assert.Single(alarm.Played);                     // exactly once ...
+        Assert.Single(alarm.Played);                     // once ...
         Assert.Equal(AlarmSound.TaskDue, alarm.Played[0]);
 
-        ticker.Fire();                                   // ... not again on subsequent ticks
+        ticker.Fire();                                   // ... not again on the next tick
         Assert.Single(alarm.Played);
+    }
+
+    [Fact]
+    public void Due_task_repeats_its_cue_every_minute_until_completed()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        session.AddTask("schnell", null, TaskImportance.High, TaskUrgency.High, 5);
+        using var vm = NewVm(session, clock, ticker, alarm);
+        var due = T0.AddMinutes(5).AddSeconds(1);
+
+        clock.Now = due;
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = due.AddSeconds(59);
+        ticker.Fire();
+        Assert.Single(alarm.Played);                     // not before the minute is up ...
+
+        clock.Now = due.AddSeconds(60);
+        ticker.Fire();
+        Assert.Equal(new[] { AlarmSound.TaskDue, AlarmSound.TaskDue }, alarm.Played);
+
+        session.SetTaskCompleted(session.Incident.Tasks[0].Id, true);
+        clock.Now = due.AddMinutes(3);
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);             // ... and never once it is ERLEDIGT
+    }
+
+    [Fact]
+    public void Due_task_stops_repeating_when_put_off_and_sounds_again_at_its_new_due_time()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        session.AddTask("schnell", null, TaskImportance.High, TaskUrgency.High, 5);
+        using var vm = NewVm(session, clock, ticker, alarm);
+        var due = T0.AddMinutes(5).AddSeconds(1);
+
+        clock.Now = due;
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        session.ExtendTaskTimer(session.Incident.Tasks[0].Id, 5); // +5 MIN from now
+        clock.Now = due.AddMinutes(4);
+        ticker.Fire();
+        Assert.Single(alarm.Played);                     // silent while put off
+
+        clock.Now = due.AddMinutes(5).AddSeconds(1);
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);             // due again: sounds at once
+    }
+
+    [Fact]
+    public void Several_overdue_tasks_share_one_cue_per_interval()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        session.AddTask("eins", null, TaskImportance.High, TaskUrgency.High, 5);
+        session.AddTask("zwei", null, TaskImportance.High, TaskUrgency.High, 5);
+        using var vm = NewVm(session, clock, ticker, alarm);
+        var due = T0.AddMinutes(5).AddSeconds(1);
+
+        clock.Now = due;
+        ticker.Fire();
+        Assert.Single(alarm.Played);                     // two tasks, one voice
+
+        clock.Now = due.AddSeconds(60);
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
+    }
+
+    [Fact]
+    public void A_second_task_falling_due_cues_at_once_and_restarts_the_interval()
+    {
+        var (session, clock, _) = NewSession();
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        session.AddTask("eins", null, TaskImportance.High, TaskUrgency.High, 5);
+        clock.Now = T0.AddSeconds(20);
+        session.AddTask("zwei", null, TaskImportance.High, TaskUrgency.High, 5);
+        using var vm = NewVm(session, clock, ticker, alarm);
+        var due = T0.AddMinutes(5).AddSeconds(1);
+
+        clock.Now = due;
+        ticker.Fire();
+        Assert.Single(alarm.Played);
+
+        clock.Now = due.AddSeconds(20);                  // "zwei" crosses due
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
+
+        clock.Now = due.AddSeconds(60);                  // a minute after "eins", 40 s after "zwei"
+        ticker.Fire();
+        Assert.Equal(2, alarm.Played.Count);
+
+        clock.Now = due.AddSeconds(80);
+        ticker.Fire();
+        Assert.Equal(3, alarm.Played.Count);
     }
 
     [Fact]
