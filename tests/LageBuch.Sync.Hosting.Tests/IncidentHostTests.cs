@@ -53,6 +53,36 @@ public class IncidentHostTests
         Assert.Equal("1.2.3", version.Version);
     }
 
+    // #655: the workspace turns a bind failure into a fixed German reason by finding a
+    // SocketException with AddressAlreadyInUse somewhere in the chain. Kestrel wraps it twice
+    // (IOException, then AddressInUseException), so this pins that the socket error survives.
+    [Fact]
+    public async Task A_port_already_taken_fails_with_address_in_use_somewhere_in_the_chain()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var first = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        await first.StartAsync(IPAddress.Loopback, 0);
+        var port = Assert.IsType<int>(first.BoundPort);
+        await using var second = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => second.StartAsync(IPAddress.Loopback, port));
+
+        var chain = new List<Exception>();
+        for (Exception? e = failure; e is not null; e = e.InnerException)
+        {
+            chain.Add(e);
+        }
+
+        Assert.Contains(chain, e => e is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.AddressAlreadyInUse });
+    }
+
     [Fact]
     public async Task A_host_reports_no_bound_port_before_it_starts_or_after_it_stops()
     {

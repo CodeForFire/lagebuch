@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
@@ -71,14 +72,39 @@ public class IncidentWorkspaceViewModelTests
     [Fact]
     public async Task A_failed_bind_surfaces_in_the_status_line_and_leaves_sharing_off()
     {
-        var host = new FakeHostController(failWith: new InvalidOperationException("Port 5859 belegt"));
+        var host = new FakeHostController(failWith: new InvalidOperationException("Only one usage of each socket addr"));
         var vm = EditableWorkspace(host);
 
         await vm.ToggleSharingCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsSharing);
-        Assert.Contains("Port 5859 belegt", vm.ShareStatus, StringComparison.Ordinal);
+        Assert.Equal(FailureReasons.SharingFailed, vm.ShareStatus);
         Assert.Null(vm.ShareAddress);
+    }
+
+    // #655: the raw socket text was English, cut off, and nothing the Lagebuchführer could act on.
+    [Fact]
+    public async Task A_port_already_taken_says_so_in_german_without_the_raw_text()
+    {
+        var failure = new IOException(
+            "Failed to bind to address https://[::]:5859: address already in use.",
+            new SocketException((int)SocketError.AddressAlreadyInUse));
+        var vm = EditableWorkspace(new FakeHostController(failWith: failure));
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.Equal(FailureReasons.SharingPortInUse, vm.ShareStatus);
+        Assert.DoesNotContain("address already in use", vm.ShareStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task No_network_says_so_in_german()
+    {
+        var vm = EditableWorkspace(new FakeHostController(failWith: new SocketException((int)SocketError.NetworkUnreachable)));
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.Equal(FailureReasons.SharingNoNetwork, vm.ShareStatus);
     }
 
     [Fact]
@@ -787,6 +813,35 @@ public class IncidentWorkspaceViewModelTests
         }
     }
 
+    // #655: writing into a folder that is not there is the one write failure every platform can
+    // produce on demand, so it stands in for the I/O path through the real File.WriteAllBytesAsync.
+    [Fact]
+    public async Task A_pdf_that_cannot_be_written_says_why_in_german()
+    {
+        var exportPath = Path.Join(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}", "export.pdf");
+        var vm = new IncidentWorkspaceViewModel(
+            TestSession.StartNew(
+                new FakeStore(),
+                new FixedClock(T0),
+                new SessionOperator("Müller"),
+                "/x.fwincident",
+                new[] { ("A?", false) },
+                Array.Empty<(string, bool)>()),
+            new FixedClock(T0),
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs { ExportPath = exportPath },
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter());
+
+        vm.ExportPdfCommand.Execute(null);
+        await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+        Assert.Equal(FailureReasons.ExportFolderMissing, vm.ExportStatus);
+        Assert.Null(vm.ExportStatusDetail);
+    }
+
     [Fact]
     public async Task A_failing_exporter_surfaces_in_ExportStatus_and_does_not_throw()
     {
@@ -813,7 +868,8 @@ public class IncidentWorkspaceViewModelTests
         vm.ExportPdfCommand.Execute(null);
         await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null); // must not throw
 
-        Assert.Contains("Datenträger voll", vm.ExportStatus, StringComparison.Ordinal);
+        Assert.Equal(FailureReasons.ExportFailed, vm.ExportStatus);
+        Assert.DoesNotContain("Datenträger voll", vm.ExportStatus, StringComparison.Ordinal); // the raw text
         Assert.False(File.Exists(exportPath));
         Assert.Null(vm.PendingPdfExportOptions); // overlay still closes on failure
         Assert.Null(vm.ExportStatusDetail); // nothing to point a tooltip at -- the export failed

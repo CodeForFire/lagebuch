@@ -1343,7 +1343,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
         catch (Exception ex)
         {
-            ExportStatus = $"Export fehlgeschlagen: {ex.Message}";
+            ExportStatus = FailureReasons.ForExport(ex);
             ExportStatusDetail = null; // nothing to point a tooltip at -- the export failed
             return null;
         }
@@ -1377,9 +1377,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 _ => $"PDF exportiert: {name} – E-Mail-Programm nicht gefunden",
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            ExportStatus = $"PDF exportiert: {name} – E-Mail fehlgeschlagen: {ex.Message}";
+            // A fixed reason: whatever the mail program said is nothing to act on (#655).
+            ExportStatus = $"PDF exportiert: {name} – E-Mail-Programm ließ sich nicht starten";
         }
     }
 
@@ -1475,7 +1476,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         }
         catch (Exception ex)
         {
-            ShareStatus = $"Freigabe fehlgeschlagen: {ex.Message}";
+            ShareStatus = FailureReasons.ForSharing(ex);
             return;
         }
 
