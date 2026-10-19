@@ -49,6 +49,9 @@
   <Color x:Key="ErrorInkColor">#260A0D</Color>
   <Color x:Key="ErrorDeepColor">#7A2B31</Color>
   <Color x:Key="ErrorWashColor">#2A1013</Color>
+  <!-- An alarming Atemschutz row or card (#669): the signal hue, dark enough that SignalColor text
+       on it still reads at 4.8:1. -->
+  <Color x:Key="SignalWashColor">#33120F</Color>
   <!-- Keyboard focus (#541), and nothing else. Deliberately not SignalColor: a red ring roaming
        every control would wear out the meaning of red next to a Rückzugsalarm. Keep it apart
        from Signal, Error, Amber and Incoming, which all carry a meaning of their own. -->
@@ -79,6 +82,7 @@
   <SolidColorBrush x:Key="ErrorInkBrush" Color="{StaticResource ErrorInkColor}" />
   <SolidColorBrush x:Key="ErrorDeepBrush" Color="{StaticResource ErrorDeepColor}" />
   <SolidColorBrush x:Key="ErrorWashBrush" Color="{StaticResource ErrorWashColor}" />
+  <SolidColorBrush x:Key="SignalWashBrush" Color="{StaticResource SignalWashColor}" />
   <SolidColorBrush x:Key="SignalDeepBrush" Color="{StaticResource SignalDeepColor}" />
   <SolidColorBrush x:Key="ActiveBrush" Color="{StaticResource ActiveColor}" />
   <SolidColorBrush x:Key="IncomingBrush" Color="{StaticResource IncomingColor}" />
