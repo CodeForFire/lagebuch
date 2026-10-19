@@ -418,6 +418,68 @@ public class MasterDataEditorRenderTests
         frame.SavePng(Path.Join(dir, "master-data-editor-fahrzeuge-after.png"));
     }
 
+    // SPEICHERN stays grey while Funkrufnamen collide, so the banner naming them must show every
+    // one (#657). It used to run on in a single line and lose the tail off the edge of the header.
+    [AvaloniaFact]
+    public void A_long_funkrufname_conflict_list_wraps_inside_the_banner()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var section = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
+
+        // Twelve doubled Funkrufnamen: far more than one 520px line holds.
+        for (var n = 1; n <= 12; n++)
+        {
+            for (var i = 0; i < 2; i++)
+            {
+                section.AddCommand.Execute(null);
+                section.Rows[^1].Wache = "Musterwache Nord";
+                section.Rows[^1].CallSign = $"Musterstadt {n}/44/1";
+            }
+        }
+
+        vm.SelectedSection = section;
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotNull(vm.VehicleConflicts);
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        var text = view.GetControl<TextBlock>("VehicleConflictsText");
+        Assert.True(text.IsEffectivelyVisible);
+        Assert.True(text.Bounds.Width <= 521, $"banner text is {text.Bounds.Width}px wide");
+        Assert.True(text.Bounds.Height > 2 * text.FontSize, $"banner text is {text.Bounds.Height}px high: not wrapped");
+
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "master-data-editor-conflicts.png"));
+    }
+
+    // IMPORTIEREN used to go grey while edits were unsaved, with nothing saying why (#657).
+    [AvaloniaFact]
+    public async Task Pressing_import_with_unsaved_edits_names_what_to_do_first()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        vm.Sections.OfType<RolesSection>().Single().AddCommand.Execute(null);
+        Assert.True(view.GetControl<Button>("ImportButton").IsEffectivelyEnabled);
+        await vm.ImportCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(view.GetControl<Border>("FileErrorBanner").IsVisible);
+        Assert.Equal("Erst SPEICHERN oder VERWERFEN, dann importieren.", vm.FileError);
+
+        var dir = Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "master-data-editor-import-dirty.png"));
+    }
+
     [AvaloniaFact]
     public void Personal_section_marks_each_person_as_own_under_its_own_header()
     {

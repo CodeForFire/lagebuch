@@ -597,8 +597,41 @@ public class MasterDataEditorViewModelTests
 
         Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, Roles(vm).ToValues());
         Assert.True(vm.IsDirty);
-        Assert.Equal(0, provider.SaveCount);          // nothing written until Save
-        Assert.False(vm.ImportCommand.CanExecute(null)); // no second import while dirty
+        Assert.Equal(0, provider.SaveCount); // nothing written until Save
+    }
+
+    // A grey IMPORTIEREN named no reason (#657). The button stays live and says what to do (#412).
+    [Fact]
+    public async Task Import_while_unsaved_edits_exist_says_to_save_or_discard_first()
+    {
+        var provider = new InMemoryProvider();
+        var files = new FakeFileService(read: MasterDataSet.Empty with { Roles = new[] { new Role("NEU") } });
+        var vm = Vm(provider, new FakeDialogs { ImportPath = "/import.json" }, files);
+        Roles(vm).AddCommand.Execute(null);
+        var before = Roles(vm).ToValues();
+
+        Assert.True(vm.ImportCommand.CanExecute(null));
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        Assert.Equal("Erst SPEICHERN oder VERWERFEN, dann importieren.", vm.FileError);
+        Assert.Null(vm.PendingConfirm);
+        Assert.Null(files.ReadPath);
+        Assert.True(vm.IsDirty);
+        Assert.Equal(before, Roles(vm).ToValues());
+        Assert.Equal(0, provider.SaveCount);
+    }
+
+    [Fact]
+    public async Task Discarding_clears_the_save_or_discard_hint()
+    {
+        var vm = Vm(new InMemoryProvider(), new FakeDialogs { ImportPath = "/import.json" });
+        Roles(vm).AddCommand.Execute(null);
+        await vm.ImportCommand.ExecuteAsync(null);
+
+        vm.DiscardCommand.Execute(null);
+
+        Assert.Null(vm.FileError);
+        Assert.False(vm.IsDirty);
     }
 
     [Fact]
