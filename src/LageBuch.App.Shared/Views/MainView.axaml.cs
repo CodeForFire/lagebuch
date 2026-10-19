@@ -13,11 +13,11 @@ public partial class MainView : UserControl
     {
         InitializeComponent();
 
-        // The shell's own width decides whether the command bar is a row of six actions or one
-        // action plus an overflow. The container query in the .axaml does the showing and hiding;
-        // this exists because the view model has decisions of its own to make at the same
-        // breakpoint, and a Style setter cannot reach a view model. Forwarding a size to a
-        // command is the one thing AGENTS.md leaves to code-behind — no state is kept here.
+        // The shell's own width decides the layout. The container queries in the .axaml fold the
+        // command bar, at widths of their own (#648); this forwards the phone breakpoint, because
+        // the view model has decisions of its own to make there, and a Style setter cannot reach
+        // a view model. Forwarding a size to a view model is the one thing AGENTS.md leaves to
+        // code-behind — no state is kept here.
         SizeChanged += OnSizeChanged;
     }
 
