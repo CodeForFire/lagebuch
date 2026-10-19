@@ -56,6 +56,8 @@ internal sealed class IncidentHostController : IIncidentHostController
         var pin = NewPin();
 
         // The persistent key is what lets joined devices recognise this host on the next share.
+        // A start that throws (the port is taken) has already released everything it held (#665),
+        // so the host can simply be dropped.
         var host = new IncidentHost(session, _clock, _appVersion, _ui, pin, masterData, identityKeyPath: _identityKeyPath);
         await host.StartAsync(IPAddress.Any, cancellationToken: cancellationToken);
         host.JoinsClosedChanged += OnJoinsClosedChanged;
