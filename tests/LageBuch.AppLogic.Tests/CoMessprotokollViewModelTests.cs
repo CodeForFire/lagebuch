@@ -32,6 +32,69 @@ public class CoMessprotokollViewModelTests
         return (session, vm);
     }
 
+    // --- HAUS ENTFERNEN / HAUS HINZUFÜGEN at the view-model level --------------------------
+    [Fact]
+    public void RemoveBuilding_AsksFirst_AndConfirmRemovesIt()
+    {
+        var changes = 0;
+        var (session, _) = CreateVm();
+        var vm = new CoMessprotokollViewModel(session, Clock, () => changes++);
+        Assert.True(vm.RemoveBuildingCommand.CanExecute(null));
+
+        vm.RemoveBuildingCommand.Execute(null);
+
+        Assert.True(vm.IsRemoveBuildingConfirmOpen);
+        Assert.Single(session.Incident.Buildings);
+
+        vm.ConfirmRemoveBuildingCommand.Execute(null);
+
+        Assert.False(vm.IsRemoveBuildingConfirmOpen);
+        Assert.Empty(session.Incident.Buildings);
+        Assert.Equal(1, changes);
+        Assert.Empty(vm.BuildingOptions);
+        Assert.False(vm.RemoveBuildingCommand.CanExecute(null)); // nothing left to remove
+    }
+
+    [Fact]
+    public void RemoveBuilding_CancelKeepsTheHaus()
+    {
+        var (session, vm) = CreateVm();
+        vm.RemoveBuildingCommand.Execute(null);
+
+        vm.CancelRemoveBuildingCommand.Execute(null);
+
+        Assert.False(vm.IsRemoveBuildingConfirmOpen);
+        Assert.Single(session.Incident.Buildings);
+    }
+
+    [Fact]
+    public void AddBuilding_OpensTheForm_AndCancelClosesIt()
+    {
+        var (_, vm) = CreateVm();
+        Assert.True(vm.AddBuildingCommand.CanExecute(null));
+
+        vm.AddBuildingCommand.Execute(null);
+        Assert.True(vm.IsAddBuildingDialogOpen);
+
+        vm.CancelAddBuildingCommand.Execute(null);
+        Assert.False(vm.IsAddBuildingDialogOpen);
+    }
+
+    [Fact]
+    public void Filter_FlagsFollowTheChosenFilter()
+    {
+        var (_, vm) = CreateVm();
+        Assert.True(vm.IsFilterAll);
+
+        vm.Filter = CoUnitFilter.Open;
+        Assert.True(vm.IsFilterOpen);
+        Assert.False(vm.IsFilterAll);
+
+        vm.Filter = CoUnitFilter.Affected;
+        Assert.True(vm.IsFilterAffected);
+        Assert.False(vm.IsFilterOpen);
+    }
+
     [Fact]
     public void ViewModel_BuildsMatrix_FromIncident()
     {

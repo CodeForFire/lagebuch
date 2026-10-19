@@ -97,6 +97,30 @@ public class IncidentDataDialogViewModelTests
         Assert.Null(store.Load("/x.fwincident").Keyword);
     }
 
+    [Fact]
+    public void Changing_only_the_einsatznummer_reports_a_change()
+    {
+        var changes = 0;
+        var vm = new IncidentDataDialogViewModel(NewSession(new FakeStore()), () => changes++);
+
+        vm.IncidentNumber = "B 1.2 260715 123";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void Changing_only_the_address_reports_a_change()
+    {
+        var changes = 0;
+        var vm = new IncidentDataDialogViewModel(NewSession(new FakeStore()), () => changes++);
+
+        vm.District = "Puch";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(1, changes);
+    }
+
     // #652: typed Einsatzdaten are not thrown away on a stray Esc; ABBRECHEN asks first.
     [Fact]
     public void Cancel_with_typed_fields_asks_before_closing()
@@ -131,6 +155,7 @@ public class IncidentDataDialogViewModelTests
         vm.ConfirmDiscardCommand.Execute(null);
 
         Assert.Equal(1, closed);
+        Assert.False(vm.IsDiscardConfirmOpen);
         Assert.Equal(before, store.SaveCount);
         Assert.Equal("B3P", store.Load("/x.fwincident").Keyword);
     }
