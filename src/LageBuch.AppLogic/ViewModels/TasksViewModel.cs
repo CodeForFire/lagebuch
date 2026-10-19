@@ -22,6 +22,9 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     // snooze is the same five minutes.
     private const int ExtendMinutes = 5;
 
+    // The ILS-Rückmeldung's cadence (ReminderViewModel): insistent without drowning the radio.
+    private static readonly TimeSpan DueRepeatInterval = TimeSpan.FromSeconds(60);
+
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly IAlarmService _alarm;
@@ -33,6 +36,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
     // (ScbaViewModel precedent — keeps Closing_workspace_drops_reminder at zero subscribers).
     private readonly IDisposable? _subscription;
     private readonly HashSet<Guid> _dueAnnounced = new();
+    private DateTimeOffset? _lastDueCueAt;
 
     public TasksViewModel(
         IIncidentSession session,
@@ -392,7 +396,7 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         OnPropertyChanged(nameof(EditErrorSummary));
     }
 
-    // --- Live countdown + one-shot due alarm ---
+    // --- Live countdown + repeating due alarm ---
     private void OnTick()
     {
         var now = _clock.Now;
@@ -401,29 +405,48 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
             row.RefreshClock(now);
         }
 
-        // Audible cue on the open->due crossing, exactly once per task per VM lifetime. Runs on
-        // joined clients too — the sound is local feedback, not logging (IsRemote gates writes).
         // Read-only workspaces (closed/reopened incidents) stay silent: stale overdue tasks must
         // not beep forever at someone reading history.
         if (!IsReadOnly)
         {
-            foreach (var task in _session.Incident.Tasks)
-            {
-                if (TaskRow.IsOverdueAt(task, now))
-                {
-                    if (_dueAnnounced.Add(task.Id))
-                    {
-                        _alarm.Play(AlarmSound.TaskDue);
-                    }
-                }
-                else if (!task.IsCompleted)
-                {
-                    _dueAnnounced.Remove(task.Id); // put off with +5 MIN: it has to sound again (#246)
-                }
-            }
+            AnnounceDueTasks(now);
         }
 
         RefreshHeader();
+    }
+
+    /// <summary>
+    /// Sounds the cue the moment a task crosses due, then repeats it on <see cref="DueRepeatInterval"/>
+    /// while any task stays overdue, so a missed cue is not the last one (#659). One cue covers every
+    /// overdue task: three of them must not talk over the radio three times a minute. Runs on joined
+    /// clients too — the sound is local feedback, not logging (IsRemote gates writes).
+    /// </summary>
+    private void AnnounceDueTasks(DateTimeOffset now)
+    {
+        var anyOverdue = false;
+        var newlyDue = false;
+        foreach (var task in _session.Incident.Tasks)
+        {
+            if (TaskRow.IsOverdueAt(task, now))
+            {
+                anyOverdue = true;
+                newlyDue |= _dueAnnounced.Add(task.Id);
+            }
+            else if (!task.IsCompleted)
+            {
+                _dueAnnounced.Remove(task.Id); // put off with +5 MIN: it has to sound again (#246)
+            }
+        }
+
+        if (!anyOverdue)
+        {
+            _lastDueCueAt = null;
+        }
+        else if (newlyDue || _lastDueCueAt is null || now - _lastDueCueAt >= DueRepeatInterval)
+        {
+            _alarm.Play(AlarmSound.TaskDue);
+            _lastDueCueAt = now;
+        }
     }
 
     // --- #460: the Aufgabe-fällig bar names the task and leads to it ---
