@@ -467,21 +467,35 @@ public class ForcesViewModelTests
     }
 
     [Fact]
-    public void Clearing_the_selected_vehicle_unlocks_fields_without_wiping_them()
+    public void Clearing_the_selected_vehicle_empties_the_fields_it_prefilled()
     {
         var vm = NewVm();
         vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
-        var brigadeBeforeClear = vm.NewBrigade;
-        var callSignBeforeClear = vm.NewCallSign;
-        var officerCountBeforeClear = vm.NewOfficerCount;
 
         vm.ClearVehicleCommand.Execute(null);
 
         Assert.False(vm.IsVehicleSelected);
         Assert.Null(vm.SelectedVehicle);
-        Assert.Equal(brigadeBeforeClear, vm.NewBrigade);
-        Assert.Equal(callSignBeforeClear, vm.NewCallSign);
-        Assert.Equal(officerCountBeforeClear, vm.NewOfficerCount);
+        Assert.Equal(string.Empty, vm.NewBrigade);
+        Assert.Null(vm.NewCallSign);
+        Assert.Null(vm.NewZugfuehrerCount);
+        Assert.Null(vm.NewOfficerCount);
+        Assert.Null(vm.NewMannschaftCount);
+        Assert.Null(vm.NewScbaCount);
+    }
+
+    [Fact]
+    public void Clearing_the_selected_vehicle_keeps_status_and_notes()
+    {
+        var vm = NewVm();
+        vm.SelectedVehicle = vm.VehicleOptions.Single(v => v.CallSign == "Aich 42/1");
+        vm.NewStatus = "Anfahrt";
+        vm.NewNotes = "über B2";
+
+        vm.ClearVehicleCommand.Execute(null);
+
+        Assert.Equal("Anfahrt", vm.NewStatus);
+        Assert.Equal("über B2", vm.NewNotes);
     }
 
     [Fact]

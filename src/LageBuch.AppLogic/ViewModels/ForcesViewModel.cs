@@ -435,11 +435,24 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
     /// </summary>
     public bool IsVehicleSelected => SelectedVehicle is not null;
 
-    /// <summary>Drops back to manual entry (e.g. a wrong pick, or a Fremdwehr unit with no
-    /// matching vehicle) without wiping whatever Feuerwehr/Funkrufname/Stärke are currently
-    /// filled in -- the operator edits on from there instead of starting over.</summary>
+    /// <summary>Drops back to blank manual entry (e.g. a wrong pick, or a Fremdwehr unit with no
+    /// matching vehicle): everything the pick derived -- Feuerwehr, Funkrufname, Stärke, AGT -- goes
+    /// with it, so no stale vehicle identity is left in the unlocked fields. Status and Notizen
+    /// stay, since a pick never sets them.</summary>
     [RelayCommand]
-    private void ClearVehicle() => SelectedVehicle = null;
+    private void ClearVehicle()
+    {
+        // Lives here, not in OnSelectedVehicleChanged(null): that also fires on a hand-typed
+        // Feuerwehr and after AddForce, neither of which may wipe a Funkrufname being typed.
+        SelectedVehicle = null;
+        NewBrigade = string.Empty;
+        NewCallSign = null;
+        NewZugfuehrerCount = null;
+        NewOfficerCount = null;
+        NewMannschaftCount = null;
+        NewScbaCount = null;
+        ShowErrors(false); // the blanked form must not read as a fresh complaint
+    }
 
     // Set while OnSelectedVehicleChanged derives NewBrigade from the picked vehicle (#215), so the
     // resulting OnNewBrigadeChanged does not immediately clear the very selection that caused it.

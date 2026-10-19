@@ -296,9 +296,10 @@ public class ForcesTabRenderTests
         Assert.False(clearButton.IsVisible);
         Assert.Null(vm.Forces.SelectedVehicle);
 
-        // Clearing keeps the derived values -- the operator edits on instead of starting over.
-        Assert.Equal("FFB Wache 1", vm.Forces.NewBrigade);
-        Assert.Equal("FFB 1/40/1", vm.Forces.NewCallSign);
+        // Clearing empties what the pick derived, so no stale vehicle identity is left behind.
+        Assert.True(string.IsNullOrEmpty(brigadeBox.Text));
+        Assert.True(string.IsNullOrEmpty(callSignBox.Text));
+        Capture(window, "forces-vehicle-cleared.png"); // after the X: back to blank manual entry
     }
 
     [AvaloniaFact]
