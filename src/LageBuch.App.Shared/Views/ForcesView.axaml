@@ -118,7 +118,8 @@
              line rather than run off the edge. -->
         <WrapPanel Orientation="Horizontal" ItemSpacing="14" LineSpacing="4" VerticalAlignment="Center">
           <TextBlock Text="GESAMTSTÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
-          <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+          <StackPanel x:Name="TotalStrengthReadout" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center"
+                      ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt">
             <TextBlock x:Name="TotalStrengthPrefixText" Classes="metric"
                        Foreground="{StaticResource SignalBrush}" Text="{Binding TotalStrengthPrefixText}" />
             <TextBlock x:Name="TotalStrengthGesamtText" Classes="metric" FontWeight="Bold"
@@ -126,7 +127,8 @@
                        Foreground="{StaticResource SignalBrush}" Text="{Binding TotalPersonnel}" />
           </StackPanel>
           <Border Width="1" Background="{StaticResource HairlineBrush}" Margin="4,2" />
-          <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+          <TextBlock Text="DAVON AGT" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                     ToolTip.Tip="Atemschutzgeräteträger" />
           <TextBlock x:Name="TotalScbaText" Classes="metric"
                      Foreground="{StaticResource SignalBrush}" Text="{Binding TotalScba}" />
         </WrapPanel>
@@ -218,20 +220,25 @@
                      Text="{Binding NewCallSign}" />
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="STÄRKE ZF / GF / MANN"
+                                  ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft"
                                   Classes.invalid="{Binding NewStrengthError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <!-- Einfache Felder statt Spinner (#76-Rework): Ziffernfilter per Behavior, leer heißt
                  0 und lässt den Platzhalter stehen. Kein Beispiel-Platzhalter: das Label sagt bereits,
                  was gezählt wird, eine erfundene Zahl könnte für eine echte gehalten werden. -->
             <StackPanel Orientation="Horizontal" Spacing="4">
               <TextBox x:Name="ZugfuehrerBox" Width="60"
+                       ToolTip.Tip="Zugführer" AutomationProperties.Name="Zugführer"
                        Text="{Binding NewZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
               <TextBox x:Name="OfficerBox" Width="60"
+                       ToolTip.Tip="Gruppenführer" AutomationProperties.Name="Gruppenführer"
                        Text="{Binding NewOfficerCount}" b:IntegerOnly.IsEnabled="True" />
               <TextBox x:Name="MannschaftBox" Width="60"
+                       ToolTip.Tip="Mannschaft" AutomationProperties.Name="Mannschaft"
                        Text="{Binding NewMannschaftCount}" b:IntegerOnly.IsEnabled="True" />
             </StackPanel>
           </HeaderedContentControl>
           <HeaderedContentControl Classes="field" Header="DAVON AGT"
+                                  ToolTip.Tip="Atemschutzgeräteträger"
                                   Classes.invalid="{Binding NewScbaCountError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBox x:Name="ScbaBox"
                      Text="{Binding NewScbaCount}" b:IntegerOnly.IsEnabled="True" />
@@ -282,7 +289,8 @@
                   <!-- Gesamt split out as its own run, bold+underlined, same idiom as the header
                        tile's TotalStrengthPrefixText/TotalPersonnel split (#233): no Run/Inlines
                        idiom exists here to bold part of one TextBlock's text. -->
-                  <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center"
+                              ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt">
                     <TextBlock Text="{Binding StrengthPrefixText}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" TextDecorations="Underline"
                                VerticalAlignment="Center" />
@@ -307,7 +315,7 @@
                           <HeaderedContentControl Classes="field" Header="ZUGFÜHRER (ZF)">
                             <TextBox Text="{Binding ZugfuehrerCount}" b:IntegerOnly.IsEnabled="True" />
                           </HeaderedContentControl>
-                          <HeaderedContentControl Classes="field" Header="FÜHRUNGSKRÄFTE (GF)">
+                          <HeaderedContentControl Classes="field" Header="GRUPPENFÜHRER (GF)">
                             <TextBox Text="{Binding OfficerCount}" b:IntegerOnly.IsEnabled="True" />
                           </HeaderedContentControl>
                           <HeaderedContentControl Classes="field" Header="MANN">
@@ -329,13 +337,18 @@
                            focused element inside the popup to route the key press through, and
                            the flyout is stuck open until a click outside it. -->
                       <Flyout Placement="BottomEdgeAlignedLeft" Opened="OnHistoryFlyoutOpened">
-                        <ItemsControl ItemsSource="{Binding EditLines}" Margin="4" Focusable="True">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                              <TextBlock Text="{Binding}" Margin="0,2" />
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <!-- The legend leads the list: the lines repeat the 1/1/6/8 notation with no
+                             column headers to read it by (#605). -->
+                        <StackPanel Margin="4" Spacing="2" Focusable="True">
+                          <TextBlock Text="Stärke: Zugführer / Gruppenführer / Mannschaft / Gesamt" Classes="secondary" FontSize="12" Margin="0,0,0,2" />
+                          <ItemsControl ItemsSource="{Binding EditLines}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding}" Margin="0,2" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
                       </Flyout>
                     </Button.Flyout>
                   </Button>
@@ -343,7 +356,15 @@
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTextColumn Header="AGT" Binding="{Binding ScbaCount}" />
+          <!-- A HeaderTemplate rather than a TextBlock as Header: the header stays the string
+               "AGT", which is how the columns are found by name (#605). -->
+          <DataGridTextColumn Header="AGT" Binding="{Binding ScbaCount}">
+            <DataGridTextColumn.HeaderTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" ToolTip.Tip="Atemschutzgeräteträger" />
+              </DataTemplate>
+            </DataGridTextColumn.HeaderTemplate>
+          </DataGridTextColumn>
           <!-- Status and Bemerkung are live controls rather than printed text: both move while the
                Einsatz runs, so they have to stay changeable after the row was added. Template
                columns keep them one click away instead of behind DataGrid's edit mode. -->
@@ -422,12 +443,14 @@
                   <TextBlock Classes="secondary" FontSize="13" TextWrapping="Wrap" Text="{Binding Brigade}" />
                   <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                     <TextBlock Text="STÄRKE" Classes="overline" FontSize="10" VerticalAlignment="Center" />
-                    <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="0" VerticalAlignment="Center"
+                                ToolTip.Tip="Zugführer / Gruppenführer / Mannschaft / Gesamt">
                       <TextBlock Text="{Binding StrengthPrefixText}" VerticalAlignment="Center" />
                       <TextBlock Text="{Binding TotalCount}" FontWeight="Bold" TextDecorations="Underline"
                                  VerticalAlignment="Center" />
                     </StackPanel>
-                    <TextBlock Text="AGT" Classes="overline" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock Text="AGT" Classes="overline" FontSize="10" VerticalAlignment="Center"
+                               ToolTip.Tip="Atemschutzgeräteträger" />
                     <TextBlock Text="{Binding ScbaCount}" VerticalAlignment="Center" />
                   </StackPanel>
                   <ComboBox HorizontalAlignment="Stretch"

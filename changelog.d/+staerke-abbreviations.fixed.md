@@ -1,0 +1,1 @@
+The Kräfte view now spells out ZF, GF and AGT and the Zugführer/Gruppenführer/Mannschaft/Gesamt notation in tooltips, names each Stärke field for screen readers, and labels GF as Gruppenführer instead of Führungskräfte in the Stärke correction (#605).
