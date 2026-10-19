@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -63,7 +64,7 @@ public class CoMessprotokollEditorCancelTests
 
     private static Button SidebarButton(Window window, string content) =>
         Sidebar(window).GetVisualDescendants().OfType<Button>()
-            .Single(b => b.Content as string == content);
+            .Single(b => b.Content as string == content && b.IsEffectivelyVisible); // the discard question has its own ABBRECHEN (#652)
 
     [AvaloniaFact]
     public void Cancel_DiscardsTheEdit_AndLeavesTheJournalAlone()
@@ -102,6 +103,10 @@ public class CoMessprotokollEditorCancelTests
 
         SidebarButton(window, "ABBRECHEN").Command!.Execute(null);
         Dispatcher.UIThread.RunJobs();
+        Assert.True(co.IsEditorOpen); // #652: asks before dropping a typed value
+        Capture(window, "co-messung-discard-confirm.png");
+        SidebarButton(window, "VERWERFEN").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
 
         var after = session.Incident.Dwellings.Single(d =>
             d.BuildingId == buildingId && d.FloorOrdinal == 2 && d.ApartmentNumber == 1);
@@ -112,6 +117,59 @@ public class CoMessprotokollEditorCancelTests
         Assert.Equal(DwellingStatus.NotSearched, co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].Status);
 
         Capture(window, "co-messung-cancel.png");
+    }
+
+    // #652, by keyboard: Esc on a typed value raises the question with ABBRECHEN focused (the
+    // destructive-confirm rule from #545), so a second reflex Enter keeps the value.
+    [AvaloniaFact]
+    public void Escape_on_a_typed_value_asks_and_a_reflex_enter_keeps_it()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
+        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        var co = vm.CoMessprotokoll;
+        co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        var ppm = Sidebar(window).GetVisualDescendants().OfType<NumericUpDown>().Single();
+        ppm.Value = 120;
+        Sidebar(window).GetVisualDescendants().OfType<TextBox>().First(t => t.IsEffectivelyVisible).Focus();
+        Dispatcher.UIThread.RunJobs();
+
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(co.IsEditorOpen);
+        Assert.True(co.IsDiscardEditorConfirmOpen);
+        var keep = Sidebar(window).GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CancelDiscardEditorButton");
+        window.AssertFocused(keep);
+
+        window.Press(PhysicalKey.Enter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(co.IsDiscardEditorConfirmOpen);
+        Assert.True(co.IsEditorOpen);
+        Assert.Equal(120, co.Editor!.CoValue);
+    }
+
+    [AvaloniaFact]
+    public void Escape_on_an_untouched_editor_closes_it_in_one_key()
+    {
+        var (window, vm, session) = ShowWorkspace();
+        session.AddCoBuilding("Mehrfamilienhaus A", 3, 4);
+        Dispatcher.UIThread.RunJobs();
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        var co = vm.CoMessprotokoll;
+        co.MatrixRows.Single(r => r.Ordinal == 2).Cells[0].OpenEditorCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        SidebarButton(window, "ABBRECHEN").Focus();
+        Dispatcher.UIThread.RunJobs();
+
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(co.IsEditorOpen);
+        Assert.False(co.IsDiscardEditorConfirmOpen);
     }
 
     [AvaloniaFact]

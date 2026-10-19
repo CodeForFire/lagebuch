@@ -276,12 +276,39 @@
              gives its last, undocked child whatever is left: the idiom MasterDataEditorView
              uses for its own fixed footers. -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8"
-                    HorizontalAlignment="Right" Margin="0,12,0,0">
+                    HorizontalAlignment="Right" Margin="0,12,0,0"
+                    IsVisible="{Binding !IsDiscardEditorConfirmOpen}">
           <Button x:Name="EditorCancelButton" Content="ABBRECHEN"
                   Command="{Binding CloseEditorCommand}" />
           <Button x:Name="EditorConfirmButton" Classes="signal" Content="FERTIG"
                   Command="{Binding ConfirmEditorCommand}" />
         </StackPanel>
+
+        <!-- #652: ABBRECHEN or Esc on a changed buffer asks before dropping it, in place of the
+             buttons it answers for. A destructive confirm (#545): focus starts on ABBRECHEN and
+             there is no primary command, so a reflex Enter keeps the edit. Nested inside the
+             sidebar's own overlay root on purpose: Esc bubbles to this panel first, which handles
+             it, so it closes the question rather than re-asking it. -->
+        <Border x:Name="DiscardEditorPanel" DockPanel.Dock="Bottom"
+                IsVisible="{Binding IsDiscardEditorConfirmOpen}"
+                b:Overlay.IsInline="True"
+                b:Overlay.CancelCommand="{Binding CancelDiscardEditorCommand}"
+                b:Overlay.InitialFocus="{Binding #CancelDiscardEditorButton}"
+                BorderBrush="{StaticResource HairlineBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="0,12,0,0" Margin="0,12,0,0">
+          <StackPanel Spacing="8">
+            <TextBlock Text="ÄNDERUNGEN VERWERFEN?" Classes="overline" />
+            <TextBlock Text="Was hier eingegeben ist, wurde noch nicht mit FERTIG übernommen."
+                       TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <Button x:Name="ConfirmDiscardEditorButton" Classes="signal" Content="VERWERFEN"
+                      Command="{Binding ConfirmDiscardEditorCommand}" />
+              <Button x:Name="CancelDiscardEditorButton" Content="ABBRECHEN"
+                      Command="{Binding CancelDiscardEditorCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
 
         <!-- The sidebar had no ScrollViewer at all: a StackPanel measures against infinity, so
              the Border simply clipped whatever did not fit, and at the app's own MinHeight of 600

@@ -1,0 +1,1 @@
+Esc or ABBRECHEN in the CO-Messprotokoll reading editor and in the Einsatzdaten dialog now asks "Änderungen verwerfen?" before throwing away typed input, with focus on ABBRECHEN, while an untouched editor still closes straight away (#652).

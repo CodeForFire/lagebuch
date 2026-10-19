@@ -82,12 +82,64 @@ public class IncidentDataDialogRenderTests
 
         var street = Find<TextBox>(window, "IncidentDataStreetBox");
         street.Focus();
-        window.Press(PhysicalKey.Escape);
+        window.Press(PhysicalKey.Escape); // nothing typed: closes in one key
         Assert.Equal(1, closed);
 
         street.Text = "Nebenstr. 1";
         window.Press(PhysicalKey.Enter);
         Assert.Equal(2, closed);
         Assert.Equal("Nebenstr. 1", session.Incident.Street);
+    }
+
+    // #652: Esc with typed Einsatzdaten asks first, focus on ABBRECHEN, so a reflex Enter keeps
+    // editing; VERWERFEN then closes without saving.
+    [AvaloniaFact]
+    public void Escape_after_typing_asks_before_discarding()
+    {
+        var closed = 0;
+        var session = Session();
+        var dialogVm = new IncidentDataDialogViewModel(session, () => { });
+        dialogVm.Closed += (_, _) => closed++;
+        var window = new Window { Content = new IncidentDataDialogView { DataContext = dialogVm }, Width = 560, Height = 560 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var street = Find<TextBox>(window, "IncidentDataStreetBox");
+        street.Focus();
+        street.Text = "Nebenstr. 1";
+
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(0, closed);
+        Assert.True(Find<Border>(window, "IncidentDataDiscardPanel").IsEffectivelyVisible);
+        window.AssertFocused(Find<Button>(window, "IncidentDataKeepEditingButton"));
+        Capture(window, "incident-data-discard-confirm.png");
+
+        window.Press(PhysicalKey.Enter);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, closed);
+        Assert.False(Find<Border>(window, "IncidentDataDiscardPanel").IsEffectivelyVisible);
+        Assert.Equal("Nebenstr. 1", street.Text);
+
+        window.Press(PhysicalKey.Escape);
+        Dispatcher.UIThread.RunJobs();
+        Find<Button>(window, "IncidentDataDiscardButton").Command!.Execute(null);
+
+        Assert.Equal(1, closed);
+        Assert.Equal("Hauptstr. 12", session.Incident.Street);
+    }
+
+    // Opt-in PNG capture for the PR's before/after pair; a plain test run writes nothing.
+    private static void Capture(Window window, string name)
+    {
+        var dir = Environment.GetEnvironmentVariable("RENDER_OUT");
+        if (string.IsNullOrWhiteSpace(dir))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, name));
     }
 }
