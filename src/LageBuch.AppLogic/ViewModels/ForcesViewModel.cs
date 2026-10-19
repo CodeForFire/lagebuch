@@ -285,12 +285,12 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
     private readonly IIncidentSession _session;
     private readonly IClock _clock;
     private readonly Action _onChanged;
-    private readonly Action<string, Action> _requestConfirm;
+    private readonly Action<string, string, Action> _requestConfirm;
     private readonly IReadOnlyList<Vehicle> _masterVehicles;
 
     /// <summary>
     /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action before
-    /// running it (message, then the action to run on confirmation) — mirrors
+    /// running it (title, message, then the action to run on confirmation) — mirrors
     /// <c>IncidentWorkspaceViewModel.CloseIncident</c>'s ConfirmDialogViewModel overlay. Defaults
     /// to running the action immediately, so tests that don't care about the confirmation step
     /// don't need to supply one.
@@ -300,14 +300,14 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
         IClock clock,
         MasterDataSet masterData,
         Action onChanged,
-        Action<string, Action>? requestConfirm = null)
+        Action<string, string, Action>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(masterData);
         _session = session;
         _clock = clock;
         _onChanged = onChanged;
-        _requestConfirm = requestConfirm ?? ((_, onConfirmed) => onConfirmed());
+        _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         _masterVehicles = masterData.Vehicles;
         IsReadOnly = session.IsReadOnly;
         StatusOptions = masterData.UnitStatus;
@@ -726,6 +726,7 @@ public sealed partial class ForcesViewModel : ObservableObject, INarrowAware, IE
                 // Irreversible during a live Einsatz, same as closing it — confirm first (#UX).
                 var label = string.IsNullOrWhiteSpace(f.CallSign) ? f.Brigade : $"{f.Brigade} {f.CallSign}";
                 _requestConfirm(
+                    "Kraft entfernen?",
                     $"„{label}“ aus der Kräfteübersicht entfernen. Fortfahren?",
                     () =>
                     {

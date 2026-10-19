@@ -101,7 +101,7 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
-    private readonly Action<string, Action> _requestConfirm;
+    private readonly Action<string, string, Action> _requestConfirm;
 
     // Quiet until the first press: a tab that opens already scolding teaches nothing.
     private bool _errorsShown;
@@ -115,13 +115,13 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
     public InvolvedPartiesViewModel(
         IIncidentSession session,
         Action onChanged,
-        Action<string, Action>? requestConfirm = null)
+        Action<string, string, Action>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(onChanged);
         _session = session;
         _onChanged = onChanged;
-        _requestConfirm = requestConfirm ?? ((_, onConfirmed) => onConfirmed());
+        _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         IsReadOnly = session.IsReadOnly;
         Parties = new ObservableCollection<InvolvedPartyRow>(session.Incident.InvolvedParties.Select(ToRow));
         _session.Changed += Refresh;
@@ -265,6 +265,7 @@ public sealed partial class InvolvedPartiesViewModel : ObservableObject, INarrow
                 _onChanged();
             },
             () => _requestConfirm(
+                "Beteiligten entfernen?",
                 $"„{party.Name}“ aus den Beteiligten entfernen. Fortfahren?",
                 () =>
                 {

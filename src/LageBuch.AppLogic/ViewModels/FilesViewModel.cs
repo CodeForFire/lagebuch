@@ -90,11 +90,11 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
     private readonly IIncidentSession _session;
     private readonly IFileDialogService _dialogs;
     private readonly Action _onChanged;
-    private readonly Action<string, Action> _requestConfirm;
+    private readonly Action<string, string, Action> _requestConfirm;
 
     /// <summary>
     /// <paramref name="requestConfirm"/> asks the host to confirm a destructive action before
-    /// running it (message, then the action to run on confirmation) — mirrors
+    /// running it (title, message, then the action to run on confirmation) — mirrors
     /// <see cref="ForcesViewModel"/>'s Kraft-removal confirm. Defaults to running the action
     /// immediately, so tests that don't care about the confirmation step don't need to supply one.
     /// </summary>
@@ -102,13 +102,13 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
         IIncidentSession session,
         IFileDialogService dialogs,
         Action onChanged,
-        Action<string, Action>? requestConfirm = null)
+        Action<string, string, Action>? requestConfirm = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _dialogs = dialogs;
         _onChanged = onChanged;
-        _requestConfirm = requestConfirm ?? ((_, onConfirmed) => onConfirmed());
+        _requestConfirm = requestConfirm ?? ((_, _, onConfirmed) => onConfirmed());
         IsReadOnly = session.IsReadOnly;
         Files = new ObservableCollection<IncidentFileRow>();
         _session.Changed += Sync;
@@ -348,6 +348,7 @@ public sealed partial class FilesViewModel : ObservableObject, IDisposable
             IsReadOnly,
             displayName => _session.RenameFile(f.Id, displayName),
             () => _requestConfirm(
+                "Datei entfernen?",
                 $"„{row.DisplayName}“ entfernen. Fortfahren?",
                 () => _ = RemoveFileAsync(f.Id)));
         return row;

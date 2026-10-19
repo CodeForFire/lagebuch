@@ -1076,11 +1076,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     /// <summary>
     /// Generic confirm-before-acting hook for children (e.g. ForcesViewModel removing a unit) that
     /// need the same destructive-action guard as <see cref="CloseIncident"/> without each owning
-    /// its own ConfirmDialogViewModel wiring.
+    /// its own ConfirmDialogViewModel wiring. The caller names what is removed in the title
+    /// (#670), as every other confirm does.
     /// </summary>
-    private void RequestConfirm(string message, Action onConfirmed)
+    private void RequestConfirm(string title, string message, Action onConfirmed)
     {
-        var dialog = new ConfirmDialogViewModel("Bestätigen", message, "ENTFERNEN", onConfirmed);
+        var dialog = new ConfirmDialogViewModel(title, message, "ENTFERNEN", onConfirmed);
         dialog.Closed += (_, _) => PendingConfirm = null;
         PendingConfirm = dialog;
     }

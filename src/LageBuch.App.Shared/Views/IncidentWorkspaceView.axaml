@@ -639,7 +639,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
                 <Button Classes="navcell" Classes.selected="{Binding IsSelected}"
-                        AutomationProperties.Name="{Binding Header}"
+                        AutomationProperties.Name="{Binding AccessibleName}"
                         ToolTip.Tip="{Binding Header}"
                         Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).SelectNavItemCommand}"
                         CommandParameter="{Binding}">
@@ -696,6 +696,7 @@
                       <DataTemplate x:DataType="vm:WorkspaceNavItemViewModel">
                         <Button Classes="ghost" HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Left" Margin="0,1"
+                                AutomationProperties.Name="{Binding AccessibleName}"
                                 Command="{Binding $parent[ItemsControl].((vm:IncidentWorkspaceViewModel)DataContext).SelectNavItemCommand}"
                                 CommandParameter="{Binding}">
                           <StackPanel Orientation="Horizontal" Spacing="10">
@@ -819,6 +820,13 @@
           <TabControl.Background>
             <SolidColorBrush Color="Transparent" />
           </TabControl.Background>
+          <!-- The status dot is colour-only, so the tab's name carries the Checkliste's state
+               (#670). Child selector: the modules' own TabControls keep their names. -->
+          <TabControl.Styles>
+            <Style Selector="TabControl#ModuleTabs > TabItem" x:DataType="vm:WorkspaceNavItemViewModel">
+              <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}" />
+            </Style>
+          </TabControl.Styles>
           <TabControl.ItemTemplate>
             <!-- The module's shortcut sits at the tab's right edge (#544); a Checkliste has none.
                  It reaches 12px into the tab's right padding: ATEMSCHUTZ and CO-MESSUNG leave the

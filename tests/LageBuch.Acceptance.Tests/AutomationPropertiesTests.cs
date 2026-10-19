@@ -300,4 +300,97 @@ public class AutomationPropertiesTests
         var removeButton = IconButtons(view).Single(b => (ToolTip.GetTip(b) as string) == "Datei entfernen");
         Assert.Equal("Datei entfernen", Name(removeButton));
     }
+
+    private static (Window Window, IncidentWorkspaceViewModel Vm, LocalIncidentSession Session) Workspace(
+        double width,
+        double height,
+        params (string Text, bool IsMandatory)[] aufbau)
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            aufbau,
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            WorkspaceRenderHelper.MasterData(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController());
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = height };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        return (window, vm, session);
+    }
+
+    // #670: a CO tile is a button whose only text is a unit number and a glyph; a screen reader
+    // announced an unnamed button for every Nutzungseinheit.
+    [AvaloniaFact]
+    public void Every_co_unit_tile_is_named_for_its_unit_and_state()
+    {
+        var (window, _, session) = Workspace(1920, 1032);
+        session.AddCoBuilding("Mehrfamilienhaus A", 2, 2);
+        WorkspaceRenderHelper.SelectTab(window, "CO-MESSUNG");
+        Dispatcher.UIThread.RunJobs();
+
+        List<Button> Tiles() => window.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Classes.Contains("unit-tile"))
+            .ToList();
+
+        var tiles = Tiles();
+        Assert.NotEmpty(tiles);
+        Assert.All(tiles, t =>
+        {
+            var cell = Assert.IsType<DwellingCellViewModel>(t.DataContext);
+            Assert.Equal(cell.TileTooltip, Name(t));
+            Assert.StartsWith(cell.Label, Name(t), StringComparison.Ordinal);
+            Assert.Contains("noch nicht abgesucht", Name(t), StringComparison.Ordinal);
+        });
+
+        var building = session.Incident.Buildings[0];
+        var first = Assert.IsType<DwellingCellViewModel>(tiles[0].DataContext);
+        session.SetDwellingStatus(building.Id, first.FloorOrdinal, first.ApartmentNumber, Domain.CoMeasurement.DwellingStatus.Affected);
+        Dispatcher.UIThread.RunJobs();
+
+        var renamed = Tiles().Single(t => t.DataContext is DwellingCellViewModel c && c.FloorOrdinal == first.FloorOrdinal && c.ApartmentNumber == first.ApartmentNumber);
+        Assert.Contains("Person(en) betroffen", Name(renamed), StringComparison.Ordinal);
+    }
+
+    // #670: the rail's status dot is colour-only, so the tab's name carries the Checkliste's state.
+    [AvaloniaFact]
+    public void A_checkliste_rail_tab_is_named_with_its_state()
+    {
+        var (window, vm, _) = Workspace(1920, 1032, ("Blaulicht aus?", true));
+        var tabs = WorkspaceRenderHelper.Tabs(window);
+        var index = vm.NavItems.ToList().FindIndex(i => i.IsChecklist);
+        var item = vm.NavItems[index];
+        var container = Assert.IsType<TabItem>(tabs.ContainerFromIndex(index));
+
+        Assert.Equal($"{item.Header} – unvollständig", Name(container));
+
+        ((ChecklistViewModel)item.Content).Items[0].IsDone = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal($"{item.Header} – vollständig", Name(container));
+
+        var module = Assert.IsType<TabItem>(tabs.ContainerFromIndex(vm.NavItems.ToList().FindIndex(i => !i.IsChecklist)));
+        Assert.Equal(Assert.IsType<WorkspaceNavItemViewModel>(module.DataContext).Header, Name(module));
+    }
+
+    [AvaloniaFact]
+    public void A_checkliste_phone_nav_cell_is_named_with_its_state()
+    {
+        var (window, vm, _) = Workspace(412, 915, ("Blaulicht aus?", true));
+        var cells = window.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Classes.Contains("navcell") && b.DataContext is WorkspaceNavItemViewModel && b.IsEffectivelyVisible)
+            .ToList();
+        Assert.NotEmpty(cells);
+
+        Assert.All(cells, c => Assert.Equal(Assert.IsType<WorkspaceNavItemViewModel>(c.DataContext).AccessibleName, Name(c)));
+        Assert.Contains(vm.NavItems, i => i.IsChecklist && i.AccessibleName.EndsWith("– unvollständig", StringComparison.Ordinal));
+    }
 }

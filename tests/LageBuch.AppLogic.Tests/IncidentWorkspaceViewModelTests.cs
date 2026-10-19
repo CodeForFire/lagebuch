@@ -172,6 +172,60 @@ public class IncidentWorkspaceViewModelTests
         Assert.False(vm.ShareJoinsClosed);
     }
 
+    // #670: every other confirm names what it does; the remove confirm said only "Bestätigen".
+    [Fact]
+    public void Removing_a_kraft_asks_kraft_entfernen()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.Forces.NewBrigade = "FFB Wache 1";
+        vm.Forces.NewCallSign = "FFB 1/40/1";
+        vm.Forces.NewMannschaftCount = 6;
+        vm.Forces.AddForceCommand.Execute(null);
+
+        vm.Forces.Forces[0].RemoveCommand.Execute(null);
+
+        Assert.Equal("Kraft entfernen?", vm.PendingConfirm?.Title);
+        Assert.Equal("ENTFERNEN", vm.PendingConfirm?.ConfirmLabel);
+    }
+
+    [Fact]
+    public void Removing_a_beteiligten_asks_beteiligten_entfernen()
+    {
+        var vm = NewWorkspace(out _, out _);
+        vm.InvolvedParties.NewName = "Erika Beispiel";
+        vm.InvolvedParties.AddCommand.Execute(null);
+
+        vm.InvolvedParties.Parties[0].RemoveCommand.Execute(null);
+
+        Assert.Equal("Beteiligten entfernen?", vm.PendingConfirm?.Title);
+    }
+
+    [Fact]
+    public void Removing_a_datei_asks_datei_entfernen()
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        session.Incident.AddFile(clock, new SessionOperator("Müller", "FFB 12/1"), "brand.jpg", "image/jpeg", 10);
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new NoopIncidentHostController());
+
+        Assert.Single(vm.Files.Files).RemoveCommand.Execute(null);
+
+        Assert.Equal("Datei entfernen?", vm.PendingConfirm?.Title);
+    }
+
     // #604: the ✕ beside the share info is a small target, and stopping cuts off every joined device
     // mid-Einsatz -- the same blast radius as leaving, which already asks.
     [Fact]

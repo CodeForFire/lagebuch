@@ -68,11 +68,22 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
 
     /// <summary>A Checkliste whose mandatory items are all ticked. Always false for a module.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
     private bool _isComplete;
 
     /// <summary>A Checkliste with mandatory items still open. Always false for a module.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibleName))]
     private bool _isIncomplete;
+
+    /// <summary>
+    /// What a screen reader announces for the tab: the header, plus the Checkliste's state that the
+    /// rail otherwise shows only as the colour of a dot (#670).
+    /// </summary>
+    public string AccessibleName =>
+        IsIncomplete ? $"{Header} – unvollständig"
+        : IsComplete ? $"{Header} – vollständig"
+        : Header;
 
     /// <summary>
     /// Upper-cases a Checkliste's name for the rail. <c>ToUpperInvariant</c> turns "ß" into "SS",
