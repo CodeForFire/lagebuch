@@ -142,6 +142,10 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     // session.
     private readonly List<RoleAssignmentRow> _all = new();
 
+    // What the roster last wrote into each form's phone and Funkrufname (#656).
+    private readonly RosterPrefill _newPrefill = new();
+    private readonly RosterPrefill _transferPrefill = new();
+
     // The two conflict messages, parsed once each: CompositeFormat is the cached form of a composite
     // template, and this hint is rebuilt on every keystroke in the add form. De is the fixed culture
     // Formatting applies to everything a person reads, repeated here because that class formats
@@ -392,7 +396,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     private string? _newPhone;
 
     partial void OnNewPersonNameChanged(string value) =>
-        PrefillFromRoster(value, () => NewPhone, v => NewPhone = v, () => NewCallSign, v => NewCallSign = v);
+        PrefillFromRoster(value, _newPrefill, () => NewPhone, v => NewPhone = v, () => NewCallSign, v => NewCallSign = v);
 
     /// <summary>Whether the Funktion is still missing, once the operator has asked (#412).</summary>
     /// <summary>Everything this form is still waiting on, on one line beneath its fields (#412).</summary>
@@ -532,7 +536,8 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     private string? _transferPhone;
 
     partial void OnTransferPersonNameChanged(string value) =>
-        PrefillFromRoster(value, () => TransferPhone, v => TransferPhone = v, () => TransferCallSign, v => TransferCallSign = v);
+        PrefillFromRoster(
+            value, _transferPrefill, () => TransferPhone, v => TransferPhone = v, () => TransferCallSign, v => TransferCallSign = v);
 
     private void BeginTransfer(RoleAssignmentRow row)
     {
@@ -586,12 +591,15 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     }
 
     /// <summary>
-    /// Fills in what the roster knows about the person just picked, shared by the new-assignment
-    /// name box and the transfer panel's. Only ever fills a blank field: a number typed by hand
-    /// outranks the roster, which may be out of date.
+    /// Fills in what the roster knows about the person just named, shared by the new-assignment
+    /// name box and the transfer panel's. A field is the roster's to write while it is blank or
+    /// still holds what the roster last put there, so correcting the name swaps the previous
+    /// person's number for the new one's, or clears it when the name matches nobody (#656). A
+    /// number typed by hand outranks the roster, which may be out of date, and is left alone.
     /// </summary>
     private void PrefillFromRoster(
         string personName,
+        RosterPrefill prefill,
         Func<string?> getPhone,
         Action<string?> setPhone,
         Func<string?> getCallSign,
@@ -599,20 +607,35 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     {
         var person = _personnel.FirstOrDefault(
             p => string.Equals(p.DisplayName, personName, StringComparison.OrdinalIgnoreCase));
-        if (person is null)
+        prefill.Phone = Refill(getPhone(), prefill.Phone, person?.Phone, setPhone);
+        prefill.CallSign = Refill(getCallSign(), prefill.CallSign, person?.CallSign, setCallSign);
+    }
+
+    // Writes the roster's value unless the field holds something typed by hand, and returns what
+    // the roster now owns in that field.
+    private static string? Refill(string? current, string? prefilled, string? fromRoster, Action<string?> set)
+    {
+        var rosterOwnsIt = string.IsNullOrWhiteSpace(current)
+            || string.Equals(current, prefilled, StringComparison.Ordinal);
+        if (!rosterOwnsIt)
         {
-            return;
+            return null;
         }
 
-        if (string.IsNullOrWhiteSpace(getPhone()))
+        if (!string.Equals(current, fromRoster, StringComparison.Ordinal)
+            && !(string.IsNullOrWhiteSpace(current) && string.IsNullOrWhiteSpace(fromRoster)))
         {
-            setPhone(person.Phone);
+            set(fromRoster);
         }
 
-        if (string.IsNullOrWhiteSpace(getCallSign()))
-        {
-            setCallSign(person.CallSign);
-        }
+        return fromRoster;
+    }
+
+    private sealed class RosterPrefill
+    {
+        public string? Phone { get; set; }
+
+        public string? CallSign { get; set; }
     }
 
     private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>

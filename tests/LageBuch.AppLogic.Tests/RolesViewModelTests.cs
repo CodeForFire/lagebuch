@@ -377,6 +377,69 @@ public class RolesViewModelTests
         Assert.Equal("01 60 / 9 99 99 99", vm.NewPhone);
     }
 
+    // #656: picking the wrong person and correcting the name must not keep the first person's
+    // number -- the Einsatzleiter would be called on someone else's phone.
+    private static readonly Person Erika = new("Musterfrau", "Erika", "GF", "Land 2", "01 52 / 7 65 43 21");
+
+    [Fact]
+    public void Correcting_the_name_replaces_the_prefilled_phone_and_call_sign()
+    {
+        var vm = NewVm(new FixedClock(T0), Md(Max, Erika));
+
+        vm.NewPersonName = "Mustermann, Max";
+        vm.NewPersonName = "Musterfrau, Erika";
+
+        Assert.Equal("01 52 / 7 65 43 21", vm.NewPhone);
+        Assert.Equal("Land 2", vm.NewCallSign);
+    }
+
+    [Fact]
+    public void Correcting_the_name_to_someone_unknown_clears_the_prefill()
+    {
+        var vm = NewVm(new FixedClock(T0), Md(Max, Erika));
+
+        vm.NewPersonName = "Mustermann, Max";
+        vm.NewPersonName = "Nachbarwehr, Nicht Im Verzeichnis";
+
+        Assert.True(string.IsNullOrEmpty(vm.NewPhone));
+        Assert.True(string.IsNullOrEmpty(vm.NewCallSign));
+    }
+
+    [Fact]
+    public void A_phone_typed_after_the_prefill_survives_a_name_correction()
+    {
+        var vm = NewVm(new FixedClock(T0), Md(Max, Erika));
+
+        vm.NewPersonName = "Mustermann, Max";
+        vm.NewPhone = "01 60 / 9 99 99 99";
+        vm.NewPersonName = "Musterfrau, Erika";
+
+        Assert.Equal("01 60 / 9 99 99 99", vm.NewPhone);
+        Assert.Equal("Land 2", vm.NewCallSign); // the untouched field still follows the name
+    }
+
+    [Fact]
+    public void Correcting_the_successors_name_replaces_the_prefill_in_the_transfer_panel()
+    {
+        var vm = NewVm(new FixedClock(T0), Md(Max, Erika));
+        vm.NewRole = "EL";
+        vm.NewPersonName = "Müller";
+        vm.AddRoleCommand.Execute(null);
+        Assert.Single(vm.Roles).BeginTransferCommand.Execute(null);
+
+        vm.TransferPersonName = "Mustermann, Max";
+        vm.TransferPersonName = "Musterfrau, Erika";
+
+        Assert.Equal("01 52 / 7 65 43 21", vm.TransferPhone);
+        Assert.Equal("Land 2", vm.TransferCallSign);
+
+        vm.TransferPhone = "01 60 / 9 99 99 99";
+        vm.TransferPersonName = "Nachbarwehr, Nicht Im Verzeichnis";
+
+        Assert.Equal("01 60 / 9 99 99 99", vm.TransferPhone);
+        Assert.True(string.IsNullOrEmpty(vm.TransferCallSign));
+    }
+
     [Fact]
     public void An_unknown_name_is_accepted_as_free_text()
     {
