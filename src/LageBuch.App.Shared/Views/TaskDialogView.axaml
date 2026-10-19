@@ -23,7 +23,7 @@
         <Border DockPanel.Dock="Top" Height="4" Background="{StaticResource SignalGradientBrush}"
                 CornerRadius="12,12,0,0" />
         <StackPanel Margin="26,22,26,24" Spacing="12">
-          <TextBlock Text="TASK ERSTELLEN" Classes="display" FontSize="20" />
+          <TextBlock Text="AUFGABE ERSTELLEN" Classes="display" FontSize="20" />
           <HeaderedContentControl Classes="field required" Header="AUFGABE" ctrl:Field.Error="{Binding TextError}">
             <!-- Freitext: kein Platzhalter, siehe #137 -->
             <TextBox x:Name="TaskDialogText" Text="{Binding Text}" AcceptsReturn="False" />
@@ -59,7 +59,7 @@
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="TaskDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
             <Button x:Name="TaskDialogSaveMoreButton" Classes="ghost"
-                    Content="SPEICHERN &amp; WEITEREN TASK" Command="{Binding SaveAndCreateAnotherCommand}" />
+                    Content="SPEICHERN &amp; WEITERE AUFGABE" Command="{Binding SaveAndCreateAnotherCommand}" />
             <Button x:Name="TaskDialogSaveButton" Classes="signal" Content="SPEICHERN"
                     Command="{Binding SaveCommand}" />
           </StackPanel>
