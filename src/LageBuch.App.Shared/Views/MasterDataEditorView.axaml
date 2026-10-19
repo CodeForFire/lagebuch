@@ -300,7 +300,8 @@
                         <ColumnDefinition Width="140" />
                         <ColumnDefinition Width="Auto" SharedSizeGroup="SettingsUnit" />
                       </Grid.ColumnDefinitions>
-                      <TextBlock Grid.Column="0" Text="Rückzugsdruck" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="0" Text="Rückzugsdruck" VerticalAlignment="Center"
+                                 ToolTip.Tip="Meldet ein Trupp diesen Druck oder weniger, löst der Rückzugsalarm aus." />
                       <NumericUpDown Grid.Column="1" Value="{Binding ReturnPressureBar}"
                                      Minimum="0" Maximum="400" Increment="5" FormatString="0" />
                       <TextBlock Grid.Column="2" Text="bar" Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />

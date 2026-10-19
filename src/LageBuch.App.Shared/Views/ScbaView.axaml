@@ -295,7 +295,7 @@
                        A command runs after the flyout has dismissed, with no selection model in
                        the picture. Same Button.Flyout idiom as ForcesView's Stärke editor. -->
                   <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
-                    <TextBlock Grid.Column="0" Text="Si." Classes="cellLabel" />
+                    <TextBlock Grid.Column="0" Text="Si." Classes="cellLabel" ToolTip.Tip="Sicherheitstrupp" />
                     <Button Grid.Column="1" x:Name="SafetyTruppButton"
                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                             Padding="8,4" FontSize="12"
@@ -382,9 +382,9 @@
               <DataTemplate x:DataType="vm:ScbaTruppRow">
                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
                       VerticalAlignment="Center" Margin="12,6">
-                  <TextBlock Grid.Row="0" Grid.Column="0" Text="akt." Classes="cellLabel" />
+                  <TextBlock Grid.Row="0" Grid.Column="0" Text="akt." Classes="cellLabel" ToolTip.Tip="Zuletzt gemeldeter Druck" />
                   <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding PressureDisplay}" Classes="mono" />
-                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Abfrage" Classes="cellLabel" />
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Abfrage" Classes="cellLabel" ToolTip.Tip="Zeit bis zur nächsten Druckabfrage" />
                   <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ControlRemainingDisplay}"
                              Classes="mono" Classes.control="{Binding IsControlDue}" />
                 </Grid>
@@ -485,11 +485,11 @@
                       <TextBlock Text="{Binding ElapsedDisplay}" Classes="mono" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal">
-                      <TextBlock Text="akt." Classes="cellLabel" />
+                      <TextBlock Text="akt." Classes="cellLabel" ToolTip.Tip="Zuletzt gemeldeter Druck" />
                       <TextBlock Text="{Binding PressureDisplay}" Classes="mono" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal">
-                      <TextBlock Text="Abfrage" Classes="cellLabel" />
+                      <TextBlock Text="Abfrage" Classes="cellLabel" ToolTip.Tip="Zeit bis zur nächsten Druckabfrage" />
                       <TextBlock Text="{Binding ControlRemainingDisplay}" Classes="mono"
                                  Classes.control="{Binding IsControlDue}" />
                     </StackPanel>
@@ -507,7 +507,7 @@
                        here, because the grid's SafetyTruppButton is found by name in tests and a
                        second control answering to it would make that search ambiguous. -->
                   <Grid ColumnDefinitions="Auto,*">
-                    <TextBlock Grid.Column="0" Text="Si." Classes="cellLabel" />
+                    <TextBlock Grid.Column="0" Text="Si." Classes="cellLabel" ToolTip.Tip="Sicherheitstrupp" />
                     <Button Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                             Padding="8,4" FontSize="12"
                             Content="{Binding SafetyTruppButtonText}"

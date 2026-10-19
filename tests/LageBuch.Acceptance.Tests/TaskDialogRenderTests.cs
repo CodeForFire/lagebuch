@@ -9,7 +9,7 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// #137: labeled-field pass over the "Task erstellen" dialog (previously had no render-test
+// #137: labeled-field pass over the "Aufgabe erstellen" dialog (previously had no render-test
 // coverage at all). Hosted directly, same idiom as ForcesTabRenderTests' strength-editor test.
 public class TaskDialogRenderTests
 {
