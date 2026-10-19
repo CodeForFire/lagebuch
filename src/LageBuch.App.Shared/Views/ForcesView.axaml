@@ -175,7 +175,8 @@
         <StackPanel x:Name="DockFields" Spacing="8">
           <!-- Fahrzeuge aller Wachen (#215): wählt man eines, werden Feuerwehr, Funkrufname und
                Stärke vorbelegt und die beiden ersten Felder gesperrt (readonly), damit die Zeile
-               nicht vom Stammdaten-Fahrzeug abweicht. Der X-Button hebt die Auswahl wieder auf. -->
+               nicht vom Stammdaten-Fahrzeug abweicht. Der X-Button hebt die Auswahl wieder auf und
+               leert, was sie vorbelegt hat. -->
           <HeaderedContentControl Classes="field" Header="FAHRZEUG">
             <StackPanel Orientation="Horizontal" Spacing="4">
               <ComboBox x:Name="VehicleBox"
