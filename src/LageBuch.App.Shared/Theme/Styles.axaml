@@ -316,6 +316,22 @@
     <Setter Property="Height" Value="38" />
   </Style>
 
+  <!-- Rückzugsalarm acknowledged (#654): still red while the Trupp is out, but the glow goes and
+       the spent button turns into a stamp reading QUITTIERT, so a silent red banner never reads
+       as broken audio. A new Trupp in alarm lifts the class again. -->
+  <Style Selector="Border.meldung.alarm.acknowledged">
+    <Setter Property="BoxShadow" Value="0 0 0 0 #00FF3D2E" />
+  </Style>
+  <Style Selector="Border.meldung.alarm.acknowledged StackPanel.meldung-actions > Button:disabled">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Border.meldung.alarm.acknowledged StackPanel.meldung-actions > Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="#FFFFFF" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+  </Style>
+
   <!-- The quiet strip: countdowns that are running, not due. Readouts, not rows - no tile, no
        tint; the time is the only thing set bright. -->
   <Style Selector="Border.meldung-strip">

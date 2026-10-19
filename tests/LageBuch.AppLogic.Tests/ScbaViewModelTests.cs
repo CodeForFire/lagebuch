@@ -449,6 +449,38 @@ public class ScbaViewModelTests
     }
 
     [Fact]
+    public void An_acknowledged_alarm_shows_as_acknowledged_until_another_trupp_trips_it()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        Register(vm).StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(10);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999;
+        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer").StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+        Assert.Equal("ALARM QUITTIEREN", vm.AlarmAcknowledgeLabel);
+
+        vm.AcknowledgeAlarmCommand.Execute(null);
+
+        // #654: pressing it again would do nothing, so it must not look pressable.
+        Assert.True(vm.IsAlarmAcknowledged);
+        Assert.False(vm.AcknowledgeAlarmCommand.CanExecute(null));
+        Assert.Equal("QUITTIERT", vm.AlarmAcknowledgeLabel);
+
+        clock.Now = T0.AddMinutes(41);
+        ticker.Fire(); // the second Trupp passes its limit and re-arms the alarm
+
+        Assert.False(vm.IsAlarmAcknowledged);
+        Assert.True(vm.AcknowledgeAlarmCommand.CanExecute(null));
+        Assert.Equal("ALARM QUITTIEREN", vm.AlarmAcknowledgeLabel);
+    }
+
+    [Fact]
     public void Repeat_cadence_is_fifteen_seconds_while_unacknowledged()
     {
         var clock = new FixedClock(T0);
