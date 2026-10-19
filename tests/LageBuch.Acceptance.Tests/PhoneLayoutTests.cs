@@ -329,6 +329,25 @@ public class PhoneLayoutTests
         Assert.True(vm.ShowCategories);
     }
 
+    // Seven columns cannot fit 412dp: a Personal row stacks into its two-column form, and the
+    // wide grid's column header goes with the wide rows it labels.
+    [AvaloniaFact]
+    public void The_stammdaten_personnel_rows_stack_on_a_phone()
+    {
+        var vm = new MasterDataEditorViewModel(new DemoProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = PhoneWindow(view);
+
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Personal");
+        Dispatcher.UIThread.RunJobs();
+
+        var grids = view.GetVisualDescendants().OfType<Grid>().ToList();
+        Assert.True(grids.Single(g => g.Classes.Contains("person-narrow")).IsEffectivelyVisible);
+        Assert.False(grids.Single(g => g.Classes.Contains("person-wide")).IsEffectivelyVisible);
+        Assert.False(Named<Grid>(view, "PersonnelHeader").IsEffectivelyVisible);
+        AssertNothingOverflows(window, view);
+    }
+
     /// <summary>Enough Stammdaten for the rail to have something to drill into.</summary>
     private sealed class DemoProvider : IMasterDataProvider
     {
@@ -336,6 +355,7 @@ public class PhoneLayoutTests
         {
             Roles = new[] { new Role("EL"), new Role("ZF") },
             Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/10/1", 9) },
+            Personnel = new[] { new Person("Mustermann", "Max", "ZF", "FFB 1/10/1", null) },
         };
 
         public void Save(MasterDataSet set)
