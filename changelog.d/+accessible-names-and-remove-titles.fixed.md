@@ -1,0 +1,1 @@
+Screen readers now hear each CO-Messprotokoll unit tile by its unit and state and each Checkliste tab with whether it is vollständig or unvollständig, and the remove confirm names what it removes ("Kraft entfernen?", "Beteiligten entfernen?", "Datei entfernen?") instead of "Bestätigen" (#670).

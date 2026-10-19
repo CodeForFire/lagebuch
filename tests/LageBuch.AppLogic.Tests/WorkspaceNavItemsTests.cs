@@ -137,6 +137,33 @@ public class WorkspaceNavItemsTests
         Assert.False(item.IsIncomplete);
     }
 
+    // #670: the dot is colour-only, so the name a screen reader announces carries the state.
+    [Fact]
+    public void A_modules_accessible_name_is_its_header()
+    {
+        var vm = Workspace(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+
+        var module = vm.NavItems.First(i => !i.IsChecklist);
+
+        Assert.Equal(module.Header, module.AccessibleName);
+    }
+
+    [Fact]
+    public void A_checklists_accessible_name_carries_its_state_and_follows_it()
+    {
+        var vm = Workspace(new[] { Seed(Nachbereitung, "Nachbereitung", ("Bericht", true)) });
+        var item = vm.NavItems.First(i => i.IsChecklist);
+        var checklist = (ChecklistViewModel)item.Content;
+        var raised = new List<string?>();
+        item.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        Assert.Equal("NACHBEREITUNG – unvollständig", item.AccessibleName);
+
+        checklist.Items[0].IsDone = true;
+
+        Assert.Equal("NACHBEREITUNG – vollständig", item.AccessibleName);
+        Assert.Contains(nameof(WorkspaceNavItemViewModel.AccessibleName), raised);
+    }
+
     // Every child subscribes to session.Changed in its constructor, so an undisposed generation
     // keeps reacting forever -- the #167/#279 failure. Disposing the workspace must take the nav
     // items and their checklists with it.

@@ -110,10 +110,12 @@ public class InvolvedPartiesViewModelTests
     public void Removing_a_row_asks_for_confirmation_before_touching_the_session()
     {
         var session = NewSession();
+        string? confirmTitle = null;
         string? confirmMessage = null;
         Action? confirmAction = null;
-        var vm = new InvolvedPartiesViewModel(session, () => { }, (message, onConfirmed) =>
+        var vm = new InvolvedPartiesViewModel(session, () => { }, (title, message, onConfirmed) =>
         {
+            confirmTitle = title;
             confirmMessage = message;
             confirmAction = onConfirmed;
         })
@@ -125,6 +127,7 @@ public class InvolvedPartiesViewModelTests
         vm.Parties[0].RemoveCommand.Execute(null);
 
         Assert.Single(vm.Parties); // nothing happened yet — the host only recorded the request
+        Assert.Equal("Beteiligten entfernen?", confirmTitle);
         Assert.Equal("„Erika Beispiel“ aus den Beteiligten entfernen. Fortfahren?", confirmMessage);
 
         confirmAction!();

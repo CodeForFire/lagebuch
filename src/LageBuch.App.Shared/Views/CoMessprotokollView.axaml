@@ -624,10 +624,13 @@
                       <!-- HorizontalAlignment="Stretch" is load-bearing: without it the Button
                            sizes to its content and sits at the left of the column the panel gave
                            it, so the columns line up but the tiles don't fill them. -->
-                      <Button Background="Transparent" BorderThickness="0" Padding="0" Height="NaN"
+                      <!-- The tile's text is a unit number and a glyph; the tooltip's sentence
+                           (unit, state, ppm) is what a screen reader announces instead (#670). -->
+                      <Button Classes="unit-tile" Background="Transparent" BorderThickness="0" Padding="0" Height="NaN"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                               ToolTip.Tip="{Binding TileTooltip}"
+                              AutomationProperties.Name="{Binding TileTooltip}"
                               Command="{Binding OpenEditorCommand}">
                         <!-- Door-mark tile: dark ground, colored accent stripe + a slash/X/circled-X
                              glyph mirror the spray-marked search convention crews already read on

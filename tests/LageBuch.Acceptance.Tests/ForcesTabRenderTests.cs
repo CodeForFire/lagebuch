@@ -161,7 +161,9 @@ public class ForcesTabRenderTests
         row.RemoveCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Assert.NotNull(vm.PendingConfirm);
-        vm.PendingConfirm!.ConfirmCommand.Execute(null);
+        Capture(window, "forces-remove-confirm.png");
+        Assert.Equal("Kraft entfernen?", vm.PendingConfirm.Title); // names what it removes (#670)
+        vm.PendingConfirm.ConfirmCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
         var remaining = Assert.Single(vm.Forces.Forces);

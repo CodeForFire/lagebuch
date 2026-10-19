@@ -563,7 +563,7 @@ public class FilesViewModelTests
             Array.Empty<(string, bool)>());
         var file = session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
         Action? confirm = null;
-        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (_, onConfirmed) => confirm = onConfirmed);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (_, _, onConfirmed) => confirm = onConfirmed);
         Assert.Single(vm.Files).RemoveCommand.Execute(null);
 
         await session.RemoveFileAsync(file.Id);
@@ -718,10 +718,12 @@ public class FilesViewModelTests
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
+        string? confirmTitle = null;
         string? confirmMessage = null;
         Action? confirmAction = null;
-        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (message, onConfirmed) =>
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (title, message, onConfirmed) =>
         {
+            confirmTitle = title;
             confirmMessage = message;
             confirmAction = onConfirmed;
         });
@@ -732,6 +734,7 @@ public class FilesViewModelTests
         // Nothing happened yet — the host only recorded the request.
         Assert.Single(vm.Files);
         Assert.Single(session.Incident.Files);
+        Assert.Equal("Datei entfernen?", confirmTitle);
         Assert.Contains("brand.jpg", confirmMessage, StringComparison.Ordinal);
 
         confirmAction!();
@@ -758,7 +761,7 @@ public class FilesViewModelTests
             Array.Empty<(string, bool)>());
         session.Incident.AddFile(clock, session.Operator!, "brand.jpg", "image/jpeg", 10);
         string? confirmMessage = null;
-        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (message, _) => confirmMessage = message);
+        var vm = new FilesViewModel(session, new FakeDialogs(), () => { }, (_, message, _) => confirmMessage = message);
         var row = Assert.Single(vm.Files);
 
         row.DisplayName = "Küchenbrand";

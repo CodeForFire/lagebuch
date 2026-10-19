@@ -663,10 +663,12 @@ public class ForcesViewModelTests
             "/x.fwincident",
             Array.Empty<(string, bool)>(),
             Array.Empty<(string, bool)>());
+        string? confirmTitle = null;
         string? confirmMessage = null;
         Action? confirmAction = null;
-        var vm = new ForcesViewModel(session, clock, Md(), () => { }, (message, onConfirmed) =>
+        var vm = new ForcesViewModel(session, clock, Md(), () => { }, (title, message, onConfirmed) =>
         {
+            confirmTitle = title;
             confirmMessage = message;
             confirmAction = onConfirmed;
         })
@@ -681,6 +683,7 @@ public class ForcesViewModelTests
 
         // Nothing happened yet — the host only recorded the request.
         Assert.Single(vm.Forces);
+        Assert.Equal("Kraft entfernen?", confirmTitle);
         Assert.Contains("FFB Wache 1", confirmMessage, StringComparison.Ordinal);
         Assert.Contains("FFB 1/40/1", confirmMessage, StringComparison.Ordinal);
 
