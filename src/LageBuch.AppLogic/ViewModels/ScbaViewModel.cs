@@ -667,10 +667,18 @@ public sealed partial class ScbaViewModel : ObservableObject, INarrowAware, IEnt
         }
     }
 
+    /// <summary>
+    /// Set by ALARM QUITTIEREN until another Trupp trips the alarm. The banner shows it (#654):
+    /// a red banner that has gone quiet must read as acknowledged, not as broken audio.
+    /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AlarmAcknowledgeLabel))]
+    [NotifyCanExecuteChangedFor(nameof(AcknowledgeAlarmCommand))]
     private bool _isAlarmAcknowledged;
 
-    private bool CanAcknowledgeAlarm => IsAnyAlarm;
+    public string AlarmAcknowledgeLabel => IsAlarmAcknowledged ? "QUITTIERT" : "ALARM QUITTIEREN";
+
+    private bool CanAcknowledgeAlarm => IsAnyAlarm && !IsAlarmAcknowledged;
 
     [RelayCommand(CanExecute = nameof(CanAcknowledgeAlarm))]
     private void AcknowledgeAlarm()

@@ -69,6 +69,24 @@ public class ScbaBannerJumpTests
         Assert.NotSame(vm.Scba, vm.SelectedNavItem?.Content);
     }
 
+    // #654: a second Atemschutzüberwacher walking up must be able to tell "acknowledged" from
+    // "audio broken" on a red, silent banner.
+    [AvaloniaFact]
+    public void An_acknowledged_alarm_says_so_on_the_banner()
+    {
+        var (window, view, _) = ShowWorkspace();
+        var ack = view.GetControl<Button>("ScbaAlarmAckButton");
+        var bar = view.GetControl<Border>("ScbaAlarmBar");
+
+        Click(window, ack);
+        Capture(window, "scba-alarm-acknowledged.png");
+
+        Assert.True(bar.IsVisible);
+        Assert.Contains("acknowledged", bar.Classes);
+        Assert.False(ack.IsEffectivelyEnabled);
+        Assert.Equal("QUITTIERT", ack.Content);
+    }
+
     private static (Window Window, IncidentWorkspaceView View, IncidentWorkspaceViewModel Vm) ShowWorkspace()
     {
         var vm = WorkspaceRenderHelper.BuildEditableWorkspaceWithAllBars();
@@ -115,6 +133,10 @@ public class ScbaBannerJumpTests
         // Park the pointer clear of the header, or the jump button's tooltip stands open across
         // the Rückzugsalarm banner in the captured frame.
         window.MouseMove(new Avalonia.Point(window.Width / 2, window.Height - 20));
+        Dispatcher.UIThread.RunJobs();
+
+        // Button brushes fade on the wall clock; let a just-pressed one finish before the frame.
+        Thread.Sleep(500);
         Dispatcher.UIThread.RunJobs();
 
         Directory.CreateDirectory(dir);

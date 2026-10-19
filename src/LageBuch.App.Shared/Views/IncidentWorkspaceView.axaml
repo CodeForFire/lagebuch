@@ -274,7 +274,8 @@
           <!-- Rückzugsalarm: the one row lit end to end, with the audible alarm (life-safety).
                The message sits in a star column so the ellipsis eats the reason, never the
                Funkrufname that leads it (#417). -->
-          <Border x:Name="ScbaAlarmBar" Classes="meldung alarm" IsVisible="{Binding Scba.IsAnyAlarm}">
+          <Border x:Name="ScbaAlarmBar" Classes="meldung alarm" IsVisible="{Binding Scba.IsAnyAlarm}"
+                  Classes.acknowledged="{Binding Scba.IsAlarmAcknowledged}">
             <Grid ColumnDefinitions="*,Auto" DataContext="{Binding Scba}">
               <Button Grid.Column="0" x:Name="ScbaAlarmJumpButton" Classes="bar"
                       Command="{Binding ShowAlarmingTruppCommand}"
@@ -303,7 +304,7 @@
                 </Grid>
               </Button>
               <StackPanel Grid.Column="1" Classes="meldung-actions">
-                <Button x:Name="ScbaAlarmAckButton" Content="ALARM QUITTIEREN"
+                <Button x:Name="ScbaAlarmAckButton" Content="{Binding AlarmAcknowledgeLabel}"
                         Command="{Binding AcknowledgeAlarmCommand}" />
               </StackPanel>
             </Grid>
