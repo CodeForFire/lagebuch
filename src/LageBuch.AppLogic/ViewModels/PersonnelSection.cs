@@ -48,6 +48,18 @@ public sealed partial class PersonnelSection : EditorSection
         });
     }
 
+    /// <summary>
+    /// The 1-based numbers of rows that hold something but no Nachname (#650). <see cref="ToPeople"/>
+    /// drops those, so saving them would lose the row silently. A wholly blank row is an untouched
+    /// placeholder, not data, and is not listed.
+    /// </summary>
+    public IReadOnlyList<int> RowsWithoutLastName() =>
+        Rows.Select((r, i) => (Row: r, Number: i + 1))
+            .Where(x => string.IsNullOrWhiteSpace(x.Row.LastName)
+                && !AllBlank(x.Row.FirstName, x.Row.Role, x.Row.CallSign, x.Row.Phone, x.Row.Email, x.Row.Note))
+            .Select(x => x.Number)
+            .ToArray();
+
     /// <summary>Rows with a non-blank last name; trimmed, with blank optionals collapsed to null.</summary>
     public IReadOnlyList<Person> ToPeople()
     {

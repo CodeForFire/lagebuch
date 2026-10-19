@@ -1,0 +1,1 @@
+Stammdaten: a personnel row with a Vorname, phone or other field but no Nachname now blocks SPEICHERN and is named in the banner ("Person ohne Nachname: Zeile 4"), instead of being dropped without a word on save (#650).
