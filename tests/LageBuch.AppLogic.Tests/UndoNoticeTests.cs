@@ -93,6 +93,50 @@ public class UndoNoticeTests
     }
 
     [Fact]
+    public void Erledigt_in_the_due_bar_offers_to_take_it_back()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        session.AddTask("Tür sichern", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        string? offered = null;
+        Action? undo = null;
+        using var vm = Tasks(session, clock, (message, onUndo) =>
+        {
+            offered = message;
+            undo = onUndo;
+        });
+        clock.Now = T0.AddMinutes(8);
+
+        vm.CompleteMostOverdueTaskCommand.Execute(null);
+
+        Assert.Equal("„Tür sichern“ erledigt.", offered);
+        Assert.True(session.Incident.Tasks[0].IsCompleted);
+        undo!();
+        Assert.False(session.Incident.Tasks[0].IsCompleted);
+    }
+
+    [Fact]
+    public void Undo_from_the_due_bar_leaves_an_aufgabe_reopened_meanwhile_alone()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        session.AddTask("Tür sichern", null, TaskImportance.Low, TaskUrgency.Low, 5);
+        Action? undo = null;
+        var changes = 0;
+        using var vm = new TasksViewModel(
+            session, clock, new FakeTicker(), new FakeAlarmService(), MasterDataSet.Empty, () => changes++, (_, onUndo) => undo = onUndo);
+        clock.Now = T0.AddMinutes(8);
+        vm.CompleteMostOverdueTaskCommand.Execute(null);
+        session.SetTaskCompleted(session.Incident.Tasks[0].Id, false); // another tab or device
+        var before = changes;
+
+        undo!();
+
+        Assert.False(session.Incident.Tasks[0].IsCompleted);
+        Assert.Equal(before, changes);
+    }
+
+    [Fact]
     public void Undo_on_the_workspace_reopens_the_aufgabe_and_closes_the_notice()
     {
         var clock = new FixedClock(T0);

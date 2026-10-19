@@ -500,7 +500,10 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
         RevealRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>The bar's ERLEDIGT: ticks off the task the bar names, as the grid's checkbox would.</summary>
+    /// <summary>
+    /// The bar's ERLEDIGT: ticks off the task the bar names, as the grid's checkbox would — undo
+    /// included (#653), since the bar pops up over the work and acts on whichever task is most overdue.
+    /// </summary>
     [RelayCommand]
     private void CompleteMostOverdueTask()
     {
@@ -511,6 +514,17 @@ public sealed partial class TasksViewModel : ObservableObject, INarrowAware, IEn
 
         _session.SetTaskCompleted(task.Id, true);
         _onChanged();
+        _offerUndo($"„{task.Text}“ erledigt.", () => ReopenIfCompleted(_session, task.Id, _onChanged));
+    }
+
+    // Undoes a tick, unless the task was reopened (or removed) meanwhile.
+    internal static void ReopenIfCompleted(IIncidentSession session, Guid id, Action onChanged)
+    {
+        if (session.Incident.Tasks.FirstOrDefault(t => t.Id == id) is { IsCompleted: true })
+        {
+            session.SetTaskCompleted(id, false);
+            onChanged();
+        }
     }
 
     /// <summary>The bar's +5 MIN: puts the task it names off by five minutes from now (#246).</summary>
@@ -736,15 +750,7 @@ public sealed partial class TaskRow : ObservableObject
         }
     }
 
-    // Undoes this row's tick, unless the task was reopened (or removed) meanwhile.
-    private void Reopen()
-    {
-        if (_session.Incident.Tasks.FirstOrDefault(t => t.Id == Id) is { IsCompleted: true })
-        {
-            _session.SetTaskCompleted(Id, false);
-            _onChanged();
-        }
-    }
+    private void Reopen() => TasksViewModel.ReopenIfCompleted(_session, Id, _onChanged);
 
     /// <summary>True while the task is open and past its due time. Order is unaffected by design.</summary>
     public bool IsOverdue { get; private set; }
