@@ -82,6 +82,24 @@ public class IncidentWorkspaceViewModelTests
         Assert.Null(vm.ShareAddress);
     }
 
+    [Fact]
+    public async Task The_share_button_says_what_pressing_it_will_do()
+    {
+        var vm = EditableWorkspace(new FakeHostController());
+        Assert.Equal("IM NETZWERK FREIGEBEN", vm.ShareButtonText);
+
+        await vm.ToggleSharingCommand.ExecuteAsync(null);
+
+        Assert.Equal("FREIGABE BEENDEN", vm.ShareButtonText);
+    }
+
+    [Fact]
+    public void Sharing_is_offered_only_for_an_editable_incident_on_a_platform_that_can_host()
+    {
+        Assert.True(EditableWorkspace(new FakeHostController()).CanHost);
+        Assert.False(ReadOnlyWorkspace(out _, closed: true, host: new FakeHostController()).CanHost);
+    }
+
     // #655: the raw socket text was English, cut off, and nothing the Lagebuchführer could act on.
     [Fact]
     public async Task A_port_already_taken_says_so_in_german_without_the_raw_text()
@@ -274,7 +292,7 @@ public class IncidentWorkspaceViewModelTests
     }
 
     // A read-only-opened workspace over a still-open incident (upgradable via continue-editing).
-    private static IncidentWorkspaceViewModel ReadOnlyWorkspace(out FixedClock clock, bool closed = false)
+    private static IncidentWorkspaceViewModel ReadOnlyWorkspace(out FixedClock clock, bool closed = false, IIncidentHostController? host = null)
     {
         var store = new FakeStore();
         clock = new FixedClock(T0);
@@ -298,7 +316,7 @@ public class IncidentWorkspaceViewModelTests
             Md(),
             new FakeDialogs(),
             new FakeAlarmService(),
-            new NoopIncidentHostController());
+            host ?? new NoopIncidentHostController());
     }
 
     // --- ETB stays live ---------------------------------------------------------------------
@@ -810,6 +828,42 @@ public class IncidentWorkspaceViewModelTests
         {
             File.Delete(pathAll);
             File.Delete(pathReduced);
+        }
+    }
+
+    // Android hands the written PDF to its share sheet; the desktop's hook does nothing.
+    [Fact]
+    public async Task A_written_pdf_is_handed_to_the_share_hook()
+    {
+        var exportPath = Path.Join(Path.GetTempPath(), $"export-{Guid.NewGuid():N}.pdf");
+        var dialogs = new FakeDialogs { ExportPath = exportPath };
+        var clock = new FixedClock(T0);
+        var vm = new IncidentWorkspaceViewModel(
+            TestSession.StartNew(
+                new FakeStore(),
+                clock,
+                new SessionOperator("Müller"),
+                "/x.fwincident",
+                new[] { ("A?", false) },
+                Array.Empty<(string, bool)>()),
+            clock,
+            new FakeTicker(),
+            Md(),
+            dialogs,
+            new FakeAlarmService(),
+            new NoopIncidentHostController(),
+            new TestPdfExporter());
+        try
+        {
+            vm.ExportPdfCommand.Execute(null);
+            await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
+
+            Assert.Equal(exportPath, dialogs.SharedPath);
+            Assert.Equal("application/pdf", dialogs.SharedMimeType);
+        }
+        finally
+        {
+            File.Delete(exportPath);
         }
     }
 

@@ -42,6 +42,14 @@ public class FailureReasonsTests
     }
 
     [Fact]
+    public void An_access_denial_wrapped_in_another_failure_still_reads_as_one()
+    {
+        var failure = new IOException(Raw, new UnauthorizedAccessException(Raw));
+
+        Assert.Equal(FailureReasons.SharingAccessDenied, FailureReasons.ForSharing(failure));
+    }
+
+    [Fact]
     public void An_unknown_sharing_failure_falls_back_to_a_german_sentence()
     {
         Assert.Equal(FailureReasons.SharingFailed, FailureReasons.ForSharing(new InvalidOperationException(Raw)));
