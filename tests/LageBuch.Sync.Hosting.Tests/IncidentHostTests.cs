@@ -83,6 +83,60 @@ public class IncidentHostTests
         Assert.Contains(chain, e => e is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.AddressAlreadyInUse });
     }
 
+    // #665: a Lagebuchführer who retries "Im Netzwerk freigeben" while another window holds the
+    // port must not collect a session handler per attempt — each one would count every change again.
+    [Fact]
+    public async Task A_failed_bind_leaves_no_handler_behind_so_a_retry_counts_each_change_once()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var first = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        await first.StartAsync(IPAddress.Loopback, 0);
+        var taken = Assert.IsType<int>(first.BoundPort);
+        await using var second = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        await Assert.ThrowsAnyAsync<Exception>(() => second.StartAsync(IPAddress.Loopback, taken));
+
+        await second.StartAsync(IPAddress.Loopback, 0);
+        var port = Assert.IsType<int>(second.BoundPort);
+        using var http = new HttpClient(TestHost.InsecureTrustAllHandler()) { BaseAddress = new Uri($"https://127.0.0.1:{port}") };
+        http.DefaultRequestHeaders.Add(SyncProtocol.PinHeader, "1234");
+        http.DefaultRequestHeaders.Add(SyncProtocol.ProtocolHeader, SyncProtocol.ProtocolVersion.ToString(CultureInfo.InvariantCulture));
+        var before = await GetRevisionAsync(http);
+
+        session.SetKeyword("B3P");
+
+        Assert.Equal(before + 1, await GetRevisionAsync(http));
+    }
+
+    [Fact]
+    public async Task A_failed_bind_reports_no_kennung_and_is_not_running()
+    {
+        var clock = new FixedClock();
+        var session = TestSession.StartNew(
+            new InMemoryStore(),
+            clock,
+            new SessionOperator("Host", "FFB 1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>());
+        await using var first = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+        await first.StartAsync(IPAddress.Loopback, 0);
+        var taken = Assert.IsType<int>(first.BoundPort);
+        await using var second = new IncidentHost(session, clock, "1.2.3", new ImmediateUiDispatcher(), "1234");
+
+        await Assert.ThrowsAnyAsync<Exception>(() => second.StartAsync(IPAddress.Loopback, taken));
+
+        Assert.False(second.IsRunning);
+        Assert.Null(second.Kennung);
+        Assert.Null(second.BoundPort);
+    }
+
     [Fact]
     public async Task A_host_reports_no_bound_port_before_it_starts_or_after_it_stops()
     {

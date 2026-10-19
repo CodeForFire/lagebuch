@@ -269,7 +269,24 @@ public sealed class IncidentHost : IAsyncDisposable
 
         _hub = app.Services.GetRequiredService<IHubContext<IncidentHub>>();
         _session.Changed += OnSessionChanged; // the host's own edits reach clients too
-        await app.StartAsync(cancellationToken);
+        try
+        {
+            await app.StartAsync(cancellationToken);
+        }
+        catch
+        {
+            // A failed bind — the port is taken — leaves nothing behind (#665): a retry would
+            // otherwise subscribe a second handler, and _app is still null, so StopAsync never
+            // disposes this application or the certificate.
+            _session.Changed -= OnSessionChanged;
+            _hub = null;
+            await app.DisposeAsync();
+            _cert?.Dispose();
+            _cert = null;
+            Kennung = null;
+            throw;
+        }
+
         _app = app;
 
         // After the start, Urls holds what Kestrel actually bound (port 0 resolved to the real one).
