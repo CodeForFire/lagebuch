@@ -73,6 +73,78 @@ public class CommandBarReachabilityTests
         Assert.NotNull(more.Flyout);
     }
 
+    // The widths at which MainView's container queries change the bar (#648). They are repeated
+    // here because a query is parsed from text: keep them in step with the Query strings. The
+    // sweep below tests one either side of each, so a button that makes the bar wider than the
+    // band it sits in fails here instead of on a tablet.
+    private const double PhoneBreakpoint = 640;
+    private const double FoldBreakpoint = 880;
+    private const double CompactBreakpoint = 1040;
+
+    // Each action on the wide bar, and the twin that stands in for it in the MEHR flyout.
+    private static readonly (string Bar, string Overflow)[] Actions =
+    [
+        ("HomeButton", "MoreHomeButton"),
+        ("MasterDataButton", "MoreMasterDataButton"),
+        ("JoinDeviceButton", "MoreJoinDeviceButton"),
+        ("OpenFileButton", "MoreOpenFileButton"),
+        ("ShortcutsButton", "MoreShortcutsButton"),
+        ("AboutButton", "MoreAboutButton"),
+    ];
+
+    // From MainWindow's MinWidth to past the widest desktop default, plus one either side of every
+    // breakpoint. Two fixed points would pass a fix for one gap and miss the next one.
+    public static TheoryData<double> Widths()
+    {
+        var widths = new SortedSet<double>();
+        for (var width = 380; width <= 1300; width += 20)
+        {
+            widths.Add(width);
+        }
+
+        foreach (var breakpoint in new[] { PhoneBreakpoint, FoldBreakpoint, CompactBreakpoint })
+        {
+            widths.Add(breakpoint);
+            widths.Add(breakpoint + 1);
+        }
+
+        return [.. widths];
+    }
+
+    [AvaloniaTheory]
+    [MemberData(nameof(Widths))]
+    public void Every_command_bar_action_is_reachable_at_every_width(double width)
+    {
+        var view = new MainView();
+        var window = new Window { Content = view, Width = width, Height = 800 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var bar = view.GetVisualDescendants().OfType<Border>().First(b => b.Name == "CommandBar");
+        foreach (var button in bar.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible))
+        {
+            var (left, right) = HorizontalBounds(button, window);
+            Assert.True(
+                left >= 0 && right <= width,
+                $"{button.Name} spans x=[{left:0}..{right:0}] on a {width:0} px bar — past the edge and unreachable.");
+        }
+
+        Assert.True(
+            ButtonNamed(view, "NewIncidentButton").IsEffectivelyVisible,
+            $"NEUER EINSATZ must stay on the bar at {width:0} px (#53 §4)");
+
+        var more = ButtonNamed(view, "MoreActionsButton");
+        var overflow = more.IsEffectivelyVisible && more.Flyout is Flyout { Content: Panel panel }
+            ? panel.Children.OfType<Button>().Select(b => b.Name).ToHashSet(StringComparer.Ordinal)
+            : [];
+        foreach (var (onBar, inOverflow) in Actions)
+        {
+            Assert.True(
+                ButtonNamed(view, onBar).IsEffectivelyVisible || overflow.Contains(inOverflow),
+                $"{onBar} is neither on the bar nor in MEHR at {width:0} px");
+        }
+    }
+
     [AvaloniaFact]
     public void A_desktop_window_keeps_every_action_on_the_bar()
     {

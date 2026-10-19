@@ -14,20 +14,24 @@
   <Panel Container.Name="Shell" Container.Sizing="Width" b:GlobalShortcuts.IsEnabled="True">
     <Panel.Styles>
       <!-- The wide defaults. Each has to be a Style rather than an attribute on the control: a
-           local value in XAML outranks every Style setter, so the query below could never win. -->
+           local value in XAML outranks every Style setter, so the queries below could never win. -->
       <Style Selector="Border#CommandBar">
         <Setter Property="Height" Value="60" />
       </Style>
-      <ContainerQuery Name="Shell" Query="max-width:640">
-        <Style Selector="Border#CommandBar">
-          <Setter Property="Height" Value="56" />
-        </Style>
+      <!-- The bar sheds in two stages, at widths taken from what it measures rather than from
+           LayoutBreakpoints.Narrow (#648). The full bar needs 1017dp; without the descriptor it
+           needs 860dp. Each query leaves about 20dp of slack for fonts that measure wider on a
+           device than in the headless harness. CommandBarReachabilityTests sweeps every width
+           and repeats these numbers, so a new button that outgrows its band fails the build. -->
+      <ContainerQuery Name="Shell" Query="max-width:1040">
         <Style Selector="TextBlock#BrandDescriptor">
           <Setter Property="IsVisible" Value="False" />
         </Style>
         <Style Selector="Border#BrandDivider">
           <Setter Property="IsVisible" Value="False" />
         </Style>
+      </ContainerQuery>
+      <ContainerQuery Name="Shell" Query="max-width:880">
         <Style Selector="StackPanel#WideActions">
           <Setter Property="IsVisible" Value="False" />
         </Style>
@@ -38,14 +42,21 @@
           <Setter Property="IsVisible" Value="True" />
         </Style>
       </ContainerQuery>
+      <!-- The phone layout everything else switches to. -->
+      <ContainerQuery Name="Shell" Query="max-width:640">
+        <Style Selector="Border#CommandBar">
+          <Setter Property="Height" Value="56" />
+        </Style>
+      </ContainerQuery>
     </Panel.Styles>
     <DockPanel>
       <!-- ===== Command bar ===== -->
       <!-- Six actions in one Auto column is wider than a phone: NEUER EINSATZ used to render at
            x=527..638 on a 411dp viewport, 227px past the edge and untappable
-           (CommandBarReachabilityTests). Below 640 the bar keeps the one action that starts work
-           and folds the rest into an overflow, the descriptor beside the wordmark goes, and the
-           bar loses 4px of height. -->
+           (CommandBarReachabilityTests). At 1040 and below, the descriptor beside the wordmark
+           goes. At 880 and below, the bar keeps the one action that starts work and folds the
+           rest into an overflow. That covers a phone in landscape and a tablet in portrait. At
+           640 and below, the bar also loses 4px of height. -->
       <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBarBrush}"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
               x:Name="CommandBar">
