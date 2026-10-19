@@ -349,8 +349,10 @@
                       <TextBlock Text="VON" Classes="overline" FontSize="9" VerticalAlignment="Center" />
                       <TextBlock Text="{Binding FromDisplay}" Classes="mono" FontSize="12" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="6"
-                                IsVisible="{Binding ToDisplay, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <!-- ToDisplay is "—" while running, which the grid column wants and a card
+                         would read as ended (#668). -->
+                    <StackPanel x:Name="RoleCardTo" Orientation="Horizontal" Spacing="6"
+                                IsVisible="{Binding !IsRunning}">
                       <TextBlock Text="BIS" Classes="overline" FontSize="9" VerticalAlignment="Center" />
                       <TextBlock Text="{Binding ToDisplay}" Classes="mono" FontSize="12" />
                     </StackPanel>
