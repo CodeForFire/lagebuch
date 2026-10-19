@@ -1,0 +1,1 @@
+Führung & Funktionen: correcting a picked name now replaces the phone and Funkrufname the Stammdaten filled in for the previous person, or clears them if the new name matches nobody, while values typed by hand are kept (#656).
