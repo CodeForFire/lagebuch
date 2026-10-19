@@ -235,7 +235,7 @@ public sealed class IncidentWorkspaceMailTests : IDisposable
         await vm.PendingPdfExportOptions!.ExportCommand.ExecuteAsync(null);
 
         Assert.Equal(
-            $"PDF exportiert: {Path.GetFileName(_exportPath)} – E-Mail fehlgeschlagen: kaputt",
+            $"PDF exportiert: {Path.GetFileName(_exportPath)} – E-Mail-Programm ließ sich nicht starten",
             vm.ExportStatus);
     }
 
