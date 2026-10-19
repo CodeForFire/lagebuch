@@ -59,9 +59,18 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Manifest mode, not the default workload-set mode. A workload set pins
+      # every manifest at once -- iOS, MAUI, emscripten -- and Microsoft has
+      # published sets before all of those were on nuget.org (10.0.402.1, on
+      # 2026-10-19), failing every Android job for an hour over an iOS manifest
+      # we never install. In manifest mode an unpublished manifest we do not use
+      # is only a warning, and Android still updates to its latest version;
+      # `--skip-manifest-update` would instead pin the SDK's GA-era baseline.
       - name: Install Android workload
         if: matrix.android
-        run: dotnet workload install android
+        run: |
+          dotnet workload config --update-mode manifests
+          dotnet workload install android
 
       # Cheap, and it guards a number that cannot be taken back: the Android versionCode is
       # derived by this script for both `make aab` and the release workflow, and Google Play
