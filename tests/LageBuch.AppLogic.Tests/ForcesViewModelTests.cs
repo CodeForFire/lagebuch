@@ -1174,6 +1174,41 @@ public class ForcesViewModelTests
     }
 
     [Fact]
+    public void Reverting_a_strength_never_taken_over_puts_the_stored_one_back()
+    {
+        var session = SessionWithTwoUnits();
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        var row = vm.Forces[0];
+        var stored = session.Incident.Forces[0];
+        var shown = row.StrengthText;
+
+        row.ZugfuehrerCount = 3; // typed into the editor, then the flyout was dismissed
+        row.MannschaftCount = 12;
+        row.RevertStrength();
+
+        Assert.Equal(stored.ZugfuehrerCount, row.ZugfuehrerCount);
+        Assert.Equal(stored.OfficerCount, row.OfficerCount);
+        Assert.Equal(stored.MannschaftCount, row.MannschaftCount);
+        Assert.Equal(stored.ScbaCount, row.ScbaCount);
+        Assert.Equal(shown, row.StrengthText);
+    }
+
+    [Fact]
+    public void Reverting_after_uebernehmen_keeps_the_correction()
+    {
+        var session = SessionWithTwoUnits();
+        var vm = new ForcesViewModel(session, new FixedClock(T0), Md(), () => { });
+        var row = vm.Forces[0];
+
+        row.MannschaftCount = 12;
+        row.ApplyStrengthEditCommand.Execute(null);
+        row.RevertStrength(); // the flyout closing after ÜBERNEHMEN
+
+        Assert.Equal(12, row.MannschaftCount);
+        Assert.Equal(12, session.Incident.Forces[0].MannschaftCount);
+    }
+
+    [Fact]
     public void A_strength_correction_made_elsewhere_reaches_the_kept_row()
     {
         var session = SessionWithTwoUnits();

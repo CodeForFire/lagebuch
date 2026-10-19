@@ -228,6 +228,20 @@ public sealed partial class ForceRow : ObservableObject
     [RelayCommand]
     private void ApplyStrengthEdit() => CommitStrength();
 
+    /// <summary>
+    /// Puts the Stärke the incident holds back into the four counts (#651). The strength editor
+    /// edits them in place, so a correction dismissed without ÜBERNEHMEN would otherwise stay in
+    /// the grid row while the session and the header total keep the stored one. After ÜBERNEHMEN
+    /// the stored Stärke already is the correction, so this keeps it.
+    /// </summary>
+    public void RevertStrength()
+    {
+        ZugfuehrerCount = _syncedStrength.Zugfuehrer;
+        OfficerCount = _syncedStrength.Officer;
+        MannschaftCount = _syncedStrength.Mannschaft;
+        ScbaCount = _syncedStrength.Scba;
+    }
+
     /// <summary>Takes the unit back completely (#76 follow-up). A closed Einsatz is a historical
     /// record: inert rather than throwing, same rule as the strength setters. The body guard also
     /// covers a programmatic Execute, which bypasses CanExecute.</summary>
