@@ -1,0 +1,1 @@
+Suggestion fields such as the ETB's VON now look and open like the dropdowns in KRÄFTE: switching to ETB, FUNKTIONEN or ATEMSCHUTZ no longer drops a list over the screen, which opens on a click, on typing or with the down arrow instead.

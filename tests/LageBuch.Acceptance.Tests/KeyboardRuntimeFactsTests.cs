@@ -82,6 +82,20 @@ public class KeyboardRuntimeFactsTests
         return (window, box);
     }
 
+    // ↓ opens a closed list, with nothing typed: the keyboard's way into the full list, now that
+    // focus no longer opens it, comes with the box and SuggestionBox adds nothing for it.
+    [AvaloniaFact]
+    public void Arrow_down_on_a_closed_box_opens_the_list()
+    {
+        var (window, box) = ShowBareBox("Mustermann, Max", "Musterfrau, Erika");
+        box.IsDropDownOpen = false;
+        Dispatcher.UIThread.RunJobs();
+
+        window.Press(PhysicalKey.ArrowDown);
+
+        Assert.True(box.IsDropDownOpen);
+    }
+
     // #466: ContainsOrdinal ignores case, umlauts included, so no box needs another FilterMode.
     [AvaloniaFact]
     public void ContainsOrdinal_ignores_case_including_umlauts()

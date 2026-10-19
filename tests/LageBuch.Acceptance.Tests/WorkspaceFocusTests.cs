@@ -117,6 +117,23 @@ public class WorkspaceFocusTests
         window.AssertFocused(Named<Control>(window, "VehicleBox"));
     }
 
+    // Field test: the list a suggestion box used to open on focus covered the rows the
+    // Lagebuchführer had switched to the module to read. It now stays closed, as KRÄFTE's ComboBox does.
+    [AvaloniaTheory]
+    [InlineData("ETB", "FromBox")]
+    [InlineData("FUNKTIONEN", "RoleBox")]
+    [InlineData("ATEMSCHUTZ", "CallSignBox")]
+    public void Clicking_a_rail_tab_leaves_the_first_field_suggestion_list_closed(string header, string firstField)
+    {
+        var (window, _, _) = ShowWorkspace();
+
+        Click(window, RailTab(window, header));
+
+        var box = Named<AutoCompleteBox>(window, firstField);
+        window.AssertFocused(box);
+        Assert.False(box.IsDropDownOpen);
+    }
+
     [AvaloniaFact]
     public void Clicking_the_kontakte_tab_puts_the_caret_in_the_search_box()
     {
