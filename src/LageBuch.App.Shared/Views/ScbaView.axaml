@@ -51,6 +51,27 @@
     <Style Selector="TextBlock.scbaStatus.control">
       <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
     </Style>
+
+    <!-- An alarming Trupp is the row the Atemschutzüberwacher has to find in a second, so the
+         whole row and card carry the alarm, not just two red cells (#669). It follows IsAlarm
+         alone, not the banner's acknowledgement (#654). Hover and selection stay in the signal
+         hue here, or the app-wide neutral fills would mask the alarm on exactly the row someone
+         just jumped to; the selected fill still reads red text at 4.2:1, the hover at 4.5:1. -->
+    <Style Selector="DataGrid#TruppGrid DataGridRow.alarm /template/ Rectangle#BackgroundRectangle">
+      <Setter Property="Fill" Value="{StaticResource SignalWashBrush}" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="DataGrid#TruppGrid DataGridRow.alarm:pointerover /template/ Rectangle#BackgroundRectangle">
+      <Setter Property="Fill" Value="#3D1512" />
+    </Style>
+    <Style Selector="DataGrid#TruppGrid DataGridRow.alarm:selected /template/ Rectangle#BackgroundRectangle">
+      <Setter Property="Fill" Value="#47181A" />
+    </Style>
+    <Style Selector="Border.row-card.alarm">
+      <Setter Property="Background" Value="{StaticResource SignalWashBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SignalBrush}" />
+      <Setter Property="BorderThickness" Value="4,1,1,1" />
+    </Style>
     <!-- WrapPanel has no ItemSpacing/LineSpacing in Avalonia 11, so the dock spaces its children. -->
     <Style Selector="WrapPanel#RegistrationDock > :is(Control)">
       <Setter Property="Margin" Value="0,0,8,0" />
@@ -236,6 +257,12 @@
       <DataGrid x:Name="TruppGrid" ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
                 SelectedItem="{Binding SelectedTrupp}"
                 RowHeight="NaN">
+        <!-- The grid makes its rows, so the alarm class reaches them through a row style (#669). -->
+        <DataGrid.Styles>
+          <Style Selector="DataGridRow" x:DataType="vm:ScbaTruppRow">
+            <Setter Property="b:AlarmClass.IsOn" Value="{Binding IsAlarm}" />
+          </Style>
+        </DataGrid.Styles>
         <DataGrid.Columns>
           <!-- Ten columns needed ~1460px and overflowed on a normal window, so related values are
                stacked into one cell each: Trupp over its call sign, the two clock values together,
@@ -425,7 +452,7 @@
         <ItemsControl x:Name="ScbaCards" ItemsSource="{Binding Trupps}" Margin="8">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:ScbaTruppRow">
-              <Border Classes="row-card">
+              <Border Classes="row-card" Classes.alarm="{Binding IsAlarm}">
                 <StackPanel Spacing="6">
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0" Text="{Binding DisplayName}" VerticalAlignment="Center"
