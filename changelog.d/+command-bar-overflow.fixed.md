@@ -1,1 +1,0 @@
-The command bar no longer runs off the right edge between 640 and 1017 dp, so NEUER EINSATZ and ÜBER can be reached on a phone in landscape, a tablet in portrait and a narrow window: the bar now drops its descriptor first and folds into MEHR below 880 dp (#648).

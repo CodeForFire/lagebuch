@@ -1,1 +1,0 @@
-On Android, the Rückzugsalarm, Druckabfrage, Leitstelle reminder and "Aufgabe fällig" now speak the same voice cues as the desktop on the alarm volume, one after another, instead of staying silent, and "Ton testen" reports whether a cue actually played (#637).

@@ -16,6 +16,72 @@ cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see 
 
 <!-- towncrier release notes start -->
 
+## [0.9.0] - 2026-10-20
+
+Security and trust. Attachments now stay inside their limits at every step: Android opens and
+shares only checked copies in the app's private temp folder, refuses an oversized pick or
+Stammdaten import while it is being copied, and a joined device deletes the files it pulled
+from the host when it leaves. A crash leaves a small report without personal data that the
+Startseite offers on the next start, and failures in sharing, export and the Dateien tab now
+say in German what went wrong. CI restores every dependency against pinned hashes. Alongside
+that come the findings of the latest Übung: Atemschutz buttons that ignore a double-click, a
+Rückzugsalarm that shows it was acknowledged, a due Aufgabe that keeps reminding, Stammdaten
+and module lists that no longer freeze on long rosters, and a command bar that fits a phone
+in landscape. The sync protocol is unchanged at 7, so 0.9.0 and 0.8.x devices share an
+Einsatz.
+
+### Added
+
+- [#631](https://github.com/CodeForFire/lagebuch/pull/631) - Über gains a "Ton testen" button that plays the Rückzugsalarm once and says plainly when this device cannot play any sound, and the Linux package now depends on alsa-utils instead of only recommending it (#603).
+- [#635](https://github.com/CodeForFire/lagebuch/pull/635) - A crash now leaves a small report holding only the app version, time, OS and each exception's type and stack trace, never its message, and the next start points to it on the Startseite (#300).
+
+### Changed
+
+- [#606](https://github.com/CodeForFire/lagebuch/pull/606) - The incident file writer was restructured to clear a static-analysis finding, with no change to the saved file.
+- [#608](https://github.com/CodeForFire/lagebuch/pull/608) - The 25 MB attachment limit and its error message are now defined once, so a file over the limit reads the same whether it was added from disk or over the sync connection (#343).
+- [#610](https://github.com/CodeForFire/lagebuch/pull/610) - The CO-Messprotokoll editor records the Schlüssel as Vorhanden, Keiner or Unbekannt, so a Wohnung marked by mistake can be set back to unknown; the PDF and the incident file are unchanged.
+- [#628](https://github.com/CodeForFire/lagebuch/pull/628) - Stopping sharing now asks first, because it disconnects every joined device and the ✕ that triggers it is easy to hit by mistake (#604).
+- [#661](https://github.com/CodeForFire/lagebuch/pull/661) - Atemschutz: after ALARM QUITTIEREN the Rückzugsalarm banner now shows that the alarm is acknowledged — the button turns into a disabled "QUITTIERT" and the glow goes — until another Trupp trips the alarm again (#654).
+- [#666](https://github.com/CodeForFire/lagebuch/pull/666) - Sharing and PDF export failures now say in German what went wrong and what to do — port in use, no network, no write access, file still open, disk full — instead of showing the raw exception text, and the status line wraps so the reason is readable on a tablet without hover (#655).
+- [#667](https://github.com/CodeForFire/lagebuch/pull/667) - Esc or ABBRECHEN in the CO-Messprotokoll reading editor and in the Einsatzdaten dialog now asks "Änderungen verwerfen?" before throwing away typed input, with focus on ABBRECHEN, while an untouched editor still closes straight away (#652).
+- [#675](https://github.com/CodeForFire/lagebuch/pull/675) - An alarming Atemschutz Trupp now colours its whole grid row, and on a phone its whole card, in the signal hue, including while it is selected, instead of only its RESTZEIT and STATUS text (#669).
+- [#676](https://github.com/CodeForFire/lagebuch/pull/676) - A due Aufgabe now repeats its cue every minute until it is ERLEDIGT or put off with +5 MIN, instead of sounding once and never again, and several overdue Aufgaben share one cue (#659).
+- [#679](https://github.com/CodeForFire/lagebuch/pull/679) - The task dialog now says Aufgabe like the rest of the app, and the Atemschutz short labels Si., akt. and Abfrage and the Rückzugsdruck setting explain themselves in tooltips (#605).
+- [#681](https://github.com/CodeForFire/lagebuch/pull/681) - Suggestion fields such as the ETB's VON now look and open like the dropdowns in KRÄFTE: switching to ETB, FUNKTIONEN or ATEMSCHUTZ no longer drops a list over the screen, which opens on a click, on typing or with the down arrow instead.
+- [#687](https://github.com/CodeForFire/lagebuch/pull/687) - The Stammdaten editor builds only the Fahrzeuge and Personal rows on screen, so a long roster opens without a pause, while Tab, Shift+Tab and + HINZUFÜGEN still reach every row.
+
+### Fixed
+
+- [#609](https://github.com/CodeForFire/lagebuch/pull/609) - On macOS and Linux, a voice alarm whose audio player hangs is now stopped after its time runs out instead of holding a thread until the app exits (#296).
+- [#622](https://github.com/CodeForFire/lagebuch/pull/622) - The Bericht's Gesamtstärke now counts Zugführer separately, in the same Zugführer/Führungskraft/Mannschaft/Gesamt notation as each unit's row and the Kräfte view, instead of leaving them out and adding them to Mannschaft (#621).
+- [#624](https://github.com/CodeForFire/lagebuch/pull/624) - Atemschutz: a double-click on RÜCKZUG no longer also triggers ABGENOMMEN, which used to end the Trupp's monitoring in the same gesture (#601).
+- [#632](https://github.com/CodeForFire/lagebuch/pull/632) - Atemschutz: a double-click on IM EINSATZ no longer also records an empty Druck or calls RÜCKZUG, because every Atemschutz action button now ignores the second press of a double-click or double-tap (#630).
+- [#633](https://github.com/CodeForFire/lagebuch/pull/633) - Failures in the Dateien tab now say in German what failed before the cause, and a joined device that sends an unknown id gets one fixed German reason back instead of the host's exception text (#602).
+- [#638](https://github.com/CodeForFire/lagebuch/pull/638) - On Android, the Rückzugsalarm, Druckabfrage, Leitstelle reminder and "Aufgabe fällig" now speak the same voice cues as the desktop on the alarm volume, one after another, instead of staying silent, and "Ton testen" reports whether a cue actually played (#637).
+- [#639](https://github.com/CodeForFire/lagebuch/pull/639) - On Android the crash notice on the Startseite now offers the report through the share sheet (TEILEN) instead of naming a path in the app's own storage that no file manager can reach (#636).
+- [#649](https://github.com/CodeForFire/lagebuch/pull/649) - The command bar no longer runs off the right edge between 640 and 1017 dp, so NEUER EINSATZ and ÜBER can be reached on a phone in landscape, a tablet in portrait and a narrow window: the bar now drops its descriptor first and folds into MEHR below 880 dp (#648).
+- [#660](https://github.com/CodeForFire/lagebuch/pull/660) - ERLEDIGT in the "Aufgabe fällig" bar now offers the same undo notice as ticking the task off in the grid, so completing the wrong task by a reflex click can be taken back (#653).
+- [#662](https://github.com/CodeForFire/lagebuch/pull/662) - Kräfte: closing the Stärke-correction flyout without ÜBERNEHMEN now puts the recorded Stärke back into the row, instead of leaving typed values on screen that the header total and the Einsatz never had (#651).
+- [#663](https://github.com/CodeForFire/lagebuch/pull/663) - Führung & Funktionen: correcting a picked name now replaces the phone and Funkrufname the Stammdaten filled in for the previous person, or clears them if the new name matches nobody, while values typed by hand are kept (#656).
+- [#664](https://github.com/CodeForFire/lagebuch/pull/664) - Stammdaten: a personnel row with a Vorname, phone or other field but no Nachname now blocks SPEICHERN and is named in the banner ("Person ohne Nachname: Zeile 4"), instead of being dropped without a word on save (#650).
+- [#671](https://github.com/CodeForFire/lagebuch/pull/671) - A failed attempt to share an incident in the network, for example because another window already holds the port, no longer leaves a half-started host attached to the incident, so a later successful share counts every change once (#665).
+- [#672](https://github.com/CodeForFire/lagebuch/pull/672) - On a phone, the card of a Funktion that is still running no longer shows "BIS —", so it no longer reads as ended (#668).
+- [#673](https://github.com/CodeForFire/lagebuch/pull/673) - A timer typed for an Aufgabe now survives a change of Dringlichkeit, and the next Aufgabe starts from the Dringlichkeit default again instead of silently reusing it (#658).
+- [#674](https://github.com/CodeForFire/lagebuch/pull/674) - Screen readers now hear each CO-Messprotokoll unit tile by its unit and state and each Checkliste tab with whether it is vollständig or unvollständig, and the remove confirm names what it removes ("Kraft entfernen?", "Beteiligten entfernen?", "Datei entfernen?") instead of "Bestätigen" (#670).
+- [#677](https://github.com/CodeForFire/lagebuch/pull/677) - The Stammdaten editor now shows every duplicate Funkrufname in its banner and says why IMPORTIEREN cannot run while changes are unsaved, instead of leaving the buttons grey without a reason (#657).
+- [#678](https://github.com/CodeForFire/lagebuch/pull/678) - The Kräfte view now spells out ZF, GF and AGT and the Zugführer/Gruppenführer/Mannschaft/Gesamt notation in tooltips, names each Stärke field for screen readers, and labels GF as Gruppenführer instead of Führungskräfte in the Stärke correction (#605).
+- [#684](https://github.com/CodeForFire/lagebuch/pull/684) - Clearing the selected Fahrzeug in Kräfte now also empties the Wache, Funkrufname and Stärke it had filled in, instead of leaving the old vehicle's values behind.
+- [#686](https://github.com/CodeForFire/lagebuch/pull/686) - Leaving a long Stammdaten category such as Fahrzeuge or Personal no longer freezes the editor for a second or more.
+- [#688](https://github.com/CodeForFire/lagebuch/pull/688) - Leaving a module that holds many entries — Beteiligte, Dateien or Kontakte on the desktop, or any card list in the phone layout — no longer freezes the app for seconds, and every module switch is about 100 ms faster (#685).
+
+### Security
+
+- [#607](https://github.com/CodeForFire/lagebuch/pull/607) - CI now restores NuGet packages against committed lock files with content hashes and installs its Python tooling with pinned hashes, so a tampered or substituted dependency fails the build.
+- [#611](https://github.com/CodeForFire/lagebuch/pull/611) - On Android, ÖFFNEN and sharing now refuse an attachment copy that is not an allow-listed regular file inside the app's private temp folder, opened copies older than a day are removed at startup, and on desktop Linux and macOS that temp folder is now readable by its owner only (#289).
+- [#625](https://github.com/CodeForFire/lagebuch/pull/625) - A joined device now deletes the attachments it pulled from the host when it leaves the incident, and clears any a crashed run left behind on the next start (#382).
+- [#627](https://github.com/CodeForFire/lagebuch/pull/627) - On Android, a picked attachment over the 25 MB limit and a Stammdaten import over the new 5 MB limit are now refused while they are being copied rather than after they are on the device, and the app no longer keeps a copy of every file ever attached (#407).
+
+
 ## [0.8.1] - 2026-10-07
 
 A patch release for Windows: the 0.8.0 installer was a 32-bit package and installed into
@@ -484,7 +550,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/CodeForFire/lagebuch/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/CodeForFire/lagebuch/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/CodeForFire/lagebuch/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/CodeForFire/lagebuch/compare/v0.7.0...v0.7.1

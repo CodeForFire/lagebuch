@@ -1,1 +1,0 @@
-Sharing and PDF export failures now say in German what went wrong and what to do — port in use, no network, no write access, file still open, disk full — instead of showing the raw exception text, and the status line wraps so the reason is readable on a tablet without hover (#655).

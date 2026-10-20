@@ -1,1 +1,0 @@
-A failed attempt to share an incident in the network, for example because another window already holds the port, no longer leaves a half-started host attached to the incident, so a later successful share counts every change once (#665).
