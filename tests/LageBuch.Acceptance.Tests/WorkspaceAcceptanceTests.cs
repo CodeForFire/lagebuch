@@ -557,6 +557,31 @@ public class WorkspaceAcceptanceTests
         Assert.False(banner.IsVisible);
     }
 
+    // Issue #697: WEITER BEARBEITEN was a quiet outline button at the far right of an unlit row,
+    // so a crew opening a file read-only did not see the way out. It is the primary action now:
+    // signal-styled, and anchored left, straight after the NUR LESEN tile (#694), where the eye
+    // lands first on an ELW monitor as on a phone.
+    [AvaloniaTheory]
+    [InlineData(1920, 1032)]
+    [InlineData(412, 915)]
+    public void Continue_editing_is_the_signal_action_right_after_the_readonly_tile(int width, int height)
+    {
+        var vm = BuildReadOnlyWorkspace();
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = height };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var banner = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "ReadOnlyBanner");
+        var button = banner.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "ContinueEditingButton");
+        var reason = banner.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "ReadOnlyReasonText");
+
+        Assert.Contains("signal", button.Classes);
+        var buttonAt = button.TranslatePoint(default, banner) ?? throw new InvalidOperationException("button is not in the banner");
+        var reasonAt = reason.TranslatePoint(default, banner) ?? throw new InvalidOperationException("reason is not in the banner");
+        Assert.True(buttonAt.X < reasonAt.X, $"WEITER BEARBEITEN at x={buttonAt.X} sits behind the reason at x={reasonAt.X}");
+        Assert.True(buttonAt.X + button.Bounds.Width < width / 2.0, $"WEITER BEARBEITEN ends at x={buttonAt.X + button.Bounds.Width}, past the middle of a {width}px window");
+    }
+
     [AvaloniaFact]
     public void Closed_incident_has_no_continue_editing_action()
     {
