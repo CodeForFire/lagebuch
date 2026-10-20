@@ -1,1 +1,0 @@
-Kräfte: closing the Stärke-correction flyout without ÜBERNEHMEN now puts the recorded Stärke back into the row, instead of leaving typed values on screen that the header total and the Einsatz never had (#651).

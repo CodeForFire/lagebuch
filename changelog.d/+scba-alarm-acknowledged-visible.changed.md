@@ -1,1 +1,0 @@
-Atemschutz: after ALARM QUITTIEREN the Rückzugsalarm banner now shows that the alarm is acknowledged — the button turns into a disabled "QUITTIERT" and the glow goes — until another Trupp trips the alarm again (#654).

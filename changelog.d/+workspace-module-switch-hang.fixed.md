@@ -1,1 +1,0 @@
-Leaving a module that holds many entries — Beteiligte, Dateien or Kontakte on the desktop, or any card list in the phone layout — no longer freezes the app for seconds, and every module switch is about 100 ms faster (#685).

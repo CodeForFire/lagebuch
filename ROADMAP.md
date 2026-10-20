@@ -11,7 +11,7 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.8.1, with a release every one to two weeks. The app is in real use,
+Version 0.9.0, with a release every one to two weeks. The app is in real use,
 but the `.fwincident` file format can still change between versions. That caveat
 is what 1.0 removes.
 
@@ -85,29 +85,35 @@ Issues: #545, #537, #541, #538, #539, #540, #466, #542, #543, #544, #246
 32-bit package and installed into `Program Files (x86)`; it is now a real x64
 package (#574).
 
-## v0.9 — Security and trust
+## v0.9 — Security and trust — **released**
 
-Two halves. Harden the parts that face the network and the file system: the
-Android attachment path and the attachment size cap that today is enforced on
-upload only. (The sync host's pairing and the broadcasts that could swallow a
-rejected command were planned here and shipped early, in 0.7.) The photos a joined device pulls from
-the host belong here too — they are now capped at 500 MB, but nothing deletes
-them when the Einsatz ends, and nothing strips the GPS coordinates out of them.
+Shipped 2026-10-20. The parts that face the network and the file system are
+hardened: Android opens and shares attachments only through the same gate as the
+desktop and checks a picked file's size while copying it rather than afterwards,
+the 25 MB cap holds on both ends of the sync, and a joined device deletes the
+attachments it pulled from the host when it leaves. (The sync host's pairing and
+the broadcasts that could swallow a rejected command were planned here and
+shipped early, in 0.7.) Stripping the GPS coordinates out of photos (#384) did
+not make it and stays open.
 
-Then make failures visible. File logging and global unhandled-exception handlers
-mean that when something goes wrong on an ELW laptop at two in the morning, there
-is something to send us afterwards.
+Failures are visible now. A crash leaves a small report — version, OS and stack
+traces, never an exception's message — that the Startseite points to on the next start, a
+hung audio player no longer leaks a thread, and sharing, export and the Dateien
+tab say in German what went wrong. The latest Übung's findings landed alongside,
+from Atemschutz double-click guards to Stammdaten and module lists that no longer
+freeze on a long roster. The sync protocol stays at 7.
 
-Issues: #289, #296, #300, #382, #384, #406, #407
+Two further ideas were considered here and declined: sharing on one chosen
+network instead of every interface (#599), and sealing a closed Einsatz with a
+hash printed in the Bericht (#598). Both add steps at an Einsatz against an
+unlikely attacker on the ELW's own network, and the exported PDF already is the
+record. The first connection to a host stays Trust-on-First-Use on purpose;
+SECURITY.md explains why a mandatory Kennung comparison would cost more than it
+protects.
 
-Then the part someone checking the app can see. A host shares on the one network
-the Lagebuchführer picks rather than on every interface. And closing an Einsatz
-seals it: a hash over the content and every attachment, printed in the Bericht,
-so a printout and a file can be checked against each other years later. The first
-connection to a host stays Trust-on-First-Use on purpose; SECURITY.md explains
-why a mandatory Kennung comparison would cost more than it protects.
+See [CHANGELOG.md](CHANGELOG.md#090---2026-10-20) for the full list.
 
-Issues: #598, #599
+Issues: #289, #296, #300, #382, #406, #407
 
 The OpenSSF Scorecard badge in the README reports two checks as weak, and both
 readings are correct. Branch-Protection and Code-Review score low because `main`

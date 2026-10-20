@@ -1,1 +1,0 @@
-On Android, a picked attachment over the 25 MB limit and a Stammdaten import over the new 5 MB limit are now refused while they are being copied rather than after they are on the device, and the app no longer keeps a copy of every file ever attached (#407).
