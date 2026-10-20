@@ -7,6 +7,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using LageBuch.App.Shared.Views;
 using LageBuch.AppLogic;
 using LageBuch.AppLogic.Services;
@@ -399,11 +400,11 @@ public class WorkspaceAcceptanceTests
     }
 
     [AvaloniaFact]
-    public void Adding_file_via_ui_updates_the_list_and_logs_to_the_etb()
+    public async Task Adding_file_via_ui_updates_the_list_and_logs_to_the_etb()
     {
         _ = BuildWorkspace(out var session);
         var path = System.IO.Path.Join(System.IO.Path.GetTempPath(), $"brand-{Guid.NewGuid():N}.jpg");
-        File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
+        await File.WriteAllBytesAsync(path, new byte[] { 1, 2, 3 });
         try
         {
             var dialogs = new AttachmentDialogs(path);
@@ -412,9 +413,12 @@ public class WorkspaceAcceptanceTests
             var window = new Window { Content = view, Width = 800, Height = 600 };
             window.Show();
 
+            // Awaited, not pumped: the add reads the file with real async I/O, which on Windows
+            // completes on an I/O thread at its own pace, so a single RunJobs() raced it and
+            // found the incident still empty on CI.
             var addButton = view.GetControl<Button>("AddFileButton");
-            addButton.Command!.Execute(null);
-            Dispatcher.UIThread.RunJobs(); // let the async command's continuation reach the UI thread
+            var add = Assert.IsAssignableFrom<IAsyncRelayCommand>(addButton.Command);
+            await add.ExecuteAsync(null);
 
             Assert.Single(session.Incident.Files);
             Assert.Contains(session.Incident.Journal, e => e.Text.StartsWith("Datei hinzugefügt:", StringComparison.Ordinal));
