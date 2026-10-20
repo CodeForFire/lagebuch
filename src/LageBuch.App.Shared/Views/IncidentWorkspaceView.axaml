@@ -558,13 +558,16 @@
             </Grid>
           </Border>
 
-          <!-- Read-only: a state, not a demand, so its tile stays unlit. -->
+          <!-- Read-only: a state, not a demand, so its tile stays unlit. The way out of it is not
+               quiet, though (#697): WEITER BEARBEITEN is the signal button, and it sits straight
+               after the tile rather than at the row's far end (#694), so it is the first thing
+               the eye meets on an ELW monitor as on a phone. The reason trims behind it. -->
           <Border x:Name="ReadOnlyBanner" Classes="meldung info" IsVisible="{Binding IsReadOnly}">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" SharedSizeGroup="MeldungTile" />
-                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
               <Border Grid.Column="0" Classes="meldung-tile">
                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -573,12 +576,14 @@
                   <TextBlock Classes="meldung-label" Text="NUR LESEN" />
                 </StackPanel>
               </Border>
-              <TextBlock Grid.Column="1" Classes="meldung-text" Text="{Binding ReadOnlyReason}" />
-              <StackPanel Grid.Column="2" Classes="meldung-actions">
-                <Button x:Name="ContinueEditingButton" Content="WEITER BEARBEITEN"
+              <StackPanel Grid.Column="1" Classes="meldung-actions" Margin="8,0,0,0">
+                <Button x:Name="ContinueEditingButton" Classes="signal" Content="WEITER BEARBEITEN"
+                        Height="38" Padding="18,0"
                         Command="{Binding ContinueEditingCommand}"
                         IsVisible="{Binding CanContinueEditing}" />
               </StackPanel>
+              <TextBlock Grid.Column="2" x:Name="ReadOnlyReasonText" Classes="meldung-text"
+                         Text="{Binding ReadOnlyReason}" />
             </Grid>
           </Border>
 
