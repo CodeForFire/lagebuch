@@ -188,8 +188,12 @@
                            only the tooltip, says "this leaves Lagebuch" (#262) — Android has no
                            hover. Mail is an icon: an address is rarely read out, and a second
                            labelled button per row is what drowned the Notiz before. -->
-                      <DockPanel Classes="contact-actions" LastChildFill="True">
-                        <Panel DockPanel.Dock="Right" Classes="contact-mail-slot" Margin="4,0,0,0">
+                      <!-- The mail slot is docked right, so it has to be declared before the number
+                           it sits to the right of; TabIndex keeps Tab on the number first (#695). -->
+                      <DockPanel Classes="contact-actions" LastChildFill="True"
+                                 KeyboardNavigation.TabNavigation="Local">
+                        <Panel DockPanel.Dock="Right" Classes="contact-mail-slot" Margin="4,0,0,0"
+                               KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
                           <Button Classes="icon-btn contact-mail"
                                   IsVisible="{Binding Person.HasEmail}"
                                   Command="{ReflectionBinding $parent[ItemsControl].DataContext.MailCommand}"
@@ -208,6 +212,7 @@
                                    IsVisible="{Binding ShowsUndialablePhone}" />
                         <!-- Named explicitly: the content is a panel, so no name is derived from it. -->
                         <Button Classes="ghost contact-call" HorizontalContentAlignment="Left"
+                                KeyboardNavigation.TabIndex="0"
                                 IsVisible="{Binding CanDial}"
                                 AutomationProperties.Name="{Binding PhoneDisplay, StringFormat='{}{0} wählen'}"
                                 Command="{ReflectionBinding $parent[ItemsControl].DataContext.CallCommand}"

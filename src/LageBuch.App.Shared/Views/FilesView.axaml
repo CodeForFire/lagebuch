@@ -45,12 +45,16 @@
       <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
     </Style>
   </UserControl.Styles>
-  <DockPanel>
+  <!-- Tab follows the screen, top to bottom (#695). The DockPanel needs its bottom-docked
+       children declared before the list that fills the rest, and declaration order alone tabbed
+       the dock before the list above it. Each child is its own tab group, ranked by TabIndex in
+       the order it appears on screen. -->
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
     <TextBlock DockPanel.Dock="Top" x:Name="FilesTitle" Text="DATEIEN" Classes="overline" Margin="0,0,0,14" />
 
     <!-- #221: the add-entry affordance lives at the lower-left on every tab, matching Kräfte/
          Atemschutz/Funktionen's input docks; this was the odd one out at the upper-right. -->
-    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsVisible="{Binding !IsReadOnly}"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="2" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsVisible="{Binding !IsReadOnly}"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <WrapPanel Orientation="Horizontal" ItemSpacing="10" LineSpacing="6" VerticalAlignment="Center">
@@ -62,7 +66,7 @@
     </Border>
 
     <!-- Upload/open failure banner: same shape as Home's OpenErrorBanner -->
-    <Border DockPanel.Dock="Top" x:Name="ErrorBanner" Background="#241608" Margin="0,0,0,14"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" DockPanel.Dock="Top" x:Name="ErrorBanner" Background="#241608" Margin="0,0,0,14"
             BorderBrush="{StaticResource AmberBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusSm}" Padding="14,10"
             IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -77,7 +81,7 @@
 
     <!-- Files can also be dropped anywhere on this panel (#262 UX follow-up); handlers wired in
          code-behind toggle the "drag-over" class and call FilesViewModel.AddFilesAsync on drop. -->
-    <Border x:Name="FilesDropZone" Background="#0C1119"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="FilesDropZone" Background="#0C1119"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True" Padding="14"
             DragDrop.AllowDrop="{Binding !IsReadOnly}">
       <StackPanel Grid.IsSharedSizeScope="True">

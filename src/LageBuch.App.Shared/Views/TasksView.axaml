@@ -83,8 +83,12 @@
       <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
     </Style>
   </UserControl.Styles>
-  <DockPanel>
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+  <!-- Tab follows the screen, top to bottom (#695). The DockPanel needs its bottom-docked
+       children declared before the list that fills the rest, and declaration order alone tabbed
+       the dock before the list above it. Each child is its own tab group, ranked by TabIndex in
+       the order it appears on screen. -->
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
+    <Grid KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
       <TextBlock Grid.Column="0" x:Name="TasksTitle" Text="AUFGABEN" Classes="overline" VerticalAlignment="Top" />
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
         <RadioButton x:Name="TaskFilterOpen" GroupName="taskFilter" Content="OFFEN"
@@ -97,7 +101,7 @@
     </Grid>
 
     <!-- The phone's way in to the dock, at the bottom edge where the thumb already is. -->
-    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+    <Button KeyboardNavigation.TabIndex="4" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
             Margin="0,12,0,0" HorizontalAlignment="Stretch"
             Height="{StaticResource ControlHeightTouch}"
             Content="+ NEUE AUFGABE"
@@ -107,7 +111,7 @@
     <!-- Input dock. Enter submits from every field; focus then goes back to WICHTIGKEIT, the
          first field in reading order (#540). The view model keeps WICHTIGKEIT, DRINGLICHKEIT and
          ZUGETEILT between tasks, so Tab walks past them unchanged. -->
-    <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="3" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
             b:EntryForm.SubmitCommand="{Binding AddTaskCommand}"
             b:EntryForm.FirstField="{Binding #ImportanceBox}"
@@ -176,7 +180,7 @@
          and Dringlichkeit in their colours, which is what it is read for. It keeps the overlay
          keyboard contract (#538) as an inline panel, as the ETB's does; closing hands focus back
          to the row's pencil. -->
-    <Border DockPanel.Dock="Bottom" x:Name="TaskEditPanel" Margin="0,16,0,0"
+    <Border KeyboardNavigation.TabIndex="2" DockPanel.Dock="Bottom" x:Name="TaskEditPanel" Margin="0,16,0,0"
             Background="#0F141D" BorderBrush="{StaticResource BorderStrongBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}"
@@ -239,7 +243,7 @@
       </ScrollViewer>
     </Border>
 
-    <Panel>
+    <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="TasksGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <DataGrid x:Name="TasksGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"

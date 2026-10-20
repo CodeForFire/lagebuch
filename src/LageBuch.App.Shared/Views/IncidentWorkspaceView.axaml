@@ -71,9 +71,14 @@
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
       </Style>
     </Panel.Styles>
-    <DockPanel>
+    <!-- Tab follows the screen, top to bottom (#695): header, module, footer. The footer and the
+         phone's nav bar are docked to the bottom, so the DockPanel needs them declared before the
+         module body, and declaration order alone sent Tab from the header bars to EINSATZ
+         ABSCHLIESSEN before the module. Each child is its own tab group, ranked by TabIndex. -->
+    <DockPanel KeyboardNavigation.TabNavigation="Local">
       <!-- ===================== Status header ===================== -->
       <Border DockPanel.Dock="Top" x:Name="StatusHeader" Background="{StaticResource SurfaceBrush}"
+              KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
               Container.Name="Header" Container.Sizing="Width">
         <!-- On a phone the tile column would eat the message (an alarm row read "Fl…" at 412px):
@@ -634,6 +639,7 @@
            rail's TabItems are hidden at this width; these cells drive the same SelectedNavItem,
            so a jump from a header Meldung bar (#422) still lights the right cell. -->
       <Border DockPanel.Dock="Bottom" x:Name="PhoneNavBar" Classes="narrow-only navbar"
+              KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="3"
               IsEnabled="{Binding IsInputEnabled}">
         <Grid ColumnDefinitions="*,Auto">
           <ItemsControl Grid.Column="0" x:Name="PhoneNavCells" ItemsSource="{Binding PrimaryNavItems}">
@@ -739,6 +745,7 @@
            export status stays here: a phone cannot afford an action footer AND a nav bar, and of
            the two it is the save state that has to remain in sight during an Einsatz. -->
       <Border DockPanel.Dock="Bottom" x:Name="ActionFooter" Background="{StaticResource HeaderBarBrush}"
+              KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="2"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0">
         <!-- #221: Close/Export moved from lower-left to lower-right, so lower-left is free for
              each tab's own "add entry" affordance without a stray click landing on either. -->
@@ -824,7 +831,8 @@
            and footer actions. The content area keeps its own inner padding, preserving
            the gap between rail and content. -->
       <!-- Greyed out while a joined client is reconnecting — it can't send commands until the link is back. -->
-      <Border x:Name="WorkspaceBody" Background="{StaticResource AppBackgroundBrush}" IsEnabled="{Binding IsInputEnabled}">
+      <Border x:Name="WorkspaceBody" Background="{StaticResource AppBackgroundBrush}" IsEnabled="{Binding IsInputEnabled}"
+              KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
         <!-- The rail is Stammdaten now (0..n Checklisten, per-module visibility), so it binds a
              resolved collection instead of ten literal TabItems. One header template serves every
              tab: IsComplete/IsIncomplete are plain booleans on the nav item and are both false for

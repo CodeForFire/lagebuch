@@ -82,8 +82,14 @@
     </Style>
   </UserControl.Styles>
 
-  <DockPanel>
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+  <!-- Tab follows what the eye reads, top to bottom (#695), not the order the DockPanel needs its
+       children declared in: every bottom-docked panel has to come before the list that fills the
+       rest, so declaration order put the input dock ahead of the list and sent Tab from HINZUFÜGEN
+       back up to the row buttons at the list's right edge. Each child is its own tab group, ranked
+       by TabIndex in the order it appears on screen. -->
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14"
+          KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
       <TextBlock Grid.Column="0" x:Name="EtbTitle" Text="EINSATZTAGEBUCH" Classes="overline" VerticalAlignment="Top" />
       <CheckBox Grid.Column="1" x:Name="HideSystemCheckBox"
                 Content="Systemmeldungen ausblenden"
@@ -93,6 +99,7 @@
     <!-- The phone's way in to the dock. Full width and at the bottom edge of the list, where the
          thumb already is; on a wide window the dock is simply always open and this never shows. -->
     <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+            KeyboardNavigation.TabIndex="5"
             Margin="0,12,0,0" HorizontalAlignment="Stretch"
             Height="{StaticResource ControlHeightTouch}"
             Content="+ NEUER EINTRAG"
@@ -104,6 +111,7 @@
          entry starts with who sent it, in reading order. VON is deliberately not sticky: a
          leftover sender would put the next message in the record under the wrong unit. -->
     <Border DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+            KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="4"
             IsVisible="{Binding ShowComposer}"
             b:EntryForm.SubmitCommand="{Binding AddEntryCommand}"
             b:EntryForm.FirstField="{Binding #FromBox}"
@@ -168,6 +176,7 @@
          keyboard contract (#538) as an inline panel. Closing hands focus back to the row's edit
          button; if a rebuild has taken that away meanwhile, to the entry field. -->
     <Border DockPanel.Dock="Bottom" x:Name="EditPanel" Margin="0,16,0,0"
+            KeyboardNavigation.TabIndex="3"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding IsEditing}"
@@ -203,6 +212,7 @@
          Deliberately independent of IsReadOnly and of the edit panel above, so a closed incident's
          edit history is still reachable (a rewrite must stay auditable after the fact). -->
     <Border DockPanel.Dock="Bottom" x:Name="HistoryPanel" Margin="0,16,0,0"
+            KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="2"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14"
             IsVisible="{Binding HistoryEntry, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -236,7 +246,7 @@
     </Border>
 
     <!-- The wide layout: one row per entry, every column at once. -->
-    <Panel>
+    <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
       <Border x:Name="EtbGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
               CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
         <DataGrid x:Name="EtbGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Entries}" IsReadOnly="True" CanUserSortColumns="False">
