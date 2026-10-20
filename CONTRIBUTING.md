@@ -143,23 +143,26 @@ project weekly and on demand (*Actions → Mutation testing → Run workflow*); 
 run's summary lists the scores, and the report is attached as an artifact. That
 full run never fails on a low score: it is for finding weak tests.
 
-A pull request is gated, but only on what it changes. For each of Domain,
-Documents, Persistence and AppLogic that the PR touches, `mutate-diff` mutates
-the changed files alone and fails below 60%, the configured `low` threshold.
+A pull request is gated, but only on the lines it changes. For each of Domain,
+Documents, Persistence and AppLogic whose `.cs` files the PR touches,
+`mutate-diff` mutates those files, keeps the mutants on lines the PR added or
+changed, and fails when fewer than 80% of them are caught. The job summary
+lists each survivor on a changed line with its file and line number. Older
+survivors elsewhere in the touched files are listed under a collapsed heading
+and never counted: kill them when you are there anyway, but they cannot block
+an unrelated fix. A PR whose changed lines hold no mutant passes.
 Sync is exempt: most of its code is exercised only by Sync.Hosting.Tests,
 which Stryker does not run, so a changed Sync file would score near zero
 however well it is tested. Reproduce the gate locally with:
 
 ```bash
-make mutate PROJECT=Domain SINCE=origin/main BREAK=60
+make mutate PROJECT=Domain SINCE=origin/main      # BREAK=80 by default
 ```
 
-It has to run in a plain clone with your branch committed: Stryker diffs commits,
-not the working tree, and inside a `git worktree` it sees no changes at all, so
-`make` refuses `SINCE` there.
-
-The score covers whole changed files, not changed lines, so a one-line edit to
-a file with old survivors can fail it. Kill them while you are there.
+The diff is taken from the merge base with `SINCE`, working tree included, so
+it works in a clone or a `git worktree` and needs no commit first. A brand-new
+file has to be added (`git add -N`) before git sees it. The scoring lives in
+`scripts/mutation-diff-score.py`; `--self-test` checks it.
 
 To act on a survivor, open it in the report, decide whether the change it shows
 would be a real bug, and if so write the test that kills it — failing first, as
