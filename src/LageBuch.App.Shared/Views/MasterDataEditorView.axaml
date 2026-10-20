@@ -5,12 +5,18 @@
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.MasterDataEditorView"
              x:DataType="vm:MasterDataEditorViewModel">
-  <!-- Its own container rather than the shell's: this view is hosted directly by the render
+  <!-- Its own breakpoint rather than the shell's: this view is hosted directly by the render
        tests as well as by MainView, and a rail that only collapses when MainView happens to be
        its parent is a rail whose phone layout nothing can check. A 220px rail beside the detail
        leaves ~150px of editor on a 412dp phone, so below the breakpoint the two become a
        drill-down — the rail is the screen until a category is picked, and ← KATEGORIEN comes back
-       to it. Wide windows keep both side by side exactly as before. -->
+       to it. Wide windows keep both side by side exactly as before.
+
+       The phone styles hang off the root's "narrow" class, bound to IsNarrow, which the
+       code-behind sets from this view's width. Not a ContainerQuery: a query attaches to every
+       element in its scope, not just to what its styles select, and each one subscribes to the
+       container's size events. The Fahrzeuge and Personal rows are thousands of elements, and
+       detaching them all from that one event took over a second every time the tab was left. -->
   <UserControl.Styles>
     <Style Selector="DockPanel#EditorBody">
       <Setter Property="Margin" Value="28,24" />
@@ -20,7 +26,7 @@
       <Setter Property="Margin" Value="0,0,16,0" />
     </Style>
     <!-- Grid.Column as a Style, not an attribute: a local value outranks a Style setter, so with
-         Grid.Column="1" on the panel the narrow query could move it down a row but never out of
+         Grid.Column="1" on the panel the narrow style could move it down a row but never out of
          the Auto column that was squeezing the title to nothing. -->
     <Style Selector="WrapPanel#EditorActions">
       <Setter Property="Grid.Row" Value="0" />
@@ -28,49 +34,47 @@
       <Setter Property="Grid.ColumnSpan" Value="1" />
     </Style>
 
-    <!-- Personal rows: the wide grid by default, the stacked phone form only inside the query.
-         Style setters, not IsVisible attributes, or the query could never swap them. -->
+    <!-- Personal rows: the wide grid by default, the stacked phone form only when narrow.
+         Style setters, not IsVisible attributes, or the narrow styles could never swap them. -->
     <Style Selector="Grid.person-narrow">
       <Setter Property="IsVisible" Value="False" />
     </Style>
 
-    <ContainerQuery Name="Editor" Query="max-width:640">
-      <Style Selector="Grid.person-wide">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Grid.person-narrow">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <Style Selector="Grid#PersonnelHeader">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="DockPanel#EditorBody">
-        <Setter Property="Margin" Value="12,16" />
-      </Style>
-      <!-- Whichever of the two is on screen gets the whole width: the rail by spanning both
-           columns, the detail because the hidden rail's Auto column measures zero. -->
-      <Style Selector="Border#CategoryRail">
-        <Setter Property="Width" Value="NaN" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="Grid.ColumnSpan" Value="2" />
-      </Style>
-      <Style Selector="Button#BackToCategoriesButton">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <Style Selector="TextBlock#EditorTitle">
-        <Setter Property="FontSize" Value="20" />
-      </Style>
-      <!-- An Auto column never shrinks, so the four actions ran off the right edge rather than
-           wrapping. On a phone they take a row of their own under the title. -->
-      <Style Selector="WrapPanel#EditorActions">
-        <Setter Property="Grid.Row" Value="1" />
-        <Setter Property="Grid.Column" Value="0" />
-        <Setter Property="Grid.ColumnSpan" Value="2" />
-        <Setter Property="Margin" Value="0,10,0,0" />
-      </Style>
-    </ContainerQuery>
+    <Style Selector="Panel#EditorRoot.narrow Grid.person-wide">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow Grid.person-narrow">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow Grid#PersonnelHeader">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow DockPanel#EditorBody">
+      <Setter Property="Margin" Value="12,16" />
+    </Style>
+    <!-- Whichever of the two is on screen gets the whole width: the rail by spanning both
+         columns, the detail because the hidden rail's Auto column measures zero. -->
+    <Style Selector="Panel#EditorRoot.narrow Border#CategoryRail">
+      <Setter Property="Width" Value="NaN" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow Button#BackToCategoriesButton">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow TextBlock#EditorTitle">
+      <Setter Property="FontSize" Value="20" />
+    </Style>
+    <!-- An Auto column never shrinks, so the four actions ran off the right edge rather than
+         wrapping. On a phone they take a row of their own under the title. -->
+    <Style Selector="Panel#EditorRoot.narrow WrapPanel#EditorActions">
+      <Setter Property="Grid.Row" Value="1" />
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="Margin" Value="0,10,0,0" />
+    </Style>
   </UserControl.Styles>
-  <Panel Container.Name="Editor" Container.Sizing="Width">
+  <Panel x:Name="EditorRoot" Classes.narrow="{Binding IsNarrow}">
     <DockPanel x:Name="EditorBody">
       <!-- Header -->
       <Grid x:Name="EditorHeader" DockPanel.Dock="Top" ColumnDefinitions="*,Auto"
@@ -244,7 +248,7 @@
           <DockPanel>
           <!-- The way back out of a category on a phone. Hidden by default through the Style at
                the top of this file, never IsVisible="False" here: a local value would outrank the
-               query that has to bring it back. -->
+               narrow style that has to bring it back. -->
           <Button DockPanel.Dock="Top" x:Name="BackToCategoriesButton" Classes="ghost narrow-only"
                   HorizontalAlignment="Left" Margin="0,0,0,12"
                   Content="&#x2190; KATEGORIEN"
@@ -808,7 +812,7 @@
                               </Grid>
 
                               <!-- The phone form of the same row: ColumnDefinitions is not a styled
-                                   property, so the query cannot reshape the grid above and swaps in
+                                   property, so a style cannot reshape the grid above and swaps in
                                    this stacked one instead, as ForcesView swaps its grid for cards.
                                    Every field carries its own label, since the header is gone. -->
                               <Grid Classes="person-narrow" ColumnDefinitions="*,*" ColumnSpacing="8"

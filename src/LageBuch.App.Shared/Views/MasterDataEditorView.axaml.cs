@@ -11,9 +11,9 @@ public partial class MasterDataEditorView : UserControl
 
         // Its own forwarder rather than one inherited from the shell: this view is also hosted
         // directly by the render tests, and a category rail that only collapses when MainView
-        // happens to be its parent is a rail whose phone layout nothing can check. The container
-        // query in the .axaml handles the sizing; this is the drill-down decision, which a Style
-        // setter cannot make. No state is kept here.
+        // happens to be its parent is a rail whose phone layout nothing can check. IsNarrow is
+        // both the drill-down decision, which a Style setter cannot make, and the "narrow" class
+        // the .axaml's phone styles key off. No state is kept here.
         SizeChanged += OnSizeChanged;
         DataContextChanged += (_, _) => ApplyNarrow(Bounds.Width);
     }

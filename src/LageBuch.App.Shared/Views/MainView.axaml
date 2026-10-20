@@ -7,48 +7,10 @@
              Background="{StaticResource AppBackgroundBrush}">
   <!-- The shell is the container every narrow-layout query in this view is measured against.
        It sits on the root Panel rather than on the command bar, because a container query styles
-       its container's DESCENDANTS and not the container element itself — a query declared on the
-       bar could hide things inside the bar but never shorten the bar. The root also covers the
-       prompt and About overlays at the bottom of this file. -->
+       its container's DESCENDANTS and not the container element itself — a container declared on
+       the bar could hide things inside the bar but never shorten the bar. -->
   <!-- The global shortcuts (#544) are caught here, on the root both platforms share. -->
   <Panel Container.Name="Shell" Container.Sizing="Width" b:GlobalShortcuts.IsEnabled="True">
-    <Panel.Styles>
-      <!-- The wide defaults. Each has to be a Style rather than an attribute on the control: a
-           local value in XAML outranks every Style setter, so the queries below could never win. -->
-      <Style Selector="Border#CommandBar">
-        <Setter Property="Height" Value="60" />
-      </Style>
-      <!-- The bar sheds in two stages, at widths taken from what it measures rather than from
-           LayoutBreakpoints.Narrow (#648). The full bar needs 1017dp; without the descriptor it
-           needs 860dp. Each query leaves about 20dp of slack for fonts that measure wider on a
-           device than in the headless harness. CommandBarReachabilityTests sweeps every width
-           and repeats these numbers, so a new button that outgrows its band fails the build. -->
-      <ContainerQuery Name="Shell" Query="max-width:1040">
-        <Style Selector="TextBlock#BrandDescriptor">
-          <Setter Property="IsVisible" Value="False" />
-        </Style>
-        <Style Selector="Border#BrandDivider">
-          <Setter Property="IsVisible" Value="False" />
-        </Style>
-      </ContainerQuery>
-      <ContainerQuery Name="Shell" Query="max-width:880">
-        <Style Selector="StackPanel#WideActions">
-          <Setter Property="IsVisible" Value="False" />
-        </Style>
-        <Style Selector="StackPanel#WideTrailingActions">
-          <Setter Property="IsVisible" Value="False" />
-        </Style>
-        <Style Selector="Button#MoreActionsButton">
-          <Setter Property="IsVisible" Value="True" />
-        </Style>
-      </ContainerQuery>
-      <!-- The phone layout everything else switches to. -->
-      <ContainerQuery Name="Shell" Query="max-width:640">
-        <Style Selector="Border#CommandBar">
-          <Setter Property="Height" Value="56" />
-        </Style>
-      </ContainerQuery>
-    </Panel.Styles>
     <DockPanel>
       <!-- ===== Command bar ===== -->
       <!-- Six actions in one Auto column is wider than a phone: NEUER EINSATZ used to render at
@@ -60,6 +22,49 @@
       <Border DockPanel.Dock="Top" Background="{StaticResource HeaderBarBrush}"
               BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1"
               x:Name="CommandBar">
+        <!-- The queries live on the bar, not on the root: a ContainerQuery attaches to every
+             element in the scope of the Styles that hold it, not only to what its own styles
+             select, and each one subscribes to the container's size events. Held by the root,
+             that was every row of every screen, and leaving a long Stammdaten category hung for
+             seconds while thousands of them unsubscribed (#685). Everything they style is in
+             the bar, the bar itself included. -->
+        <Border.Styles>
+          <!-- The wide defaults. Each has to be a Style rather than an attribute on the control: a
+               local value in XAML outranks every Style setter, so the queries below could never win. -->
+          <Style Selector="Border#CommandBar">
+            <Setter Property="Height" Value="60" />
+          </Style>
+          <!-- The bar sheds in two stages, at widths taken from what it measures rather than from
+               LayoutBreakpoints.Narrow (#648). The full bar needs 1017dp; without the descriptor it
+               needs 860dp. Each query leaves about 20dp of slack for fonts that measure wider on a
+               device than in the headless harness. CommandBarReachabilityTests sweeps every width
+               and repeats these numbers, so a new button that outgrows its band fails the build. -->
+          <ContainerQuery Name="Shell" Query="max-width:1040">
+            <Style Selector="TextBlock#BrandDescriptor">
+              <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="Border#BrandDivider">
+              <Setter Property="IsVisible" Value="False" />
+            </Style>
+          </ContainerQuery>
+          <ContainerQuery Name="Shell" Query="max-width:880">
+            <Style Selector="StackPanel#WideActions">
+              <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="StackPanel#WideTrailingActions">
+              <Setter Property="IsVisible" Value="False" />
+            </Style>
+            <Style Selector="Button#MoreActionsButton">
+              <Setter Property="IsVisible" Value="True" />
+            </Style>
+          </ContainerQuery>
+          <!-- The phone layout everything else switches to. -->
+          <ContainerQuery Name="Shell" Query="max-width:640">
+            <Style Selector="Border#CommandBar">
+              <Setter Property="Height" Value="56" />
+            </Style>
+          </ContainerQuery>
+        </Border.Styles>
         <Grid Margin="0,0,16,0" ColumnDefinitions="Auto,*,Auto">
           <!-- Brand mark: signal bar + wordmark. One baseline, one voice: LAGEBUCH is the single
                tracked-caps wordmark; the descriptor rides beside it in sentence-case body type

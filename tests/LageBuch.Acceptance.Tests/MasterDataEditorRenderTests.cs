@@ -104,6 +104,29 @@ public class MasterDataEditorRenderTests
         Assert.True(new FileInfo(path).Length > 0);
     }
 
+    // The desktop half of PhoneLayoutTests' Stammdaten checks: on an ELW screen the rail keeps
+    // its 220px beside the detail, there is no way "back", and a Personal row is the wide grid
+    // under its column header.
+    [AvaloniaFact]
+    public void A_wide_editor_keeps_the_rail_and_the_wide_personnel_rows()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Personal");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(vm.IsNarrow);
+        Assert.Equal(220, view.GetControl<Border>("CategoryRail").Bounds.Width, precision: 0);
+        Assert.False(view.GetControl<Button>("BackToCategoriesButton").IsEffectivelyVisible);
+
+        var grids = view.GetVisualDescendants().OfType<Grid>().ToList();
+        Assert.All(grids.Where(g => g.Classes.Contains("person-wide")), g => Assert.True(g.IsEffectivelyVisible));
+        Assert.All(grids.Where(g => g.Classes.Contains("person-narrow")), g => Assert.False(g.IsEffectivelyVisible));
+        Assert.True(grids.Single(g => g.Name == "PersonnelHeader").IsEffectivelyVisible);
+    }
+
     // The ETB's checkbox being disabled is a promise the UI makes, not just a view-model flag:
     // it is the legally relevant record and every Systemmeldung lands there. The resolver ignores
     // a hidden ETB anyway, but this is where an operator is told why they cannot switch it off.
