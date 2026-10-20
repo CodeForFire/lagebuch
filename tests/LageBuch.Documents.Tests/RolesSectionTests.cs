@@ -23,14 +23,14 @@ public class RolesSectionTests
         PdfText.AssertInOrder(
             text,
             "Funktionszuweisung",
-            "Funktion Name Abschnitt",
+            "Funktion Abschnitt Name",
             "Von Bis",
-            "EL Mayr Nord 1/40 0171 22.06.2026 09:05 22.06.2026 10:05",
-            "ZF Bauer — — — — —");
+            "EL Nord Mayr 1/40 0171 22.06.2026 09:05 22.06.2026 10:05",
+            "ZF — Bauer — — — —");
 
         // All seven cells on one line: a missing column definition would wrap the row.
         Assert.Contains(
-            "EL Mayr Nord 1/40 0171 22.06.2026 09:05 22.06.2026 10:05",
+            "EL Nord Mayr 1/40 0171 22.06.2026 09:05 22.06.2026 10:05",
             PdfText.LinesOf(incident, Started, IncidentPdfSections.Roles));
     }
 
@@ -42,7 +42,7 @@ public class RolesSectionTests
 
         var text = PdfText.Of(incident, Started, IncidentPdfSections.Roles);
 
-        Assert.Contains("EL Mayr — — — 22.06.2026 09:05 —", text, StringComparison.Ordinal);
+        Assert.Contains("EL — Mayr — — 22.06.2026 09:05 —", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class RolesSectionTests
         var text = PdfText.Of(incident, Started, IncidentPdfSections.Roles);
 
         Assert.Contains("Funktionszuweisung — keine Einträge —", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("Funktion Name", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Funktion Abschnitt", text, StringComparison.Ordinal);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock

@@ -7,7 +7,7 @@ namespace LageBuch.Documents.Sections;
 
 public static class RolesSection
 {
-    private static readonly string[] HeaderTitles = ["Funktion", "Name", "Abschnitt", "Funkrufname", "Handynummer", "Von", "Bis"];
+    private static readonly string[] HeaderTitles = ["Funktion", "Abschnitt", "Name", "Funkrufname", "Handynummer", "Von", "Bis"];
 
     public static void Compose(IContainer container, Incident incident)
     {
@@ -24,13 +24,14 @@ public static class RolesSection
 
             column.Item().Table(table =>
             {
-                // Seven columns on A4 portrait: only Name still gets meaningful slack, and the
-                // two timestamps keep fixed widths so they never wrap mid-value.
+                // The app's order (#696): Funktion, Abschnitt, Name, Funkrufname, Handynummer, then
+                // the times. Seven columns on A4 portrait: only Name still gets meaningful slack, and
+                // the two timestamps keep fixed widths so they never wrap mid-value.
                 table.ColumnsDefinition(columns =>
                 {
                     columns.RelativeColumn(1); // Funktion
-                    columns.RelativeColumn(2); // Name
                     columns.RelativeColumn(1); // Abschnitt
+                    columns.RelativeColumn(2); // Name
                     columns.RelativeColumn(1); // Funkrufname
                     columns.RelativeColumn(1); // Handynummer
                     columns.ConstantColumn(95); // Von
@@ -48,8 +49,8 @@ public static class RolesSection
                 foreach (var role in incident.Roles)
                 {
                     table.Cell().Element(Cells.Body).Text(role.Role);
-                    table.Cell().Element(Cells.Body).Text(role.PersonName);
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.Section));
+                    table.Cell().Element(Cells.Body).Text(role.PersonName);
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.CallSign));
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.Phone));
                     table.Cell().Element(Cells.Body).Text(role.From is { } f ? Formatting.Timestamp(f) : "—");
