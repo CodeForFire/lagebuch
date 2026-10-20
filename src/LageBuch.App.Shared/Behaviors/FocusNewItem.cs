@@ -92,11 +92,13 @@ public static class FocusNewItem
     }
 
     // Posted: the row's container is only realized on the next layout pass, and a Focus() on a
-    // control not laid out yet is dropped.
+    // control not laid out yet is dropped. Scrolled to first: a list that builds only the rows on
+    // screen has no container for a row added below the fold until it is brought into view.
     private static void FocusFirstField(ItemsControl list, object row) =>
         Dispatcher.UIThread.Post(
             () =>
             {
+                list.ScrollIntoView(row);
                 var field = list.ContainerFromItem(row)?.GetVisualDescendants().OfType<Control>()
                     .FirstOrDefault(e => e is TextBox or AutoCompleteBox && e.Focusable && e.IsEffectivelyVisible && e.IsEffectivelyEnabled);
                 if (field is null)
