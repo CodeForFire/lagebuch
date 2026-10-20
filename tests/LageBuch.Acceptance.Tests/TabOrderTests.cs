@@ -117,6 +117,10 @@ public class TabOrderTests
             .Single(t => t.PlaceholderText == AnonymizedExampleData.LinkUrlPlaceholder);
         var groupBox = view.GetVisualDescendants().OfType<AutoCompleteBox>()
             .Single(b => b.Name == "LinkGroupBox");
+        var upButton = view.GetVisualDescendants().OfType<Button>()
+            .Single(b => (ToolTip.GetTip(b) as string) == "Nach oben");
+        var downButton = view.GetVisualDescendants().OfType<Button>()
+            .Single(b => (ToolTip.GetTip(b) as string) == "Nach unten");
         var removeButton = view.GetVisualDescendants().OfType<Button>()
             .Single(b => (ToolTip.GetTip(b) as string) == "Entfernen");
 
@@ -130,6 +134,12 @@ public class TabOrderTests
         // #518: the optional group follows the URL, before the row actions.
         window.Tab();
         Assert.True(groupBox.IsKeyboardFocusWithin);
+
+        window.Tab();
+        Assert.True(upButton.IsKeyboardFocusWithin);
+
+        window.Tab();
+        Assert.True(downButton.IsKeyboardFocusWithin);
 
         window.Tab();
         Assert.True(removeButton.IsKeyboardFocusWithin);

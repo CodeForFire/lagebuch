@@ -58,6 +58,28 @@ public sealed partial class LinksSection : EditorSection
         });
     }
 
+    [RelayCommand]
+    private void MoveUp(LinkRow row)
+    {
+        var i = Rows.IndexOf(row);
+        if (i > 0)
+        {
+            Rows.Move(i, i - 1);
+            _onChanged();
+        }
+    }
+
+    [RelayCommand]
+    private void MoveDown(LinkRow row)
+    {
+        var i = Rows.IndexOf(row);
+        if (i >= 0 && i < Rows.Count - 1)
+        {
+            Rows.Move(i, i + 1);
+            _onChanged();
+        }
+    }
+
     /// <summary>Rows with both a non-blank name and URL, trimmed, in current order.</summary>
     public IReadOnlyList<Link> ToValues()
     {

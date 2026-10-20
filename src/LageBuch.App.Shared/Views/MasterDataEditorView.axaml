@@ -347,7 +347,7 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Checkliste template editor (Aufbau/Abbau): text + mandatory. New items go to the end (#698). -->
+              <!-- Checkliste template editor (Aufbau/Abbau): text + mandatory, reorderable -->
               <DataTemplate x:DataType="vm:ChecklistTemplateSection">
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
@@ -368,7 +368,7 @@
                   </Grid>
 
                   <!-- Column headers (#137): each row is unlabeled otherwise. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="TEXT" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="PFLICHT" Classes="overline" FontSize="10" />
                   </Grid>
@@ -376,14 +376,26 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ChecklistTemplateRow">
-                          <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
                             <TextBox Grid.Column="0" Text="{Binding Text}" Margin="0,0,6,0" />
                             <CheckBox Grid.Column="1" Content="Pflicht" IsChecked="{Binding IsMandatory}"
                                       VerticalAlignment="Center" Margin="0,0,6,0" />
                             <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
-                            <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="2" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            </Button>
+                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Button>
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
@@ -441,7 +453,7 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Links editor: name + URL + group (#518) -->
+              <!-- Links editor: name + URL + group (#518), reorderable -->
               <DataTemplate x:DataType="vm:LinksSection">
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
@@ -449,7 +461,7 @@
                   <!-- Column headers (#137): each row is unlabeled otherwise. The trailing columns
                        are fixed to the row's icon buttons for the reason given on the vehicles
                        header below: "Auto" would size to this Grid's own empty cells. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,*,32" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,*,28,32,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="URL" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="GRUPPE" Classes="overline" FontSize="10"
@@ -459,7 +471,7 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LinkRow">
-                          <Grid ColumnDefinitions="*,*,*,32" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,*,*,28,32,32" Margin="0,0,0,6">
                             <TextBox Grid.Column="0"
                                      PlaceholderText="{x:Static md:AnonymizedExampleData.LinkNamePlaceholder}"
                                      Text="{Binding Name}" Margin="0,0,6,0" />
@@ -483,7 +495,19 @@
                             <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
-                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="3" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
+                                    AutomationProperties.Name="Nach oben"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            </Button>
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
+                                    AutomationProperties.Name="Nach unten"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Button>
+                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">

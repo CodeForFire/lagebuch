@@ -352,10 +352,11 @@ public class MasterDataEditorRenderTests
     // #76: the Fahrzeuge section — Wache + Funkrufname + Sitzplätze per row, Wache and
     // Funkrufname as AutoCompleteBoxes fed from the master data (free text still allowed).
     // Issue #698: manual sorting was rarely needed and awkward to use, so only Navigation, whose
-    // order IS the Einsatz sidebar's, keeps its up/down buttons. Every other category keeps the
-    // order its entries already have, and a new entry goes to the end.
+    // order IS the Einsatz sidebar's, the Checklisten, whose order is the sequence of steps, and
+    // the Links, whose order is the Einsatz's link list, keep their up/down buttons. Every other
+    // category keeps the order its entries already have, and a new entry goes to the end.
     [AvaloniaFact]
-    public void Only_navigation_offers_moving_rows_up_and_down()
+    public void Only_navigation_checklisten_and_links_offer_moving_rows_up_and_down()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         var view = new MasterDataEditorView { DataContext = vm };
@@ -373,9 +374,9 @@ public class MasterDataEditorRenderTests
             var moveButtons = Buttons("Nach oben", "Nach unten");
             var removeButtons = Buttons("Entfernen");
 
-            if (section.Title == "Navigation")
+            if (section is NavigationSection or ChecklistTemplateSection or LinksSection)
             {
-                Assert.True(moveButtons > 0, "Navigation lost its up/down buttons");
+                Assert.True(moveButtons > 0, $"{section.Title} lost its up/down buttons");
             }
             else
             {
@@ -408,8 +409,8 @@ public class MasterDataEditorRenderTests
             .Where(b => b.Classes.Contains("icon-btn"))
             .ToList();
 
-        // Two Links rows, each with its remove button (#698 dropped up/down).
-        Assert.Equal(2, rowButtons.Count);
+        // Two Links rows, each with up/down/remove.
+        Assert.Equal(6, rowButtons.Count);
         foreach (var button in rowButtons)
         {
             var icon = Assert.Single(button.GetVisualDescendants().OfType<PathIcon>());

@@ -28,6 +28,42 @@ public class MasterDataSectionTests
         Assert.Equal(new[] { "EL", "ZF" }, s.ToValues());
     }
 
+    // #698: the Checklisten keep manual sorting -- their order is the sequence of steps the
+    // incident's checklist is seeded with.
+    [Fact]
+    public void Checklist_items_still_move_up_and_down_and_flag_a_change()
+    {
+        var changes = 0;
+        var s = new ChecklistTemplateSection(
+            Guid.NewGuid(),
+            "Aufbau",
+            new[] { new ChecklistTemplateItem("Erster", true), new ChecklistTemplateItem("Zweiter", false), new ChecklistTemplateItem("Dritter", false) },
+            () => changes++);
+
+        s.MoveUpCommand.Execute(s.Rows[^1]);   // Erster, Dritter, Zweiter
+        s.MoveDownCommand.Execute(s.Rows[0]);  // Dritter, Erster, Zweiter
+
+        Assert.Equal(new[] { "Dritter", "Erster", "Zweiter" }, s.ToValues().Select(i => i.Text));
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void Checklist_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
+    {
+        var changes = 0;
+        var s = new ChecklistTemplateSection(
+            Guid.NewGuid(),
+            "Aufbau",
+            new[] { new ChecklistTemplateItem("Erster", true), new ChecklistTemplateItem("Zweiter", false) },
+            () => changes++);
+
+        s.MoveUpCommand.Execute(s.Rows[0]);
+        s.MoveDownCommand.Execute(s.Rows[^1]);
+
+        Assert.Equal(new[] { "Erster", "Zweiter" }, s.ToValues().Select(i => i.Text));
+        Assert.Equal(0, changes);
+    }
+
     [Fact]
     public void No_op_list_edits_do_not_flag_changes_or_throw()
     {
