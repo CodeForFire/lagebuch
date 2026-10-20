@@ -101,7 +101,8 @@ public class MainActivity : AvaloniaMainActivity
             trustStore: new JsonTrustStore(AndroidAppPaths.TrustJsonPath(this)),
             pdfExporter: new NoopIncidentPdfExporter(),
             lastConnection: new JsonLastConnectionStore(AndroidAppPaths.LastConnectionJsonPath(this)),
-            lastCrashReport: CrashReports.TakePending(FilesDir!.AbsolutePath));
+            lastCrashReport: CrashReports.TakePending(FilesDir!.AbsolutePath),
+            alarmMute: new AlarmMute(AndroidAppPaths.AlarmMuteJsonPath(this)));
 
         base.OnCreate(savedInstanceState);
     }

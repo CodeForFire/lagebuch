@@ -37,6 +37,58 @@ public class IncidentWorkspaceViewModelTests
             host);
     }
 
+    // #699: a crew must not lose the Rückzugsalarm without noticing, so the workspace shows
+    // that the alarms are muted, and follows a change made in ÜBER while the Einsatz is open.
+    [Fact]
+    public void The_workspace_shows_that_alarms_are_muted_and_follows_a_change()
+    {
+        var mute = new AlarmMute();
+        using var vm = MutableWorkspace(mute);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        Assert.False(vm.AlarmsMuted);
+        mute.Set(true);
+
+        Assert.True(vm.AlarmsMuted);
+        Assert.Contains(nameof(IncidentWorkspaceViewModel.AlarmsMuted), raised);
+    }
+
+    [Fact]
+    public void A_closed_workspace_stops_listening_to_the_mute_switch()
+    {
+        var mute = new AlarmMute();
+        var vm = MutableWorkspace(mute);
+        vm.Dispose();
+        var raised = 0;
+        vm.PropertyChanged += (_, _) => raised++;
+
+        mute.Set(true);
+
+        Assert.Equal(0, raised);
+    }
+
+    private static IncidentWorkspaceViewModel MutableWorkspace(AlarmMute mute)
+    {
+        var clock = new FixedClock(T0);
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            clock,
+            new SessionOperator("Müller"),
+            "/x.fwincident",
+            new[] { ("A?", false) },
+            Array.Empty<(string, bool)>());
+        return new IncidentWorkspaceViewModel(
+            session,
+            clock,
+            new FakeTicker(),
+            Md(),
+            new FakeDialogs(),
+            new FakeAlarmService(),
+            new FakeHostController(),
+            alarmMute: mute);
+    }
+
     // --- Network sharing (no Tailscale required) --------------------------------------------
     [Fact]
     public async Task Toggling_sharing_on_starts_the_host_and_offers_its_address_without_a_status_line()

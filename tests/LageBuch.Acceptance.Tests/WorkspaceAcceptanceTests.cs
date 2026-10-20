@@ -582,6 +582,46 @@ public class WorkspaceAcceptanceTests
         Assert.True(buttonAt.X + button.Bounds.Width < width / 2.0, $"WEITER BEARBEITEN ends at x={buttonAt.X + button.Bounds.Width}, past the middle of a {width}px window");
     }
 
+    // #699: muting the alarm cues in ÜBER must not go unnoticed in an Einsatz, so the footer
+    // says so, in every module and on a phone, and goes again when the alarms come back.
+    [AvaloniaTheory]
+    [InlineData(1280, 800)]
+    [InlineData(412, 915)]
+    public void Footer_says_when_the_alarm_cues_are_muted(int width, int height)
+    {
+        var mute = new AlarmMute();
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator("Müller", "FFB 12/1"),
+            "/x.fwincident",
+            new[] { ("Blaulicht aus?", false) },
+            Array.Empty<(string, bool)>());
+        var vm = new IncidentWorkspaceViewModel(
+            session,
+            new FixedClock(),
+            new NoopTicker(),
+            Md(),
+            new FakeDialogs(),
+            new NoopAlarmService(),
+            new NoopIncidentHostController(),
+            alarmMute: mute);
+        var window = new Window { Content = new IncidentWorkspaceView { DataContext = vm }, Width = width, Height = height };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var status = window.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Name == "AlarmsMutedStatus");
+        Assert.False(status.IsEffectivelyVisible);
+
+        mute.Set(true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(status.IsEffectivelyVisible);
+        Assert.True(status.Bounds.Width > 0, "the muted note takes no space -- nothing is drawn");
+
+        mute.Set(false);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(status.IsEffectivelyVisible);
+    }
+
     [AvaloniaFact]
     public void Closed_incident_has_no_continue_editing_action()
     {

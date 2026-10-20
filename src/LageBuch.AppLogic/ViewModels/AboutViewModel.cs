@@ -9,7 +9,8 @@ namespace LageBuch.AppLogic.ViewModels;
 /// Content of the "Über" overlay: what the app is, who publishes it, and where its source lives.
 /// Display data plus a few commands — the host clears the overlay via <see cref="Closed"/>,
 /// and repository links go through <see cref="IFileDialogService.OpenUrlAsync"/> like every other
-/// link in the app (works on desktop and Android alike). It also hosts the sound check (#603).
+/// link in the app (works on desktop and Android alike). It also hosts the sound check (#603) and
+/// the device's switch to mute the alarm cues (#699).
 /// </summary>
 public sealed partial class AboutViewModel : ObservableObject
 {
@@ -17,12 +18,45 @@ public sealed partial class AboutViewModel : ObservableObject
 
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService? _alarm;
+    private readonly AlarmMute? _alarmMute;
 
-    public AboutViewModel(IFileDialogService dialogs, string version, IAlarmService? alarm = null)
+    public AboutViewModel(IFileDialogService dialogs, string version, IAlarmService? alarm = null, AlarmMute? alarmMute = null)
     {
         _dialogs = dialogs;
         Version = version;
         _alarm = alarm;
+        _alarmMute = alarmMute;
+    }
+
+    /// <summary>Whether this device has a mute switch to offer; the checkbox is hidden otherwise.</summary>
+    public bool CanMuteAlarms => _alarmMute is not null;
+
+    /// <summary>
+    /// "Alarmtöne stumm schalten" (#699). A switch that cannot be saved stays off and says so in
+    /// <see cref="ErrorMessage"/>, rather than looking muted for this session only.
+    /// </summary>
+    public bool IsAlarmMuted
+    {
+        get => _alarmMute?.IsMuted ?? false;
+        set
+        {
+            if (_alarmMute is null || value == _alarmMute.IsMuted)
+            {
+                return;
+            }
+
+            try
+            {
+                _alarmMute.Set(value);
+                ErrorMessage = null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                ErrorMessage = $"Einstellung nicht gespeichert: {ex.Message}";
+            }
+
+            OnPropertyChanged();
+        }
     }
 
     /// <summary>Whether this device has an alarm service to test; the button is hidden otherwise.</summary>
@@ -52,10 +86,13 @@ public sealed partial class AboutViewModel : ObservableObject
         SoundTestFailed = false;
         SoundTestResult = "Rückzugsalarm wird abgespielt …";
         var played = await _alarm.PlayTestAsync();
-        SoundTestFailed = !played;
-        SoundTestResult = played
-            ? "Rückzugsalarm abgespielt. Nichts gehört? Lautstärke und Lautsprecher prüfen."
-            : "Auf diesem Gerät konnte kein Ton abgespielt werden. Alarme erscheinen nur auf dem Bildschirm.";
+        SoundTestFailed = !played || IsAlarmMuted;
+        SoundTestResult = (played, IsAlarmMuted) switch
+        {
+            (true, false) => "Rückzugsalarm abgespielt. Nichts gehört? Lautstärke und Lautsprecher prüfen.",
+            (true, true) => "Rückzugsalarm abgespielt. Alarmtöne sind stumm geschaltet: im Einsatz bleibt er stumm.",
+            _ => "Auf diesem Gerät konnte kein Ton abgespielt werden. Alarme erscheinen nur auf dem Bildschirm.",
+        };
     }
 
     // No AppName/Descriptor here: the About card shows the project badge, which carries the

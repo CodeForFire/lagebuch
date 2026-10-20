@@ -98,6 +98,69 @@ public class AboutViewModelTests
         Assert.Contains("nur auf dem Bildschirm", vm.SoundTestResult, StringComparison.Ordinal);
     }
 
+    // #699: the mute switch lives in ÜBER, next to the sound check.
+    [Fact]
+    public void Muting_in_Ueber_switches_the_device_alarms_off_and_on()
+    {
+        var mute = new AlarmMute();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", new FakeAlarmService(), mute);
+
+        Assert.True(vm.CanMuteAlarms);
+        Assert.False(vm.IsAlarmMuted);
+
+        vm.IsAlarmMuted = true;
+        Assert.True(mute.IsMuted);
+
+        vm.IsAlarmMuted = false;
+        Assert.False(mute.IsMuted);
+    }
+
+    [Fact]
+    public void Ueber_shows_a_mute_set_elsewhere()
+    {
+        var mute = new AlarmMute();
+        mute.Set(true);
+
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", new FakeAlarmService(), mute);
+
+        Assert.True(vm.IsAlarmMuted);
+    }
+
+    // The test still plays while muted, but it must not read as "all good": the Einsatz stays
+    // silent until the switch goes back off.
+    [Fact]
+    public async Task A_sound_test_while_muted_says_the_alarms_stay_silent()
+    {
+        var mute = new AlarmMute();
+        mute.Set(true);
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", new FakeAlarmService(), mute);
+
+        await vm.TestSoundCommand.ExecuteAsync(null);
+
+        Assert.Contains("stumm", vm.SoundTestResult, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_mute_that_cannot_be_saved_is_reported_and_not_shown_as_set()
+    {
+        var mute = new AlarmMute(Path.Join(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}", "alarm-mute.json"));
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", new FakeAlarmService(), mute);
+
+        vm.IsAlarmMuted = true;
+
+        Assert.False(vm.IsAlarmMuted);
+        Assert.False(mute.IsMuted);
+        Assert.NotNull(vm.ErrorMessage);
+    }
+
+    [Fact]
+    public void Without_a_mute_switch_there_is_no_checkbox()
+    {
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", new FakeAlarmService());
+
+        Assert.False(vm.CanMuteAlarms);
+    }
+
     [Fact]
     public void Without_an_alarm_service_there_is_nothing_to_test()
     {
