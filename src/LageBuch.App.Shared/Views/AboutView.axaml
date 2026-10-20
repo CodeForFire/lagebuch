@@ -64,10 +64,26 @@
 
             <!-- Sound check (#603): the one way to know before an Einsatz that the Rückzugsalarm is
                  audible. A failure the device can see is shown in amber; a success still asks the
-                 listener, since a muted device cannot be detected. -->
+                 listener, since a muted device cannot be detected. The test plays even while the
+                 alarms are muted, and then says they stay silent in the Einsatz. -->
             <StackPanel x:Name="SoundTest" Spacing="6" Margin="0,4,0,0" IsVisible="{Binding CanTestSound}">
               <Separator Margin="0,2,0,4" />
               <TextBlock Text="ALARMTON" Classes="overline" FontSize="10" />
+              <!-- Mute (#699): a device setting, not part of the Einsatz. The hint says in plain
+                   words what it costs, and turns amber while it is on. -->
+              <StackPanel x:Name="AlarmMute" Spacing="2" IsVisible="{Binding CanMuteAlarms}">
+                <CheckBox x:Name="AlarmMuteCheckBox" Content="Alarmtöne stumm schalten"
+                          IsChecked="{Binding IsAlarmMuted}" />
+                <TextBlock x:Name="AlarmMuteHint" Text="Auch der Rückzugsalarm bleibt dann stumm."
+                           TextWrapping="Wrap" Classes="secondary" Classes.muted="{Binding IsAlarmMuted}">
+                  <TextBlock.Styles>
+                    <Style Selector="TextBlock.muted">
+                      <Setter Property="Foreground" Value="{StaticResource AmberBrush}" />
+                      <Setter Property="FontWeight" Value="SemiBold" />
+                    </Style>
+                  </TextBlock.Styles>
+                </TextBlock>
+              </StackPanel>
               <Button x:Name="TestSoundButton" Content="TON TESTEN" Command="{Binding TestSoundCommand}"
                       HorizontalAlignment="Left" />
               <TextBlock x:Name="SoundTestResult" Text="{Binding SoundTestResult}" TextWrapping="Wrap"

@@ -82,7 +82,8 @@ internal static class Program
             lastPdfExport: new JsonLastPdfExportStore(AppPaths.LastPdfExportJsonPath),
             lastConnection: new JsonLastConnectionStore(AppPaths.LastConnectionJsonPath),
             mailComposer: new OsMailComposer(),
-            lastCrashReport: CrashReports.TakePending(AppPaths.Root));
+            lastCrashReport: CrashReports.TakePending(AppPaths.Root),
+            alarmMute: new AlarmMute(AppPaths.AlarmMuteJsonPath));
     }
 
     private static string AppVersion => typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";

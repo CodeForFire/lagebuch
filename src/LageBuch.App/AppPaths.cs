@@ -15,6 +15,8 @@ internal static class AppPaths
 
     public static string LastConnectionJsonPath => Path.Join(Root, "last-connection.json");
 
+    public static string AlarmMuteJsonPath => Path.Join(Root, "alarm-mute.json");
+
     public static string AttachmentCacheDir => Path.Join(Root, "attachment-cache");
 
     public static string TrustJsonPath => Path.Join(Root, "trust.json");

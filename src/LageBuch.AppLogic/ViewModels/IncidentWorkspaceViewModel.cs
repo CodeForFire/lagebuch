@@ -30,6 +30,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly MasterDataSet _masterData;
     private readonly IFileDialogService _dialogs;
     private readonly IAlarmService _alarm;
+    private readonly AlarmMute? _alarmMute;
     private readonly IIncidentHostController _hostController;
     private readonly IIncidentPdfExporter _pdfExporter;
     private readonly ILastPdfExportStore? _lastPdfExportStore;
@@ -52,7 +53,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     private readonly List<ChecklistViewModel> _checklists = new();
     private bool _disposed;
 
-    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null)
+    public IncidentWorkspaceViewModel(IIncidentSession session, IClock clock, ITicker ticker, MasterDataSet masterData, IFileDialogService dialogs, IAlarmService alarm, IIncidentHostController hostController, IIncidentPdfExporter? pdfExporter = null, ILastPdfExportStore? lastPdfExport = null, IIncidentStore? store = null, IUiDispatcher? uiDispatcher = null, string? remoteHost = null, IMailComposer? mailComposer = null, AlarmMute? alarmMute = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
@@ -64,6 +65,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _alarm = alarm;
         _hostController = hostController;
         _hostController.JoinsClosedChanged += OnJoinsClosedChanged;
+        _alarmMute = alarmMute;
+        if (_alarmMute is not null)
+        {
+            _alarmMute.Changed += OnAlarmMuteChanged;
+        }
+
         _pdfExporter = pdfExporter ?? new NoopIncidentPdfExporter();
         _lastPdfExportStore = lastPdfExport;
         _mailComposer = mailComposer ?? new NoopMailComposer();
@@ -501,6 +508,12 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
     public string StatusDisplay => Formatting.State(_session.Incident.State);
 
+    /// <summary>
+    /// True while this device's alarm cues are muted in ÜBER (#699). The footer says so, so a crew
+    /// cannot lose the Rückzugsalarm without seeing it.
+    /// </summary>
+    public bool AlarmsMuted => _alarmMute?.IsMuted ?? false;
+
     public string ReadOnlyReason => _session.Incident.State == IncidentState.Closed
         ? "Abgeschlossen — schreibgeschützt"
         : "Schreibgeschützt geöffnet";
@@ -782,6 +795,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         _disposed = true;
         _session.Changed -= RefreshIncidentData;
         _hostController.JoinsClosedChanged -= OnJoinsClosedChanged;
+        if (_alarmMute is not null)
+        {
+            _alarmMute.Changed -= OnAlarmMuteChanged;
+        }
 
         if (_session is RemoteIncidentSession remote)
         {
@@ -1431,6 +1448,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     }
 
     // Raised on a request thread when the budget runs out, so marshal before touching bound state.
+    // ÜBER sets the switch on the UI thread today; marshal anyway, like every other event here.
+    private void OnAlarmMuteChanged(object? sender, EventArgs e) =>
+        _uiDispatcher.Post(() => OnPropertyChanged(nameof(AlarmsMuted)));
+
     private void OnJoinsClosedChanged(object? sender, EventArgs e) =>
         _uiDispatcher.Post(() =>
         {

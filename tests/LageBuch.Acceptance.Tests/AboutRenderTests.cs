@@ -97,6 +97,32 @@ public class AboutRenderTests
         Capture(window, "about-sound-failed.png");
     }
 
+    // #699: the mute switch, through the real checkbox. Its hint has to say plainly that the
+    // Rückzugsalarm goes silent too.
+    [AvaloniaFact]
+    public void Ueber_mutes_the_alarms_and_says_the_Rueckzugsalarm_goes_silent_too()
+    {
+        var mute = new AlarmMute();
+        var vm = new AboutViewModel(new FakeDialogs(), "0.1.0", new NoopAlarmService(), mute);
+        var window = new Window { Content = new AboutView { DataContext = vm }, Width = 640, Height = 1000 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "about-mute-off.png");
+
+        var checkBox = window.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Name == "AlarmMuteCheckBox");
+        Assert.True(checkBox.IsEffectivelyVisible);
+        Assert.Equal("Alarmtöne stumm schalten", checkBox.Content);
+        var hint = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "AlarmMuteHint");
+        Assert.Contains("Rückzugsalarm", hint.Text, StringComparison.Ordinal);
+
+        checkBox.IsChecked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(mute.IsMuted);
+        Assert.Contains("muted", hint.Classes);
+        Capture(window, "about-mute-on.png");
+    }
+
     [AvaloniaFact]
     public void Without_an_alarm_service_the_sound_test_is_hidden()
     {

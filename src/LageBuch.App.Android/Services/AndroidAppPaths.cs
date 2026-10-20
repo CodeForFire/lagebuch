@@ -23,6 +23,9 @@ internal static class AndroidAppPaths
     public static string RecentFilesJsonPath(Context context) =>
         System.IO.Path.Join(context.FilesDir!.AbsolutePath, "recent.json");
 
+    public static string AlarmMuteJsonPath(Context context) =>
+        System.IO.Path.Join(context.FilesDir!.AbsolutePath, "alarm-mute.json");
+
     public static string CacheDir(Context context) => context.CacheDir!.AbsolutePath;
 
     public static string AttachmentCacheDir(Context context) =>

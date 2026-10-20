@@ -32,10 +32,15 @@ public static class CompositionRoot
         ILastPdfExportStore? lastPdfExport = null,
         ILastConnectionStore? lastConnection = null,
         IMailComposer? mailComposer = null,
-        string? lastCrashReport = null)
+        string? lastCrashReport = null,
+        AlarmMute? alarmMute = null)
     {
-        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport);
+        // Every cue goes through the device's mute switch (#699); without a file to keep it in,
+        // the switch still works for this run.
+        alarmMute ??= new AlarmMute();
+        alarm = new MutedAlarmService(alarm, alarmMute);
+        var home = new HomeViewModel(store, masterData, recent, dialogs, clock, ticker, alarm, hostController, appVersion, uiDispatcher, lastSaveFolder, attachmentCacheRoot, trustStore: trustStore, pdfExporter: pdfExporter, lastPdfExport: lastPdfExport, lastConnection: lastConnection, mailComposer: mailComposer, runInBackground: work => _ = Task.Run(work), lastCrashReport: lastCrashReport, alarmMute: alarmMute);
         var editor = new MasterDataEditorViewModel(masterData, dialogs, masterDataFileService);
-        return new MainWindowViewModel(home, editor, dialogs, appVersion, alarm);
+        return new MainWindowViewModel(home, editor, dialogs, appVersion, alarm, alarmMute);
     }
 }
