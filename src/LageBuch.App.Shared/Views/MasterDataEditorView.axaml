@@ -554,7 +554,17 @@
                                ToolTip.Tip="Eigenes Fahrzeug" />
                   </Grid>
                   <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                    <!-- Only the rows on screen are built. A brigade's roster runs to 40 rows of
+                         a dozen controls each, and building them all took most of a second every
+                         time the category was opened. RowTabNavigation keeps Tab walking into the
+                         rows not built yet; FocusNewItem scrolls a new row into view first. -->
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True"
+                                  b:RowTabNavigation.IsEnabled="True">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <VirtualizingStackPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
                           <Grid ColumnDefinitions="*,*,150,70,70,28,32,32" Margin="0,0,0,6">
@@ -767,7 +777,14 @@
                                Classes="overline" FontSize="10" />
                   </Grid>
                   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                    <!-- Only the rows on screen are built, as for the Fahrzeuge above. -->
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True"
+                                  b:RowTabNavigation.IsEnabled="True">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <VirtualizingStackPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PersonRow">
                           <!-- One card per person, so the two lines read as one entry rather than as
