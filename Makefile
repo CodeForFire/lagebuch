@@ -105,23 +105,33 @@ test-all: ## Run tests over the full solution (needs JDK <= 21)
 # headless UI, which is too slow and too flaky to repeat once per mutant.
 MUTATE_PROJECTS := Domain Sync Documents Persistence AppLogic
 
-# SINCE=<committish> mutates only the files changed since it, and BREAK=<0-100>
-# fails below that score -- together they are the pull request gate in
-# .github/workflows/mutation.yml (SINCE=origin/main BREAK=60). Stryker's
-# --since finds no changes inside a git worktree and passes every file, so
-# SINCE is refused there rather than reporting a gate it never checked.
+# SINCE=<committish> is the pull request gate in .github/workflows/mutation.yml
+# (SINCE=origin/main): it mutates only the .cs files changed since the merge
+# base, working tree included, then scores only the mutants on changed lines
+# and fails below BREAK. Stryker's own --since is not used: it scores whole
+# files, and inside a git worktree it finds no changes at all.
 SINCE ?=
-BREAK ?=
-MUTATE_FLAGS := $(if $(SINCE),--since:$(SINCE),) $(if $(BREAK),--break-at $(BREAK),)
+BREAK ?= 80
+MUTATE_OUT = $(CURDIR)/StrykerOutput/$(PROJECT)
+MUTATE_SCORE = python3 -I scripts/mutation-diff-score.py
 
-mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|AppLogic [SINCE= BREAK=])
+mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|AppLogic [SINCE= BREAK=80])
 	@if [ -z "$(filter $(PROJECT),$(MUTATE_PROJECTS))" ]; then \
 	  echo "Usage: make mutate PROJECT=<one of: $(MUTATE_PROJECTS)>"; exit 2; fi
-	@if [ -n "$(SINCE)" ] && [ -f .git ]; then \
-	  echo "SINCE does not work in a git worktree (Stryker sees no changes); run it from a clone."; exit 2; fi
-	cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker \
-	  --output $(CURDIR)/StrykerOutput/$(PROJECT) $(MUTATE_FLAGS)
-	@echo "Report: $(CURDIR)/StrykerOutput/$(PROJECT)/reports/mutation-report.html"
+	@rm -f $(MUTATE_OUT)/reports/changed-lines.md
+	@if [ -z "$(SINCE)" ]; then \
+	  (cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker --output $(MUTATE_OUT)) || exit $$?; \
+	  echo "Report: $(MUTATE_OUT)/reports/mutation-report.html"; \
+	else \
+	  files=$$($(MUTATE_SCORE) files --base "$(SINCE)" --project-dir src/LageBuch.$(PROJECT)) || exit 2; \
+	  if [ -z "$$files" ]; then \
+	    echo "No .cs file in LageBuch.$(PROJECT) changed since $(SINCE) -- nothing to mutate."; exit 0; fi; \
+	  set --; for f in $$files; do set -- "$$@" --mutate "**/$$f"; done; \
+	  (cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker --output $(MUTATE_OUT) "$$@") || exit $$?; \
+	  echo "Report: $(MUTATE_OUT)/reports/mutation-report.html"; \
+	  $(MUTATE_SCORE) score --report $(MUTATE_OUT)/reports/mutation-report.json --base "$(SINCE)" \
+	    --project-dir src/LageBuch.$(PROJECT) --threshold $(BREAK) --summary $(MUTATE_OUT)/reports/changed-lines.md; \
+	fi
 
 run: ## Run the desktop app
 	$(DOTNET) run --project $(APP)
