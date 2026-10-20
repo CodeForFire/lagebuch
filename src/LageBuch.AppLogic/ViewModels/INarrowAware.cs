@@ -9,8 +9,8 @@ namespace LageBuch.AppLogic.ViewModels;
 /// "narrow" means, and exactly one size forwarder in the views feeding it.
 /// <para>
 /// This exists because the alternative does not work. Layout that is purely presentational —
-/// padding, font size, a hidden label — is a container query in the .axaml and needs no view
-/// model at all. But a phone also changes what the module <em>does</em>: an add-entry dock that is
+/// padding, font size, a hidden label — is a style keyed off the workspace's <c>narrow</c> class
+/// in the .axaml and needs nothing from the module. But a phone also changes what the module <em>does</em>: an add-entry dock that is
 /// always on screen becomes a sheet that opens and closes. A <c>Style</c> setter cannot express
 /// that, and binding <c>IsVisible</c> to the open flag directly would hide the dock on the desktop
 /// too, because a XAML binding is a local value and outranks every setter that might restore it.

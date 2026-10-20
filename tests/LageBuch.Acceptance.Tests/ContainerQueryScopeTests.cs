@@ -28,6 +28,28 @@ public class ContainerQueryScopeTests
         Assert.Empty(Flatten(view.Styles).OfType<ContainerQuery>());
     }
 
+    [AvaloniaFact]
+    public void The_workspace_root_holds_no_container_query_over_the_open_module()
+    {
+        var root = Assert.IsAssignableFrom<Control>(new IncidentWorkspaceView().Content);
+
+        Assert.Empty(Flatten(root.Styles).OfType<ContainerQuery>());
+    }
+
+    // Measured on #685: leaving Beteiligte with 200 entries took 33 s with its own query in place,
+    // 291 ms without. Every module lays out for a phone off the workspace's "narrow" class instead.
+    [AvaloniaFact]
+    public void No_module_view_lays_out_for_a_phone_with_a_container_query()
+    {
+        UserControl[] modules =
+        [
+            new EtbView(), new ForcesView(), new RolesView(), new TasksView(), new ScbaView(),
+            new InvolvedPartiesView(), new FilesView(), new ContactsView(), new CoMessprotokollView(),
+        ];
+
+        Assert.All(modules, view => Assert.Empty(Flatten(view.Styles).OfType<ContainerQuery>()));
+    }
+
     private static IEnumerable<IStyle> Flatten(IEnumerable<IStyle> styles) =>
         styles.SelectMany(s => Flatten(s.Children).Prepend(s));
 }

@@ -8,7 +8,7 @@
              x:DataType="vm:ScbaViewModel">
   <UserControl.Styles>
     <!-- Field widths as Styles, not Width= on the controls: a local value in XAML outranks a
-         Style setter, so the narrow query below could never widen them. -->
+         Style setter, so the narrow styles below could never widen them. -->
     <!-- The Druckkontrolle's answer to a press it could not record (#539): red for nothing to
          record, amber for a reading that is asked about once before it goes in. -->
     <Style Selector="TextBlock.pressureError">
@@ -84,44 +84,42 @@
       <Setter Property="Margin" Value="0,0,6,0" />
     </Style>
 
-    <!-- The narrow layout, keyed off the workspace's container. This grid is the widest in the
+    <!-- The narrow layout, keyed off the workspace's "narrow" class (#685). This grid is the widest in the
          app — its fixed columns alone total 1025px and it wants 1205px — so there is nothing to
          squeeze: a phone reads the same Trupps as cards. -->
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <!-- Wide enough that only one fits a phone's content column, which is how a horizontal
-           WrapPanel is told "one field per line". -->
-      <Style Selector="AutoCompleteBox#CallSignBox">
-        <Setter Property="Width" Value="356" />
-      </Style>
-      <Style Selector="ComboBox#TruppTypeBox">
-        <Setter Property="Width" Value="356" />
-      </Style>
-      <Style Selector="AutoCompleteBox#TruppfuehrerBox">
-        <Setter Property="Width" Value="356" />
-      </Style>
-      <Style Selector="AutoCompleteBox#TruppmannBox">
-        <Setter Property="Width" Value="356" />
-      </Style>
-      <Style Selector="AutoCompleteBox#ZweiterTruppmannBox">
-        <Setter Property="Width" Value="356" />
-      </Style>
-      <Style Selector="TextBlock#ScbaTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Border#ScbaGridPanel">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Border#ScbaCardPanel">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <Style Selector="WrapPanel#RegistrationDock > :is(Control)">
-        <Setter Property="Margin" Value="0,0,0,8" />
-      </Style>
-      <Style Selector="Button.dock-action">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-    </ContainerQuery>
+    <!-- Wide enough that only one fits a phone's content column, which is how a horizontal
+         WrapPanel is told "one field per line". -->
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#CallSignBox">
+      <Setter Property="Width" Value="356" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ComboBox#TruppTypeBox">
+      <Setter Property="Width" Value="356" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#TruppfuehrerBox">
+      <Setter Property="Width" Value="356" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#TruppmannBox">
+      <Setter Property="Width" Value="356" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#ZweiterTruppmannBox">
+      <Setter Property="Width" Value="356" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#ScbaTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#ScbaGridPanel">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#ScbaCardPanel">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow WrapPanel#RegistrationDock > :is(Control)">
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
   </UserControl.Styles>
   <DockPanel>
     <TextBlock DockPanel.Dock="Top" x:Name="ScbaTitle" Text="ATEMSCHUTZÜBERWACHUNG" Classes="overline"

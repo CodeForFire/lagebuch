@@ -5,7 +5,7 @@
              x:Class="LageBuch.App.Shared.Views.ContactsView"
              x:DataType="vm:ContactsViewModel">
   <!-- Wide defaults are Style setters, not attributes: a local value outranks every setter, so the
-       phone query below could never move or resize anything written inline. -->
+       phone styles below could never move or resize anything written inline. -->
   <UserControl.Styles>
     <Style Selector="TextBox#ContactSearchBox">
       <Setter Property="Margin" Value="16,0,0,0" />
@@ -32,39 +32,37 @@
       <Setter Property="Height" Value="{StaticResource ControlHeight}" />
     </Style>
 
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="TextBlock#ContactsTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="TextBox#ContactSearchBox">
-        <Setter Property="Margin" Value="0" />
-      </Style>
-      <!-- ...and drop to a row of their own on a phone, where the number stretches into a
-           thumb-sized target instead of squeezing the name out of the card. -->
-      <Style Selector="DockPanel.contact-actions">
-        <Setter Property="Grid.Row" Value="2" />
-        <Setter Property="Grid.RowSpan" Value="1" />
-        <Setter Property="Grid.Column" Value="0" />
-        <Setter Property="Grid.ColumnSpan" Value="2" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Margin" Value="0,10,0,0" />
-      </Style>
-      <!-- A raised surface on a phone: with no pointer to hover, a transparent number would read
-           as plain text nobody thinks to tap. -->
-      <Style Selector="Button.contact-call">
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
-      </Style>
-      <Style Selector="Panel.contact-mail-slot">
-        <Setter Property="Width" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-      <Style Selector="Button.contact-mail">
-        <Setter Property="Width" Value="{StaticResource ControlHeightTouch}" />
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-    </ContainerQuery>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#ContactsTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#ContactSearchBox">
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <!-- ...and drop to a row of their own on a phone, where the number stretches into a
+         thumb-sized target instead of squeezing the name out of the card. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow DockPanel.contact-actions">
+      <Setter Property="Grid.Row" Value="2" />
+      <Setter Property="Grid.RowSpan" Value="1" />
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,10,0,0" />
+    </Style>
+    <!-- A raised surface on a phone: with no pointer to hover, a transparent number would read
+         as plain text nobody thinks to tap. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.contact-call">
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Panel.contact-mail-slot">
+      <Setter Property="Width" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.contact-mail">
+      <Setter Property="Width" Value="{StaticResource ControlHeightTouch}" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
   </UserControl.Styles>
 
   <DockPanel>

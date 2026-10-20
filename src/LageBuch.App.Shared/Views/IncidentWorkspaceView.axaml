@@ -6,15 +6,18 @@
              xmlns:b="clr-namespace:LageBuch.App.Shared.Behaviors"
              x:Class="LageBuch.App.Shared.Views.IncidentWorkspaceView"
              x:DataType="vm:IncidentWorkspaceViewModel">
-  <!-- The workspace is its own container, measured on the root Panel: a container query styles
-       its container's descendants, not the container itself, so the element carrying the name has
-       to sit outside everything the query touches. The header keeps its own, narrower container
-       below — that one is about the width the Meldungen have, this one about the whole shell. -->
-  <Panel Container.Name="Workspace" Container.Sizing="Width" b:WorkspaceFocus.Rail="{Binding #ModuleTabs}"
+  <!-- The phone layout of the workspace and of every module view hangs off the root's "narrow"
+       class, bound to IsNarrow, which the code-behind sets from this view's width. Not a
+       ContainerQuery: a query attaches to every element in its scope, not just to what its styles
+       select, and each one subscribes to the container's size events. A module with a few hundred
+       rows is tens of thousands of elements, and detaching them all from that one event made
+       leaving Beteiligte with 200 entries take half a minute (#685). The header keeps its own
+       query on the small subtree it styles: that one is about the width the Meldungen have. -->
+  <Panel x:Name="WorkspaceRoot" Classes.narrow="{Binding IsNarrow}" b:WorkspaceFocus.Rail="{Binding #ModuleTabs}"
          b:RowKeys.UndoCommand="{Binding UndoCommand}">
     <Panel.Styles>
       <!-- The wide defaults. Every one of these has to be a Style and not an attribute on the
-           control: a local value in XAML outranks a Style setter, so the query could not win. -->
+           control: a local value in XAML outranks a Style setter, so the narrow styles could not win. -->
       <Style Selector="Border#WorkspaceBody">
         <Setter Property="Padding" Value="24,0,0,0" />
       </Style>
@@ -29,46 +32,44 @@
       </Style>
       <!-- Trimmed rather than unbounded: a long Stichwort would otherwise push the status group
            onto its own line and still run past the window edge. A Style, not MaxWidth on the
-           element, so the narrow query below can tighten it. -->
+           element, so the narrow style below can tighten it. -->
       <Style Selector="TextBlock#EinsatznummerValue">
         <Setter Property="MaxWidth" Value="560" />
       </Style>
-      <ContainerQuery Name="Workspace" Query="max-width:640">
-        <!-- The rail is 172px of a 411dp screen. Its TabItems go; the TabControl stays, so it
-             still hosts the content and still owns SelectedItem — which is what keeps every
-             render test's WorkspaceRenderHelper.SelectTab working. PhoneNavBar drives it now. -->
-        <Style Selector="TabItem">
-          <Setter Property="IsVisible" Value="False" />
-        </Style>
-        <Style Selector="Border#PhoneNavBar">
-          <Setter Property="IsVisible" Value="True" />
-        </Style>
-        <Style Selector="StackPanel#FooterActions">
-          <Setter Property="IsVisible" Value="False" />
-        </Style>
-        <Style Selector="Border#WorkspaceBody">
-          <Setter Property="Padding" Value="0" />
-        </Style>
-        <Style Selector="Border.tab-content">
-          <Setter Property="Padding" Value="12" />
-        </Style>
-        <Style Selector="Border#StatusHeader">
-          <Setter Property="Padding" Value="12,8" />
-        </Style>
-        <Style Selector="Border#ActionFooter">
-          <Setter Property="Padding" Value="12,6" />
-        </Style>
-        <!-- The Stichwort is the hero at 28px on an ELW monitor, but at 412dp it and the
-             Einsatznummer chip together want ~394px of a 388px line and the chip loses its tail.
-             Smaller type keeps both whole; it is still by far the largest thing on the screen. -->
-        <Style Selector="TextBlock#EinsatznummerValue">
-          <Setter Property="FontSize" Value="21" />
-          <Setter Property="MaxWidth" Value="240" />
-        </Style>
-        <Style Selector="TextBlock#IncidentNumberChip">
-          <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-        </Style>
-      </ContainerQuery>
+      <!-- The rail is 172px of a 411dp screen. Its TabItems go; the TabControl stays, so it
+           still hosts the content and still owns SelectedItem — which is what keeps every
+           render test's WorkspaceRenderHelper.SelectTab working. PhoneNavBar drives it now. -->
+      <Style Selector="Panel#WorkspaceRoot.narrow TabItem">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Panel#WorkspaceRoot.narrow Border#PhoneNavBar">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#FooterActions">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+      <Style Selector="Panel#WorkspaceRoot.narrow Border#WorkspaceBody">
+        <Setter Property="Padding" Value="0" />
+      </Style>
+      <Style Selector="Panel#WorkspaceRoot.narrow Border.tab-content">
+        <Setter Property="Padding" Value="12" />
+      </Style>
+      <Style Selector="Panel#WorkspaceRoot.narrow Border#StatusHeader">
+        <Setter Property="Padding" Value="12,8" />
+      </Style>
+      <Style Selector="Panel#WorkspaceRoot.narrow Border#ActionFooter">
+        <Setter Property="Padding" Value="12,6" />
+      </Style>
+      <!-- The Stichwort is the hero at 28px on an ELW monitor, but at 412dp it and the
+           Einsatznummer chip together want ~394px of a 388px line and the chip loses its tail.
+           Smaller type keeps both whole; it is still by far the largest thing on the screen. -->
+      <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#EinsatznummerValue">
+        <Setter Property="FontSize" Value="21" />
+        <Setter Property="MaxWidth" Value="240" />
+      </Style>
+      <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#IncidentNumberChip">
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      </Style>
     </Panel.Styles>
     <DockPanel>
       <!-- ===================== Status header ===================== -->

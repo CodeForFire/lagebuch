@@ -19,33 +19,31 @@
     </Style>
 
     <!-- Hidden by default through a Style, never IsVisible="False" on the panel: a local value
-         in XAML outranks a Style setter, so the query below could never bring it back. -->
+         in XAML outranks a Style setter, so the narrow styles below could never bring it back. -->
     <Style Selector="WrapPanel.file-meta-line">
       <Setter Property="IsVisible" Value="False" />
     </Style>
 
-    <!-- The narrow layout, keyed off the workspace's container. Six columns of metadata squeeze
+    <!-- The narrow layout, keyed off the workspace's "narrow" class (#685). Six columns of metadata squeeze
          the name — the one column that matters — to nothing on a phone, so below the breakpoint
          the three metadata columns collapse (an Auto column with a hidden child is zero wide) and
          reappear as one quiet line under the name. -->
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="TextBlock#FilesTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Grid#FilesHeaderRow">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="TextBlock.file-meta-column">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="WrapPanel.file-meta-line">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <Style Selector="Button#AddFileButton">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-    </ContainerQuery>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#FilesTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Grid#FilesHeaderRow">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock.file-meta-column">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow WrapPanel.file-meta-line">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button#AddFileButton">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
   </UserControl.Styles>
   <DockPanel>
     <TextBlock DockPanel.Dock="Top" x:Name="FilesTitle" Text="DATEIEN" Classes="overline" Margin="0,0,0,14" />
@@ -127,7 +125,7 @@
                 <TextBlock Grid.Column="3" Classes="file-meta-column" Text="{Binding AddedBy}" Margin="10,0"
                            VerticalAlignment="Center" />
                 <!-- The same three values, on their own line, for the width where they have no
-                     columns to live in. Default hidden; the container query above shows it. -->
+                     columns to live in. Default hidden; the narrow style above shows it. -->
                 <WrapPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6" Classes="file-meta-line"
                            Orientation="Horizontal" ItemSpacing="12" LineSpacing="2" Margin="0,2,0,0">
                   <TextBlock Classes="mono" FontSize="11" Text="{Binding SizeDisplay}" />

@@ -7,7 +7,7 @@
              x:DataType="vm:InvolvedPartiesViewModel">
   <!-- Same dock idiom as ForcesView: the fields run side by side on a wide window and stack on a
        phone. Orientation and widths are Style setters rather than attributes, because a local value
-       in XAML outranks a Style setter and the container query could never change them. -->
+       in XAML outranks a Style setter and the narrow styles could never change them. -->
   <UserControl.Styles>
     <Style Selector="StackPanel#DockFields">
       <Setter Property="Orientation" Value="Horizontal" />
@@ -22,30 +22,28 @@
       <Setter Property="Width" Value="320" />
     </Style>
 
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="StackPanel#DockFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <Style Selector="TextBlock#InvolvedPartiesTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="TextBox#NewNameBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#NewPhoneBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#NewNotesBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="HeaderedContentControl.field">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-      </Style>
-      <Style Selector="Button.dock-action">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-    </ContainerQuery>
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#InvolvedPartiesTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewNameBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewPhoneBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#NewNotesBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow HeaderedContentControl.field">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
   </UserControl.Styles>
 
   <DockPanel>
