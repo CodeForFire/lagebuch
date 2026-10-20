@@ -351,6 +351,46 @@ public class MasterDataEditorRenderTests
 
     // #76: the Fahrzeuge section — Wache + Funkrufname + Sitzplätze per row, Wache and
     // Funkrufname as AutoCompleteBoxes fed from the master data (free text still allowed).
+    // Issue #698: manual sorting was rarely needed and awkward to use, so only Navigation, whose
+    // order IS the Einsatz sidebar's, the Checklisten, whose order is the sequence of steps, and
+    // the Links, whose order is the Einsatz's link list, keep their up/down buttons. Every other
+    // category keeps the order its entries already have, and a new entry goes to the end.
+    [AvaloniaFact]
+    public void Only_navigation_checklisten_and_links_offer_moving_rows_up_and_down()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        int Buttons(params string[] names) => view.GetVisualDescendants().OfType<Button>()
+            .Count(b => names.Contains(AutomationProperties.GetName(b), StringComparer.Ordinal));
+
+        foreach (var section in vm.Sections.Concat<EditorSection>(vm.Checklists))
+        {
+            vm.SelectedSection = section;
+            Dispatcher.UIThread.RunJobs();
+            var moveButtons = Buttons("Nach oben", "Nach unten");
+            var removeButtons = Buttons("Entfernen");
+
+            if (section is NavigationSection or ChecklistTemplateSection or LinksSection)
+            {
+                Assert.True(moveButtons > 0, $"{section.Title} lost its up/down buttons");
+            }
+            else
+            {
+                Assert.True(moveButtons == 0, $"{section.Title} still offers moving rows up and down");
+            }
+
+            if (section.Title is "Rollen" or "Einheiten-Status" or "Trupp-Typen" or "Links" or "Fahrzeuge" or "Aufbau")
+            {
+                // The sample has rows here, so the check above is not vacuous.
+                Assert.True(removeButtons > 0, $"{section.Title} shows no rows to check");
+            }
+        }
+    }
+
     // Issue #197: the ▲/▼/✕ row-action buttons used to be Unicode text on a Button, which
     // defaults to Oswald -- a font that carries none of the three codepoints, so the affordance
     // only ever appeared where the OS happened to supply a fallback face. Now PathIcons like the

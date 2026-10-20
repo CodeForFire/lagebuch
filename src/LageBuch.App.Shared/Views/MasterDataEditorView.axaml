@@ -321,31 +321,19 @@
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- Column headers (#137): each row is unlabeled otherwise. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="{Binding ColumnHeader}" Classes="overline" FontSize="10" />
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Items}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:MasterDataItem">
-                          <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
                             <TextBox Grid.Column="0" Text="{Binding Value}" />
                             <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
-                            <Button Grid.Column="1" Classes="icon-btn" Margin="6,0,0,0" ToolTip.Tip="Nach oben"
-                                    AutomationProperties.Name="Nach oben"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
-                            </Button>
-                            <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
-                                    AutomationProperties.Name="Nach unten"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-                            </Button>
-                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="1" Classes="icon-btn" Margin="6,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
@@ -533,18 +521,18 @@
                 </DockPanel>
               </DataTemplate>
 
-              <!-- Vehicles editor (#76): Wache + Funkrufname + Sitzplätze, reorderable. -->
+              <!-- Vehicles editor (#76): Wache + Funkrufname + Sitzplätze. -->
               <DataTemplate x:DataType="vm:VehiclesSection">
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- Column headers (#137): each row is unlabeled otherwise.
-                       The trailing three columns use fixed widths matching the row template's
-                       icon-btn buttons (28px, plus each subsequent button's 4px left margin) —
+                       The trailing column uses a fixed width matching the row template's
+                       icon-btn button (28px, plus its 4px left margin) —
                        "Auto" would size to this Grid's own (empty) content instead of the row
                        template's buttons, leaving the header and row Grids to disagree on width
                        and dragging SITZPLÄTZE/ZF/EIGEN out of alignment with their columns. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,70,28,32,32" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,150,70,70,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="WACHE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="FUNKRUFNAME" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="2" Text="SITZPLÄTZE" Classes="overline" FontSize="10" />
@@ -567,7 +555,7 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VehicleRow">
-                          <Grid ColumnDefinitions="*,*,150,70,70,28,32,32" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,*,150,70,70,32" Margin="0,0,0,6">
                             <!-- AutoCompleteBox statt ComboBox: Vorschläge aus den Stammdaten,
                                  aber Freitext bleibt möglich (Fremdwehren), wie im Kräfte-Dock. -->
                             <Grid Grid.Column="0" Margin="0,0,6,0">
@@ -604,19 +592,7 @@
                             <!-- ReflectionBinding: the section commands live on the parent ItemsControl's
                                  DataContext, whose static type is object under compiled bindings, so a
                                  compiled $parent cast path won't resolve. -->
-                            <Button Grid.Column="5" Classes="icon-btn" Margin="0,0,0,0" ToolTip.Tip="Nach oben"
-                                    AutomationProperties.Name="Nach oben"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
-                            </Button>
-                            <Button Grid.Column="6" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
-                                    AutomationProperties.Name="Nach unten"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-                            </Button>
-                            <Button Grid.Column="7" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
@@ -636,9 +612,9 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
-                  <!-- Fixed trailing widths matching the row template's icon-btn buttons, as in the
+                  <!-- A fixed trailing width matching the row template's icon-btn button, as in the
                        Fahrzeuge template above: "Auto" would size to this Grid's own empty content. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,150,28,32,32" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,150,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="TYP" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="STÄRKE" Classes="overline" FontSize="10"
                                ToolTip.Tip="Personen im Trupp: 2, oder 3 mit zweitem Truppmann" />
@@ -649,7 +625,7 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TruppTypeRow">
-                          <Grid ColumnDefinitions="*,110,150,28,32,32" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,110,150,32" Margin="0,0,0,6">
                             <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="Angriffstrupp" />
                             <!-- Bounds are bound, not written in: a Trupp has as many positions as
@@ -664,19 +640,7 @@
                                            VerticalAlignment="Center" />
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
                                  $parent path cannot resolve here. -->
-                            <Button Grid.Column="3" Classes="icon-btn" ToolTip.Tip="Nach oben"
-                                    AutomationProperties.Name="Nach oben"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
-                            </Button>
-                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
-                                    AutomationProperties.Name="Nach unten"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-                            </Button>
-                            <Button Grid.Column="5" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">
@@ -697,9 +661,9 @@
                 <DockPanel>
                   <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
-                  <!-- Fixed trailing widths matching the row template's icon-btn buttons, as in the
+                  <!-- A fixed trailing width matching the row template's icon-btn button, as in the
                        Trupp-Typen template above: "Auto" would size to this Grid's own empty content. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,180,28,32,32" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,180,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="ROLLE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="EINDEUTIGKEIT" Classes="overline" FontSize="10"
                                ToolTip.Tip="Wie oft die Funktion besetzt werden darf" />
@@ -708,7 +672,7 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:RoleRow">
-                          <Grid ColumnDefinitions="*,180,28,32,32" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,180,32" Margin="0,0,0,6">
                             <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="Einsatzleiter" />
                             <!-- Options rather than bare ComboBoxItems: an enum cannot be matched
@@ -726,19 +690,7 @@
                             </ComboBox>
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
                                  $parent path cannot resolve here. -->
-                            <Button Grid.Column="2" Classes="icon-btn" ToolTip.Tip="Nach oben"
-                                    AutomationProperties.Name="Nach oben"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveUpCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
-                            </Button>
-                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Nach unten"
-                                    AutomationProperties.Name="Nach unten"
-                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.MoveDownCommand}"
-                                    CommandParameter="{Binding}">
-                              <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-                            </Button>
-                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">

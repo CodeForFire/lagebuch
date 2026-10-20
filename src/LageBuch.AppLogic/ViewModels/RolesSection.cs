@@ -76,28 +76,6 @@ public sealed partial class RolesSection : EditorSection
         });
     }
 
-    [RelayCommand]
-    private void MoveUp(RoleRow row)
-    {
-        var i = Rows.IndexOf(row);
-        if (i > 0)
-        {
-            Rows.Move(i, i - 1);
-            _onChanged();
-        }
-    }
-
-    [RelayCommand]
-    private void MoveDown(RoleRow row)
-    {
-        var i = Rows.IndexOf(row);
-        if (i >= 0 && i < Rows.Count - 1)
-        {
-            Rows.Move(i, i + 1);
-            _onChanged();
-        }
-    }
-
     /// <summary>
     /// Rows with a non-blank name, trimmed, first spelling winning a case-insensitive duplicate --
     /// the same normalization <see cref="TruppTypesSection"/> uses, and deliberately stricter than

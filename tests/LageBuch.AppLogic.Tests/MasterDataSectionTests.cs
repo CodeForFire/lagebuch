@@ -7,18 +7,18 @@ namespace LageBuch.AppLogic.Tests;
 public class MasterDataSectionTests
 {
     [Fact]
-    public void Add_remove_and_reorder_a_list_and_flag_changes()
+    public void Add_and_remove_in_a_list_flag_changes_and_a_new_entry_goes_to_the_end()
     {
         var changes = 0;
         var s = new EditableListSection("Rollen", "ROLLE", new[] { "EL", "ZF" }, () => changes++);
 
         s.AddCommand.Execute(null);
         s.Items[^1].Value = "GF";
-        s.MoveUpCommand.Execute(s.Items[^1]);   // GF moves ahead of ZF
         s.RemoveCommand.Execute(s.Items.First(i => i.Value == "EL"));
 
-        Assert.Equal(new[] { "GF", "ZF" }, s.ToValues());
-        Assert.Equal(4, changes); // add + edit + move + remove, one onChanged each
+        // #698: no manual sorting any more, so the stored order stands and GF is appended.
+        Assert.Equal(new[] { "ZF", "GF" }, s.ToValues());
+        Assert.Equal(3, changes); // add + edit + remove, one onChanged each
     }
 
     [Fact]
@@ -28,13 +28,40 @@ public class MasterDataSectionTests
         Assert.Equal(new[] { "EL", "ZF" }, s.ToValues());
     }
 
+    // #698: the Checklisten keep manual sorting -- their order is the sequence of steps the
+    // incident's checklist is seeded with.
     [Fact]
-    public void MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
+    public void Checklist_items_still_move_up_and_down_and_flag_a_change()
     {
-        var s = new EditableListSection("Rollen", "ROLLE", new[] { "EL", "ZF" }, () => { });
-        s.MoveUpCommand.Execute(s.Items[0]);
-        s.MoveDownCommand.Execute(s.Items[^1]);
-        Assert.Equal(new[] { "EL", "ZF" }, s.ToValues());
+        var changes = 0;
+        var s = new ChecklistTemplateSection(
+            Guid.NewGuid(),
+            "Aufbau",
+            new[] { new ChecklistTemplateItem("Erster", true), new ChecklistTemplateItem("Zweiter", false), new ChecklistTemplateItem("Dritter", false) },
+            () => changes++);
+
+        s.MoveUpCommand.Execute(s.Rows[^1]);   // Erster, Dritter, Zweiter
+        s.MoveDownCommand.Execute(s.Rows[0]);  // Dritter, Erster, Zweiter
+
+        Assert.Equal(new[] { "Dritter", "Erster", "Zweiter" }, s.ToValues().Select(i => i.Text));
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void Checklist_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
+    {
+        var changes = 0;
+        var s = new ChecklistTemplateSection(
+            Guid.NewGuid(),
+            "Aufbau",
+            new[] { new ChecklistTemplateItem("Erster", true), new ChecklistTemplateItem("Zweiter", false) },
+            () => changes++);
+
+        s.MoveUpCommand.Execute(s.Rows[0]);
+        s.MoveDownCommand.Execute(s.Rows[^1]);
+
+        Assert.Equal(new[] { "Erster", "Zweiter" }, s.ToValues().Select(i => i.Text));
+        Assert.Equal(0, changes);
     }
 
     [Fact]
@@ -47,8 +74,6 @@ public class MasterDataSectionTests
         var exception = Record.Exception(() =>
         {
             s.RemoveCommand.Execute(foreignItem);       // not in the collection
-            s.MoveUpCommand.Execute(s.Items[0]);        // already first
-            s.MoveDownCommand.Execute(s.Items[^1]);      // already last
         });
 
         Assert.Null(exception);
@@ -230,36 +255,21 @@ public class MasterDataSectionTests
     }
 
     [Fact]
-    public void Vehicles_reorder_moves_a_row_and_flags_a_change()
+    public void Vehicles_keep_the_stored_order_and_a_new_row_goes_to_the_end()
     {
         var changes = 0;
         var vehicles = new[]
         {
-            new Vehicle("Wache 1", "Land 1", 6),
             new Vehicle("Wache 1", "Land 2", 6),
+            new Vehicle("Wache 1", "Land 1", 6),
         };
         var s = new VehiclesSection("Fahrzeuge", vehicles, Array.Empty<string>(), Array.Empty<string>(), () => changes++);
 
-        s.MoveUpCommand.Execute(s.Rows[^1]); // Land 2 moves ahead of Land 1
+        s.AddCommand.Execute(null);
 
-        Assert.Equal(new[] { "Land 2", "Land 1" }, s.Rows.Select(r => r.CallSign));
+        // #698: the stored order is not re-sorted, and a new row is appended.
+        Assert.Equal(new[] { "Land 2", "Land 1", string.Empty }, s.Rows.Select(r => r.CallSign));
         Assert.Equal(1, changes);
-    }
-
-    [Fact]
-    public void Vehicles_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
-    {
-        var vehicles = new[]
-        {
-            new Vehicle("Wache 1", "Land 1", 6),
-            new Vehicle("Wache 1", "Land 2", 6),
-        };
-        var s = new VehiclesSection("Fahrzeuge", vehicles, Array.Empty<string>(), Array.Empty<string>(), () => { });
-
-        s.MoveUpCommand.Execute(s.Rows[0]);
-        s.MoveDownCommand.Execute(s.Rows[^1]);
-
-        Assert.Equal(new[] { "Land 1", "Land 2" }, s.Rows.Select(r => r.CallSign));
     }
 
     [Fact]
@@ -329,7 +339,7 @@ public class MasterDataSectionTests
     }
 
     [Fact]
-    public void TruppTypes_remove_and_reorder_flag_changes()
+    public void TruppTypes_remove_flags_a_change_and_keeps_the_order()
     {
         var changes = 0;
         var s = new TruppTypesSection(
@@ -337,24 +347,10 @@ public class MasterDataSectionTests
             new[] { new TruppType("Erster"), new TruppType("Zweiter"), new TruppType("Dritter") },
             () => changes++);
 
-        s.MoveUpCommand.Execute(s.Rows[^1]);   // Erster, Dritter, Zweiter
-        s.MoveDownCommand.Execute(s.Rows[0]);  // Dritter, Erster, Zweiter
-        s.RemoveCommand.Execute(s.Rows[0]);    // Erster, Zweiter
+        s.RemoveCommand.Execute(s.Rows[1]);
 
-        Assert.Equal(new[] { "Erster", "Zweiter" }, s.Rows.Select(r => r.Name));
-        Assert.Equal(3, changes);
-    }
-
-    [Fact]
-    public void TruppTypes_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
-    {
-        var s = new TruppTypesSection(
-            "Trupp-Typen", new[] { new TruppType("Erster"), new TruppType("Zweiter") }, () => { });
-
-        s.MoveUpCommand.Execute(s.Rows[0]);
-        s.MoveDownCommand.Execute(s.Rows[^1]);
-
-        Assert.Equal(new[] { "Erster", "Zweiter" }, s.Rows.Select(r => r.Name));
+        Assert.Equal(new[] { "Erster", "Dritter" }, s.Rows.Select(r => r.Name));
+        Assert.Equal(1, changes);
     }
 
     // #470: the Funktionen editor became a typed section when the uniqueness moved onto the row,
