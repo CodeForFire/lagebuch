@@ -30,6 +30,8 @@ public static class Formatting
     public static string OrDash(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "—" : value;
 
+    public static int ProbeClamp(int value) => value > 10 ? 10 : value + 1;
+
     // "Straße, Ortsteil" with blank parts dropped; null when neither is set. Shared by the
     // workspace header and the PDF header so the two never render the address differently.
     public static string? Address(string? street, string? district)
