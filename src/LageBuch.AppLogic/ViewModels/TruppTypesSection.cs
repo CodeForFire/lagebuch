@@ -55,28 +55,6 @@ public sealed partial class TruppTypesSection : EditorSection
         });
     }
 
-    [RelayCommand]
-    private void MoveUp(TruppTypeRow row)
-    {
-        var i = Rows.IndexOf(row);
-        if (i > 0)
-        {
-            Rows.Move(i, i - 1);
-            _onChanged();
-        }
-    }
-
-    [RelayCommand]
-    private void MoveDown(TruppTypeRow row)
-    {
-        var i = Rows.IndexOf(row);
-        if (i >= 0 && i < Rows.Count - 1)
-        {
-            Rows.Move(i, i + 1);
-            _onChanged();
-        }
-    }
-
     /// <summary>
     /// Rows with a non-blank name, trimmed, first spelling winning a case-insensitive duplicate --
     /// the same normalization the plain name list did before, since the Atemschutz form looks a

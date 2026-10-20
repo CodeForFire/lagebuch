@@ -70,28 +70,6 @@ public sealed partial class ChecklistTemplateSection : EditorSection
         });
     }
 
-    [RelayCommand]
-    private void MoveUp(ChecklistTemplateRow row)
-    {
-        var i = Rows.IndexOf(row);
-        if (i > 0)
-        {
-            Rows.Move(i, i - 1);
-            _onChanged();
-        }
-    }
-
-    [RelayCommand]
-    private void MoveDown(ChecklistTemplateRow row)
-    {
-        var i = Rows.IndexOf(row);
-        if (i >= 0 && i < Rows.Count - 1)
-        {
-            Rows.Move(i, i + 1);
-            _onChanged();
-        }
-    }
-
     /// <summary>
     /// Rows with non-blank text, trimmed, in current order. Unlike the flat lists' ToValues, this
     /// does not de-duplicate — repeating a checklist step under a different mandatory flag is

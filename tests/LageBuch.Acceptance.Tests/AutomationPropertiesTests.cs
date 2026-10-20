@@ -48,7 +48,7 @@ public class AutomationPropertiesTests
         root.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("icon-btn")).ToList();
 
     [AvaloniaFact]
-    public void Master_data_editor_reorder_and_remove_buttons_are_named_for_automation()
+    public void Master_data_editor_row_buttons_are_named_for_automation()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         var view = new MasterDataEditorView { DataContext = vm };
@@ -72,18 +72,19 @@ public class AutomationPropertiesTests
             }
         }
 
-        AssertNamed("Rollen", 3); // Nach oben / Nach unten / Entfernen, one row
-        AssertNamed("Aufbau", 3);
+        // #698: outside Navigation a row carries only Entfernen.
+        AssertNamed("Rollen", 1);
+        AssertNamed("Aufbau", 1);
 
         // Navigation rows reorder but cannot be removed: they are derived from the modules and
         // the Checklisten, so only «Neue Checkliste» and the delete button change the set.
         AssertNamed("Navigation", 2 * (NavModules.All.Count + 1));
-        AssertNamed("Links", 3);
+        AssertNamed("Links", 1);
         AssertNamed("Personal", 2); // only Entfernen, once in the wide row and once in its phone form
 
         var vehicles = (VehiclesSection)vm.Sections.Single(s => s.Title == "Fahrzeuge");
         vehicles.AddCommand.Execute(null);
-        AssertNamed("Fahrzeuge", 3);
+        AssertNamed("Fahrzeuge", 1);
     }
 
     private static ForcesViewModel BuildForcesVm(out LocalIncidentSession session)
