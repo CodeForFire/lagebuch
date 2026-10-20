@@ -6,12 +6,12 @@
              xmlns:ctrl="clr-namespace:LageBuch.App.Shared.Controls"
              x:Class="LageBuch.App.Shared.Views.RolesView"
              x:DataType="vm:RolesViewModel">
-  <!-- Keyed off the workspace's container. Field widths are Styles rather than Width= on the
-       controls: a local value in XAML outranks a Style setter, so the narrow query could never
+  <!-- Keyed off the workspace's "narrow" class (#685). Field widths are Styles rather than Width= on the
+       controls: a local value in XAML outranks a Style setter, so the narrow styles could never
        widen them. One dock serves both layouts. -->
   <UserControl.Styles>
     <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
-         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         XAML outranks a Style setter, so the narrow styles below could not turn the dock upright
          and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
          a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
          and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
@@ -46,55 +46,53 @@
       <Setter Property="Width" Value="150" />
     </Style>
 
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="StackPanel#DockFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <Style Selector="StackPanel#TransferFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <!-- The bottom bar already says FUNKTIONEN; dropping the heading gives the checkbox room. -->
-      <Style Selector="TextBlock#RolesTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Border#RolesGridPanel">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Border#RolesCardPanel">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <Style Selector="AutoCompleteBox#RoleBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="AutoCompleteBox#PersonNameBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#SectionBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="AutoCompleteBox#CallSignBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#PhoneBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="AutoCompleteBox#TransferPersonNameBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="AutoCompleteBox#TransferCallSignBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#TransferPhoneBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="HeaderedContentControl.field">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-      </Style>
-      <Style Selector="Button.dock-action">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-    </ContainerQuery>
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#TransferFields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <!-- The bottom bar already says FUNKTIONEN; dropping the heading gives the checkbox room. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#RolesTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#RolesGridPanel">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#RolesCardPanel">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#RoleBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#PersonNameBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#SectionBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#CallSignBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#PhoneBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#TransferPersonNameBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#TransferCallSignBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#TransferPhoneBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow HeaderedContentControl.field">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
   </UserControl.Styles>
 
   <DockPanel>

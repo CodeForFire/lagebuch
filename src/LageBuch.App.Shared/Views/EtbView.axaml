@@ -7,17 +7,17 @@
              xmlns:md="clr-namespace:LageBuch.Persistence.MasterData;assembly=LageBuch.Persistence"
              x:Class="LageBuch.App.Shared.Views.EtbView"
              x:DataType="vm:EtbViewModel">
-  <!-- The narrow layout, keyed off the workspace's container (declared on IncidentWorkspaceView's
-       root Panel — a query resolves its container by name anywhere below it, so a module view
-       states its own phone rules without the shell knowing anything about them).
+  <!-- The narrow layout, keyed off the "narrow" class on IncidentWorkspaceView's root Panel
+       (#685): a module view states its own phone rules without the shell knowing anything about
+       them.
 
        Every field width lives in a Style here rather than as Width="…" on the control, because a
-       local value in XAML outranks a Style setter and the query below could never widen it. The
-       one dock serves both layouts: the query turns its row of fixed-width fields into a stack of
+       local value in XAML outranks a Style setter and the narrow styles below could never widen it. The
+       one dock serves both layouts: the narrow styles turn its row of fixed-width fields into a stack of
        full-width ones. -->
   <UserControl.Styles>
     <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
-         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         XAML outranks a Style setter, so the narrow styles below could not turn the dock upright
          and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
          a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
          and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
@@ -40,48 +40,46 @@
       <Setter Property="Width" Value="420" />
     </Style>
 
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="StackPanel#DockFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <Style Selector="StackPanel#EditFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <!-- The bottom bar already says ETB; the heading would only cost the checkbox its width. -->
-      <Style Selector="TextBlock#EtbTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#DockFields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#EditFields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <!-- The bottom bar already says ETB; the heading would only cost the checkbox its width. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#EtbTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
 
-      <!-- Six columns budgeted for an ELW monitor cannot be made to fit 412dp, so the phone
-           reads the same rows as cards instead. -->
-      <Style Selector="Border#EtbGridPanel">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Border#EtbCardPanel">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
+    <!-- Six columns budgeted for an ELW monitor cannot be made to fit 412dp, so the phone
+         reads the same rows as cards instead. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#EtbGridPanel">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#EtbCardPanel">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
 
-      <!-- The dock stacks. -->
-      <Style Selector="AutoCompleteBox#FromBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="AutoCompleteBox#ToBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#EtbTextBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#EditTextBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="HeaderedContentControl.field">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-      </Style>
-      <Style Selector="Button.dock-action">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-    </ContainerQuery>
+    <!-- The dock stacks. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#FromBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#ToBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#EtbTextBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#EditTextBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow HeaderedContentControl.field">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
   </UserControl.Styles>
 
   <DockPanel>

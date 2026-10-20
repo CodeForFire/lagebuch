@@ -9,7 +9,7 @@
              x:Class="LageBuch.App.Shared.Views.CoMessprotokollView"
              x:DataType="vm:CoMessprotokollViewModel">
   <UserControl.Styles>
-    <!-- Wide defaults for everything the narrow query below re-sizes. Each has to be a Style and
+    <!-- Wide defaults for everything the narrow styles below re-sizes. Each has to be a Style and
          not an attribute on the control: a local value in XAML outranks a Style setter. -->
     <Style Selector="Border#DwellingEditor">
       <Setter Property="Width" Value="320" />
@@ -21,31 +21,29 @@
       <Setter Property="Width" Value="200" />
     </Style>
 
-    <!-- The narrow layout, keyed off the workspace's container. -->
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="TextBlock#CoTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <!-- The editor takes the whole width; ShowMatrix gets the matrix out of its way. -->
-      <Style Selector="Border#DwellingEditor">
-        <Setter Property="Width" Value="NaN" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="0,8" />
-      </Style>
-      <!-- 104px of gutter against a 388px column left nothing for the tiles, whose own floor is
-           96px; 56 still fits "1.UG" and its Nutzung on one left edge. -->
-      <Style Selector="StackPanel.floor-gutter">
-        <Setter Property="Width" Value="56" />
-      </Style>
-      <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
-           leaves it the width of its longest entry. -->
-      <Style Selector="ComboBox#BuildingBox">
-        <Setter Property="Width" Value="300" />
-      </Style>
-      <Style Selector="HeaderedContentControl.field">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-      </Style>
-    </ContainerQuery>
+    <!-- The narrow layout, keyed off the workspace's "narrow" class (#685). -->
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#CoTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- The editor takes the whole width; ShowMatrix gets the matrix out of its way. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#DwellingEditor">
+      <Setter Property="Width" Value="NaN" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0,8" />
+    </Style>
+    <!-- 104px of gutter against a 388px column left nothing for the tiles, whose own floor is
+         96px; 56 still fits "1.UG" and its Nutzung on one left edge. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel.floor-gutter">
+      <Setter Property="Width" Value="56" />
+    </Style>
+    <!-- Explicit rather than NaN: a ComboBox does not stretch to fill its slot, so NaN
+         leaves it the width of its longest entry. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow ComboBox#BuildingBox">
+      <Setter Property="Width" Value="300" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow HeaderedContentControl.field">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
 
     <!-- Active filter chip. Deliberately NOT Button.signal: that class is the red accent, and red
          already means "Person(en) betroffen" on every tile below. Reusing it here would put the

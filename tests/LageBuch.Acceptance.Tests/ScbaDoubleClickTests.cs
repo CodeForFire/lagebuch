@@ -3,7 +3,6 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
-using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -64,12 +63,11 @@ public class ScbaDoubleClickTests
         var row = scba.Trupps[^1];
 
         // What IncidentWorkspaceView does at a phone's width: its code-behind folds the composer
-        // away, and its "Workspace" container query swaps the grid for the cards.
+        // away, and its root's "narrow" class swaps the grid for the cards.
         vm.IsNarrow = narrow;
         var view = new ScbaView { DataContext = scba };
-        var workspace = new Panel { Children = { view } };
-        Container.SetName(workspace, "Workspace");
-        Container.SetSizing(workspace, ContainerSizing.Width);
+        var workspace = new Panel { Name = "WorkspaceRoot", Children = { view } };
+        workspace.Classes.Set("narrow", narrow);
         var window = new Window { Content = workspace, Width = narrow ? 420 : 1400, Height = 900 };
         window.Show();
         Dispatcher.UIThread.RunJobs();

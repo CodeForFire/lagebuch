@@ -15,10 +15,10 @@ public partial class IncidentWorkspaceView : UserControl
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
 
-        // The one size forwarder in the workspace. The container query in the .axaml handles
-        // everything presentational; this is for the decisions a Style setter cannot make, and the
-        // workspace view model hands the flag down to every module it owns, so no module view
-        // needs a forwarder of its own. Forwarding an event is what AGENTS.md leaves to
+        // The one size forwarder in the workspace. The root's "narrow" class in the .axaml binds
+        // to the flag for everything presentational; the flag also carries the decisions a Style
+        // setter cannot make, and the workspace view model hands it down to every module it owns,
+        // so no module view needs a forwarder of its own. Forwarding an event is what AGENTS.md leaves to
         // code-behind — no state is kept here.
         SizeChanged += OnSizeChanged;
     }

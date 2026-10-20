@@ -8,7 +8,7 @@
              x:DataType="vm:TasksViewModel">
   <UserControl.Styles>
     <!-- Orientation as a Style, never Orientation="Horizontal" on the panel: a local value in
-         XAML outranks a Style setter, so the narrow query below could not turn the dock upright
+         XAML outranks a Style setter, so the narrow styles below could not turn the dock upright
          and every field stayed on one squeezed line. A StackPanel rather than a WrapPanel because
          a vertical WrapPanel flows into columns; a vertical StackPanel gives one field per line
          and constrains each to the panel's width, which is what makes Width=NaN fill it. -->
@@ -31,7 +31,7 @@
     </Style>
 
     <!-- Wide defaults as Styles, not Width= on the controls: a local value in XAML outranks a
-         Style setter, so the narrow query below could never widen them. -->
+         Style setter, so the narrow styles below could never widen them. -->
     <Style Selector="StackPanel#EditFields">
       <Setter Property="Orientation" Value="Horizontal" />
     </Style>
@@ -45,45 +45,43 @@
       <Setter Property="Width" Value="320" />
     </Style>
 
-    <!-- The narrow layout, keyed off the workspace's container. -->
-    <ContainerQuery Name="Workspace" Query="max-width:640">
-      <Style Selector="StackPanel#DockFields, StackPanel#EditFields">
-        <Setter Property="Orientation" Value="Vertical" />
-      </Style>
-      <!-- The bottom bar already says AUFGABEN; the heading would only cost the filters room. -->
-      <Style Selector="TextBlock#TasksTitle">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Border#TasksGridPanel">
-        <Setter Property="IsVisible" Value="False" />
-      </Style>
-      <Style Selector="Border#TasksCardPanel">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <!-- The segments share the width out evenly (UniformGrid) and grow to a thumb's height. -->
-      <Style Selector="ListBox.triage">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-      </Style>
-      <Style Selector="ListBox.triage Border.seg">
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-      <Style Selector="AutoCompleteBox#AssigneeBox, AutoCompleteBox#EditAssigneeBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#TimerBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="TextBox#TaskNewTextBox, TextBox#EditTextBox">
-        <Setter Property="Width" Value="NaN" />
-      </Style>
-      <Style Selector="HeaderedContentControl.field">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-      </Style>
-      <Style Selector="Button.dock-action">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
-      </Style>
-    </ContainerQuery>
+    <!-- The narrow layout, keyed off the workspace's "narrow" class (#685). -->
+    <Style Selector="Panel#WorkspaceRoot.narrow StackPanel#DockFields, Panel#WorkspaceRoot.narrow StackPanel#EditFields">
+      <Setter Property="Orientation" Value="Vertical" />
+    </Style>
+    <!-- The bottom bar already says AUFGABEN; the heading would only cost the filters room. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBlock#TasksTitle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#TasksGridPanel">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Border#TasksCardPanel">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <!-- The segments share the width out evenly (UniformGrid) and grow to a thumb's height. -->
+    <Style Selector="Panel#WorkspaceRoot.narrow ListBox.triage">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow ListBox.triage Border.seg">
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow AutoCompleteBox#AssigneeBox, Panel#WorkspaceRoot.narrow AutoCompleteBox#EditAssigneeBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#TimerBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow TextBox#TaskNewTextBox, Panel#WorkspaceRoot.narrow TextBox#EditTextBox">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow HeaderedContentControl.field">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Panel#WorkspaceRoot.narrow Button.dock-action">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
+    </Style>
   </UserControl.Styles>
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
