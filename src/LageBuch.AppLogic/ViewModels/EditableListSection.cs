@@ -46,6 +46,28 @@ public sealed partial class EditableListSection : EditorSection
         });
     }
 
+    [RelayCommand]
+    private void MoveUp(MasterDataItem item)
+    {
+        var i = Items.IndexOf(item);
+        if (i > 0)
+        {
+            Items.Move(i, i - 1);
+            _onChanged();
+        }
+    }
+
+    [RelayCommand]
+    private void MoveDown(MasterDataItem item)
+    {
+        var i = Items.IndexOf(item);
+        if (i >= 0 && i < Items.Count - 1)
+        {
+            Items.Move(i, i + 1);
+            _onChanged();
+        }
+    }
+
     /// <summary>Trimmed, non-empty, de-duplicated (ordinal, first wins), in current order.</summary>
     public IReadOnlyList<string> ToValues()
     {
