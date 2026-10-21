@@ -1,0 +1,1 @@
+The Links search now follows the title on the left as on Kontakte, and the actions in dialogs and the Wohnung editor start at their left edge with the primary button first, so a wide window no longer pushes them away from the fields they submit (#693, #694).

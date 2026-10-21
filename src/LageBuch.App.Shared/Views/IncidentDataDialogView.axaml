@@ -42,11 +42,12 @@
               <TextBox x:Name="IncidentDataDistrictBox" Text="{Binding District}" PlaceholderText="z. B. Puch" />
             </HeaderedContentControl>
           </Grid>
-          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0"
+          <!-- Left, primary first (#694): the actions start under the fields they save. -->
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0"
                       IsVisible="{Binding !IsDiscardConfirmOpen}">
-            <Button x:Name="IncidentDataCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
             <Button x:Name="IncidentDataSaveButton" Classes="signal" Content="SPEICHERN"
                     Command="{Binding SaveCommand}" />
+            <Button x:Name="IncidentDataCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
           </StackPanel>
           <!-- #652: ABBRECHEN or Esc after typing asks first, in place of the buttons. A
                destructive confirm (#545): focus on ABBRECHEN, no primary command. Its own overlay
@@ -60,7 +61,7 @@
             <StackPanel Spacing="8">
               <TextBlock Text="ÄNDERUNGEN VERWERFEN?" Classes="overline" />
               <TextBlock Text="Die Eingaben sind noch nicht gespeichert." TextWrapping="Wrap" />
-              <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+              <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
                 <Button x:Name="IncidentDataDiscardButton" Classes="signal" Content="VERWERFEN"
                         Command="{Binding ConfirmDiscardCommand}" />
                 <Button x:Name="IncidentDataKeepEditingButton" Content="ABBRECHEN"

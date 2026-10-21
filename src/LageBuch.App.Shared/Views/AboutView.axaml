@@ -114,7 +114,7 @@
             </Border>
 
             <Button x:Name="CloseButton" Content="SCHLIESSEN" Command="{Binding CloseCommand}"
-                    HorizontalAlignment="Right" Margin="0,10,0,0" />
+                    HorizontalAlignment="Left" Margin="0,10,0,0" />
           </StackPanel>
         </ScrollViewer>
       </DockPanel>

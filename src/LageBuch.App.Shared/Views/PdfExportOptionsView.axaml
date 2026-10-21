@@ -44,9 +44,10 @@
           <TextBlock x:Name="SelectionError" Classes="field-error" Margin="0,8,0,0"
                      Text="{Binding SelectionError}"
                      IsVisible="{Binding SelectionError, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+          <!-- Left, primary first (#694): the export starts under the sections it exports. -->
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0">
             <Button x:Name="ExportButton" Classes="signal" Content="{Binding ExportLabel}" Command="{Binding ExportCommand}" />
+            <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
           </StackPanel>
         </StackPanel>
       </DockPanel>
