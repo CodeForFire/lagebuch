@@ -33,7 +33,7 @@ public class MainWindowViewModelTests
 
         Assert.True(vm.TryRunShortcut(new KeyChord(ShortcutKey.F1)));
         Assert.NotNull(vm.PendingShortcutOverview);
-        Assert.Equal(ShortcutRegistry.All.Count, vm.PendingShortcutOverview!.Rows.Count);
+        Assert.Equal(new ShortcutOverviewViewModel().Rows, vm.PendingShortcutOverview!.Rows);
 
         vm.PendingShortcutOverview.CloseCommand.Execute(null);
         Assert.Null(vm.PendingShortcutOverview);

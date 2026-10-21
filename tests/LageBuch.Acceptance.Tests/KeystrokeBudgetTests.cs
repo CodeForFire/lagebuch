@@ -72,7 +72,7 @@ public class KeystrokeBudgetTests(ITestOutputHelper output)
         StartIn(shell, NavModules.Etb, "EtbTextBox");
         var keys = new CountingKeyboard(shell.Window);
 
-        keys.Press(PhysicalKey.Digit4, RawInputModifiers.Control);
+        keys.Press(PhysicalKey.Digit5, RawInputModifiers.Control);
         Dispatcher.UIThread.RunJobs();
         keys.Press(PhysicalKey.ArrowDown); // the first Stammdaten vehicle
         keys.Press(PhysicalKey.Enter);

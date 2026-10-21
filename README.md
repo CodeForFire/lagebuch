@@ -82,7 +82,7 @@ Die wichtigsten:
 
 | Taste | Wirkung |
 |---|---|
-| **Strg+1** … **Strg+0** | Modul öffnen – fest je Modul, egal wie die Seitenleiste sortiert ist (Strg+1 ETB, Strg+4 Kräfte, Strg+6 Atemschutz) |
+| **Strg+1** … **Strg+0** | Eintrag der Seitenleiste öffnen, von oben gezählt – auch Checklisten; die Ziffer steht am Eintrag |
 | **Strg+Tab** / **Strg+Umschalt+Tab** | nächstes / vorheriges Modul der Seitenleiste, auch Checklisten |
 | **Strg+N** | neuer ETB-Eintrag, Cursor im Feld VON |
 | **F9** | zur dringendsten Meldung: Rückzugsalarm, dann Druckabfrage, fällige Aufgabe, Rückmeldung an die ILS |

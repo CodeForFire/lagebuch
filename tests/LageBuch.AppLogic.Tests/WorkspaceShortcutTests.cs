@@ -16,6 +16,12 @@ public class WorkspaceShortcutTests
     private static readonly KeyChord CtrlN = new(ShortcutKey.N, Ctrl: true);
     private static readonly KeyChord F9 = new(ShortcutKey.F9);
 
+    private static readonly ShortcutKey[] Digits =
+    [
+        ShortcutKey.D1, ShortcutKey.D2, ShortcutKey.D3, ShortcutKey.D4, ShortcutKey.D5,
+        ShortcutKey.D6, ShortcutKey.D7, ShortcutKey.D8, ShortcutKey.D9, ShortcutKey.D0,
+    ];
+
     private static KeyChord Ctrl(ShortcutKey digit) => new(digit, Ctrl: true);
 
     private static (IncidentWorkspaceViewModel Vm, FixedClock Clock, FakeTicker Ticker) Workspace(
@@ -66,7 +72,7 @@ public class WorkspaceShortcutTests
     }
 
     [Fact]
-    public void A_module_shortcut_selects_its_module_wherever_the_stammdaten_put_it_on_the_rail()
+    public void Ctrl_digit_opens_the_rail_entry_at_that_position()
     {
         var navigation = new[]
         {
@@ -78,26 +84,43 @@ public class WorkspaceShortcutTests
         var focusRequests = 0;
         vm.ModuleFocusRequested += (_, _) => focusRequests++;
 
-        Assert.True(vm.TryRunShortcut(Ctrl(ShortcutKey.D4)));
+        Assert.True(vm.TryRunShortcut(Ctrl(ShortcutKey.D1)));
         Assert.Equal("KRÄFTE", Selected(vm));
         Assert.Equal(1, focusRequests);
 
-        Assert.True(vm.TryRunShortcut(Ctrl(ShortcutKey.D6)));
+        Assert.True(vm.TryRunShortcut(Ctrl(ShortcutKey.D3)));
         Assert.Equal("ATEMSCHUTZ", Selected(vm));
     }
 
     [Fact]
-    public void The_shortcut_of_a_module_the_stammdaten_hide_does_nothing()
+    public void Rail_hints_number_the_shown_entries_in_order_without_a_gap_for_a_hidden_one()
     {
         var navigation = new[]
         {
+            new NavEntry(NavModules.Forces, null, true),
+            new NavEntry(NavModules.Tasks, null, false),
             new NavEntry(NavModules.Etb, null, true),
-            new NavEntry(NavModules.Forces, null, false),
         };
         var (vm, _, _) = Workspace(navigation);
-        var before = Selected(vm);
 
-        Assert.False(vm.TryRunShortcut(Ctrl(ShortcutKey.D4)));
+        // The Einsatz's own Checklisten follow, then the modules the layout never mentioned.
+        Assert.Equal(
+            Enumerable.Range(0, vm.NavItems.Count).Select(i => i < 10 ? $"Strg+{(i + 1) % 10}" : null),
+            vm.NavItems.Select(item => item.ShortcutHint));
+        Assert.Equal("Strg+2", vm.NavItems.Single(item => item.ModuleKey == NavModules.Etb).ShortcutHint);
+        Assert.True(vm.NavItems[2].IsChecklist);
+        Assert.Equal("Strg+3", vm.NavItems[2].ShortcutHint);
+    }
+
+    [Fact]
+    public void A_digit_past_the_last_rail_entry_does_nothing()
+    {
+        var onlyEtb = NavModules.All.Select(key => new NavEntry(key, null, key == NavModules.Etb)).ToList();
+        var (vm, _, _) = Workspace(onlyEtb);
+        var before = Selected(vm);
+        var beyond = Digits[vm.NavItems.Count];
+
+        Assert.False(vm.TryRunShortcut(Ctrl(beyond)));
         Assert.Equal(before, Selected(vm));
     }
 
@@ -239,14 +262,5 @@ public class WorkspaceShortcutTests
 
         Assert.Contains(nameof(IncidentWorkspaceViewModel.MostUrgentWarning), changes);
         Assert.True(vm.ShowsWarningHintOnReminder);
-    }
-
-    [Fact]
-    public void Every_built_in_module_tab_carries_its_shortcut_and_a_checkliste_none()
-    {
-        var (vm, _, _) = Workspace();
-
-        Assert.Equal("Strg+4", vm.NavItems.Single(i => string.Equals(i.ModuleKey, NavModules.Forces, StringComparison.Ordinal)).ShortcutHint);
-        Assert.All(vm.NavItems.Where(i => i.IsChecklist), i => Assert.Null(i.ShortcutHint));
     }
 }

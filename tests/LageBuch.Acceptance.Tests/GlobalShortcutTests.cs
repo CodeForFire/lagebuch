@@ -18,6 +18,12 @@ public class GlobalShortcutTests
 {
     // Kräfte first and Atemschutz before the ETB: a shortcut bound to a rail position would land
     // somewhere else here.
+    private static readonly PhysicalKey[] DigitKeys =
+    [
+        PhysicalKey.Digit1, PhysicalKey.Digit2, PhysicalKey.Digit3, PhysicalKey.Digit4, PhysicalKey.Digit5,
+        PhysicalKey.Digit6, PhysicalKey.Digit7, PhysicalKey.Digit8, PhysicalKey.Digit9, PhysicalKey.Digit0,
+    ];
+
     private static readonly NavEntry[] ReorderedNavigation =
     [
         new(NavModules.Forces, null, true),
@@ -95,7 +101,7 @@ public class GlobalShortcutTests
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Ctrl_4_selects_Kraefte_and_focuses_its_first_field(bool reorderedRail)
+    public void The_digit_of_Kraeftes_rail_position_selects_it_and_focuses_its_first_field(bool reorderedRail)
     {
         var masterData = WorkspaceRenderHelper.MasterData();
         if (reorderedRail)
@@ -107,8 +113,9 @@ public class GlobalShortcutTests
         vm.SelectedNavItem = vm.NavItems.Single(i => i.ModuleKey == NavModules.Etb);
         Dispatcher.UIThread.RunJobs();
         FocusByTab(SelectedRailTab(window));
+        var position = vm.NavItems.IndexOf(vm.NavItems.Single(i => i.ModuleKey == NavModules.Forces));
 
-        PressAndSettle(window, PhysicalKey.Digit4, RawInputModifiers.Control);
+        PressAndSettle(window, DigitKeys[position], RawInputModifiers.Control);
 
         Assert.Equal("KRÄFTE", vm.SelectedNavItem?.Header);
         window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
@@ -117,8 +124,8 @@ public class GlobalShortcutTests
     [AvaloniaFact]
     public void Ctrl_N_from_Kraefte_focuses_VON()
     {
-        var (window, _, vm) = ShowShell();
-        PressAndSettle(window, PhysicalKey.Digit4, RawInputModifiers.Control);
+        var (window, _, vm) = ShowShell(masterData: WorkspaceRenderHelper.MasterData() with { Navigation = ReorderedNavigation });
+        PressAndSettle(window, PhysicalKey.Digit1, RawInputModifiers.Control);
         window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
 
         PressAndSettle(window, PhysicalKey.N, RawInputModifiers.Control);
@@ -235,7 +242,7 @@ public class GlobalShortcutTests
     }
 
     [AvaloniaFact]
-    public void The_F1_overview_lists_exactly_the_registered_shortcuts_and_Esc_closes_it()
+    public void The_F1_overview_lists_the_view_models_rows_and_Esc_closes_it()
     {
         var (window, shell, _) = ShowShell();
 
@@ -245,7 +252,7 @@ public class GlobalShortcutTests
         var rows = overview.GetControl<ItemsControl>("ShortcutRows").GetRealizedContainers()
             .Select(c => string.Join(" | ", c.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text)))
             .ToList();
-        var registered = ShortcutRegistry.All.Select(s => $"{s.Chord.Display} | {s.Description}").ToList();
+        var registered = new ShortcutOverviewViewModel().Rows.Select(r => $"{r.Keys} | {r.Description}").ToList();
         Assert.Equal(registered, rows);
 
         PressAndSettle(window, PhysicalKey.Escape);
@@ -271,7 +278,7 @@ public class GlobalShortcutTests
     }
 
     [AvaloniaFact]
-    public void Every_module_tab_shows_its_shortcut_on_the_rail()
+    public void The_rail_numbers_its_tabs_in_the_order_shown()
     {
         var (window, _, vm) = ShowShell();
 
@@ -280,7 +287,7 @@ public class GlobalShortcutTests
             .Select(t => t.Text)
             .ToList();
 
-        Assert.Equal(vm.NavItems.Where(i => !i.IsChecklist).Select(i => ShortcutRegistry.HintFor(i.ModuleKey)), hints);
+        Assert.Equal(vm.NavItems.Select((_, i) => ShortcutRegistry.HintFor(i)).OfType<string>(), hints);
     }
 
     private sealed class StaticMasterData(MasterDataSet set) : IMasterDataProvider
