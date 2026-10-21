@@ -147,6 +147,11 @@
                              MinimumPrefixLength="0"
                              Text="{Binding NewRole}" />
           </HeaderedContentControl>
+          <HeaderedContentControl Classes="field" Header="ABSCHNITT">
+            <TextBox x:Name="SectionBox"
+                     PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
+                     Text="{Binding NewSection}" />
+          </HeaderedContentControl>
           <HeaderedContentControl Classes="field suggest required" Header="NAME"
                                   Classes.invalid="{Binding NewPersonNameError, Converter={x:Static ObjectConverters.IsNotNull}}">
             <AutoCompleteBox x:Name="PersonNameBox"
@@ -155,11 +160,6 @@
                              FilterMode="ContainsOrdinal"
                              MinimumPrefixLength="0"
                              Text="{Binding NewPersonName}" />
-          </HeaderedContentControl>
-          <HeaderedContentControl Classes="field" Header="ABSCHNITT">
-            <TextBox x:Name="SectionBox"
-                     PlaceholderText="{x:Static md:AnonymizedExampleData.SectionPlaceholder}"
-                     Text="{Binding NewSection}" />
           </HeaderedContentControl>
           <!-- Suggestion list, not a closed set: an ad-hoc or mutual-aid call sign must stay
                enterable, so this is an AutoCompleteBox rather than a ComboBox (#92). -->
@@ -274,8 +274,8 @@
       <DataGrid x:Name="RolesGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Roles}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FUNKTION" Binding="{Binding Role}" />
-          <DataGridTextColumn Header="NAME" Binding="{Binding PersonName}" Width="*" />
           <DataGridTextColumn Header="ABSCHNITT" Binding="{Binding Section}" />
+          <DataGridTextColumn Header="NAME" Binding="{Binding PersonName}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
           <!-- Handynummer is a live cell rather than printed text: a corrected number is edited in
                place, not by ending and re-assigning the role. Mirrors ForcesView's Bemerkung column,
@@ -321,9 +321,10 @@
       </DataGrid>
     </Border>
 
-    <!-- The narrow layout: one card per assignment. The Funktion leads — it is what the position
-         is called on the radio — with the person under it; the Handynummer stays a live field for
-         the same reason it is one in the grid, and ÜBERTRAGEN stays with the row it hands over. -->
+    <!-- The narrow layout: one card per assignment, in the grid's order (#696). The Funktion leads —
+         it is what the position is called on the radio — with its Abschnitt and the person under it;
+         the Handynummer stays a live field for the same reason it is one in the grid, and
+         ÜBERTRAGEN stays with the row it hands over. -->
     <Border x:Name="RolesCardPanel" Classes="narrow-only"
             Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
@@ -335,13 +336,14 @@
                 <StackPanel Spacing="5">
                   <TextBlock Text="{Binding Role}" FontWeight="SemiBold"
                              Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Section}" Classes="secondary" FontSize="13" TextWrapping="Wrap"
+                             IsVisible="{Binding Section, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   <TextBlock Text="{Binding PersonName}" TextWrapping="Wrap" />
-                  <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2">
-                    <TextBlock Text="{Binding Section}" Classes="secondary" FontSize="13"
-                               IsVisible="{Binding Section, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                    <TextBlock Text="{Binding CallSign}" Classes="mono" FontSize="12"
-                               IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  </WrapPanel>
+                  <TextBlock Text="{Binding CallSign}" Classes="mono" FontSize="12"
+                             IsVisible="{Binding CallSign, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <TextBox PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
+                           Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                           IsEnabled="{Binding !IsReadOnly}" />
                   <WrapPanel Orientation="Horizontal" ItemSpacing="12" LineSpacing="2">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <TextBlock Text="VON" Classes="overline" FontSize="9" VerticalAlignment="Center" />
@@ -355,9 +357,6 @@
                       <TextBlock Text="{Binding ToDisplay}" Classes="mono" FontSize="12" />
                     </StackPanel>
                   </WrapPanel>
-                  <TextBox PlaceholderText="{x:Static md:AnonymizedExampleData.PhoneNumberPlaceholder}"
-                           Text="{Binding Phone, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                           IsEnabled="{Binding !IsReadOnly}" />
                   <Button Content="ÜBERTRAGEN" HorizontalAlignment="Stretch"
                           Height="{StaticResource ControlHeightTouch}"
                           IsVisible="{Binding IsRunning}"
