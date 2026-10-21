@@ -3,7 +3,7 @@
     "project": "LageBuch.AppLogic.csproj",
     "mutation-level": "Standard",
     "reporters": ["html", "markdown", "json", "progress"],
-    "thresholds": { "high": 90, "low": 70, "break": 70 },
+    "thresholds": { "high": 90, "low": 72, "break": 72 },
     "ignore-methods": ["*ThrowIfNull", "*ThrowIfNullOrEmpty", "*ThrowIfNullOrWhiteSpace"],
     "ignore-mutations": ["string"]
   }
