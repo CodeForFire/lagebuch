@@ -353,10 +353,11 @@ public class MasterDataEditorRenderTests
     // Funkrufname as AutoCompleteBoxes fed from the master data (free text still allowed).
     // Issue #698: manual sorting was rarely needed and awkward to use, so only Navigation, whose
     // order IS the Einsatz sidebar's, the Checklisten, whose order is the sequence of steps, and
-    // the Links, whose order is the Einsatz's link list, keep their up/down buttons. Every other
+    // the Links, whose order is the Einsatz's link list, keep their up/down buttons -- and, since
+    // #715, the Einheiten-Status, whose order is the STATUS picker's in the Kräfte. Every other
     // category keeps the order its entries already have, and a new entry goes to the end.
     [AvaloniaFact]
-    public void Only_navigation_checklisten_and_links_offer_moving_rows_up_and_down()
+    public void Only_navigation_einheiten_status_checklisten_and_links_offer_moving_rows_up_and_down()
     {
         var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
         var view = new MasterDataEditorView { DataContext = vm };
@@ -374,7 +375,7 @@ public class MasterDataEditorRenderTests
             var moveButtons = Buttons("Nach oben", "Nach unten");
             var removeButtons = Buttons("Entfernen");
 
-            if (section is NavigationSection or ChecklistTemplateSection or LinksSection)
+            if (section is NavigationSection or EditableListSection or ChecklistTemplateSection or LinksSection)
             {
                 Assert.True(moveButtons > 0, $"{section.Title} lost its up/down buttons");
             }

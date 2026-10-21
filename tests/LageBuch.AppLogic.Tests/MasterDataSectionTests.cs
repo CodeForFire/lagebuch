@@ -6,19 +6,51 @@ namespace LageBuch.AppLogic.Tests;
 
 public class MasterDataSectionTests
 {
+    // #715: the Einheiten-Status keep manual sorting -- their order is the STATUS picker's in
+    // the Kräfte of an Einsatz.
     [Fact]
-    public void Add_and_remove_in_a_list_flag_changes_and_a_new_entry_goes_to_the_end()
+    public void Add_remove_and_reorder_the_einheiten_status_and_flag_changes()
     {
         var changes = 0;
-        var s = new EditableListSection("Rollen", "ROLLE", new[] { "EL", "ZF" }, () => changes++);
+        var s = new EditableListSection("Einheiten-Status", "STATUS", new[] { "Alarmiert", "Am Einsatzort" }, () => changes++);
 
         s.AddCommand.Execute(null);
-        s.Items[^1].Value = "GF";
-        s.RemoveCommand.Execute(s.Items.First(i => i.Value == "EL"));
+        s.Items[^1].Value = "Auf Anfahrt";
+        s.MoveUpCommand.Execute(s.Items[^1]);   // Auf Anfahrt moves ahead of Am Einsatzort
+        s.RemoveCommand.Execute(s.Items.First(i => i.Value == "Alarmiert"));
 
-        // #698: no manual sorting any more, so the stored order stands and GF is appended.
-        Assert.Equal(new[] { "ZF", "GF" }, s.ToValues());
-        Assert.Equal(3, changes); // add + edit + remove, one onChanged each
+        Assert.Equal(new[] { "Auf Anfahrt", "Am Einsatzort" }, s.ToValues());
+        Assert.Equal(4, changes); // add + edit + move + remove, one onChanged each
+    }
+
+    [Fact]
+    public void Einheiten_status_MoveDown_moves_the_first_entry_one_place_down_and_flags_a_change()
+    {
+        var changes = 0;
+        var s = new EditableListSection("Einheiten-Status", "STATUS", new[] { "Alarmiert", "Auf Anfahrt", "Am Einsatzort" }, () => changes++);
+
+        s.MoveDownCommand.Execute(s.Items[0]);
+
+        Assert.Equal(new[] { "Auf Anfahrt", "Alarmiert", "Am Einsatzort" }, s.ToValues());
+        Assert.Equal(1, changes);
+
+        s.MoveDownCommand.Execute(s.Items[1]);   // the second-to-last still moves to the end
+
+        Assert.Equal(new[] { "Auf Anfahrt", "Am Einsatzort", "Alarmiert" }, s.ToValues());
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void Einheiten_status_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
+    {
+        var changes = 0;
+        var s = new EditableListSection("Einheiten-Status", "STATUS", new[] { "Alarmiert", "Am Einsatzort" }, () => changes++);
+
+        s.MoveUpCommand.Execute(s.Items[0]);
+        s.MoveDownCommand.Execute(s.Items[^1]);
+
+        Assert.Equal(new[] { "Alarmiert", "Am Einsatzort" }, s.ToValues());
+        Assert.Equal(0, changes);
     }
 
     [Fact]
@@ -74,6 +106,8 @@ public class MasterDataSectionTests
         var exception = Record.Exception(() =>
         {
             s.RemoveCommand.Execute(foreignItem);       // not in the collection
+            s.MoveUpCommand.Execute(foreignItem);       // not in the collection
+            s.MoveDownCommand.Execute(foreignItem);
         });
 
         Assert.Null(exception);

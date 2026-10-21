@@ -1,0 +1,1 @@
+The Einheiten-Status keep their manual order alongside Navigation, the Checklisten and Links, with "Nach oben" and "Nach unten" back on every row, because that order is the order of the STATUS picker in an Einsatz (#715).

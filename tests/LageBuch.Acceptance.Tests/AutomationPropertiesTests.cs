@@ -23,6 +23,7 @@ public class AutomationPropertiesTests
         public MasterDataSet Get() => MasterDataSet.Empty with
         {
             Roles = new[] { new Role("EL") },
+            UnitStatus = new[] { "Alarmiert" },
             ChecklistTemplates = ChecklistTemplate.AufbauAbbau(new[] { new ChecklistTemplateItem("Aufstellort ELW frei?", true) }, null),
             Links = new[] { new Link("Wetterdienst", "https://dwd.de") },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "Land 1", null) },
@@ -72,9 +73,11 @@ public class AutomationPropertiesTests
             }
         }
 
-        // #698: outside Navigation, the Checklisten and Links a row carries only Entfernen.
+        // #698, #715: outside Navigation, the Einheiten-Status, the Checklisten and Links a row
+        // carries only Entfernen.
         AssertNamed("Rollen", 1);
-        AssertNamed("Aufbau", 3); // Nach oben / Nach unten / Entfernen, one row
+        AssertNamed("Einheiten-Status", 3); // Nach oben / Nach unten / Entfernen, one row
+        AssertNamed("Aufbau", 3);
 
         // Navigation rows reorder but cannot be removed: they are derived from the modules and
         // the Checklisten, so only «Neue Checkliste» and the delete button change the set.
