@@ -1,5 +1,5 @@
 using LageBuch.AppLogic.Services;
-using LageBuch.Persistence.MasterData;
+using LageBuch.AppLogic.ViewModels;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -16,22 +16,25 @@ public class ShortcutRegistryTests
     }
 
     [Fact]
-    public void Every_built_in_module_has_exactly_one_shortcut()
+    public void Digit_shortcuts_are_ctrl_1_to_0_for_the_first_ten_rail_entries()
     {
-        foreach (var module in NavModules.All)
-        {
-            Assert.Single(ShortcutRegistry.All, s => s.Action == ShortcutAction.ShowModule
-                && string.Equals(s.ModuleKey, module, StringComparison.Ordinal));
-        }
+        Assert.Equal("Strg+1", ShortcutRegistry.HintFor(0));
+        Assert.Equal("Strg+4", ShortcutRegistry.HintFor(3));
+        Assert.Equal("Strg+0", ShortcutRegistry.HintFor(9));
+        Assert.Null(ShortcutRegistry.HintFor(10));
+        Assert.Equal(
+            Enumerable.Range(0, 10).Cast<int?>(),
+            ShortcutRegistry.All.Where(s => s.Action == ShortcutAction.ShowRailEntry).Select(s => s.RailIndex));
     }
 
     [Fact]
-    public void Module_shortcuts_are_ctrl_and_a_digit_in_the_order_the_rail_shipped_with()
+    public void The_overview_lists_the_digit_shortcuts_as_one_row()
     {
-        Assert.Equal("Strg+1", ShortcutRegistry.HintFor(NavModules.Etb));
-        Assert.Equal("Strg+4", ShortcutRegistry.HintFor(NavModules.Forces));
-        Assert.Equal("Strg+0", ShortcutRegistry.HintFor(NavModules.Contacts));
-        Assert.Null(ShortcutRegistry.HintFor(NavModules.Checklist));
+        var rows = new ShortcutOverviewViewModel().Rows;
+
+        Assert.Equal("Strg+1 … Strg+0", rows[0].Keys);
+        Assert.DoesNotContain(rows, r => r.Keys == "Strg+4");
+        Assert.Equal(ShortcutRegistry.All.Count - 9, rows.Count);
     }
 
     [Fact]

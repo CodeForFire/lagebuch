@@ -35,7 +35,7 @@ public class KeyboardWalkthroughTests
             var vm = shell.Workspace;
 
             // Kräfte: one vehicle from a neighbouring Feuerwehr.
-            keys.Press(PhysicalKey.Digit4, RawInputModifiers.Control);
+            keys.Press(PhysicalKey.Digit5, RawInputModifiers.Control);
             Dispatcher.UIThread.RunJobs();
             window.AssertFocused(Named<ComboBox>(window, "VehicleBox"));
             keys.Tab();
@@ -48,7 +48,7 @@ public class KeyboardWalkthroughTests
             Assert.Equal("Florian Nachbarort 40/1", Assert.Single(vm.Forces.Forces).CallSign);
 
             // Atemschutz: register a Trupp and send it in.
-            keys.Press(PhysicalKey.Digit6, RawInputModifiers.Control);
+            keys.Press(PhysicalKey.Digit7, RawInputModifiers.Control);
             Dispatcher.UIThread.RunJobs();
             window.AssertFocused(Named<AutoCompleteBox>(window, "CallSignBox"));
             keys.Type("Florian Testort 40/1");
@@ -99,7 +99,7 @@ public class KeyboardWalkthroughTests
             Assert.Contains(vm.Etb.Entries, e => e.Text == "Wasserversorgung steht");
 
             // Aufgaben: one task.
-            keys.Press(PhysicalKey.Digit2, RawInputModifiers.Control);
+            keys.Press(PhysicalKey.Digit3, RawInputModifiers.Control);
             Dispatcher.UIThread.RunJobs();
             keys.TabTo(Named<TextBox>(window, "TaskNewTextBox"));
             keys.Type("Hydrantenplan holen");

@@ -1,4 +1,4 @@
-using LageBuch.Persistence.MasterData;
+using System.Globalization;
 
 namespace LageBuch.AppLogic.Services;
 
@@ -7,11 +7,11 @@ namespace LageBuch.AppLogic.Services;
 /// rail's key hints and the overview all read this one table, so none of them can drift.
 /// </summary>
 /// <remarks>
-/// A module's shortcut is bound to its key, never to its rail position: the rail comes from the
-/// Stammdaten Navigation and the Einsatz's own Checklisten, so "the fourth tab" differs between
-/// Feuerwehren and incidents. The digits follow the order the rail shipped with
-/// (<see cref="NavModules.All"/>), Ctrl+0 being the tenth. Checklisten are user-named and have no
-/// fixed key; Ctrl+Tab reaches them.
+/// The digits follow the rail as shown, Checklisten included: Ctrl+1 is the top entry and Ctrl+0
+/// the tenth, like browser tabs. They used to be bound to each module's key, which read as chaos
+/// the moment the Stammdaten Navigation reordered or hid a module (Strg+1, Strg+5, Strg+2, …).
+/// The order the Stammdaten set is global and stays put, so the numbers are stable within a
+/// Feuerwehr. Entries past the tenth have no digit; Ctrl+Tab reaches them.
 /// </remarks>
 public static class ShortcutRegistry
 {
@@ -26,19 +26,18 @@ public static class ShortcutRegistry
     /// <summary>The shortcut bound to <paramref name="chord"/>; null when there is none.</summary>
     public static Shortcut? Find(KeyChord chord) => All.FirstOrDefault(s => s.Chord == chord);
 
-    /// <summary>The key hint for a built-in module's rail tab; null for a Checkliste or an unknown key.</summary>
-    public static string? HintFor(string moduleKey) =>
-        All.FirstOrDefault(s => s.Action == ShortcutAction.ShowModule
-            && string.Equals(s.ModuleKey, moduleKey, StringComparison.Ordinal))?.Chord.Display;
+    /// <summary>The key hint for the rail entry at <paramref name="railIndex"/>; null past the tenth.</summary>
+    public static string? HintFor(int railIndex) =>
+        All.FirstOrDefault(s => s.Action == ShortcutAction.ShowRailEntry && s.RailIndex == railIndex)?.Chord.Display;
 
     private static List<Shortcut> Build()
     {
-        var shortcuts = NavModules.All
-            .Select((module, i) => new Shortcut(
-                new KeyChord(Digits[i], Ctrl: true),
-                ShortcutAction.ShowModule,
-                $"{ModuleLabels.Header(module)} öffnen",
-                module))
+        var shortcuts = Digits
+            .Select((digit, i) => new Shortcut(
+                new KeyChord(digit, Ctrl: true),
+                ShortcutAction.ShowRailEntry,
+                $"{(i + 1).ToString(CultureInfo.InvariantCulture)}. Eintrag der Leiste öffnen",
+                i))
             .ToList();
 
         shortcuts.Add(new Shortcut(new KeyChord(ShortcutKey.Tab, Ctrl: true), ShortcutAction.NextModule, "Nächstes Modul"));
@@ -90,8 +89,8 @@ public sealed record KeyChord(ShortcutKey Key, bool Ctrl = false, bool Shift = f
 /// <summary>What a global shortcut does.</summary>
 public enum ShortcutAction
 {
-    /// <summary>Open the module named by <see cref="Shortcut.ModuleKey"/>.</summary>
-    ShowModule,
+    /// <summary>Open the rail entry at <see cref="Shortcut.RailIndex"/>.</summary>
+    ShowRailEntry,
 
     /// <summary>The next rail entry as shown, wrapping.</summary>
     NextModule,
@@ -110,4 +109,4 @@ public enum ShortcutAction
 }
 
 /// <summary>One global shortcut: its chord, what it does, and the German line the overview shows for it.</summary>
-public sealed record Shortcut(KeyChord Chord, ShortcutAction Action, string Description, string? ModuleKey = null);
+public sealed record Shortcut(KeyChord Chord, ShortcutAction Action, string Description, int? RailIndex = null);

@@ -602,9 +602,8 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
 
         switch (shortcut.Action)
         {
-            case ShortcutAction.ShowModule:
-                return NavItems.FirstOrDefault(item => string.Equals(item.ModuleKey, shortcut.ModuleKey, StringComparison.Ordinal)) is { } module
-                    && ShowNavItem(module);
+            case ShortcutAction.ShowRailEntry:
+                return shortcut.RailIndex is { } index && index < NavItems.Count && ShowNavItem(NavItems[index]);
             case ShortcutAction.NextModule:
                 return StepRail(+1);
             case ShortcutAction.PreviousModule:
@@ -1027,7 +1026,10 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 var checklist = new ChecklistViewModel(_session, list, OnChanged);
                 _checklists.Add(checklist);
                 NavItems.Add(new WorkspaceNavItemViewModel(
-                    WorkspaceNavItemViewModel.HeaderFor(list.Title), checklist, checklist));
+                    WorkspaceNavItemViewModel.HeaderFor(list.Title), checklist, checklist)
+                {
+                    ShortcutHint = ShortcutRegistry.HintFor(NavItems.Count),
+                });
                 continue;
             }
 
@@ -1036,7 +1038,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
                 NavItems.Add(new WorkspaceNavItemViewModel(
                     ModuleLabels.Header(spec.ModuleKey), content, moduleKey: spec.ModuleKey)
                 {
-                    ShortcutHint = ShortcutRegistry.HintFor(spec.ModuleKey),
+                    ShortcutHint = ShortcutRegistry.HintFor(NavItems.Count),
                 });
             }
         }

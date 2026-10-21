@@ -51,7 +51,8 @@ public sealed partial class WorkspaceNavItemViewModel : ObservableObject, IDispo
 
     /// <summary>
     /// The global shortcut that opens this entry, shown on its rail tab (#544): a keyboard user
-    /// never hovers, so a tooltip would not tell them. Null for a Checkliste, which has none.
+    /// never hovers, so a tooltip would not tell them. It follows the entry's position on the rail;
+    /// null past the tenth, which has no digit left.
     /// </summary>
     public string? ShortcutHint { get; init; }
 
