@@ -141,7 +141,18 @@ headless UI, which is too slow and too flaky to repeat once per mutant.
 The [Mutation testing](.github/workflows/mutation.yml) workflow runs every
 project weekly and on demand (*Actions → Mutation testing → Run workflow*); each
 run's summary lists the scores, and the report is attached as an artifact. That
-full run never fails on a low score: it is for finding weak tests.
+full run is for finding weak tests, and it guards one thing: each project's
+score may not fall below the floor in its `stryker-config.json`
+(`thresholds.break`). The pull-request gate below never counts code a PR leaves
+alone, so without the floor the old code's score could only drift down.
+
+A floor sits two points below the project's last weekly score, rounded down, so
+run-to-run noise does not trip it. It only ever goes up: when a pull request
+raises a project's score — killing old survivors, say — raise the floor in the
+same pull request, from `make mutate PROJECT=<name>`. Lower one only for a
+reason written in the pull request, such as code moving between projects.
+Stryker refuses a `break` above `low`, so set `low` to the same number; both
+`low` and `high` (90) only colour the report.
 
 A pull request is gated, but only on the lines it changes. For each of Domain,
 Documents, Persistence and AppLogic whose `.cs` files the PR touches,

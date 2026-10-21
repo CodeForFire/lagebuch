@@ -5,7 +5,9 @@ name: Mutation testing
 # marks code the suite executes without really checking. It runs two ways:
 #
 # - mutate: every project, weekly and on demand. A report for finding weak
-#   tests, not a gate -- thresholds.break is 0 in every stryker-config.json.
+#   tests, and a ratchet: it fails when a project drops below the floor in its
+#   stryker-config.json (thresholds.break), which the PR gate cannot see,
+#   since it never counts code a PR leaves alone.
 # - mutate-diff: on a pull request, only the files it changes, scored on the
 #   lines it changes and failing below 80%. It judges new work, not the debt
 #   already in the weekly report; old survivors in a touched file are listed
