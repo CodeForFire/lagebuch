@@ -85,11 +85,14 @@ public class HeaderSearchAndActionPlacementTests
 
     private static double Right(Visual v, Visual root) => Left(v, root) + v.Bounds.Width;
 
+    private static Visual ParentOf(Visual v) =>
+        v.GetVisualParent() ?? throw new InvalidOperationException($"{v} has no visual parent.");
+
     private static void AssertSearchFollowsTitle(Window window, string titleName, string boxName)
     {
         var title = Named<TextBlock>(window, titleName);
         var box = Named<TextBox>(window, boxName);
-        var header = (Visual)box.GetVisualParent()!;
+        var header = ParentOf(box);
 
         var gap = Left(box, window) - Right(title, window);
         Assert.True(
@@ -108,8 +111,8 @@ public class HeaderSearchAndActionPlacementTests
     /// </summary>
     private static void AssertActionsAnchoredLeft(Visual root, Button primary, params Button[] following)
     {
-        var row = (Visual)primary.GetVisualParent()!;
-        var container = (Visual)row.GetVisualParent()!;
+        var row = ParentOf(primary);
+        var container = ParentOf(row);
 
         var offset = Left(primary, root) - Left(container, root);
         Assert.True(
@@ -319,7 +322,7 @@ public class HeaderSearchAndActionPlacementTests
     // A lone button has no row of its own: it sits straight in the card's content column.
     private static void AssertStartsAtItsColumnsLeftEdge(Visual root, Button button)
     {
-        var column = (Visual)button.GetVisualParent()!;
+        var column = ParentOf(button);
         var offset = Left(button, root) - Left(column, root);
         Assert.True(Math.Abs(offset) <= 1, $"{button.Name} starts {offset:F0}px in from the left edge of its card.");
     }
