@@ -45,6 +45,19 @@ public class RolesSectionTests
         Assert.Contains("EL — Mayr — — 22.06.2026 09:05 —", text, StringComparison.Ordinal);
     }
 
+    // #700: the Bericht prints the number the way the app shows it; the file keeps what was typed.
+    [Fact]
+    public void A_handynummer_prints_in_its_reading_form()
+    {
+        var incident = Incident.Start(Clock, Op);
+        incident.AssignRole(Clock, Op, "EL", "Mayr", from: Started.AddMinutes(5), phone: "+49 (0)171 1234567");
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Roles);
+
+        Assert.Contains("+49 171 1234567", text, StringComparison.Ordinal);
+        Assert.Equal("+49 (0)171 1234567", Assert.Single(incident.Roles).Phone);
+    }
+
     [Fact]
     public void Without_assignments_the_section_says_so_instead_of_an_empty_table()
     {

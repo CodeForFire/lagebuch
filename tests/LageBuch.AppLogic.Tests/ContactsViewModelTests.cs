@@ -293,6 +293,45 @@ public class ContactsViewModelTests
         Assert.Null(dialogs.DialedNumber);
     }
 
+    // #700: the roster keeps the number as it was typed; the card reads it the DIN 5008 way.
+    [Fact]
+    public void A_contact_shows_its_number_in_the_reading_form()
+    {
+        var row = Vm().VisibleContacts[0];
+
+        Assert.Equal("01 71 / 1 23 45 67", row.Person.Phone);
+        Assert.Equal("0171 1234567", row.PhoneDisplay);
+        Assert.True(row.CanDial);
+        Assert.False(row.ShowsUndialablePhone);
+    }
+
+    // A number with neither Vorwahl nor country code has no global tel: form, so the card shows
+    // it as typed and offers no button that could only fail.
+    [Theory]
+    [InlineData("112")]
+    [InlineData("Zentrale 4711")]
+    public void A_number_that_cannot_be_dialled_is_shown_but_not_offered(string phone)
+    {
+        var row = new ContactsViewModel(
+            new[] { new Person("Wache", "Florian", null, null, phone) },
+            new NoopContactDialogs()).VisibleContacts[0];
+
+        Assert.Equal(phone, row.PhoneDisplay);
+        Assert.False(row.CanDial);
+        Assert.True(row.ShowsUndialablePhone);
+    }
+
+    [Fact]
+    public void A_contact_without_a_number_offers_neither_form()
+    {
+        var row = new ContactsViewModel(
+            new[] { new Person("Leer", "Lena", null, null, "  ") },
+            new NoopContactDialogs()).VisibleContacts[0];
+
+        Assert.False(row.CanDial);
+        Assert.False(row.ShowsUndialablePhone);
+    }
+
     // A blank field arrives from the importer as "" rather than null, so the view's per-field
     // visibility cannot be a null check.
     [Fact]
