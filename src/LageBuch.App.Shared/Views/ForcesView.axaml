@@ -273,7 +273,7 @@
     <Panel>
     <Border x:Name="ForcesGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="ForcesGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
+      <DataGrid x:Name="ForcesGrid" b:RowKeys.IsEnabled="True" b:GridCellFocus.IsEnabled="True" ItemsSource="{Binding Forces}" IsReadOnly="True" CanUserSortColumns="False">
         <DataGrid.Columns>
           <DataGridTextColumn Header="FEUERWEHR" Binding="{Binding Brigade}" Width="*" />
           <DataGridTextColumn Header="FUNKRUFNAME" Binding="{Binding CallSign}" />
