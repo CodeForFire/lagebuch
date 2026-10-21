@@ -54,7 +54,9 @@ public static class ContactLauncher
     {
         ArgumentNullException.ThrowIfNull(dialogs);
 
-        if (!PhoneNumberValidator.TryGetTelUri(number, out _))
+        // The null test is spelled out for CA1062, whose flow analysis does not follow the
+        // validator into the Domain helper it now delegates to (#700).
+        if (number is null || !PhoneNumberValidator.TryGetTelUri(number, out _))
         {
             return $"„{label}“ hat keine gültige Telefonnummer.";
         }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Headless;
@@ -125,6 +126,30 @@ public class ContactsTabRenderTests
         var tags = ContactsView(window).GetVisualDescendants().OfType<Border>()
             .Where(b => b.Name == "ForeignTag" && b.IsEffectivelyVisible);
         Assert.Single(tags);
+    }
+
+    // #700: the roster writes "01 71 / 1 23 45 67"; the card reads it the DIN 5008 way, and a
+    // number with no global tel: form is plain text rather than a button that can only fail.
+    [AvaloniaFact]
+    public void A_card_shows_the_number_in_its_reading_form_and_dials_only_what_it_can()
+    {
+        var roster = Roster().Append(new Person("Wache", "Florian", null, null, "112")).ToArray();
+        var (window, _) = ShowWorkspace(WorkspaceRenderHelper.MasterData() with { Personnel = roster });
+        WorkspaceRenderHelper.SelectTab(window, "KONTAKTE");
+        var view = ContactsView(window);
+
+        var calls = view.GetVisualDescendants().OfType<Button>()
+            .Where(b => b.Classes.Contains("contact-call") && b.IsEffectivelyVisible).ToList();
+        Assert.Equal(8, calls.Count);
+        Assert.Contains(calls, b => AutomationProperties.GetName(b) == "0171 1234567 wählen");
+        Assert.Contains(
+            view.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Text == "0171 1234567" && t.IsEffectivelyVisible);
+
+        var plain = Assert.Single(
+            view.GetVisualDescendants().OfType<TextBlock>(),
+            t => t.Name == "ContactPhoneText" && t.IsEffectivelyVisible);
+        Assert.Equal("112", plain.Text);
     }
 
     // Opening the tab by click puts the caret in the search box: WorkspaceFocusTests (#542).

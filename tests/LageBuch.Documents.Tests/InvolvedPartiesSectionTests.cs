@@ -27,6 +27,21 @@ public class InvolvedPartiesSectionTests
             PdfText.LinesOf(incident, Started, IncidentPdfSections.InvolvedParties));
     }
 
+    // #700: the Bericht prints the number the way the app shows it; the file keeps what was typed.
+    [Fact]
+    public void A_phone_number_prints_in_its_reading_form()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        incident.AddInvolvedParty(clock, op, "Erika Beispiel", "01 71 / 0 00 00 01", null);
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.InvolvedParties);
+
+        Assert.Contains("Erika Beispiel 0171 0000001", text, StringComparison.Ordinal);
+        Assert.Equal("01 71 / 0 00 00 01", Assert.Single(incident.InvolvedParties).Phone);
+    }
+
     [Fact]
     public void Without_parties_the_section_says_so_instead_of_an_empty_table()
     {
