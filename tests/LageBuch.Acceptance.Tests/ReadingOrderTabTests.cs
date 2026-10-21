@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -58,6 +59,29 @@ public class ReadingOrderTabTests
         FocusByTab(Named<Button>(content, "EtbAddAndTaskButton"));
         window.Tab();
         window.AssertFocused(Named<Button>(window, "CloseButton"));
+    }
+
+    // Seen testing #695: Tab on from the grid to the row's edit button left the ring on the row's
+    // ZEIT cell, so two places looked focused. DataGridCell's :focus means "the grid holds focus
+    // anywhere and this cell is current", and a row button counts as anywhere.
+    [AvaloniaFact]
+    public void The_cell_ring_shows_while_the_grid_has_focus_and_leaves_with_it()
+    {
+        var (window, _) = ShowWorkspace();
+        WorkspaceRenderHelper.SelectTab(window, "ETB");
+        var content = WorkspaceRenderHelper.SelectedTabContent(window);
+        var grid = Named<DataGrid>(content, "EtbGrid");
+        bool AnyCellRing() => grid.GetVisualDescendants().OfType<Grid>().Any(g => g.Name == "FocusVisual" && g.IsEffectivelyVisible);
+
+        FocusByTab(Named<CheckBox>(content, "HideSystemCheckBox"));
+        window.Tab();
+        window.AssertFocused(grid);
+        Assert.True(AnyCellRing());
+
+        window.Tab();
+        var editButton = Assert.IsType<Button>(window.FocusedElement());
+        Assert.Equal("Bearbeiten", AutomationProperties.GetName(editButton));
+        Assert.False(AnyCellRing());
     }
 
     // The entry form is the last thing in every module, so leaving its last control leaves the
