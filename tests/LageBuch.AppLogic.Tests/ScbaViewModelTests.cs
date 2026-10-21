@@ -534,6 +534,318 @@ public class ScbaViewModelTests
         Assert.Equal(countBeforeRemoval, alarm.Played.Count); // and no further ticks announce once cleared
     }
 
+    // #719: the banner names why the Trupp has to come out, and a pressure alarm is not a time alarm.
+    [Fact]
+    public void A_pressure_alarm_names_the_Rueckzugsdruck_as_its_reason()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(15);
+        row.PressureInput = 45;
+        row.RecordPressureCommand.Execute(null);
+
+        Assert.Equal("Trupp 1 (Angriffstrupp): Rückzugsdruck erreicht (45 bar)", vm.AlarmDisplay);
+    }
+
+    [Fact]
+    public void The_Rueckzugsalarm_repeats_exactly_when_fifteen_seconds_have_passed()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        Register(vm).StartCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(30);
+        ticker.Fire();
+        clock.Now = T0.AddMinutes(30).AddSeconds(15);
+        ticker.Fire();
+
+        Assert.Equal(2, alarm.Played.Count);
+    }
+
+    // #719: Abgenommen on the last alarming Trupp takes the banner down there and then, not at the
+    // next tick, and leaves no acknowledgement behind for the next alarm to inherit.
+    [Fact]
+    public void Removing_the_last_alarming_trupp_clears_the_banner_and_its_acknowledgement_at_once()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+        vm.AcknowledgeAlarmCommand.Execute(null);
+        row.WithdrawCommand.Execute(null);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        var canExecuteChanges = 0;
+        vm.AcknowledgeAlarmCommand.CanExecuteChanged += (_, _) => canExecuteChanges++;
+
+        row.MarkRemovedCommand.Execute(null);
+
+        Assert.False(vm.IsAnyAlarm);
+        Assert.False(vm.IsAlarmAcknowledged);
+        Assert.Contains(nameof(ScbaViewModel.IsAnyAlarm), raised);
+        Assert.Contains(nameof(ScbaViewModel.AlarmDisplay), raised);
+        Assert.True(canExecuteChanges > 0);
+    }
+
+    [Fact]
+    public void Abgenommen_refreshes_the_header_and_reports_the_change()
+    {
+        var clock = new FixedClock(T0);
+        var changes = 0;
+        var vm = Vm(clock, NewSession(clock), () => changes++);
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+        row.WithdrawCommand.Execute(null);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        var before = changes;
+
+        row.MarkRemovedCommand.Execute(null);
+
+        Assert.Contains(nameof(ScbaViewModel.HasControlReminder), raised);
+        Assert.Contains(nameof(ScbaViewModel.NextControlDisplay), raised);
+        Assert.Equal(before + 1, changes);
+    }
+
+    // A row is updated in place when the incident changes (#294), so its bindings have to be raised
+    // from there too: a Trupp registered later is a new Sicherheitstrupp candidate for this one.
+    [Fact]
+    public void Registering_another_trupp_refreshes_an_existing_rows_Sicherheitstrupp_picker()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        var row = Register(vm);
+        var raised = new List<string?>();
+        row.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer");
+
+        Assert.Superset(
+            new HashSet<string?>
+            {
+                nameof(ScbaTruppRow.SafetyTruppChoices),
+                nameof(ScbaTruppRow.SafetyTruppButtonText),
+                nameof(ScbaTruppRow.SafetyTruppHint),
+                nameof(ScbaTruppRow.HasSafetyTruppHint),
+                nameof(ScbaTruppRow.StatusDisplay),
+            },
+            raised.ToHashSet());
+    }
+
+    // A tick with nothing new to log must not report a change: the workspace re-syncs the ETB list
+    // and stamps LastSavedAt on every one, so a change per tick would do both once a second.
+    [Fact]
+    public void A_tick_that_trips_nothing_reports_no_change()
+    {
+        var clock = new FixedClock(T0);
+        var changes = 0;
+        var ticker = new FakeTicker();
+        var vm = Vm(clock, NewSession(clock), () => changes++, ticker);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999;
+        Register(vm).StartCommand.Execute(null);
+        var before = changes;
+
+        clock.Now = T0.AddMinutes(5);
+        ticker.Fire();
+
+        Assert.Equal(before, changes);
+    }
+
+    [Fact]
+    public void Removing_one_of_two_alarming_trupps_keeps_the_acknowledgement_and_stays_silent()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var alarm = new FakeAlarmService();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker, alarm: alarm);
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 999; // keep Druckabfrage out of this Rückzugsalarm-only test
+        var first = Register(vm);
+        first.StartCommand.Execute(null);
+        Register(vm, truppfuehrer: "Huber", truppmann: "Mayer").StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+        vm.AcknowledgeAlarmCommand.Execute(null);
+        var played = alarm.Played.Count;
+
+        first.WithdrawCommand.Execute(null);
+        first.MarkRemovedCommand.Execute(null);
+
+        Assert.True(vm.IsAnyAlarm);
+        Assert.True(vm.IsAlarmAcknowledged);
+        Assert.Equal(played, alarm.Played.Count);
+    }
+
+    // #719: reopening an incident must not write a Trupp's Rückzugsalarm into the ETB a second
+    // time, whether the Trupp is still under air or already on Rückzug -- and a Trupp that was not
+    // yet alarming must still get its entry once it does.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Reopening_does_not_log_an_alarm_already_in_the_ETB_again(bool withdrawing)
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        var ticker = new FakeTicker();
+        using (var before = Vm(clock, session, ticker: ticker))
+        {
+            before.NewMaxDurationMinutes = 30;
+            before.NewControlIntervalMinutes = 999;
+            var row = Register(before);
+            row.StartCommand.Execute(null);
+            clock.Now = T0.AddMinutes(31);
+            ticker.Fire();
+            if (withdrawing)
+            {
+                row.WithdrawCommand.Execute(null);
+            }
+        }
+
+        var reopenedTicker = new FakeTicker();
+        using var reopened = Vm(clock, session, ticker: reopenedTicker);
+        reopenedTicker.Fire();
+
+        Assert.Single(session.Incident.Journal, e => e.Text.Contains("Rückzugsalarm", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Reopening_still_logs_the_alarm_of_a_trupp_that_was_not_alarming_yet()
+    {
+        var clock = new FixedClock(T0);
+        var session = NewSession(clock);
+        using (var before = Vm(clock, session))
+        {
+            before.NewMaxDurationMinutes = 30;
+            before.NewControlIntervalMinutes = 999;
+            Register(before).StartCommand.Execute(null);
+        }
+
+        clock.Now = T0.AddMinutes(10);
+        var ticker = new FakeTicker();
+        using var reopened = Vm(clock, session, ticker: ticker);
+        clock.Now = T0.AddMinutes(31);
+        ticker.Fire();
+
+        Assert.Single(session.Incident.Journal, e => e.Text.Contains("Rückzugsalarm", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_row_timers_read_dash_before_the_start_then_count_and_turn_ueberzogen_and_faellig_at_zero()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 10;
+        var row = Register(vm);
+
+        Assert.Equal("—", row.ElapsedDisplay);
+        Assert.Equal("—", row.RemainingDisplay);
+        Assert.Equal("—", row.ControlRemainingDisplay);
+
+        row.StartCommand.Execute(null);
+        clock.Now = T0.AddMinutes(6).AddSeconds(30);
+        Assert.Equal("06:30", row.ElapsedDisplay);
+        Assert.Equal("23:30", row.RemainingDisplay);
+        Assert.Equal("03:30", row.ControlRemainingDisplay);
+
+        clock.Now = T0.AddMinutes(10); // the Druckabfrage falls due on the second
+        Assert.Equal("fällig", row.ControlRemainingDisplay);
+
+        clock.Now = T0.AddMinutes(30); // the Einsatzzeit runs out on the second
+        Assert.Equal("überzogen", row.RemainingDisplay);
+    }
+
+    [Fact]
+    public void A_trupp_on_Rueckzug_keeps_counting_down()
+    {
+        var clock = new FixedClock(T0);
+        var vm = Vm(clock, NewSession(clock));
+        vm.NewMaxDurationMinutes = 30;
+        vm.NewControlIntervalMinutes = 10;
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+        row.WithdrawCommand.Execute(null);
+
+        clock.Now = T0.AddMinutes(5);
+
+        Assert.Equal("25:00", row.RemainingDisplay);
+        Assert.Equal("05:00", row.ControlRemainingDisplay);
+    }
+
+    // #719: the grid shows these through bindings, so a tick that forgets to raise one leaves the
+    // Atemschutz screen showing a frozen timer or a stale status.
+    [Fact]
+    public void A_tick_refreshes_every_row_and_header_binding()
+    {
+        var clock = new FixedClock(T0);
+        var ticker = new FakeTicker();
+        var vm = Vm(clock, NewSession(clock), ticker: ticker);
+        var row = Register(vm);
+        row.StartCommand.Execute(null);
+        var rowRaised = new List<string?>();
+        row.PropertyChanged += (_, e) => rowRaised.Add(e.PropertyName);
+        var vmRaised = new List<string?>();
+        vm.PropertyChanged += (_, e) => vmRaised.Add(e.PropertyName);
+        var commands = new[] { row.StartCommand, row.RecordPressureCommand, row.WithdrawCommand, row.MarkRemovedCommand };
+        var canExecuteChanges = new int[commands.Length];
+        for (var i = 0; i < commands.Length; i++)
+        {
+            var index = i;
+            commands[i].CanExecuteChanged += (_, _) => canExecuteChanges[index]++;
+        }
+
+        clock.Now = T0.AddMinutes(1);
+        ticker.Fire();
+
+        Assert.Superset(
+            new HashSet<string?>
+            {
+                nameof(ScbaTruppRow.IsWaiting),
+                nameof(ScbaTruppRow.IsActive),
+                nameof(ScbaTruppRow.IsWithdrawing),
+                nameof(ScbaTruppRow.IsReturned),
+                nameof(ScbaTruppRow.IsAlarm),
+                nameof(ScbaTruppRow.IsControlDue),
+                nameof(ScbaTruppRow.StartTimeDisplay),
+                nameof(ScbaTruppRow.PressureDisplay),
+                nameof(ScbaTruppRow.PressurePlaceholder),
+                nameof(ScbaTruppRow.ElapsedDisplay),
+                nameof(ScbaTruppRow.RemainingDisplay),
+                nameof(ScbaTruppRow.ControlRemainingDisplay),
+                nameof(ScbaTruppRow.StatusDisplay),
+                nameof(ScbaTruppRow.CanAssignSafetyTrupp),
+            },
+            rowRaised.ToHashSet());
+        Assert.All(canExecuteChanges, count => Assert.True(count > 0));
+        Assert.Superset(
+            new HashSet<string?>
+            {
+                nameof(ScbaViewModel.HasControlReminder),
+                nameof(ScbaViewModel.IsAnyControlDue),
+                nameof(ScbaViewModel.NextControlDisplay),
+                nameof(ScbaViewModel.IsControlCountingDown),
+                nameof(ScbaViewModel.NextControlName),
+                nameof(ScbaViewModel.NextControlRemaining),
+                nameof(ScbaViewModel.IsAnyAlarm),
+                nameof(ScbaViewModel.AlarmDisplay),
+            },
+            vmRaised.ToHashSet());
+    }
+
     [Fact]
     public void A_second_trupp_newly_alarming_re_announces_after_ack()
     {
