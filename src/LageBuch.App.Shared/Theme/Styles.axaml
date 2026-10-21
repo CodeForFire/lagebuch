@@ -1098,6 +1098,15 @@
     <Setter Property="Padding" Value="12,0" />
     <Setter Property="FontSize" Value="13.5" />
   </Style>
+  <!-- The current cell's ring belongs to the grid holding focus itself, where arrows move the row.
+       DataGridCell's own :focus also counts focus anywhere in the grid, so Tab on to a row's edit
+       button left the ring on that row's first cell and two places looked focused. -->
+  <Style Selector="DataGridCell:focus /template/ Grid#FocusVisual">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="DataGrid:focus DataGridCell:current /template/ Grid#FocusVisual">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
   <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
     <Setter Property="Fill" Value="#14202B" />
     <Setter Property="Opacity" Value="1" />

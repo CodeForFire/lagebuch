@@ -77,7 +77,11 @@
     </Style>
   </UserControl.Styles>
 
-  <DockPanel>
+  <!-- Tab follows the screen, top to bottom (#695). The DockPanel needs its bottom-docked
+       children declared before the matrix that fills the rest, and declaration order alone tabbed
+       the HAUS dock before the filter bar and the matrix above it. Each child that can hold focus
+       is its own tab group, ranked by TabIndex in the order it appears on screen. -->
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
     <!-- Title: every other tab leads with one at this same position (DockPanel.Dock="Top",
          Margin bottom 14) — this view was missing it (#137). -->
     <TextBlock DockPanel.Dock="Top" x:Name="CoTitle" Text="CO-MESSPROTOKOLL" Classes="overline" Margin="0,0,0,14" />
@@ -88,7 +92,7 @@
          divider rather than sandwiched between them. Adding a *floor* is not a building-level
          action but structure editing, so UG/OG HINZUFÜGEN moved out of here and into the STRUKTUR
          toolbar alongside the per-floor Wohnungen counts (#265). -->
-    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="8" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="14">
       <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
@@ -119,7 +123,7 @@
     <!-- Add Building Dialog: opened by the HAUS HINZUFÜGEN button in the bottom dock, so it
          expands directly above that dock rather than at the top, away from the button that
          opened it. Keeps the overlay keyboard contract as an inline panel (#538). -->
-    <Border x:Name="AddBuildingPanel" DockPanel.Dock="Bottom"
+    <Border KeyboardNavigation.TabIndex="7" x:Name="AddBuildingPanel" DockPanel.Dock="Bottom"
             IsVisible="{Binding IsAddBuildingDialogOpen}"
             b:Overlay.IsInline="True"
             b:Overlay.CancelCommand="{Binding CancelAddBuildingCommand}" b:Overlay.PrimaryCommand="{Binding ConfirmAddBuildingCommand}"
@@ -160,7 +164,7 @@
     <!-- Remove Building Confirmation. A destructive confirm (#538, contract 1 of #545): focus
          starts on ABBRECHEN and there is no primary command, so a reflex Enter cancels. HAUS HINZUFÜGEN
          is the fallback: HAUS ENTFERNEN is disabled once the last house is gone. -->
-    <Border x:Name="RemoveBuildingPanel" DockPanel.Dock="Top"
+    <Border KeyboardNavigation.TabIndex="0" x:Name="RemoveBuildingPanel" DockPanel.Dock="Top"
             IsVisible="{Binding IsRemoveBuildingConfirmOpen}"
             b:Overlay.IsInline="True"
             b:Overlay.CancelCommand="{Binding CancelRemoveBuildingCommand}"
@@ -189,7 +193,7 @@
          so the crew can keep typing the count they meant. For the same reason it is the one panel
          outside the overlay keyboard contract (#538): it never takes focus, and Esc reaches its
          cancel through the KeyBinding on the matrix, where the spinner that raised it sits. -->
-    <Border x:Name="ApartmentRemovalPanel"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="ApartmentRemovalPanel"
             DockPanel.Dock="Top"
             IsVisible="{Binding IsApartmentRemovalOpen}"
             Background="#0F141D"
@@ -250,7 +254,7 @@
     <!-- Editor Sidebar (right). An inline panel under the overlay keyboard contract (#538), but
          with no primary command: Enter must not commit, see CoValueInput below. FERTIG rebuilds
          the tile that opened it, so focus falls back to the house picker. -->
-    <Border x:Name="DwellingEditor"
+    <Border KeyboardNavigation.TabIndex="2" x:Name="DwellingEditor"
             DockPanel.Dock="Right"
             IsVisible="{Binding IsEditorOpen}"
             b:Overlay.IsInline="True"
@@ -446,7 +450,7 @@
     <!-- Building summary strip: the "how far are we" answer that scanning tiles can't give quickly
          on a large building, plus the status filter. Sits above the matrix because it's read first
          and read most. -->
-    <Border DockPanel.Dock="Top" IsVisible="{Binding HasBuildings}" Margin="0,0,0,14">
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="3" DockPanel.Dock="Top" IsVisible="{Binding HasBuildings}" Margin="0,0,0,14">
       <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
         <StackPanel Grid.Column="0" Spacing="6">
           <StackPanel Orientation="Horizontal" Spacing="10">
@@ -486,7 +490,7 @@
          appear in the same mode. Adding a floor and setting a floor's unit count are the same job
          (describing the building), done once at the start; keeping them out of the way for the
          rest of the incident is the whole point of the mode. -->
-    <Border DockPanel.Dock="Top" IsVisible="{Binding IsStructureMode}" Margin="0,0,0,12"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="4" DockPanel.Dock="Top" IsVisible="{Binding IsStructureMode}" Margin="0,0,0,12"
             Background="#0F141D" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" Padding="12,10">
       <!-- A WrapPanel, not a horizontal StackPanel: four buttons no longer fit a phone's width. -->
@@ -511,7 +515,7 @@
          No picker as for Wohnungen (#419): the whole floor goes or none of it, so this just
          names what hangs on it. Sits under the toolbar that raised it. A destructive confirm
          (#538): focus starts on ABBRECHEN, and Enter only presses the focused button. -->
-    <Border x:Name="FloorRemovalPanel"
+    <Border KeyboardNavigation.TabIndex="5" x:Name="FloorRemovalPanel"
             DockPanel.Dock="Top"
             IsVisible="{Binding IsFloorRemovalOpen}"
             b:Overlay.IsInline="True"
@@ -555,7 +559,7 @@
          rightmost unit of every floor. Reserving the 16px keeps the tiles clear of it. -->
     <!-- ShowMatrix, not just HasBuildings: on a phone the Wohnung editor takes the whole width,
          so the matrix stands aside while it is open rather than being squeezed to nothing. -->
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+    <ScrollViewer KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="6" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                   AllowAutoHide="False"
                   IsVisible="{Binding ShowMatrix}">
       <!-- Arrow keys walk the tiles (#543): ← → within a floor, ↑ ↓ between floors. -->

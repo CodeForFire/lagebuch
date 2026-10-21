@@ -46,12 +46,16 @@
     </Style>
   </UserControl.Styles>
 
-  <DockPanel>
+  <!-- Tab follows the screen, top to bottom (#695). The DockPanel needs its bottom-docked
+       children declared before the list that fills the rest, and declaration order alone tabbed
+       the dock before the list above it. Each child is its own tab group, ranked by TabIndex in
+       the order it appears on screen. -->
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
     <TextBlock DockPanel.Dock="Top" x:Name="InvolvedPartiesTitle" Text="BETEILIGTE" Classes="overline"
                Margin="0,0,0,14" />
 
     <!-- The phone's way in to the form, at the bottom edge where the thumb already is. -->
-    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+    <Button KeyboardNavigation.TabIndex="2" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
             Margin="0,12,0,0" HorizontalAlignment="Stretch"
             Height="{StaticResource ControlHeightTouch}"
             Content="+ BETEILIGTE/N AUFNEHMEN"
@@ -59,7 +63,7 @@
             Command="{Binding OpenComposerCommand}" />
 
     <!-- Input dock. Enter submits from every field; focus then goes back to NAME (#540). -->
-    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0"
             IsVisible="{Binding ShowComposer}"
             b:EntryForm.SubmitCommand="{Binding AddCommand}"
             b:EntryForm.FirstField="{Binding #NewNameBox}"
@@ -119,7 +123,7 @@
     <!-- One card per person on every width: an address book is read entry by entry, and the same
          stacked card works on a 412dp phone. Stretch, never a centred MaxWidth column, so the
          list cannot change width while it scrolls. -->
-    <Border x:Name="InvolvedPartiesPanel"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0" x:Name="InvolvedPartiesPanel"
             Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True"
             IsVisible="{Binding Parties.Count}">

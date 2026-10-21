@@ -10,11 +10,12 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// #262 (UX review, "No accessibility support"): no explicit TabIndex exists anywhere in the app,
-// so keyboard-only navigation relies entirely on Avalonia's default declaration-order tab
-// navigation. Rather than sprinkling TabIndex speculatively, these tests verify the riskiest
-// layouts (many same-row fields/buttons) already tab in reading order -- if one of these starts
-// failing, that specific spot needs an explicit TabIndex fix, not a blanket sweep.
+// #262 (UX review, "No accessibility support"): keyboard-only navigation relies on Avalonia's
+// default declaration-order tab navigation. Rather than sprinkling TabIndex speculatively, these
+// tests verify the riskiest layouts (many same-row fields/buttons) already tab in reading order --
+// if one of these starts failing, that specific spot needs an explicit TabIndex fix, not a blanket
+// sweep. The spots that did need one, where a DockPanel's declaration order differs from the
+// screen's, are pinned in ReadingOrderTabTests (#695).
 public class TabOrderTests
 {
     [AvaloniaFact]

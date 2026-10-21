@@ -18,6 +18,19 @@
        container's size events. The Fahrzeuge and Personal rows are thousands of elements, and
        detaching them all from that one event took over a second every time the tab was left. -->
   <UserControl.Styles>
+    <!-- Tab reaches an add button after the rows it sits under (#695). Docked to the bottom, it
+         has to be declared before them, and declaration order alone tabbed it first. Every child of
+         such a panel is its own tab group, and the button ranks after the rest. -->
+    <Style Selector="DockPanel.add-below">
+      <Setter Property="KeyboardNavigation.TabNavigation" Value="Local" />
+    </Style>
+    <Style Selector="DockPanel.add-below > :is(Control)">
+      <Setter Property="KeyboardNavigation.TabNavigation" Value="Local" />
+      <Setter Property="KeyboardNavigation.TabIndex" Value="0" />
+    </Style>
+    <Style Selector="DockPanel.add-below > Button.add-row">
+      <Setter Property="KeyboardNavigation.TabIndex" Value="1" />
+    </Style>
     <Style Selector="DockPanel#EditorBody">
       <Setter Property="Margin" Value="28,24" />
     </Style>
@@ -133,7 +146,7 @@
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
                 CornerRadius="{StaticResource RadiusMd}" Padding="6"
                 IsVisible="{Binding ShowCategories}">
-          <DockPanel>
+          <DockPanel Classes="add-below">
             <!-- Docked outside the scroll region below. The Checklisten are the one part of this
                  rail a brigade can grow without bound, so an "add" button living at the end of
                  them would be the first thing to scroll out of reach on exactly the configuration
@@ -141,7 +154,7 @@
                  the slack above the button into a footer rather than a gap. -->
             <!-- Button before the rule: a DockPanel gives the FIRST Dock="Bottom" child the
                  bottom-most strip, so declaring the rule first would draw it under the button. -->
-            <Button x:Name="AddChecklistButton" DockPanel.Dock="Bottom"
+            <Button x:Name="AddChecklistButton" DockPanel.Dock="Bottom" Classes="add-row"
                     Content="+ NEUE CHECKLISTE" HorizontalAlignment="Stretch"
                     Margin="0,6,0,0" Command="{Binding AddChecklistCommand}" />
             <Border DockPanel.Dock="Bottom" Height="1" Margin="0,8,0,0"
@@ -317,8 +330,8 @@
 
               <!-- String-list / checklist editor -->
               <DataTemplate x:DataType="vm:EditableListSection">
-                <DockPanel>
-                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- Column headers (#137): each row is unlabeled otherwise. -->
                   <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
@@ -361,8 +374,8 @@
 
               <!-- Checkliste template editor (Aufbau/Abbau): text + mandatory, reorderable -->
               <DataTemplate x:DataType="vm:ChecklistTemplateSection">
-                <DockPanel>
-                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
 
                   <!-- The list's name. The overline keeps the context the rail label used to
@@ -467,8 +480,8 @@
 
               <!-- Links editor: name + URL + group (#518), reorderable -->
               <DataTemplate x:DataType="vm:LinksSection">
-                <DockPanel>
-                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- Column headers (#137): each row is unlabeled otherwise. The trailing columns
                        are fixed to the row's icon buttons for the reason given on the vehicles
@@ -535,8 +548,8 @@
 
               <!-- Vehicles editor (#76): Wache + Funkrufname + Sitzplätze. -->
               <DataTemplate x:DataType="vm:VehiclesSection">
-                <DockPanel>
-                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- Column headers (#137): each row is unlabeled otherwise.
                        The trailing column uses a fixed width matching the row template's
@@ -621,8 +634,8 @@
               <!-- Trupp-Typen editor (#398): the crew size and Einsatzzeit live on the row, so
                    renaming a type can no longer silently drop its rule. -->
               <DataTemplate x:DataType="vm:TruppTypesSection">
-                <DockPanel>
-                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- A fixed trailing width matching the row template's icon-btn button, as in the
                        Fahrzeuge template above: "Auto" would size to this Grid's own empty content. -->
@@ -670,8 +683,8 @@
                    held, so this is a typed section rather than the plain name list — the mode used
                    to be dropped on load and defaulted again on save. -->
               <DataTemplate x:DataType="vm:RolesSection">
-                <DockPanel>
-                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- A fixed trailing width matching the row template's icon-btn button, as in the
                        Trupp-Typen template above: "Auto" would size to this Grid's own empty content. -->
@@ -718,8 +731,8 @@
 
               <!-- Personnel editor -->
               <DataTemplate x:DataType="vm:PersonnelSection">
-                <DockPanel>
-                  <Button DockPanel.Dock="Bottom" Classes="signal" Content="+ HINZUFÜGEN"
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- Column headers (#137): each field is unlabeled otherwise, and a PlaceholderText
                        disappears once the field is filled. Two lines, because each person takes two:

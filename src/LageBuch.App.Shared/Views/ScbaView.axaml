@@ -121,7 +121,11 @@
       <Setter Property="Height" Value="{StaticResource ControlHeightTouch}" />
     </Style>
   </UserControl.Styles>
-  <DockPanel>
+  <!-- Tab follows the screen, top to bottom (#695). The DockPanel needs its bottom-docked
+       children declared before the list that fills the rest, and declaration order alone tabbed
+       the dock before the list above it. Each child is its own tab group, ranked by TabIndex in
+       the order it appears on screen. -->
+  <DockPanel KeyboardNavigation.TabNavigation="Local">
     <TextBlock DockPanel.Dock="Top" x:Name="ScbaTitle" Text="ATEMSCHUTZÜBERWACHUNG" Classes="overline"
                Margin="0,0,0,14" VerticalAlignment="Center" />
 
@@ -130,7 +134,7 @@
          from every tab. -->
     <!-- The phone's way in to the dock. A Trupp under air is what must stay in sight, so the
          eight-field Bereitstellen form only appears when it is actually being filled in. -->
-    <Button DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
+    <Button KeyboardNavigation.TabIndex="2" DockPanel.Dock="Bottom" x:Name="OpenComposerButton" Classes="signal"
             Margin="0,12,0,0" HorizontalAlignment="Stretch"
             Height="{StaticResource ControlHeightTouch}"
             Content="+ TRUPP BEREITSTELLEN"
@@ -138,7 +142,7 @@
             Command="{Binding OpenComposerCommand}" />
 
     <!-- Enter submits from every field; focus then goes back to FUNKRUFNAME (#540). -->
-    <Border x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
+    <Border KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1" x:Name="InputDock" DockPanel.Dock="Bottom" Margin="0,16,0,0" IsEnabled="{Binding !IsReadOnly}"
             IsVisible="{Binding ShowComposer}"
             b:EntryForm.SubmitCommand="{Binding AddTruppCommand}"
             b:EntryForm.FirstField="{Binding #CallSignBox}"
@@ -244,7 +248,7 @@
       </ScrollViewer>
     </Border>
 
-    <Panel>
+    <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="0">
     <Border x:Name="ScbaGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
       <!-- Rows size to their content here, unlike the other grids. A Trupp is two people, or three

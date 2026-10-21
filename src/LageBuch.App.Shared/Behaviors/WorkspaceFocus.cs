@@ -148,9 +148,13 @@ public static class WorkspaceFocus
     private static void OnGotFocus(object? sender, RoutedEventArgs e)
     {
         if (sender is Control root && Subscriptions.TryGetValue(root, out var subscription)
-            && e.Source is InputElement focused && !Overlay.IsInOverlay(focused))
+            && e.Source is InputElement focused)
         {
-            subscription.Remember(focused);
+            subscription.KeepRailEntryOnSelectedTab();
+            if (!Overlay.IsInOverlay(focused))
+            {
+                subscription.Remember(focused);
+            }
         }
     }
 
@@ -185,6 +189,21 @@ public static class WorkspaceFocus
             _rememberedPlace = RailTabOf(focused) is not null ? Place.Rail
                 : rail.IsVisualAncestorOf(focused) ? Place.Module
                 : Place.Elsewhere;
+        }
+
+        // The rail is a Once group: Tab enters it at its active element. The TabControl is an
+        // ItemsControl and takes every focused descendant for that element, the module's controls
+        // included, so Tab from the header bars landed on whatever the module last had focused, and
+        // Shift+Tab from the module's first control resolved back to that control and went nowhere
+        // (#695). Bubbling to the root comes after the TabControl's own handling, so this wins.
+        public void KeepRailEntryOnSelectedTab()
+        {
+            var tab = SelectedRailTab();
+            KeyboardNavigation.SetTabOnceActiveElement(rail, tab);
+            if (rail.ItemsPanelRoot is { } panel)
+            {
+                KeyboardNavigation.SetTabOnceActiveElement(panel, tab);
+            }
         }
 
         public TabItem? RailTabOf(Visual visual) =>
