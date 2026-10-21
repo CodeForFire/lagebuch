@@ -56,12 +56,13 @@
                                Text="{Binding Assignee}" />
             </HeaderedContentControl>
           </Grid>
-          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="TaskDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
-            <Button x:Name="TaskDialogSaveMoreButton" Classes="ghost"
-                    Content="SPEICHERN &amp; WEITERE AUFGABE" Command="{Binding SaveAndCreateAnotherCommand}" />
+          <!-- Left, primary first (#694): the actions start under the fields they save. -->
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0">
             <Button x:Name="TaskDialogSaveButton" Classes="signal" Content="SPEICHERN"
                     Command="{Binding SaveCommand}" />
+            <Button x:Name="TaskDialogSaveMoreButton" Classes="ghost"
+                    Content="SPEICHERN &amp; WEITERE AUFGABE" Command="{Binding SaveAndCreateAnotherCommand}" />
+            <Button x:Name="TaskDialogCancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
           </StackPanel>
         </StackPanel>
       </DockPanel>

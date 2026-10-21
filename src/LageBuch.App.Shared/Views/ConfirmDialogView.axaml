@@ -29,10 +29,11 @@
           <CheckBox x:Name="SubOptionCheckBox" Margin="28,-4,0,0" IsVisible="{Binding HasSubOption}"
                     IsEnabled="{Binding IsOptionChecked}"
                     IsChecked="{Binding IsSubOptionChecked}" Content="{Binding SubOptionLabel}" />
-          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
+          <!-- Left, primary first (#694): the answer starts under the question it answers. -->
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left" Margin="0,8,0,0">
             <Button x:Name="ConfirmButton" Classes="signal" Content="{Binding ConfirmLabel}"
                     Command="{Binding ConfirmCommand}" />
+            <Button x:Name="CancelButton" Content="ABBRECHEN" Command="{Binding CancelCommand}" />
           </StackPanel>
         </StackPanel>
       </DockPanel>

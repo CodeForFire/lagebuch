@@ -272,14 +272,15 @@
              point of this whole sidebar, so a button you first have to go looking for is the
              same bug in a weaker form. Docked before the ScrollViewer because a DockPanel
              gives its last, undocked child whatever is left: the idiom MasterDataEditorView
-             uses for its own fixed footers. -->
+             uses for its own fixed footers. Left-aligned, FERTIG first (#694): the action starts
+             under the fields it commits, like every input dock's HINZUFÜGEN. -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8"
-                    HorizontalAlignment="Right" Margin="0,12,0,0"
+                    HorizontalAlignment="Left" Margin="0,12,0,0"
                     IsVisible="{Binding !IsDiscardEditorConfirmOpen}">
-          <Button x:Name="EditorCancelButton" Content="ABBRECHEN"
-                  Command="{Binding CloseEditorCommand}" />
           <Button x:Name="EditorConfirmButton" Classes="signal" Content="FERTIG"
                   Command="{Binding ConfirmEditorCommand}" />
+          <Button x:Name="EditorCancelButton" Content="ABBRECHEN"
+                  Command="{Binding CloseEditorCommand}" />
         </StackPanel>
 
         <!-- #652: ABBRECHEN or Esc on a changed buffer asks before dropping it, in place of the
@@ -299,7 +300,7 @@
             <TextBlock Text="ÄNDERUNGEN VERWERFEN?" Classes="overline" />
             <TextBlock Text="Was hier eingegeben ist, wurde noch nicht mit FERTIG übernommen."
                        TextWrapping="Wrap" />
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
               <Button x:Name="ConfirmDiscardEditorButton" Classes="signal" Content="VERWERFEN"
                       Command="{Binding ConfirmDiscardEditorCommand}" />
               <Button x:Name="CancelDiscardEditorButton" Content="ABBRECHEN"
