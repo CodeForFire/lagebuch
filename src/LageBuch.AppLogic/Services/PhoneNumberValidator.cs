@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
+using LageBuch.Domain;
 
 namespace LageBuch.AppLogic.Services;
 
@@ -22,16 +22,11 @@ namespace LageBuch.AppLogic.Services;
 /// </remarks>
 public static class PhoneNumberValidator
 {
-    private const int MinDigits = 3;
-
-    // E.164 caps at 15; the slack is for an internal extension written into the roster.
-    private const int MaxDigits = 20;
-    private const int MaxInputLength = 64;
-
     /// <summary>
     /// True only for a number this app is willing to dial, with <paramref name="uri"/> set to the
-    /// ready-to-launch "tel:&lt;digits&gt;" — a leading '+' where the input had one, then digits
-    /// and nothing else.
+    /// ready-to-launch RFC 3966 global number "tel:+&lt;digits&gt;" — see
+    /// <see cref="PhoneNumber.TryGetGlobalNumber"/> for how a national number gets its +49, and
+    /// why a number with neither a Vorwahl nor a country code ("112") is refused (#700).
     /// </summary>
     /// <remarks>
     /// The '+' is left unencoded on purpose: it is a literal in a tel: URI, and "%2B" is dialed as
@@ -44,38 +39,10 @@ public static class PhoneNumberValidator
     public static bool TryGetTelUri([NotNullWhen(true)] string? input, [NotNullWhen(true)] out Uri? uri)
     {
         uri = null;
-        var raw = input?.Trim();
-        if (string.IsNullOrEmpty(raw) || raw.Length > MaxInputLength)
-        {
-            return false;
-        }
 
-        var dial = new StringBuilder(raw.Length);
-        if (raw[0] == '+')
-        {
-            dial.Append('+');
-            raw = raw[1..];
-        }
-
-        var digits = 0;
-        foreach (var c in raw)
-        {
-            if (char.IsAsciiDigit(c))
-            {
-                dial.Append(c);
-                digits++;
-            }
-            else if (c is not (' ' or '/' or '-' or '.' or '(' or ')' or ' '))
-            {
-                // Anything else -- a letter, a '+' anywhere but first, '*', '#', ',', ';', a
-                // control character -- means this is not a phone number and must not reach a dialer.
-                return false;
-            }
-        }
-
-        return digits >= MinDigits
-            && digits <= MaxDigits
-            && Uri.TryCreate("tel:" + dial, UriKind.Absolute, out uri)
+        // The scheme is added here, to a '+' and digits: nothing typed can choose another one.
+        return PhoneNumber.TryGetGlobalNumber(input, out var global)
+            && Uri.TryCreate("tel:" + global, UriKind.Absolute, out uri)
             && string.Equals(uri.Scheme, "tel", StringComparison.Ordinal);
     }
 }

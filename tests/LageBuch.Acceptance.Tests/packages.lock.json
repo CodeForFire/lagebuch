@@ -454,7 +454,10 @@
         }
       },
       "lagebuch.domain": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "libphonenumber-csharp": "[9.0.41, )"
+        }
       },
       "lagebuch.persistence": {
         "type": "Project",
@@ -513,6 +516,12 @@
         "requested": "[8.4.2, )",
         "resolved": "8.4.2",
         "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
+      },
+      "libphonenumber-csharp": {
+        "type": "CentralTransitive",
+        "requested": "[9.0.41, )",
+        "resolved": "9.0.41",
+        "contentHash": "GpBGFg/L1OuHem8qpZ2Ca6Tm5pPqL81iDLiUwNIbfSWVIyiQpui5jqMOr7pgVKg9rD5ppK2iCHDfg9hvtQe1OQ=="
       },
       "Microsoft.AspNetCore.SignalR.Client": {
         "type": "CentralTransitive",

@@ -45,7 +45,7 @@ public static class InvolvedPartiesSection
                 foreach (var party in incident.InvolvedParties)
                 {
                     table.Cell().Element(Cells.Body).Text(party.Name);
-                    table.Cell().Element(Cells.Body).Text(Formatting.OrDash(party.Phone));
+                    table.Cell().Element(Cells.Body).Text(Formatting.OrDash(PhoneNumber.Display(party.Phone)));
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(party.Notes));
                 }
             });

@@ -5,4 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Phone number parsing and formatting (#700): the German Vorwahl lengths live in its metadata. -->
+    <PackageReference Include="libphonenumber-csharp" />
+  </ItemGroup>
+
 </Project>

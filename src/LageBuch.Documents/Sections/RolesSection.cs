@@ -52,7 +52,7 @@ public static class RolesSection
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.Section));
                     table.Cell().Element(Cells.Body).Text(role.PersonName);
                     table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.CallSign));
-                    table.Cell().Element(Cells.Body).Text(Formatting.OrDash(role.Phone));
+                    table.Cell().Element(Cells.Body).Text(Formatting.OrDash(PhoneNumber.Display(role.Phone)));
                     table.Cell().Element(Cells.Body).Text(role.From is { } f ? Formatting.Timestamp(f) : "—");
                     table.Cell().Element(Cells.Body).Text(role.To is { } t ? Formatting.Timestamp(t) : "—");
                 }
