@@ -110,6 +110,11 @@ MUTATE_PROJECTS := Domain Sync Documents Persistence AppLogic
 # base, working tree included, then scores only the mutants on changed lines
 # and fails below BREAK. Stryker's own --since is not used: it scores whole
 # files, and inside a git worktree it finds no changes at all.
+#
+# Without SINCE, the whole project is mutated and fails below the floor in its
+# stryker-config.json (thresholds.break). That floor guards the weekly run; the
+# SINCE run overrides it with --break-at 0, since the floor is a project score
+# and would otherwise judge the changed files as a whole again.
 SINCE ?=
 BREAK ?= 80
 MUTATE_OUT = $(CURDIR)/StrykerOutput/$(PROJECT)
@@ -127,7 +132,7 @@ mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|
 	  if [ -z "$$files" ]; then \
 	    echo "No .cs file in LageBuch.$(PROJECT) changed since $(SINCE) -- nothing to mutate."; exit 0; fi; \
 	  set --; for f in $$files; do set -- "$$@" --mutate "**/$$f"; done; \
-	  (cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker --output $(MUTATE_OUT) "$$@") || exit $$?; \
+	  (cd tests/LageBuch.$(PROJECT).Tests && $(DOTNET) tool run dotnet-stryker --output $(MUTATE_OUT) --break-at 0 "$$@") || exit $$?; \
 	  echo "Report: $(MUTATE_OUT)/reports/mutation-report.html"; \
 	  $(MUTATE_SCORE) score --report $(MUTATE_OUT)/reports/mutation-report.json --base "$(SINCE)" \
 	    --project-dir src/LageBuch.$(PROJECT) --threshold $(BREAK) --summary $(MUTATE_OUT)/reports/changed-lines.md; \

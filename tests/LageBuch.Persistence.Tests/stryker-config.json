@@ -3,7 +3,7 @@
     "project": "LageBuch.Persistence.csproj",
     "mutation-level": "Standard",
     "reporters": ["html", "markdown", "json", "progress"],
-    "thresholds": { "high": 80, "low": 60, "break": 0 },
+    "thresholds": { "high": 90, "low": 84, "break": 84 },
     "ignore-methods": ["*ThrowIfNull", "*ThrowIfNullOrEmpty", "*ThrowIfNullOrWhiteSpace"]
   }
 }
