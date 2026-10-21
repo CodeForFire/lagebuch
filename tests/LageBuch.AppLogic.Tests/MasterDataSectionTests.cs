@@ -24,6 +24,23 @@ public class MasterDataSectionTests
     }
 
     [Fact]
+    public void Einheiten_status_MoveDown_moves_the_first_entry_one_place_down_and_flags_a_change()
+    {
+        var changes = 0;
+        var s = new EditableListSection("Einheiten-Status", "STATUS", new[] { "Alarmiert", "Auf Anfahrt", "Am Einsatzort" }, () => changes++);
+
+        s.MoveDownCommand.Execute(s.Items[0]);
+
+        Assert.Equal(new[] { "Auf Anfahrt", "Alarmiert", "Am Einsatzort" }, s.ToValues());
+        Assert.Equal(1, changes);
+
+        s.MoveDownCommand.Execute(s.Items[1]);   // the second-to-last still moves to the end
+
+        Assert.Equal(new[] { "Auf Anfahrt", "Am Einsatzort", "Alarmiert" }, s.ToValues());
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
     public void Einheiten_status_MoveDown_at_the_end_and_MoveUp_at_the_top_are_no_ops()
     {
         var changes = 0;
