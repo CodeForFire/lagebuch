@@ -17,7 +17,11 @@ public sealed record ForceUnit(
     // Same convention, appended after OfficerCount for the #216 addition. Zugführer is a rank
     // above Führungskraft (Gruppenführer) and counted separately, ahead of it in the Stärke
     // notation: ZF/GF/Mannschaft/Gesamt.
-    int ZugfuehrerCount = 0)
+    int ZugfuehrerCount = 0,
+
+    // The Abschnitt, Unterabschnitt or Bereitstellung the unit is placed in; null is "nicht
+    // zugeordnet". Appended last so every older row and payload reads as unplaced.
+    Guid? NodeId = null)
 {
     /// <summary>Mannschaft = Gesamtstärke abzüglich Zugführer und Führungskräfte.</summary>
     public int MannschaftCount => PersonnelCount - OfficerCount - ZugfuehrerCount;
@@ -92,6 +96,9 @@ public sealed record ForceUnit(
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
     };
 
+    /// <summary>Returns a copy placed in <paramref name="nodeId"/>, or unplaced when null.</summary>
+    public ForceUnit WithNode(Guid? nodeId) => this with { NodeId = nodeId };
+
     public IReadOnlyList<ForceUnitStrengthEdit> Edits { get; private init; } =
         Array.Empty<ForceUnitStrengthEdit>();
 
@@ -105,8 +112,9 @@ public sealed record ForceUnit(
         string? notes,
         int officerCount,
         IEnumerable<ForceUnitStrengthEdit>? edits = null,
-        int zugfuehrerCount = 0)
-        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount, zugfuehrerCount)
+        int zugfuehrerCount = 0,
+        Guid? nodeId = null)
+        => new(id, brigade, callSign, personnelCount, scbaCount, status, notes, officerCount, zugfuehrerCount, nodeId)
         {
             Edits = (edits ?? Enumerable.Empty<ForceUnitStrengthEdit>()).ToList(),
         };

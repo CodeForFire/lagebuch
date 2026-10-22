@@ -5,6 +5,7 @@ using LageBuch.Domain.Etb;
 using LageBuch.Domain.Files;
 using LageBuch.Domain.Involved;
 using LageBuch.Domain.SituationReports;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -27,6 +28,7 @@ public sealed class Incident
     private readonly List<InvolvedParty> _involvedParties = new();
     private readonly List<SituationReport> _situationReports = new();
     private readonly List<IssuedItem> _issuedItems = new();
+    private readonly List<CommandNode> _commandNodes = new();
 
     private Incident()
     {
@@ -96,6 +98,8 @@ public sealed class Incident
 
     /// <summary>How many Geräte are still out, i.e. not yet given back.</summary>
     public int ItemsOut => _issuedItems.Count(i => i.IsOut);
+    /// <summary>Abschnitte, Unterabschnitte, Bereitstellungen and partner Einsatzleitungen in creation order, dissolved ones included.</summary>
+    public IReadOnlyList<CommandNode> CommandNodes => _commandNodes;
 
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
@@ -169,7 +173,8 @@ public sealed class Incident
         string? postalCode = null,
         string? place = null,
         IEnumerable<SituationReport>? situationReports = null,
-        IEnumerable<IssuedItem>? issuedItems = null)
+        IEnumerable<IssuedItem>? issuedItems = null,
+        IEnumerable<CommandNode>? commandNodes = null)
     {
         var incident = new Incident
         {
@@ -201,6 +206,7 @@ public sealed class Incident
         incident._involvedParties.AddRange(involvedParties);
         incident._situationReports.AddRange(situationReports ?? []);
         incident._issuedItems.AddRange(issuedItems ?? []);
+        incident._commandNodes.AddRange(commandNodes ?? Enumerable.Empty<CommandNode>());
         return incident;
     }
 
@@ -683,6 +689,200 @@ public sealed class Incident
 
         return updated;
     }
+
+    /// <summary>The node with <paramref name="id"/>, or null when this incident has none by that id.</summary>
+    public CommandNode? FindCommandNode(Guid id) => _commandNodes.Find(n => n.Id == id);
+
+    /// <summary>
+    /// Forms an Abschnitt, Unterabschnitt, Bereitstellung or partner Einsatzleitung. An Unterabschnitt
+    /// must lie in a live Abschnitt of this incident; live siblings (same parent) have unique names.
+    /// </summary>
+    public CommandNode AddCommandNode(
+        IClock clock, SessionOperator op, CommandNodeKind kind, string name, Guid? parentId = null)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var node = CommandNode.Create(kind, name, parentId);
+        CommandNode? parent = null;
+        if (parentId is { } pid)
+        {
+            parent = FindCommandNode(pid)
+                ?? throw new KeyNotFoundException($"Abschnitt {pid} nicht gefunden.");
+            if (parent.Kind != CommandNodeKind.Abschnitt || !parent.IsLive)
+            {
+                throw new ArgumentException("Ein Unterabschnitt liegt in einem bestehenden Abschnitt.", nameof(parentId));
+            }
+        }
+
+        EnsureNameFree(node.Name, node.ParentId, node.Id);
+        _commandNodes.Add(node);
+
+        var text = kind switch
+        {
+            CommandNodeKind.Unterabschnitt => $"Unterabschnitt gebildet: {node.Name} in {parent?.Name}",
+            CommandNodeKind.Bereitstellung => $"Bereitstellung eingerichtet: {node.Name}",
+            CommandNodeKind.Partner => $"Einsatzleitung eingetragen: {node.Name}",
+            _ => $"Abschnitt gebildet: {node.Name}",
+        };
+        AppendSystemEntry(clock, op, text);
+        return node;
+    }
+
+    /// <summary>
+    /// Corrects a node's name and details. Rename, Auftrag and Funkgruppe changes reach the ETB;
+    /// Standort, Rufname and Telefon are working data and stay silent, like a unit's Bemerkung.
+    /// </summary>
+    public CommandNode UpdateCommandNode(
+        IClock clock,
+        SessionOperator op,
+        Guid nodeId,
+        string name,
+        string? auftrag,
+        string? standort,
+        string? funkgruppe,
+        string? rufname,
+        string? telefon)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindCommandNodeIndex(nodeId);
+        var previous = _commandNodes[index];
+        if (!previous.IsLive)
+        {
+            throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+        }
+
+        var updated = previous.WithDetails(name, auftrag, standort, funkgruppe, rufname, telefon);
+        EnsureNameFree(updated.Name, updated.ParentId, updated.Id);
+        _commandNodes[index] = updated;
+
+        if (!string.Equals(previous.Name, updated.Name, StringComparison.Ordinal))
+        {
+            AppendSystemEntry(clock, op, $"{KindLabel(updated.Kind)} umbenannt: {previous.Name} → {updated.Name}");
+        }
+
+        if (!string.Equals(previous.Auftrag, updated.Auftrag, StringComparison.Ordinal))
+        {
+            var auftragText = updated.Auftrag is null
+                ? $"Auftrag {updated.Name} aufgehoben"
+                : $"Auftrag {updated.Name}: {updated.Auftrag}";
+            AppendSystemEntry(clock, op, auftragText);
+        }
+
+        if (updated.Funkgruppe is not null
+            && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
+        {
+            AppendSystemEntry(clock, op, $"Funkgruppe {updated.Name}: {updated.Funkgruppe}");
+        }
+
+        return updated;
+    }
+
+    /// <summary>
+    /// Dissolves a node; it stays in <see cref="CommandNodes"/> as history. Refused while units sit
+    /// on it or a live Unterabschnitt lies under it.
+    /// </summary>
+    public CommandNode DissolveCommandNode(IClock clock, SessionOperator op, Guid nodeId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = FindCommandNodeIndex(nodeId);
+        var node = _commandNodes[index];
+        if (node.IsLive
+            && (_forces.Exists(f => f.NodeId == nodeId)
+                || _commandNodes.Exists(n => n.IsLive && n.ParentId == nodeId)))
+        {
+            throw new InvalidOperationException("Abschnitt ist nicht leer.");
+        }
+
+        var dissolved = node.DissolvedAtTime(clock.Now);
+        _commandNodes[index] = dissolved;
+        AppendSystemEntry(clock, op, $"{KindLabel(dissolved.Kind)} aufgelöst: {dissolved.Name}");
+        return dissolved;
+    }
+
+    /// <summary>
+    /// Places a unit in a live node, or takes it out of its node when <paramref name="nodeId"/> is
+    /// null. Moving it where it already is writes nothing.
+    /// </summary>
+    public ForceUnit MoveForceUnit(IClock clock, SessionOperator op, Guid unitId, Guid? nodeId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _forces.FindIndex(f => f.Id == unitId);
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Einheit {unitId} nicht gefunden.");
+        }
+
+        CommandNode? target = null;
+        if (nodeId is { } id)
+        {
+            target = FindCommandNode(id) ?? throw new KeyNotFoundException($"Abschnitt {id} nicht gefunden.");
+            if (!target.IsLive)
+            {
+                throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+            }
+
+            if (target.Kind == CommandNodeKind.Partner)
+            {
+                throw new InvalidOperationException(
+                    "Einsatzleitungen anderer Organisationen führen keine eigenen Einheiten.");
+            }
+        }
+
+        var previous = _forces[index];
+        if (previous.NodeId == nodeId)
+        {
+            return previous;
+        }
+
+        var updated = previous.WithNode(nodeId);
+        _forces[index] = updated;
+
+        var oldName = previous.NodeId is { } old ? FindCommandNode(old)?.Name : null;
+        var text = target is not null
+            ? $"{Label(updated)} → {target.Name}"
+            : $"{Label(updated)}: Abschnitt aufgehoben (vorher {oldName ?? "unbekannt"})";
+        AppendSystemEntry(clock, op, text, from: updated.CallSign);
+        return updated;
+    }
+
+    private int FindCommandNodeIndex(Guid nodeId)
+    {
+        var index = _commandNodes.FindIndex(n => n.Id == nodeId);
+        return index >= 0 ? index : throw new KeyNotFoundException($"Abschnitt {nodeId} nicht gefunden.");
+    }
+
+    // Live siblings share the parent; every top-level node shares the null parent's namespace.
+    private void EnsureNameFree(string name, Guid? parentId, Guid exceptId)
+    {
+        if (_commandNodes.Exists(n =>
+                n.IsLive && n.Id != exceptId && n.ParentId == parentId
+                && string.Equals(n.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Name ist bereits vergeben.");
+        }
+    }
+
+    private static string KindLabel(CommandNodeKind kind) => kind switch
+    {
+        CommandNodeKind.Unterabschnitt => "Unterabschnitt",
+        CommandNodeKind.Bereitstellung => "Bereitstellung",
+        CommandNodeKind.Partner => "Einsatzleitung",
+        _ => "Abschnitt",
+    };
+
+    private static string Label(ForceUnit unit) =>
+        unit.CallSign is null ? unit.Brigade : $"{unit.Brigade} ({unit.CallSign})";
 
     /// <summary>
     /// Corrects a unit's Stärke (Führungskraft / Gesamt / davon AGT) in place, keeping its identity
