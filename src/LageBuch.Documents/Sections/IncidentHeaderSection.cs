@@ -51,7 +51,7 @@ public static class IncidentHeaderSection
                 row.RelativeItem().Text(t =>
                 {
                     t.Span("Adresse: ").SemiBold();
-                    t.Span(Formatting.OrDash(Formatting.Address(incident.Street, incident.District)));
+                    t.Span(Formatting.OrDash(Formatting.Address(incident)));
                 });
             });
 

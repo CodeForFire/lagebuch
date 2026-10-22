@@ -121,7 +121,7 @@ public static class CommandApplier
                 incident.SetKeyword(c.Keyword);
                 break;
             case SetAddressCommand c:
-                incident.SetAddress(c.Street, c.District);
+                incident.SetAddress(c.Street, c.District, c.HouseNumber, c.PostalCode, c.Place);
                 break;
             case SetStatusCommand c:
                 incident.SetStatus(c.Status);

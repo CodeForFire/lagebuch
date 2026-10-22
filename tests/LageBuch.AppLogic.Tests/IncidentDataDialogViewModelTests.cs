@@ -62,6 +62,42 @@ public class IncidentDataDialogViewModelTests
     }
 
     [Fact]
+    public void Save_writes_hausnummer_plz_and_ort_next_to_strasse_and_ortsteil()
+    {
+        var store = new FakeStore();
+        var session = NewSession(store);
+        var vm = new IncidentDataDialogViewModel(session, () => { });
+
+        vm.Street = "Hauptstr.";
+        vm.HouseNumber = " 12 ";
+        vm.PostalCode = "82256";
+        vm.Place = "Fürstenfeldbruck";
+        vm.District = "Puch";
+        vm.SaveCommand.Execute(null);
+
+        var saved = store.Load("/x.fwincident");
+        Assert.Equal("12", saved.HouseNumber);
+        Assert.Equal("82256", saved.PostalCode);
+        Assert.Equal("Fürstenfeldbruck", saved.Place);
+        Assert.Equal("Hauptstr. 12, Puch, 82256 Fürstenfeldbruck", Formatting.Address(saved));
+    }
+
+    [Fact]
+    public void Changing_only_the_plz_counts_as_a_change_and_keeps_the_other_parts()
+    {
+        var store = new FakeStore();
+        var session = NewSession(store);
+        session.SetAddress("Hauptstr.", "Puch", houseNumber: "12", place: "Fürstenfeldbruck");
+        var vm = new IncidentDataDialogViewModel(session, () => { });
+
+        vm.PostalCode = "82256";
+
+        Assert.True(vm.HasChanges);
+        vm.SaveCommand.Execute(null);
+        Assert.Equal("Hauptstr. 12, Puch, 82256 Fürstenfeldbruck", Formatting.Address(store.Load("/x.fwincident")));
+    }
+
+    [Fact]
     public void Blank_fields_clear_the_values()
     {
         var store = new FakeStore();

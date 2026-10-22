@@ -68,7 +68,7 @@ public sealed class IncidentRepository
 
         Run(
             inserts,
-            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy);",
+            "INSERT INTO incident_meta (id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place) " + "VALUES ($id,$started,$state,$num,$ils,$kw,$street,$district,$status,$closedAt,$closedBy,$houseNumber,$postalCode,$place);",
             p =>
             {
                 p("$id", incident.Id.ToString());
@@ -85,6 +85,9 @@ public sealed class IncidentRepository
                 p("$status", (object?)incident.Status ?? DBNull.Value);
                 p("$closedAt", (object?)incident.ClosedAt?.ToString(Iso) ?? DBNull.Value);
                 p("$closedBy", (object?)incident.ClosedBy ?? DBNull.Value);
+                p("$houseNumber", (object?)incident.HouseNumber ?? DBNull.Value);
+                p("$postalCode", (object?)incident.PostalCode ?? DBNull.Value);
+                p("$place", (object?)incident.Place ?? DBNull.Value);
             });
 
         for (var i = 0; i < incident.Checklists.Count; i++)
@@ -547,7 +550,7 @@ public sealed class IncidentRepository
 
         var meta = ReadRow(
             cn,
-            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by FROM incident_meta LIMIT 1;");
+            "SELECT id, started_at, state, incident_number, ils_number, keyword, street, district, status, closed_at, closed_by, house_number, postal_code, place FROM incident_meta LIMIT 1;");
 
         // One query per table, grouped in C# -- the same shape as editsByEntry below. Items whose
         // list_id matches no list row are dropped: V23 fills list_id for every row it finds, so a
@@ -826,7 +829,10 @@ public sealed class IncidentRepository
             tasks,
             buildings,
             dwellings,
-            involvedParties);
+            involvedParties,
+            meta[11] as string,
+            meta[12] as string,
+            meta[13] as string);
     }
 
     private static DateTimeOffset ParseDate(string s) =>

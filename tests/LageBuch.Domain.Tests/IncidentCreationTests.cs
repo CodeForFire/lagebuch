@@ -69,6 +69,21 @@ public class IncidentCreationTests
     }
 
     [Fact]
+    public void SetAddress_trims_every_part_and_clears_blank_ones()
+    {
+        var incident = Incident.Start(new FixedClock(T0), new SessionOperator("Müller"));
+        incident.SetAddress("Hauptstr.", "Puch", houseNumber: "12", postalCode: "82256", place: "Fürstenfeldbruck");
+
+        incident.SetAddress(" Bahnhofstr. ", " ", houseNumber: " 3a ", postalCode: string.Empty, place: " Dachau ");
+
+        Assert.Equal("Bahnhofstr.", incident.Street);
+        Assert.Equal("3a", incident.HouseNumber);
+        Assert.Null(incident.PostalCode);
+        Assert.Equal("Dachau", incident.Place);
+        Assert.Null(incident.District);
+    }
+
+    [Fact]
     public void SetIncidentNumber_null_clears_previous_value()
     {
         var incident = Incident.Start(new FixedClock(T0), new SessionOperator("Müller"));

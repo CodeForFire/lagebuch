@@ -93,7 +93,10 @@ public static class SnapshotMapper
                 d.KeyAvailable.ToNullableBool(),
                 d.CoValue,
                 d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList())).ToList(),
-            incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)).ToList());
+            incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)).ToList(),
+            HouseNumber: incident.HouseNumber,
+            PostalCode: incident.PostalCode,
+            Place: incident.Place);
     }
 
     public static Incident FromSnapshot(IncidentSnapshot snapshot)
@@ -170,7 +173,10 @@ public static class SnapshotMapper
                 KeyAvailabilityEncoding.FromNullableBool(d.KeyAvailable),
                 d.CoValue,
                 d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)))),
-            (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)));
+            (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)),
+            snapshot.HouseNumber,
+            snapshot.PostalCode,
+            snapshot.Place);
     }
 
     private static ScbaTruppDto ToDto(AtemschutzTrupp t) => new(

@@ -76,7 +76,17 @@ public class VersionHandshakeTests
     {
         // 7 lets a client send updateTask and extendTaskTimer (#246). A host at 6 has neither in its
         // command allowlist and would reject the edit, so a 6 and a 7 must not connect.
-        Assert.Equal(7, SyncProtocol.ProtocolVersion);
-        Assert.Equal(7, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 7, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 7, int.MaxValue);
+    }
+
+    [Fact]
+    public void Hausnummer_plz_and_ort_raise_the_floor_to_protocol_eight()
+    {
+        // 8 carries Hausnummer, PLZ and Ort on setAddress (#401). A client at 7 would send setAddress
+        // without them, and a host at 8 reads the missing parts as cleared -- so a 7 and an 8 must
+        // not connect.
+        Assert.Equal(8, SyncProtocol.ProtocolVersion);
+        Assert.Equal(8, SyncProtocol.MinimumProtocolVersion);
     }
 }

@@ -49,6 +49,7 @@ public class CommandSerializationTests
         new SetIncidentNumberCommand("B 1.2 260812 001"),
         new SetKeywordCommand("Brand 2"),
         new SetAddressCommand("Hauptstraße 1", "Bezirk 2"),
+        new SetAddressCommand("Hauptstraße", "Puch", "1", "82256", "Fürstenfeldbruck"),
         new SetStatusCommand(null),
         new CloseIncidentCommand(Op),
         new AddFileCommand(Op, Guid.NewGuid(), "brand.jpg", "image/jpeg", 4),

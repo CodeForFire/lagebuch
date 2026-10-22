@@ -40,6 +40,13 @@ public sealed class Incident
 
     public string? Street { get; private set; }
 
+    public string? HouseNumber { get; private set; }
+
+    public string? PostalCode { get; private set; }
+
+    /// <summary>The Ort, for an Einsatz outside the home Gemeinde (#401); <see cref="District"/> stays the Ortsteil.</summary>
+    public string? Place { get; private set; }
+
     public string? District { get; private set; }
 
     public string? Status { get; private set; }
@@ -144,7 +151,10 @@ public sealed class Incident
         IEnumerable<IncidentTask> tasks,
         IEnumerable<Building> buildings,
         IEnumerable<Dwelling> dwellings,
-        IEnumerable<InvolvedParty> involvedParties)
+        IEnumerable<InvolvedParty> involvedParties,
+        string? houseNumber = null,
+        string? postalCode = null,
+        string? place = null)
     {
         var incident = new Incident
         {
@@ -154,6 +164,9 @@ public sealed class Incident
             IncidentNumber = incidentNumber,
             Keyword = keyword,
             Street = street,
+            HouseNumber = houseNumber,
+            PostalCode = postalCode,
+            Place = place,
             District = district,
             Status = status,
             ClosedAt = closedAt,
@@ -285,11 +298,16 @@ public sealed class Incident
         Keyword = string.IsNullOrWhiteSpace(keyword) ? null : keyword.Trim();
     }
 
-    public void SetAddress(string? street, string? district)
+    // Every part is optional, and an omitted one is cleared: the one-Gemeinde workflow stays
+    // Straße + Ortsteil, and the PLZ and Ort only matter for überörtliche Hilfe (#401).
+    public void SetAddress(string? street, string? district, string? houseNumber = null, string? postalCode = null, string? place = null)
     {
         EnsureOpen();
-        Street = string.IsNullOrWhiteSpace(street) ? null : street.Trim();
-        District = string.IsNullOrWhiteSpace(district) ? null : district.Trim();
+        Street = TrimToNull(street);
+        HouseNumber = TrimToNull(houseNumber);
+        PostalCode = TrimToNull(postalCode);
+        Place = TrimToNull(place);
+        District = TrimToNull(district);
     }
 
     public void SetStatus(string? status)
@@ -803,6 +821,8 @@ public sealed class Incident
     // bucket; anything else is compared trimmed, the same way names are. Ordinal-ignore-case rather
     // than InvariantCulture: these are operator-typed labels, not identifiers, and the app compares
     // every other such value this way.
+    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     private static string NormalizeSection(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
     public AtemschutzTrupp AddScbaTrupp(

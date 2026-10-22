@@ -187,12 +187,43 @@ public class MigrationsTests : IDisposable
 
         using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
         Migrations.Migrate(cn2);
-        Assert.Equal(25, Migrations.GetVersion(cn2));
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
 
         using var check = cn2.CreateCommand();
         check.CommandText =
             "SELECT count(*) FROM pragma_table_info('involved_parties') " +
             "WHERE name IN ('id','ordinal','name','phone','notes','created_by','created_at');";
         Assert.Equal(7L, (long)check.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void V25_database_upgrades_to_v26_keeping_the_address_and_adding_blank_hausnummer_plz_and_ort()
+    {
+        using (var cn = SqliteConnectionFactory.OpenReadWrite(_path))
+        using (var cmd = cn.CreateCommand())
+        {
+            cmd.CommandText =
+                "CREATE TABLE schema_version (version INTEGER NOT NULL); INSERT INTO schema_version (version) VALUES (25);" +
+                "CREATE TABLE incident_meta (id TEXT PRIMARY KEY, started_at TEXT NOT NULL, state INTEGER NOT NULL, incident_number TEXT, " +
+                "ils_number TEXT, keyword TEXT, street TEXT, district TEXT, status TEXT, closed_at TEXT, closed_by TEXT);" +
+                "INSERT INTO incident_meta (id, started_at, state, street, district) VALUES ('m', '2026-06-22T09:00:00+02:00', 0, 'Hauptstr. 12', 'Puch');";
+            cmd.ExecuteNonQuery();
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        using var cn2 = SqliteConnectionFactory.OpenReadWrite(_path);
+        Migrations.Migrate(cn2);
+        Assert.Equal(Migrations.CurrentVersion, Migrations.GetVersion(cn2));
+
+        using var check = cn2.CreateCommand();
+        check.CommandText = "SELECT street, district, house_number, postal_code, place FROM incident_meta;";
+        using var r = check.ExecuteReader();
+        Assert.True(r.Read());
+        Assert.Equal("Hauptstr. 12", r.GetString(0));
+        Assert.Equal("Puch", r.GetString(1));
+        Assert.True(r.IsDBNull(2));
+        Assert.True(r.IsDBNull(3));
+        Assert.True(r.IsDBNull(4));
     }
 }

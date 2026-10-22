@@ -30,13 +30,24 @@ public static class Formatting
     public static string OrDash(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "—" : value;
 
-    // "Straße, Ortsteil" with blank parts dropped; null when neither is set. Shared by the
-    // workspace header and the PDF header so the two never render the address differently.
-    public static string? Address(string? street, string? district)
+    // "Straße Hausnr., Ortsteil, PLZ Ort" with blank parts dropped, in the order of a German
+    // postal address; null when nothing is set. Shared by the workspace header and the PDF
+    // header so the two never render the address differently.
+    public static string? Address(
+        string? street, string? district, string? houseNumber = null, string? postalCode = null, string? place = null)
     {
-        var joined = string.Join(", ", new[] { street, district }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var joined = Join(", ", Join(" ", street, houseNumber), district, Join(" ", postalCode, place));
         return joined.Length == 0 ? null : joined;
     }
+
+    public static string? Address(Incident incident)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        return Address(incident.Street, incident.District, incident.HouseNumber, incident.PostalCode, incident.Place);
+    }
+
+    private static string Join(string separator, params string?[] parts) =>
+        string.Join(separator, parts.OfType<string>().Select(s => s.Trim()).Where(s => s.Length > 0));
 
     public static string Level(TaskImportance importance) => importance switch
     {

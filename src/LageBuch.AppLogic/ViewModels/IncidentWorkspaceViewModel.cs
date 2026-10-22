@@ -102,7 +102,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         // Seed the backing fields directly so initialization doesn't trigger a write-back/save.
         _keywordDisplay = _session.Incident.Keyword;
         _incidentNumberInput = _session.Incident.IncidentNumber?.Value ?? string.Empty;
-        _addressDisplay = Formatting.Address(_session.Incident.Street, _session.Incident.District);
+        _addressDisplay = Formatting.Address(_session.Incident);
 
         // The header is a projection of the incident's head data; any mutation -- the Einsatzdaten
         // dialog on this device, or (host or joined client alike) a command from another device
@@ -325,7 +325,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
         var incident = _session.Incident;
         KeywordDisplay = incident.Keyword;
         IncidentNumberInput = incident.IncidentNumber?.Value ?? string.Empty;
-        AddressDisplay = Formatting.Address(incident.Street, incident.District);
+        AddressDisplay = Formatting.Address(incident);
         OnPropertyChanged(nameof(OperatorDisplay));
     }
 

@@ -49,15 +49,21 @@ public static class SyncProtocol
     /// 7: a client may send <c>updateTask</c> and <c>extendTaskTimer</c> (#246). A host at 6 would
     /// reject both commands, so the floor rises to 7.
     /// </para>
+    /// <para>
+    /// 8: the address carries Hausnummer, PLZ and Ort (#401), on <c>setAddress</c> and in the
+    /// snapshot. A peer at 7 would not just ignore them: a client at 7 sends <c>setAddress</c>
+    /// without the new fields, which a host at 8 reads as "cleared", wiping what another device
+    /// entered. The floor rises to 8.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 7;
+    public const int ProtocolVersion = 8;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 7;
+    public const int MinimumProtocolVersion = 8;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,
