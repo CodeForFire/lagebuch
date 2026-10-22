@@ -117,27 +117,12 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
-      - name: Publish
-        run: >
-          dotnet publish src/LageBuch.App/LageBuch.App.csproj -r win-x64 ${{ env.PUBLISH_FLAGS }}
-          -p:Version=${{ needs.version.outputs.version }} -o publish
-      - name: Install WiX
-        run: |
-          dotnet tool install --global wix --version 5.0.2
-          echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
-      - name: Build MSI
-        # Absolute paths: WiX resolves <Files Include> relative to the .wxs file's own directory,
-        # not the working directory, so a bare "publish" would look under packaging/windows.
-        # msi_version, not version: a ProductVersion must be numeric, so the MSI inside a
-        # v0.6.0-beta.1 release identifies itself as 0.6.0. The file name keeps the full version.
-        # -arch x64: WiX defaults to an x86 package, which installs ProgramFiles64Folder into
-        # "Program Files (x86)" and registers under WOW6432Node — wrong for a win-x64 publish.
-        run: >
-          wix build packaging/windows/Lagebuch.wxs -arch x64
-          -d Version=${{ needs.version.outputs.msi_version }}
-          -d "PublishDir=${{ github.workspace }}\publish"
-          -d "IconFile=${{ github.workspace }}\src\LageBuch.App\Assets\icon.ico"
-          -o "lagebuch-${{ needs.version.outputs.version }}-x64.msi"
+      # Shared with pr-msi.yml; the publish flags there mirror PUBLISH_FLAGS above.
+      - uses: ./.github/actions/build-msi
+        with:
+          version: ${{ needs.version.outputs.version }}
+          msi-version: ${{ needs.version.outputs.msi_version }}
+          file-name: lagebuch-${{ needs.version.outputs.version }}-x64.msi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: msi

@@ -1,0 +1,53 @@
+name: Build MSI
+description: >-
+  Publish the desktop app for win-x64 and package it as an MSI with WiX. Shared by the tagged
+  release (release.yml) and the on-demand pull request build (pr-msi.yml), so the two cannot
+  drift apart. Runs on a Windows runner after checkout and setup-dotnet; uploading the MSI is
+  left to the caller.
+
+inputs:
+  version:
+    description: Full version for -p:Version= (e.g. 0.6.0-beta.1).
+    required: true
+  msi-version:
+    description: Numeric ProductVersion for the MSI (e.g. 0.6.0).
+    required: true
+  file-name:
+    description: File name of the MSI, written to the workspace root.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Publish
+      shell: pwsh
+      env:
+        VERSION: ${{ inputs.version }}
+      run: >
+        dotnet publish src/LageBuch.App/LageBuch.App.csproj -r win-x64
+        -c Release --self-contained true
+        -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+        -p:DebugType=none -p:DebugSymbols=false
+        "-p:Version=$env:VERSION" -o publish
+    - name: Install WiX
+      shell: pwsh
+      run: |
+        dotnet tool install --global wix --version 5.0.2
+        echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+    - name: Build MSI
+      # Absolute paths: WiX resolves <Files Include> relative to the .wxs file's own directory,
+      # not the working directory, so a bare "publish" would look under packaging/windows.
+      # msi-version, not version: a ProductVersion must be numeric, so the MSI inside a
+      # v0.6.0-beta.1 release identifies itself as 0.6.0. The file name keeps the full version.
+      # -arch x64: WiX defaults to an x86 package, which installs ProgramFiles64Folder into
+      # "Program Files (x86)" and registers under WOW6432Node — wrong for a win-x64 publish.
+      shell: pwsh
+      env:
+        MSI_VERSION: ${{ inputs.msi-version }}
+        FILE_NAME: ${{ inputs.file-name }}
+      run: >
+        wix build packaging/windows/Lagebuch.wxs -arch x64
+        -d "Version=$env:MSI_VERSION"
+        -d "PublishDir=$env:GITHUB_WORKSPACE\publish"
+        -d "IconFile=$env:GITHUB_WORKSPACE\src\LageBuch.App\Assets\icon.ico"
+        -o "$env:FILE_NAME"

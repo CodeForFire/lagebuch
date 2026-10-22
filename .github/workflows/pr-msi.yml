@@ -1,0 +1,134 @@
+name: PR MSI
+
+# An installable Windows MSI for a pull request, on demand: add the `build-msi` label and every
+# push to the pull request builds one, until the label comes off. Not on every pull request,
+# because Windows minutes cost double and most changes never need to be tried on a Windows
+# machine. The download link lands in one comment on the pull request, updated on each build.
+on:
+  pull_request:
+    types:
+      - labeled
+      - synchronize
+      - reopened
+
+# Deny by default; each job grants itself exactly what it needs. The jobs that build the pull
+# request's code only ever read, and the one that may write to the pull request runs no code
+# from it.
+permissions: {}
+
+# A newer push supersedes a build still running for an older one.
+concurrency:
+  group: pr-msi-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    # Adding some other label to a labelled pull request is not a reason to build again.
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'build-msi') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'build-msi')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      msi_version: ${{ steps.v.outputs.msi_version }}
+      file_name: ${{ steps.v.outputs.file_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the latest release tag is the base version
+          persist-credentials: false
+      # The MSI identifies itself as the latest release (0.9.1), which Lagebuch.wxs's
+      # AllowSameVersionUpgrades lets install over that release and over an older build of
+      # this pull request, and which the next real release then replaces. The app's own
+      # version (0.9.1-pr123.abc1234) and the file name say which build a tester is running.
+      - id: v
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' origin/main)
+          base="${tag#v}"
+          base="${base%%-*}"
+          sha="${HEAD_SHA:0:7}"
+          {
+            echo "version=${base}-pr${PR_NUMBER}.${sha}"
+            echo "msi_version=${base}"
+            echo "file_name=lagebuch-pr${PR_NUMBER}-${sha}-x64.msi"
+          } >> "$GITHUB_OUTPUT"
+
+  msi:
+    needs: version
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    outputs:
+      url: ${{ steps.upload.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - uses: ./.github/actions/build-msi
+        with:
+          version: ${{ needs.version.outputs.version }}
+          msi-version: ${{ needs.version.outputs.msi_version }}
+          file-name: ${{ needs.version.outputs.file_name }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: upload
+        with:
+          name: msi-pr${{ github.event.pull_request.number }}
+          path: ${{ needs.version.outputs.file_name }}
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+      # Also where a fork's pull request finds its MSI: the comment job is skipped for those.
+      - name: Link the MSI in the run summary
+        shell: bash
+        env:
+          FILE_NAME: ${{ needs.version.outputs.file_name }}
+          URL: ${{ steps.upload.outputs.artifact-url }}
+        run: echo "**Windows MSI:** [${FILE_NAME}](${URL})" >> "$GITHUB_STEP_SUMMARY"
+
+  comment:
+    needs: [version, msi]
+    # A fork's pull request gets a read-only token, so it could not comment anyway.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      # One comment per pull request, found again by its marker and edited in place, so a
+      # pull request pushed ten times carries one link to the newest MSI, not ten.
+      - name: Post or update the download comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_VERSION: ${{ needs.version.outputs.msi_version }}
+          FILE_NAME: ${{ needs.version.outputs.file_name }}
+          URL: ${{ needs.msi.outputs.url }}
+        run: |
+          marker='<!-- pr-msi -->'
+          cat > body.md <<EOF
+          ${marker}
+          **Windows MSI for this pull request:** [\`${FILE_NAME}\`](${URL}) — built from ${HEAD_SHA:0:7}
+
+          - Kept for 14 days. Downloading needs a GitHub login, and the MSI arrives inside a .zip.
+          - Built on ${BASE_VERSION}, so it installs over that release, and the next release replaces it.
+          - Not signed: SmartScreen → *Weitere Informationen* → *Trotzdem ausführen*.
+
+          Remove the \`build-msi\` label to stop building on every push.
+          EOF
+          id=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" \
+            | head -n1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${id}" -F body=@body.md > /dev/null
+          else
+            gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" -F body=@body.md > /dev/null
+          fi
