@@ -483,13 +483,29 @@ public sealed class Incident
         DateTimeOffset? from = null,
         DateTimeOffset? to = null,
         string? section = null,
-        string? phone = null)
+        string? phone = null,
+        Guid? nodeId = null,
+        RoleSlot slot = RoleSlot.None)
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(op);
 
-        var assignment = RoleAssignment.Create(role, personName, callSign, from, to, section, phone);
+        // Any node kind may hold a Funktion: Bereitstellung and partner Einsatzleitungen have a
+        // Leiter on the sheet too. The node's name wins over a free-text section; the rename
+        // propagation keeps Section equal to it, so FindRunningRoleHolder needs no change.
+        if (nodeId is { } id)
+        {
+            var node = FindCommandNode(id) ?? throw new KeyNotFoundException($"Abschnitt {id} nicht gefunden.");
+            if (!node.IsLive)
+            {
+                throw new InvalidOperationException("Abschnitt ist aufgelöst.");
+            }
+
+            section = node.Name;
+        }
+
+        var assignment = RoleAssignment.Create(role, personName, callSign, from, to, section, phone, nodeId, slot);
         _roles.Add(assignment);
         AppendSystemEntry(clock, op, $"Funktion {assignment.Role} zugewiesen: {assignment.PersonName}");
         return assignment;
@@ -559,7 +575,9 @@ public sealed class Incident
             from: clock.Now,
             to: null,
             section: ended.Section,
-            phone: newPhone);
+            phone: newPhone,
+            nodeId: ended.NodeId,
+            slot: ended.Slot);
         _roles.Add(next);
 
         AppendSystemEntry(clock, op, $"Funktion {ended.Role} übergeben: {ended.PersonName} → {next.PersonName}");
@@ -747,6 +765,15 @@ public sealed class Incident
         if (!string.Equals(previous.Name, updated.Name, StringComparison.Ordinal))
         {
             AppendSystemEntry(clock, op, $"{KindLabel(updated.Kind)} umbenannt: {previous.Name} → {updated.Name}");
+
+            // Running Funktionen follow the rename; ended ones keep the name they held on the day.
+            for (var i = 0; i < _roles.Count; i++)
+            {
+                if (_roles[i].NodeId == nodeId && _roles[i].To is null)
+                {
+                    _roles[i] = _roles[i] with { Section = updated.Name };
+                }
+            }
         }
 
         if (!string.Equals(previous.Auftrag, updated.Auftrag, StringComparison.Ordinal))
@@ -780,6 +807,7 @@ public sealed class Incident
         var node = _commandNodes[index];
         if (node.IsLive
             && (_forces.Exists(f => f.NodeId == nodeId)
+                || _roles.Exists(r => r.NodeId == nodeId && r.To is null)
                 || _commandNodes.Exists(n => n.IsLive && n.ParentId == nodeId)))
         {
             throw new InvalidOperationException("Abschnitt ist nicht leer.");
