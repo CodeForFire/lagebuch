@@ -41,6 +41,8 @@ public class MasterDataStoreTests : IDisposable
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert" },
             Keywords = new[] { "B3 Person", "THL 1" },
+            Districts = new[] { "Puch" },
+            Streets = new[] { new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"), new Street("Am Sulzbogen") },
             ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
                 new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
                 new[] { new ChecklistTemplateItem("Abbauschritt", true) }),
@@ -69,11 +71,24 @@ public class MasterDataStoreTests : IDisposable
         Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplates[1].Items);
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
         Assert.Equal(new[] { "B3 Person", "THL 1" }, reopened.Keywords);
+        Assert.Equal(new[] { "Puch" }, reopened.Districts);
+        Assert.Equal(
+            new[] { new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"), new Street("Am Sulzbogen") },
+            reopened.Streets);
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("Land 1", max.CallSign);
         Assert.Equal("max.mustermann@example.org", max.Email);
         Assert.Equal("KBM Gefahrgut", max.Note);
         Assert.Equal("01 71 / 1 23 45 67", max.Phone);
+    }
+
+    [Fact]
+    public void Saving_again_replaces_the_strassen_rather_than_adding_to_them()
+    {
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Streets = new[] { new Street("Hauptstraße"), new Street("Am Vorfeld") } });
+        MasterDataStore.Save(_path, MasterDataSet.Empty with { Streets = new[] { new Street("Pucher Straße", "Puch") } });
+
+        Assert.Equal(new[] { new Street("Pucher Straße", "Puch") }, MasterDataStore.GetOrCreate(_path).Streets);
     }
 
     [Fact]

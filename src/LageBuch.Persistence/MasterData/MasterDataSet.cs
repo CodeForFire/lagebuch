@@ -16,6 +16,12 @@ public sealed record MasterDataSet(
     // Einsatzstichwörter offered in the Einsatzdaten dialog (#704). Only the chosen text lands in
     // the incident, so renaming or deleting one here never changes a past Einsatz.
     IReadOnlyList<string> Keywords,
+
+    // Ortsteile and Straßen offered in the Einsatzdaten dialog (#461). Two lists, because an
+    // Ortsteil need not have a street listed for it -- a Weiler is often addressed by its own name.
+    // As with the Stichwörter, only the chosen text lands in the incident.
+    IReadOnlyList<string> Districts,
+    IReadOnlyList<Street> Streets,
     IReadOnlyList<Link> Links,
 
     // 0..n user-defined Checkliste templates, in the order the Stammdaten editor lists them.
@@ -46,6 +52,8 @@ public sealed record MasterDataSet(
         Array.Empty<Role>(),
         Array.Empty<string>(),
         Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<Street>(),
         Array.Empty<Link>(),
         Array.Empty<ChecklistTemplate>(),
         Array.Empty<NavEntry>(),
@@ -67,6 +75,8 @@ public sealed record MasterDataSet(
         Roles.Count == 0
         && UnitStatus.Count == 0
         && Keywords.Count == 0
+        && Districts.Count == 0
+        && Streets.Count == 0
         && Links.Count == 0 && ChecklistTemplates.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0
@@ -324,6 +334,14 @@ public sealed record Person(
 /// opposite of HasZugfuehrer's default -- a missing flag must not turn a whole fleet foreign.
 /// </summary>
 public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false, bool IsOwn = true);
+
+/// <summary>
+/// One street of the Gemeinde (#461), with the Ortsteil, PLZ and Ort it lies in where those are
+/// known. Picking it in the Einsatzdaten fills those fields when every row of that name agrees, so
+/// a street that runs through two Ortsteile or PLZ is two rows. Every part but the name may be
+/// blank: OpenStreetMap, where most lists come from, rarely says which Ortsteil a street is in.
+/// </summary>
+public sealed record Street(string Name, string District = "", string PostalCode = "", string Place = "");
 
 /// <summary>
 /// One Trupp-Typ: its name, how many people it is crewed by, and the Einsatzzeit it defaults to.
@@ -704,6 +722,8 @@ public static class MasterDataJson
             ParseRoles(root),
             Arr(root, "unitStatus"),
             Arr(root, "keywords"),
+            Arr(root, "districts"),
+            ParseStreets(root),
             links,
             checklists,
             ParseNavigation(root),
@@ -907,6 +927,37 @@ public static class MasterDataJson
             Str(s, "dispatchCentreName") ?? d.DispatchCentreName);
     }
 
+    // A street list is typically generated from OpenStreetMap and runs to hundreds of rows, so one
+    // malformed row is skipped rather than failing the whole import: a row without a name says
+    // nothing, and a field that is not a string reads as blank.
+    private static IReadOnlyList<Street> ParseStreets(JsonElement root)
+    {
+        if (!root.TryGetProperty("streets", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<Street>();
+        }
+
+        var result = new List<Street>();
+        foreach (var x in arr.EnumerateArray())
+        {
+            var name = Text(x, "name");
+            if (name.Length > 0)
+            {
+                result.Add(new Street(name, Text(x, "district"), Text(x, "postalCode"), Text(x, "place")));
+            }
+        }
+
+        return result;
+
+        static string Text(JsonElement e, string prop) =>
+            e.ValueKind == JsonValueKind.Object
+            && e.TryGetProperty(prop, out var v)
+            && v.ValueKind == JsonValueKind.String
+            && v.GetString() is { } text
+                ? text.Trim()
+                : string.Empty;
+    }
+
     private static IReadOnlyList<Person> ParsePersonnel(JsonElement root)
     {
         if (!root.TryGetProperty("personnel", out var arr) || arr.ValueKind != JsonValueKind.Array)
@@ -962,6 +1013,8 @@ public static class MasterDataJson
             }),
             unitStatus = set.UnitStatus,
             keywords = set.Keywords,
+            districts = set.Districts,
+            streets = set.Streets.Select(t => new { name = t.Name, district = t.District, postalCode = t.PostalCode, place = t.Place }),
             truppTypes = set.TruppTypes.Select(t => new
             {
                 name = t.Name,

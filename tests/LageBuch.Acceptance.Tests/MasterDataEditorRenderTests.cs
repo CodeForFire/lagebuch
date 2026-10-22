@@ -29,6 +29,13 @@ public class MasterDataEditorRenderTests
             },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
             Keywords = new[] { "B3 Person", "THL 1" },
+            Districts = new[] { "Aich", "Puch" },
+            Streets = new[]
+            {
+                new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"),
+                new Street("Lindacher Straße", "Lindach", "82256", "Fürstenfeldbruck"),
+                new Street("Pucher Straße", string.Empty, "82256", "Fürstenfeldbruck"),
+            },
             TruppTypes = new[]
             {
                 new TruppType("Angriffstrupp"),
@@ -90,8 +97,8 @@ public class MasterDataEditorRenderTests
         Dispatcher.UIThread.RunJobs();
 
         // Two rails: the app's own categories, then the brigade's own Checklisten under their
-        // own heading. Einstellungen + Navigation + 7 data categories, and this fixture's 2.
-        Assert.Equal(9, view.GetControl<ListBox>("CategoryList").ItemCount);
+        // own heading. Einstellungen + Navigation + 9 data categories, and this fixture's 2.
+        Assert.Equal(11, view.GetControl<ListBox>("CategoryList").ItemCount);
         Assert.Equal(2, view.GetControl<ListBox>("ChecklistList").ItemCount);
         Assert.False(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.True(view.GetControl<Button>("SaveButton").IsVisible);
@@ -267,6 +274,32 @@ public class MasterDataEditorRenderTests
         var texts = view.GetVisualDescendants().OfType<TextBox>().Select(t => t.Text).ToList();
         Assert.Contains("B3 Person", texts);
         Assert.Contains("THL 1", texts);
+    }
+
+    // #461: a Straße carries its Ortsteil, PLZ and Ort, so the Straßen editor is a typed section,
+    // built like Fahrzeuge; this pins that the rows and their fields reach the screen.
+    [AvaloniaFact]
+    public void Strassen_section_lists_each_street_with_ortsteil_plz_and_ort()
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Straßen");
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 1080, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, "master-data-editor-strassen.png"));
+        }
+
+        var texts = view.GetVisualDescendants().OfType<TextBox>().Select(t => t.Text).ToList();
+        Assert.Contains("Lindacher Straße", texts);
+        Assert.Contains("Lindach", texts);
+        Assert.Contains("82256", texts);
+        Assert.Contains("Fürstenfeldbruck", texts);
     }
 
     // #470: a Funktion carries how often it may be held, so the Rollen editor is a typed section
@@ -650,7 +683,7 @@ public class MasterDataEditorRenderTests
 
         Assert.True(view.GetControl<TextBlock>("NoChecklistsText").IsVisible);
         Assert.False(view.GetControl<ListBox>("ChecklistList").IsVisible);
-        Assert.Equal(9, view.GetControl<ListBox>("CategoryList").ItemCount);
+        Assert.Equal(11, view.GetControl<ListBox>("CategoryList").ItemCount);
 
         // Laid out, not merely IsVisible -- that property stays true for a button clipped to
         // nothing, which is exactly the failure a docked action is supposed to rule out.
@@ -710,7 +743,7 @@ public class MasterDataEditorRenderTests
 
         // No row cut in half: the last category's bottom edge lies inside the scrolled extent.
         var rows = view.GetControl<ListBox>("CategoryList").GetVisualDescendants().OfType<ListBoxItem>().ToArray();
-        Assert.Equal(9, rows.Length);
+        Assert.Equal(11, rows.Length);
         var lastBottom = rows[^1].TranslatePoint(new Point(0, rows[^1].Bounds.Height), rail)!.Value.Y;
         var clipMessage = $"the last category ends {lastBottom:F0}px into a "
             + $"{rail.Extent.Height:F0}px extent -- it is clipped.";

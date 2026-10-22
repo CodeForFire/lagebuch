@@ -67,8 +67,49 @@ public class MasterDataJsonTests
         Assert.Equal(new[] { new Role("EL") }, set.Roles);
         Assert.Empty(set.UnitStatus);
         Assert.Empty(set.Keywords);
+        Assert.Empty(set.Districts);
+        Assert.Empty(set.Streets);
         Assert.Empty(set.Links);
         Assert.Empty(set.Personnel);
+    }
+
+    [Fact]
+    public void Parse_reads_streets_with_their_optional_ortsteil_plz_and_ort()
+    {
+        var set = Parse("""
+            {
+              "districts": ["Puch", "Aich"],
+              "streets": [
+                { "name": "Hauptstraße", "district": "Puch", "postalCode": "82256", "place": "Fürstenfeldbruck" },
+                { "name": " Am Sulzbogen " }
+              ]
+            }
+            """);
+
+        Assert.Equal(new[] { "Puch", "Aich" }, set.Districts);
+        Assert.Equal(
+            new[]
+            {
+                new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"),
+                new Street("Am Sulzbogen"),
+            },
+            set.Streets);
+    }
+
+    [Fact]
+    public void Parse_drops_a_street_without_a_name_and_reads_null_fields_as_blank()
+    {
+        var set = Parse("""
+            {
+              "streets": [
+                { "name": "  ", "district": "Puch" },
+                { "district": "Aich" },
+                { "name": "Lindacher Straße", "district": null, "postalCode": 82256 }
+              ]
+            }
+            """);
+
+        Assert.Equal(new Street("Lindacher Straße"), Assert.Single(set.Streets));
     }
 
     [Fact]
@@ -101,6 +142,12 @@ public class MasterDataJsonTests
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
             Keywords = new[] { "B3 Person", "THL Öl" },
+            Districts = new[] { "Puch", "Aich" },
+            Streets = new[]
+            {
+                new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"),
+                new Street("Am Sulzbogen"),
+            },
             Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä"), new Link("ERICard", "https://example.org/ericard", "Gefahrgut") },
 
             // relaxed escaping must survive the round trip
@@ -119,6 +166,8 @@ public class MasterDataJsonTests
         Assert.Equal(original.Roles, reparsed.Roles);
         Assert.Equal(original.UnitStatus, reparsed.UnitStatus);
         Assert.Equal(original.Keywords, reparsed.Keywords);
+        Assert.Equal(original.Districts, reparsed.Districts);
+        Assert.Equal(original.Streets, reparsed.Streets);
         Assert.Equal(original.ChecklistTemplates[0].Items, reparsed.ChecklistTemplates[0].Items);
         Assert.Equal(original.ChecklistTemplates[1].Items, reparsed.ChecklistTemplates[1].Items);
         Assert.Equal(original.Links, reparsed.Links);
@@ -550,6 +599,8 @@ public class MasterDataJsonTests
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Links = new[] { new Link("N", "U") } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Keywords = new[] { "B3 Person" } }).IsEmpty);
+        Assert.False((MasterDataSet.Empty with { Districts = new[] { "Puch" } }).IsEmpty);
+        Assert.False((MasterDataSet.Empty with { Streets = new[] { new Street("Hauptstraße") } }).IsEmpty);
     }
 
     [Fact]

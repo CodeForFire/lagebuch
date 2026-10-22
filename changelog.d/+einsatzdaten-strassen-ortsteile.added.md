@@ -1,0 +1,1 @@
+Einsatzdaten: STRASSE and ORTSTEIL suggest the Straßen and Ortsteile from two new Stammdaten lists, a picked street fills in its Ortsteil, PLZ and Ort where they are still empty, and `make osm-streets` builds both lists for a Gemeinde from OpenStreetMap (#461).

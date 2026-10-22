@@ -103,7 +103,15 @@ public class VersionHandshakeTests
     {
         // 10 lets a client send setInvolvedPartyDwelling (#702). A host at 9 has no such command in
         // its allowlist and would reject the link, so a 9 and a 10 must not connect.
-        Assert.Equal(10, SyncProtocol.ProtocolVersion);
-        Assert.Equal(10, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 10, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 10, int.MaxValue);
+    }
+
+    [Fact]
+    public void Strassen_and_Ortsteile_raise_the_protocol_but_not_the_floor()
+    {
+        // 11 adds districts and streets to the Stammdaten payload (#461). A peer at 10 skips both
+        // keys and offers no suggestions, so it stays joinable.
+        Assert.InRange(SyncProtocol.ProtocolVersion, 11, int.MaxValue);
     }
 }

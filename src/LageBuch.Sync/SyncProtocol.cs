@@ -65,8 +65,13 @@ public static class SyncProtocol
     /// <c>dwellingId</c> and <c>dwellingLabel</c> (#702). A host at 9 would reject the command, so
     /// the floor rises to 10.
     /// </para>
+    /// <para>
+    /// 11: the Stammdaten payload carries <c>districts</c> and <c>streets</c>, the Ortsteile and
+    /// Straßen (#461). A peer at 10 skips both keys and offers no suggestions, and a payload without
+    /// them reads as none, so the floor stays at 10.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 10;
+    public const int ProtocolVersion = 11;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
