@@ -57,6 +57,9 @@ public static class CommandApplier
             case EditRolePhoneCommand c:
                 incident.EditRolePhone(clock, Operator(c.Operator), c.AssignmentId, c.Phone);
                 break;
+            case SetRoleReportsToCommand c:
+                incident.SetRoleReportsTo(clock, Operator(c.Operator), c.AssignmentId, c.ReportsToId);
+                break;
             case AddForceUnitCommand c:
                 incident.AddForceUnit(
                     clock,
@@ -157,6 +160,9 @@ public static class CommandApplier
                 break;
             case RemoveInvolvedPartyCommand c:
                 incident.RemoveInvolvedParty(c.PartyId);
+                break;
+            case SetInvolvedPartyDwellingCommand c:
+                incident.SetInvolvedPartyDwelling(c.PartyId, c.DwellingId);
                 break;
             case UpdateTaskCommand c:
                 incident.UpdateTask(c.TaskId, c.Text, c.Assignee, c.Importance, c.Urgency);

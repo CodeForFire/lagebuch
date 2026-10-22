@@ -90,7 +90,10 @@ public sealed record RoleAssignmentDto(
     DateTimeOffset? From,
     DateTimeOffset? To,
     string? Section,
-    string? Phone);
+    string? Phone,
+
+    // Defaulted like DwellingDto.Readings: a snapshot without the key reads as "no hierarchy".
+    Guid? ReportsToId = null);
 
 public sealed record ForceUnitDto(
     Guid Id,
@@ -162,7 +165,8 @@ public sealed record TaskDto(
 
 /// <summary>One Beteiligte/r on the wire; mirrors <see cref="LageBuch.Domain.Involved.InvolvedParty"/>.</summary>
 public sealed record InvolvedPartyDto(
-    Guid Id, string Name, string? Phone, string? Notes, string CreatedBy, DateTimeOffset CreatedAt);
+    Guid Id, string Name, string? Phone, string? Notes, string CreatedBy, DateTimeOffset CreatedAt,
+    Guid? DwellingId = null, string? DwellingLabel = null);
 
 public sealed record BuildingDto(
     Guid Id, string Name, int FloorCount, int ApartmentsPerFloor,

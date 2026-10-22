@@ -60,15 +60,24 @@ public static class SyncProtocol
     /// the key and offers no suggestions, and a payload without it reads as none, so the floor stays
     /// at 8.
     /// </para>
+    /// <para>
+    /// 10: a client may send <c>setRoleReportsTo</c>, and a snapshot's Funktionen carry
+    /// <c>reportsToId</c> (#703). A host at 9 would reject the command, so the floor rises to 10.
+    /// </para>
+    /// <para>
+    /// 11: a client may send <c>setInvolvedPartyDwelling</c>, and a snapshot's Beteiligte carry
+    /// <c>dwellingId</c> and <c>dwellingLabel</c> (#702). A host at 10 would reject the command, so
+    /// the floor rises to 11.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 9;
+    public const int ProtocolVersion = 11;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 8;
+    public const int MinimumProtocolVersion = 11;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

@@ -156,7 +156,7 @@ public sealed class IncidentRepository
             var r = incident.Roles[i];
             Run(
                 inserts,
-                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph);",
+                "INSERT INTO role_assignments (id, ordinal, role, person_name, call_sign, from_time, to_time, section, phone, reports_to_id) VALUES ($id,$o,$role,$name,$cs,$from,$to,$sec,$ph,$up);",
                 p =>
                 {
                     p("$id", r.Id.ToString());
@@ -168,6 +168,7 @@ public sealed class IncidentRepository
                     p("$to", (object?)r.To?.ToString(Iso) ?? DBNull.Value);
                     p("$sec", (object?)r.Section ?? DBNull.Value);
                     p("$ph", (object?)r.Phone ?? DBNull.Value);
+                    p("$up", (object?)r.ReportsToId?.ToString() ?? DBNull.Value);
                 });
         }
     }
@@ -431,7 +432,7 @@ public sealed class IncidentRepository
             var party = incident.InvolvedParties[i];
             Run(
                 inserts,
-                "INSERT INTO involved_parties (id, ordinal, name, phone, notes, created_by, created_at) " + "VALUES ($id,$o,$name,$phone,$notes,$by,$cat);",
+                "INSERT INTO involved_parties (id, ordinal, name, phone, notes, created_by, created_at, dwelling_id, dwelling_label) " + "VALUES ($id,$o,$name,$phone,$notes,$by,$cat,$dwelling,$dwellingLabel);",
                 p =>
                 {
                     p("$id", party.Id.ToString());
@@ -441,6 +442,8 @@ public sealed class IncidentRepository
                     p("$notes", (object?)party.Notes ?? DBNull.Value);
                     p("$by", party.CreatedBy);
                     p("$cat", party.CreatedAt.ToString(Iso));
+                    p("$dwelling", (object?)party.DwellingId?.ToString() ?? DBNull.Value);
+                    p("$dwellingLabel", (object?)party.DwellingLabel ?? DBNull.Value);
                 });
         }
     }
@@ -604,7 +607,7 @@ public sealed class IncidentRepository
 
         var roles = ReadAll(
             cn,
-            "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone FROM role_assignments ORDER BY ordinal;",
+            "SELECT id, role, person_name, call_sign, from_time, to_time, section, phone, reports_to_id FROM role_assignments ORDER BY ordinal;",
             r => new Domain.RoleAssignment(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
@@ -613,7 +616,8 @@ public sealed class IncidentRepository
                 NullableDate(r, 4),
                 NullableDate(r, 5),
                 Str(r, 6),
-                Str(r, 7)));
+                Str(r, 7),
+                Str(r, 8) is { } up ? Guid.Parse(up) : null));
 
         var strengthEditsByUnit = ReadAll(
             cn,
@@ -790,14 +794,16 @@ public sealed class IncidentRepository
 
         var involvedParties = ReadAll(
             cn,
-            "SELECT id, name, phone, notes, created_by, created_at FROM involved_parties ORDER BY ordinal;",
+            "SELECT id, name, phone, notes, created_by, created_at, dwelling_id, dwelling_label FROM involved_parties ORDER BY ordinal;",
             r => Domain.Involved.InvolvedParty.Rehydrate(
                 Guid.Parse(r.GetString(0)),
                 r.GetString(1),
                 Str(r, 2),
                 Str(r, 3),
                 r.GetString(4),
-                ParseDate(r.GetString(5))));
+                ParseDate(r.GetString(5)),
+                Str(r, 6) is { } dwelling ? Guid.Parse(dwelling) : null,
+                Str(r, 7)));
 
         // Legacy fallback: files written before the Einsatznummer unification carry the 4-digit
         // number in ils_number and nothing in incident_number. Load that old value as the

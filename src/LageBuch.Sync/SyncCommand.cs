@@ -19,6 +19,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
 [JsonDerivedType(typeof(TransferRoleCommand), "transferRole")]
 [JsonDerivedType(typeof(EditRolePhoneCommand), "editRolePhone")]
+[JsonDerivedType(typeof(SetRoleReportsToCommand), "setRoleReportsTo")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
 [JsonDerivedType(typeof(UpdateForceStrengthCommand), "updateForceStrength")]
@@ -55,6 +56,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AddInvolvedPartyCommand), "addInvolvedParty")]
 [JsonDerivedType(typeof(UpdateInvolvedPartyCommand), "updateInvolvedParty")]
 [JsonDerivedType(typeof(RemoveInvolvedPartyCommand), "removeInvolvedParty")]
+[JsonDerivedType(typeof(SetInvolvedPartyDwellingCommand), "setInvolvedPartyDwelling")]
 public abstract record SyncCommand;
 
 /// <summary>The operator at the sending device — carried on attributed mutations (see §6).</summary>
@@ -81,6 +83,9 @@ public sealed record TransferRoleCommand(
     OperatorDto Operator, Guid AssignmentId, string NewPersonName, string? NewCallSign, string? NewPhone) : SyncCommand;
 
 public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentId, string? Phone) : SyncCommand;
+
+/// <summary>Who a Funktion reports to (#703); a null ReportsToId clears it.</summary>
+public sealed record SetRoleReportsToCommand(OperatorDto Operator, Guid AssignmentId, Guid? ReportsToId) : SyncCommand;
 
 // OfficerCount/ZugfuehrerCount default to 0 so a pre-#76/#216 payload (no such property on the
 // wire) deserializes as "keine Führungskraft/kein ZF erfasst" instead of failing the contract.
@@ -167,6 +172,10 @@ public sealed record AddInvolvedPartyCommand(OperatorDto Operator, string Name, 
 public sealed record UpdateInvolvedPartyCommand(Guid PartyId, string Name, string? Phone, string? Notes) : SyncCommand;
 
 public sealed record RemoveInvolvedPartyCommand(Guid PartyId) : SyncCommand;
+
+/// <summary>The Wohnung a Beteiligte/r was found in (#702); a null DwellingId clears it. Ids only:
+/// the host copies the Wohnung's location itself, so no peer can put a label of its own there.</summary>
+public sealed record SetInvolvedPartyDwellingCommand(Guid PartyId, Guid? DwellingId) : SyncCommand;
 
 // No operator on the wire: a task correction is a silent edit (no ETB entry), like RenameFileCommand.
 public sealed record UpdateTaskCommand(

@@ -417,6 +417,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Send(new EditRolePhoneCommand(Op(), assignmentId, phone));
 
+    public void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId) =>
+        Send(new SetRoleReportsToCommand(Op(), assignmentId, reportsToId));
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,
@@ -451,6 +454,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void RemoveInvolvedParty(Guid partyId) =>
         Send(new RemoveInvolvedPartyCommand(partyId));
+
+    public void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId) =>
+        Send(new SetInvolvedPartyDwellingCommand(partyId, dwellingId));
 
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Send(new UpdateTaskCommand(taskId, text, assignee ?? string.Empty, importance, urgency));

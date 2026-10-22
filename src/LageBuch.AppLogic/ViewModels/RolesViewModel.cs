@@ -127,6 +127,64 @@ public sealed partial class RoleAssignmentRow : ObservableObject
 
     [RelayCommand(CanExecute = nameof(CanBeginTransfer))]
     private void BeginTransfer() => _onTransfer(this);
+
+    /// <summary>The MELDET AN flyout's entries (#703); set by <c>RolesViewModel</c> once every row exists.</summary>
+    public IReadOnlyList<ReportsToChoice> ReportsToChoices { get; private set; } = [];
+
+    /// <summary>What the MELDET AN button reads: the superior, "— niemand —", or "unbekannt".</summary>
+    public string ReportsToButtonText { get; private set; } = ReportsToChoice.NoneDisplay;
+
+    /// <summary>Only a running Funktion takes a new superior; an ended one keeps the record it has.</summary>
+    public bool CanSetReportsTo => !IsReadOnly && IsRunning;
+
+    /// <summary>
+    /// Brings the picker in line with the incident. A second pass after every row is built, for the
+    /// reason <c>MarkDuplicates</c> gives: the choices depend on all the other rows.
+    /// </summary>
+    public void SetReportsTo(IReadOnlyList<ReportsToChoice> choices, string buttonText)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+        ArgumentNullException.ThrowIfNull(buttonText);
+        ReportsToChoices = choices;
+        ReportsToButtonText = buttonText;
+        OnPropertyChanged(nameof(ReportsToChoices));
+        OnPropertyChanged(nameof(ReportsToButtonText));
+        OnPropertyChanged(nameof(CanSetReportsTo));
+    }
+
+    /// <summary>How far down the Führungsstruktur this row sits: 0 for a Funktion that reports to no one shown.</summary>
+    public int Depth { get; private set; }
+
+    /// <summary>
+    /// The guide lines in front of the Funktion in the grid, one cell per level above it. Empty at
+    /// the top level.
+    /// </summary>
+    public IReadOnlyList<TreeGuideSegment> TreeSegments { get; private set; } = [];
+
+    /// <summary>The same guide lines as text, "│  └─ " and so on: what a test or a screen reader compares.</summary>
+    public string TreeGuide => string.Concat(TreeSegments.Select(g => g.Text));
+
+    /// <summary>The phone card's indent, in device-independent pixels.</summary>
+    public double IndentWidth => Depth * RolesViewModel.IndentPerLevel;
+
+    /// <summary>Places the row in the tree; set by <c>RolesViewModel</c> once the visible rows are known.</summary>
+    public void SetTreePosition(IReadOnlyList<TreeGuideSegment> segments)
+    {
+        ArgumentNullException.ThrowIfNull(segments);
+        if (Depth != segments.Count)
+        {
+            Depth = segments.Count;
+            OnPropertyChanged(nameof(Depth));
+            OnPropertyChanged(nameof(IndentWidth));
+        }
+
+        if (!TreeSegments.SequenceEqual(segments))
+        {
+            TreeSegments = segments;
+            OnPropertyChanged(nameof(TreeSegments));
+            OnPropertyChanged(nameof(TreeGuide));
+        }
+    }
 }
 
 public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEntryForm, IDisposable
@@ -200,6 +258,7 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         }
 
         MarkDuplicates(); // after every row exists — see the comment on it
+        RefreshReportsTo();
         ApplyFilter();
 
         // A handover changes who holds what without touching the form, so a conflict computed from
@@ -266,11 +325,53 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
     private void ApplyFilter() =>
         RowReconciler.Reconcile(
             Roles,
-            _all.Where(r => ShowAllRoles || r.IsRunning).ToList(),
+            TreeOrder(_all.Where(r => ShowAllRoles || r.IsRunning).ToList()),
             r => r.Id,
             r => r.Id,
             r => r,
             (_, _) => { });
+
+    /// <summary>The phone card's indent per level of the Führungsstruktur (#703).</summary>
+    public const double IndentPerLevel = 14;
+
+    // The Führungsstruktur as the list shows it (#703): depth-first, each Funktion under the one it
+    // reports to, siblings in the order the incident lists them (#696). A row whose superior is not
+    // shown -- ended and filtered out, or not in this file at all -- stands at the top rather than
+    // vanishing, and the placed set ends a loop a foreign build may have written, so every visible
+    // row is listed exactly once.
+    private List<RoleAssignmentRow> TreeOrder(List<RoleAssignmentRow> visible)
+    {
+        var reportsTo = _session.Incident.Roles.ToDictionary(r => r.Id, r => r.ReportsToId);
+        var shown = visible.Select(r => r.Id).ToHashSet();
+        var children = visible.ToLookup(r => reportsTo.GetValueOrDefault(r.Id) is { } up && shown.Contains(up) ? up : Guid.Empty);
+        var ordered = new List<RoleAssignmentRow>(visible.Count);
+        var placed = new HashSet<Guid>();
+
+        // `indent` is what each level above draws past this row: a line on down to a later sibling
+        // of that level, or nothing once its last child is placed.
+        void Place(RoleAssignmentRow row, List<TreeGuideSegment> indent, TreeGuideSegment? branch)
+        {
+            placed.Add(row.Id);
+            row.SetTreePosition(branch is null ? indent : [.. indent, branch]);
+            ordered.Add(row);
+            var below = children[row.Id].Where(c => !placed.Contains(c.Id)).ToList();
+            List<TreeGuideSegment> next = branch is null ? indent : [.. indent, branch == TreeGuideSegment.Tee ? TreeGuideSegment.Pass : TreeGuideSegment.Blank];
+            for (var i = 0; i < below.Count; i++)
+            {
+                Place(below[i], next, i == below.Count - 1 ? TreeGuideSegment.Elbow : TreeGuideSegment.Tee);
+            }
+        }
+
+        foreach (var row in children[Guid.Empty].Concat(visible))
+        {
+            if (!placed.Contains(row.Id))
+            {
+                Place(row, [], null);
+            }
+        }
+
+        return ordered;
+    }
 
     public bool IsReadOnly { get; }
 
@@ -636,6 +737,100 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
         public string? Phone { get; set; }
 
         public string? CallSign { get; set; }
+    }
+
+    // The MELDET AN picker of every row (#703). It offers exactly the links the domain accepts:
+    // running Funktionen other than the row itself and anyone below it, so a pick is never refused.
+    private void RefreshReportsTo()
+    {
+        var roles = _session.Incident.Roles;
+        var byId = roles.ToDictionary(r => r.Id);
+        foreach (var row in _all)
+        {
+            var assignment = byId[row.Id];
+            void Select(Guid? reportsToId) => SetReportsTo(row.Id, reportsToId);
+
+            var choices = new List<ReportsToChoice> { new(null, ReportsToChoice.NoneDisplay, null, assignment.ReportsToId is null, Select) };
+            choices.AddRange(roles
+                .Where(r => r.To is null && r.Id != row.Id && !ReportsUpTo(r, row.Id, byId))
+                .Select(r => new ReportsToChoice(r.Id, r.Label, r.Section, r.Id == assignment.ReportsToId, Select)));
+
+            var buttonText = assignment.ReportsToId switch
+            {
+                null => ReportsToChoice.NoneDisplay,
+                { } id when byId.TryGetValue(id, out var superior) => superior.Label,
+                _ => ReportsToChoice.UnknownDisplay,
+            };
+            row.SetReportsTo(choices, buttonText);
+        }
+    }
+
+    // Whether `assignment` reports, directly or further up, to `superiorId`. The visited set ends the
+    // walk on a loop a foreign build may have written.
+    private static bool ReportsUpTo(Domain.RoleAssignment assignment, Guid superiorId, Dictionary<Guid, Domain.RoleAssignment> byId)
+    {
+        var visited = new HashSet<Guid>();
+        for (var up = assignment.ReportsToId; up is { } id && visited.Add(id); up = byId.TryGetValue(id, out var next) ? next.ReportsToId : null)
+        {
+            if (id == superiorId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether a drag of <paramref name="assignmentId"/> may be dropped under
+    /// <paramref name="superiorId"/>, or at the top level when that is null (#703). The same links
+    /// the MELDET AN menu offers, less the one already in force: a drop that changes nothing shows
+    /// no drop cursor.
+    /// </summary>
+    public bool CanMoveUnder(Guid assignmentId, Guid? superiorId)
+    {
+        if (IsReadOnly)
+        {
+            return false;
+        }
+
+        var byId = _session.Incident.Roles.ToDictionary(r => r.Id);
+        if (!byId.TryGetValue(assignmentId, out var assignment) || assignment.To is not null || assignment.ReportsToId == superiorId)
+        {
+            return false;
+        }
+
+        return superiorId is not { } id
+            || (id != assignmentId && byId.TryGetValue(id, out var superior) && superior.To is null && !ReportsUpTo(superior, assignmentId, byId));
+    }
+
+    /// <summary>Drops a dragged Funktion under another, or at the top level for null. False, and nothing written, when the drop is not allowed.</summary>
+    public bool MoveUnder(Guid assignmentId, Guid? superiorId)
+    {
+        if (!CanMoveUnder(assignmentId, superiorId))
+        {
+            return false;
+        }
+
+        SetReportsTo(assignmentId, superiorId);
+        return true;
+    }
+
+    /// <summary>The Funktion being dragged, while a drag is under way; shows the "oberste Ebene" drop zone.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDraggingRole))]
+    private Guid? _draggingId;
+
+    public bool IsDraggingRole => DraggingId is not null;
+
+    public void BeginDrag(Guid assignmentId) => DraggingId = assignmentId;
+
+    public void EndDrag() => DraggingId = null;
+
+    private void SetReportsTo(Guid assignmentId, Guid? reportsToId)
+    {
+        _session.SetRoleReportsTo(assignmentId, reportsToId); // Changed → RefreshRoles updates the rows
+        _onChanged();
     }
 
     private RoleAssignmentRow CreateRow(Domain.RoleAssignment r) =>

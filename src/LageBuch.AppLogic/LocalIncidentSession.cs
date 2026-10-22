@@ -171,6 +171,9 @@ public sealed class LocalIncidentSession : IIncidentSession
     public void EditRolePhone(Guid assignmentId, string? phone) =>
         Mutate(() => Incident.EditRolePhone(_clock, RequireOperator(), assignmentId, phone));
 
+    public void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId) =>
+        Mutate(() => Incident.SetRoleReportsTo(_clock, RequireOperator(), assignmentId, reportsToId));
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,
@@ -205,6 +208,9 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void RemoveInvolvedParty(Guid partyId) =>
         Mutate(() => Incident.RemoveInvolvedParty(partyId));
+
+    public void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId) =>
+        Mutate(() => Incident.SetInvolvedPartyDwelling(partyId, dwellingId));
 
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Mutate(() => Incident.UpdateTask(taskId, text, assignee, importance, urgency));

@@ -34,6 +34,80 @@ public class RolesSectionTests
             PdfText.LinesOf(incident, Started, IncidentPdfSections.Roles));
     }
 
+    // #703: who reports to whom, printed as an indented tree under the table, superior first.
+    [Fact]
+    public void The_fuehrungsstruktur_lists_each_funktion_under_the_one_it_reports_to()
+    {
+        var incident = Incident.Start(Clock, Op);
+        var el = incident.AssignRole(Clock, Op, "EL", "Mayr");
+        var ea = incident.AssignRole(Clock, Op, "Abschnittsleiter", "Bauer", section: "Nord");
+        var gf = incident.AssignRole(Clock, Op, "GF", "Wagner", section: "Nord");
+        incident.AssignRole(Clock, Op, "Presse", "Lang");
+        incident.SetRoleReportsTo(Clock, Op, ea.Id, el.Id);
+        incident.SetRoleReportsTo(Clock, Op, gf.Id, ea.Id);
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Roles);
+
+        var start = lines.ToList().IndexOf("Führungsstruktur");
+        Assert.True(start >= 0, "no Führungsstruktur heading");
+        Assert.Equal(
+            ["EL (Mayr)", "– Abschnittsleiter (Bauer) · Nord", "– GF (Wagner) · Nord", "Presse (Lang)"],
+            lines.Skip(start + 1).Take(4));
+    }
+
+    // An older or foreign file can hold a link to an assignment it lacks, or a loop. Every Funktion
+    // is still printed exactly once, rather than lost or repeated without end.
+    [Fact]
+    public void A_dangling_link_or_a_loop_still_prints_every_funktion_once()
+    {
+        var incident = Incident.Start(Clock, Op);
+        var a = incident.AssignRole(Clock, Op, "EL", "Mayr");
+        var b = incident.AssignRole(Clock, Op, "EAL", "Bauer");
+        var c = incident.AssignRole(Clock, Op, "GF", "Wagner");
+        var rehydrated = Incident.Rehydrate(
+            incident.Id,
+            incident.StartedAt,
+            incident.State,
+            incident.IncidentNumber,
+            incident.Keyword,
+            incident.Street,
+            incident.District,
+            incident.Status,
+            incident.ClosedAt,
+            incident.ClosedBy,
+            incident.Checklists,
+            incident.Journal,
+            [a with { ReportsToId = Guid.NewGuid() }, b with { ReportsToId = c.Id }, c with { ReportsToId = b.Id }],
+            incident.Forces,
+            incident.ScbaTrupps,
+            incident.Audit,
+            incident.Timers,
+            incident.Files,
+            incident.Tasks,
+            incident.Buildings,
+            incident.Dwellings,
+            incident.InvolvedParties);
+
+        var lines = PdfText.LinesOf(rehydrated, Started, IncidentPdfSections.Roles).ToList();
+        var start = lines.IndexOf("Führungsstruktur");
+
+        var tree = lines.Skip(start + 1).ToList();
+        Assert.Equal(["EL (Mayr)", "EAL (Bauer)", "– GF (Wagner)"], tree.Take(3));
+        Assert.DoesNotContain(tree.Skip(3), l => l.Contains("(Mayr)", StringComparison.Ordinal)
+            || l.Contains("(Bauer)", StringComparison.Ordinal) || l.Contains("(Wagner)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Without_any_link_there_is_no_fuehrungsstruktur()
+    {
+        var incident = Incident.Start(Clock, Op);
+        incident.AssignRole(Clock, Op, "EL", "Mayr");
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.Roles);
+
+        Assert.DoesNotContain("Führungsstruktur", text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_running_assignment_has_a_start_but_no_end()
     {

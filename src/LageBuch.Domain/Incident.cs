@@ -537,7 +537,9 @@ public sealed class Incident
         var ended = previous.EndedAt(clock.Now);
         _roles[index] = ended;
 
-        var next = RoleAssignment.Create(
+        // The incoming holder reports where the outgoing one did, and whoever still reports to the
+        // outgoing one now reports to the incoming one (#703). The ended record keeps its own link.
+        var created = RoleAssignment.Create(
             ended.Role,
             newPersonName,
             newCallSign,
@@ -545,10 +547,78 @@ public sealed class Incident
             to: null,
             section: ended.Section,
             phone: newPhone);
+        var next = created with { ReportsToId = ended.ReportsToId };
+        for (var i = 0; i < _roles.Count; i++)
+        {
+            if (_roles[i].ReportsToId == ended.Id && _roles[i].To is null)
+            {
+                _roles[i] = _roles[i] with { ReportsToId = next.Id };
+            }
+        }
+
         _roles.Add(next);
 
         AppendSystemEntry(clock, op, $"Funktion {ended.Role} übergeben: {ended.PersonName} → {next.PersonName}");
         return next;
+    }
+
+    /// <summary>
+    /// Records who a Funktion reports to (#703), or clears it with null. Refuses only what can only
+    /// be a bug: a Funktion reporting to itself, an assignment this incident does not have, and a
+    /// loop. Only a real change reaches the ETB, like <see cref="EditRolePhone"/>.
+    /// </summary>
+    public RoleAssignment SetRoleReportsTo(IClock clock, SessionOperator op, Guid assignmentId, Guid? reportsToId)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var index = _roles.FindIndex(r => r.Id == assignmentId);
+        if (index < 0)
+        {
+            throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(assignmentId));
+        }
+
+        var previous = _roles[index];
+        var superior = reportsToId is { } superiorId ? SuperiorFor(previous, superiorId) : null;
+        if (previous.ReportsToId == reportsToId)
+        {
+            return previous;
+        }
+
+        var updated = previous with { ReportsToId = reportsToId };
+        _roles[index] = updated;
+        var text = superior is null
+            ? $"Funktion {updated.Label} meldet an: —"
+            : $"Funktion {updated.Label} meldet an {superior.Label}";
+        AppendSystemEntry(clock, op, text);
+        return updated;
+    }
+
+    // The assignment `subordinate` may report to, or why not. Walking up from it, meeting the
+    // subordinate means a loop; the visited set ends the walk on a loop a foreign build already wrote.
+    private RoleAssignment SuperiorFor(RoleAssignment subordinate, Guid superiorId)
+    {
+        if (superiorId == subordinate.Id)
+        {
+            throw new ArgumentException("Eine Funktion kann nicht an sich selbst melden.", nameof(superiorId));
+        }
+
+        var superior = _roles.Find(r => r.Id == superiorId)
+            ?? throw new ArgumentException("Funktionszuweisung nicht gefunden.", nameof(superiorId));
+
+        var visited = new HashSet<Guid>();
+        for (var current = superior; current is not null && visited.Add(current.Id);
+             current = current.ReportsToId is { } up ? _roles.Find(r => r.Id == up) : null)
+        {
+            if (current.Id == subordinate.Id)
+            {
+                throw new InvalidOperationException(
+                    $"{subordinate.Label} kann nicht an {superior.Label} melden: das ergäbe einen Kreis.");
+            }
+        }
+
+        return superior;
     }
 
     /// <summary>
@@ -1082,6 +1152,46 @@ public sealed class Incident
         EnsureOpen();
         _involvedParties.RemoveAt(FindInvolvedPartyIndex(partyId));
     }
+
+    /// <summary>
+    /// Records the Wohnung a Beteiligte/r was found in (#702), or clears it with null. The Wohnung's
+    /// location is copied at this moment, so the entry keeps saying where once the Wohnung is gone.
+    /// Silent, like <see cref="AddInvolvedParty"/>: a third party's whereabouts stay out of the ETB.
+    /// </summary>
+    public InvolvedParty SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId)
+    {
+        EnsureOpen();
+        var index = FindInvolvedPartyIndex(partyId);
+        string? label = null;
+        if (dwellingId is { } id)
+        {
+            label = DwellingLocation(id) ?? throw new KeyNotFoundException($"Wohnung {id} nicht gefunden.");
+        }
+
+        var updated = _involvedParties[index].WithDwelling(dwellingId, label);
+        _involvedParties[index] = updated;
+        return updated;
+    }
+
+    /// <summary>
+    /// Where <paramref name="party"/> was found: the Wohnung as it is now while it still exists, so
+    /// a renamed Haus or Wohnung reads current, otherwise the copy taken when it was linked.
+    /// </summary>
+    public string? DwellingLocationOf(InvolvedParty party)
+    {
+        ArgumentNullException.ThrowIfNull(party);
+        return party.DwellingId is { } id && DwellingLocation(id) is { } live ? live : party.DwellingLabel;
+    }
+
+    /// <summary>"Hauptstr. 12, 1. OG, Whg. 2" for a Wohnung of this incident, or null when it has none by that id.</summary>
+    public string? DwellingLocation(Guid dwellingId) =>
+        _dwellings.Find(d => d.Id == dwellingId) is { } dwelling && _buildings.Find(b => b.Id == dwelling.BuildingId) is { } building
+            ? CoMeasurementLabels.DwellingLocation(building, dwelling.FloorOrdinal, dwelling.ApartmentNumber)
+            : null;
+
+    /// <summary>The Beteiligten found in <paramref name="dwellingId"/>, in the order they were recorded.</summary>
+    public IReadOnlyList<InvolvedParty> InvolvedPartiesIn(Guid dwellingId) =>
+        _involvedParties.Where(p => p.DwellingId == dwellingId).ToList();
 
     private int FindInvolvedPartyIndex(Guid partyId)
     {

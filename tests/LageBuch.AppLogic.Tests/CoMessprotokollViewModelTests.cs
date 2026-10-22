@@ -141,6 +141,38 @@ public class CoMessprotokollViewModelTests
         Assert.NotEqual("Müller", CoMeasurementLabels.ApartmentLabel(building, 1, cell.ApartmentNumber));
     }
 
+    // --- Issue #702: the Beteiligten found in a Wohnung ----------------------------------------
+    [Fact]
+    public void Editor_lists_the_beteiligte_found_in_the_wohnung()
+    {
+        var (session, vm) = CreateVm();
+        var haus = session.Incident.Buildings[0].Id;
+        var cell = vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0];
+        var dwelling = session.Incident.Dwellings.Single(d => d.BuildingId == haus && d.FloorOrdinal == 0 && d.ApartmentNumber == cell.ApartmentNumber);
+        session.AddInvolvedParty("Erika Beispiel", null, null);
+        session.AddInvolvedParty("POK Mustermann", null, null);
+        session.SetInvolvedPartyDwelling(session.Incident.InvolvedParties[0].Id, dwelling.Id);
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
+
+        var editor = vm.Editor;
+        Assert.NotNull(editor);
+        Assert.True(editor.HasInvolvedParties);
+        Assert.Equal(["Erika Beispiel"], editor.InvolvedPartyNames);
+    }
+
+    [Fact]
+    public void Editor_of_a_wohnung_without_beteiligte_shows_none()
+    {
+        var (_, vm) = CreateVm();
+
+        vm.MatrixRows.Single(r => r.Ordinal == 0).Cells[0].OpenEditorCommand.Execute(null);
+
+        var editor = vm.Editor;
+        Assert.NotNull(editor);
+        Assert.False(editor.HasInvolvedParties);
+    }
+
     // --- Issue #424: the Messreihe -----------------------------------------------------------
     [Fact]
     public void Editor_ShowsTheCommittedMessreihe_NewestFirst()
@@ -1132,6 +1164,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void EditRolePhone(Guid assignmentId, string? phone) => _inner.EditRolePhone(assignmentId, phone);
 
+    public void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId) => _inner.SetRoleReportsTo(assignmentId, reportsToId);
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,
@@ -1161,6 +1195,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
         _inner.UpdateInvolvedParty(partyId, name, phone, notes);
 
     public void RemoveInvolvedParty(Guid partyId) => _inner.RemoveInvolvedParty(partyId);
+
+    public void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId) => _inner.SetInvolvedPartyDwelling(partyId, dwellingId);
 
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         _inner.UpdateTask(taskId, text, assignee, importance, urgency);

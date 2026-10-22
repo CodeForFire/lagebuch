@@ -67,6 +67,9 @@ public interface IIncidentSession
     /// <summary>Corrects a role assignment's phone number. Logs to the ETB only on a real change.</summary>
     void EditRolePhone(Guid assignmentId, string? phone);
 
+    /// <summary>Who a Funktion reports to (#703); null clears it.</summary>
+    void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId);
+
     void AddForceUnit(
         string brigade,
         int personnelCount,
@@ -102,6 +105,9 @@ public interface IIncidentSession
 
     /// <summary>Takes a Beteiligte/n back completely. No ETB line.</summary>
     void RemoveInvolvedParty(Guid partyId);
+
+    /// <summary>The Wohnung a Beteiligte/r was found in (#702); null clears it. No ETB line.</summary>
+    void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId);
 
     /// <summary>Corrects a task's fields (#246): typo fixes, reassignment, re-prioritizing.</summary>
     void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency);

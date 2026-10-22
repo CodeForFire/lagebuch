@@ -87,7 +87,7 @@ public class VersionHandshakeTests
         // without them, and a host at 8 reads the missing parts as cleared -- so a 7 and an 8 must
         // not connect.
         Assert.InRange(SyncProtocol.ProtocolVersion, 8, int.MaxValue);
-        Assert.Equal(8, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 8, int.MaxValue);
     }
 
     [Fact]
@@ -95,7 +95,24 @@ public class VersionHandshakeTests
     {
         // 9 adds keywords to the Stammdaten payload (#704). A peer at 8 skips the key and offers no
         // Stichwort suggestions, so it stays joinable.
-        Assert.Equal(9, SyncProtocol.ProtocolVersion);
-        Assert.Equal(8, SyncProtocol.MinimumProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 9, int.MaxValue);
+    }
+
+    [Fact]
+    public void Who_reports_to_whom_raises_the_floor_to_protocol_ten()
+    {
+        // 10 lets a client send setRoleReportsTo (#703). A host at 9 has no such command in its
+        // allowlist and would reject the link, so a 9 and a 10 must not connect.
+        Assert.InRange(SyncProtocol.ProtocolVersion, 10, int.MaxValue);
+        Assert.InRange(SyncProtocol.MinimumProtocolVersion, 10, int.MaxValue);
+    }
+
+    [Fact]
+    public void Beteiligte_in_a_wohnung_raise_the_floor_to_protocol_eleven()
+    {
+        // 11 lets a client send setInvolvedPartyDwelling (#702). A host at 10 has no such command in
+        // its allowlist and would reject the link, so a 10 and an 11 must not connect.
+        Assert.Equal(11, SyncProtocol.ProtocolVersion);
+        Assert.Equal(11, SyncProtocol.MinimumProtocolVersion);
     }
 }

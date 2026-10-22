@@ -33,6 +33,15 @@ public sealed record InvolvedParty
 
     public DateTimeOffset CreatedAt { get; private init; }
 
+    /// <summary>The CO-Messung's Wohnung this person was found in (#702), or null.</summary>
+    public Guid? DwellingId { get; private init; }
+
+    /// <summary>
+    /// Where that Wohnung was when the link was made, e.g. "Hauptstr. 12, 1. OG, Whg. 2": a copy,
+    /// so the entry still says where once the Wohnung has left the building.
+    /// </summary>
+    public string? DwellingLabel { get; private init; }
+
     public static InvolvedParty Create(
         DateTimeOffset createdAt, string name, string? phone, string? notes, SessionOperator @operator)
     {
@@ -50,7 +59,14 @@ public sealed record InvolvedParty
     }
 
     public static InvolvedParty Rehydrate(
-        Guid id, string name, string? phone, string? notes, string createdBy, DateTimeOffset createdAt)
+        Guid id,
+        string name,
+        string? phone,
+        string? notes,
+        string createdBy,
+        DateTimeOffset createdAt,
+        Guid? dwellingId = null,
+        string? dwellingLabel = null)
         => new()
         {
             Id = id,
@@ -59,6 +75,8 @@ public sealed record InvolvedParty
             Notes = notes,
             CreatedBy = createdBy,
             CreatedAt = createdAt,
+            DwellingId = dwellingId,
+            DwellingLabel = dwellingLabel,
         };
 
     /// <summary>Returns a copy with corrected details, validated and normalised the same way
@@ -68,6 +86,10 @@ public sealed record InvolvedParty
         var (validName, validPhone, validNotes) = Validate(name, phone, notes);
         return this with { Name = validName, Phone = validPhone, Notes = validNotes };
     }
+
+    /// <summary>Returns a copy found in <paramref name="dwellingId"/>, described as <paramref name="label"/>; both null clears it.</summary>
+    public InvolvedParty WithDwelling(Guid? dwellingId, string? label) =>
+        this with { DwellingId = dwellingId, DwellingLabel = label };
 
     private static (string Name, string? Phone, string? Notes) Validate(string name, string? phone, string? notes)
     {

@@ -46,7 +46,7 @@ public static class SnapshotMapper
                 e.From,
                 e.To,
                 e.Edits.Select(x => new EtbEntryEditDto(x.PreviousText, x.EditedBy, x.EditedAt)).ToList())).ToList(),
-            incident.Roles.Select(r => new RoleAssignmentDto(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)).ToList(),
+            incident.Roles.Select(r => new RoleAssignmentDto(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone, r.ReportsToId)).ToList(),
             incident.Forces.Select(f => new ForceUnitDto(
                 f.Id,
                 f.Brigade,
@@ -93,7 +93,7 @@ public static class SnapshotMapper
                 d.KeyAvailable.ToNullableBool(),
                 d.CoValue,
                 d.Readings.Select(r => new CoReadingDto(r.MeasuredAt, r.Value, r.RecordedBy)).ToList())).ToList(),
-            incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)).ToList(),
+            incident.InvolvedParties.Select(p => new InvolvedPartyDto(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel)).ToList(),
             HouseNumber: incident.HouseNumber,
             PostalCode: incident.PostalCode,
             Place: incident.Place);
@@ -126,7 +126,7 @@ public static class SnapshotMapper
                 e.From,
                 e.To,
                 e.Edits.Select(x => new EtbEntryEdit(x.PreviousText, x.EditedBy, x.EditedAt)))),
-            snapshot.Roles.Select(r => new RoleAssignment(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone)),
+            snapshot.Roles.Select(r => new RoleAssignment(r.Id, r.Role, r.PersonName, r.CallSign, r.From, r.To, r.Section, r.Phone, r.ReportsToId)),
             snapshot.Forces.Select(f => ForceUnit.Rehydrate(
                 f.Id,
                 f.Brigade,
@@ -173,7 +173,7 @@ public static class SnapshotMapper
                 KeyAvailabilityEncoding.FromNullableBool(d.KeyAvailable),
                 d.CoValue,
                 d.Readings?.Select(r => new CoReading(r.MeasuredAt, r.Value, r.RecordedBy)))),
-            (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt)),
+            (snapshot.InvolvedParties ?? []).Select(p => InvolvedParty.Rehydrate(p.Id, p.Name, p.Phone, p.Notes, p.CreatedBy, p.CreatedAt, p.DwellingId, p.DwellingLabel)),
             snapshot.HouseNumber,
             snapshot.PostalCode,
             snapshot.Place);
