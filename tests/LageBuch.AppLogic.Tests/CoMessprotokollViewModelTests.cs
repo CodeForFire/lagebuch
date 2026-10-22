@@ -1132,6 +1132,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void EditRolePhone(Guid assignmentId, string? phone) => _inner.EditRolePhone(assignmentId, phone);
 
+    public void SetRoleReportsTo(Guid assignmentId, Guid? reportsToId) => _inner.SetRoleReportsTo(assignmentId, reportsToId);
+
     public void AddForceUnit(
         string brigade,
         int personnelCount,

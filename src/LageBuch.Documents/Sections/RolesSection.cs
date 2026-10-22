@@ -57,6 +57,55 @@ public static class RolesSection
                     table.Cell().Element(Cells.Body).Text(role.To is { } t ? Formatting.Timestamp(t) : "—");
                 }
             });
+
+            // Who reported to whom (#703), as a tree rather than an eighth column: a column would
+            // squeeze the table past A4 portrait, and it would flatten exactly what the reader wants
+            // to see. Only printed once someone actually reported to someone.
+            if (incident.Roles.Any(r => r.ReportsToId is not null))
+            {
+                column.Item().PaddingTop(6).Text("Führungsstruktur").SemiBold();
+                foreach (var (role, depth) in Hierarchy(incident.Roles))
+                {
+                    var label = role.Section is { } section ? $"{role.Label} · {section}" : role.Label;
+                    var line = depth == 0 ? label : $"– {label}";
+                    column.Item().PaddingLeft(14 * depth).Text(line);
+                }
+            }
         });
+    }
+
+    // Depth-first, in the order the assignments were made. A Funktion whose superior is not in the
+    // file, or one caught in a loop a foreign build wrote, is printed as a root rather than lost.
+    private static List<(RoleAssignment Role, int Depth)> Hierarchy(IReadOnlyList<RoleAssignment> roles)
+    {
+        var ids = roles.Select(r => r.Id).ToHashSet();
+        var result = new List<(RoleAssignment, int)>();
+        var printed = new HashSet<Guid>();
+
+        void Visit(RoleAssignment role, int depth)
+        {
+            if (!printed.Add(role.Id))
+            {
+                return;
+            }
+
+            result.Add((role, depth));
+            foreach (var child in roles.Where(r => r.ReportsToId == role.Id))
+            {
+                Visit(child, depth + 1);
+            }
+        }
+
+        foreach (var root in roles.Where(r => r.ReportsToId is not { } up || !ids.Contains(up)))
+        {
+            Visit(root, 0);
+        }
+
+        foreach (var leftover in roles)
+        {
+            Visit(leftover, 0);
+        }
+
+        return result;
     }
 }

@@ -19,6 +19,7 @@ namespace LageBuch.Sync;
 [JsonDerivedType(typeof(AssignRoleCommand), "assignRole")]
 [JsonDerivedType(typeof(TransferRoleCommand), "transferRole")]
 [JsonDerivedType(typeof(EditRolePhoneCommand), "editRolePhone")]
+[JsonDerivedType(typeof(SetRoleReportsToCommand), "setRoleReportsTo")]
 [JsonDerivedType(typeof(AddForceUnitCommand), "addForceUnit")]
 [JsonDerivedType(typeof(UpdateForceUnitCommand), "updateForceUnit")]
 [JsonDerivedType(typeof(UpdateForceStrengthCommand), "updateForceStrength")]
@@ -81,6 +82,9 @@ public sealed record TransferRoleCommand(
     OperatorDto Operator, Guid AssignmentId, string NewPersonName, string? NewCallSign, string? NewPhone) : SyncCommand;
 
 public sealed record EditRolePhoneCommand(OperatorDto Operator, Guid AssignmentId, string? Phone) : SyncCommand;
+
+/// <summary>Who a Funktion reports to (#703); a null ReportsToId clears it.</summary>
+public sealed record SetRoleReportsToCommand(OperatorDto Operator, Guid AssignmentId, Guid? ReportsToId) : SyncCommand;
 
 // OfficerCount/ZugfuehrerCount default to 0 so a pre-#76/#216 payload (no such property on the
 // wire) deserializes as "keine Führungskraft/kein ZF erfasst" instead of failing the contract.

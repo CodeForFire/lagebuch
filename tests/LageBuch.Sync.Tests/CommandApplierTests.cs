@@ -54,6 +54,24 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void SetRoleReportsTo_over_the_wire_links_and_clears_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+        var op = new SessionOperator("Host", "FFB 1");
+        var el = incident.AssignRole(clock, op, "EL", "Huber", from: clock.Now);
+        var gf = incident.AssignRole(clock, op, "GF", "Schmidt", from: clock.Now);
+        var client = new OperatorDto("Maier", "FFB 2");
+
+        ApplyOverWire(new SetRoleReportsToCommand(client, gf.Id, el.Id), incident, clock);
+        Assert.Equal(el.Id, incident.Roles.Single(r => r.Id == gf.Id).ReportsToId);
+        Assert.Equal("Maier (FFB 2)", incident.Journal[^1].EnteredBy);
+
+        ApplyOverWire(new SetRoleReportsToCommand(client, gf.Id, null), incident, clock);
+        Assert.Null(incident.Roles.Single(r => r.Id == gf.Id).ReportsToId);
+    }
+
+    [Fact]
     public void Applying_a_non_file_command_returns_null()
     {
         var clock = new FixedClock();

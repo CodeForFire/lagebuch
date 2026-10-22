@@ -17,6 +17,8 @@ public class CommandSerializationTests
         new AssignRoleCommand(Op, "EL", "Huber", "FFB 1", DateTimeOffset.UnixEpoch, null, "Abschnitt", "0171"),
         new TransferRoleCommand(Op, Guid.NewGuid(), "Schmidt", "FFB 12/2", "0172"),
         new EditRolePhoneCommand(Op, Guid.NewGuid(), "0173"),
+        new SetRoleReportsToCommand(Op, Guid.NewGuid(), Guid.NewGuid()),
+        new SetRoleReportsToCommand(Op, Guid.NewGuid(), null),
         new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4),
         new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4, 1),
         new UpdateForceUnitCommand(Op, Guid.NewGuid(), "Bereitstellung", null),
