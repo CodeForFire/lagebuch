@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using LageBuch.Domain.Atemschutz;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.Sqlite;
 using Microsoft.Data.Sqlite;
 
@@ -45,11 +46,12 @@ public sealed class MasterDataStore
             Run(
                 cn,
                 tx,
-                "INSERT INTO md_roles (value, uniqueness) VALUES ($v,$u);",
+                "INSERT INTO md_roles (value, uniqueness, slot) VALUES ($v,$u,$s);",
                 p =>
                 {
                     p("$v", r.Name);
                     p("$u", Role.UniquenessName(r.Uniqueness));
+                    p("$s", (object?)LeadershipKeys.SlotKey(r.Slot) ?? DBNull.Value);
                 });
         }
 
@@ -171,6 +173,22 @@ public sealed class MasterDataStore
                     p("$o", v.IsOwn ? 1 : 0);
                     p("$p", (object?)v.Phone ?? DBNull.Value);
                     p("$e", (object?)v.Email ?? DBNull.Value);
+                });
+        }
+
+        Run(cn, tx, "DELETE FROM md_talk_groups;", _ => { });
+        foreach (var g in set.TalkGroups)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_talk_groups (value, number, kind, note) VALUES ($v,$n,$k,$o);",
+                p =>
+                {
+                    p("$v", g.Name);
+                    p("$n", (object?)g.Number ?? DBNull.Value);
+                    p("$k", TalkGroup.KindName(g.Kind));
+                    p("$o", (object?)g.Note ?? DBNull.Value);
                 });
         }
 
@@ -314,6 +332,7 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL, place TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1, phone TEXT, email TEXT);
+            CREATE TABLE IF NOT EXISTS md_talk_groups (value TEXT NOT NULL, number TEXT, kind TEXT NOT NULL, note TEXT);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
                 id TEXT PRIMARY KEY,
                 ordinal INTEGER NOT NULL,
@@ -450,6 +469,14 @@ public sealed class MasterDataStore
         // that existed before #470 is Multiple, which is also what a NULL reads back as, so widening
         // loses nothing and a flag would record nothing. Save always writes the column explicitly.
         SchemaHelpers.AddColumnIfMissing(cn, null, "md_roles", "uniqueness", "TEXT");
+
+        // The Führungstafel slot of a Funktion. A pre-slot md_roles reads NULL, which is no slot.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_roles", "slot", "TEXT");
+
+        // md_talk_groups' optional columns: no released store lacks them, but #397's sweep holds
+        // every repairable column to the same rule.
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_talk_groups", "number", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, null, "md_talk_groups", "note", "TEXT");
 
         // Wachen and Funkrufnamen used to be lists of their own; they are derived from md_vehicles
         // (and md_personnel) now. Drop the stale tables a pre-change store still carries -- their
@@ -616,6 +643,7 @@ public sealed class MasterDataStore
             ReadTextSnippets(cn),
             ReadPremises(cn),
             ReadDevices(cn),
+            ReadTalkGroups(cn),
             ReadSettings(cn));
     }
 
@@ -864,12 +892,12 @@ public sealed class MasterDataStore
     private static List<Role> ReadRoles(SqliteConnection cn)
     {
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "SELECT value, uniqueness FROM md_roles;";
+        cmd.CommandText = "SELECT value, uniqueness, slot FROM md_roles;";
         using var r = cmd.ExecuteReader();
         var list = new List<Role>();
         while (r.Read())
         {
-            list.Add(new Role(r.GetString(0), Role.UniquenessFrom(Str(r, 1))));
+            list.Add(new Role(r.GetString(0), Role.UniquenessFrom(Str(r, 1)), LeadershipKeys.SlotFrom(Str(r, 2))));
         }
 
         return list;
@@ -898,6 +926,20 @@ public sealed class MasterDataStore
         while (r.Read())
         {
             list.Add(new Street(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3)));
+        }
+
+        return list;
+    }
+
+    private static List<TalkGroup> ReadTalkGroups(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT value, number, kind, note FROM md_talk_groups;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<TalkGroup>();
+        while (r.Read())
+        {
+            list.Add(new TalkGroup(r.GetString(0), Str(r, 1), TalkGroup.KindFrom(Str(r, 2)), Str(r, 3)));
         }
 
         return list;

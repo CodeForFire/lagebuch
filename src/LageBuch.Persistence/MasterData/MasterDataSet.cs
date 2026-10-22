@@ -4,6 +4,7 @@ using System.Text.Json;
 using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 
 namespace LageBuch.Persistence.MasterData;
@@ -53,6 +54,9 @@ public sealed record MasterDataSet(
     // each with how many there are. Only the chosen name lands in the incident; the count is a live
     // rule, checked against today's Stammdaten.
     IReadOnlyList<Device> Devices,
+    // Funkgruppen (TMO/DMO) offered as suggestions on the Führungstafel. Only the chosen text
+    // lands in an incident, so renaming one here never changes a past Einsatz.
+    IReadOnlyList<TalkGroup> TalkGroups,
 
     // Operational defaults (timers, durations). Unlike the lists, always populated — a store with
     // no overrides yields IncidentSettings.Defaults, never a zeroed record.
@@ -78,6 +82,7 @@ public sealed record MasterDataSet(
         Array.Empty<TextSnippet>(),
         Array.Empty<Premises>(),
         Array.Empty<Device>(),
+        Array.Empty<TalkGroup>(),
         IncidentSettings.Defaults);
 
     /// <summary>
@@ -101,7 +106,8 @@ public sealed record MasterDataSet(
         && Vehicles.Count == 0
         && TextSnippets.Count == 0
         && Premises.Count == 0
-        && Devices.Count == 0;
+        && Devices.Count == 0
+        && TalkGroups.Count == 0;
 
     /// <summary>
     /// The Wachen: the distinct Wache of every vehicle, trimmed, case-insensitively de-duplicated,
@@ -349,7 +355,7 @@ public enum RoleUniqueness
 /// and <c>HomeViewModel</c> catches only the JSON exception types around the master-data parse.
 /// </para>
 /// </summary>
-public sealed record Role(string Name, RoleUniqueness Uniqueness = RoleUniqueness.Multiple)
+public sealed record Role(string Name, RoleUniqueness Uniqueness = RoleUniqueness.Multiple, RoleSlot Slot = RoleSlot.None)
 {
     /// <summary>The spelling <see cref="UniquenessFrom"/> reads back.</summary>
     public static string UniquenessName(RoleUniqueness uniqueness) => uniqueness switch
@@ -444,6 +450,36 @@ public sealed record Vehicle(
 
     /// <inheritdoc cref="Person.HasEmail"/>
     public bool HasEmail => !string.IsNullOrWhiteSpace(Email);
+}
+
+/// <summary>Whether a Funkgruppe is a Truppmittel-Funk (TMO) or a Direktmodus group (DMO).</summary>
+public enum TalkGroupKind
+{
+    Tmo,
+    Dmo,
+}
+
+/// <summary>
+/// One Funkgruppe from the Stammdaten, e.g. "TMO FW_MUSTER 1000" or "DMO 301_F". Number is the
+/// optional channel or group number and Note free text; both are null or blank when not given.
+/// </summary>
+public sealed record TalkGroup(string Name, string? Number, TalkGroupKind Kind, string? Note = null)
+{
+    /// <summary>The kind upper-case, then the name, then the number when present.</summary>
+    public string Display =>
+        string.IsNullOrWhiteSpace(Number)
+            ? $"{KindLabel(Kind)} {Name}"
+            : $"{KindLabel(Kind)} {Name} {Number}";
+
+    /// <summary>The label shown for <paramref name="kind"/>.</summary>
+    public static string KindLabel(TalkGroupKind kind) => kind == TalkGroupKind.Dmo ? "DMO" : "TMO";
+
+    /// <summary>The file format's spelling, read back by <see cref="KindFrom"/>.</summary>
+    public static string KindName(TalkGroupKind kind) => kind == TalkGroupKind.Dmo ? "dmo" : "tmo";
+
+    /// <summary>Total: an unknown or missing kind reads as <see cref="TalkGroupKind.Tmo"/>.</summary>
+    public static TalkGroupKind KindFrom(string? name) =>
+        string.Equals(name?.Trim(), "dmo", StringComparison.OrdinalIgnoreCase) ? TalkGroupKind.Dmo : TalkGroupKind.Tmo;
 }
 
 /// <summary>
@@ -862,6 +898,7 @@ public static class MasterDataJson
     // would be lost so the user can add a vehicle for it before saving.
     private const string LegacyBrigadesKey = "brigades";
     private const string LegacyCallSignsKey = "radioCallSigns";
+    private const int MaxTalkGroupNameLength = 200;
 
     private static readonly JsonSerializerOptions ExportOptions = new()
     {
@@ -953,11 +990,49 @@ public static class MasterDataJson
                     Role.UniquenessFrom(
                         x.TryGetProperty("uniqueness", out var u) && u.ValueKind == JsonValueKind.String
                             ? u.GetString()
+                            : null),
+                    LeadershipKeys.SlotFrom(
+                        x.TryGetProperty("slot", out var sl) && sl.ValueKind == JsonValueKind.String
+                            ? sl.GetString()
                             : null)));
         }
 
         return result;
     }
+
+    // Hostile input: name is required and capped, kind degrades to TMO, and blank optional strings
+    // (which arrive as "" rather than null) are normalised to null.
+    private static IReadOnlyList<TalkGroup> ParseTalkGroups(JsonElement root)
+    {
+        if (!root.TryGetProperty("talkGroups", out var arr) || arr.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<TalkGroup>();
+        }
+
+        var result = new List<TalkGroup>();
+        foreach (var x in arr.EnumerateArray())
+        {
+            var name = RequiredName(x, "Funkgruppe").Trim();
+            if (name.Length > MaxTalkGroupNameLength)
+            {
+                throw new JsonException($"Funkgruppe: \"name\" darf höchstens {MaxTalkGroupNameLength} Zeichen lang sein.");
+            }
+
+            result.Add(new TalkGroup(
+                name,
+                BlankToNull(OptionalString(x, "number")),
+                TalkGroup.KindFrom(OptionalString(x, "kind")),
+                BlankToNull(OptionalString(x, "note"))));
+        }
+
+        return result;
+    }
+
+    private static string? OptionalString(JsonElement e, string key) =>
+        e.TryGetProperty(key, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
+
+    private static string? BlankToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static MasterDataSet ParseRoot(JsonElement root)
     {
@@ -999,6 +1074,7 @@ public static class MasterDataJson
             ParseTextSnippets(root),
             ParsePremises(root),
             ParseDevices(root),
+            ParseTalkGroups(root),
             ParseSettings(root));
     }
 
@@ -1393,6 +1469,7 @@ public static class MasterDataJson
             {
                 name = r.Name,
                 uniqueness = Role.UniquenessName(r.Uniqueness),
+                slot = LeadershipKeys.SlotKey(r.Slot),
             }),
             unitStatus = set.UnitStatus,
             keywords = set.Keywords,
@@ -1409,6 +1486,13 @@ public static class MasterDataJson
             navigation = NavigationForExport(set),
             links = set.Links.Select(l => new { name = l.Name, url = l.Url, group = l.Group }),
             vehicles = set.Vehicles.Select(v => new { wache = v.Wache, callSign = v.CallSign, seats = v.Seats, hasZugfuehrer = v.HasZugfuehrer, isOwn = v.IsOwn, phone = v.Phone, email = v.Email }),
+            talkGroups = set.TalkGroups.Select(t => new
+            {
+                name = t.Name,
+                number = t.Number,
+                kind = TalkGroup.KindName(t.Kind),
+                note = t.Note,
+            }),
             personnel = set.Personnel.Select(p => new
             {
                 lastName = p.LastName,
