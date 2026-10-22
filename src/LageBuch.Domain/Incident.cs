@@ -89,6 +89,12 @@ public sealed class Incident
     /// <summary>Abschnitte, Unterabschnitte, Bereitstellungen and partner Einsatzleitungen in creation order, dissolved ones included.</summary>
     public IReadOnlyList<CommandNode> CommandNodes => _commandNodes;
 
+    /// <summary>The Führungsstufe of the Einsatz, or null while none is set.</summary>
+    public Fuehrungsstufe? Fuehrungsstufe { get; private set; }
+
+    /// <summary>How the Einsatzleitung can be reached. Never null; <see cref="LeadershipPost.Empty"/> until filled.</summary>
+    public LeadershipPost LeadershipPost { get; private set; } = LeadershipPost.Empty;
+
     /// <summary>The persisted state of the timer with this key, or null if none has been recorded.</summary>
     public IncidentTimerState? FindTimer(string key) => _timers.Find(t => t.Key == key);
 
@@ -160,7 +166,9 @@ public sealed class Incident
         string? houseNumber = null,
         string? postalCode = null,
         string? place = null,
-        IEnumerable<CommandNode>? commandNodes = null)
+        IEnumerable<CommandNode>? commandNodes = null,
+        Fuehrungsstufe? fuehrungsstufe = null,
+        LeadershipPost? leadershipPost = null)
     {
         var incident = new Incident
         {
@@ -177,6 +185,8 @@ public sealed class Incident
             Status = status,
             ClosedAt = closedAt,
             ClosedBy = closedBy,
+            Fuehrungsstufe = fuehrungsstufe,
+            LeadershipPost = leadershipPost ?? LeadershipPost.Empty,
         };
         incident._checklists.AddRange(checklists);
         incident._journal.AddRange(journal);
@@ -687,6 +697,54 @@ public sealed class Incident
         if (!string.Equals(previous.Status, updated.Status, StringComparison.Ordinal))
         {
             AppendSystemEntry(clock, op, StatusChangeText(previous, updated), from: updated.CallSign);
+        }
+
+        return updated;
+    }
+
+    /// <summary>Sets or clears the Führungsstufe. A no-op when unchanged.</summary>
+    public void SetFuehrungsstufe(IClock clock, SessionOperator op, Fuehrungsstufe? stufe)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        if (Fuehrungsstufe == stufe)
+        {
+            return;
+        }
+
+        Fuehrungsstufe = stufe;
+        AppendSystemEntry(
+            clock,
+            op,
+            stufe is { } value ? $"Führungsstufe {value} festgelegt" : "Führungsstufe aufgehoben");
+    }
+
+    /// <summary>
+    /// Corrects how the Einsatzleitung can be reached. Only a Funkgruppe change reaches the ETB;
+    /// Standort, Rufname and Telefon are working data and stay silent, like a node's.
+    /// </summary>
+    public LeadershipPost UpdateLeadershipPost(
+        IClock clock,
+        SessionOperator op,
+        string? standort,
+        string? rufname,
+        string? telefon,
+        string? funkgruppe)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(op);
+
+        var updated = new LeadershipPost(standort, rufname, telefon, funkgruppe).Normalized();
+        var previous = LeadershipPost;
+        LeadershipPost = updated;
+
+        if (updated.Funkgruppe is not null
+            && !string.Equals(previous.Funkgruppe, updated.Funkgruppe, StringComparison.Ordinal))
+        {
+            AppendSystemEntry(clock, op, $"Funkgruppe Einsatzleitung: {updated.Funkgruppe}");
         }
 
         return updated;
