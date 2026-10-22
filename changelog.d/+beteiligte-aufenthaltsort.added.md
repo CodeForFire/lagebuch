@@ -1,0 +1,1 @@
+Beteiligte: a Beteiligte/r records their Aufenthaltsort after an evacuation, such as at a neighbour's or in an RTW with its Funkrufname, with the time it was last changed, on their card and in the PDF (#701).

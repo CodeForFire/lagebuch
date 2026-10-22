@@ -178,6 +178,27 @@ public class IncidentRoundTripTests : IDisposable
     }
 
     [Fact]
+    public void The_aufenthaltsort_of_a_beteiligte_and_its_time_survive_a_round_trip()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Müller", "FFB 12/1");
+        var incident = Incident.Start(clock, op);
+        var placed = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        incident.AddInvolvedParty(clock, op, "POK Mustermann", null, null);
+        var set = incident.SetInvolvedPartyWhereabouts(clock, placed.Id, "im RTW Rotkreuz Musterstadt 71/1");
+
+        IncidentRepository.Save(_path, incident);
+        var loaded = IncidentRepository.Load(_path);
+
+        var back = loaded.InvolvedParties.Single(p => p.Id == placed.Id);
+        Assert.Equal("im RTW Rotkreuz Musterstadt 71/1", back.Whereabouts);
+        Assert.Equal(set.WhereaboutsAt, back.WhereaboutsAt);
+        var unknown = loaded.InvolvedParties.Single(p => p.Id != placed.Id);
+        Assert.Null(unknown.Whereabouts);
+        Assert.Null(unknown.WhereaboutsAt);
+    }
+
+    [Fact]
     public void An_edited_status_and_bemerkung_survive_a_round_trip()
     {
         // The point of making them editable is that the corrected value is what ends up in the

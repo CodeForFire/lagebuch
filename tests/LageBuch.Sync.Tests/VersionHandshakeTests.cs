@@ -114,4 +114,13 @@ public class VersionHandshakeTests
         // keys and offers no suggestions, so it stays joinable.
         Assert.InRange(SyncProtocol.ProtocolVersion, 11, int.MaxValue);
     }
+
+    [Fact]
+    public void The_beteiligte_aufenthaltsort_raises_the_floor_to_protocol_twelve()
+    {
+        // 12 lets a client send setInvolvedPartyWhereabouts (#701). A host at 11 has no such command
+        // in its allowlist and would reject the Aufenthaltsort, so an 11 and a 12 must not connect.
+        Assert.Equal(12, SyncProtocol.ProtocolVersion);
+        Assert.Equal(12, SyncProtocol.MinimumProtocolVersion);
+    }
 }

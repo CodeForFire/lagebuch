@@ -19,6 +19,8 @@ public class CommandSerializationTests
         new EditRolePhoneCommand(Op, Guid.NewGuid(), "0173"),
         new SetInvolvedPartyDwellingCommand(Guid.NewGuid(), Guid.NewGuid()),
         new SetInvolvedPartyDwellingCommand(Guid.NewGuid(), null),
+        new SetInvolvedPartyWhereaboutsCommand(Guid.NewGuid(), "im RTW Rotkreuz Musterstadt 71/1"),
+        new SetInvolvedPartyWhereaboutsCommand(Guid.NewGuid(), null),
         new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4),
         new AddForceUnitCommand(Op, "Aich", 9, "Aich 42/1", "Im Einsatz", "Notiz", 4, 1),
         new UpdateForceUnitCommand(Op, Guid.NewGuid(), "Bereitstellung", null),

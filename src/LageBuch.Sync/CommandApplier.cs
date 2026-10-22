@@ -161,6 +161,9 @@ public static class CommandApplier
             case SetInvolvedPartyDwellingCommand c:
                 incident.SetInvolvedPartyDwelling(c.PartyId, c.DwellingId);
                 break;
+            case SetInvolvedPartyWhereaboutsCommand c:
+                incident.SetInvolvedPartyWhereabouts(clock, c.PartyId, c.Whereabouts);
+                break;
             case UpdateTaskCommand c:
                 incident.UpdateTask(c.TaskId, c.Text, c.Assignee, c.Importance, c.Urgency);
                 break;

@@ -70,15 +70,20 @@ public static class SyncProtocol
     /// Straßen (#461). A peer at 10 skips both keys and offers no suggestions, and a payload without
     /// them reads as none, so the floor stays at 10.
     /// </para>
+    /// <para>
+    /// 12: a client may send <c>setInvolvedPartyWhereabouts</c>, and a snapshot's Beteiligte carry
+    /// <c>whereabouts</c> and <c>whereaboutsAt</c>, the Aufenthaltsort (#701). A host at 11 would
+    /// reject the command, so the floor rises to 12.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 11;
+    public const int ProtocolVersion = 12;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming
     /// which end to update; a peer at or above it is served. See <see cref="ProtocolVersion"/> for
     /// when to raise this.
     /// </summary>
-    public const int MinimumProtocolVersion = 10;
+    public const int MinimumProtocolVersion = 12;
 
     /// <summary>
     /// What an absent or zero protocol number on the wire means: the contract as it stood at v0.6.1,

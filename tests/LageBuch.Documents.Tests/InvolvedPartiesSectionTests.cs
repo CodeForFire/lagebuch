@@ -17,13 +17,13 @@ public class InvolvedPartiesSectionTests
         PdfText.AssertInOrder(
             text,
             "Beteiligte",
-            "Name Telefon Wohnung Notiz",
-            "Erika Beispiel 0171 0000001 — Schlüssel übergeben",
-            "POK Mustermann — — —");
+            "Name Telefon Wohnung Aufenthaltsort Notiz",
+            "Erika Beispiel 0171 0000001 — — Schlüssel übergeben",
+            "POK Mustermann — — — —");
 
-        // All four cells on one line: a missing column definition would wrap the row.
+        // All five cells on one line: a missing column definition would wrap the row.
         Assert.Contains(
-            "Erika Beispiel 0171 0000001 — Schlüssel übergeben",
+            "Erika Beispiel 0171 0000001 — — Schlüssel übergeben",
             PdfText.LinesOf(incident, Started, IncidentPdfSections.InvolvedParties));
     }
 
@@ -42,6 +42,23 @@ public class InvolvedPartiesSectionTests
         var text = PdfText.Of(incident, Started, IncidentPdfSections.InvolvedParties);
 
         Assert.Contains("Erika Beispiel — Hauptstr. 12, 1. OG, Whg. 2 —", text, StringComparison.Ordinal);
+    }
+
+    // #701: the Aufenthaltsort with the full date and time it was last changed, for an Einsatz
+    // that ran past midnight.
+    [Fact]
+    public void A_beteiligte_with_an_aufenthaltsort_prints_it_with_its_stand()
+    {
+        var clock = new FixedClock(Started);
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "CO");
+        var party = incident.AddInvolvedParty(clock, op, "Erika Beispiel", null, null);
+        clock.Now = Started.AddMinutes(32);
+        incident.SetInvolvedPartyWhereabouts(clock, party.Id, "bei Nachbarin Frau Meier");
+
+        var text = PdfText.Of(incident, Started, IncidentPdfSections.InvolvedParties);
+
+        PdfText.AssertInOrder(text, "Erika Beispiel", "bei Nachbarin Frau Meier", "Stand 27.09.2026 14:32");
     }
 
     // #700: the Bericht prints the number the way the app shows it; the file keeps what was typed.
@@ -88,6 +105,6 @@ public class InvolvedPartiesSectionTests
 
     private sealed class FixedClock(DateTimeOffset now) : IClock
     {
-        public DateTimeOffset Now { get; } = now;
+        public DateTimeOffset Now { get; set; } = now;
     }
 }

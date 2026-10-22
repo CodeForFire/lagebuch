@@ -98,6 +98,8 @@ internal static class SchemaGuard
         new("involved_parties", "notes", "TEXT", false, null),
         new("involved_parties", "dwelling_id", "TEXT", false, null),
         new("involved_parties", "dwelling_label", "TEXT", false, null),
+        new("involved_parties", "whereabouts", "TEXT", false, null),
+        new("involved_parties", "whereabouts_at", "TEXT", false, null),
         new("role_assignments", "call_sign", "TEXT", false, null),
         new("role_assignments", "from_time", "TEXT", false, null),
         new("role_assignments", "to_time", "TEXT", false, null),

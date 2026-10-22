@@ -455,6 +455,9 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
     public void SetInvolvedPartyDwelling(Guid partyId, Guid? dwellingId) =>
         Send(new SetInvolvedPartyDwellingCommand(partyId, dwellingId));
 
+    public void SetInvolvedPartyWhereabouts(Guid partyId, string? whereabouts) =>
+        Send(new SetInvolvedPartyWhereaboutsCommand(partyId, whereabouts));
+
     public void UpdateTask(Guid taskId, string text, string? assignee, TaskImportance importance, TaskUrgency urgency) =>
         Send(new UpdateTaskCommand(taskId, text, assignee ?? string.Empty, importance, urgency));
 
