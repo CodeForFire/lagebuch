@@ -55,8 +55,13 @@ public static class SyncProtocol
     /// without the new fields, which a host at 8 reads as "cleared", wiping what another device
     /// entered. The floor rises to 8.
     /// </para>
+    /// <para>
+    /// 9: the Stammdaten payload carries <c>keywords</c>, the Stichwörter (#704). A peer at 8 skips
+    /// the key and offers no suggestions, and a payload without it reads as none, so the floor stays
+    /// at 8.
+    /// </para>
     /// </summary>
-    public const int ProtocolVersion = 8;
+    public const int ProtocolVersion = 9;
 
     /// <summary>
     /// The oldest contract this build still speaks. A peer below it is refused with a message naming

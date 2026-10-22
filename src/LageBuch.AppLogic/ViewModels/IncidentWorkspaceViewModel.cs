@@ -312,7 +312,7 @@ public sealed partial class IncidentWorkspaceViewModel : ObservableObject, IDisp
     [RelayCommand(CanExecute = nameof(CanEditIncidentData))]
     private void EditIncidentData()
     {
-        var dialog = new IncidentDataDialogViewModel(_session, OnChanged);
+        var dialog = new IncidentDataDialogViewModel(_session, OnChanged, _masterData.Keywords);
 
         // Clear the overlay on either outcome; Save has already applied the edits on confirm, and
         // the header projections refresh through the session's Changed event.

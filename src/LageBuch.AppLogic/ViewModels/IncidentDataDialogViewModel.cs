@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LageBuch.AppLogic.Services;
 using LageBuch.Domain.ValueObjects;
 using LageBuch.Sync;
 
@@ -19,11 +20,12 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
 
-    public IncidentDataDialogViewModel(IIncidentSession session, Action onChanged)
+    public IncidentDataDialogViewModel(IIncidentSession session, Action onChanged, IReadOnlyList<string>? keywordOptions = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _onChanged = onChanged;
+        KeywordOptions = keywordOptions ?? [];
 
         var incident = session.Incident;
         _keyword = incident.Keyword;
@@ -36,6 +38,12 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     }
 
     public event EventHandler? Closed;
+
+    /// <summary>
+    /// The Stammdaten's Stichwörter (#704), offered as suggestions and never enforced: the alarm
+    /// text is what it is, and only the chosen text is stored in the incident.
+    /// </summary>
+    public IReadOnlyList<string> KeywordOptions { get; }
 
     [ObservableProperty]
     private string? _keyword;
@@ -75,7 +83,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         get
         {
             var incident = _session.Incident;
-            return Normalize(Keyword) != incident.Keyword
+            return KeywordToSave != incident.Keyword
                 || Normalize(IncidentNumber) != incident.IncidentNumber?.Value
                 || AddressDiffers(incident);
         }
@@ -90,7 +98,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     private void Save()
     {
         var incident = _session.Incident;
-        var keyword = Normalize(Keyword);
+        var keyword = KeywordToSave;
         var number = Normalize(IncidentNumber);
 
         var changed = false;
@@ -147,6 +155,10 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
 
     [RelayCommand]
     private void CancelDiscard() => IsDiscardConfirmOpen = false;
+
+    // In the Stammdaten's spelling when it matches one apart from case and whitespace, so "b3p"
+    // records as "B3P"; otherwise exactly as typed.
+    private string? KeywordToSave => Normalize(StammdatenCatalogue.Normalize(Keyword, KeywordOptions));
 
     private bool AddressDiffers(Domain.Incident incident) =>
         Normalize(Street) != incident.Street

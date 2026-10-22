@@ -12,6 +12,10 @@ public sealed record MasterDataSet(
     // nothing said that an Einsatzleiter is one person -- the same move #398 made for Trupp-Typen.
     IReadOnlyList<Role> Roles,
     IReadOnlyList<string> UnitStatus,
+
+    // Einsatzstichwörter offered in the Einsatzdaten dialog (#704). Only the chosen text lands in
+    // the incident, so renaming or deleting one here never changes a past Einsatz.
+    IReadOnlyList<string> Keywords,
     IReadOnlyList<Link> Links,
 
     // 0..n user-defined Checkliste templates, in the order the Stammdaten editor lists them.
@@ -41,6 +45,7 @@ public sealed record MasterDataSet(
     public static MasterDataSet Empty { get; } = new(
         Array.Empty<Role>(),
         Array.Empty<string>(),
+        Array.Empty<string>(),
         Array.Empty<Link>(),
         Array.Empty<ChecklistTemplate>(),
         Array.Empty<NavEntry>(),
@@ -61,6 +66,7 @@ public sealed record MasterDataSet(
     public bool IsEmpty =>
         Roles.Count == 0
         && UnitStatus.Count == 0
+        && Keywords.Count == 0
         && Links.Count == 0 && ChecklistTemplates.Count == 0
         && TruppTypes.Count == 0
         && Personnel.Count == 0
@@ -697,6 +703,7 @@ public static class MasterDataJson
         return new MasterDataSet(
             ParseRoles(root),
             Arr(root, "unitStatus"),
+            Arr(root, "keywords"),
             links,
             checklists,
             ParseNavigation(root),
@@ -954,6 +961,7 @@ public static class MasterDataJson
                 uniqueness = Role.UniquenessName(r.Uniqueness),
             }),
             unitStatus = set.UnitStatus,
+            keywords = set.Keywords,
             truppTypes = set.TruppTypes.Select(t => new
             {
                 name = t.Name,
