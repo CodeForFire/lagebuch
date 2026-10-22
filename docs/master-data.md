@@ -24,6 +24,18 @@ person's call sign) becomes a call-sign suggestion. Maintaining the vehicle
 list is all that is needed; every field still accepts free text for anything
 not in it (a Leitstelle, a mutual-aid unit).
 
+## Funkgruppen and the Führungstafel slot of a Funktion
+
+`talkGroups` lists the Funkgruppen a Führungsstelle works on: each has a `name`, an
+optional `number`, a `kind` (`"tmo"` or `"dmo"`, TMO when missing or unknown) and an
+optional `note`. A name is required and at most 200 characters. The editor shows them in
+a **Funkgruppen** section, and an Einsatz copies the text it uses, so renaming or
+deleting a group here never changes a past Einsatz.
+
+A role may carry an optional `slot` — `leiter`, `melder`, `fuehrungsassistent` or
+`fachberater` — the post on the Führungstafel its holder fills. A missing or unknown
+slot means none.
+
 ## Kontakte: die Notiz ist das Suchfeld
 
 A personnel row carries an optional `email` and an optional `note` besides the

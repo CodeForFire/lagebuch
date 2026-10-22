@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -13,11 +14,12 @@ public sealed partial class RoleRow : ObservableObject
 {
     private readonly Action _onChanged;
 
-    public RoleRow(string name, RoleUniqueness uniqueness, Action onChanged)
+    public RoleRow(string name, RoleUniqueness uniqueness, RoleSlot slot, Action onChanged)
     {
         _onChanged = onChanged;
         _name = name;
         _uniqueness = uniqueness;
+        _slot = slot;
     }
 
     /// <summary>
@@ -27,6 +29,9 @@ public sealed partial class RoleRow : ObservableObject
     /// a copy per row.
     /// </summary>
     public IReadOnlyList<UniquenessOption> UniquenessOptions { get; } = RolesSection.UniquenessChoices;
+
+    /// <summary>The Führungstafel posts, built once by <see cref="RolesSection.SlotChoices"/>.</summary>
+    public IReadOnlyList<SlotOption> SlotOptions { get; } = RolesSection.SlotChoices;
 
     [ObservableProperty]
     private string _name;
@@ -39,6 +44,15 @@ public sealed partial class RoleRow : ObservableObject
     [ObservableProperty]
     private RoleUniqueness _uniqueness;
 
+    /// <summary>
+    /// The post on the Führungstafel a holder of this Funktion fills, or none. Carried through the
+    /// editor so that a save does not erase it.
+    /// </summary>
+    [ObservableProperty]
+    private RoleSlot _slot;
+
+    partial void OnSlotChanged(RoleSlot value) => _onChanged();
+
     partial void OnNameChanged(string value) => _onChanged();
 
     partial void OnUniquenessChanged(RoleUniqueness value) => _onChanged();
@@ -48,3 +62,6 @@ public sealed partial class RoleRow : ObservableObject
 /// precedent). A closed record rather than a generic one, so the picker's compiled-binding item
 /// template stays simple.</summary>
 public readonly record struct UniquenessOption(RoleUniqueness Value, string Label);
+
+/// <summary>A <see cref="RoleSlot"/> paired with its German label, built like <see cref="UniquenessOption"/>.</summary>
+public readonly record struct SlotOption(RoleSlot Value, string Label);

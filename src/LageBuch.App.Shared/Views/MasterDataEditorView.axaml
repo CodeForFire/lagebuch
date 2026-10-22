@@ -693,6 +693,52 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Funkgruppen editor: NAME / NUMMER / ART (TMO or DMO) / NOTIZ. -->
+              <DataTemplate x:DataType="vm:TalkGroupsSection">
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- A fixed trailing width matching the row's icon-btn button, as in the Fahrzeuge template. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,100,*,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="NAME" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="1" Text="NUMMER" Classes="overline" FontSize="10" />
+                    <TextBlock Grid.Column="2" Text="ART" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Truppmittel-Funk (TMO) oder Direktmodus (DMO)" />
+                    <TextBlock Grid.Column="3" Text="NOTIZ" Classes="overline" FontSize="10" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TalkGroupRow">
+                          <Grid ColumnDefinitions="*,110,100,*,32" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
+                                     PlaceholderText="FW_MUSTER 1000" AutomationProperties.Name="Name der Funkgruppe" />
+                            <TextBox Grid.Column="1" Margin="0,0,6,0" Text="{Binding Number}"
+                                     AutomationProperties.Name="Nummer der Funkgruppe" />
+                            <ComboBox Grid.Column="2" Margin="0,0,6,0" ItemsSource="{Binding KindOptions}"
+                                      SelectedValue="{Binding Kind}"
+                                      SelectedValueBinding="{Binding Value}"
+                                      AutomationProperties.Name="Art der Funkgruppe">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:TalkGroupKindOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBox Grid.Column="3" Margin="0,0,6,0" Text="{Binding Note}"
+                                     AutomationProperties.Name="Notiz zur Funkgruppe" />
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Trupp-Typen editor (#398): the crew size and Einsatzzeit live on the row, so
                    renaming a type can no longer silently drop its rule. -->
               <DataTemplate x:DataType="vm:TruppTypesSection">
@@ -750,16 +796,18 @@
                           HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
                   <!-- A fixed trailing width matching the row template's icon-btn button, as in the
                        Trupp-Typen template above: "Auto" would size to this Grid's own empty content. -->
-                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,180,32" Margin="0,0,0,6">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,180,200,32" Margin="0,0,0,6">
                     <TextBlock Grid.Column="0" Text="ROLLE" Classes="overline" FontSize="10" />
                     <TextBlock Grid.Column="1" Text="EINDEUTIGKEIT" Classes="overline" FontSize="10"
                                ToolTip.Tip="Wie oft die Funktion besetzt werden darf" />
+                    <TextBlock Grid.Column="2" Text="AUF DER FÜHRUNGSTAFEL" Classes="overline" FontSize="10"
+                               ToolTip.Tip="Welchen Platz auf der Führungstafel die Funktion einnimmt" />
                   </Grid>
                   <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:RoleRow">
-                          <Grid ColumnDefinitions="*,180,32" Margin="0,0,0,6">
+                          <Grid ColumnDefinitions="*,180,200,32" Margin="0,0,0,6">
                             <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="Einsatzleiter" />
                             <!-- Options rather than bare ComboBoxItems: an enum cannot be matched
@@ -775,9 +823,18 @@
                                 <DataTemplate x:DataType="vm:UniquenessOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
                               </ComboBox.ItemTemplate>
                             </ComboBox>
+                            <!-- Same shape as the Eindeutigkeit picker: options carry the label. -->
+                            <ComboBox Grid.Column="2" Margin="6,0,0,0" ItemsSource="{Binding SlotOptions}"
+                                      SelectedValue="{Binding Slot}"
+                                      SelectedValueBinding="{Binding Value}"
+                                      AutomationProperties.Name="Auf der Führungstafel">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SlotOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
                                  $parent path cannot resolve here. -->
-                            <Button Grid.Column="2" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                            <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
                                     Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
                                     CommandParameter="{Binding}">

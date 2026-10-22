@@ -40,6 +40,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
     private PersonnelSection _personnel = null!;
     private VehiclesSection _vehicles = null!;
     private StreetsSection _streets = null!;
+    private TalkGroupsSection _talkGroups = null!;
     private SettingsSection _settings = null!;
 
     public MasterDataEditorViewModel(IMasterDataProvider provider, IFileDialogService dialogs, IMasterDataFileService files)
@@ -225,6 +226,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
             // rows (plus the roster), so the vehicle list is the single place to maintain them.
             // The derived lists still serve as typing suggestions for further rows.
             _vehicles = new VehiclesSection("Fahrzeuge", set.Vehicles, set.Brigades, set.RadioCallSigns, OnVehiclesChanged, RequestConfirm),
+            _talkGroups = new TalkGroupsSection("Funkgruppen", set.TalkGroups, MarkDirty, RequestConfirm),
         };
 
         foreach (var section in categories.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
@@ -326,6 +328,7 @@ public sealed partial class MasterDataEditorViewModel : ObservableObject, INarro
         Navigation = _navigation.ToValues(),
         Personnel = _personnel.ToPeople(),
         Vehicles = _vehicles.ToValues(),
+        TalkGroups = _talkGroups.ToValues(),
         Settings = _settings.ToSettings(),
     };
 

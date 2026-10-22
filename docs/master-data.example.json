@@ -1,9 +1,10 @@
 {
   "roles": [
-    { "name": "EL", "uniqueness": "uniquePerIncident" },
-    { "name": "EAL", "uniqueness": "multiple" },
+    { "name": "EL", "uniqueness": "uniquePerIncident", "slot": "leiter" },
+    { "name": "EAL", "uniqueness": "multiple", "slot": "leiter" },
     { "name": "ZF", "uniqueness": "multiple" },
     { "name": "GF", "uniqueness": "multiple" },
+    { "name": "Melder", "uniqueness": "multiple", "slot": "melder" },
     { "name": "Abschnittsleiter", "uniqueness": "uniquePerSection" }
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz"],
@@ -71,6 +72,12 @@
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 1", "seats": 9, "hasZugfuehrer": false, "isOwn": true },
     { "wache": "FF Musterstadt", "callSign": "Florian Musterstadt 11/1", "seats": 6, "hasZugfuehrer": true, "isOwn": true },
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false }
+  ],
+  "talkGroups": [
+    { "name": "FW_MUSTER 1000", "number": "1000", "kind": "tmo", "note": "Einsatzstelle" },
+    { "name": "FW_MUSTER 1001", "number": null, "kind": "tmo", "note": null },
+    { "name": "301_F", "number": "301", "kind": "dmo", "note": "Atemschutzüberwachung" },
+    { "name": "302_F", "number": null, "kind": "dmo", "note": null }
   ],
   "personnel": [
     { "lastName": "Mustermann", "firstName": "Max", "role": "ZF", "callSign": "Florian Musterstadt 1", "phone": "0171 0000000", "isOwn": true, "email": "max.mustermann@ff-musterstadt.example", "note": "KBM Gefahrgut, Fachberater Arbeits- und Gesundheitsschutz" },

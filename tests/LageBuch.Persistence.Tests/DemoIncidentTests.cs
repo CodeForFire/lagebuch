@@ -2,6 +2,7 @@ using LageBuch.Domain;
 using LageBuch.Domain.Atemschutz;
 using LageBuch.Domain.CoMeasurement;
 using LageBuch.Domain.Etb;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Tasks;
 using LageBuch.Domain.Time;
 using LageBuch.Domain.ValueObjects;
@@ -248,13 +249,18 @@ public class DemoIncidentTests : IDisposable
         Assert.Equal(
             new[]
             {
-                new Role("EL", RoleUniqueness.UniquePerIncident),
-                new Role("EAL", RoleUniqueness.Multiple),
+                new Role("EL", RoleUniqueness.UniquePerIncident, RoleSlot.Leiter),
+                new Role("EAL", RoleUniqueness.Multiple, RoleSlot.Leiter),
                 new Role("ZF", RoleUniqueness.Multiple),
                 new Role("GF", RoleUniqueness.Multiple),
+                new Role("Melder", RoleUniqueness.Multiple, RoleSlot.Melder),
                 new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection),
             },
             set.Roles);
+
+        // Two TMO and two DMO groups, so the reference shows both kinds.
+        Assert.Equal(2, set.TalkGroups.Count(g => g.Kind == TalkGroupKind.Tmo));
+        Assert.Equal(2, set.TalkGroups.Count(g => g.Kind == TalkGroupKind.Dmo));
     }
 
     private static void WriteSampleIfRequested(Incident incident)

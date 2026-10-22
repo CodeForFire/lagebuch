@@ -1,5 +1,6 @@
 using LageBuch.AppLogic.Services;
 using LageBuch.AppLogic.ViewModels;
+using LageBuch.Domain.Leadership;
 using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
@@ -191,8 +192,8 @@ public class MasterDataEditorViewModelTests
             new[]
             {
                 "Einstellungen", "Navigation", "Einheiten-Status",
-                "Fahrzeuge", "Links", "Ortsteile", "Personal", "Rollen", "Stichwörter", "Straßen",
-                "Trupp-Typen",
+                "Fahrzeuge", "Funkgruppen", "Links", "Ortsteile", "Personal", "Rollen", "Stichwörter",
+                "Straßen", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
     }
@@ -1070,5 +1071,54 @@ public class MasterDataEditorViewModelTests
                 new Street("Hauptstraße", "Puch"),
             },
             provider.Get().Streets);
+    }
+
+    [Fact]
+    public void Adding_a_funkgruppe_and_changing_a_slot_marks_dirty_and_saves_both()
+    {
+        var provider = new InMemoryProvider();
+        var vm = Vm(provider);
+        Assert.False(vm.IsDirty);
+
+        var groups = vm.Sections.OfType<TalkGroupsSection>().Single();
+        groups.AddCommand.Execute(null);
+        groups.Rows[^1].Name = "301_F";
+        groups.Rows[^1].Kind = TalkGroupKind.Dmo;
+        groups.Rows[^1].Number = " ";
+        var el = Roles(vm).Rows.First(r => r.Name == "EL");
+        el.Slot = RoleSlot.Leiter;
+        Assert.True(vm.IsDirty);
+        vm.SaveCommand.Execute(null);
+
+        var set = provider.Get();
+        var group = Assert.Single(set.TalkGroups);
+        Assert.Equal(new TalkGroup("301_F", null, TalkGroupKind.Dmo), group);
+        Assert.Equal(RoleSlot.Leiter, set.Roles.Single(r => r.Name == "EL").Slot);
+    }
+
+    [Fact]
+    public void A_role_slot_survives_an_editor_load_and_save()
+    {
+        var provider = new InMemoryProvider();
+        provider.Save(provider.Get() with { Roles = new[] { new Role("EL", RoleUniqueness.UniquePerIncident, RoleSlot.Leiter), new Role("Melder", RoleUniqueness.Multiple, RoleSlot.Melder) } });
+        var vm = Vm(provider);
+
+        Roles(vm).AddCommand.Execute(null); // any edit, then a save that rewrites every role
+        vm.SaveCommand.Execute(null);
+
+        var roles = provider.Get().Roles;
+        Assert.Equal(RoleSlot.Leiter, roles.Single(r => r.Name == "EL").Slot);
+        Assert.Equal(RoleSlot.Melder, roles.Single(r => r.Name == "Melder").Slot);
+    }
+
+    [Fact]
+    public void The_slot_picker_offers_none_and_the_four_posts_in_german()
+    {
+        var vm = Vm(new InMemoryProvider());
+        var row = Roles(vm).Rows[0];
+
+        Assert.Equal(
+            new[] { "—", "Leiter", "Melder", "Führungsassistent", "Fachberater" },
+            row.SlotOptions.Select(o => o.Label));
     }
 }
