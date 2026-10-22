@@ -246,7 +246,7 @@
     <Panel KeyboardNavigation.TabNavigation="Local" KeyboardNavigation.TabIndex="1">
     <Border x:Name="TasksGridPanel" Background="#0C1119" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusMd}" ClipToBounds="True">
-      <DataGrid x:Name="TasksGrid" b:RowKeys.IsEnabled="True" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
+      <DataGrid x:Name="TasksGrid" b:RowKeys.IsEnabled="True" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedTask}"
                 IsReadOnly="{Binding IsReadOnly}" CanUserSortColumns="False">
         <DataGrid.Columns>
           <!-- A live CheckBox rather than a DataGridCheckBoxColumn (#543): that column only toggles

@@ -256,7 +256,7 @@
            Styles.axaml would clip the last crew member. -->
       <!-- x:Name + SelectedItem: a jump from the header's Atemschutz bars selects the Trupp in the
            view model and the code-behind scrolls this grid to it (#422). -->
-      <DataGrid x:Name="TruppGrid" ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
+      <DataGrid x:Name="TruppGrid" b:SelectedRowTab.IsEnabled="True" ItemsSource="{Binding Trupps}" IsReadOnly="True" CanUserSortColumns="False"
                 SelectedItem="{Binding SelectedTrupp}"
                 RowHeight="NaN">
         <!-- The grid makes its rows, so the alarm class reaches them through a row style (#669). -->
