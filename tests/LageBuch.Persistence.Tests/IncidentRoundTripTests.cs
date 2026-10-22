@@ -744,7 +744,43 @@ public class IncidentRoundTripTests : IDisposable
         Assert.Equal(CommandNodeKind.Partner, loaded.CommandNodes.Single(x => x.Id == partner.Id).Kind);
         Assert.Equal(CommandNodeKind.Abschnitt, loaded.CommandNodes.Single(x => x.Id == unter.Id).Kind);
         Assert.Equal(CommandNodeKind.Abschnitt, loaded.CommandNodes.Single(x => x.Id == unter2.Id).Kind);
-        Assert.Equal(abschnitt.Id, loaded.CommandNodes.Single(x => x.Id == abschnitt.Id).Id);
+        var top = loaded.CommandNodes.Single(x => x.Id == abschnitt.Id);
+        Assert.Equal(CommandNodeKind.Abschnitt, top.Kind);
+        Assert.Null(top.ParentId);
+    }
+
+    [Fact]
+    public void A_v29_file_loads_with_every_unit_and_funktion_unplaced_and_no_Fuehrungsstufe()
+    {
+        var clock = new Clock();
+        var op = new SessionOperator("Muster");
+        var incident = Incident.Start(clock, op, "Brand");
+        var node = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        var unit = incident.AddForceUnit(clock, op, "FF Puch", 9);
+        incident.MoveForceUnit(clock, op, unit.Id, node.Id);
+        incident.AssignRole(clock, op, "Abschnittsleiter", "Erika Beispiel", nodeId: node.Id, slot: RoleSlot.Leiter);
+        incident.SetFuehrungsstufe(clock, op, Fuehrungsstufe.B);
+        incident.UpdateLeadershipPost(clock, op, "Feuerwehrhaus", "Florian EL", "0171 0000002", "TBZ 2");
+        IncidentRepository.Save(_path, incident);
+
+        // Roll the file back to the V29 shape: no V30 columns, no command_nodes table.
+        ExecRaw(
+            "UPDATE schema_version SET version = 29; DROP TABLE command_nodes;" +
+            "ALTER TABLE force_units DROP COLUMN node_id;" +
+            "ALTER TABLE role_assignments DROP COLUMN node_id; ALTER TABLE role_assignments DROP COLUMN slot;" +
+            "ALTER TABLE incident_meta DROP COLUMN fuehrungsstufe; ALTER TABLE incident_meta DROP COLUMN el_standort;" +
+            "ALTER TABLE incident_meta DROP COLUMN el_rufname; ALTER TABLE incident_meta DROP COLUMN el_telefon;" +
+            "ALTER TABLE incident_meta DROP COLUMN el_funkgruppe;");
+
+        var loaded = IncidentRepository.Load(_path);
+
+        Assert.Null(Assert.Single(loaded.Forces).NodeId);
+        var role = Assert.Single(loaded.Roles);
+        Assert.Null(role.NodeId);
+        Assert.Equal(RoleSlot.None, role.Slot);
+        Assert.Empty(loaded.CommandNodes);
+        Assert.Null(loaded.Fuehrungsstufe);
+        Assert.Equal(LeadershipPost.Empty, loaded.LeadershipPost);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
