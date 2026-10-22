@@ -1,1 +1,1 @@
-Funktionen: each Funktion records which Funktion it reports to, picked in a new MELDET AN column and carried over to the new holder on a handover, and the PDF prints the resulting Führungsstruktur as a tree (#703).
+Funktionen: the list shows the Führungsstruktur as a tree, re-linked by dragging a Funktion onto the one it reports to or through an Unterstellen menu, carried over to the new holder on a handover, and printed as a tree in the PDF (#703).

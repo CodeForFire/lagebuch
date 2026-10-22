@@ -21,7 +21,7 @@ public class RolesColumnOrderTests
         var headers = view.GetControl<DataGrid>("RolesGrid").Columns.Select(c => c.Header as string).ToList();
 
         Assert.Equal(
-            new[] { "FUNKTION", "ABSCHNITT", "NAME", "FUNKRUFNAME", "HANDYNUMMER", "MELDET AN", "VON", "BIS", "AKTION" },
+            new[] { "FUNKTION", "ABSCHNITT", "NAME", "FUNKRUFNAME", "HANDYNUMMER", "VON", "BIS", "AKTION" },
             headers);
     }
 
