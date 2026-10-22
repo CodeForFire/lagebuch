@@ -1,1 +1,0 @@
-Tab into a grid (ETB, Aufgaben, Funktionen, Kräfte, Atemschutz) now enters the selected row's buttons and then moves on, instead of walking every row and, after a scroll, walking them bottom-up from wherever the grid last built a row (#724).

@@ -16,6 +16,39 @@ cut — see [CONTRIBUTING.md](CONTRIBUTING.md). For the commits themselves, see 
 
 <!-- towncrier release notes start -->
 
+## [0.9.1] - 2026-10-22
+
+A patch release with the first field reports on 0.9.0, all of them about the screen and the
+keyboard. Tab now follows each screen from top to bottom and enters only a grid's selected row,
+the Links search and dialog actions sit where the eye starts, a read-only file puts WEITER
+BEARBEITEN first, and the Funktionen read in the order they are called out. Phone numbers read
+the DIN 5008 way and dial as +49, alarm tones can be muted per device, and the Stammdaten keep
+manual sorting only where the order is used. No file-format or sync change: 0.9.0 and 0.9.1
+devices still share an Einsatz.
+
+### Added
+
+- [#707](https://github.com/CodeForFire/lagebuch/pull/707) - ÜBER has a device-local "Alarmtöne stumm schalten" checkbox that silences every alarm cue, the Rückzugsalarm included, and the Einsatz footer shows "Alarmtöne stumm" while it is on (#699).
+- [#717](https://github.com/CodeForFire/lagebuch/pull/717) - Phone numbers in Kontakte and in the Bericht's Funktionen and Beteiligte tables now read the DIN 5008 way (such as 0171 2345678 or +49 89 1234567-12), and dialling a contact hands the dialer an international +49 number (#700).
+
+### Changed
+
+- [#705](https://github.com/CodeForFire/lagebuch/pull/705) - In a file opened read-only, WEITER BEARBEITEN is now the highlighted primary button straight after the NUR LESEN tile instead of a quiet button at the far end of the row (#697).
+- [#709](https://github.com/CodeForFire/lagebuch/pull/709) - The Funktionen grid, the phone cards, the add form with its Tab order and the Bericht now read Funktion, Abschnitt, Name, Funkrufname, Handynummer, then the times (#696).
+- [#712](https://github.com/CodeForFire/lagebuch/pull/712) - The Links search now follows the title on the left as on Kontakte, and the actions in dialogs and the Wohnung editor start at their left edge with the primary button first, so a wide window no longer pushes them away from the fields they submit (#693, #694).
+- [#716](https://github.com/CodeForFire/lagebuch/pull/716) - Ctrl+1 … Ctrl+0 now open the rail entries in the order shown, Checklisten included, so the hints still read 1, 2, 3 after the Stammdaten Navigation reorders or hides modules.
+
+### Removed
+
+- [#706](https://github.com/CodeForFire/lagebuch/pull/706), [#718](https://github.com/CodeForFire/lagebuch/pull/718) - The Stammdaten editor no longer offers moving entries up and down outside Navigation, the Einheiten-Status, the Checklisten and Links; existing entries keep their stored order and a new entry is added at the end (#698, #715).
+
+### Fixed
+
+- [#708](https://github.com/CodeForFire/lagebuch/pull/708) - Tab now follows each screen from top to bottom: from the header bars it enters the module rail and then the module, and an entry form's last button leads on to the footer instead of back up to the list's row buttons, in every module and in the Stammdaten editor; Shift+Tab from a module's first control returns to the rail again, and a Kontakte row reaches its phone number before the mail button beside it, and a grid no longer leaves its focus ring on a row's first cell once Tab moves on to that row's buttons (#695).
+- [#711](https://github.com/CodeForFire/lagebuch/pull/711) - Kräfte: a STATUS combo clicked in a grid row keeps the keyboard, so after choosing a status Down steps to the next one instead of moving the grid's cursor to the next row (#536).
+- [#725](https://github.com/CodeForFire/lagebuch/pull/725) - Tab into a grid (ETB, Aufgaben, Funktionen, Kräfte, Atemschutz) now enters the selected row's buttons and then moves on, instead of walking every row and, after a scroll, walking them bottom-up from wherever the grid last built a row (#724).
+
+
 ## [0.9.0] - 2026-10-20
 
 Security and trust. Attachments now stay inside their limits at every step: Android opens and
@@ -550,7 +583,8 @@ First release (Windows + Linux prerelease).
 - AutoCompleteBox border matched to app inputs (#41)
 - ILS countdown made the visual focus of the reminder bar (#44)
 
-[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/CodeForFire/lagebuch/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/CodeForFire/lagebuch/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/CodeForFire/lagebuch/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/CodeForFire/lagebuch/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/CodeForFire/lagebuch/compare/v0.7.1...v0.8.0

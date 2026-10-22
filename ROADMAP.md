@@ -11,7 +11,7 @@ The one hard date below is not ours to move.
 
 ## Where we are
 
-Version 0.9.0, with a release every one to two weeks. The app is in real use,
+Version 0.9.1, with a release every one to two weeks. The app is in real use,
 but the `.fwincident` file format can still change between versions. That caveat
 is what 1.0 removes.
 
@@ -115,6 +115,12 @@ See [CHANGELOG.md](CHANGELOG.md#090---2026-10-20) for the full list.
 
 Issues: #289, #296, #300, #382, #406, #407
 
+0.9.1 followed on 2026-10-22 as a patch with the first field reports on 0.9.0,
+all of them about the screen and the keyboard: Tab order, where the search and
+the actions sit, the Funktionen column order, phone number formatting, muting
+the alarm tones and less manual sorting in the Stammdaten. The reports that ask
+for something new to be stored went to v0.10 instead.
+
 The OpenSSF Scorecard badge in the README reports two checks as weak, and both
 readings are correct. Branch-Protection and Code-Review score low because `main`
 requires zero approving reviews. With one maintainer there is nobody to approve,
@@ -123,13 +129,40 @@ a second maintainer exists, at which point the requirement goes to one. Force
 pushes, branch deletion and merging without green CI are already blocked, for
 administrators included.
 
-## v0.10 — i18n and architecture
+## v0.10 — New incident modules and Stammdaten
+
+The feature wishes that came back from the field, as opposed to the corrections:
+a Dekon-Platz with its Platzführung, up to six freely named gases instead of CO
+alone, umluftabhängige Filtergeräte, Häuser and Einsatzpläne pre-defined in the
+Stammdaten rather than retyped at every Einsatz, an address that can hold a house
+number, a PLZ and an Ort, images pasted straight from the clipboard, and links
+opened without leaving the app.
+
+The first field reports on 0.9.0 added to the list: where a Betroffener is now,
+the CO-Messung linking a Wohnung to the Betroffene found in it, who reports to
+whom among the Funktionen, and Stichwörter from the Stammdaten offered as
+suggestions in the Einsatzdaten.
+
+This used to be v0.11, behind i18n. It moved ahead after 0.9.0 for two reasons.
+These are what the people using the app today are asking for, and an
+architecture release would have made them wait for work they cannot see. And
+every one of them adds or changes something the `.fwincident` file stores, so
+they are cheapest before the freeze below, after which each costs a forward
+migration that has to keep working for good. The German wording they add is
+written inline like all the rest and extracted with it in v0.11.
+
+Issues: #384, #401, #410, #420, #421, #423, #427, #428, #429, #461, #592, #701,
+#702, #703, #704
+
+## v0.11 — i18n and architecture
 
 Lagebuch is German software, and that is a strength. It should not also be an
 accident of implementation. Today the German wording is literal text inside
 views and domain code, so there is no translation to contribute even if someone
 wanted to. Deciding the mechanism comes first; extracting strings before that
-means doing it twice.
+means doing it twice. It used to come before the new modules and moved behind
+them after 0.9.0 (see v0.10): the wording those modules add is extracted here
+with everything else, once #350 has decided how.
 
 The portability review belongs to the same decision. "ILS" is the Bavarian name
 for the dispatch centre and is hardcoded — including in the ETB entry written
@@ -141,29 +174,14 @@ same question — configuration, translation, or a stable key rendered at displa
 time — and answering it once is the whole point of doing #350 first.
 
 Alongside it, the layering work: `MasterDataSet` moving out of the persistence
-assembly, the session abstractions finding their right home, and German ETB
-wording moving out of the domain types.
+assembly (#297), by then with the new Stammdaten categories from v0.10 in it,
+the session abstractions finding their right home, and German ETB wording moving
+out of the domain types.
 
 Alt-mnemonics wait for the same decision: a mnemonic is a letter of the label,
 so picking them before the labels are translatable means picking them twice.
 
 Issues: #282, #297, #298, #299, #302, #304, #350, #400, #402, #403, #404, #462
-
-## v0.11 — New incident modules and Stammdaten
-
-The feature wishes that came back from the field, as opposed to the corrections:
-a Dekon-Platz with its Platzführung, up to six freely named gases instead of CO
-alone, umluftabhängige Filtergeräte, Häuser and Einsatzpläne pre-defined in the
-Stammdaten rather than retyped at every Einsatz, an address that can hold a house
-number, a PLZ and an Ort, images pasted straight from the clipboard, and links
-opened without leaving the app.
-
-They sit here rather than earlier for one reason: every one of them adds or
-changes something the `.fwincident` file stores. That makes them the last work
-that can be done cheaply, because after the freeze below every one of them costs
-a forward migration that has to keep working for good.
-
-Issues: #401, #410, #420, #421, #423, #427, #428, #429, #461
 
 ## v0.12 — Wasserförderung
 

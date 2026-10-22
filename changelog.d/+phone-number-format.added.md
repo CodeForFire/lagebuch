@@ -1,1 +1,0 @@
-Phone numbers in Kontakte and in the Bericht's Funktionen and Beteiligte tables now read the DIN 5008 way (such as 0171 2345678 or +49 89 1234567-12), and dialling a contact hands the dialer an international +49 number (#700).
