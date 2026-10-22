@@ -196,7 +196,7 @@ public sealed partial class OperatorPromptViewModel : ObservableObject
         PersonOptions = OwnDisplayNames(_personnel);
         CallSignOptions = hostMasterData.RadioCallSigns;
         var keyword = string.IsNullOrWhiteSpace(joined.Keyword) ? "Unbenannter Einsatz" : joined.Keyword;
-        JoinedIncidentDisplay = Formatting.Address(joined.Street, joined.District) is { } address
+        JoinedIncidentDisplay = Formatting.Address(joined) is { } address
             ? $"{keyword} · {address}"
             : keyword;
         ErrorMessage = null;

@@ -50,7 +50,10 @@ public sealed record IncidentSnapshot(
     // Defaulted like DwellingDto.Readings: a snapshot without the key reads as "no Beteiligte".
     IReadOnlyList<InvolvedPartyDto>? InvolvedParties = null,
     long Revision = 0,
-    Guid Epoch = default);
+    Guid Epoch = default,
+    string? HouseNumber = null,
+    string? PostalCode = null,
+    string? Place = null);
 
 public sealed record TimerDto(
     string Key,

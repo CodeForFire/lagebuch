@@ -136,7 +136,7 @@ public interface IIncidentSession
 
     void SetKeyword(string? keyword);
 
-    void SetAddress(string? street, string? district);
+    void SetAddress(string? street, string? district, string? houseNumber = null, string? postalCode = null, string? place = null);
 
     void SetStatus(string? status);
 

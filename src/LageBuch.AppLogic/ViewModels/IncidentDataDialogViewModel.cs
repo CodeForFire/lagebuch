@@ -7,8 +7,8 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// The "Einsatzdaten" overlay behind the workspace header's edit affordance: Stichwort,
-/// Einsatznummer, Straße and Ortsteil edited together, buffered until SPEICHERN (the CO-Messung
-/// editor's contract, #242). It replaces the inline Einsatznummer editor (#69) -- the number is
+/// Einsatznummer and the address (Straße, Hausnummer, PLZ, Ort, Ortsteil; #401) edited together,
+/// buffered until SPEICHERN (the CO-Messung editor's contract, #242). It replaces the inline Einsatznummer editor (#69) -- the number is
 /// still typically unknown at creation and added once ILS calls back, but it is now one field of
 /// several rather than the only one editable after the fact; the address in particular had no UI
 /// at all before, so the PDF's "Adresse" line was always empty. Closed fires on Speichern AND
@@ -29,6 +29,9 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         _keyword = incident.Keyword;
         _incidentNumber = incident.IncidentNumber?.Value;
         _street = incident.Street;
+        _houseNumber = incident.HouseNumber;
+        _postalCode = incident.PostalCode;
+        _place = incident.Place;
         _district = incident.District;
     }
 
@@ -42,6 +45,15 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _street;
+
+    [ObservableProperty]
+    private string? _houseNumber;
+
+    [ObservableProperty]
+    private string? _postalCode;
+
+    [ObservableProperty]
+    private string? _place;
 
     [ObservableProperty]
     private string? _district;
@@ -65,8 +77,7 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
             var incident = _session.Incident;
             return Normalize(Keyword) != incident.Keyword
                 || Normalize(IncidentNumber) != incident.IncidentNumber?.Value
-                || Normalize(Street) != incident.Street
-                || Normalize(District) != incident.District;
+                || AddressDiffers(incident);
         }
     }
 
@@ -81,8 +92,6 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         var incident = _session.Incident;
         var keyword = Normalize(Keyword);
         var number = Normalize(IncidentNumber);
-        var street = Normalize(Street);
-        var district = Normalize(District);
 
         var changed = false;
         if (keyword != incident.Keyword)
@@ -97,9 +106,14 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
             changed = true;
         }
 
-        if (street != incident.Street || district != incident.District)
+        if (AddressDiffers(incident))
         {
-            _session.SetAddress(street, district);
+            _session.SetAddress(
+                Normalize(Street),
+                Normalize(District),
+                Normalize(HouseNumber),
+                Normalize(PostalCode),
+                Normalize(Place));
             changed = true;
         }
 
@@ -133,6 +147,13 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
 
     [RelayCommand]
     private void CancelDiscard() => IsDiscardConfirmOpen = false;
+
+    private bool AddressDiffers(Domain.Incident incident) =>
+        Normalize(Street) != incident.Street
+        || Normalize(HouseNumber) != incident.HouseNumber
+        || Normalize(PostalCode) != incident.PostalCode
+        || Normalize(Place) != incident.Place
+        || Normalize(District) != incident.District;
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

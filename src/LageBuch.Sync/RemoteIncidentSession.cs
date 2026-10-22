@@ -494,7 +494,8 @@ public sealed class RemoteIncidentSession : IIncidentSession, IAsyncDisposable
 
     public void SetKeyword(string? keyword) => Send(new SetKeywordCommand(keyword));
 
-    public void SetAddress(string? street, string? district) => Send(new SetAddressCommand(street, district));
+    public void SetAddress(string? street, string? district, string? houseNumber = null, string? postalCode = null, string? place = null) =>
+        Send(new SetAddressCommand(street, district, houseNumber, postalCode, place));
 
     public void SetStatus(string? status) => Send(new SetStatusCommand(status));
 

@@ -52,6 +52,17 @@ public class IncidentHeaderSectionTests
     }
 
     [Fact]
+    public void Header_prints_hausnummer_plz_and_ort_for_an_einsatz_outside_the_gemeinde()
+    {
+        var incident = Incident.Start(new FixedClock(Started), new SessionOperator("Huber"));
+        incident.SetAddress("Hauptstr.", "Puch", houseNumber: "12", postalCode: "85238", place: "Petershausen");
+
+        var text = PdfText.Of(incident, Started.AddHours(1), IncidentPdfSections.None);
+
+        Assert.Contains("Adresse: Hauptstr. 12, Puch, 85238 Petershausen", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_closed_einsatz_shows_its_state_and_when_it_was_closed()
     {
         var clock = new FixedClock(Started);

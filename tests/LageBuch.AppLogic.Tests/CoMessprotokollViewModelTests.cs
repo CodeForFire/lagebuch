@@ -1203,7 +1203,8 @@ internal sealed class SnapshotRoundTrippingSession : IIncidentSession
 
     public void SetKeyword(string? keyword) => _inner.SetKeyword(keyword);
 
-    public void SetAddress(string? street, string? district) => _inner.SetAddress(street, district);
+    public void SetAddress(string? street, string? district, string? houseNumber = null, string? postalCode = null, string? place = null) =>
+        _inner.SetAddress(street, district, houseNumber, postalCode, place);
 
     public void SetStatus(string? status) => _inner.SetStatus(status);
 

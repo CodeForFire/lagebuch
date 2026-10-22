@@ -43,6 +43,17 @@ public class CommandApplierTests
     }
 
     [Fact]
+    public void SetAddress_over_the_wire_sets_hausnummer_plz_and_ort_on_the_host()
+    {
+        var clock = new FixedClock();
+        var incident = NewIncident(clock);
+
+        ApplyOverWire(new SetAddressCommand("Hauptstraße", "Puch", "1", "85238", "Petershausen"), incident, clock);
+
+        Assert.Equal("Hauptstraße 1, Puch, 85238 Petershausen", Formatting.Address(incident));
+    }
+
+    [Fact]
     public void Applying_a_non_file_command_returns_null()
     {
         var clock = new FixedClock();

@@ -126,7 +126,13 @@ public sealed record SetIncidentNumberCommand(string? IncidentNumber) : SyncComm
 
 public sealed record SetKeywordCommand(string? Keyword) : SyncCommand;
 
-public sealed record SetAddressCommand(string? Street, string? District) : SyncCommand;
+/// <summary>The whole address at once (#401); a part left out is cleared, the way the dialog saves it.</summary>
+public sealed record SetAddressCommand(
+    string? Street,
+    string? District,
+    string? HouseNumber = null,
+    string? PostalCode = null,
+    string? Place = null) : SyncCommand;
 
 public sealed record SetStatusCommand(string? Status) : SyncCommand;
 

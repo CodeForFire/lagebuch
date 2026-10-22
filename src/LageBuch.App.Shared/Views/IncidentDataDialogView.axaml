@@ -34,11 +34,24 @@
                        PlaceholderText="z. B. B 1.2 260715 123" />
             </HeaderedContentControl>
           </Grid>
-          <Grid ColumnDefinitions="3*,2*" ColumnSpacing="12">
+          <!-- #401: every address part is optional. Inside the home Gemeinde STRASSE, HAUSNR. and
+               ORTSTEIL are enough; PLZ and ORT are for überörtliche Hilfe. -->
+          <Grid ColumnDefinitions="3*,*" ColumnSpacing="12">
             <HeaderedContentControl Grid.Column="0" Classes="field" Header="STRASSE">
-              <TextBox x:Name="IncidentDataStreetBox" Text="{Binding Street}" PlaceholderText="z. B. Hauptstr. 12" />
+              <TextBox x:Name="IncidentDataStreetBox" Text="{Binding Street}" PlaceholderText="z. B. Hauptstr." />
             </HeaderedContentControl>
-            <HeaderedContentControl Grid.Column="1" Classes="field" Header="ORTSTEIL">
+            <HeaderedContentControl Grid.Column="1" Classes="field" Header="HAUSNR.">
+              <TextBox x:Name="IncidentDataHouseNumberBox" Text="{Binding HouseNumber}" PlaceholderText="12" />
+            </HeaderedContentControl>
+          </Grid>
+          <Grid ColumnDefinitions="2*,3*,3*" ColumnSpacing="12">
+            <HeaderedContentControl Grid.Column="0" Classes="field" Header="PLZ">
+              <TextBox x:Name="IncidentDataPostalCodeBox" Text="{Binding PostalCode}" PlaceholderText="85238" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Grid.Column="1" Classes="field" Header="ORT">
+              <TextBox x:Name="IncidentDataPlaceBox" Text="{Binding Place}" PlaceholderText="z. B. Petershausen" />
+            </HeaderedContentControl>
+            <HeaderedContentControl Grid.Column="2" Classes="field" Header="ORTSTEIL">
               <TextBox x:Name="IncidentDataDistrictBox" Text="{Binding District}" PlaceholderText="z. B. Puch" />
             </HeaderedContentControl>
           </Grid>

@@ -28,7 +28,7 @@ public class IncidentDataDialogRenderTests
             Array.Empty<(string, bool)>(),
             new IncidentNumber("B 1.2 260715 123"),
             keyword: "B3P");
-        session.SetAddress("Hauptstr. 12", "FFB");
+        session.SetAddress("Hauptstr. 12", "FFB", postalCode: "82256", place: "Fürstenfeldbruck");
         return session;
     }
 
@@ -37,7 +37,7 @@ public class IncidentDataDialogRenderTests
         window.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
 
     [AvaloniaFact]
-    public void Dialog_renders_with_all_four_fields_prefilled()
+    public void Dialog_renders_with_every_field_prefilled()
     {
         var dialogVm = new IncidentDataDialogViewModel(Session(), () => { });
 
@@ -50,6 +50,9 @@ public class IncidentDataDialogRenderTests
         Assert.Equal("B 1.2 260715 123", Find<TextBox>(window, "IncidentDataNumberBox").Text);
         Assert.Equal("Hauptstr. 12", Find<TextBox>(window, "IncidentDataStreetBox").Text);
         Assert.Equal("FFB", Find<TextBox>(window, "IncidentDataDistrictBox").Text);
+        Assert.Equal(string.Empty, Find<TextBox>(window, "IncidentDataHouseNumberBox").Text ?? string.Empty);
+        Assert.Equal("82256", Find<TextBox>(window, "IncidentDataPostalCodeBox").Text);
+        Assert.Equal("Fürstenfeldbruck", Find<TextBox>(window, "IncidentDataPlaceBox").Text);
         Assert.True(Find<Button>(window, "IncidentDataSaveButton").IsEnabled);
 
         var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");

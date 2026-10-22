@@ -253,7 +253,8 @@ public sealed class LocalIncidentSession : IIncidentSession
 
     public void SetKeyword(string? keyword) => Mutate(() => Incident.SetKeyword(keyword));
 
-    public void SetAddress(string? street, string? district) => Mutate(() => Incident.SetAddress(street, district));
+    public void SetAddress(string? street, string? district, string? houseNumber = null, string? postalCode = null, string? place = null) =>
+        Mutate(() => Incident.SetAddress(street, district, houseNumber, postalCode, place));
 
     public void SetStatus(string? status) => Mutate(() => Incident.SetStatus(status));
 

@@ -46,6 +46,19 @@ public class FormattingTests
         Assert.Equal(expected, Formatting.Address(street, district));
     }
 
+    [Theory]
+    [InlineData("Hauptstr.", "12", "85238", "Petershausen", "Puch", "Hauptstr. 12, Puch, 85238 Petershausen")]
+    [InlineData("Hauptstr.", "12", null, "Petershausen", null, "Hauptstr. 12, Petershausen")]
+    [InlineData(null, null, "85238", null, null, "85238")]
+    [InlineData(null, "12", null, null, null, "12")]
+    [InlineData(" Hauptstr. ", " ", " ", " Dachau ", null, "Hauptstr., Dachau")]
+    [InlineData(null, null, null, null, null, null)]
+    public void Address_joins_street_and_house_number_then_ortsteil_then_plz_and_ort(
+        string? street, string? houseNumber, string? postalCode, string? place, string? district, string? expected)
+    {
+        Assert.Equal(expected, Formatting.Address(street, district, houseNumber, postalCode, place));
+    }
+
     public static TheoryData<TaskImportance, string> ImportanceLabels => new()
     {
         { TaskImportance.High, "Hoch" },

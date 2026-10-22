@@ -8,7 +8,7 @@ namespace LageBuch.Persistence.Sqlite;
 
 public static class Migrations
 {
-    public const int CurrentVersion = 25;
+    public const int CurrentVersion = 26;
 
     public static int GetVersion(SqliteConnection cn)
     {
@@ -163,6 +163,11 @@ public static class Migrations
         if (version < 25)
         {
             ApplyV25(cn, tx);
+        }
+
+        if (version < 26)
+        {
+            ApplyV26(cn, tx);
         }
 
         // The version gate above is not proof that the steps it skipped ever ran: a build from a
@@ -791,6 +796,15 @@ public static class Migrations
             );
             """;
         Exec(cn, tx, sql25);
+    }
+
+    // Hausnummer, PLZ and Ort next to Straße and Ortsteil (#401), for an Einsatz outside the home
+    // Gemeinde. All nullable: an older file opens with them blank and reads exactly as before.
+    private static void ApplyV26(SqliteConnection cn, SqliteTransaction tx)
+    {
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "house_number", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "postal_code", "TEXT");
+        SchemaHelpers.AddColumnIfMissing(cn, tx, "incident_meta", "place", "TEXT");
     }
 
     private static void SetVersion(SqliteConnection cn, SqliteTransaction tx, int version)
