@@ -78,6 +78,24 @@
       <Setter Property="IsVisible" Value="True" />
       <Setter Property="Margin" Value="0,0,0,2" />
     </Style>
+    <!-- The wide gap between the two pickers is a Style, so the narrow state can drop it and both
+         pickers start on the same left edge. -->
+    <Style Selector="StackPanel.slot-cell">
+      <Setter Property="Margin" Value="6,0,0,0" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow StackPanel.slot-cell">
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <!-- A hairline closing each row block, shown only on a phone where a row is several lines. -->
+    <Style Selector="Border.row-rule">
+      <Setter Property="IsVisible" Value="False" />
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Background" Value="{StaticResource HairlineBrush}" />
+      <Setter Property="Margin" Value="0,10,0,4" />
+    </Style>
+    <Style Selector="Panel#EditorRoot.narrow Border.row-rule">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
     <Style Selector="Panel#EditorRoot.narrow Grid.pick-header">
       <Setter Property="IsVisible" Value="False" />
     </Style>
@@ -750,7 +768,8 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TalkGroupRow">
-                          <Grid Classes="pick-row" ColumnDefinitions="*,Auto,*,32" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,6">
+                          <Grid Classes="pick-row" ColumnDefinitions="*,Auto,*,32" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,0,0,6">
+                            <Border Grid.Row="3" Grid.ColumnSpan="4" Classes="row-rule" />
                             <TextBox Grid.Column="0" Classes="row-name" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="FW_MUSTER" MaxLength="200" AutomationProperties.Name="Name der Funkgruppe" />
                             <WrapPanel Classes="row-extras">
@@ -860,7 +879,8 @@
                     <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:RoleRow">
-                          <Grid Classes="pick-row" ColumnDefinitions="*,Auto,32" RowDefinitions="Auto,Auto" Margin="0,0,0,6">
+                          <Grid Classes="pick-row" ColumnDefinitions="*,Auto,32" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,6">
+                            <Border Grid.Row="2" Grid.ColumnSpan="3" Classes="row-rule" />
                             <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="Einsatzleiter" AutomationProperties.Name="Name der Funktion" />
                             <WrapPanel Classes="row-extras">
@@ -881,9 +901,9 @@
                             </ComboBox>
                             </StackPanel>
                             <!-- Same shape as the Eindeutigkeit picker: options carry the label. -->
-                            <StackPanel Width="200">
-                            <TextBlock Classes="overline narrow-label" FontSize="10" Margin="6,0,0,2" Text="AUF DER FÜHRUNGSTAFEL" />
-                            <ComboBox Margin="6,0,0,0" HorizontalAlignment="Stretch" ItemsSource="{Binding SlotOptions}"
+                            <StackPanel Classes="slot-cell" Width="200">
+                            <TextBlock Classes="overline narrow-label" FontSize="10" Text="AUF DER FÜHRUNGSTAFEL" />
+                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SlotOptions}"
                                       SelectedValue="{Binding Slot}"
                                       SelectedValueBinding="{Binding Value}"
                                       AutomationProperties.Name="Auf der Führungstafel">

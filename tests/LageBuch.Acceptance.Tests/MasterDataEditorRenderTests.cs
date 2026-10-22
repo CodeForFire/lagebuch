@@ -404,6 +404,18 @@ public class MasterDataEditorRenderTests
         var name = view.GetVisualDescendants().OfType<TextBox>()
             .First(t => t.GetVisualAncestors().All(a => a is not ComboBox));
         Assert.True(name.Bounds.Width >= 90, $"{title}: the name field is only {name.Bounds.Width:F0}px wide at 400px");
+
+        if (title == "Rollen")
+        {
+            // Both picker pairs of a block start on the same left edge on a phone.
+            var first = view.GetVisualDescendants().OfType<ComboBox>()
+                .First(c => AutomationProperties.GetName(c) == "Eindeutigkeit");
+            var second = view.GetVisualDescendants().OfType<ComboBox>()
+                .First(c => AutomationProperties.GetName(c) == "Auf der Führungstafel");
+            var left1 = first.TranslatePoint(default, view)!.Value.X;
+            var left2 = second.TranslatePoint(default, view)!.Value.X;
+            Assert.True(Math.Abs(left1 - left2) <= 1.0, $"Eindeutigkeit starts at {left1:F0}, Führungstafel at {left2:F0}");
+        }
     }
 
     private static List<ComboBox> UniquenessPickers(Control view) =>
