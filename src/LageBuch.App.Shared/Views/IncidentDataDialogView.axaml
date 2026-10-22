@@ -40,10 +40,15 @@
             </HeaderedContentControl>
           </Grid>
           <!-- #401: every address part is optional. Inside the home Gemeinde STRASSE, HAUSNR. and
-               ORTSTEIL are enough; PLZ and ORT are for überörtliche Hilfe. -->
+               ORTSTEIL are enough; PLZ and ORT are for überörtliche Hilfe.
+               #461: STRASSE and ORTSTEIL suggest the Stammdaten's Straßen and Ortsteile, like
+               STICHWORT; a picked street fills in ORTSTEIL, PLZ and ORT where they are empty. -->
           <Grid ColumnDefinitions="3*,*" ColumnSpacing="12">
-            <HeaderedContentControl Grid.Column="0" Classes="field" Header="STRASSE">
-              <TextBox x:Name="IncidentDataStreetBox" Text="{Binding Street}" PlaceholderText="z. B. Hauptstr." />
+            <HeaderedContentControl Grid.Column="0" Classes="field suggest" Header="STRASSE">
+              <AutoCompleteBox x:Name="IncidentDataStreetBox" PlaceholderText="z. B. Hauptstr."
+                               ItemsSource="{Binding StreetOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               Text="{Binding Street}" />
             </HeaderedContentControl>
             <HeaderedContentControl Grid.Column="1" Classes="field" Header="HAUSNR.">
               <TextBox x:Name="IncidentDataHouseNumberBox" Text="{Binding HouseNumber}" PlaceholderText="12" />
@@ -56,8 +61,11 @@
             <HeaderedContentControl Grid.Column="1" Classes="field" Header="ORT">
               <TextBox x:Name="IncidentDataPlaceBox" Text="{Binding Place}" PlaceholderText="z. B. Fürstenfeldbruck" />
             </HeaderedContentControl>
-            <HeaderedContentControl Grid.Column="2" Classes="field" Header="ORTSTEIL">
-              <TextBox x:Name="IncidentDataDistrictBox" Text="{Binding District}" PlaceholderText="z. B. Puch" />
+            <HeaderedContentControl Grid.Column="2" Classes="field suggest" Header="ORTSTEIL">
+              <AutoCompleteBox x:Name="IncidentDataDistrictBox" PlaceholderText="z. B. Puch"
+                               ItemsSource="{Binding DistrictOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               Text="{Binding District}" />
             </HeaderedContentControl>
           </Grid>
           <!-- Left, primary first (#694): the actions start under the fields they save. -->

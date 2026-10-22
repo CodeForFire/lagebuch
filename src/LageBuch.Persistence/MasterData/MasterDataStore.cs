@@ -54,6 +54,23 @@ public sealed class MasterDataStore
 
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
         ReplaceList(cn, tx, "md_keywords", set.Keywords);
+        ReplaceList(cn, tx, "md_districts", set.Districts);
+
+        Run(cn, tx, "DELETE FROM md_streets;", _ => { });
+        foreach (var street in set.Streets)
+        {
+            Run(
+                cn,
+                tx,
+                "INSERT INTO md_streets (name, district, postal_code, place) VALUES ($n,$d,$z,$p);",
+                p =>
+                {
+                    p("$n", street.Name);
+                    p("$d", street.District);
+                    p("$z", street.PostalCode);
+                    p("$p", street.Place);
+                });
+        }
 
         Run(cn, tx, "DELETE FROM md_links;", _ => { });
         foreach (var l in set.Links)
@@ -237,6 +254,8 @@ public sealed class MasterDataStore
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_keywords (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_districts (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_streets (name TEXT NOT NULL, district TEXT NOT NULL, postal_code TEXT NOT NULL, place TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
@@ -485,6 +504,8 @@ public sealed class MasterDataStore
             ReadRoles(cn),
             ReadColumn(cn, "SELECT value FROM md_unit_status;"),
             ReadColumn(cn, "SELECT value FROM md_keywords;"),
+            ReadColumn(cn, "SELECT value FROM md_districts;"),
+            ReadStreets(cn),
             ReadLinks(cn),
             ReadChecklists(cn),
             ReadNavigation(cn),
@@ -689,6 +710,20 @@ public sealed class MasterDataStore
         while (r.Read())
         {
             list.Add(new Vehicle(r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3) != 0, r.GetInt32(4) != 0));
+        }
+
+        return list;
+    }
+
+    private static List<Street> ReadStreets(SqliteConnection cn)
+    {
+        using var cmd = cn.CreateCommand();
+        cmd.CommandText = "SELECT name, district, postal_code, place FROM md_streets;";
+        using var r = cmd.ExecuteReader();
+        var list = new List<Street>();
+        while (r.Read())
+        {
+            list.Add(new Street(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3)));
         }
 
         return list;

@@ -54,6 +54,54 @@ SPEICHERN write it — the operator who typed it is the one who can still fix it
 The same check runs right after an import, which is where an unusable address
 most often comes from.
 
+## Straßen und Ortsteile aus OpenStreetMap
+
+The **Ortsteile** (`districts`) and **Straßen** (`streets`) are offered as
+suggestions in the STRASSE and ORTSTEIL fields of the Einsatzdaten. Picking a
+street fills in its Ortsteil, PLZ and Ort, but only into fields that are still
+empty, and only where every row of that street agrees. A street that runs through
+two Ortsteile is two rows, and picking it leaves ORTSTEIL for the
+Lagebuchführer. Both lists are suggestions, never a closed set: an address that
+is not listed is still recorded as typed.
+
+A Gemeinde has hundreds of streets, so nobody types them in. `make osm-streets`
+fetches them from OpenStreetMap through the Overpass API:
+
+```bash
+# districts and streets as a JSON fragment
+make osm-streets AGS=09179121 OUT=strassen.json
+
+# or replace them inside an exported Stammdaten file, then IMPORTIEREN it
+make osm-streets AGS=09179121 MERGE=meine.masterdata.json
+```
+
+`AGS` is the eight-digit *amtlicher Gemeindeschlüssel* (09179121 is
+Fürstenfeldbruck). It identifies the Gemeinde unambiguously, where a name would
+not: several Gemeinden are called Puch. Outside Germany, pass the boundary's OSM
+relation id as `RELATION=` instead. `MERGE` rewrites only `districts` and
+`streets` and leaves the rest of the file as it was. Two runs over unchanged map
+data give a byte-identical file, so a regenerated list only shows a diff where
+the map changed.
+
+What the list contains is decided by what OpenStreetMap holds:
+
+- **Street names** come from named roads. An address only confirms a name that a
+  road already has, because `addr:street` tags carry typos. A Weiler that is
+  addressed by its own name („Rothschwaig 1") is listed as a street too.
+- **PLZ and Ort** come from the street's own addresses, and otherwise from the
+  Gemeinde, if it has only one PLZ.
+- **Ortsteile** are the Gemeinde's `place` nodes (village, hamlet, suburb …).
+  Which Ortsteil a *street* is in is filled in only where its addresses say so
+  (`addr:suburb`, `addr:hamlet`). That is rare: in Fürstenfeldbruck it is the
+  streets of Puch and Aich. OpenStreetMap has no Ortsteil boundaries to test a
+  street against, and a nearest-point guess would put wrong Ortsteile into an
+  Einsatz, so the tool does not guess. Fill in the rest in the **Straßen**
+  editor, or in your own generator.
+
+The data is © OpenStreetMap contributors, available under the
+[ODbL 1.0](https://www.openstreetmap.org/copyright). Keep that attribution with
+any file you pass on.
+
 ## Sample data
 
 [`samples/demo-stammdaten.json`](samples/demo-stammdaten.json) is a complete,

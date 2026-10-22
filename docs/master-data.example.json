@@ -8,6 +8,13 @@
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz"],
   "keywords": ["B2", "B3", "B3 Person", "THL 1", "THL 2 VU eingeklemmt", "ABC 1"],
+  "districts": ["Musterdorf", "Neudorf"],
+  "streets": [
+    { "name": "Bahnhofstraße", "district": "", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Hauptstraße", "district": "", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Hauptstraße", "district": "Musterdorf", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Kirchweg", "district": "Musterdorf", "postalCode": "12345", "place": "Musterstadt" }
+  ],
   "truppTypes": [
     { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 },
     { "name": "Wassertrupp", "memberCount": 2, "maxDurationMinutes": 30 },

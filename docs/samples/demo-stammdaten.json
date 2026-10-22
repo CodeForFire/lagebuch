@@ -10,6 +10,16 @@
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz", "Einsatzbereit über Funk", "Abgerückt"],
   "keywords": ["B1", "B2", "B3", "B3 Person", "THL 1", "THL 2 VU eingeklemmt", "THL Öl", "ABC 1"],
+  "districts": ["Musterdorf", "Neudorf", "Oberau"],
+  "streets": [
+    { "name": "Am Sportplatz", "district": "", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Bahnhofstraße", "district": "", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Hauptstraße", "district": "", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Hauptstraße", "district": "Musterdorf", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Kirchweg", "district": "Musterdorf", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Lindenallee", "district": "Neudorf", "postalCode": "12345", "place": "Musterstadt" },
+    { "name": "Mühlweg", "district": "Neudorf", "postalCode": "12345", "place": "Musterstadt" }
+  ],
   "truppTypes": [
     { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 },
     { "name": "Wassertrupp", "memberCount": 2, "maxDurationMinutes": 30 },

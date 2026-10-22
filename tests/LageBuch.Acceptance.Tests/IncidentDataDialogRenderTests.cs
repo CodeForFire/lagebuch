@@ -51,8 +51,8 @@ public class IncidentDataDialogRenderTests
 
         Assert.Equal("B3P", Find<AutoCompleteBox>(window, "IncidentDataKeywordBox").Text);
         Assert.Equal("B 1.2 260715 123", Find<TextBox>(window, "IncidentDataNumberBox").Text);
-        Assert.Equal("Hauptstr.", Find<TextBox>(window, "IncidentDataStreetBox").Text);
-        Assert.Equal("Puch", Find<TextBox>(window, "IncidentDataDistrictBox").Text);
+        Assert.Equal("Hauptstr.", Find<AutoCompleteBox>(window, "IncidentDataStreetBox").Text);
+        Assert.Equal("Puch", Find<AutoCompleteBox>(window, "IncidentDataDistrictBox").Text);
         Assert.Equal("12", Find<TextBox>(window, "IncidentDataHouseNumberBox").Text);
         Assert.Equal("82256", Find<TextBox>(window, "IncidentDataPostalCodeBox").Text);
         Assert.Equal("Fürstenfeldbruck", Find<TextBox>(window, "IncidentDataPlaceBox").Text);
@@ -86,7 +86,7 @@ public class IncidentDataDialogRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var street = Find<TextBox>(window, "IncidentDataStreetBox");
+        var street = Find<AutoCompleteBox>(window, "IncidentDataStreetBox");
         street.Focus();
         window.Press(PhysicalKey.Escape); // nothing typed: closes in one key
         Assert.Equal(1, closed);
@@ -109,7 +109,7 @@ public class IncidentDataDialogRenderTests
         var window = new Window { Content = new IncidentDataDialogView { DataContext = dialogVm }, Width = 560, Height = 560 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        var street = Find<TextBox>(window, "IncidentDataStreetBox");
+        var street = Find<AutoCompleteBox>(window, "IncidentDataStreetBox");
         street.Focus();
         street.Text = "Nebenstr.";
 
@@ -171,6 +171,60 @@ public class IncidentDataDialogRenderTests
         Assert.True(popup.IsOpen);
         Assert.Equal(["B2", "B3", "B3 Person", "THL 1"], list.Items.Cast<string>());
 
+        SaveWithPopup(window, popup, "incident-data-dialog-stichwoerter.png");
+    }
+
+    // #461: opening STRASSE lists the Stammdaten's Straßen, and picking one fills in the Ortsteil,
+    // PLZ and Ort that were still empty.
+    [AvaloniaFact]
+    public void Picking_a_strasse_suggestion_fills_ortsteil_plz_and_ort()
+    {
+        var session = TestSession.StartNew(
+            new FakeStore(),
+            new FixedClock(),
+            new SessionOperator(AnonymizedExampleData.OperatorSurname, "FFB 12/1"),
+            "/x.fwincident",
+            Array.Empty<(string, bool)>(),
+            Array.Empty<(string, bool)>(),
+            keyword: "B3P");
+        var dialogVm = new IncidentDataDialogViewModel(
+            session,
+            () => { },
+            districts: ["Aich", "Puch"],
+            streets:
+            [
+                new Street("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"),
+                new Street("Lindacher Straße", "Lindach", "82256", "Fürstenfeldbruck"),
+                new Street("Pucher Straße", "Puch", "82256", "Fürstenfeldbruck"),
+            ]);
+        var window = new Window { Content = new IncidentDataDialogView { DataContext = dialogVm }, Width = 560, Height = 480 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var street = Find<AutoCompleteBox>(window, "IncidentDataStreetBox");
+        street.Focus();
+        street.Text = "Str";
+        street.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var popup = street.GetVisualDescendants().OfType<Popup>().Single();
+        var list = popup.Child!.GetVisualDescendants().OfType<ListBox>().Single();
+        Assert.True(popup.IsOpen);
+        Assert.Equal(["Hauptstraße", "Lindacher Straße", "Pucher Straße"], list.Items.Cast<string>());
+        SaveWithPopup(window, popup, "incident-data-dialog-strassen.png");
+
+        street.SelectedItem = "Lindacher Straße";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Lindach", Find<AutoCompleteBox>(window, "IncidentDataDistrictBox").Text);
+        Assert.Equal("82256", Find<TextBox>(window, "IncidentDataPostalCodeBox").Text);
+        Assert.Equal("Fürstenfeldbruck", Find<TextBox>(window, "IncidentDataPlaceBox").Text);
+    }
+
+    // A suggestion list is a popup, a TopLevel of its own that the window's frame does not
+    // contain, so the screenshot draws the popup's frame over the window's at the popup's offset.
+    private static void SaveWithPopup(Window window, Popup popup, string name)
+    {
         var popupRoot = TopLevel.GetTopLevel(popup.Child)!;
         Dispatcher.UIThread.RunJobs();
         using var windowFrame = window.CaptureRenderedFrame()!;
@@ -185,7 +239,7 @@ public class IncidentDataDialogRenderTests
 
         var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
         Directory.CreateDirectory(dir);
-        composite.Save(Path.Join(dir, "incident-data-dialog-stichwoerter.png"), PngBitmapEncoderOptions.Default);
+        composite.Save(Path.Join(dir, name), PngBitmapEncoderOptions.Default);
     }
 
     // #704: the Stichwörter from the Stammdaten are offered in the STICHWORT field, and picking one

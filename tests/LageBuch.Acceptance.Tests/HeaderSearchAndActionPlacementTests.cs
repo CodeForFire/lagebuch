@@ -272,7 +272,7 @@ public class HeaderSearchAndActionPlacementTests
         AssertActionsAnchoredLeft(
             window, Named<Button>(window, "IncidentDataSaveButton"), Named<Button>(window, "IncidentDataCancelButton"));
 
-        var street = Named<TextBox>(window, "IncidentDataStreetBox");
+        var street = Named<AutoCompleteBox>(window, "IncidentDataStreetBox");
         street.Focus();
         street.Text = "Nebenstr. 1";
         window.Press(PhysicalKey.Escape);

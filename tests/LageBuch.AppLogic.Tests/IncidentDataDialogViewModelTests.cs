@@ -1,6 +1,7 @@
 using LageBuch.AppLogic.ViewModels;
 using LageBuch.Domain;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.AppLogic.Tests;
 
@@ -320,5 +321,137 @@ public class IncidentDataDialogViewModelTests
         var vm = new IncidentDataDialogViewModel(ro, () => { });
 
         Assert.False(vm.SaveCommand.CanExecute(null));
+    }
+
+    // #461: the Stammdaten's Straßen and Ortsteile. The two Aicher Straßen agree on PLZ and Ort but
+    // not on the Ortsteil -- the shape a street running through two Ortsteile takes.
+    private static readonly Street[] Streets =
+    [
+        new("Hauptstraße", "Puch", "82256", "Fürstenfeldbruck"),
+        new("Pucher Straße", string.Empty, "82256", "Fürstenfeldbruck"),
+        new("Lindacher Straße", "Lindach", "82256", "Fürstenfeldbruck"),
+        new("Aicher Straße", "Aich", "82256", "Fürstenfeldbruck"),
+        new("Aicher Straße", "Puch", "82256", "Fürstenfeldbruck"),
+    ];
+
+    private static IncidentDataDialogViewModel WithStreets(LocalIncidentSession session) =>
+        new(session, () => { }, districts: ["Puch", "Aich", "Pfaffing"], streets: Streets);
+
+    [Fact]
+    public void Street_and_district_suggestions_come_from_the_stammdaten_without_duplicates()
+    {
+        var vm = WithStreets(NewSession(new FakeStore()));
+
+        Assert.Equal(
+            new[] { "Hauptstraße", "Pucher Straße", "Lindacher Straße", "Aicher Straße" },
+            vm.StreetOptions);
+
+        // Lindach has a street but no entry of its own; it is offered all the same.
+        Assert.Equal(new[] { "Puch", "Aich", "Pfaffing", "Lindach" }, vm.DistrictOptions);
+    }
+
+    [Fact]
+    public void Picking_a_street_fills_its_ortsteil_plz_and_ort()
+    {
+        var vm = WithStreets(NewSession(new FakeStore()));
+
+        vm.Street = "Hauptstraße";
+
+        Assert.Equal("Puch", vm.District);
+        Assert.Equal("82256", vm.PostalCode);
+        Assert.Equal("Fürstenfeldbruck", vm.Place);
+    }
+
+    [Fact]
+    public void A_typed_street_matches_apart_from_case_and_whitespace_and_saves_in_the_stammdaten_spelling()
+    {
+        var store = new FakeStore();
+        var vm = WithStreets(NewSession(store));
+
+        vm.Street = " hauptstraße ";
+        vm.District = "puch";
+        vm.SaveCommand.Execute(null);
+
+        var saved = store.Load("/x.fwincident");
+        Assert.Equal("Hauptstraße", saved.Street);
+        Assert.Equal("Puch", saved.District);
+        Assert.Equal("82256", saved.PostalCode);
+    }
+
+    [Fact]
+    public void A_field_the_rows_disagree_on_is_left_empty()
+    {
+        var vm = WithStreets(NewSession(new FakeStore()));
+
+        vm.Street = "Aicher Straße";
+
+        Assert.Null(vm.District); // Aich or Puch: guessing would be worse than asking
+        Assert.Equal("82256", vm.PostalCode);
+        Assert.Equal("Fürstenfeldbruck", vm.Place);
+    }
+
+    [Fact]
+    public void A_typed_ortsteil_is_never_overwritten()
+    {
+        var vm = WithStreets(NewSession(new FakeStore()));
+        vm.District = "Aich";
+
+        vm.Street = "Hauptstraße";
+
+        Assert.Equal("Aich", vm.District);
+        Assert.Equal("82256", vm.PostalCode);
+    }
+
+    [Fact]
+    public void The_address_already_in_the_incident_is_never_overwritten()
+    {
+        var session = NewSession(new FakeStore());
+        session.SetAddress("Bahnhofstraße", "Aich", null, "82256", "Fürstenfeldbruck");
+        var vm = WithStreets(session);
+
+        vm.Street = "Lindacher Straße";
+
+        Assert.Equal("Aich", vm.District);
+    }
+
+    [Fact]
+    public void Picking_another_street_replaces_what_the_first_one_filled_in()
+    {
+        var vm = WithStreets(NewSession(new FakeStore()));
+        vm.Street = "Hauptstraße";
+
+        vm.Street = "Lindacher Straße";
+        Assert.Equal("Lindach", vm.District);
+
+        // Pucher Straße has no Ortsteil, so Lindach would now be wrong: it goes.
+        vm.Street = "Pucher Straße";
+        Assert.Null(vm.District);
+        Assert.Equal("82256", vm.PostalCode);
+    }
+
+    [Fact]
+    public void Typing_past_a_known_street_keeps_what_it_filled_in()
+    {
+        // "Hauptstraße 12" out of habit: no longer a match, but the Ortsteil was right.
+        var vm = WithStreets(NewSession(new FakeStore()));
+        vm.Street = "Hauptstraße";
+
+        vm.Street = "Hauptstraße 12";
+
+        Assert.Equal("Puch", vm.District);
+    }
+
+    [Fact]
+    public void An_unknown_street_is_kept_as_typed_and_fills_nothing()
+    {
+        var store = new FakeStore();
+        var vm = WithStreets(NewSession(store));
+
+        vm.Street = "Feldweg am Weiher";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Null(vm.District);
+        Assert.Null(vm.PostalCode);
+        Assert.Equal("Feldweg am Weiher", store.Load("/x.fwincident").Street);
     }
 }

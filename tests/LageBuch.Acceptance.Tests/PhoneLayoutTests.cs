@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -348,6 +349,25 @@ public class PhoneLayoutTests
         AssertNothingOverflows(window, view);
     }
 
+    // #461: a Straßen row is four fields and a button, which still has to fit 412dp: the street
+    // name keeps the widest column and nothing runs past the edge.
+    [AvaloniaFact]
+    public void The_stammdaten_strassen_rows_fit_a_phone()
+    {
+        var vm = new MasterDataEditorViewModel(new DemoProvider(), new FakeDialogs(), new NoFiles());
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = PhoneWindow(view);
+
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == "Straßen");
+        Dispatcher.UIThread.RunJobs();
+
+        AssertNothingOverflows(window, view);
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame()!;
+        frame.SavePng(Path.Join(dir, "master-data-editor-strassen-phone.png"));
+    }
+
     /// <summary>Enough Stammdaten for the rail to have something to drill into.</summary>
     private sealed class DemoProvider : IMasterDataProvider
     {
@@ -356,6 +376,7 @@ public class PhoneLayoutTests
             Roles = new[] { new Role("EL"), new Role("ZF") },
             Vehicles = new[] { new Vehicle("FFB Wache 1", "FFB 1/10/1", 9) },
             Personnel = new[] { new Person("Mustermann", "Max", "ZF", "FFB 1/10/1", null) },
+            Streets = new[] { new Street("Bürgermeister-Braumiller-Straße", "Puch", "82256", "Fürstenfeldbruck") },
         };
 
         public void Save(MasterDataSet set)

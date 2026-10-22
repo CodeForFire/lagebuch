@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain.ValueObjects;
+using LageBuch.Persistence.MasterData;
 using LageBuch.Sync;
 
 namespace LageBuch.AppLogic.ViewModels;
@@ -19,13 +20,28 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
 {
     private readonly IIncidentSession _session;
     private readonly Action _onChanged;
+    private readonly IReadOnlyList<Street> _streets;
 
-    public IncidentDataDialogViewModel(IIncidentSession session, Action onChanged, IReadOnlyList<string>? keywordOptions = null)
+    // What the last recognised street filled in (#461), per field. A field still holding exactly
+    // that may be refilled by the next street; anything else was typed and is never touched.
+    private string? _filledDistrict;
+    private string? _filledPostalCode;
+    private string? _filledPlace;
+
+    public IncidentDataDialogViewModel(
+        IIncidentSession session,
+        Action onChanged,
+        IReadOnlyList<string>? keywordOptions = null,
+        IReadOnlyList<string>? districts = null,
+        IReadOnlyList<Street>? streets = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         _session = session;
         _onChanged = onChanged;
         KeywordOptions = keywordOptions ?? [];
+        _streets = streets ?? [];
+        StreetOptions = Distinct(_streets.Select(s => s.Name));
+        DistrictOptions = Distinct((districts ?? []).Concat(_streets.Select(s => s.District)));
 
         var incident = session.Incident;
         _keyword = incident.Keyword;
@@ -44,6 +60,17 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     /// text is what it is, and only the chosen text is stored in the incident.
     /// </summary>
     public IReadOnlyList<string> KeywordOptions { get; }
+
+    /// <summary>
+    /// The Stammdaten's Straßen (#461), each name once, as suggestions. Like the Stichwörter they
+    /// are never enforced: a street the list lacks is recorded as typed.
+    /// </summary>
+    public IReadOnlyList<string> StreetOptions { get; }
+
+    /// <summary>
+    /// The Stammdaten's Ortsteile, plus any Ortsteil a street names that the list itself lacks.
+    /// </summary>
+    public IReadOnlyList<string> DistrictOptions { get; }
 
     [ObservableProperty]
     private string? _keyword;
@@ -117,8 +144,8 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
         if (AddressDiffers(incident))
         {
             _session.SetAddress(
-                Normalize(Street),
-                Normalize(District),
+                StreetToSave,
+                DistrictToSave,
                 Normalize(HouseNumber),
                 Normalize(PostalCode),
                 Normalize(Place));
@@ -160,12 +187,60 @@ public sealed partial class IncidentDataDialogViewModel : ObservableObject
     // records as "B3P"; otherwise exactly as typed.
     private string? KeywordToSave => Normalize(StammdatenCatalogue.Normalize(Keyword, KeywordOptions));
 
+    private string? StreetToSave => Normalize(StammdatenCatalogue.Normalize(Street, StreetOptions));
+
+    private string? DistrictToSave => Normalize(StammdatenCatalogue.Normalize(District, DistrictOptions));
+
     private bool AddressDiffers(Domain.Incident incident) =>
-        Normalize(Street) != incident.Street
+        StreetToSave != incident.Street
         || Normalize(HouseNumber) != incident.HouseNumber
         || Normalize(PostalCode) != incident.PostalCode
         || Normalize(Place) != incident.Place
-        || Normalize(District) != incident.District;
+        || DistrictToSave != incident.District;
+
+    /// <summary>
+    /// A recognised street fills in its Ortsteil, PLZ and Ort (#461) -- each only where every
+    /// Stammdaten row of that name agrees, and only into a field that is empty or still holds what
+    /// the previous street filled in. Text that matches no street changes nothing, so typing on
+    /// past a name ("Hauptstraße 12") keeps what it brought.
+    /// </summary>
+    partial void OnStreetChanged(string? value)
+    {
+        var name = StammdatenCatalogue.Normalize(value, StreetOptions);
+        var rows = _streets.Where(s => string.Equals(s.Name.Trim(), name, StringComparison.Ordinal)).ToList();
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        District = Fill(District, ref _filledDistrict, Agreed(rows, s => s.District));
+        PostalCode = Fill(PostalCode, ref _filledPostalCode, Agreed(rows, s => s.PostalCode));
+        Place = Fill(Place, ref _filledPlace, Agreed(rows, s => s.Place));
+    }
+
+    // The one non-blank value every row holds, or null when a row is blank or two rows differ.
+    private static string? Agreed(List<Street> rows, Func<Street, string> field)
+    {
+        var values = rows.Select(r => field(r).Trim()).Distinct(StringComparer.Ordinal).ToList();
+        return values is [{ Length: > 0 } only] ? only : null;
+    }
+
+    private static string? Fill(string? current, ref string? filled, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(current) && !string.Equals(current, filled, StringComparison.Ordinal))
+        {
+            return current;
+        }
+
+        filled = value;
+        return value;
+    }
+
+    private static List<string> Distinct(IEnumerable<string> values) =>
+        values.Select(v => v.Trim())
+            .Where(v => v.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

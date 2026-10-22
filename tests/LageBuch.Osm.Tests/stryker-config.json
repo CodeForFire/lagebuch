@@ -1,0 +1,9 @@
+{
+  "stryker-config": {
+    "project": "LageBuch.Osm.csproj",
+    "mutation-level": "Standard",
+    "reporters": ["html", "markdown", "json", "progress"],
+    "thresholds": { "high": 97, "low": 96, "break": 96 },
+    "ignore-methods": ["*ThrowIfNull", "*ThrowIfNullOrEmpty", "*ThrowIfNullOrWhiteSpace", "*ThrowIfNegativeOrZero"]
+  }
+}

@@ -11,7 +11,8 @@ using LageBuch.Persistence.MasterData;
 
 namespace LageBuch.Acceptance.Tests;
 
-// A brigade's real roster is far longer than the screen: 39 Fahrzeuge, 38 people. Built all at
+// A brigade's real roster is far longer than the screen: 39 Fahrzeuge, 38 people, and some 320
+// Straßen once a Gemeinde's streets come from OpenStreetMap (#461). Built all at
 // once, opening the category took most of a second, so the long lists build only the rows on
 // screen. That must not cost the keyboard anything: + HINZUFÜGEN still lands in the new row at
 // the bottom (#543), and Tab and Shift+Tab still walk every row, including those not built yet.
@@ -25,6 +26,7 @@ public class StammdatenLongListTests
         {
             Personnel = Enumerable.Range(1, RowCount).Select(i => new Person($"Muster{i}", "Max", null, null, null)).ToArray(),
             Vehicles = Enumerable.Range(1, RowCount).Select(i => new Vehicle("FFB Wache 1", $"FFB 1/{i}/1", 6)).ToArray(),
+            Streets = Enumerable.Range(1, RowCount).Select(i => new Street($"Musterweg {i}", "Puch", "82256", "Fürstenfeldbruck")).ToArray(),
         };
 
         public void Save(MasterDataSet set)
@@ -52,6 +54,7 @@ public class StammdatenLongListTests
         {
             PersonnelSection p => p.Rows.ToList<object>(),
             VehiclesSection v => v.Rows.ToList<object>(),
+            StreetsSection s => s.Rows.ToList<object>(),
             _ => throw new InvalidOperationException(title),
         };
         return (window, vm, rows);
@@ -60,7 +63,7 @@ public class StammdatenLongListTests
     // The section's own row list, not a suggestion box's popup list inside a row.
     private static ItemsControl RowList(Window window) =>
         window.GetVisualDescendants().OfType<ItemsControl>()
-            .Single(l => l.DataContext is PersonnelSection or VehiclesSection && l.ItemCount == RowCount);
+            .Single(l => l.DataContext is PersonnelSection or VehiclesSection or StreetsSection && l.ItemCount == RowCount);
 
     private static Control FirstField(Window window, object row) =>
         window.GetVisualDescendants().OfType<Control>()
@@ -97,6 +100,7 @@ public class StammdatenLongListTests
     [AvaloniaTheory]
     [InlineData("Personal")]
     [InlineData("Fahrzeuge")]
+    [InlineData("Straßen")]
     public void A_long_list_builds_only_the_rows_on_screen(string title)
     {
         var (window, _, rows) = ShowSection(title);
@@ -109,6 +113,7 @@ public class StammdatenLongListTests
     [AvaloniaTheory]
     [InlineData("Personal")]
     [InlineData("Fahrzeuge")]
+    [InlineData("Straßen")]
     public void Hinzufuegen_reaches_the_new_row_below_a_long_list(string title)
     {
         var (window, vm, _) = ShowSection(title);
@@ -138,6 +143,7 @@ public class StammdatenLongListTests
     [AvaloniaTheory]
     [InlineData("Personal")]
     [InlineData("Fahrzeuge")]
+    [InlineData("Straßen")]
     public void Tab_walks_every_row_of_a_long_list(string title)
     {
         var (window, _, rows) = ShowSection(title);
@@ -150,6 +156,7 @@ public class StammdatenLongListTests
     [AvaloniaTheory]
     [InlineData("Personal")]
     [InlineData("Fahrzeuge")]
+    [InlineData("Straßen")]
     public void Shift_tab_walks_back_up_every_row_of_a_long_list(string title)
     {
         var (window, _, rows) = ShowSection(title);

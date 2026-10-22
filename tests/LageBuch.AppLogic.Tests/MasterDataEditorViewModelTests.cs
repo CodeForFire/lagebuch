@@ -191,7 +191,8 @@ public class MasterDataEditorViewModelTests
             new[]
             {
                 "Einstellungen", "Navigation", "Einheiten-Status",
-                "Fahrzeuge", "Links", "Personal", "Rollen", "Stichwörter", "Trupp-Typen",
+                "Fahrzeuge", "Links", "Ortsteile", "Personal", "Rollen", "Stichwörter", "Straßen",
+                "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
     }
@@ -315,7 +316,7 @@ public class MasterDataEditorViewModelTests
     [Fact]
     public void Save_maps_every_category_to_its_own_list_in_BuildSet()
     {
-        var listTitles = new[] { "Einheiten-Status", "Stichwörter" };
+        var listTitles = new[] { "Einheiten-Status", "Stichwörter", "Ortsteile" };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var vm = Vm(provider);
@@ -361,6 +362,11 @@ public class MasterDataEditorViewModelTests
         vehicles.Rows[^1].Wache = "MARK-Wache";
         vehicles.Rows[^1].CallSign = "MARK-Funkrufname";
 
+        var streets = vm.Sections.OfType<StreetsSection>().Single();
+        streets.AddCommand.Execute(null);
+        streets.Rows[^1].Name = "MARK-Straßen";
+        streets.Rows[^1].District = "MARK-Straßen-Ortsteil";
+
         var truppTypes = TruppTypes(vm);
         truppTypes.AddCommand.Execute(null);
         truppTypes.Rows[^1].Name = "MARK-Trupp-Typen";
@@ -373,6 +379,8 @@ public class MasterDataEditorViewModelTests
         Assert.Contains(set.Roles, r => r.Name == "MARK-Rollen" && r.Uniqueness == RoleUniqueness.UniquePerSection);
         Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
         Assert.Contains("MARK-Stichwörter", set.Keywords);
+        Assert.Contains("MARK-Ortsteile", set.Districts);
+        Assert.Contains(set.Streets, t => t.Name == "MARK-Straßen" && t.District == "MARK-Straßen-Ortsteil");
         Assert.Contains(set.TruppTypes, t => t.Name == "MARK-Trupp-Typen" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
         Assert.Contains(set.Vehicles, v => v.Wache == "MARK-Wache" && v.CallSign == "MARK-Funkrufname");
 
@@ -1028,5 +1036,39 @@ public class MasterDataEditorViewModelTests
         await vm.ImportCommand.ExecuteAsync(null);
 
         Assert.Equal("Import fehlgeschlagen: Datei nicht lesbar.", vm.FileError);
+    }
+
+    [Fact]
+    public void Streets_keep_named_rows_trimmed_and_suggest_every_known_ortsteil()
+    {
+        var provider = new InMemoryProvider(MasterDataSet.Empty with
+        {
+            Districts = new[] { "Puch" },
+            Streets = new[]
+            {
+                new Street("Lindacher Straße", "Lindach", "82256", "Fürstenfeldbruck"),
+                new Street("Am Vorfeld", string.Empty, "82256", "Fürstenfeldbruck"), // no Ortsteil to offer
+            },
+        });
+        var vm = Vm(provider);
+        var streets = vm.Sections.OfType<StreetsSection>().Single();
+
+        Assert.Equal(new[] { "Puch", "Lindach" }, streets.Rows[0].DistrictOptions);
+
+        streets.AddCommand.Execute(null);
+        streets.Rows[^1].Name = " Hauptstraße ";
+        streets.Rows[^1].District = "Puch ";
+        streets.AddCommand.Execute(null); // left blank: dropped on save
+        streets.Rows[^1].District = "Aich";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            new[]
+            {
+                new Street("Lindacher Straße", "Lindach", "82256", "Fürstenfeldbruck"),
+                new Street("Am Vorfeld", string.Empty, "82256", "Fürstenfeldbruck"),
+                new Street("Hauptstraße", "Puch"),
+            },
+            provider.Get().Streets);
     }
 }

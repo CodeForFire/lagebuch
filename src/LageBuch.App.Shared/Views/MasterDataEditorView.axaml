@@ -631,6 +631,68 @@
                 </DockPanel>
               </DataTemplate>
 
+              <!-- Straßen editor (#461): Straße + Ortsteil + PLZ + Ort. A list from OpenStreetMap
+                   runs to hundreds of rows, so only those on screen are built, as for Fahrzeuge. -->
+              <DataTemplate x:DataType="vm:StreetsSection">
+                <DockPanel Classes="add-below">
+                  <Button DockPanel.Dock="Bottom" Classes="signal add-row" Content="+ HINZUFÜGEN"
+                          HorizontalAlignment="Left" Margin="0,12,0,0" Command="{Binding AddCommand}" />
+                  <!-- A fixed trailing width matching the row template's icon-btn button, as in the
+                       Fahrzeuge template above: "Auto" would size to this Grid's own empty content.
+                       The headers trim rather than run into each other at phone width. -->
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="2*,*,80,*,32" Margin="0,0,0,6">
+                    <TextBlock Grid.Column="0" Text="STRASSE" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                    <TextBlock Grid.Column="1" Text="ORTSTEIL" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                    <TextBlock Grid.Column="2" Text="PLZ" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                    <TextBlock Grid.Column="3" Text="ORT" Classes="overline" FontSize="10"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                  </Grid>
+                  <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Rows}" b:FocusNewItem.IsEnabled="True"
+                                  b:RowTabNavigation.IsEnabled="True">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <VirtualizingStackPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StreetRow">
+                          <Grid ColumnDefinitions="2*,*,80,*,32" Margin="0,0,0,6">
+                            <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
+                                     PlaceholderText="z. B. Hauptstraße" />
+                            <Grid Grid.Column="1" Margin="0,0,6,0">
+                              <AutoCompleteBox PlaceholderText="z. B. Puch"
+                                               ItemsSource="{Binding DistrictOptions}"
+                                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                                               Text="{Binding District}" />
+                              <PathIcon Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Margin="0,0,9,0" IsHitTestVisible="False"
+                                        Foreground="{StaticResource TextMutedBrush}"
+                                        Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            </Grid>
+                            <TextBox Grid.Column="2" Margin="0,0,6,0" Text="{Binding PostalCode}"
+                                     PlaceholderText="82256" />
+                            <TextBox Grid.Column="3" Text="{Binding Place}"
+                                     PlaceholderText="z. B. Fürstenfeldbruck" />
+                            <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
+                                 $parent path cannot resolve here. -->
+                            <Button Grid.Column="4" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
+                                    AutomationProperties.Name="Entfernen"
+                                    Command="{ReflectionBinding $parent[ItemsControl].DataContext.RemoveCommand}"
+                                    CommandParameter="{Binding}">
+                              <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </DataTemplate>
+
               <!-- Trupp-Typen editor (#398): the crew size and Einsatzzeit live on the row, so
                    renaming a type can no longer silently drop its rule. -->
               <DataTemplate x:DataType="vm:TruppTypesSection">

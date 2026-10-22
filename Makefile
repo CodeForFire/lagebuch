@@ -73,7 +73,7 @@ TEST_TARGET := $(if $(PROJECT),$(PROJECT),$(SLNF))
 .PHONY: help restore build build-all test test-all mutate run format format-check ci clean \
         android-image android-image-rebuild apk aab emulator install run-android \
         logcat uninstall package-linux logo-assets samples screenshots demo-gif \
-        play-listing-check play-screenshots phone-screenshots emulator-phone
+        play-listing-check play-screenshots phone-screenshots emulator-phone osm-streets
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} \
@@ -103,7 +103,7 @@ test-all: ## Run tests over the full solution (needs JDK <= 21)
 # Projects with a tests/LageBuch.<name>.Tests/stryker-config.json. Sync.Hosting
 # and the Avalonia projects are left out: their tests open real sockets or run
 # headless UI, which is too slow and too flaky to repeat once per mutant.
-MUTATE_PROJECTS := Domain Sync Documents Persistence AppLogic
+MUTATE_PROJECTS := Domain Sync Documents Persistence AppLogic Osm
 
 # SINCE=<committish> is the pull request gate in .github/workflows/mutation.yml
 # (SINCE=origin/main): it mutates only the .cs files changed since the merge
@@ -120,7 +120,7 @@ BREAK ?= 80
 MUTATE_OUT = $(CURDIR)/StrykerOutput/$(PROJECT)
 MUTATE_SCORE = python3 -I scripts/mutation-diff-score.py
 
-mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|AppLogic [SINCE= BREAK=80])
+mutate: ## Mutation-test one project (PROJECT=Domain|Sync|Documents|Persistence|AppLogic|Osm [SINCE= BREAK=80])
 	@if [ -z "$(filter $(PROJECT),$(MUTATE_PROJECTS))" ]; then \
 	  echo "Usage: make mutate PROJECT=<one of: $(MUTATE_PROJECTS)>"; exit 2; fi
 	@rm -f $(MUTATE_OUT)/reports/changed-lines.md
@@ -161,6 +161,19 @@ ci: ## Reproduce the CI build+test legs locally (desktop projects only — exclu
 clean: ## Remove build output (bin/ and obj/)
 	-$(DOTNET) clean $(SLNF)
 	find src tests -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
+
+# AGS=<amtlicher Gemeindeschlüssel> (or RELATION=<OSM id>) picks the Gemeinde. OUT=<file>
+# writes the districts/streets fragment there instead of stdout; MERGE=<file> replaces the
+# Ortsteile and Straßen inside an exported Stammdaten file in place. See docs/master-data.md.
+AGS      ?=
+RELATION ?=
+OUT      ?=
+MERGE    ?=
+OSM_ARGS  = $(if $(AGS),--ags $(AGS)) $(if $(RELATION),--relation $(RELATION)) \
+            $(if $(OUT),--out $(OUT)) $(if $(MERGE),--merge $(MERGE))
+
+osm-streets: ## Straßen and Ortsteile from OpenStreetMap (AGS=09179121 [OUT=file | MERGE=stammdaten.json])
+	$(DOTNET) run --project tools/LageBuch.OsmImport -c $(CONFIG) -- $(OSM_ARGS)
 
 ## Android (built in Docker, run on the host)
 
