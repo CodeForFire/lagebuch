@@ -53,6 +53,7 @@ public sealed class MasterDataStore
         }
 
         ReplaceList(cn, tx, "md_unit_status", set.UnitStatus);
+        ReplaceList(cn, tx, "md_keywords", set.Keywords);
 
         Run(cn, tx, "DELETE FROM md_links;", _ => { });
         foreach (var l in set.Links)
@@ -235,6 +236,7 @@ public sealed class MasterDataStore
         const string schema = """
             CREATE TABLE IF NOT EXISTS md_roles (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_unit_status (value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS md_keywords (value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS md_links (name TEXT NOT NULL, url TEXT NOT NULL, group_name TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS md_vehicles (wache TEXT NOT NULL, call_sign TEXT NOT NULL, seats INTEGER NOT NULL DEFAULT 0, has_zugfuehrer INTEGER NOT NULL DEFAULT 0, is_own INTEGER NOT NULL DEFAULT 1);
             CREATE TABLE IF NOT EXISTS md_checklist_lists (
@@ -482,6 +484,7 @@ public sealed class MasterDataStore
         return new(
             ReadRoles(cn),
             ReadColumn(cn, "SELECT value FROM md_unit_status;"),
+            ReadColumn(cn, "SELECT value FROM md_keywords;"),
             ReadLinks(cn),
             ReadChecklists(cn),
             ReadNavigation(cn),

@@ -9,6 +9,7 @@
     { "name": "Presse", "uniqueness": "multiple" }
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz", "Einsatzbereit über Funk", "Abgerückt"],
+  "keywords": ["B1", "B2", "B3", "B3 Person", "THL 1", "THL 2 VU eingeklemmt", "THL Öl", "ABC 1"],
   "truppTypes": [
     { "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 },
     { "name": "Wassertrupp", "memberCount": 2, "maxDurationMinutes": 30 },

@@ -191,7 +191,7 @@ public class MasterDataEditorViewModelTests
             new[]
             {
                 "Einstellungen", "Navigation", "Einheiten-Status",
-                "Fahrzeuge", "Links", "Personal", "Rollen", "Trupp-Typen",
+                "Fahrzeuge", "Links", "Personal", "Rollen", "Stichwörter", "Trupp-Typen",
             },
             vm.Sections.Select(s => s.Title));
     }
@@ -315,7 +315,7 @@ public class MasterDataEditorViewModelTests
     [Fact]
     public void Save_maps_every_category_to_its_own_list_in_BuildSet()
     {
-        var listTitles = new[] { "Einheiten-Status" };
+        var listTitles = new[] { "Einheiten-Status", "Stichwörter" };
 
         var provider = new InMemoryProvider(MasterDataSet.Empty);
         var vm = Vm(provider);
@@ -372,6 +372,7 @@ public class MasterDataEditorViewModelTests
         var set = provider.Get();
         Assert.Contains(set.Roles, r => r.Name == "MARK-Rollen" && r.Uniqueness == RoleUniqueness.UniquePerSection);
         Assert.Contains("MARK-Einheiten-Status", set.UnitStatus);
+        Assert.Contains("MARK-Stichwörter", set.Keywords);
         Assert.Contains(set.TruppTypes, t => t.Name == "MARK-Trupp-Typen" && t.MemberCount == 3 && t.MaxDurationMinutes == 20);
         Assert.Contains(set.Vehicles, v => v.Wache == "MARK-Wache" && v.CallSign == "MARK-Funkrufname");
 

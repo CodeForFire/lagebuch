@@ -98,6 +98,38 @@ public class IncidentDataDialogViewModelTests
     }
 
     [Fact]
+    public void Stichwort_suggestions_come_from_the_stammdaten()
+    {
+        var vm = new IncidentDataDialogViewModel(NewSession(new FakeStore()), () => { }, ["B3 Person", "THL 1"]);
+
+        Assert.Equal(["B3 Person", "THL 1"], vm.KeywordOptions);
+    }
+
+    [Fact]
+    public void Save_records_a_stichwort_in_the_stammdaten_spelling()
+    {
+        var store = new FakeStore();
+        var vm = new IncidentDataDialogViewModel(NewSession(store), () => { }, ["B3 Person"]);
+
+        vm.Keyword = " b3 person ";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("B3 Person", store.Load("/x.fwincident").Keyword);
+    }
+
+    [Fact]
+    public void Save_keeps_a_stichwort_the_stammdaten_do_not_list()
+    {
+        var store = new FakeStore();
+        var vm = new IncidentDataDialogViewModel(NewSession(store), () => { }, ["B3 Person"]);
+
+        vm.Keyword = "Ölspur";
+        vm.SaveCommand.Execute(null);
+
+        Assert.Equal("Ölspur", store.Load("/x.fwincident").Keyword);
+    }
+
+    [Fact]
     public void Blank_fields_clear_the_values()
     {
         var store = new FakeStore();

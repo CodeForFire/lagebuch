@@ -26,8 +26,13 @@
                alarm, the Einsatznummer once ILS calls back (#69), the address as it firms up. The
                fields are buffered until SPEICHERN so a half-typed number never lands in the file. -->
           <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-            <HeaderedContentControl Grid.Column="0" Classes="field" Header="STICHWORT">
-              <TextBox x:Name="IncidentDataKeywordBox" Text="{Binding Keyword}" PlaceholderText="z. B. B3P" />
+            <!-- #704: the Stammdaten's Stichwörter as suggestions, not a closed set: an alarm text
+                 the list lacks stays enterable, so this is an AutoCompleteBox, as in the ETB. -->
+            <HeaderedContentControl Grid.Column="0" Classes="field suggest" Header="STICHWORT">
+              <AutoCompleteBox x:Name="IncidentDataKeywordBox" PlaceholderText="z. B. B3P"
+                               ItemsSource="{Binding KeywordOptions}"
+                               FilterMode="ContainsOrdinal" MinimumPrefixLength="0"
+                               Text="{Binding Keyword}" />
             </HeaderedContentControl>
             <HeaderedContentControl Grid.Column="1" Classes="field" Header="EINSATZNUMMER">
               <TextBox x:Name="IncidentDataNumberBox" Classes="mono" Text="{Binding IncidentNumber}"

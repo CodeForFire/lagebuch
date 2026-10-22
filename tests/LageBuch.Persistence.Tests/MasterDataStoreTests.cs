@@ -40,6 +40,7 @@ public class MasterDataStoreTests : IDisposable
         {
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert" },
+            Keywords = new[] { "B3 Person", "THL 1" },
             ChecklistTemplates = ChecklistTemplate.AufbauAbbau(
                 new[] { new ChecklistTemplateItem("Schritt 1", true), new ChecklistTemplateItem("Schritt 2", false) },
                 new[] { new ChecklistTemplateItem("Abbauschritt", true) }),
@@ -67,6 +68,7 @@ public class MasterDataStoreTests : IDisposable
             reopened.ChecklistTemplates[0].Items);
         Assert.Equal(new[] { new ChecklistTemplateItem("Abbauschritt", true) }, reopened.ChecklistTemplates[1].Items);
         Assert.Equal(new Link("Wetterdienst", "https://dwd.de"), Assert.Single(reopened.Links));
+        Assert.Equal(new[] { "B3 Person", "THL 1" }, reopened.Keywords);
         var max = reopened.Personnel.Single(p => p.LastName == "Mustermann");
         Assert.Equal("Land 1", max.CallSign);
         Assert.Equal("max.mustermann@example.org", max.Email);

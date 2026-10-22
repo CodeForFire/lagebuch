@@ -86,7 +86,16 @@ public class VersionHandshakeTests
         // 8 carries Hausnummer, PLZ and Ort on setAddress (#401). A client at 7 would send setAddress
         // without them, and a host at 8 reads the missing parts as cleared -- so a 7 and an 8 must
         // not connect.
-        Assert.Equal(8, SyncProtocol.ProtocolVersion);
+        Assert.InRange(SyncProtocol.ProtocolVersion, 8, int.MaxValue);
+        Assert.Equal(8, SyncProtocol.MinimumProtocolVersion);
+    }
+
+    [Fact]
+    public void Stichwoerter_raise_the_protocol_but_not_the_floor()
+    {
+        // 9 adds keywords to the Stammdaten payload (#704). A peer at 8 skips the key and offers no
+        // Stichwort suggestions, so it stays joinable.
+        Assert.Equal(9, SyncProtocol.ProtocolVersion);
         Assert.Equal(8, SyncProtocol.MinimumProtocolVersion);
     }
 }

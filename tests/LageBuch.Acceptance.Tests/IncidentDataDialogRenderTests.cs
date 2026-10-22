@@ -46,7 +46,7 @@ public class IncidentDataDialogRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("B3P", Find<TextBox>(window, "IncidentDataKeywordBox").Text);
+        Assert.Equal("B3P", Find<AutoCompleteBox>(window, "IncidentDataKeywordBox").Text);
         Assert.Equal("B 1.2 260715 123", Find<TextBox>(window, "IncidentDataNumberBox").Text);
         Assert.Equal("Hauptstr.", Find<TextBox>(window, "IncidentDataStreetBox").Text);
         Assert.Equal("Puch", Find<TextBox>(window, "IncidentDataDistrictBox").Text);
@@ -69,7 +69,7 @@ public class IncidentDataDialogRenderTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Same(Find<TextBox>(window, "IncidentDataKeywordBox"), TopLevel.GetTopLevel(window)!.FocusManager!.GetFocusedElement());
+        window.AssertFocused(Find<AutoCompleteBox>(window, "IncidentDataKeywordBox"));
     }
 
     [AvaloniaFact]
@@ -144,5 +144,35 @@ public class IncidentDataDialogRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, name));
+    }
+
+    // #704: the Stichwörter from the Stammdaten are offered in the STICHWORT field, and picking one
+    // with Enter takes the suggestion without saving the dialog past the operator.
+    [AvaloniaFact]
+    public void Enter_on_a_stichwort_suggestion_picks_it_and_a_second_enter_saves()
+    {
+        var closed = 0;
+        var session = Session();
+        var dialogVm = new IncidentDataDialogViewModel(session, () => { }, ["B3 Person", "THL 1"]);
+        dialogVm.Closed += (_, _) => closed++;
+        var window = new Window { Content = new IncidentDataDialogView { DataContext = dialogVm }, Width = 560, Height = 480 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var keyword = Find<AutoCompleteBox>(window, "IncidentDataKeywordBox");
+        keyword.Focus();
+        keyword.Text = string.Empty;
+        keyword.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        window.Press(PhysicalKey.ArrowDown); // onto "B3 Person"
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Equal(0, closed);
+        Assert.Equal("B3 Person", dialogVm.Keyword);
+
+        window.Press(PhysicalKey.Enter);
+
+        Assert.Equal(1, closed);
+        Assert.Equal("B3 Person", session.Incident.Keyword);
     }
 }

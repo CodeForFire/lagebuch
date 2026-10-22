@@ -16,6 +16,7 @@ public class MasterDataJsonTests
             {
               "roles": ["EL", "ZF"],
               "unitStatus": ["Alarmiert"],
+              "keywords": ["B3 Person", "THL 1"],
               "truppTypes": [{ "name": "Angriffstrupp", "memberCount": 2, "maxDurationMinutes": 30 }],
               "checklistTemplateAufbau": [{ "text": "Schritt 1", "mandatory": true }],
               "checklistTemplateAbbau": [{ "text": "Abbauschritt", "mandatory": false }],
@@ -26,6 +27,7 @@ public class MasterDataJsonTests
 
         Assert.Equal(new[] { new Role("EL"), new Role("ZF") }, set.Roles);
         Assert.Equal(new[] { "Alarmiert" }, set.UnitStatus);
+        Assert.Equal(new[] { "B3 Person", "THL 1" }, set.Keywords);
         Assert.Equal(new TruppType("Angriffstrupp", 2, 30), Assert.Single(set.TruppTypes));
         Assert.Equal(new ChecklistTemplateItem("Schritt 1", true), Assert.Single(set.ChecklistTemplates[0].Items));
         Assert.Equal(new ChecklistTemplateItem("Abbauschritt", false), Assert.Single(set.ChecklistTemplates[1].Items));
@@ -64,6 +66,7 @@ public class MasterDataJsonTests
         var set = Parse("""{ "roles": ["EL"] }""");
         Assert.Equal(new[] { new Role("EL") }, set.Roles);
         Assert.Empty(set.UnitStatus);
+        Assert.Empty(set.Keywords);
         Assert.Empty(set.Links);
         Assert.Empty(set.Personnel);
     }
@@ -97,6 +100,7 @@ public class MasterDataJsonTests
         {
             Roles = new[] { new Role("EL"), new Role("ZF") },
             UnitStatus = new[] { "Alarmiert", "Im Einsatz" },
+            Keywords = new[] { "B3 Person", "THL Öl" },
             Links = new[] { new Link("Ä ö ü Dienst", "https://example.org/ä"), new Link("ERICard", "https://example.org/ericard", "Gefahrgut") },
 
             // relaxed escaping must survive the round trip
@@ -114,6 +118,7 @@ public class MasterDataJsonTests
 
         Assert.Equal(original.Roles, reparsed.Roles);
         Assert.Equal(original.UnitStatus, reparsed.UnitStatus);
+        Assert.Equal(original.Keywords, reparsed.Keywords);
         Assert.Equal(original.ChecklistTemplates[0].Items, reparsed.ChecklistTemplates[0].Items);
         Assert.Equal(original.ChecklistTemplates[1].Items, reparsed.ChecklistTemplates[1].Items);
         Assert.Equal(original.Links, reparsed.Links);
@@ -544,6 +549,7 @@ public class MasterDataJsonTests
         Assert.False((MasterDataSet.Empty with { Roles = new[] { new Role("EL") } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Personnel = new[] { new Person("X", "Y", null, null, null) } }).IsEmpty);
         Assert.False((MasterDataSet.Empty with { Links = new[] { new Link("N", "U") } }).IsEmpty);
+        Assert.False((MasterDataSet.Empty with { Keywords = new[] { "B3 Person" } }).IsEmpty);
     }
 
     [Fact]
