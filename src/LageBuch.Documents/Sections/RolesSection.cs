@@ -68,7 +68,7 @@ public static class RolesSection
                 {
                     var label = role.Section is { } section ? $"{role.Label} · {section}" : role.Label;
                     var line = depth == 0 ? label : $"– {label}";
-                    column.Item().PaddingLeft(14 * depth).Text(line);
+                    column.Item().PaddingLeft(14f * depth).Text(line);
                 }
             }
         });
