@@ -249,6 +249,7 @@ public class SnapshotRoundTripTests
                 new CommandNodeDto(nord.Id, (CommandNodeKind)99, "Nord", null, null, null, null, null, null, null),
                 new CommandNodeDto(self, CommandNodeKind.Unterabschnitt, "Selbst", self, null, null, null, null, null, null),
                 new CommandNodeDto(withParent, CommandNodeKind.Abschnitt, "Mit Eltern", nord.Id, null, null, null, null, null, null),
+                new CommandNodeDto(nord.Id, CommandNodeKind.Abschnitt, "Doppelt", null, null, null, null, null, null, null),
             ],
         };
 
@@ -261,6 +262,8 @@ public class SnapshotRoundTripTests
         Assert.Null(r.FindCommandNode(self)?.ParentId);
         Assert.Equal(CommandNodeKind.Abschnitt, r.FindCommandNode(withParent)?.Kind);
         Assert.Null(r.FindCommandNode(withParent)?.ParentId);
+        Assert.Equal(3, r.CommandNodes.Count);
+        Assert.Equal("Nord", r.FindCommandNode(nord.Id)?.Name);
     }
 
     [Fact]

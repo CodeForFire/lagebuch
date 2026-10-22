@@ -592,4 +592,64 @@ public class CommandNodeAggregateTests
         Assert.Equal(abschnitt, incident.FindCommandNode(good)?.ParentId);
         Assert.Equal(CommandNodeKind.Unterabschnitt, incident.FindCommandNode(good)?.Kind);
     }
+
+    [Fact]
+    public void Same_named_unterabschnitte_under_different_abschnitte_do_not_share_a_role_holder()
+    {
+        var (incident, clock, op) = NewIncident();
+        var one = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var two = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Abschnitt 2");
+        var nordOne = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord", one.Id);
+        var nordTwo = incident.AddCommandNode(clock, op, CommandNodeKind.Unterabschnitt, "Nord", two.Id);
+        var holder = incident.AssignRole(clock, op, "UAL", "Huber", section: "Nord", nodeId: nordOne.Id);
+
+        Assert.Same(holder, incident.FindRunningRoleHolder("UAL", "Nord", nordOne.Id));
+        Assert.Null(incident.FindRunningRoleHolder("UAL", "Nord", nordTwo.Id));
+    }
+
+    [Fact]
+    public void A_node_keyed_lookup_ignores_the_section_text_of_an_assignment_in_another_node_or_none()
+    {
+        var (incident, clock, op) = NewIncident();
+        var nord = incident.AddCommandNode(clock, op, CommandNodeKind.Abschnitt, "Nord");
+        incident.AssignRole(clock, op, "EL", "Typed", section: "Nord");
+
+        Assert.Null(incident.FindRunningRoleHolder("EL", "Nord", nord.Id));
+        Assert.NotNull(incident.FindRunningRoleHolder("EL", "Nord", null));
+    }
+
+    [Fact]
+    public void Rehydrating_two_nodes_with_one_id_keeps_the_first()
+    {
+        var id = Guid.NewGuid();
+        var first = CommandNode.Rehydrate(id, CommandNodeKind.Abschnitt, "Nord", null, null, null, null, null, null, null);
+        var second = CommandNode.Rehydrate(id, CommandNodeKind.Abschnitt, "Süd", null, null, null, null, null, null, null);
+
+        var incident = Incident.Rehydrate(
+            Guid.NewGuid(),
+            T0,
+            IncidentState.Open,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            Array.Empty<ChecklistList>(),
+            Array.Empty<EtbEntry>(),
+            Array.Empty<RoleAssignment>(),
+            Array.Empty<ForceUnit>(),
+            Array.Empty<Atemschutz.AtemschutzTrupp>(),
+            Array.Empty<AuditEvent>(),
+            Array.Empty<Time.IncidentTimerState>(),
+            Array.Empty<Files.IncidentFile>(),
+            Array.Empty<Tasks.IncidentTask>(),
+            Array.Empty<CoMeasurement.Building>(),
+            Array.Empty<CoMeasurement.Dwelling>(),
+            Array.Empty<Involved.InvolvedParty>(),
+            commandNodes: new[] { first, second });
+
+        Assert.Equal("Nord", Assert.Single(incident.CommandNodes).Name);
+    }
 }

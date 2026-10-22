@@ -48,6 +48,25 @@ public class ForcesSectionTests
     }
 
     [Fact]
+    public void An_unterabschnitt_is_printed_with_its_abschnitt_so_same_named_ones_stay_apart()
+    {
+        var incident = Incident.Start(Clock, Op);
+        var one = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 1");
+        var two = incident.AddCommandNode(Clock, Op, CommandNodeKind.Abschnitt, "Abschnitt 2");
+        var nordOne = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Nord", one.Id);
+        var nordTwo = incident.AddCommandNode(Clock, Op, CommandNodeKind.Unterabschnitt, "Nord", two.Id);
+        var a = incident.AddForceUnit(Clock, Op, "Emmering", 6, callSign: "1/40");
+        var b = incident.AddForceUnit(Clock, Op, "Aich", 6, callSign: "2/10");
+        incident.MoveForceUnit(Clock, Op, a.Id, nordOne.Id);
+        incident.MoveForceUnit(Clock, Op, b.Id, nordTwo.Id);
+
+        var lines = PdfText.LinesOf(incident, Started, IncidentPdfSections.Forces);
+
+        Assert.Contains("Emmering 1/40 Abschnitt 1 / Nord 0/0/6/6 0 — —", lines);
+        Assert.Contains("Aich 2/10 Abschnitt 2 / Nord 0/0/6/6 0 — —", lines);
+    }
+
+    [Fact]
     public void A_dissolved_abschnitt_still_names_the_unit_placed_in_it()
     {
         var started = Incident.Start(Clock, Op);

@@ -452,7 +452,7 @@ public sealed record Vehicle(
     public bool HasEmail => !string.IsNullOrWhiteSpace(Email);
 }
 
-/// <summary>Whether a Funkgruppe is a Truppmittel-Funk (TMO) or a Direktmodus group (DMO).</summary>
+/// <summary>TMO: Netzbetrieb (Trunked Mode Operation); DMO: Direktbetrieb (Direct Mode Operation).</summary>
 public enum TalkGroupKind
 {
     Tmo,
