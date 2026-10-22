@@ -1,7 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LageBuch.App.Shared.Views;
@@ -144,6 +147,45 @@ public class IncidentDataDialogRenderTests
         Directory.CreateDirectory(dir);
         using var frame = window.CaptureRenderedFrame()!;
         frame.SavePng(Path.Join(dir, name));
+    }
+
+    // #704: opening STICHWORT lists the Stammdaten's Stichwörter. The list is a popup, a TopLevel
+    // of its own that the window's frame does not contain, so the PR screenshot draws the popup's
+    // frame over the window's at the popup's offset.
+    [AvaloniaFact]
+    public void Opening_the_stichwort_field_lists_the_stammdaten_stichwoerter()
+    {
+        var dialogVm = new IncidentDataDialogViewModel(Session(), () => { }, ["B2", "B3", "B3 Person", "THL 1"]);
+        var window = new Window { Content = new IncidentDataDialogView { DataContext = dialogVm }, Width = 560, Height = 480 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var keyword = Find<AutoCompleteBox>(window, "IncidentDataKeywordBox");
+        keyword.Focus();
+        keyword.Text = string.Empty;
+        keyword.IsDropDownOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var popup = keyword.GetVisualDescendants().OfType<Popup>().Single();
+        var list = popup.Child!.GetVisualDescendants().OfType<ListBox>().Single();
+        Assert.True(popup.IsOpen);
+        Assert.Equal(["B2", "B3", "B3 Person", "THL 1"], list.Items.Cast<string>());
+
+        var popupRoot = TopLevel.GetTopLevel(popup.Child)!;
+        Dispatcher.UIThread.RunJobs();
+        using var windowFrame = window.CaptureRenderedFrame()!;
+        using var popupFrame = popupRoot.CaptureRenderedFrame()!;
+        var offset = popupRoot.PointToScreen(default) - window.PointToScreen(default);
+        using var composite = new RenderTargetBitmap(windowFrame.PixelSize);
+        using (var context = composite.CreateDrawingContext())
+        {
+            context.DrawImage(windowFrame, new Rect(windowFrame.Size));
+            context.DrawImage(popupFrame, new Rect(new Point(offset.X, offset.Y), popupFrame.Size));
+        }
+
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        composite.Save(Path.Join(dir, "incident-data-dialog-stichwoerter.png"), PngBitmapEncoderOptions.Default);
     }
 
     // #704: the Stichwörter from the Stammdaten are offered in the STICHWORT field, and picking one
