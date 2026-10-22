@@ -342,7 +342,7 @@ public sealed record Person(
 /// </summary>
 public sealed record Vehicle(string Wache, string CallSign, int Seats, bool HasZugfuehrer = false, bool IsOwn = true);
 
-/// <summary>Whether a Funkgruppe is a Truppmittel-Funk (TMO) or a Direktmodus group (DMO).</summary>
+/// <summary>TMO: Netzbetrieb (Trunked Mode Operation); DMO: Direktbetrieb (Direct Mode Operation).</summary>
 public enum TalkGroupKind
 {
     Tmo,

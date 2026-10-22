@@ -1088,6 +1088,18 @@ public sealed class Incident
     }
 
     /// <summary>
+    /// <see cref="FindRunningRoleHolder(string, string?)"/>, keyed on the Abschnitt <em>node</em> when
+    /// one is given. Names are only unique among siblings, so two Unterabschnitte called "Nord" under
+    /// different Abschnitte carry the same Section text; matching on it would hand one's holder to
+    /// the other. With a <paramref name="nodeId"/> only running assignments placed in that node
+    /// match and the Section text is ignored; with null this is the Section lookup unchanged.
+    /// </summary>
+    public RoleAssignment? FindRunningRoleHolder(string role, string? section, Guid? nodeId) =>
+        nodeId is { } id
+            ? FirstRunningRoleHolder(role, _ => true, assignment => assignment.NodeId == id)
+            : FindRunningRoleHolder(role, section);
+
+    /// <summary>
     /// The running assignment holding <paramref name="role"/> in <em>any</em> Abschnitt, or null when
     /// nobody holds it. This is the question a Funktion marked unique once per <c>Einsatz</c> asks:
     /// one Einsatzleiter for the whole Einsatz, whatever the Abschnitt either of them is typed into.
@@ -1104,7 +1116,8 @@ public sealed class Incident
 
     // One loop for both public forms, so liveness, the role comparison and the first-match rule
     // cannot drift apart between them; only the Abschnitt test differs.
-    private RoleAssignment? FirstRunningRoleHolder(string role, Func<string?, bool> sectionMatches)
+    private RoleAssignment? FirstRunningRoleHolder(
+        string role, Func<string?, bool> sectionMatches, Func<RoleAssignment, bool>? also = null)
     {
         var wanted = role?.Trim();
         if (string.IsNullOrEmpty(wanted))
@@ -1116,7 +1129,8 @@ public sealed class Incident
         {
             if (assignment.To is null
                 && string.Equals(assignment.Role?.Trim(), wanted, StringComparison.OrdinalIgnoreCase)
-                && sectionMatches(assignment.Section))
+                && sectionMatches(assignment.Section)
+                && (also is null || also(assignment)))
             {
                 return assignment;
             }

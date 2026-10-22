@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LageBuch.AppLogic.Services;
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using LageBuch.Domain.Time;
 using LageBuch.Persistence.MasterData;
 
@@ -484,7 +485,8 @@ public sealed partial class RolesViewModel : ObservableObject, INarrowAware, IEn
             from: _clock.Now,
             to: null,
             section: NewSection,
-            phone: NewPhone); // Changed → RefreshRoles renders the row
+            phone: NewPhone,
+            slot: StammdatenCatalogue.Find(NewRole, _roles)?.Slot ?? RoleSlot.None); // Changed → RefreshRoles renders the row
         NewRole = string.Empty;
         NewPersonName = string.Empty;
         NewSection = null;

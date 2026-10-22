@@ -760,7 +760,7 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                       <TextBlock Width="110" Text="NUMMER" Classes="overline" FontSize="10" />
                       <TextBlock Width="100" Text="ART" Classes="overline" FontSize="10"
-                                 ToolTip.Tip="Truppmittel-Funk (TMO) oder Direktmodus (DMO)" />
+                                 ToolTip.Tip="Netzbetrieb (TMO) oder Direktbetrieb (DMO)" />
                     </StackPanel>
                     <TextBlock Grid.Column="2" Text="NOTIZ" Classes="overline" FontSize="10" />
                   </Grid>
@@ -773,27 +773,27 @@
                             <TextBox Grid.Column="0" Classes="row-name" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="FW_MUSTER" MaxLength="200" AutomationProperties.Name="Name der Funkgruppe" />
                             <WrapPanel Classes="row-extras">
-                            <StackPanel Width="110">
-                            <TextBlock Classes="overline narrow-label" FontSize="10" Text="NUMMER" />
-                            <TextBox Margin="0,0,6,0" Text="{Binding Number}"
-                                     AutomationProperties.Name="Nummer der Funkgruppe" />
-                            </StackPanel>
-                            <StackPanel Width="100">
-                            <TextBlock Classes="overline narrow-label" FontSize="10" Text="ART" />
-                            <ComboBox Margin="0,0,6,0" HorizontalAlignment="Stretch" ItemsSource="{Binding KindOptions}"
-                                      SelectedValue="{Binding Kind}"
-                                      SelectedValueBinding="{Binding Value}"
-                                      AutomationProperties.Name="Art der Funkgruppe">
-                              <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:TalkGroupKindOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
-                              </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            </StackPanel>
+                              <StackPanel Width="110">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="NUMMER" />
+                                <TextBox Margin="0,0,6,0" Text="{Binding Number}"
+                                         AutomationProperties.Name="Nummer der Funkgruppe" />
+                              </StackPanel>
+                              <StackPanel Width="100">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="ART" />
+                                <ComboBox Margin="0,0,6,0" HorizontalAlignment="Stretch" ItemsSource="{Binding KindOptions}"
+                                          SelectedValue="{Binding Kind}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          AutomationProperties.Name="Art der Funkgruppe">
+                                  <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TalkGroupKindOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                                  </ComboBox.ItemTemplate>
+                                </ComboBox>
+                              </StackPanel>
                             </WrapPanel>
                             <StackPanel Classes="row-note">
-                            <TextBlock Classes="overline narrow-label" FontSize="10" Text="NOTIZ" />
-                            <TextBox Margin="0,0,6,0" Text="{Binding Note}"
-                                     AutomationProperties.Name="Notiz zur Funkgruppe" />
+                              <TextBlock Classes="overline narrow-label" FontSize="10" Text="NOTIZ" />
+                              <TextBox Margin="0,0,6,0" Text="{Binding Note}"
+                                       AutomationProperties.Name="Notiz zur Funkgruppe" />
                             </StackPanel>
                             <Button Grid.Column="3" Classes="icon-btn" Margin="4,0,0,0" ToolTip.Tip="Entfernen"
                                     AutomationProperties.Name="Entfernen"
@@ -884,34 +884,34 @@
                             <TextBox Grid.Column="0" Margin="0,0,6,0" Text="{Binding Name}"
                                      PlaceholderText="Einsatzleiter" AutomationProperties.Name="Name der Funktion" />
                             <WrapPanel Classes="row-extras">
-                            <StackPanel Width="180">
-                            <TextBlock Classes="overline narrow-label" FontSize="10" Text="EINDEUTIGKEIT" />
-                            <!-- Options rather than bare ComboBoxItems: an enum cannot be matched
-                                 against a ComboBoxItem's content text, so SelectedItem would have
-                                 nothing to select and the picker would render blank. The item
-                                 template carries the German label, the way the Aufgaben dialog's
-                                 Wichtigkeit picker does. -->
-                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding UniquenessOptions}"
-                                      SelectedValue="{Binding Uniqueness}"
-                                      SelectedValueBinding="{Binding Value}"
-                                      AutomationProperties.Name="Eindeutigkeit">
-                              <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:UniquenessOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
-                              </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            </StackPanel>
-                            <!-- Same shape as the Eindeutigkeit picker: options carry the label. -->
-                            <StackPanel Classes="slot-cell" Width="200">
-                            <TextBlock Classes="overline narrow-label" FontSize="10" Text="AUF DER FÜHRUNGSTAFEL" />
-                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SlotOptions}"
-                                      SelectedValue="{Binding Slot}"
-                                      SelectedValueBinding="{Binding Value}"
-                                      AutomationProperties.Name="Auf der Führungstafel">
-                              <ComboBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:SlotOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
-                              </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            </StackPanel>
+                              <StackPanel Width="180">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="EINDEUTIGKEIT" />
+                                <!-- Options rather than bare ComboBoxItems: an enum cannot be matched
+                                     against a ComboBoxItem's content text, so SelectedItem would have
+                                     nothing to select and the picker would render blank. The item
+                                     template carries the German label, the way the Aufgaben dialog's
+                                     Wichtigkeit picker does. -->
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding UniquenessOptions}"
+                                          SelectedValue="{Binding Uniqueness}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          AutomationProperties.Name="Eindeutigkeit">
+                                  <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:UniquenessOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                                  </ComboBox.ItemTemplate>
+                                </ComboBox>
+                              </StackPanel>
+                              <!-- Same shape as the Eindeutigkeit picker: options carry the label. -->
+                              <StackPanel Classes="slot-cell" Width="200">
+                                <TextBlock Classes="overline narrow-label" FontSize="10" Text="AUF DER FÜHRUNGSTAFEL" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SlotOptions}"
+                                          SelectedValue="{Binding Slot}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          AutomationProperties.Name="Auf der Führungstafel">
+                                  <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SlotOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                                  </ComboBox.ItemTemplate>
+                                </ComboBox>
+                              </StackPanel>
                             </WrapPanel>
                             <!-- ReflectionBinding: see the Fahrzeuge template for why a compiled
                                  $parent path cannot resolve here. -->

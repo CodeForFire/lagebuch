@@ -14,7 +14,8 @@ internal static class CommandNodeRepair
     /// </summary>
     internal static List<CommandNode> Resolve(IEnumerable<CommandNode> nodes)
     {
-        var list = nodes.Select(n => Enum.IsDefined(n.Kind) ? n : Rebuild(n, CommandNodeKind.Abschnitt, n.ParentId)).ToList();
+        // First wins: a hostile snapshot can repeat an id, which the file's primary key cannot.
+        var list = nodes.DistinctBy(n => n.Id).Select(n => Enum.IsDefined(n.Kind) ? n : Rebuild(n, CommandNodeKind.Abschnitt, n.ParentId)).ToList();
         var abschnittIds = list.Where(n => n.Kind == CommandNodeKind.Abschnitt).Select(n => n.Id).ToHashSet();
 
         return list.ConvertAll(n =>

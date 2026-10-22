@@ -1,5 +1,6 @@
 using System.Globalization;
 using LageBuch.Domain;
+using LageBuch.Domain.Leadership;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -25,7 +26,7 @@ public static class ForcesSection
                     {
                         columns.RelativeColumn(2); // LageBuch
                         columns.RelativeColumn(2); // Funkrufname
-                        columns.RelativeColumn(2); // Abschnitt
+                        columns.RelativeColumn(3); // Abschnitt (an Unterabschnitt prints "Abschnitt / Name")
                         columns.ConstantColumn(55); // Stärke
                         columns.ConstantColumn(45); // AGT
                         columns.RelativeColumn(2); // Status
@@ -47,7 +48,7 @@ public static class ForcesSection
 
                         // The record is the record: a dissolved Abschnitt still names its units, and a
                         // node id this file does not hold (a foreign file) reads like an unplaced unit.
-                        var abschnitt = unit.NodeId is { } nodeId ? incident.FindCommandNode(nodeId)?.Name : null;
+                        var abschnitt = unit.NodeId is { } nodeId ? NodeLabel(incident, incident.FindCommandNode(nodeId)) : null;
                         table.Cell().Element(Cells.Body).Text(Formatting.OrDash(abschnitt));
 
                         // Stärke im 1/1/2-Format: Führungskräfte/Mannschaft/Gesamt (#76).
@@ -75,5 +76,21 @@ public static class ForcesSection
                 t.Span(incident.TotalScba.ToString(CultureInfo.InvariantCulture));
             });
         });
+    }
+
+    // Names are only unique among siblings, so an Unterabschnitt prints with its Abschnitt; a
+    // missing parent (a foreign file) leaves the bare name.
+    private static string? NodeLabel(Incident incident, CommandNode? node)
+    {
+        if (node is null)
+        {
+            return null;
+        }
+
+        return node.Kind == CommandNodeKind.Unterabschnitt
+            && node.ParentId is { } parentId
+            && incident.FindCommandNode(parentId) is { } parent
+                ? $"{parent.Name} / {node.Name}"
+                : node.Name;
     }
 }

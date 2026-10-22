@@ -5,7 +5,7 @@
     { "name": "ZF", "uniqueness": "multiple" },
     { "name": "GF", "uniqueness": "multiple" },
     { "name": "Melder", "uniqueness": "multiple", "slot": "melder" },
-    { "name": "Abschnittsleiter", "uniqueness": "uniquePerSection" }
+    { "name": "Abschnittsleiter", "uniqueness": "uniquePerSection", "slot": "leiter" }
   ],
   "unitStatus": ["Alarmiert", "Auf Anfahrt", "Bereitstellungsraum", "Im Einsatz"],
   "keywords": ["B2", "B3", "B3 Person", "THL 1", "THL 2 VU eingeklemmt", "ABC 1"],

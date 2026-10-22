@@ -254,7 +254,7 @@ public class DemoIncidentTests : IDisposable
                 new Role("ZF", RoleUniqueness.Multiple),
                 new Role("GF", RoleUniqueness.Multiple),
                 new Role("Melder", RoleUniqueness.Multiple, RoleSlot.Melder),
-                new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection),
+                new Role("Abschnittsleiter", RoleUniqueness.UniquePerSection, RoleSlot.Leiter),
             },
             set.Roles);
 
