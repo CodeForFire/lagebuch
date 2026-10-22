@@ -813,7 +813,7 @@ public class MasterDataJsonTests
         {
             TalkGroups = new[]
             {
-                new TalkGroup("FW_MUSTER 1000", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
                 new TalkGroup("301_F", null, TalkGroupKind.Dmo),
             },
         };
@@ -821,7 +821,7 @@ public class MasterDataJsonTests
         var reparsed = Parse(MasterDataJson.Serialize(original));
 
         Assert.Equal(original.TalkGroups, reparsed.TalkGroups);
-        Assert.Equal("TMO FW_MUSTER 1000 1000", reparsed.TalkGroups[0].Display);
+        Assert.Equal("TMO FW_MUSTER 1000", reparsed.TalkGroups[0].Display);
         Assert.Equal("DMO 301_F", reparsed.TalkGroups[1].Display);
     }
 

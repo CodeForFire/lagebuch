@@ -74,9 +74,9 @@
     { "wache": "FF Musterdorf", "callSign": "Florian Musterdorf 40/1", "seats": 9, "hasZugfuehrer": false, "isOwn": false }
   ],
   "talkGroups": [
-    { "name": "FW_MUSTER 1000", "number": "1000", "kind": "tmo", "note": "Einsatzstelle" },
-    { "name": "FW_MUSTER 1001", "number": null, "kind": "tmo", "note": null },
-    { "name": "301_F", "number": "301", "kind": "dmo", "note": "Atemschutzüberwachung" },
+    { "name": "FW_MUSTER", "number": "1000", "kind": "tmo", "note": "Einsatzstelle" },
+    { "name": "RD_MUSTER", "number": "1001", "kind": "tmo", "note": null },
+    { "name": "301_F", "number": null, "kind": "dmo", "note": "Atemschutzüberwachung" },
     { "name": "302_F", "number": null, "kind": "dmo", "note": null }
   ],
   "personnel": [

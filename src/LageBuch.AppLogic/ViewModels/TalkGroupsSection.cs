@@ -6,7 +6,7 @@ namespace LageBuch.AppLogic.ViewModels;
 
 /// <summary>
 /// Editor for the Funkgruppen Stammdaten: rows of name, number, TMO/DMO and a note. A row without
-/// a name is dropped on save; the first spelling wins a case-insensitive duplicate of kind and name.
+/// a name is dropped on save; the first spelling wins a case-insensitive duplicate of kind, name and number.
 /// </summary>
 public sealed partial class TalkGroupsSection : EditorSection
 {
@@ -60,16 +60,24 @@ public sealed partial class TalkGroupsSection : EditorSection
     public IReadOnlyList<TalkGroup> ToValues()
     {
         var result = new List<TalkGroup>();
-        var seen = new HashSet<(TalkGroupKind, string)>();
+        var seen = new HashSet<(TalkGroupKind, string, string)>();
         foreach (var row in Rows)
         {
             var name = row.Name?.Trim() ?? string.Empty;
-            if (name.Length == 0 || !seen.Add((row.Kind, name.ToUpperInvariant())))
+            if (name.Length > TalkGroup.MaxNameLength)
+            {
+                // The TextBox caps typing; this guards a pasted or programmatic value so a saved
+                // file always passes the import's cap.
+                name = name[..TalkGroup.MaxNameLength].TrimEnd();
+            }
+
+            var number = Blank(row.Number);
+            if (name.Length == 0 || !seen.Add((row.Kind, name.ToUpperInvariant(), number?.ToUpperInvariant() ?? string.Empty)))
             {
                 continue;
             }
 
-            result.Add(new TalkGroup(name, Blank(row.Number), row.Kind, Blank(row.Note)));
+            result.Add(new TalkGroup(name, number, row.Kind, Blank(row.Note)));
         }
 
         return result;

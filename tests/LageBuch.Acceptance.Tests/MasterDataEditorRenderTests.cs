@@ -31,9 +31,9 @@ public class MasterDataEditorRenderTests
             },
             TalkGroups = new[]
             {
-                new TalkGroup("FW_MUSTER 1000", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
-                new TalkGroup("FW_MUSTER 1001", null, TalkGroupKind.Tmo),
-                new TalkGroup("301_F", "301", TalkGroupKind.Dmo, "Atemschutzüberwachung"),
+                new TalkGroup("FW_MUSTER", "1000", TalkGroupKind.Tmo, "Einsatzstelle"),
+                new TalkGroup("RD_MUSTER", "1001", TalkGroupKind.Tmo),
+                new TalkGroup("301_F", null, TalkGroupKind.Dmo, "Atemschutzüberwachung"),
                 new TalkGroup("302_F", null, TalkGroupKind.Dmo),
             },
             UnitStatus = new[] { "Alarmiert", "Auf Anfahrt", "Im Einsatz" },
@@ -374,6 +374,38 @@ public class MasterDataEditorRenderTests
         Assert.Contains("mehrfach", labels);
     }
 
+    // Phone width (the app's narrow breakpoint is 640): the name field of a Funktion or a
+    // Funkgruppe must stay wide enough to read and type in.
+    [AvaloniaTheory]
+    [InlineData("Rollen", "stammdaten-rollen-narrow.png")]
+    [InlineData("Funkgruppen", "stammdaten-funkgruppen-narrow.png")]
+    public void Rollen_and_Funkgruppen_keep_a_usable_name_field_at_phone_width(string title, string file)
+    {
+        var vm = new MasterDataEditorViewModel(new SampleProvider(), new FakeDialogs(), new NoFiles());
+        vm.SelectedSection = vm.Sections.Single(s => s.Title == title);
+        var view = new MasterDataEditorView { DataContext = vm };
+        var window = new Window { Content = view, Width = 400, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        // On a phone picking a category steps into it; the selection above ran before the view
+        // measured itself as narrow, so step in explicitly.
+        Assert.True(vm.IsNarrow);
+        vm.IsDetailOpen = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var dir = Environment.GetEnvironmentVariable("LAGEBUCH_SHOT_DIR") ?? Path.Join(Path.GetTempPath(), "lagebuch-shots");
+        Directory.CreateDirectory(dir);
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            frame.SavePng(Path.Join(dir, file));
+        }
+
+        var name = view.GetVisualDescendants().OfType<TextBox>()
+            .First(t => t.GetVisualAncestors().All(a => a is not ComboBox));
+        Assert.True(name.Bounds.Width >= 90, $"{title}: the name field is only {name.Bounds.Width:F0}px wide at 400px");
+    }
+
     private static List<ComboBox> UniquenessPickers(Control view) =>
         view.GetVisualDescendants().OfType<ComboBox>()
             .Where(c => AutomationProperties.GetName(c) == "Eindeutigkeit")
@@ -400,7 +432,7 @@ public class MasterDataEditorRenderTests
             .Where(t => t.GetVisualAncestors().All(a => a is not ComboBox))
             .Select(t => t.Text)
             .ToList();
-        Assert.Contains("FW_MUSTER 1000", texts);
+        Assert.Contains("FW_MUSTER", texts);
         Assert.Contains("301_F", texts);
         Assert.Contains("Atemschutzüberwachung", texts);
 
